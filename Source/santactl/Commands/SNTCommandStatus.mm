@@ -117,6 +117,12 @@ REGISTER_COMMAND_NAME(@"status")
     staticRuleCount = count;
   }];
 
+  // Rules hash
+  __block NSString *rulesHash;
+  [rop databaseRulesHash:^(NSString *hash) {
+    rulesHash = hash;
+  }];
+
   // Sync status
   __block NSDate *fullSyncLastSuccess;
   [rop fullSyncLastSuccess:^(NSDate *date) {
@@ -253,6 +259,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"push_notifications" : pushNotifications,
         @"bundle_scanning" : @(enableBundles),
         @"events_pending_upload" : @(eventCount),
+        @"rules_hash" : rulesHash ?: @"null",
       };
     } else {
       stats[@"sync"] = @{
@@ -342,6 +349,7 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Push Notifications", [pushNotifications UTF8String]);
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
       printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
+      printf("  %-25s | %s\n", "Rules Hash", [rulesHash UTF8String]);
     }
 
     printf(">>> Metrics\n");

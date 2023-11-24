@@ -21,6 +21,7 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
+#include "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTRule.h"
@@ -607,6 +608,28 @@
 - (void)testConstantVersionIsUpdated {
   XCTAssertEqual([self.sut currentSupportedVersion], [self.sut currentVersion],
                  @"initialized database should update to the maximum supported version");
+}
+
+- (void)testHashOfHashes {
+  NSArray<SNTRule *> *rules = @[
+    [self _exampleCertRule],
+    [self _exampleBinaryRule],
+    [self _exampleTeamIDRule],
+    [self _exampleSigningIDRuleIsPlatform:NO],
+  ];
+  [self.sut addRules:rules ruleCleanup:SNTRuleCleanupAll error:nil];
+  XCTAssertEqualObjects([self.sut hashOfHashes], @"a6cb5171bbb8895820d61e395592b293");
+
+  // Add a transitive rule. The hash should not change.
+  SNTRule *transitiveRule = [self _exampleTransitiveRule];
+  [self.sut addRules:@[ transitiveRule ] ruleCleanup:SNTRuleCleanupNone error:nil];
+  XCTAssertEqualObjects([self.sut hashOfHashes], @"a6cb5171bbb8895820d61e395592b293");
+
+  // Add a remove rule. The hash should change.
+  SNTRule *removeRule = self._exampleBinaryRule;
+  removeRule.state = SNTRuleStateRemove;
+  [self.sut addRules:@[ removeRule ] ruleCleanup:SNTRuleCleanupNone error:nil];
+  XCTAssertEqualObjects([self.sut hashOfHashes], @"d4dd223bafbdda2c36bb0513dfabb38b");
 }
 
 @end

@@ -278,6 +278,23 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SNTXxhash",
+    hdrs = ["SNTXxhash.h"],
+    deps = [
+        "@xxhash",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTXxhashTest",
+    srcs = ["SNTXxhashTest.mm"],
+    deps = [
+        ":SNTXxhash",
+        ":TestUtils",
+    ],
+)
+
 santa_unit_test(
     name = "TelemetryEventMapTest",
     srcs = ["TelemetryEventMapTest.mm"],
@@ -552,7 +569,6 @@ santa_unit_test(
         ":SNTStoredFileAccessEvent",
     ],
 )
-
 
 santa_unit_test(
     name = "SNTStoredExecutionEventTest",

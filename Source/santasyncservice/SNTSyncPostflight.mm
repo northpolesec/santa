@@ -16,6 +16,7 @@
 #import "Source/santasyncservice/SNTSyncPostflight.h"
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
@@ -48,13 +49,16 @@ using santa::NSStringToUTF8String;
     case SNTSyncTypeCleanAll: req->set_sync_type(::pbv1::CLEAN_ALL); break;
   }
 
+  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
+  [rop databaseRulesHash:^(NSString *hash){
+      // req->set_rules_hash(NSStringToUTF8String(hash));
+  }];
+
   ::pbv1::PostflightResponse response;
   [self performRequest:[self requestWithMessage:req] intoMessage:&response timeout:30];
-
-  [[self.daemonConn synchronousRemoteObjectProxy]
-      updateSyncSettings:PostflightConfigBundle(self.syncState)
-                   reply:^{
-                   }];
+  [rop updateSyncSettings:PostflightConfigBundle(self.syncState)
+                    reply:^{
+                    }];
 
   return YES;
 }

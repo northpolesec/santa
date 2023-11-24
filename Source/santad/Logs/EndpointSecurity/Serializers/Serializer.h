@@ -27,12 +27,9 @@
 #include "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTXxhash.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #import "Source/santad/SNTDecisionCache.h"
-
-// Forward declaration of XXH3 types
-struct XXH3_state_s;
-typedef XXH3_state_s XXH3_state_t;
 
 @class SNTStoredExecutionEvent;
 
@@ -41,7 +38,7 @@ namespace santa {
 class Serializer {
  public:
   Serializer(SNTDecisionCache *decision_cache);
-  virtual ~Serializer();
+  virtual ~Serializer() = default;
 
   std::vector<uint8_t> SerializeMessage(std::unique_ptr<santa::EnrichedMessage> msg) {
     return std::visit([this](const auto &arg) { return this->SerializeMessageTemplate(arg); },
@@ -128,7 +125,7 @@ class Serializer {
   std::shared_ptr<std::string> machine_id_;
   // Used to ensure a reference sticks around while no vended copies exists
   std::shared_ptr<std::string> saved_machine_id_;
-  XXH3_state_t *common_hash_state_;
+  Xxhash common_hash_state_;
 };
 
 }  // namespace santa

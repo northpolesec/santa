@@ -216,6 +216,10 @@ double watchdogRAMPeak = 0;
   reply(rules, nil);
 }
 
+- (void)databaseRulesHash:(void (^)(NSString *hash))reply {
+  reply([[SNTDatabaseController ruleTable] hashOfHashes]);
+}
+
 #pragma mark Config Ops
 
 - (void)watchdogInfo:(void (^)(uint64_t, uint64_t, double, double))reply {
