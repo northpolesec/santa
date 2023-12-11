@@ -66,6 +66,9 @@ Additionally, please follow these guidelines:
 * Have C++ call into Rust, not the other way around.
 * Don't use cxx to return `Result` types across the FFI. (It might throw a C++
 exception.)
+* Run `cargo fix && cargo fmt` before submitting code for review. You may need to run the
+  nightly to support all options in `rustfmt.toml`: `rustup run nightly cargo
+  fmt`.
 
 ### Identifier Conventions
 All submissions related to the use of different identifiers should adhere to the following conventions.
@@ -76,6 +79,7 @@ All submissions related to the use of different identifiers should adhere to the
 | CDHash | lowercase | `2d1cff4b1080058e7e5913e5a3398bcd0199b6a4` |
 | TeamID | uppercase | `43AQ936H96` |
 | Signing ID | case insensitive | `EQHXZ8M8AV:com.google.Chrome` |
+  exception.)
 
 ### The small print
 Contributions made by corporations are covered by a different agreement than

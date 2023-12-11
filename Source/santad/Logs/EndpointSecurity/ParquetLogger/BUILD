@@ -17,8 +17,8 @@ rust_static_library(
 )
 
 rust_test(
-    name="parquet_logger_test",
-    crate=":parquet_logger",
+    name = "parquet_logger_test",
+    crate = ":parquet_logger",
 )
 
 cc_library(
