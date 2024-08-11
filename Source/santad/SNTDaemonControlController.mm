@@ -160,6 +160,18 @@ double watchdogRAMPeak = 0;
   reply([SNTConfigurator configurator].staticRules.count);
 }
 
+- (void) addStandaloneRule:(SNTRule *)rule reply:(void (^)(NSError *))reply {
+  NSError *error;
+
+  if (![[SNTConfigurator configurator] enableStandaloneMode]) {
+    reply(nil);
+  }
+  // only add rules if standalone mode is enabled
+
+  [[SNTDatabaseController ruleTable] addRules:@[rule] ruleCleanup:SNTRuleCleanupNone error: &error];
+  reply(error);
+}
+
 - (void)retrieveAllRules:(void (^)(NSArray<SNTRule *> *, NSError *))reply {
   SNTConfigurator *config = [SNTConfigurator configurator];
 

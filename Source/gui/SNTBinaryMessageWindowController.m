@@ -14,13 +14,19 @@
 
 #import "Source/gui/SNTBinaryMessageWindowController.h"
 
+#import <LocalAuthentication/LocalAuthentication.h>
 #import <MOLCertificate/MOLCertificate.h>
+#import <MOLXPCConnection/MOLXPCConnection.h>
 #import <SecurityInterface/SFCertificatePanel.h>
+#import <dispatch/dispatch.h>
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTLogging.h"
+#import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTXPCControlInterface.h"
 
 @interface SNTBinaryMessageWindowController ()
 ///  The custom message to display for this event
@@ -82,9 +88,17 @@
 - (void)loadWindow {
   [super loadWindow];
   NSURL *url = [SNTBlockMessage eventDetailURLForEvent:self.event customURL:self.customURL];
+  BOOL isStandalone = [[SNTConfigurator configurator] enableStandaloneMode];
 
-  if (!url) {
+  if (!url && !isStandalone) {
     [self.openEventButton removeFromSuperview];
+  } if (!isStandalone) {
+    [self.checkEventButton removeFromSuperview];
+  } else if (isStandalone) {
+    [self.openEventButton setTitle:@"Approve"];
+    // Require the button keyEquivalent set to be CMD + Return
+    [self.openEventButton setKeyEquivalent:@"\r"];                                   // Return Key
+    [self.openEventButton setKeyEquivalentModifierMask:NSEventModifierFlagCommand];  // Command Key
   } else if (self.customURL.length == 0) {
     // Set the button text only if a per-rule custom URL is not used. If a
     // custom URL is used, it is assumed that the `EventDetailText` config value
@@ -135,10 +149,91 @@
                                                showGroup:YES];
 }
 
+// When running in standalone mode, the user is prompted to approve the binary.
+- (void)approveBinaryForStandaloneMode {
+  LAContext *context;
+  NSError *err;
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  context = [[LAContext alloc] init];
+
+  if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&err]) {
+    // TODO: handle error
+    LOGE(@"Unable to process Touch ID error: %@", err);
+    return;
+  }
+
+  [context
+     evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+    localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]
+              reply:^(BOOL success, NSError *error) {
+                if (success) {
+                  SNTRuleType ruleType = SNTRuleTypeSigningID;
+                  NSString *ruleIdentifier = self.event.signingID;
+
+                  // Check here to see if the binary is validly signed if not
+                  // then use a hash rule instead of a signing ID
+                  if (self.event.signingChain.count == 0) {
+                    LOGD(@"No certificate chain found for %@", self.event.filePath);
+                    ruleType = SNTRuleTypeBinary;
+                    ruleIdentifier = self.event.fileSHA256;
+                  }
+
+                  // Add rule to allow binary same as santactl rule.
+                  SNTRule *newRule =
+                    [[SNTRule alloc] initWithIdentifier:ruleIdentifier
+                                                  state:SNTRuleStateAllow
+                                                   type:ruleType
+                                              customMsg:@"Approved by user"
+                                              timestamp:[[NSDate now] timeIntervalSince1970]];
+
+                  // TODO add bundle hash to a dictionary / database
+                  // table for auto-approval so the user isn't drowning
+                  // in dialogs
+                  dispatch_semaphore_t sema2 = dispatch_semaphore_create(0);
+
+                  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+                  daemonConn.invalidationHandler = ^{
+                    LOGE(@"Connection invalidated");
+                    dispatch_semaphore_signal(sema2);
+                  };
+
+                  [daemonConn resume];
+                  [[daemonConn remoteObjectProxy]
+                    addStandaloneRule:newRule reply:^(NSError *error) {
+                      if (error) {
+                        LOGE(@"Failed to modify rules standalone: %s",
+                             [error.localizedDescription UTF8String]);
+                        LOGE(@"Failure reason: %@", error.localizedFailureReason);
+                      }
+                      dispatch_semaphore_signal(sema2);
+                    }];
+                  dispatch_semaphore_wait(sema2, DISPATCH_TIME_FOREVER);
+                } else {
+                  LOGE(@"Authentication Error: %@", error);
+                }
+                dispatch_semaphore_signal(sema);
+              }];
+  dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+}
+
 - (IBAction)openEventDetails:(id)sender {
+  if ([[SNTConfigurator configurator] enableStandaloneMode]) {
+    [self closeWindow:sender];
+    [self approveBinaryForStandaloneMode];
+    return;
+  }
+
   NSURL *url = [SNTBlockMessage eventDetailURLForEvent:self.event customURL:self.customURL];
 
   [self closeWindow:sender];
+  [[NSWorkspace sharedWorkspace] openURL:url];
+}
+
+- (IBAction)checkEventDetails:(id)sender {
+  NSString *eventCheckURL = [NSString stringWithFormat:@"https://www.virustotal.com/gui/search/%@", self.event.fileSHA256];
+  NSURL *url = [[NSURL alloc] initWithString:eventCheckURL];
+
   [[NSWorkspace sharedWorkspace] openURL:url];
 }
 

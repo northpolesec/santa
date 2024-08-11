@@ -74,6 +74,7 @@ objc_library(
         "SecurityInterface",
         "SystemExtensions",
         "UserNotifications",
+        "LocalAuthentication",
     ],
     deps = [
         ":SNTAboutWindowView",
