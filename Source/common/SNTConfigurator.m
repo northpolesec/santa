@@ -93,6 +93,7 @@ static NSString *const kMachineIDPlistKeyKey = @"MachineIDKey";
 
 static NSString *const kEnableSilentModeKey = @"EnableSilentMode";
 static NSString *const kEnableSilentTTYModeKey = @"EnableSilentTTYMode";
+static NSString *const kEnableStandaloneMode = @"EnableStandaloneMode";
 static NSString *const kAboutTextKey = @"AboutText";
 static NSString *const kMoreInfoURLKey = @"MoreInfoURL";
 static NSString *const kEventDetailURLKey = @"EventDetailURL";
@@ -224,6 +225,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kEnableBadSignatureProtectionKey : number,
       kEnableSilentModeKey : number,
       kEnableSilentTTYModeKey : number,
+      kEnableStandaloneMode : number,
       kAboutTextKey : string,
       kMoreInfoURLKey : string,
       kEventDetailURLKey : string,
@@ -766,6 +768,11 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 
 - (BOOL)enableSilentTTYMode {
   NSNumber *number = self.configState[kEnableSilentTTYModeKey];
+  return number ? [number boolValue] : NO;
+}
+
+- (BOOL)enableStandaloneMode {
+  NSNumber *number = self.configState[kEnableStandaloneMode];
   return number ? [number boolValue] : NO;
 }
 
