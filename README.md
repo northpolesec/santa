@@ -1,10 +1,10 @@
 # Santa
 
-[![license](https://img.shields.io/github/license/google/santa)](https://github.com/google/santa/blob/main/LICENSE)
-[![CI](https://github.com/google/santa/actions/workflows/ci.yml/badge.svg)](https://github.com/google/santa/actions/workflows/ci.yml)
-[![latest release](https://img.shields.io/github/v/release/google/santa.svg)](https://github.com/google/santa/releases/latest)
-[![latest release date](https://img.shields.io/github/release-date/google/santa.svg)](https://github.com/google/santa/releases/latest)
-[![downloads](https://img.shields.io/github/downloads/google/santa/latest/total)](https://github.com/google/santa/releases/latest)
+[![license](https://img.shields.io/github/license/northpolesec/santa)](https://github.com/northpolesec/santa/blob/main/LICENSE)
+[![CI](https://github.com/northpolesec/santa/actions/workflows/ci.yml/badge.svg)](https://github.com/northpolesec/santa/actions/workflows/ci.yml)
+[![latest release](https://img.shields.io/github/v/release/northpolesec/santa.svg)](https://github.com/northpolesec/santa/releases/latest)
+[![latest release date](https://img.shields.io/github/release-date/northpolesec/santa.svg)](https://github.com/northpolesec/santa/releases/latest)
+[![downloads](https://img.shields.io/github/downloads/northpolesec/santa/latest/total)](https://github.com/northpolesec/santa/releases/latest)
 
 <p align="center">
     <img src="./docs/images/santa-sleigh-256.png" height="128" alt="Santa Icon" />
@@ -21,8 +21,8 @@ It is named Santa because it keeps track of binaries that are naughty or nice.
 # Docs
 
 The Santa docs are stored in the
-[Docs](https://github.com/google/santa/blob/main/docs) directory and are published
-at https://santa.dev.
+[Docs](https://github.com/northpolesec/santa/blob/main/docs) directory and are published
+at https://northpole.dev.
 
 The docs include deployment options, details on how parts of Santa work and
 instructions for developing Santa itself.
@@ -30,15 +30,14 @@ instructions for developing Santa itself.
 # Get Help
 
 If you have questions or otherwise need help getting started,
-the [santa-dev](https://groups.google.com/forum/#!forum/santa-dev) group is a
-great place.
+the [#santa channel on the macadmins slack](https://app.slack.com/client/T04QVKUQG/C0E1VRBGW) is a great place to start.
 
 If you believe you have a bug, feel free to report [an
-issue](https://github.com/google/santa/issues) and we'll respond as soon as we
+issue](https://github.com/northpolesec/santa/issues) and we'll respond as soon as we
 can.
 
 If you believe you've found a vulnerability, please read the
-[security policy](https://github.com/google/santa/security/policy) for
+[security policy](https://github.com/northpolesec/santa/security/policy) for
 disclosure reporting.
 
 # Features
@@ -72,8 +71,7 @@ disclosure reporting.
   used in macOS. The binaries in every OS update (and in some cases entire new
   versions) are therefore automatically allowed. This does not affect binaries
   from Apple's App Store, which use various certs that change regularly for
-  common apps. Likewise, you cannot block Santa itself, and Santa uses a
-  distinct separate cert than other Google apps.
+  common apps. Likewise, you cannot block Santa itself.
 
 * Userland components validate each other: each of the userland components (the
   daemon, the GUI agent and the command-line utility) communicate with each
@@ -125,9 +123,6 @@ protect hosts in whatever other ways you see fit.
     * [Zentral](https://github.com/zentralopensource/zentral/wiki) - A
       centralized service that pulls data from multiple sources and deploy
       configurations to multiple services.
-    * [Zercurity](https://github.com/zercurity/zercurity) - A dockerized service
-      for managing and monitoring applications across a large fleet utilizing
-      Santa + Osquery.
 
 * Alternatively, `santactl` can configure rules locally (without a sync
   server).
@@ -142,7 +137,4 @@ instead.
 
 # Contributing
 Patches to this project are very much welcome. Please see the
-[CONTRIBUTING](https://santa.dev/development/contributing) doc.
-
-# Disclaimer
-This is **not** an official Google product.
+[CONTRIBUTING](https://northpole.dev/development/contributing) doc.
