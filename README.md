@@ -7,7 +7,7 @@
 [![downloads](https://img.shields.io/github/downloads/northpolesec/santa/latest/total)](https://github.com/northpolesec/santa/releases/latest)
 
 <p align="center">
-    <img src="./docs/images/santa-sleigh-256.png" height="128" alt="Santa Icon" />
+    <img src="./docs/images/nps-logo-256.png" height="128" alt="Santa Icon" />
 </p>
 
 Santa is a binary and file access authorization system for macOS. It consists of a system
