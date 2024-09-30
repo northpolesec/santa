@@ -2,7 +2,7 @@ name: Fuzzing
 
 on:
   schedule:
-    - cron: '0 6 * * *' # Every day at 6:00 UTC
+    - cron: '0 7 * * *' # Every day at 6:00 UTC
   workflow_dispatch:  # Allows you to run this workflow manually from the Actions tab
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
             bazel run --config=fuzz $target -- -- -max_len=32768 -runs=1000000 -timeout=5
           done
       - name: Upload crashes
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4.4.0
         if: failure()
         with:
           name: artifacts

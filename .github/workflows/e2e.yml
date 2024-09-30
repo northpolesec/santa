@@ -2,7 +2,7 @@ name: E2E
 
 on:
   schedule:
-    - cron: '0 4 * * *' # Every day at 4:00 UTC (not to interfere with fuzzing)
+    - cron: '0 5 * * *' # Every day at 5:00 UTC (not to interfere with fuzzing)
   workflow_dispatch:
 
 jobs:
