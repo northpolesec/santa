@@ -653,12 +653,14 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
                                              &err);
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list).size(), 2);
-  XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[0],
-                 WatchItemPolicy::Process("mypath1", "com.northpolesec.test1", "validtid_1", cdhashBytes,
-                                          [certHash UTF8String], std::make_optional(true)));
-  XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[1],
-                 WatchItemPolicy::Process("mypath2", "com.northpolesec.test2", "validtid_2", cdhashBytes,
-                                          [certHash UTF8String], std::make_optional(false)));
+  XCTAssertEqual(
+    std::get<PolicyProcessVec>(proc_list)[0],
+    WatchItemPolicy::Process("mypath1", "com.northpolesec.test1", "validtid_1", cdhashBytes,
+                             [certHash UTF8String], std::make_optional(true)));
+  XCTAssertEqual(
+    std::get<PolicyProcessVec>(proc_list)[1],
+    WatchItemPolicy::Process("mypath2", "com.northpolesec.test2", "validtid_2", cdhashBytes,
+                             [certHash UTF8String], std::make_optional(false)));
 }
 
 - (void)testIsWatchItemNameValid {

@@ -133,9 +133,10 @@
 
 - (void)testEnsureErrorsFromTransportAreHandled {
   NSURL *url = [NSURL URLWithString:@"http://localhost:9444"];
-  NSError *mockErr = [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
-                                                code:505
-                                            userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
+  NSError *mockErr =
+    [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
+                               code:505
+                           userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
   NSError *err;
 
   [self createMockResponseWithURL:url withCode:505 withData:nil withError:mockErr];

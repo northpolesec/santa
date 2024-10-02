@@ -29,8 +29,8 @@
   self = [super init];
   if (self) {
     _notifications = [NSMutableDictionary dictionary];
-    _notificationsQueue =
-      dispatch_queue_create("com.northpolesec.santa.syncservice.notifications", DISPATCH_QUEUE_SERIAL);
+    _notificationsQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.notifications",
+                                                DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }

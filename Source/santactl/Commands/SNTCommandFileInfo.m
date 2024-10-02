@@ -248,7 +248,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kCDHash : self.cdhash,
     };
 
-    _printQueue = dispatch_queue_create("com.northpolesec.santactl.print_queue", DISPATCH_QUEUE_SERIAL);
+    _printQueue =
+      dispatch_queue_create("com.northpolesec.santactl.print_queue", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }
