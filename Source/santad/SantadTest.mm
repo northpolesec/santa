@@ -71,9 +71,9 @@ static void SetBinaryDataFromHexString(const char *hexStr, uint8_t *buf, size_t 
   }
 }
 
-static const char *kAllowedSigningID = "com.northpolesec.allowed_signing_id";
-static const char *kBlockedSigningID = "com.northpolesec.blocked_signing_id";
-static const char *kNoRuleMatchSigningID = "com.northpolesec.no_rule_match_signing_id";
+static const char *kAllowedSigningID = "com.google.allowed_signing_id";
+static const char *kBlockedSigningID = "com.google.blocked_signing_id";
+static const char *kNoRuleMatchSigningID = "com.google.no_rule_match_signing_id";
 static const char *kBlockedTeamID = "EQHXZ8M8AV";
 static const char *kAllowedTeamID = "TJNVEKW352";
 static const char *kAllowedCDHash = "dedebf2eac732d873008b17b3e44a56599dd614b";
