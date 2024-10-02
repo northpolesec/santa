@@ -54,22 +54,22 @@ package_group(
 run_command(
     name = "unload",
     cmd = """
-sudo launchctl unload /Library/LaunchDaemons/com.google.santad.plist 2>/dev/null
-sudo launchctl unload /Library/LaunchDaemons/com.google.santa.bundleservice.plist 2>/dev/null
-sudo launchctl unload /Library/LaunchDaemons/com.google.santa.metricservice.plist 2>/dev/null
-sudo launchctl unload /Library/LaunchDaemons/com.google.santa.syncservice.plist 2>/dev/null
-launchctl unload /Library/LaunchAgents/com.google.santa.plist 2>/dev/null
+sudo launchctl unload /Library/LaunchDaemons/com.northpolesec.santad.plist 2>/dev/null
+sudo launchctl unload /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist 2>/dev/null
+sudo launchctl unload /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist 2>/dev/null
+sudo launchctl unload /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist 2>/dev/null
+launchctl unload /Library/LaunchAgents/com.northpolesec.santa.plist 2>/dev/null
 """,
 )
 
 run_command(
     name = "load",
     cmd = """
-sudo launchctl load /Library/LaunchDaemons/com.google.santad.plist
-sudo launchctl load /Library/LaunchDaemons/com.google.santa.bundleservice.plist
-sudo launchctl load /Library/LaunchDaemons/com.google.santa.metricservice.plist
-sudo launchctl load /Library/LaunchDaemons/com.google.santa.syncservice.plist
-launchctl load /Library/LaunchAgents/com.google.santa.plist
+sudo launchctl load /Library/LaunchDaemons/com.northpolesec.santad.plist
+sudo launchctl load /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist
+sudo launchctl load /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist
+sudo launchctl load /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist
+launchctl load /Library/LaunchAgents/com.northpolesec.santa.plist
 """,
 )
 
@@ -101,12 +101,12 @@ genrule(
         "//Source/gui:Santa",
         "Conf/install.sh",
         "Conf/uninstall.sh",
-        "Conf/com.google.santa.bundleservice.plist",
-        "Conf/com.google.santa.metricservice.plist",
-        "Conf/com.google.santa.syncservice.plist",
-        "Conf/com.google.santad.plist",
-        "Conf/com.google.santa.plist",
-        "Conf/com.google.santa.newsyslog.conf",
+        "Conf/com.northpolesec.santa.bundleservice.plist",
+        "Conf/com.northpolesec.santa.metricservice.plist",
+        "Conf/com.northpolesec.santa.syncservice.plist",
+        "Conf/com.northpolesec.santad.plist",
+        "Conf/com.northpolesec.santa.plist",
+        "Conf/com.northpolesec.santa.newsyslog.conf",
         "Conf/Package/Distribution.xml",
         "Conf/Package/notarization_tool.sh",
         "Conf/Package/package_and_sign.sh",
@@ -163,9 +163,9 @@ genrule(
             mkdir -p $(@D)/dsym
             cp -LR $$(dirname $$(dirname $${SRC})) $(@D)/dsym/Santa.app.dSYM
             ;;
-          *com.google.santa.daemon.systemextension.dSYM*Info.plist)
+          *com.northpolesec.santa.daemon.systemextension.dSYM*Info.plist)
             mkdir -p $(@D)/dsym
-            cp -LR $$(dirname $$(dirname $${SRC})) $(@D)/dsym/com.google.santa.daemon.systemextension.dSYM
+            cp -LR $$(dirname $$(dirname $${SRC})) $(@D)/dsym/com.northpolesec.santa.daemon.systemextension.dSYM
             ;;
         esac
       done

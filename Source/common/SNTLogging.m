@@ -52,7 +52,7 @@ void logMessage(LogLevel level, FILE *destination, NSString *format, ...) {
 
     // If requested, redirect output to syslog.
     if ([[[NSProcessInfo processInfo] arguments] containsObject:@"--syslog"] ||
-        [binaryName isEqualToString:@"com.google.santa.daemon"]) {
+        [binaryName isEqualToString:@"com.northpolesec.santa.daemon"]) {
       useSyslog = YES;
       pthread_key_create(&syslogKey, syslogClientDestructor);
     }
@@ -70,7 +70,7 @@ void logMessage(LogLevel level, FILE *destination, NSString *format, ...) {
     if (client == NULL) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-      client = asl_open(NULL, "com.google.santa", 0);
+      client = asl_open(NULL, "com.northpolesec.santa", 0);
       asl_set_filter(client, ASL_FILTER_MASK_UPTO(ASL_LEVEL_DEBUG));
 #pragma clang diagnostic pop
       pthread_setspecific(syslogKey, client);

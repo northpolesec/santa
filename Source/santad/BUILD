@@ -830,16 +830,16 @@ objc_library(
 )
 
 macos_bundle(
-    name = "com.google.santa.daemon",
+    name = "com.northpolesec.santa.daemon",
     bundle_extension = "systemextension",
-    bundle_id = "com.google.santa.daemon",
+    bundle_id = "com.northpolesec.santa.daemon",
     codesignopts = [
         "--timestamp",
         "--force",
         "--options library,kill,runtime",
     ],
     entitlements = select({
-        "//:adhoc_build": "com.google.santa.daemon.systemextension-adhoc.entitlements",
+        "//:adhoc_build": "com.northpolesec.santa.daemon.systemextension-adhoc.entitlements",
         # Non-adhoc builds get their entitlements from the provisioning profile.
         "//conditions:default": None,
     }),

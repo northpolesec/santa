@@ -98,7 +98,7 @@ this new adhoc build will show up as a second instance of Santa. Remove the
 non-adhoc instance like so:
 
 ```sh
-systemextensionsctl uninstall EQHXZ8M8AV com.google.santa.daemon
+systemextensionsctl uninstall EQHXZ8M8AV com.northpolesec.santa.daemon
 ```
 
 #### IDE Setup
@@ -117,7 +117,7 @@ Bazel build rules. To use this:
 #### Debugging
 
 lldb can be used to debug Santa, similarly to any other project, with some
-exceptions. lldb can attach to com.google.santa.daemon, however any breakpoints
+exceptions. lldb can attach to com.northpolesec.santa.daemon, however any breakpoints
 in the decision making codepath can deadlock the machine.
 
 #### Tests

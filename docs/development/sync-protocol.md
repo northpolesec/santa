@@ -294,7 +294,7 @@ sequenceDiagram
     "execution_time": 1657764366.475035,
     "file_sha256": "8621d92262aef379d3cfe9e099f287be5b996a281995b5cc64932f7d62f3dc85",
     "decision": "ALLOW_BINARY",
-    "file_bundle_id": "com.google.santa.syncservice",
+    "file_bundle_id": "com.northpolesec.santa.syncservice",
     "file_bundle_version_string": "9999.1.1",
     "pid": 2595,
     "current_sessions": [
@@ -304,7 +304,7 @@ sequenceDiagram
       "markowsky@ttys003"
     ],
     "team_id": "EQHXZ8M8AV",
-    "signing_id": "EQHXZ8M8AV:com.google.santa",
+    "signing_id": "EQHXZ8M8AV:com.northpolesec.santa",
     "cdhash": "dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a"
   }]
 }

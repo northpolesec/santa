@@ -108,7 +108,7 @@ using PolicyProcessVec = std::vector<WatchItemPolicy::Process>;
 
 static void PopulateError(NSError **err, NSString *msg) {
   if (err) {
-    *err = [NSError errorWithDomain:@"com.google.santa.watchitems"
+    *err = [NSError errorWithDomain:@"com.northpolesec.santa.watchitems"
                                code:0
                            userInfo:@{NSLocalizedDescriptionKey : msg}];
   }
@@ -626,7 +626,7 @@ std::shared_ptr<WatchItems> WatchItems::CreateInternal(NSString *config_path, NS
     return nullptr;
   }
 
-  dispatch_queue_t q = dispatch_queue_create("com.google.santa.daemon.watch_items.q",
+  dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.watch_items.q",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
   dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
   dispatch_source_set_timer(timer_source, dispatch_time(DISPATCH_TIME_NOW, 0),

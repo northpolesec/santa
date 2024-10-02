@@ -36,7 +36,7 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 }
 
 @interface SNTConfigurator ()
-/// A NSUserDefaults object set to use the com.google.santa suite.
+/// A NSUserDefaults object set to use the com.northpolesec.santa suite.
 @property(readonly, nonatomic) NSUserDefaults *defaults;
 
 /// Keys and expected value types.
@@ -68,7 +68,7 @@ NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist
 #endif
 
 /// The domain used by mobileconfig.
-static NSString *const kMobileConfigDomain = @"com.google.santa";
+static NSString *const kMobileConfigDomain = @"com.northpolesec.santa";
 
 /// The keys managed by a mobileconfig.
 static NSString *const kStaticRules = @"StaticRules";
@@ -288,7 +288,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
     _syncStateAccessAuthorizerBlock = syncStateAccessAuthorizer;
 
     _defaults = [NSUserDefaults standardUserDefaults];
-    [_defaults addSuiteNamed:@"com.google.santa"];
+    [_defaults addSuiteNamed:@"com.northpolesec.santa"];
     _configState = [self readForcedConfig];
     [self cacheStaticRules];
 
@@ -1305,9 +1305,9 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 }
 
 - (void)startWatchingDefaults {
-  // Only com.google.santa.daemon should listen.
+  // Only com.northpolesec.santa.daemon should listen.
   NSString *processName = [[NSProcessInfo processInfo] processName];
-  if (![processName isEqualToString:@"com.google.santa.daemon"]) return;
+  if (![processName isEqualToString:@"com.northpolesec.santa.daemon"]) return;
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(defaultsChanged:)
                                                name:NSUserDefaultsDidChangeNotification

@@ -53,7 +53,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   if (self) {
     _pendingNotifications = [[NSMutableArray alloc] init];
     _hashBundleBinariesQueue =
-      dispatch_queue_create("com.google.santagui.hashbundlebinaries", DISPATCH_QUEUE_SERIAL);
+      dispatch_queue_create("com.northpolesec.santagui.hashbundlebinaries", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }
@@ -177,8 +177,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     kSigningChain : signingChain,
   };
 
-  [dc postNotificationName:@"com.google.santa.notification.blockedeexecution"
-                    object:@"com.google.santa"
+  [dc postNotificationName:@"com.northpolesec.santa.notification.blockedeexecution"
+                    object:@"com.northpolesec.santa"
                   userInfo:userInfo
         deliverImmediately:YES];
 }

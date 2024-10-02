@@ -60,8 +60,8 @@
 
   [sut postBlockNotification:ev withCustomMessage:@"" andCustomURL:@""];
 
-  OCMVerify([dncMock postNotificationName:@"com.google.santa.notification.blockedeexecution"
-                                   object:@"com.google.santa"
+  OCMVerify([dncMock postNotificationName:@"com.northpolesec.santa.notification.blockedeexecution"
+                                   object:@"com.northpolesec.santa"
                                  userInfo:[OCMArg checkWithBlock:^BOOL(NSDictionary *userInfo) {
                                    XCTAssertEqualObjects(userInfo[@"file_sha256"], @"the-sha256");
                                    XCTAssertEqualObjects(userInfo[@"pid"], @84156);

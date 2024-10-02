@@ -7,7 +7,7 @@
 		<dict>
 			<key>PayloadContent</key>
 			<dict>
-				<key>com.google.santa</key>
+				<key>com.northpolesec.santa</key>
 				<dict>
 					<key>Forced</key>
 					<array>
@@ -94,11 +94,11 @@
 		</dict>
 	</array>
 	<key>PayloadDescription</key>
-	<string>com.google.santa</string>
+	<string>com.northpolesec.santa</string>
 	<key>PayloadDisplayName</key>
-	<string>com.google.santa</string>
+	<string>com.northpolesec.santa</string>
 	<key>PayloadIdentifier</key>
-	<string>com.google.santa</string>
+	<string>com.northpolesec.santa</string>
 	<key>PayloadOrganization</key>
 	<string></string>
 	<key>PayloadRemovalDisallowed</key>

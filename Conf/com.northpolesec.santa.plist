@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 				<key>Label</key>
-				<string>com.google.santa</string>
+				<string>com.northpolesec.santa</string>
 				<key>ProgramArguments</key>
 				<array>
 					<string>/Applications/Santa.app/Contents/MacOS/Santa</string>

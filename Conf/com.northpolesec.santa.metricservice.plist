@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.google.santa.metricservice</string>
+	<string>com.northpolesec.santa.metricservice</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/Applications/Santa.app/Contents/MacOS/santametricservice</string>
@@ -11,7 +11,7 @@
 	</array>
 	<key>MachServices</key>
 	<dict>
-		<key>com.google.santa.metricservice</key>
+		<key>com.northpolesec.santa.metricservice</key>
 		<true/>
 	</dict>
 	<key>RunAtLoad</key>

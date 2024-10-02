@@ -94,7 +94,7 @@
       NSInteger statusCode = ((NSHTTPURLResponse *)taskResponse).statusCode;
       if (statusCode != 200) {
         localError = [[NSError alloc]
-          initWithDomain:@"com.google.santa.metricservice.writers.http"
+          initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
                     code:statusCode
                 userInfo:@{
                   NSLocalizedDescriptionKey : [NSString

@@ -24,7 +24,7 @@ namespace santa {
 
 std::shared_ptr<Spool> Spool::Create(std::string_view base_dir, size_t max_spool_disk_size,
                                      size_t max_spool_batch_size, uint64_t flush_timeout_ms) {
-  dispatch_queue_t q = dispatch_queue_create("com.google.santa.daemon.file_base_q",
+  dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.file_base_q",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
   dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
   dispatch_source_set_timer(timer_source, dispatch_time(DISPATCH_TIME_NOW, 0),

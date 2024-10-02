@@ -531,13 +531,13 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Test valid SigningID
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
-      @[ @{kWatchItemConfigKeyProcessesSigningID : @"com.google.test"} ]
+      @[ @{kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.test"} ]
   },
                                              &err);
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list).size(), 1);
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[0],
-                 WatchItemPolicy::Process("", "com.google.test", "", {}, "", std::nullopt));
+                 WatchItemPolicy::Process("", "com.northpolesec.test", "", {}, "", std::nullopt));
 
   // Test TeamID length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
@@ -634,7 +634,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
     kWatchItemConfigKeyProcesses : @[
       @{
         kWatchItemConfigKeyProcessesBinaryPath : @"mypath1",
-        kWatchItemConfigKeyProcessesSigningID : @"com.google.test1",
+        kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.test1",
         kWatchItemConfigKeyProcessesTeamID : @"validtid_1",
         kWatchItemConfigKeyProcessesCDHash : cdhash,
         kWatchItemConfigKeyProcessesCertificateSha256 : certHash,
@@ -642,7 +642,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
       },
       @{
         kWatchItemConfigKeyProcessesBinaryPath : @"mypath2",
-        kWatchItemConfigKeyProcessesSigningID : @"com.google.test2",
+        kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.test2",
         kWatchItemConfigKeyProcessesTeamID : @"validtid_2",
         kWatchItemConfigKeyProcessesCDHash : cdhash,
         kWatchItemConfigKeyProcessesCertificateSha256 : certHash,
@@ -654,10 +654,10 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list).size(), 2);
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[0],
-                 WatchItemPolicy::Process("mypath1", "com.google.test1", "validtid_1", cdhashBytes,
+                 WatchItemPolicy::Process("mypath1", "com.northpolesec.test1", "validtid_1", cdhashBytes,
                                           [certHash UTF8String], std::make_optional(true)));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[1],
-                 WatchItemPolicy::Process("mypath2", "com.google.test2", "validtid_2", cdhashBytes,
+                 WatchItemPolicy::Process("mypath2", "com.northpolesec.test2", "validtid_2", cdhashBytes,
                                           [certHash UTF8String], std::make_optional(false)));
 }
 

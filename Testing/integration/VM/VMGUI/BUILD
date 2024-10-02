@@ -27,7 +27,7 @@ objc_library(
 
 macos_application(
     name = "VMGUI",
-    bundle_id = "com.google.santa.e2e.vmgui",
+    bundle_id = "com.northpolesec.santa.e2e.vmgui",
     entitlements = "//Testing/integration/VM/Common:entitlements",
     infoplists = ["//Testing/integration/VM/Common:plist"],
     minimum_os_version = "13.0",

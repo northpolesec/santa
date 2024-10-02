@@ -209,7 +209,7 @@ NSString *const StatResultToString(StatResult result) {
 }
 
 std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t interval) {
-  dispatch_queue_t q = dispatch_queue_create("com.google.santa.santametricsservice.q",
+  dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.santametricsservice.q",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
 
   dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
@@ -284,7 +284,7 @@ Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t in
       run_on_first_start_(run_on_first_start) {
   SetInterval(interval_);
 
-  events_q_ = dispatch_queue_create("com.google.santa.santametricsservice.events_q",
+  events_q_ = dispatch_queue_create("com.northpolesec.santa.santametricsservice.events_q",
                                     DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
 }
 

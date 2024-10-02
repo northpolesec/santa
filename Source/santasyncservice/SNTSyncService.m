@@ -58,7 +58,7 @@
     _daemonConn = daemonConn;
     _syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:daemonConn];
 
-    // This service should only start up if com.google.santa.daemon
+    // This service should only start up if com.northpolesec.santa.daemon
     // noticed there is sync server configured and established a connection
     // with us. Go ahead and start syncing!
     [_syncManager syncSecondsFromNow:15];

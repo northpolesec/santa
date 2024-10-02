@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.google.santa.bundleservice</string>
+	<string>com.northpolesec.santa.bundleservice</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/Applications/Santa.app/Contents/MacOS/santabundleservice</string>
@@ -11,7 +11,7 @@
 	</array>
 	<key>MachServices</key>
 	<dict>
-		<key>com.google.santa.bundleservice</key>
+		<key>com.northpolesec.santa.bundleservice</key>
 		<true/>
 	</dict>
 	<key>RunAtLoad</key>

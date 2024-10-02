@@ -99,7 +99,7 @@ class ProcessSet {
  public:
   ProcessSet() {
     q_ = dispatch_queue_create(
-      "com.google.santa.daemon.faa",
+      "com.northpolesec.santa.daemon.faa",
       dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
                                               QOS_CLASS_USER_INTERACTIVE, 0));
   };

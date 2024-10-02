@@ -6,7 +6,7 @@ parent: Binaries
 
 **Note:** This documentation refers to the main Santa daemon as `santad`, but
 this process will typically be seen on the system by its full name:
-`com.google.santa.daemon`.
+`com.northpolesec.santa.daemon`.
 
 The `santad` process makes decisions
 about binary executions, file access, and mounting USB mass storage devices. It

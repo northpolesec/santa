@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.google.santa.daemon</string>
+	<string>com.northpolesec.santa.daemon</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -21,6 +21,6 @@
         <key>NSEndpointSecurityEarlyBoot</key>
         <true/>
 	<key>CFBundleExecutable</key>
-	<string>com.google.santa.daemon</string>
+	<string>com.northpolesec.santa.daemon</string>
 </dict>
 </plist>

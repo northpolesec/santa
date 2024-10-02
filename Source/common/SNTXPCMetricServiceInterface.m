@@ -29,7 +29,7 @@
 }
 
 + (NSString *)serviceID {
-  return @"com.google.santa.metricservice";
+  return @"com.northpolesec.santa.metricservice";
 }
 
 + (MOLXPCConnection *)configuredConnection {

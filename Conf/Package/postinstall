@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Load com.google.santa.daemon and com.google.santa.bundleservice
+# Load com.northpolesec.santa.daemon and com.northpolesec.santa.bundleservice
 # If a user is logged in, also load the GUI agent.
 # If the target volume is not /, do nothing
 
@@ -13,24 +13,24 @@
 mkdir -p /usr/local/bin
 /bin/ln -sf /Applications/Santa.app/Contents/MacOS/santactl /usr/local/bin/santactl
 
-# Remove the kext before com.google.santa.daemon loads if the SystemExtension is already present.
-/bin/launchctl list EQHXZ8M8AV.com.google.santa.daemon > /dev/null 2>&1 && rm -rf /Library/Extensions/santa-driver.kext
+# Remove the kext before com.northpolesec.santa.daemon loads if the SystemExtension is already present.
+/bin/launchctl list EQHXZ8M8AV.com.northpolesec.santa.daemon > /dev/null 2>&1 && rm -rf /Library/Extensions/santa-driver.kext
 
-# Load com.google.santa.daemon, its main has logic to handle loading the kext
+# Load com.northpolesec.santa.daemon, its main has logic to handle loading the kext
 # or relaunching itself as a SystemExtension.
-/bin/launchctl load -w /Library/LaunchDaemons/com.google.santad.plist
+/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santad.plist
 
-# Load com.google.santa.bundleservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.google.santa.bundleservice.plist
+# Load com.northpolesec.santa.bundleservice
+/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist
 
-# Load com.google.santa.metricservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.google.santa.metricservice.plist
+# Load com.northpolesec.santa.metricservice
+/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist
 
-# Load com.google.santa.syncservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.google.santa.syncservice.plist
+# Load com.northpolesec.santa.syncservice
+/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist
 
 GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 [[ -z "${GUI_USER}" ]] && exit 0
 
-/bin/launchctl asuser "${GUI_USER}" /bin/launchctl load /Library/LaunchAgents/com.google.santa.plist
+/bin/launchctl asuser "${GUI_USER}" /bin/launchctl load /Library/LaunchAgents/com.northpolesec.santa.plist
 exit 0

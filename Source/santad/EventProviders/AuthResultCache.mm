@@ -99,7 +99,7 @@ AuthResultCache::AuthResultCache(std::shared_ptr<EndpointSecurityAPI> esapi,
   }
 
   q_ = dispatch_queue_create(
-    "com.google.santa.daemon.auth_result_cache.q",
+    "com.northpolesec.santa.daemon.auth_result_cache.q",
     dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
                                             QOS_CLASS_USER_INTERACTIVE, 0));
 }
