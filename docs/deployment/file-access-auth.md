@@ -195,8 +195,8 @@ When the `EventLogType` configuration key is set to `syslog` or `file`, an examp
 action=FILE_ACCESS|policy_version=v0.1-experimental|policy_name=UserFoo|path=/Users/local/tmp/foo/text.txt|access_type=OPEN|decision=AUDIT_ONLY|pid=12|ppid=56|process=cat|processpath=/bin/cat|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id
 ```
 
-When the `EventLogType` configuration key is set to `protobuf`, a log is emitted to match the `FileAccess` message in the [santa.proto](https://github.com/google/santa/blob/main/Source/common/santa.proto) schema.
+When the `EventLogType` configuration key is set to `protobuf`, a log is emitted to match the `FileAccess` message in the [santa.proto](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto) schema.
 
 ### Default Mute Set
 
-The EndpointSecurity framework maintains a set of paths dubbed the "default mute set" that are particularly difficult for ES clients to handle. Additionally, AUTH events from some of these paths have ES response deadline times set very low. In order to help increase stability of this feature, file accesses from binaries in the default mute set are not currently logged. A list of binaries that will not have operations logged can be found in [SNTRuleTable.m](https://github.com/google/santa/blob/2023.4/Source/santad/DataLayer/SNTRuleTable.m#L90-L105). This could be addressed in the future (see [Github Issue #1096](https://github.com/google/santa/issues/1096)).
+The EndpointSecurity framework maintains a set of paths dubbed the "default mute set" that are particularly difficult for ES clients to handle. Additionally, AUTH events from some of these paths have ES response deadline times set very low. In order to help increase stability of this feature, file accesses from binaries in the default mute set are not currently logged. A list of binaries that will not have operations logged can be found in [SNTRuleTable.m](https://github.com/northpolesec/santa/blob/2023.4/Source/santad/DataLayer/SNTRuleTable.m#L90-L105). This could be addressed in the future (see [Github Issue #1096](https://github.com/northpolesec/santa/issues/1096)).

@@ -144,7 +144,7 @@ are sent via the sync server. Details on this structure are defined in the
 documentation.
 
 Additionally, the
-[example configuration](https://github.com/google/santa/blob/d5195b55d2784776fa078096f59137d22da55b06/docs/deployment/com.northpolesec.santa.example.mobileconfig#L45)
+[example configuration](https://github.com/northpolesec/santa/blob/main/docs/deployment/com.google.santa.example.mobileconfig#L45)
 has a demonstration on how to define static rules.
 
 ### Example Configuration Profile
@@ -305,4 +305,4 @@ example when an app is launched from a directory considered private to a user.
 An example payload for this use case is provided [here](tcc.configuration-profile-policy.santa.example.mobileconfig)
 
 This would be used alongside a payload allowing [notifications](notificationsettings.santa.example.mobileconfig) to be sent,
-and for allowing the [system extension](https://github.com/google/santa/blob/main/docs/deployment/system-extension-policy.santa.example.mobileconfig) to be loaded without end user interaction.
+and for allowing the [system extension](https://github.com/northpolesec/santa/blob/main/docs/deployment/system-extension-policy.santa.example.mobileconfig) to be loaded without end user interaction.
