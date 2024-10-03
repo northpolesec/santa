@@ -188,7 +188,7 @@ func testFileAccessEvent() -> SNTFileAccessEvent {
   faaEvent.fileSHA256 = "b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670"
   faaEvent.filePath = "/Applications/gShoe.app/Contents/MacOS/gShoe"
   faaEvent.application = "gShoe"
-  faaEvent.teamID = "EQHXZ8M8AV"
+  faaEvent.teamID = "ZMCG7MLDV9"
   faaEvent.signingID = "com.northpolesec.gShoe"
   faaEvent.executingUser = "nobody"
   faaEvent.pid = 456
