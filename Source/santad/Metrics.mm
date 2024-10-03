@@ -44,6 +44,7 @@ static NSString *const kEventTypeAuthSignal = @"AuthSignal";
 static NSString *const kEventTypeAuthTruncate = @"AuthTruncate";
 static NSString *const kEventTypeAuthUnlink = @"AuthUnlink";
 static NSString *const kEventTypeNotifyClose = @"NotifyClose";
+static NSString *const kEventTypeNotifyCodesigningInvalidated = @"NotifyCodesigningInvalidated";
 static NSString *const kEventTypeNotifyExchangedata = @"NotifyExchangedata";
 static NSString *const kEventTypeNotifyExec = @"NotifyExec";
 static NSString *const kEventTypeNotifyExit = @"NotifyExit";
@@ -120,6 +121,7 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
     case ES_EVENT_TYPE_AUTH_TRUNCATE: return kEventTypeAuthTruncate;
     case ES_EVENT_TYPE_AUTH_UNLINK: return kEventTypeAuthUnlink;
     case ES_EVENT_TYPE_NOTIFY_CLOSE: return kEventTypeNotifyClose;
+    case ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED: return kEventTypeNotifyCodesigningInvalidated;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: return kEventTypeNotifyExchangedata;
     case ES_EVENT_TYPE_NOTIFY_EXEC: return kEventTypeNotifyExec;
     case ES_EVENT_TYPE_NOTIFY_EXIT: return kEventTypeNotifyExit;

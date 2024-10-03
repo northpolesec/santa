@@ -188,6 +188,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
     {ES_EVENT_TYPE_AUTH_TRUNCATE, @"AuthTruncate"},
     {ES_EVENT_TYPE_AUTH_UNLINK, @"AuthUnlink"},
     {ES_EVENT_TYPE_NOTIFY_CLOSE, @"NotifyClose"},
+    {ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED, @"NotifyCodesigningInvalidated"},
     {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, @"NotifyExchangedata"},
     {ES_EVENT_TYPE_NOTIFY_EXEC, @"NotifyExec"},
     {ES_EVENT_TYPE_NOTIFY_EXIT, @"NotifyExit"},

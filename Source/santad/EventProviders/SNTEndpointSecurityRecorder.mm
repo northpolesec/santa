@@ -190,6 +190,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
   // clang-format off
   std::set<es_event_type_t> events{
     ES_EVENT_TYPE_NOTIFY_CLOSE,
+    ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED,
     ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA,
     ES_EVENT_TYPE_NOTIFY_EXEC,
     ES_EVENT_TYPE_NOTIFY_EXIT,
