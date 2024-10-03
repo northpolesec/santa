@@ -144,7 +144,7 @@ are sent via the sync server. Details on this structure are defined in the
 documentation.
 
 Additionally, the
-[example configuration](https://github.com/northpolesec/santa/blob/main/docs/deployment/com.google.santa.example.mobileconfig#L45)
+[example configuration](https://github.com/northpolesec/santa/blob/main/docs/deployment/com.northpolesec.santa.example.mobileconfig#L45)
 has a demonstration on how to define static rules.
 
 ### Example Configuration Profile
