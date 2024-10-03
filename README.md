@@ -135,3 +135,8 @@ instead.
 # Contributing
 Patches to this project are very much welcome. Please see the
 [CONTRIBUTING](https://northpole.dev/development/contributing) doc.
+
+# Disclaimer
+
+North Pole Security and North Pole Security Santa are not affiliated with
+Google.
