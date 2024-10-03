@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.google.santa.syncservice</string>
+	<string>com.northpolesec.santa.syncservice</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/Applications/Santa.app/Contents/MacOS/santasyncservice</string>
@@ -11,7 +11,7 @@
 	</array>
 	<key>MachServices</key>
 	<dict>
-		<key>com.google.santa.syncservice</key>
+		<key>com.northpolesec.santa.syncservice</key>
 		<true/>
 	</dict>
 	<key>RunAtLoad</key>

@@ -122,7 +122,7 @@
     XCTAssertEqual(NO, result, @"result of call to write did not fail as expected");
     XCTAssertNotNil(err);
     XCTAssertEqual(code, err.code);
-    XCTAssertEqualObjects(@"com.google.santa.metricservice.writers.http", err.domain);
+    XCTAssertEqualObjects(@"com.northpolesec.santa.metricservice.writers.http", err.domain);
 
     NSString *expectedErrMsg = [NSString
       stringWithFormat:@"received http status code %ld from %@", code, url.absoluteString];
@@ -133,9 +133,10 @@
 
 - (void)testEnsureErrorsFromTransportAreHandled {
   NSURL *url = [NSURL URLWithString:@"http://localhost:9444"];
-  NSError *mockErr = [[NSError alloc] initWithDomain:@"com.google.santa.metricservice.writers.http"
-                                                code:505
-                                            userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
+  NSError *mockErr =
+    [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
+                               code:505
+                           userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
   NSError *err;
 
   [self createMockResponseWithURL:url withCode:505 withData:nil withError:mockErr];
@@ -182,7 +183,7 @@
   XCTAssertEqual(NO, result);
 
   NSError *mockErr =
-    [[NSError alloc] initWithDomain:@"com.google.santa.metricservice.writers.http.test"
+    [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http.test"
                                code:505
                            userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
 

@@ -30,7 +30,7 @@ using santa::Logger;
 using santa::Message;
 using santa::WatchItemPathType;
 
-static constexpr std::string_view kSantaKextIdentifier = "com.google.santa-driver";
+static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa-driver";
 
 @implementation SNTEndpointSecurityTamperResistance {
   std::shared_ptr<Logger> _logger;
@@ -179,11 +179,11 @@ es_auth_result_t ValidateLaunchctlExec(const Message &esMsg) {
     return ES_AUTH_RESULT_ALLOW;
   }
 
-  // Check whether com.google.santa.daemon is in the argument list.
+  // Check whether com.northpolesec.santa.daemon is in the argument list.
   // launchctl no longer accepts PIDs to operate on.
   for (int i = 2; i < argCount; i++) {
     es_string_token_t arg = esApi->ExecArg(&esMsg->event.exec, i);
-    if (strnstr(arg.data, "com.google.santa.daemon", arg.length) != NULL) {
+    if (strnstr(arg.data, "com.northpolesec.santa.daemon", arg.length) != NULL) {
       return ES_AUTH_RESULT_DENY;
     }
   }

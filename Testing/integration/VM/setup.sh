@@ -40,7 +40,7 @@ tee ${HOME}/Library/LaunchAgents/runner.plist << EOF
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.google.santa.e2erunner</string>
+    <string>com.northpolesec.santa.e2erunner</string>
     <key>ProgramArguments</key>
     <array>
         <string>/Volumes/init/run.sh</string>

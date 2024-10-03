@@ -178,7 +178,7 @@ objc_library(
 
 macos_command_line_application(
     name = "santasyncservice",
-    bundle_id = "com.google.santa.syncservice",
+    bundle_id = "com.northpolesec.santa.syncservice",
     codesignopts = [
         "--timestamp",
         "--force",

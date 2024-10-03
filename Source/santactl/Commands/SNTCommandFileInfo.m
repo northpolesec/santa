@@ -248,7 +248,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kCDHash : self.cdhash,
     };
 
-    _printQueue = dispatch_queue_create("com.google.santactl.print_queue", DISPATCH_QUEUE_SERIAL);
+    _printQueue =
+      dispatch_queue_create("com.northpolesec.santactl.print_queue", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }
@@ -357,7 +358,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         case errSecCSReqUnsupported: return @"Yes, but failed requirement validation";
         case errSecCSInfoPlistFailed: return @"Yes, but can't validate as Info.plist is missing";
         case errSecCSSignatureInvalid:
-          if ([error.domain isEqualToString:@"com.google.molcodesignchecker"]) {
+          if ([error.domain isEqualToString:@"com.northpolesec.molcodesignchecker"]) {
             return @"Yes, but signing is not consistent for all architectures";
           }
         case CSSMERR_TP_CERT_REVOKED: return @"Yes, but the signing certificate was revoked";

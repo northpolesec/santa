@@ -42,7 +42,7 @@ function die {
 }
 
 readonly INPUT_APP="${RELEASE_ROOT}/binaries/Santa.app"
-readonly INPUT_SYSX="${INPUT_APP}/Contents/Library/SystemExtensions/com.google.santa.daemon.systemextension"
+readonly INPUT_SYSX="${INPUT_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension"
 readonly INPUT_SANTACTL="${INPUT_APP}/Contents/MacOS/santactl"
 readonly INPUT_SANTABS="${INPUT_APP}/Contents/MacOS/santabundleservice"
 readonly INPUT_SANTAMS="${INPUT_APP}/Contents/MacOS/santametricservice"
@@ -94,7 +94,7 @@ done
 # be verified without using sudo.
 /usr/bin/find "${RELEASE_ROOT}/binaries" -type f -name CodeResources -exec chmod 0644 {} \;
 /usr/bin/find "${RELEASE_ROOT}/binaries" -type d -exec chmod 0755 {} \;
-/usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.google.santa*" -exec chmod 0644 {} \;
+/usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.northpolesec.santa*" -exec chmod 0644 {} \;
 
 echo "verifying signatures"
 /usr/bin/codesign -vv -R="certificate leaf[subject.OU] = ${SIGNING_TEAMID}" \
@@ -114,13 +114,13 @@ echo "creating app pkg"
   "${APP_PKG_ROOT}/private/etc/asl" \
   "${APP_PKG_ROOT}/private/etc/newsyslog.d"
 /bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/Applications/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santad.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.plist" "${APP_PKG_ROOT}/Library/LaunchAgents/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.bundleservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.metricservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.syncservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.asl.conf" "${APP_PKG_ROOT}/private/etc/asl/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santad.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.plist" "${APP_PKG_ROOT}/Library/LaunchAgents/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.bundleservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.metricservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.syncservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.asl.conf" "${APP_PKG_ROOT}/private/etc/asl/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
 /bin/cp -vXL "${SCRIPT_PATH}/preinstall" "${APP_PKG_SCRIPTS}/"
 /bin/cp -vXL "${SCRIPT_PATH}/postinstall" "${APP_PKG_SCRIPTS}/"
 /bin/chmod +x "${APP_PKG_SCRIPTS}/"*
@@ -133,7 +133,7 @@ echo "creating app pkg"
 /usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
 
 # Build app package
-/usr/bin/pkgbuild --identifier "com.google.santa" \
+/usr/bin/pkgbuild --identifier "com.northpolesec.santa" \
   --version "$(echo "${RELEASE_NAME}" | cut -d - -f2)" \
   --root "${APP_PKG_ROOT}" \
   --component-plist "${SCRATCH}/component.plist" \

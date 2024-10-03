@@ -46,7 +46,7 @@ def santa_unit_test(
 
     macos_unit_test(
         name = "%s" % name,
-        bundle_id = "com.google.santa.UnitTest.%s" % name,
+        bundle_id = "com.northpolesec.santa.UnitTest.%s" % name,
         minimum_os_version = minimum_os_version,
         deps = [":%s_lib" % name],
         size = size,

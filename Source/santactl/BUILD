@@ -87,7 +87,7 @@ objc_library(
 
 macos_command_line_application(
     name = "santactl",
-    bundle_id = "com.google.santa.ctl",
+    bundle_id = "com.northpolesec.santa.ctl",
     codesignopts = [
         "--timestamp",
         "--force",

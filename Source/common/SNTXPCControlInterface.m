@@ -22,18 +22,18 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
 
-NSString *const kBundleID = @"com.google.santa.daemon";
+NSString *const kBundleID = @"com.northpolesec.santa.daemon";
 
 @implementation SNTXPCControlInterface
 
 + (NSString *)serviceID {
 #ifdef SANTAADHOC
   // The mach service for an adhoc signed ES sysx uses the "endpoint-security" prefix instead of
-  // the teamid. In Santa's case it will be endpoint-security.com.google.santa.daemon.xpc.
+  // the teamid. In Santa's case it will be endpoint-security.com.northpolesec.santa.daemon.xpc.
   return [NSString stringWithFormat:@"endpoint-security.%@.xpc", kBundleID];
 #else
   MOLCodesignChecker *cs = [[MOLCodesignChecker alloc] initWithSelf];
-  // "teamid.com.google.santa.daemon.xpc"
+  // "teamid.com.northpolesec.santa.daemon.xpc"
   return [NSString stringWithFormat:@"%@.%@.xpc", cs.teamID, kBundleID];
 #endif
 }

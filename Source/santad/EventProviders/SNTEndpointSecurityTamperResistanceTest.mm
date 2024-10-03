@@ -39,7 +39,7 @@ using santa::WatchItemPathType;
 static constexpr std::string_view kEventsDBPath = "/private/var/db/santa/events.db";
 static constexpr std::string_view kRulesDBPath = "/private/var/db/santa/rules.db";
 static constexpr std::string_view kBenignPath = "/some/other/path";
-static constexpr std::string_view kSantaKextIdentifier = "com.google.santa-driver";
+static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa-driver";
 
 @interface SNTEndpointSecurityTamperResistanceTest : XCTestCase
 @end

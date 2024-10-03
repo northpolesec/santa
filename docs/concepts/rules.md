@@ -107,7 +107,7 @@ To begin using transitive allowlisting, `EnableTransitiveRules` should be set to
 When a process is trying to execute, `santad` retrieves information on the
 binary, including a hash of the entire file, signing ID, the signing chain (if
 any), and the team ID. The collected info is then passed through the
-[SNTPolicyProcessor](https://github.com/google/santa/blob/master/Source/santad/SNTPolicyProcessor.h).
+[SNTPolicyProcessor](https://github.com/northpolesec/santa/blob/master/Source/santad/SNTPolicyProcessor.h).
 
 Rules (both ALLOW and BLOCK) are evaluated in the following order, from most
 specific to least specific:

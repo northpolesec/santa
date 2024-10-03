@@ -26,7 +26,7 @@ objc_library(
 
 macos_application(
     name = "InstallationTool",
-    bundle_id = "com.google.santa.e2e.installation-tool",
+    bundle_id = "com.northpolesec.santa.e2e.installation-tool",
     entitlements = "//Testing/integration/VM/Common:entitlements",
     infoplists = ["//Testing/integration/VM/Common:plist"],
     minimum_os_version = "12.0",

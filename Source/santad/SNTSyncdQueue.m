@@ -32,7 +32,7 @@
   if (self) {
     _uploadBackoff = [[NSCache alloc] init];
     _uploadBackoff.countLimit = 128;
-    _syncdQueue = dispatch_queue_create("com.google.syncd_queue", DISPATCH_QUEUE_SERIAL);
+    _syncdQueue = dispatch_queue_create("com.northpolesec.syncd_queue", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }

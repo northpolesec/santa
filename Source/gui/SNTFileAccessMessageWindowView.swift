@@ -189,7 +189,7 @@ func testFileAccessEvent() -> SNTFileAccessEvent {
   faaEvent.filePath = "/Applications/gShoe.app/Contents/MacOS/gShoe"
   faaEvent.application = "gShoe"
   faaEvent.teamID = "EQHXZ8M8AV"
-  faaEvent.signingID = "com.google.gShoe"
+  faaEvent.signingID = "com.northpolesec.gShoe"
   faaEvent.executingUser = "nobody"
   faaEvent.pid = 456
   faaEvent.ppid = 123

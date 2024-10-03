@@ -639,7 +639,7 @@ void SerializeAndCheckNonESEvents(
     ::pbv1::Execution pbExec;
 
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
-    cd.entitlements = @{@"com.google.test" : @(YES)};
+    cd.entitlements = @{@"com.northpolesec.test" : @(YES)};
 
     XCTAssertEqual(0, pbExec.entitlement_info().entitlements_size());
     XCTAssertFalse(cd.entitlementsFiltered);
@@ -657,7 +657,7 @@ void SerializeAndCheckNonESEvents(
     ::pbv1::Execution pbExec;
 
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
-    cd.entitlements = @{@"com.google.test" : @(YES), @"com.google.test2" : @(NO)};
+    cd.entitlements = @{@"com.northpolesec.test" : @(YES), @"com.northpolesec.test2" : @(NO)};
     cd.entitlementsFiltered = YES;
 
     XCTAssertEqual(0, pbExec.entitlement_info().entitlements_size());

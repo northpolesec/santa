@@ -8,9 +8,9 @@
 </choices-outline>
 
 <choice id="default">
-    <pkg-ref id="com.google.santa"/>
+    <pkg-ref id="com.northpolesec.santa"/>
 </choice>
 
-<pkg-ref id="com.google.santa">app.pkg</pkg-ref>
+<pkg-ref id="com.northpolesec.santa">app.pkg</pkg-ref>
 
 </installer-gui-script>

@@ -83,7 +83,7 @@
   if (![NSJSONSerialization isValidJSONObject:normalizedMetrics]) {
     if (err != nil) {
       *err = [[NSError alloc]
-        initWithDomain:@"com.google.santa.metricservice.formats.rawjson"
+        initWithDomain:@"com.northpolesec.santa.metricservice.formats.rawjson"
                   code:EINVAL
               userInfo:@{
                 NSLocalizedDescriptionKey : @"unable to convert metrics to JSON: invalid metrics"

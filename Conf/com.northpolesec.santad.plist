@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.google.santad</string>
+	<string>com.northpolesec.santad</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Applications/Santa.app/Contents/Library/SystemExtensions/com.google.santa.daemon.systemextension/Contents/MacOS/com.google.santa.daemon</string>
+		<string>/Applications/Santa.app/Contents/Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension/Contents/MacOS/com.northpolesec.santa.daemon</string>
 		<string>--syslog</string>
 	</array>
 	<key>MachServices</key>
 	<dict>
-		<key>com.google.santa.daemon</key>
+		<key>com.northpolesec.santa.daemon</key>
 		<true/>
 	</dict>
 	<key>RunAtLoad</key>

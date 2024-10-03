@@ -462,7 +462,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 - (void)testPolicyProcessMatchesESProcess {
   const char *instigatingCertHash = "abc123";
   const char *teamId = "myvalidtid";
-  const char *signingId = "com.google.test";
+  const char *signingId = "com.northpolesec.test";
   std::vector<uint8_t> cdhashBytes(CS_CDHASH_LEN);
   std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
   es_file_t esFile = MakeESFile("foo");

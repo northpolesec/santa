@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>santasyncservice</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.google.santa.syncservice</string>
+	<string>com.northpolesec.santa.syncservice</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

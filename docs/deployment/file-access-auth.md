@@ -195,7 +195,7 @@ When the `EventLogType` configuration key is set to `syslog` or `file`, an examp
 action=FILE_ACCESS|policy_version=v0.1-experimental|policy_name=UserFoo|path=/Users/local/tmp/foo/text.txt|access_type=OPEN|decision=AUDIT_ONLY|pid=12|ppid=56|process=cat|processpath=/bin/cat|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id
 ```
 
-When the `EventLogType` configuration key is set to `protobuf`, a log is emitted to match the `FileAccess` message in the [santa.proto](https://github.com/google/santa/blob/main/Source/common/santa.proto) schema.
+When the `EventLogType` configuration key is set to `protobuf`, a log is emitted to match the `FileAccess` message in the [santa.proto](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto) schema.
 
 ### Default Mute Set
 

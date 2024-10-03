@@ -165,7 +165,7 @@ double watchdogRAMPeak = 0;
 
   // Do not return any rules if syncBaseURL is set and return an error.
   if (config.syncBaseURL) {
-    reply(@[], [NSError errorWithDomain:@"com.google.santad"
+    reply(@[], [NSError errorWithDomain:@"com.northpolesec.santad"
                                    code:403  // (TODO) define error code
                                userInfo:@{NSLocalizedDescriptionKey : @"SyncBaseURL is set"}]);
     return;

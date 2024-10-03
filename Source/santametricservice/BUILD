@@ -58,7 +58,7 @@ test_suite(
 
 macos_command_line_application(
     name = "santametricservice",
-    bundle_id = "com.google.santa.metricservice",
+    bundle_id = "com.northpolesec.santa.metricservice",
     codesignopts = [
         "--timestamp",
         "--force",

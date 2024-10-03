@@ -77,7 +77,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
                                 0);
       [self ruleSyncImpl];
     }];
-    _syncQueue = dispatch_queue_create("com.google.santa.syncservice", DISPATCH_QUEUE_SERIAL);
+    _syncQueue = dispatch_queue_create("com.northpolesec.santa.syncservice", DISPATCH_QUEUE_SERIAL);
     _syncLimiter = dispatch_semaphore_create(kMaxEnqueuedSyncs);
 
     _eventBatchSize = kDefaultEventBatchSize;

@@ -103,10 +103,10 @@ macos_application(
         "//Source/santabundleservice": "MacOS",
         "//Source/santametricservice": "MacOS",
         "//Source/santasyncservice": "MacOS",
-        "//Source/santad:com.google.santa.daemon": "Library/SystemExtensions",
+        "//Source/santad:com.northpolesec.santa.daemon": "Library/SystemExtensions",
     },
     app_icons = glob(["Resources/Images.xcassets/**"]),
-    bundle_id = "com.google.santa",
+    bundle_id = "com.northpolesec.santa",
     bundle_name = "Santa",
     codesignopts = [
         "--timestamp",

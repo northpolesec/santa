@@ -86,11 +86,11 @@ static void SantaWatchdog(void *context) {
 }
 
 void CleanupAndReExec() {
-  LOGI(@"com.google.santa.daemon is running from an unexpected path: cleaning up");
+  LOGI(@"com.northpolesec.santa.daemon is running from an unexpected path: cleaning up");
   NSFileManager *fm = [NSFileManager defaultManager];
-  [fm removeItemAtPath:@"/Library/LaunchDaemons/com.google.santad.plist" error:NULL];
+  [fm removeItemAtPath:@"/Library/LaunchDaemons/com.northpolesec.santad.plist" error:NULL];
 
-  LOGI(@"loading com.google.santa.daemon as a SystemExtension");
+  LOGI(@"loading com.northpolesec.santa.daemon as a SystemExtension");
   NSTask *t = [[NSTask alloc] init];
   t.launchPath = [@(kSantaAppPath) stringByAppendingString:@"/Contents/MacOS/Santa"];
   t.arguments = @[ @"--load-system-extension" ];
@@ -99,7 +99,7 @@ void CleanupAndReExec() {
 
   t = [[NSTask alloc] init];
   t.launchPath = @"/bin/launchctl";
-  t.arguments = @[ @"remove", @"com.google.santad" ];
+  t.arguments = @[ @"remove", @"com.northpolesec.santad" ];
   [t launch];
   [t waitUntilExit];
 
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
     }
 
     dispatch_queue_t watchdog_queue = dispatch_queue_create(
-      "com.google.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
+      "com.northpolesec.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
     dispatch_source_t watchdog_timer =
       dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, watchdog_queue);
 

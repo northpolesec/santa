@@ -19,7 +19,7 @@ objc_library(
 
 macos_application(
     name = "VMCLI",
-    bundle_id = "com.google.santa.e2e.vmcli",
+    bundle_id = "com.northpolesec.santa.e2e.vmcli",
     entitlements = "//Testing/integration/VM/Common:entitlements",
     infoplists = ["//Testing/integration/VM/Common:plist"],
     minimum_os_version = "13.0",
