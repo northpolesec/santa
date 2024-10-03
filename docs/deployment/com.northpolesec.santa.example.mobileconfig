@@ -45,22 +45,13 @@
 								<key>StaticRules</key>
 								<array>
 									<dict>
-										<!-- Always allow files signed by Google LLC -->
+										<!-- Always allow files signed by North Pole Security Inc -->
 										<key>identifier</key>
-										<string>EQHXZ8M8AV</string>
+										<string>ZMCG7MLDV9</string>
 										<key>policy</key>
 										<string>ALLOWLIST</string>
 										<key>rule_type</key>
 										<string>TEAMID</string>
-									</dict>
-									<dict>
-										<!-- Always allow files signed by "Internal Tools Certificate" -->
-										<key>identifier</key>
-										<string>b2617611fb6c008bfe9e05b7a633d4f21c403a0a1a88b514a04c3e5e111be025</string>
-										<key>policy</key>
-										<string>ALLOWLIST</string>
-										<key>rule_type</key>
-										<string>CERTIFICATE</string>
 									</dict>
 									<dict>
 										<!-- Always BLOCK the BundleExample.app binary in Santa's testdata files, for testing -->

@@ -98,7 +98,7 @@ this new adhoc build will show up as a second instance of Santa. Remove the
 non-adhoc instance like so:
 
 ```sh
-systemextensionsctl uninstall EQHXZ8M8AV com.northpolesec.santa.daemon
+systemextensionsctl uninstall ZMCG7MLDV9 com.northpolesec.santa.daemon
 ```
 
 #### IDE Setup
