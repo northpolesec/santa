@@ -92,7 +92,8 @@
 
   if (!url && !isStandalone) {
     [self.openEventButton removeFromSuperview];
-  } if (!isStandalone) {
+  }
+  if (!isStandalone) {
     [self.checkEventButton removeFromSuperview];
   } else if (isStandalone) {
     [self.openEventButton setTitle:@"Approve"];
@@ -163,57 +164,58 @@
     return;
   }
 
-  [context
-     evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
-    localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]
-              reply:^(BOOL success, NSError *error) {
-                if (success) {
-                  SNTRuleType ruleType = SNTRuleTypeSigningID;
-                  NSString *ruleIdentifier = self.event.signingID;
+  [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+          localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]
+                    reply:^(BOOL success, NSError *error) {
+                      if (success) {
+                        SNTRuleType ruleType = SNTRuleTypeSigningID;
+                        NSString *ruleIdentifier = self.event.signingID;
 
-                  // Check here to see if the binary is validly signed if not
-                  // then use a hash rule instead of a signing ID
-                  if (self.event.signingChain.count == 0) {
-                    LOGD(@"No certificate chain found for %@", self.event.filePath);
-                    ruleType = SNTRuleTypeBinary;
-                    ruleIdentifier = self.event.fileSHA256;
-                  }
+                        // Check here to see if the binary is validly signed if not
+                        // then use a hash rule instead of a signing ID
+                        if (self.event.signingChain.count == 0) {
+                          LOGD(@"No certificate chain found for %@", self.event.filePath);
+                          ruleType = SNTRuleTypeBinary;
+                          ruleIdentifier = self.event.fileSHA256;
+                        }
 
-                  // Add rule to allow binary same as santactl rule.
-                  SNTRule *newRule =
-                    [[SNTRule alloc] initWithIdentifier:ruleIdentifier
-                                                  state:SNTRuleStateAllow
-                                                   type:ruleType
-                                              customMsg:@"Approved by user"
-                                              timestamp:[[NSDate now] timeIntervalSince1970]];
+                        // Add rule to allow binary same as santactl rule.
+                        SNTRule *newRule =
+                          [[SNTRule alloc] initWithIdentifier:ruleIdentifier
+                                                        state:SNTRuleStateAllow
+                                                         type:ruleType
+                                                    customMsg:@"Approved by user"
+                                                    timestamp:[[NSDate now] timeIntervalSince1970]];
 
-                  // TODO add bundle hash to a dictionary / database
-                  // table for auto-approval so the user isn't drowning
-                  // in dialogs
-                  dispatch_semaphore_t sema2 = dispatch_semaphore_create(0);
+                        // TODO add bundle hash to a dictionary / database
+                        // table for auto-approval so the user isn't drowning
+                        // in dialogs
+                        dispatch_semaphore_t sema2 = dispatch_semaphore_create(0);
 
-                  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
-                  daemonConn.invalidationHandler = ^{
-                    LOGE(@"Connection invalidated");
-                    dispatch_semaphore_signal(sema2);
-                  };
+                        MOLXPCConnection *daemonConn =
+                          [SNTXPCControlInterface configuredConnection];
+                        daemonConn.invalidationHandler = ^{
+                          LOGE(@"Connection invalidated");
+                          dispatch_semaphore_signal(sema2);
+                        };
 
-                  [daemonConn resume];
-                  [[daemonConn remoteObjectProxy]
-                    addStandaloneRule:newRule reply:^(NSError *error) {
-                      if (error) {
-                        LOGE(@"Failed to modify rules standalone: %s",
-                             [error.localizedDescription UTF8String]);
-                        LOGE(@"Failure reason: %@", error.localizedFailureReason);
+                        [daemonConn resume];
+                        [[daemonConn remoteObjectProxy]
+                          addStandaloneRule:newRule
+                                      reply:^(NSError *error) {
+                                        if (error) {
+                                          LOGE(@"Failed to modify rules standalone: %s",
+                                               [error.localizedDescription UTF8String]);
+                                          LOGE(@"Failure reason: %@", error.localizedFailureReason);
+                                        }
+                                        dispatch_semaphore_signal(sema2);
+                                      }];
+                        dispatch_semaphore_wait(sema2, DISPATCH_TIME_FOREVER);
+                      } else {
+                        LOGE(@"Authentication Error: %@", error);
                       }
-                      dispatch_semaphore_signal(sema2);
+                      dispatch_semaphore_signal(sema);
                     }];
-                  dispatch_semaphore_wait(sema2, DISPATCH_TIME_FOREVER);
-                } else {
-                  LOGE(@"Authentication Error: %@", error);
-                }
-                dispatch_semaphore_signal(sema);
-              }];
   dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
 }
 
@@ -231,7 +233,8 @@
 }
 
 - (IBAction)checkEventDetails:(id)sender {
-  NSString *eventCheckURL = [NSString stringWithFormat:@"https://www.virustotal.com/gui/search/%@", self.event.fileSHA256];
+  NSString *eventCheckURL =
+    [NSString stringWithFormat:@"https://www.virustotal.com/gui/search/%@", self.event.fileSHA256];
   NSURL *url = [[NSURL alloc] initWithString:eventCheckURL];
 
   [[NSWorkspace sharedWorkspace] openURL:url];
