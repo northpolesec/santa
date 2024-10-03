@@ -318,7 +318,6 @@
 ///
 @property(readonly, nonatomic) BOOL enableStandaloneMode;
 
-
 ///
 /// The text to display when opening Santa.app.
 /// If unset, the default text will be displayed.

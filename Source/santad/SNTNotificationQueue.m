@@ -68,7 +68,7 @@ static const int kMaximumNotifications = 10;
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
                     andCustomURL:d[@"url"]];
-      //TODO if running in standalone mode, add the rules to the database
+      // TODO if running in standalone mode, add the rules to the database
       [postedNotifications addObject:d];
     }
     [self.pendingNotifications removeObjectsInArray:postedNotifications];

@@ -51,7 +51,7 @@ struct RuleCounts {
 - (void)databaseEventCount:(void (^)(int64_t count))reply;
 - (void)staticRuleCount:(void (^)(int64_t count))reply;
 
-/// 
+///
 /// Standalone rules
 ///
 - (void)addStandaloneRule:(SNTRule *)rule reply:(void (^)(NSError *))reply;
