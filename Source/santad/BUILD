@@ -1458,6 +1458,7 @@ test_suite(
         ":SNTEndpointSecurityFileAccessAuthorizerTest",
         ":SNTEndpointSecurityRecorderTest",
         ":SNTEndpointSecurityTamperResistanceTest",
+        ":SNTEndpointSecurityTreeAwareClientTest",
         ":SNTEventTableTest",
         ":SNTExecutionControllerTest",
         ":SNTPolicyProcessorTest",
