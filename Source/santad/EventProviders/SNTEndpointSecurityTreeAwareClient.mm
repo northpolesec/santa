@@ -1,4 +1,5 @@
 /// Copyright 2024 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -73,9 +74,13 @@ using santa::Processor;
   return [super subscribe:eventsWithLifecycle];
 }
 
+- (bool)eventWasAdded:(es_event_type_t)eventType {
+  return _addedEvents[eventType];
+}
+
 - (bool)handleContextMessage:(Message &)esMsg {
   if (!_processTree) {
-    return false;
+    return [self eventWasAdded:esMsg->event_type];
   }
 
   // Inform the tree
@@ -108,7 +113,7 @@ using santa::Processor;
   // ...and create the token for those.
   esMsg.SetProcessToken(santa::santad::process_tree::ProcessToken(_processTree, std::move(pids)));
 
-  return _addedEvents[esMsg->event_type];
+  return [self eventWasAdded:esMsg->event_type];
 }
 
 @end
