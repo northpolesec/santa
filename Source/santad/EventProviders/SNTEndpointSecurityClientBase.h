@@ -1,4 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -78,6 +79,8 @@
                handler:(void (^)(const santa::Message &))messageHandler;
 
 - (bool)clearCache;
+
+- (bool)handleContextMessage:(santa::Message &)esMsg;
 
 + (std::set<std::string>)getProtectedPaths;
 + (bool)isProtectedPath:(const std::string_view)path;

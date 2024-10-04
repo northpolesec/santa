@@ -320,6 +320,22 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "SNTEndpointSecurityTreeAwareClientTest",
+    srcs = ["EventProviders/SNTEndpointSecurityTreeAwareClientTest.mm"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":EndpointSecurityMessage",
+        ":Metrics",
+        ":MockEndpointSecurityAPI",
+        ":SNTEndpointSecurityTreeAwareClient",
+        "//Source/common:TestUtils",
+        "@OCMock",
+    ],
+)
+
 objc_library(
     name = "SNTEndpointSecurityRecorder",
     srcs = ["EventProviders/SNTEndpointSecurityRecorder.mm"],
