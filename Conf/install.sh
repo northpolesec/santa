@@ -18,9 +18,6 @@ if [[ -z "${BINARIES}" || -z "${CONF}" ]]; then
   fi
 fi
 
-# Unload santad and scheduled sync job.
-/bin/launchctl remove com.northpolesec.santad >/dev/null 2>&1
-
 # Unload bundle service
 /bin/launchctl remove com.northpolesec.santa.bundleservice >/dev/null 2>&1
 
@@ -30,26 +27,15 @@ fi
 # Unload sync service
 /bin/launchctl remove com.northpolesec.santa.syncservice >/dev/null 2>&1
 
-# Unload kext.
-/sbin/kextunload -b com.northpolesec.santa-driver >/dev/null 2>&1
-
 # Determine if anyone is logged into the GUI
 GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 
 # Unload GUI agent if someone is logged in.
-[[ -n "${GUI_USER}" ]] && \
-  /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.northpolesec.santagui
-[[ -n "$GUI_USER" ]] && \
+[[ -n "{$GUI_USER}" ]] && \
   /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.northpolesec.santa
 
-# Cleanup cruft from old versions
-/bin/launchctl remove com.northpolesec.santasync >/dev/null 2>&1
-/bin/rm /Library/LaunchDaemons/com.northpolesec.santasync.plist >/dev/null 2>&1
-/bin/rm /usr/libexec/santad >/dev/null 2>&1
-/bin/rm /usr/sbin/santactl >/dev/null 2>&1
+# Remove the current version.
 /bin/rm -rf /Applications/Santa.app 2>&1
-/bin/rm -rf /Library/Extensions/santa-driver.kext 2>&1
-/bin/rm /etc/asl/com.northpolesec.santa.asl.conf
 
 # Copy new files.
 /bin/mkdir -p /var/db/santa
@@ -63,14 +49,13 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/cp ${CONF}/com.northpolesec.santa.bundleservice.plist /Library/LaunchDaemons
 /bin/cp ${CONF}/com.northpolesec.santa.metricservice.plist /Library/LaunchDaemons
 /bin/cp ${CONF}/com.northpolesec.santa.syncservice.plist /Library/LaunchDaemons
-/bin/cp ${CONF}/com.northpolesec.santad.plist /Library/LaunchDaemons
 /bin/cp ${CONF}/com.northpolesec.santa.newsyslog.conf /etc/newsyslog.d/
 
 # Reload syslogd to pick up ASL configuration change.
 /usr/bin/killall -HUP syslogd
 
 # Load com.northpolesec.santa.daemon
-/bin/launchctl load /Library/LaunchDaemons/com.northpolesec.santad.plist
+/Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
 
 # Load com.northpolesec.santa.bundleservice
 /bin/launchctl load /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist

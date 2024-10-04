@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Load com.northpolesec.santa.daemon and com.northpolesec.santa.bundleservice
+# Load com.northpolesec.santa.daemon and supporting services.
 # If a user is logged in, also load the GUI agent.
 # If the target volume is not /, do nothing
 
@@ -13,12 +13,8 @@
 mkdir -p /usr/local/bin
 /bin/ln -sf /Applications/Santa.app/Contents/MacOS/santactl /usr/local/bin/santactl
 
-# Remove the kext before com.northpolesec.santa.daemon loads if the SystemExtension is already present.
-/bin/launchctl list ZMCG7MLDV9.com.northpolesec.santa.daemon > /dev/null 2>&1 && rm -rf /Library/Extensions/santa-driver.kext
-
-# Load com.northpolesec.santa.daemon, its main has logic to handle loading the kext
-# or relaunching itself as a SystemExtension.
-/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santad.plist
+# Load com.northpolesec.santa.daemon
+/Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
 
 # Load com.northpolesec.santa.bundleservice
 /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist

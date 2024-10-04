@@ -35,6 +35,9 @@
 
 - (void)requestNeedsUserApproval:(OSSystemExtensionRequest *)request {
   NSLog(@"SystemExtension \"%@\" request needs user approval", request.identifier);
+
+  // If the sysx is not authorized, don't wait around. macOS will start the sysx once authorized.
+  exit(1);
 }
 
 - (void)request:(OSSystemExtensionRequest *)request didFailWithError:(NSError *)error {

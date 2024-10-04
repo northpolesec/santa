@@ -85,28 +85,6 @@ static void SantaWatchdog(void *context) {
   }
 }
 
-void CleanupAndReExec() {
-  LOGI(@"com.northpolesec.santa.daemon is running from an unexpected path: cleaning up");
-  NSFileManager *fm = [NSFileManager defaultManager];
-  [fm removeItemAtPath:@"/Library/LaunchDaemons/com.northpolesec.santad.plist" error:NULL];
-
-  LOGI(@"loading com.northpolesec.santa.daemon as a SystemExtension");
-  NSTask *t = [[NSTask alloc] init];
-  t.launchPath = [@(kSantaAppPath) stringByAppendingString:@"/Contents/MacOS/Santa"];
-  t.arguments = @[ @"--load-system-extension" ];
-  [t launch];
-  [t waitUntilExit];
-
-  t = [[NSTask alloc] init];
-  t.launchPath = @"/bin/launchctl";
-  t.arguments = @[ @"remove", @"com.northpolesec.santad" ];
-  [t launch];
-  [t waitUntilExit];
-
-  // This exit will likely never be called because the above launchctl command will kill us.
-  exit(0);
-}
-
 int main(int argc, char *argv[]) {
   @autoreleasepool {
     // Do not wait on child processes
@@ -119,12 +97,6 @@ int main(int argc, char *argv[]) {
     if ([pi.arguments containsObject:@"-v"]) {
       printf("%s (build %s)\n", [product_version UTF8String], [build_version UTF8String]);
       return 0;
-    }
-
-    // Ensure Santa daemon is started as a system extension
-    if ([pi.arguments.firstObject isEqualToString:@(kSantaDPath)]) {
-      // Does not return
-      CleanupAndReExec();
     }
 
     dispatch_queue_t watchdog_queue = dispatch_queue_create(
