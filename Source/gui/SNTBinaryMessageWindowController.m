@@ -92,9 +92,6 @@
 
   if (!url && !isStandalone) {
     [self.openEventButton removeFromSuperview];
-  }
-  if (!isStandalone) {
-    [self.checkEventButton removeFromSuperview];
   } else if (isStandalone) {
     [self.openEventButton setTitle:@"Approve"];
     // Require the button keyEquivalent set to be CMD + Return
@@ -229,14 +226,6 @@
   NSURL *url = [SNTBlockMessage eventDetailURLForEvent:self.event customURL:self.customURL];
 
   [self closeWindow:sender];
-  [[NSWorkspace sharedWorkspace] openURL:url];
-}
-
-- (IBAction)checkEventDetails:(id)sender {
-  NSString *eventCheckURL =
-    [NSString stringWithFormat:@"https://www.virustotal.com/gui/search/%@", self.event.fileSHA256];
-  NSURL *url = [[NSURL alloc] initWithString:eventCheckURL];
-
   [[NSWorkspace sharedWorkspace] openURL:url];
 }
 
