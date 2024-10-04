@@ -54,7 +54,7 @@ package_group(
 run_command(
     name = "unload",
     cmd = """
-sudo launchctl unload /Library/LaunchDaemons/com.northpolesec.santad.plist 2>/dev/null
+/Applications/Santa.app/Contents/MacOS/Santa --unload-system-extension 2>/dev/null
 sudo launchctl unload /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist 2>/dev/null
 sudo launchctl unload /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist 2>/dev/null
 sudo launchctl unload /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist 2>/dev/null
@@ -65,7 +65,7 @@ launchctl unload /Library/LaunchAgents/com.northpolesec.santa.plist 2>/dev/null
 run_command(
     name = "load",
     cmd = """
-sudo launchctl load /Library/LaunchDaemons/com.northpolesec.santad.plist
+/Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
 sudo launchctl load /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist
 sudo launchctl load /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist
 sudo launchctl load /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist
@@ -104,7 +104,6 @@ genrule(
         "Conf/com.northpolesec.santa.bundleservice.plist",
         "Conf/com.northpolesec.santa.metricservice.plist",
         "Conf/com.northpolesec.santa.syncservice.plist",
-        "Conf/com.northpolesec.santad.plist",
         "Conf/com.northpolesec.santa.plist",
         "Conf/com.northpolesec.santa.newsyslog.conf",
         "Conf/Package/Distribution.xml",
@@ -139,10 +138,6 @@ genrule(
       # Gather together the dSYMs. Throw an error if no dSYMs were found
       for SRC in $(SRCS); do
         case $${SRC} in
-          *santad.dSYM*Info.plist)
-            mkdir -p $(@D)/dsym
-            cp -LR $$(dirname $$(dirname $${SRC})) $(@D)/dsym/santad.dSYM
-            ;;
           *santactl.dSYM*Info.plist)
             mkdir -p $(@D)/dsym
             cp -LR $$(dirname $$(dirname $${SRC})) $(@D)/dsym/santactl.dSYM
