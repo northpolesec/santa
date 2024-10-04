@@ -31,7 +31,7 @@ fi
 GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 
 # Unload GUI agent if someone is logged in.
-[[ -n "{$GUI_USER}" ]] && \
+[[ -n "${GUI_USER}" ]] && \
   /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.northpolesec.santa
 
 # Remove the current version.
