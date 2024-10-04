@@ -152,17 +152,17 @@
 
 // When running in standalone mode, the user is prompted to approve the binary.
 - (void)approveBinaryForStandaloneMode {
-  LAContext *context;
   NSError *err;
 
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  context = [[LAContext alloc] init];
+  LAContext *context = [[LAContext alloc] init];
 
   if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&err]) {
     // TODO: handle error
     LOGE(@"Unable to process Touch ID error: %@", err);
     return;
   }
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
           localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]

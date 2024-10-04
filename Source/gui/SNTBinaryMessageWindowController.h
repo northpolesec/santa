@@ -60,12 +60,6 @@
 @property(weak) IBOutlet NSButton *dismissEventButton;
 
 ///
-///   Reference to the "Check Event" button in the XIB. Used to help the user
-///   check the binary.
-///
-@property(weak) IBOutlet NSButton *checkEventButton;
-
-///
 ///  The execution event that this window is for
 ///
 @property(readonly) SNTStoredEvent *event;
