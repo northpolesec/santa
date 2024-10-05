@@ -31,6 +31,11 @@
    "executable": {
     "path": "foo",
     "truncated": false
+   },
+   "code_signature": {
+    "cdhash": "QUFBQUFBQUFBQUFBQUFBQUFBQUE=",
+    "signing_id": "my_signing_id",
+    "team_id": "my_team_id"
    }
   },
   "source": {
