@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -214,6 +215,23 @@ static inline void EncodeAnnotations(std::function<::pbv1::process_tree::Annotat
   }
 }
 
+static inline void EncodeCodeSignature(std::function<::pbv1::CodeSignature *()> lazy_f, const es_process_t *es_proc) {
+  if (es_proc->codesigning_flags & CS_SIGNED) {
+    ::pbv1::CodeSignature *pb_code_sig = lazy_f();
+
+    pb_code_sig->set_cdhash(es_proc->cdhash, sizeof(es_proc->cdhash));
+
+    if (es_proc->signing_id.length > 0) {
+      pb_code_sig->set_signing_id(es_proc->signing_id.data, es_proc->signing_id.length);
+    }
+
+    if (es_proc->team_id.length > 0) {
+      pb_code_sig->set_team_id(es_proc->team_id.data, es_proc->team_id.length);
+    }
+  }
+}
+
+
 static inline void EncodeProcessInfoLight(::pbv1::ProcessInfoLight *pb_proc_info,
                                           const es_process_t *es_proc,
                                           const EnrichedProcess &enriched_proc) {
@@ -236,6 +254,8 @@ static inline void EncodeProcessInfoLight(::pbv1::ProcessInfoLight *pb_proc_info
   EncodeFileInfoLight(pb_proc_info->mutable_executable(), es_proc->executable);
 
   EncodeAnnotations([pb_proc_info] { return pb_proc_info->mutable_annotations(); }, enriched_proc);
+
+  EncodeCodeSignature([pb_proc_info] { return pb_proc_info->mutable_code_signature(); }, es_proc);
 }
 
 static inline void EncodeProcessInfoLight(::pbv1::ProcessInfoLight *pb_proc_info,
@@ -269,17 +289,7 @@ static inline void EncodeProcessInfo(::pbv1::ProcessInfo *pb_proc_info, uint32_t
   pb_proc_info->set_is_platform_binary(es_proc->is_platform_binary);
   pb_proc_info->set_is_es_client(es_proc->is_es_client);
 
-  if (es_proc->codesigning_flags & CS_SIGNED) {
-    ::pbv1::CodeSignature *pb_code_sig = pb_proc_info->mutable_code_signature();
-    pb_code_sig->set_cdhash(es_proc->cdhash, sizeof(es_proc->cdhash));
-    if (es_proc->signing_id.length > 0) {
-      pb_code_sig->set_signing_id(es_proc->signing_id.data, es_proc->signing_id.length);
-    }
-
-    if (es_proc->team_id.length > 0) {
-      pb_code_sig->set_team_id(es_proc->team_id.data, es_proc->team_id.length);
-    }
-  }
+  EncodeCodeSignature([pb_proc_info]{ return pb_proc_info->mutable_code_signature(); }, es_proc);
 
   pb_proc_info->set_cs_flags(es_proc->codesigning_flags);
 
