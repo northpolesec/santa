@@ -186,14 +186,13 @@ genrule(
 )
 
 genrule(
-  name = "package-dev",
-  srcs = [ ":release" ],
-  outs = ["santa-dev.pkg"],
-  cmd = """
+    name = "package-dev",
+    srcs = [":release"],
+    outs = ["santa-dev.pkg"],
+    cmd = """
   tar -xzvf $(<)
-  RELEASE_ROOT=. SCRATCH=. BUILD_DEV_DISTRIBUTION_PKG=1 \
+  RELEASE_ROOT=. PKG_OUT_DIR=$(@D) BUILD_DEV_DISTRIBUTION_PKG=1 \
     ./conf/package.sh
-  mv santa-dev.pkg $(@)
   """,
 )
 

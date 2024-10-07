@@ -1,7 +1,12 @@
 #!/bin/bash
 
+function die {
+  echo "${@}"
+  exit 2
+}
+
 # This script packages up Santa and its configs.
-# The output is "${SCRATCH}/app.pkg".
+# The output is "${PKG_OUT_DIR}/app.pkg".
 #
 # If BUILD_DEV_DISTRIBUTION_PKG is set, "santa-dev.pkg" will also be produced.
 # The dev package is helpful when testing installer behavior for dev builds.
@@ -13,15 +18,13 @@
 # rules in Santa's main BUILD file.
 [[ -n "${RELEASE_ROOT}" ]] || die "RELEASE_ROOT unset"
 
-[[ -n "${SCRATCH}" ]] || die "SCRATCH unset"
+# PKG_OUT_DIR is a required environment variable that points to a desired
+# output directory.
+[[ -n "${PKG_OUT_DIR}" ]] || die "PKG_OUT_DIR unset"
 
 ################################################################################
 
-function die {
-  echo "${@}"
-  exit 2
-}
-
+readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
 readonly APP_PKG_ROOT="${SCRATCH}/app_pkg_root"
 readonly APP_PKG_SCRIPTS="${SCRATCH}/pkg_scripts"
 
@@ -59,18 +62,19 @@ echo "creating app pkg"
 /usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
 
 # Build app package
+readonly APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "binaries/Santa.app/Contents/Info.plist")
 /usr/bin/pkgbuild --identifier "com.northpolesec.santa" \
-  --version 9999.1.1 \
+  --version "${APP_VERSION}" \
   --root "${APP_PKG_ROOT}" \
   --component-plist "${SCRATCH}/component.plist" \
   --scripts "${APP_PKG_SCRIPTS}" \
-  "${SCRATCH}/app.pkg"
+  "${PKG_OUT_DIR}/app.pkg"
 
 # Build dev distribution package if instructed.
 if [ -n "${BUILD_DEV_DISTRIBUTION_PKG}" ]; then
   echo "productbuild pkg"
   /usr/bin/productbuild \
     --distribution "${SCRIPT_PATH}/Distribution.xml" \
-    --package-path "${SCRATCH}" \
-    "santa-dev.pkg"
+    --package-path "${PKG_OUT_DIR}" \
+    "${PKG_OUT_DIR}/santa-dev.pkg"
 fi
