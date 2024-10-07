@@ -108,6 +108,7 @@ genrule(
         "Conf/com.northpolesec.santa.newsyslog.conf",
         "Conf/Package/Distribution.xml",
         "Conf/Package/notarization_tool.sh",
+        "Conf/Package/package.sh",
         "Conf/Package/package_and_sign.sh",
         "Conf/Package/postinstall",
         "Conf/Package/preinstall",
@@ -182,6 +183,19 @@ genrule(
     """,
     }),
     heuristic_label_expansion = 0,
+)
+
+genrule(
+  name = "package-dev",
+  srcs = [ ":release" ],
+  outs = ["santa-dev.pkg"],
+  cmd = """
+  tar -xzvf $(<)
+  # chmod a+x conf/package.sh
+  RELEASE_ROOT=. SCRATCH=. BUILD_DEV_DISTRIBUTION_PKG=1 \
+    ./conf/package.sh
+  mv santa-dev.pkg $(@)
+  """,
 )
 
 test_suite(
