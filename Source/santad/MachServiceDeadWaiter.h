@@ -20,6 +20,9 @@
 
 #include <string>
 
+// MachServiceDeadWaiter is a small waiter class that looks up a mach service,
+// then waits for all the receive rights of that service to reach zero
+// (MACH_NOTIFY_DEAD_NAME).
 class MachServiceDeadWaiter {
  public:
   explicit MachServiceDeadWaiter(std::string service_name);
@@ -28,7 +31,6 @@ class MachServiceDeadWaiter {
   ~MachServiceDeadWaiter();
 
  private:
-  std::string service_name_;
   mach_port_t send_port_;
   mach_port_t receive_port_;
 };

@@ -16,7 +16,7 @@
 #include "Source/common/SNTLogging.h"
 
 MachServiceDeadWaiter::MachServiceDeadWaiter(std::string service_name)
-    : service_name_(service_name), send_port_(MACH_PORT_NULL), receive_port_(MACH_PORT_NULL) {
+    : send_port_(MACH_PORT_NULL), receive_port_(MACH_PORT_NULL) {
   if (bootstrap_look_up(bootstrap_port, service_name.c_str(), &send_port_) != KERN_SUCCESS) {
     return;
   }
