@@ -13,8 +13,16 @@
 mkdir -p /usr/local/bin
 /bin/ln -sf /Applications/Santa.app/Contents/MacOS/santactl /usr/local/bin/santactl
 
-# Load com.northpolesec.santa.daemon
-/Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
+if /bin/launchctl list EQHXZ8M8AV.com.google.santa.daemon > /dev/null 2>&1; then
+    # Load com.northpolesec.santa.daemon from Santa_NPS.app. While com.google.santa.daemon
+    # is running, com.northpolesec.santa.daemon will idle. When com.google.santa.daemon is unloaded
+    # by the user or MDM, com.northpolesec.santa.daemon will finish installing itself. 
+    /Applications/Santa_NPS.app/Contents/MacOS/Santa --load-system-extension
+else
+    # Finish installing, and load com.northpolesec.santa.daemon
+    mv /Applications/Santa_NPS.app /Applications/Santa.app
+    /Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
+fi
 
 # Load com.northpolesec.santa.bundleservice
 /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist

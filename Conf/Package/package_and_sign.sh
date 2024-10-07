@@ -6,6 +6,11 @@
 # DMG. It also outputs a single release tarball.
 # All of the following environment variables are required.
 
+function die {
+  echo "${@}"
+  exit 2
+}
+
 # RELEASE_ROOT is a required environment variable that points to the root
 # of an extracted release tarball produced with the :release and :release_driver
 # rules in Santa's main BUILD file.
@@ -36,11 +41,6 @@
 
 ################################################################################
 
-function die {
-  echo "${@}"
-  exit 2
-}
-
 readonly INPUT_APP="${RELEASE_ROOT}/binaries/Santa.app"
 readonly INPUT_SYSX="${INPUT_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension"
 readonly INPUT_SANTACTL="${INPUT_APP}/Contents/MacOS/santactl"
@@ -48,15 +48,9 @@ readonly INPUT_SANTABS="${INPUT_APP}/Contents/MacOS/santabundleservice"
 readonly INPUT_SANTAMS="${INPUT_APP}/Contents/MacOS/santametricservice"
 readonly INPUT_SANTASS="${INPUT_APP}/Contents/MacOS/santasyncservice"
 
-readonly RELEASE_NAME="santa-$(/usr/bin/defaults read "${INPUT_APP}/Contents/Info.plist" CFBundleShortVersionString)"
+readonly RELEASE_NAME="santa-$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${INPUT_APP}/Contents/Info.plist")"
 
-readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}/santa-"XXXXXX)
-readonly APP_PKG_ROOT="${SCRATCH}/app_pkg_root"
-readonly APP_PKG_SCRIPTS="${SCRATCH}/pkg_scripts"
-
-readonly SCRIPT_PATH="$(/usr/bin/dirname -- ${BASH_SOURCE[0]})"
-
-/bin/mkdir -p "${APP_PKG_ROOT}" "${APP_PKG_SCRIPTS}"
+readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
 
 readonly DMG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.dmg"
 readonly TAR_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.tar.gz"
@@ -78,7 +72,7 @@ for ARTIFACT in "${INPUT_SYSX}" "${INPUT_APP}"; do
   /usr/bin/zip -9r "${SCRATCH}/${BN}.zip" "${ARTIFACT}"
 
   echo "notarizing ${BN}"
-  PBID=$(/usr/bin/defaults read "${ARTIFACT}/Contents/Info.plist" CFBundleIdentifier)
+  PBID=$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "${ARTIFACT}/Contents/Info.plist")
   "${NOTARIZATION_TOOL}" --file "${SCRATCH}/${BN}.zip"
 done
 
@@ -107,36 +101,11 @@ echo "creating fresh release tarball"
 /bin/cp -r "${RELEASE_ROOT}/dsym" "${SCRATCH}/tar_root/${RELEASE_NAME}"
 /usr/bin/tar -C "${SCRATCH}/tar_root" -czvf "${TAR_PATH}" "${RELEASE_NAME}" || die "failed to create release tarball"
 
-echo "creating app pkg"
-/bin/mkdir -p "${APP_PKG_ROOT}/Applications" \
-  "${APP_PKG_ROOT}/Library/LaunchAgents" \
-  "${APP_PKG_ROOT}/Library/LaunchDaemons" \
-  "${APP_PKG_ROOT}/private/etc/asl" \
-  "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/Applications/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.plist" "${APP_PKG_ROOT}/Library/LaunchAgents/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.bundleservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.metricservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.syncservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
-/bin/cp -vXL "${SCRIPT_PATH}/preinstall" "${APP_PKG_SCRIPTS}/"
-/bin/cp -vXL "${SCRIPT_PATH}/postinstall" "${APP_PKG_SCRIPTS}/"
-/bin/chmod +x "${APP_PKG_SCRIPTS}/"*
-
-# Disable bundle relocation.
-/usr/bin/pkgbuild --analyze --root "${APP_PKG_ROOT}" "${SCRATCH}/component.plist"
-/usr/bin/plutil -replace BundleIsRelocatable -bool NO "${SCRATCH}/component.plist"
-/usr/bin/plutil -replace BundleIsVersionChecked -bool NO "${SCRATCH}/component.plist"
-/usr/bin/plutil -replace BundleOverwriteAction -string upgrade "${SCRATCH}/component.plist"
-/usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
-
-# Build app package
-/usr/bin/pkgbuild --identifier "com.northpolesec.santa" \
-  --version "$(echo "${RELEASE_NAME}" | cut -d - -f2)" \
-  --root "${APP_PKG_ROOT}" \
-  --component-plist "${SCRATCH}/component.plist" \
-  --scripts "${APP_PKG_SCRIPTS}" \
-  "${SCRATCH}/app.pkg"
+# Create the app pkg at "${SCRATCH}/app.pkg".
+export RELEASE_ROOT
+export PKG_OUT_DIR="${SCRATCH}"
+readonly SCRIPT_PATH="$(/usr/bin/dirname -- ${BASH_SOURCE[0]})"
+"${SCRIPT_PATH}/package.sh"
 
 # Build signed distribution package
 echo "productbuild pkg"
