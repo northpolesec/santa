@@ -191,7 +191,6 @@ genrule(
   outs = ["santa-dev.pkg"],
   cmd = """
   tar -xzvf $(<)
-  # chmod a+x conf/package.sh
   RELEASE_ROOT=. SCRATCH=. BUILD_DEV_DISTRIBUTION_PKG=1 \
     ./conf/package.sh
   mv santa-dev.pkg $(@)
