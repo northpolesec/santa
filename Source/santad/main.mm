@@ -15,6 +15,7 @@
 #include <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 #include <mach/task.h>
+
 #include <memory>
 
 #import "Source/common/SNTConfigurator.h"
@@ -22,6 +23,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SystemResources.h"
+#include "Source/santad/MachServiceDeadWaiter.h"
 #import "Source/santad/Santad.h"
 #include "Source/santad/SantadDeps.h"
 
@@ -85,6 +87,52 @@ static void SantaWatchdog(void *context) {
   }
 }
 
+static void FinishInstall() {
+  // Wait for com.google.santa.daemon to be removed.
+  while (1) {
+    // Record if com.google.santa.daemon is an active and enabled system extension.
+    BOOL google_santa_active_enabled = NO;
+    NSDictionary *system_extensions =
+      [NSDictionary dictionaryWithContentsOfFile:@"/Library/SystemExtensions/db.plist"];
+    for (NSDictionary *sysx in system_extensions[@"extensions"]) {
+      if ([sysx[@"identifier"] isEqualToString:@"com.google.santa.daemon"] &&
+          [sysx[@"state"] isEqualToString:@"activated_enabled"]) {
+        google_santa_active_enabled = YES;
+      }
+    }
+
+    // Wait for its mach port to die. MachServiceDeadWaiter will return immediately if the service
+    // can not be found.
+    MachServiceDeadWaiter google_santa("EQHXZ8M8AV.com.google.santa.daemon.xpc");
+
+    // If com.google.santa.daemon was recored as being active and enabled, wait for 1 second and
+    // check again. This should be enough time for com.google.santa.daemon to be updated or recover
+    // from a crash.
+    if (google_santa_active_enabled) {
+      LOGI(@"com.google.santa.daemon was active and enabled - waiting for removal");
+      sleep(1);
+      continue;
+    }
+
+    // com.google.santa.daemon has been uninstalled.
+    break;
+  }
+
+  // Rename Santa_NPS.app to Santa.app.
+  NSFileManager *fm = [NSFileManager defaultManager];
+  if ([fm fileExistsAtPath:@"/Applications/Santa_NPS.app"]) {
+    NSError *error;
+    if (![fm removeItemAtPath:@"/Applications/Santa.app" error:&error]) {
+      LOGE(@"NPS rename: remove error: %@", error);
+    }
+    if (![fm moveItemAtPath:@"/Applications/Santa_NPS.app"
+                     toPath:@"/Applications/Santa.app"
+                      error:&error]) {
+      LOGE(@"NPS rename: move error: %@", error);
+    }
+  }
+}
+
 int main(int argc, char *argv[]) {
   @autoreleasepool {
     // Do not wait on child processes
@@ -98,6 +146,8 @@ int main(int argc, char *argv[]) {
       printf("%s (build %s)\n", [product_version UTF8String], [build_version UTF8String]);
       return 0;
     }
+
+    FinishInstall();
 
     dispatch_queue_t watchdog_queue = dispatch_queue_create(
       "com.northpolesec.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);

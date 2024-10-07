@@ -798,6 +798,7 @@ objc_library(
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
+        ":MachServiceDeadWaiter",
         ":Metrics",
         ":SNTCompilerController",
         ":SNTDatabaseController",
@@ -843,6 +844,15 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SystemResources",
     ],
+)
+
+objc_library(
+    name = "MachServiceDeadWaiter",
+    srcs = [
+        "MachServiceDeadWaiter.h",
+        "MachServiceDeadWaiter.mm",
+    ],
+    deps = ["//Source/common:SNTLogging"],
 )
 
 macos_bundle(
