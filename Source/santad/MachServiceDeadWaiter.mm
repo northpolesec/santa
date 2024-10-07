@@ -20,7 +20,6 @@ MachServiceDeadWaiter::MachServiceDeadWaiter(std::string service_name)
   if (bootstrap_look_up(bootstrap_port, service_name.c_str(), &send_port_) != KERN_SUCCESS) {
     return;
   }
-  service_seen_ = true;
 
   // Create a port to listen for `MACH_NOTIFY_DEAD_NAME` from `service_name`.
   if (mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &receive_port_) !=

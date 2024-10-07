@@ -27,11 +27,8 @@ class MachServiceDeadWaiter {
   MachServiceDeadWaiter &operator=(const MachServiceDeadWaiter &) = delete;
   ~MachServiceDeadWaiter();
 
-  bool service_seen() { return service_seen_; };
-
  private:
   std::string service_name_;
-  bool service_seen_ = false;
   mach_port_t send_port_;
   mach_port_t receive_port_;
 };
