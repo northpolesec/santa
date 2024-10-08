@@ -35,6 +35,10 @@
 ///  The custom URL to use for this event
 @property(copy) NSString *customURL;
 
+///  The reply block to call when the user has made a decision in standalone
+///  mode.
+@property(copy) void (^replyBlock)(BOOL authenticated);
+
 ///  A 'friendly' string representing the certificate information
 @property(readonly, nonatomic) NSString *publisherInfo;
 
@@ -51,12 +55,14 @@
 
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url {
+                    customURL:(NSString *)url 
+                    reply:(void (^)(BOOL authenticated))replyBlock {
   self = [super initWithWindowNibName:@"MessageWindow"];
   if (self) {
     _event = event;
     _customMessage = message;
     _customURL = url;
+    _replyBlock = replyBlock;
     _progress = [NSProgress discreteProgressWithTotalUnitCount:1];
     [_progress addObserver:self
                 forKeyPath:@"fractionCompleted"
@@ -93,6 +99,14 @@
   if (!url && !isStandalone) {
     [self.openEventButton removeFromSuperview];
   } else if (isStandalone) {
+    // Check if we can do Touch ID. If not disable the button and display an
+    // error to the user.
+    NSError *err;
+
+    if (![self isAbleToAuthenticateInStandaloneMode:&err]) {
+      [self.openEventButton removeFromSuperview];
+    }
+
     [self.openEventButton setTitle:@"Approve"];
     // Require the button keyEquivalent set to be CMD + Return
     [self.openEventButton setKeyEquivalent:@"\r"];                                   // Return Key
@@ -147,72 +161,38 @@
                                                showGroup:YES];
 }
 
-// When running in standalone mode, the user is prompted to approve the binary.
-- (void)approveBinaryForStandaloneMode {
-  NSError *err;
-
+- (BOOL) isAbleToAuthenticateInStandaloneMode:(NSError **)err {
   LAContext *context = [[LAContext alloc] init];
 
-  if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&err]) {
-    // TODO: handle error
-    LOGE(@"Unable to process Touch ID error: %@", err);
-    return;
+  if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:err]) {
+    return NO;
   }
+
+  return YES;
+}
+
+// When running in standalone mode, the user is prompted to approve the binary.
+- (void)approveBinaryForStandaloneMode {
+  LAContext *context = [[LAContext alloc] init];
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
           localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]
                     reply:^(BOOL success, NSError *error) {
-                      if (success) {
-                        SNTRuleType ruleType = SNTRuleTypeSigningID;
-                        NSString *ruleIdentifier = self.event.signingID;
-
-                        // Check here to see if the binary is validly signed if not
-                        // then use a hash rule instead of a signing ID
-                        if (self.event.signingChain.count == 0) {
-                          LOGD(@"No certificate chain found for %@", self.event.filePath);
-                          ruleType = SNTRuleTypeBinary;
-                          ruleIdentifier = self.event.fileSHA256;
-                        }
-
-                        // Add rule to allow binary same as santactl rule.
-                        SNTRule *newRule =
-                          [[SNTRule alloc] initWithIdentifier:ruleIdentifier
-                                                        state:SNTRuleStateAllow
-                                                         type:ruleType
-                                                    customMsg:@"Approved by user"
-                                                    timestamp:[[NSDate now] timeIntervalSince1970]];
-
-                        // TODO add bundle hash to a dictionary / database
-                        // table for auto-approval so the user isn't drowning
-                        // in dialogs
-                        dispatch_semaphore_t sema2 = dispatch_semaphore_create(0);
-
-                        MOLXPCConnection *daemonConn =
-                          [SNTXPCControlInterface configuredConnection];
-                        daemonConn.invalidationHandler = ^{
-                          LOGE(@"Connection invalidated");
-                          dispatch_semaphore_signal(sema2);
-                        };
-
-                        [daemonConn resume];
-                        [[daemonConn remoteObjectProxy]
-                          addStandaloneRule:newRule
-                                      reply:^(NSError *error) {
-                                        if (error) {
-                                          LOGE(@"Failed to modify rules standalone: %s",
-                                               [error.localizedDescription UTF8String]);
-                                          LOGE(@"Failure reason: %@", error.localizedFailureReason);
-                                        }
-                                        dispatch_semaphore_signal(sema2);
-                                      }];
-                        dispatch_semaphore_wait(sema2, DISPATCH_TIME_FOREVER);
-                      } else {
-                        LOGE(@"Authentication Error: %@", error);
+                      if (self.replyBlock == nil) {
+                        dispatch_semaphore_signal(sema); 
+                        return;
                       }
-                      dispatch_semaphore_signal(sema);
+
+                      if (success) {
+                          self.replyBlock(YES);
+                      } else {
+                          self.replyBlock(NO);
+                      }
+                      dispatch_semaphore_signal(sema); 
                     }];
+
   dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
 }
 

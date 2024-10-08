@@ -25,7 +25,8 @@
 
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url;
+                    customURL:(NSString *)url
+                    reply:(void (^)(BOOL authenticated))replyBlock;
 
 - (IBAction)showCertInfo:(id)sender;
 - (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash;
