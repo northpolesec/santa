@@ -332,14 +332,15 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
-                 andCustomURL:(NSString *)url {
+                 andCustomURL:(NSString *)url 
+                 andReply:(void (^)(BOOL))reply {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
   }
 
   SNTBinaryMessageWindowController *pendingMsg =
-    [[SNTBinaryMessageWindowController alloc] initWithEvent:event customMsg:message customURL:url];
+    [[SNTBinaryMessageWindowController alloc] initWithEvent:event customMsg:message customURL:url reply:reply];
 
   [self queueMessage:pendingMsg];
 }
