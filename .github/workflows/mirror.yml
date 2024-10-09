@@ -1,0 +1,44 @@
+name: Mirror Main 
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # Runs every 10 minutes
+  workflow_dispatch:  # Allows manual triggering
+
+env:
+  SOURCE_REPO: 'northpolesec/santa'  
+  TARGET_BRANCH: 'main'
+
+jobs:
+  mirror_repository:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Check repository name
+      id: check_repo
+      run: |
+        REPO_NAME="${GITHUB_REPOSITORY#*/}"
+        SOURCE_NAME="${SOURCE_REPO#*/}"
+        if [ "$REPO_NAME" = "$SOURCE_NAME" ]; then
+          echo "Repository name matches SOURCE repo. Skipping mirroring."
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "Repository names do not match. Proceeding with mirroring."
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Checkout
+      if: steps.check_repo.outputs.skip == 'false'
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Mirror repository
+      if: steps.check_repo.outputs.skip == 'false'
+      run: |
+        git remote add source https://github.com/${{ env.SOURCE_REPO }}.git
+        git fetch source ${{ env.TARGET_BRANCH }}
+        git reset --hard source/${{ env.TARGET_BRANCH }}
+        git push -f origin ${{ env.TARGET_BRANCH }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
