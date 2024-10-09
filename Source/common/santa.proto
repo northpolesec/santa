@@ -868,11 +868,12 @@ message AuthenticationAutoUnlock {
 
 // Information related to various authentication events
 message Authentication {
+  optional bool success = 1;
   oneof event {
-    AuthenticationOD authentication_od = 1;
-    AuthenticationTouchID authentication_touch_id = 2;
-    AuthenticationToken authentication_token = 3;
-    AuthenticationAutoUnlock authentication_auto_unlock = 4;
+    AuthenticationOD authentication_od = 2;
+    AuthenticationTouchID authentication_touch_id = 3;
+    AuthenticationToken authentication_token = 4;
+    AuthenticationAutoUnlock authentication_auto_unlock = 5;
   }
 }
 
