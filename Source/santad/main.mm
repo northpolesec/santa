@@ -113,6 +113,7 @@ static bool IsGoogleSantaActiveEnabled() {
       return true;
     }
   }
+
   return false;
 }
 
@@ -143,6 +144,9 @@ static void FinishInstall() {
   }
 
   // Rename Santa_NPS.app to Santa.app.
+  // TODO: Check /Applications/Santa_NPS.app signature before finalizing the install.
+  // TODO: Handle supporting services.
+  // TODO: Add tamper protection to /Applications/Santa.app.
   NSFileManager *fm = [NSFileManager defaultManager];
   if ([fm fileExistsAtPath:@"/Applications/Santa_NPS.app"]) {
     NSError *error;

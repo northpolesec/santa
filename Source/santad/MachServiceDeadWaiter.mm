@@ -13,6 +13,9 @@
 /// limitations under the License.
 
 #include "Source/santad/MachServiceDeadWaiter.h"
+
+#include <servers/bootstrap.h>
+
 #include "Source/common/SNTLogging.h"
 
 MachServiceDeadWaiter::MachServiceDeadWaiter(std::string service_name)

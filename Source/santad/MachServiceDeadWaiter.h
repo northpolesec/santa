@@ -16,7 +16,6 @@
 #define SANTA__SANTAD_MACH_SERVICE_DEAD_WAITER_H
 
 #include <mach/mach.h>
-#include <servers/bootstrap.h>
 
 #include <string>
 
