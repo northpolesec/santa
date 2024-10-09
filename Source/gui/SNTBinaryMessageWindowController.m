@@ -97,15 +97,9 @@
   BOOL isStandalone = [[SNTConfigurator configurator] enableStandaloneMode];
 
   if (!url && !isStandalone) {
+    LOGE(@"PLM -- No URL to open for event %@", self.event.idx);
     [self.openEventButton removeFromSuperview];
   } else if (isStandalone) {
-    // Check if we can do Touch ID. If not disable the button and display an
-    // error to the user.
-    NSError *err;
-
-    if (![self isAbleToAuthenticateInStandaloneMode:&err]) {
-      [self.openEventButton removeFromSuperview];
-    }
 
     [self.openEventButton setTitle:@"Approve"];
     // Require the button keyEquivalent set to be CMD + Return
@@ -145,6 +139,10 @@
   if (!self.event.fileBundleName) {
     [self.applicationNameLabel removeFromSuperview];
   }
+
+  if ([[SNTConfigurator configurator] enableStandaloneMode]) {
+    self.replyBlock(NO);
+  }
 }
 
 - (NSString *)messageHash {
@@ -161,6 +159,8 @@
                                                showGroup:YES];
 }
 
+// Check if the user is able to authenticate using Touch ID. Returns YES if the
+// user is able to NO Otherwise
 - (BOOL) isAbleToAuthenticateInStandaloneMode:(NSError **)err {
   LAContext *context = [[LAContext alloc] init];
 
@@ -176,6 +176,18 @@
   LAContext *context = [[LAContext alloc] init];
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  // Check if we can do Touch ID. If not disable the button and display an
+  // error to the user.
+  NSError *err;
+
+  LOGE(@"PLM -- Attempting to authenticate user for standalone mode");
+
+  // If we're unable to authenticate the user using touch ID, remove the approval button.
+  if (![self isAbleToAuthenticateInStandaloneMode:&err]) {
+      LOGE(@"PLM -- Unable to authenticate user for standalone mode: %@", err);
+      [self.openEventButton removeFromSuperview];
+  }
 
   [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
           localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]
@@ -193,6 +205,7 @@
                       dispatch_semaphore_signal(sema); 
                     }];
 
+  //TODO do we need to use a semaphore here?
   dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
 }
 
