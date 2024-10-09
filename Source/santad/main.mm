@@ -105,7 +105,7 @@ static bool IsGoogleSantaActiveEnabled() {
     NSString *identifier = sysx[@"identifier"];
     if (![identifier isKindOfClass:[NSString class]]) return false;
 
-    NSString *state = sysx[@"identifier"];
+    NSString *state = sysx[@"state"];
     if (![state isKindOfClass:[NSString class]]) return false;
 
     if ([identifier isEqualToString:@"com.google.santa.daemon"] &&
