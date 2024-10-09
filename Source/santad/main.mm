@@ -87,27 +87,51 @@ static void SantaWatchdog(void *context) {
   }
 }
 
+static bool IsGoogleSantaActiveEnabled() {
+  // `+[OSSystemExtensionRequest propertiesRequestForExtension:queue:]` is only usable when
+  // inspecting system extensions signed with the same TEAM ID as the caller. Instead, look through
+  // the system extension on-disk db.plist artifact. To prevent crashing on schema changes, check
+  // the types of the values as the dictionary is walked.
+  NSDictionary *system_extensions_db =
+    [NSDictionary dictionaryWithContentsOfFile:@"/Library/SystemExtensions/db.plist"];
+  if (![system_extensions_db isKindOfClass:[NSDictionary class]]) return false;
+
+  NSArray *system_extensions = system_extensions_db[@"extensions"];
+  if (![system_extensions isKindOfClass:[NSArray class]]) return false;
+
+  for (NSDictionary *sysx in system_extensions) {
+    if (![sysx isKindOfClass:[NSDictionary class]]) return false;
+
+    NSString *identifier = sysx[@"identifier"];
+    if (![identifier isKindOfClass:[NSString class]]) return false;
+
+    NSString *state = sysx[@"identifier"];
+    if (![state isKindOfClass:[NSString class]]) return false;
+
+    if ([identifier isEqualToString:@"com.google.santa.daemon"] &&
+        [state isEqualToString:@"activated_enabled"]) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static void FinishInstall() {
   // Wait for com.google.santa.daemon to be removed.
   while (1) {
     // Record if com.google.santa.daemon is an active and enabled system extension.
-    BOOL google_santa_active_enabled = NO;
-    NSDictionary *system_extensions =
-      [NSDictionary dictionaryWithContentsOfFile:@"/Library/SystemExtensions/db.plist"];
-    for (NSDictionary *sysx in system_extensions[@"extensions"]) {
-      if ([sysx[@"identifier"] isEqualToString:@"com.google.santa.daemon"] &&
-          [sysx[@"state"] isEqualToString:@"activated_enabled"]) {
-        google_santa_active_enabled = YES;
-      }
-    }
+    bool google_santa_active_enabled = IsGoogleSantaActiveEnabled();
 
     // Wait for its mach port to die. MachServiceDeadWaiter will return immediately if the service
-    // can not be found.
+    // can not be found. Perform this call unconditionally, if /Library/SystemExtensions/db.plist
+    // changes its schema and `IsGoogleSantaActiveEnabled` returns a false negative, checking for
+    // the mach service is still the correct thing to do.
     MachServiceDeadWaiter google_santa("EQHXZ8M8AV.com.google.santa.daemon.xpc");
 
-    // If com.google.santa.daemon was recored as being active and enabled, wait for 1 second and
+    // If com.google.santa.daemon was recorded as being active and enabled, wait for 1 second and
     // check again. This should be enough time for com.google.santa.daemon to be updated or recover
-    // from a crash.
+    // from a crash, preventing this loop from spinning too fast. It also prevents
+    // com.google.santa.daemon and com.northpolesec.santa.daemon from racing during a system reboot.
     if (google_santa_active_enabled) {
       LOGI(@"com.google.santa.daemon was active and enabled - waiting for removal");
       sleep(1);
