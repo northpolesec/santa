@@ -410,7 +410,8 @@ static NSString *const kPrinterProxyPostMonterey =
         // Check if we're in standalone mode and create the rule wrapping it in a block. 
         if ([[SNTConfigurator configurator] enableStandaloneMode]) {
           replyBlock = ^void(BOOL authenticated) {
-            LOGE(@"User responded to block event for %@ with authenticated: %d", se.filePath, authenticated);
+            LOGE(@"PLM -- User responded to block event for %@ with authenticated: %d", se.filePath, authenticated);
+            LOGE(@"PLM -- %@", NSThread.callStackSymbols);
             if (authenticated) {
               [self createRuleForStandaloneMode:YES event:se];
             }

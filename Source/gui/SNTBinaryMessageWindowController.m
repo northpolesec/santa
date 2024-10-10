@@ -37,7 +37,7 @@
 
 ///  The reply block to call when the user has made a decision in standalone
 ///  mode.
-@property(copy) void (^replyBlock)(BOOL authenticated);
+//@property(readonly, nonatomic) void (^replyBlock)(BOOL authenticated);
 
 ///  A 'friendly' string representing the certificate information
 @property(readonly, nonatomic) NSString *publisherInfo;
@@ -63,6 +63,7 @@
     _customMessage = message;
     _customURL = url;
     _replyBlock = replyBlock;
+//    _replyBlockSemaphore = dispatch_semaphore_create(0);
     _progress = [NSProgress discreteProgressWithTotalUnitCount:1];
     [_progress addObserver:self
                 forKeyPath:@"fractionCompleted"
@@ -96,10 +97,18 @@
   NSURL *url = [SNTBlockMessage eventDetailURLForEvent:self.event customURL:self.customURL];
   BOOL isStandalone = [[SNTConfigurator configurator] enableStandaloneMode];
 
+  LOGE(@"PLM -- loadWindow isStandalone %d", isStandalone);
+
   if (!url && !isStandalone) {
-    LOGE(@"PLM -- No URL to open for event %@", self.event.idx);
+    LOGE(@"PLM -- No URL to open for event %@ removing button", self.event.idx);
     [self.openEventButton removeFromSuperview];
   } else if (isStandalone) {
+    NSError *err;
+
+    if (![self isAbleToAuthenticateInStandaloneMode:&err]) {
+      LOGE(@"Unable to authenticate with TouchID in Standalone Mode: %@", err);
+      [self.openEventButton removeFromSuperview];
+    }
 
     [self.openEventButton setTitle:@"Approve"];
     // Require the button keyEquivalent set to be CMD + Return
@@ -140,7 +149,7 @@
     [self.applicationNameLabel removeFromSuperview];
   }
 
-  if ([[SNTConfigurator configurator] enableStandaloneMode]) {
+  if (![[SNTConfigurator configurator] enableStandaloneMode]) {
     self.replyBlock(NO);
   }
 }
@@ -177,29 +186,23 @@
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  // Check if we can do Touch ID. If not disable the button and display an
-  // error to the user.
-  NSError *err;
-
   LOGE(@"PLM -- Attempting to authenticate user for standalone mode");
-
-  // If we're unable to authenticate the user using touch ID, remove the approval button.
-  if (![self isAbleToAuthenticateInStandaloneMode:&err]) {
-      LOGE(@"PLM -- Unable to authenticate user for standalone mode: %@", err);
-      [self.openEventButton removeFromSuperview];
-  }
 
   [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
           localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]
                     reply:^(BOOL success, NSError *error) {
                       if (self.replyBlock == nil) {
+                        LOGE(@"PLM -- replyBlock is nil");
                         dispatch_semaphore_signal(sema); 
                         return;
                       }
 
                       if (success) {
+                          LOGE(@"PLM -- User authenticated for standalone mode");
                           self.replyBlock(YES);
+                          LOGE(@"PLM -- Finished calling reply block with YES");
                       } else {
+                          LOGE(@"PLM -- User failed to authenticate for standalone mode");
                           self.replyBlock(NO);
                       }
                       dispatch_semaphore_signal(sema); 
@@ -207,12 +210,16 @@
 
   //TODO do we need to use a semaphore here?
   dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+  //dispatch_semaphore_signal(self.replyBlockSemaphore);
 }
 
 - (IBAction)openEventDetails:(id)sender {
-  if ([[SNTConfigurator configurator] enableStandaloneMode]) {
+  BOOL isInStandaloneMode = [[SNTConfigurator configurator] enableStandaloneMode];
+
+  if (isInStandaloneMode) {
     [self closeWindow:sender];
     [self approveBinaryForStandaloneMode];
+
     return;
   }
 
@@ -220,6 +227,11 @@
 
   [self closeWindow:sender];
   [[NSWorkspace sharedWorkspace] openURL:url];
+
+  if (self.replyBlock) {
+    LOGE(@"PLM -- Calling reply block with NO from openEventDetails");
+    self.replyBlock(NO);
+  }
 }
 
 #pragma mark Generated properties
