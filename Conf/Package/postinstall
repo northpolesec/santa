@@ -1,17 +1,7 @@
 #!/bin/bash
 
-# Load com.northpolesec.santa.daemon and supporting services.
-# If a user is logged in, also load the GUI agent.
 # If the target volume is not /, do nothing
-
 [[ $3 != "/" ]] && exit 0
-
-# Restart syslogd to pick up ASL configuration change
-/usr/bin/killall -HUP syslogd
-
-# Create hopefully useful symlink for santactl
-mkdir -p /usr/local/bin
-/bin/ln -sf /Applications/Santa.app/Contents/MacOS/santactl /usr/local/bin/santactl
 
 # Load com.northpolesec.santa.daemon from Santa_NPS.app. While com.google.santa.daemon
 # is running, com.northpolesec.santa.daemon will idle. When com.google.santa.daemon is unloaded
@@ -21,17 +11,4 @@ mkdir -p /usr/local/bin
 # allow NPS to implement tamper protections on /Applications/Santa.app.
 /Applications/Santa_NPS.app/Contents/MacOS/Santa --load-system-extension
 
-# Load com.northpolesec.santa.bundleservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist
-
-# Load com.northpolesec.santa.metricservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist
-
-# Load com.northpolesec.santa.syncservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist
-
-GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
-[[ -z "${GUI_USER}" ]] && exit 0
-
-/bin/launchctl asuser "${GUI_USER}" /bin/launchctl load /Library/LaunchAgents/com.northpolesec.santa.plist
 exit 0
