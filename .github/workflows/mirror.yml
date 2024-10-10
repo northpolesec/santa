@@ -12,7 +12,6 @@ env:
 jobs:
   mirror_repository:
     runs-on: macos-latest
-      - name: Should Mirror
     steps:
         id: should_mirror
         run: |
@@ -30,7 +29,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: Update Commits
-
         if: steps.should_mirror.outputs.enabled == 'true'
         run: |
           git remote add source https://github.com/${{ env.SOURCE_REPO }}.git
