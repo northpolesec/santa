@@ -184,7 +184,7 @@
 - (void)approveBinaryForStandaloneMode {
   LAContext *context = [[LAContext alloc] init];
 
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  //dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   LOGE(@"PLM -- Attempting to authenticate user for standalone mode");
 
@@ -193,7 +193,7 @@
                     reply:^(BOOL success, NSError *error) {
                       if (self.replyBlock == nil) {
                         LOGE(@"PLM -- replyBlock is nil");
-                        dispatch_semaphore_signal(sema); 
+   //                     dispatch_semaphore_signal(sema); 
                         return;
                       }
 
@@ -205,11 +205,11 @@
                           LOGE(@"PLM -- User failed to authenticate for standalone mode");
                           self.replyBlock(NO);
                       }
-                      dispatch_semaphore_signal(sema); 
+    //                  dispatch_semaphore_signal(sema); 
                     }];
 
   //TODO do we need to use a semaphore here?
-  dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+  //dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
   //dispatch_semaphore_signal(self.replyBlockSemaphore);
 }
 
@@ -217,8 +217,8 @@
   BOOL isInStandaloneMode = [[SNTConfigurator configurator] enableStandaloneMode];
 
   if (isInStandaloneMode) {
-    [self closeWindow:sender];
     [self approveBinaryForStandaloneMode];
+    [self closeWindow:sender];
 
     return;
   }

@@ -104,20 +104,13 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   // this message, don't do anything else.
   if ([SNTConfigurator configurator].enableSilentMode) return;
 
-  /*
-  LOGE(@"PLM -- Calling reply block with YES from queueMessage");
-  if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
-    SNTBinaryMessageWindowController *controller = (SNTBinaryMessageWindowController *)pendingMsg;
-    if (controller.replyBlock) {
-      LOGE(@"PLM -- Calling reply block with YES from queueMessage");
-      controller.replyBlock(YES);
-    }
-  }*/
-
   dispatch_async(dispatch_get_main_queue(), ^{
     if ([self notificationAlreadyQueued:pendingMsg]) {
-   //   pendingMsg.replyBlock(NO);
-      LOGE(@"PLM -- Notification already queued, dropping");
+      if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
+        SNTBinaryMessageWindowController *bmwc = (SNTBinaryMessageWindowController *)pendingMsg;
+        LOGE(@"PLM -- Notification already queued, dropping");
+        bmwc.replyBlock(NO);
+      }
       return;
     }
 
@@ -360,17 +353,6 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
   LOGE(@"PLM -- queueing message");
   [self queueMessage:pendingMsg];
-/*
-  if ([[SNTConfigurator configurator] enableStandaloneMode]) {
-    if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
-      SNTBinaryMessageWindowController *controller = (SNTBinaryMessageWindowController *)pendingMsg;
-      LOGE(@"PLM -- waiting for the user to approve the binary");
-     // dispatch_wait(controller.replyBlockSemaphore, DISPATCH_TIME_FOREVER);
-    }
-  }
-  */
-  NSRunLoop *runLoop = [NSRunLoop mainRunLoop];
-  [runLoop run];
 }
 
 - (void)postUSBBlockNotification:(SNTDeviceEvent *)event withCustomMessage:(NSString *)message {

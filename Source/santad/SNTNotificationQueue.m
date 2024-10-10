@@ -57,7 +57,7 @@ static const int kMaximumNotifications = 10;
 
   if (reply) {
     // Copy the block
-    d[@"reply"] = reply; //[reply copy];
+    d[@"reply"] = [reply copy];
   }
 
   @synchronized(self.pendingNotifications) {
