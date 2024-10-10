@@ -13,6 +13,7 @@ jobs:
   mirror_repository:
     runs-on: macos-latest
     steps:
+      - name: Should Mirror 
         id: should_mirror
         run: |
           if [ "${{ secrets.ENABLE_MIRRORING }}" = "true" ]; then
@@ -23,7 +24,6 @@ jobs:
             echo "enabled=false" >> $GITHUB_OUTPUT
           fi
       - name: Checkout
-
         if: steps.should_mirror.outputs.enabled == 'true'
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
         with:
