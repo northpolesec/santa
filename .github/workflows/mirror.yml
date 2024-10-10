@@ -1,0 +1,40 @@
+name: Mirror Main
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # Runs every 10 minutes
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  SOURCE_REPO: 'northpolesec/santa'
+  TARGET_BRANCH: 'main'
+
+jobs:
+  mirror_repository:
+    runs-on: macos-latest
+    steps:
+      - name: Should Mirror 
+        id: should_mirror
+        run: |
+          if [ "${{ secrets.ENABLE_MIRRORING }}" = "true" ]; then
+            echo "Mirroring $SOURCE_REPO"
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          else
+            echo "Secret gate not passed. Skipping mirroring."
+            echo "enabled=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Checkout
+        if: steps.should_mirror.outputs.enabled == 'true'
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Update Commits
+        if: steps.should_mirror.outputs.enabled == 'true'
+        run: |
+          git remote add source https://github.com/${{ env.SOURCE_REPO }}.git
+          git fetch source ${{ env.TARGET_BRANCH }}
+          git reset --hard source/${{ env.TARGET_BRANCH }}
+          git push -f origin ${{ env.TARGET_BRANCH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
