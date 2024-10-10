@@ -150,6 +150,9 @@ REGISTER_COMMAND_NAME(@"status")
     enableTransitiveRules = response;
   }];
 
+  // TODO make a proper RPC call for this.
+  BOOL enableStandAloneMode = [[SNTConfigurator configurator] enableStandaloneMode];
+
   __block BOOL watchItemsEnabled = NO;
   __block uint64_t watchItemsRuleCount = 0;
   __block NSString *watchItemsPolicyVersion = nil;
@@ -199,6 +202,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"driver_connected" : @(YES),
         @"mode" : clientMode ?: @"null",
         @"transitive_rules" : @(enableTransitiveRules),
+        @"standalone_mode" : @(configurator.enableStandaloneMode),
         @"log_type" : eventLogType,
         @"file_logging" : @(fileLogging),
         @"watchdog_cpu_events" : @(cpuEvents),
@@ -264,6 +268,9 @@ REGISTER_COMMAND_NAME(@"status")
 
     if (enableTransitiveRules) {
       printf("  %-25s | %s\n", "Transitive Rules", (enableTransitiveRules ? "Yes" : "No"));
+    }
+    if (enableStandAloneMode) {
+      printf("  %-25s | %s\n", "Standalone Mode", (enableStandAloneMode ? "Yes" : "No"));
     }
 
     printf("  %-25s | %s\n", "Log Type", [eventLogType UTF8String]);

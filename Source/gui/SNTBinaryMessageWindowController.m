@@ -14,13 +14,19 @@
 
 #import "Source/gui/SNTBinaryMessageWindowController.h"
 
+#import <LocalAuthentication/LocalAuthentication.h>
 #import <MOLCertificate/MOLCertificate.h>
+#import <MOLXPCConnection/MOLXPCConnection.h>
 #import <SecurityInterface/SFCertificatePanel.h>
+#import <dispatch/dispatch.h>
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTLogging.h"
+#import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTXPCControlInterface.h"
 
 @interface SNTBinaryMessageWindowController ()
 ///  The custom message to display for this event
@@ -28,6 +34,10 @@
 
 ///  The custom URL to use for this event
 @property(copy) NSString *customURL;
+
+///  The reply block to call when the user has made a decision in standalone
+///  mode.
+//@property(readonly, nonatomic) void (^replyBlock)(BOOL authenticated);
 
 ///  A 'friendly' string representing the certificate information
 @property(readonly, nonatomic) NSString *publisherInfo;
@@ -45,12 +55,15 @@
 
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url {
+                    customURL:(NSString *)url 
+                    reply:(void (^)(BOOL authenticated))replyBlock {
   self = [super initWithWindowNibName:@"MessageWindow"];
   if (self) {
     _event = event;
     _customMessage = message;
     _customURL = url;
+    _replyBlock = replyBlock;
+//    _replyBlockSemaphore = dispatch_semaphore_create(0);
     _progress = [NSProgress discreteProgressWithTotalUnitCount:1];
     [_progress addObserver:self
                 forKeyPath:@"fractionCompleted"
@@ -82,9 +95,25 @@
 - (void)loadWindow {
   [super loadWindow];
   NSURL *url = [SNTBlockMessage eventDetailURLForEvent:self.event customURL:self.customURL];
+  BOOL isStandalone = [[SNTConfigurator configurator] enableStandaloneMode];
 
-  if (!url) {
+  LOGE(@"PLM -- loadWindow isStandalone %d", isStandalone);
+
+  if (!url && !isStandalone) {
+    LOGE(@"PLM -- No URL to open for event %@ removing button", self.event.idx);
     [self.openEventButton removeFromSuperview];
+  } else if (isStandalone) {
+    NSError *err;
+
+    if (![self isAbleToAuthenticateInStandaloneMode:&err]) {
+      LOGE(@"Unable to authenticate with TouchID in Standalone Mode: %@", err);
+      [self.openEventButton removeFromSuperview];
+    }
+
+    [self.openEventButton setTitle:@"Approve"];
+    // Require the button keyEquivalent set to be CMD + Return
+    [self.openEventButton setKeyEquivalent:@"\r"];                                   // Return Key
+    [self.openEventButton setKeyEquivalentModifierMask:NSEventModifierFlagCommand];  // Command Key
   } else if (self.customURL.length == 0) {
     // Set the button text only if a per-rule custom URL is not used. If a
     // custom URL is used, it is assumed that the `EventDetailText` config value
@@ -119,6 +148,10 @@
   if (!self.event.fileBundleName) {
     [self.applicationNameLabel removeFromSuperview];
   }
+
+  if (![[SNTConfigurator configurator] enableStandaloneMode]) {
+    self.replyBlock(NO);
+  }
 }
 
 - (NSString *)messageHash {
@@ -135,11 +168,70 @@
                                                showGroup:YES];
 }
 
+// Check if the user is able to authenticate using Touch ID. Returns YES if the
+// user is able to NO Otherwise
+- (BOOL) isAbleToAuthenticateInStandaloneMode:(NSError **)err {
+  LAContext *context = [[LAContext alloc] init];
+
+  if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:err]) {
+    return NO;
+  }
+
+  return YES;
+}
+
+// When running in standalone mode, the user is prompted to approve the binary.
+- (void)approveBinaryForStandaloneMode {
+  LAContext *context = [[LAContext alloc] init];
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  LOGE(@"PLM -- Attempting to authenticate user for standalone mode");
+
+  [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+          localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]
+                    reply:^(BOOL success, NSError *error) {
+                      if (self.replyBlock == nil) {
+                        LOGE(@"PLM -- replyBlock is nil");
+                        dispatch_semaphore_signal(sema); 
+                        return;
+                      }
+
+                      if (success) {
+                          LOGE(@"PLM -- User authenticated for standalone mode");
+                          self.replyBlock(YES);
+                          LOGE(@"PLM -- Finished calling reply block with YES");
+                      } else {
+                          LOGE(@"PLM -- User failed to authenticate for standalone mode");
+                          self.replyBlock(NO);
+                      }
+                      dispatch_semaphore_signal(sema); 
+                    }];
+
+  //TODO do we need to use a semaphore here?
+  dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+  //dispatch_semaphore_signal(self.replyBlockSemaphore);
+}
+
 - (IBAction)openEventDetails:(id)sender {
+  BOOL isInStandaloneMode = [[SNTConfigurator configurator] enableStandaloneMode];
+
+  if (isInStandaloneMode) {
+    [self closeWindow:sender];
+    [self approveBinaryForStandaloneMode];
+
+    return;
+  }
+
   NSURL *url = [SNTBlockMessage eventDetailURLForEvent:self.event customURL:self.customURL];
 
   [self closeWindow:sender];
   [[NSWorkspace sharedWorkspace] openURL:url];
+
+  if (self.replyBlock) {
+    LOGE(@"PLM -- Calling reply block with NO from openEventDetails");
+    self.replyBlock(NO);
+  }
 }
 
 #pragma mark Generated properties

@@ -25,7 +25,8 @@
 
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url;
+                    customURL:(NSString *)url
+                    reply:(void (^)(BOOL authenticated))replyBlock;
 
 - (IBAction)showCertInfo:(id)sender;
 - (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash;
@@ -63,6 +64,17 @@
 ///  The execution event that this window is for
 ///
 @property(readonly) SNTStoredEvent *event;
+
+///
+/// TODO(PLM) Fix comment
+/// The reply block to call when the user has authenticated via touch ID in standalone mode.
+///
+@property(readonly, nonatomic) void (^replyBlock)(BOOL authenticated);
+
+///
+/// TODO(PLM) Fix this comment
+///
+//@property dispatch_semaphore_t replyBlockSemaphore;
 
 ///
 ///  The root progress object. Child nodes are vended to santad to report on work being done.
