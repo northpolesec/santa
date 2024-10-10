@@ -145,20 +145,17 @@ static void FinishInstall() {
 
   // Rename Santa_NPS.app to Santa.app.
   // TODO: Check /Applications/Santa_NPS.app signature before finalizing the install.
-  // TODO: Handle supporting services.
   // TODO: Add tamper protection to /Applications/Santa.app.
-  NSFileManager *fm = [NSFileManager defaultManager];
-  if ([fm fileExistsAtPath:@"/Applications/Santa_NPS.app"]) {
-    NSError *error;
-    if (![fm removeItemAtPath:@"/Applications/Santa.app" error:&error]) {
-      LOGE(@"NPS rename: remove error: %@", error);
-    }
-    if (![fm moveItemAtPath:@"/Applications/Santa_NPS.app"
-                     toPath:@"/Applications/Santa.app"
-                      error:&error]) {
-      LOGE(@"NPS rename: move error: %@", error);
-    }
-  }
+  NSString *finish_install_script = [[NSBundle mainBundle] pathForResource:@"finish_install"
+                                                                    ofType:@"sh"];
+  NSTask *task = [[NSTask alloc] init];
+  task.launchPath = @"/bin/bash";
+  task.arguments = @[ finish_install_script ];
+  task.environment = @{@"CONF_DIR" : [[NSBundle mainBundle] resourcePath]};
+  NSError *error;
+  [task launchAndReturnError:&error];
+  LOGI(@"finish_install.sh error: %@", error);
+  [task waitUntilExit];
 }
 
 int main(int argc, char *argv[]) {

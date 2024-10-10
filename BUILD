@@ -7,7 +7,14 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
+exports_files([
+    "LICENSE",
+    "Conf/finish_install.sh",
+    "Conf/com.northpolesec.santa.bundleservice.plist",
+    "Conf/com.northpolesec.santa.metricservice.plist",
+    "Conf/com.northpolesec.santa.plist",
+    "Conf/com.northpolesec.santa.syncservice.plist",
+])
 
 # The version label for mac_* rules.
 apple_bundle_version(
@@ -101,10 +108,6 @@ genrule(
         "//Source/gui:Santa",
         "Conf/install.sh",
         "Conf/uninstall.sh",
-        "Conf/com.northpolesec.santa.bundleservice.plist",
-        "Conf/com.northpolesec.santa.metricservice.plist",
-        "Conf/com.northpolesec.santa.syncservice.plist",
-        "Conf/com.northpolesec.santa.plist",
         "Conf/com.northpolesec.santa.newsyslog.conf",
         "Conf/Package/Distribution.xml",
         "Conf/Package/notarization_tool.sh",
