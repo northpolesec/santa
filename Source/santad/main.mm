@@ -15,7 +15,6 @@
 #include <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 #include <mach/task.h>
-
 #include <memory>
 
 #import "Source/common/SNTConfigurator.h"
@@ -23,7 +22,6 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SystemResources.h"
-#include "Source/santad/MachServiceDeadWaiter.h"
 #import "Source/santad/Santad.h"
 #include "Source/santad/SantadDeps.h"
 
@@ -87,80 +85,6 @@ static void SantaWatchdog(void *context) {
   }
 }
 
-static bool IsGoogleSantaActiveEnabled() {
-  // `+[OSSystemExtensionRequest propertiesRequestForExtension:queue:]` is only usable when
-  // inspecting system extensions signed with the same TEAM ID as the caller. Instead, look through
-  // the system extension on-disk db.plist artifact. To prevent crashing on schema changes, check
-  // the types of the values as the dictionary is walked.
-  NSDictionary *system_extensions_db =
-    [NSDictionary dictionaryWithContentsOfFile:@"/Library/SystemExtensions/db.plist"];
-  if (![system_extensions_db isKindOfClass:[NSDictionary class]]) return false;
-
-  NSArray *system_extensions = system_extensions_db[@"extensions"];
-  if (![system_extensions isKindOfClass:[NSArray class]]) return false;
-
-  for (NSDictionary *sysx in system_extensions) {
-    if (![sysx isKindOfClass:[NSDictionary class]]) return false;
-
-    NSString *identifier = sysx[@"identifier"];
-    if (![identifier isKindOfClass:[NSString class]]) return false;
-
-    NSString *state = sysx[@"state"];
-    if (![state isKindOfClass:[NSString class]]) return false;
-
-    if ([identifier isEqualToString:@"com.google.santa.daemon"] &&
-        [state isEqualToString:@"activated_enabled"]) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-static void FinishInstall() {
-  // Wait for com.google.santa.daemon to be removed.
-  while (1) {
-    // Record if com.google.santa.daemon is an active and enabled system extension.
-    bool google_santa_active_enabled = IsGoogleSantaActiveEnabled();
-
-    // Wait for its mach port to die. MachServiceDeadWaiter will return immediately if the service
-    // can not be found. Perform this call unconditionally, if /Library/SystemExtensions/db.plist
-    // changes its schema and `IsGoogleSantaActiveEnabled` returns a false negative, checking for
-    // the mach service is still the correct thing to do.
-    MachServiceDeadWaiter google_santa("EQHXZ8M8AV.com.google.santa.daemon.xpc");
-
-    // If com.google.santa.daemon was recorded as being active and enabled, wait for 1 second and
-    // check again. This should be enough time for com.google.santa.daemon to be updated or recover
-    // from a crash, preventing this loop from spinning too fast. It also prevents
-    // com.google.santa.daemon and com.northpolesec.santa.daemon from racing during a system reboot.
-    if (google_santa_active_enabled) {
-      LOGI(@"com.google.santa.daemon was active and enabled - waiting for removal");
-      sleep(1);
-      continue;
-    }
-
-    // com.google.santa.daemon has been uninstalled.
-    break;
-  }
-
-  // Rename Santa_NPS.app to Santa.app.
-  // TODO: Check /Applications/Santa_NPS.app signature before finalizing the install.
-  // TODO: Handle supporting services.
-  // TODO: Add tamper protection to /Applications/Santa.app.
-  NSFileManager *fm = [NSFileManager defaultManager];
-  if ([fm fileExistsAtPath:@"/Applications/Santa_NPS.app"]) {
-    NSError *error;
-    if (![fm removeItemAtPath:@"/Applications/Santa.app" error:&error]) {
-      LOGE(@"NPS rename: remove error: %@", error);
-    }
-    if (![fm moveItemAtPath:@"/Applications/Santa_NPS.app"
-                     toPath:@"/Applications/Santa.app"
-                      error:&error]) {
-      LOGE(@"NPS rename: move error: %@", error);
-    }
-  }
-}
-
 int main(int argc, char *argv[]) {
   @autoreleasepool {
     // Do not wait on child processes
@@ -174,8 +98,6 @@ int main(int argc, char *argv[]) {
       printf("%s (build %s)\n", [product_version UTF8String], [build_version UTF8String]);
       return 0;
     }
-
-    FinishInstall();
 
     dispatch_queue_t watchdog_queue = dispatch_queue_create(
       "com.northpolesec.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
