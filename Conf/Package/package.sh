@@ -44,7 +44,7 @@ echo "creating app pkg"
   "${APP_PKG_ROOT}/Library/LaunchDaemons" \
   "${APP_PKG_ROOT}/private/etc/asl" \
   "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-/bin/cp -vXR "binaries/Santa.app" "${APP_PKG_ROOT}/Applications/Santa_NPS.app"
+/bin/cp -vXR "binaries/Santa.app" "${APP_PKG_ROOT}/Applications/Santa.app"
 /bin/cp -vX "conf/com.northpolesec.santa.plist" "${APP_PKG_ROOT}/Library/LaunchAgents/"
 /bin/cp -vX "conf/com.northpolesec.santa.bundleservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
 /bin/cp -vX "conf/com.northpolesec.santa.metricservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
