@@ -145,6 +145,7 @@ objc_library(
     name = "CertificateHelpers",
     srcs = ["CertificateHelpers.m"],
     hdrs = ["CertificateHelpers.h"],
+    module_name = "santa_common_CertificateHelpers",
     deps = [
         "@MOLCertificate",
     ],
@@ -178,6 +179,7 @@ objc_library(
     srcs = ["SNTBlockMessage.m"],
     hdrs = ["SNTBlockMessage.h"],
     defines = ["SANTAGUI"],
+    module_name = "santa_common_SNTBlockMessage",
     deps = [
         ":SNTConfigurator",
         ":SNTFileAccessEvent",
@@ -334,6 +336,7 @@ objc_library(
     name = "SNTStoredEvent",
     srcs = ["SNTStoredEvent.m"],
     hdrs = ["SNTStoredEvent.h"],
+    module_name = "santa_common_SNTStoredEvent",
     deps = [
         ":SNTCommonEnums",
         "@MOLCertificate",
