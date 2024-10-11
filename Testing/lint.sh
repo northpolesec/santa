@@ -10,5 +10,7 @@ find ${GIT_ROOT} \( -name "*.m" -o -name "*.h" -o -name "*.mm" -o -name "*.cc" \
 go install github.com/bazelbuild/buildtools/buildifier@latest
 ~/go/bin/buildifier --lint=warn -r ${GIT_ROOT}
 
+virtualenv ./venv
+source ./venv/bin/activate
 python3 -m pip install -q pyink
 python3 -m pyink --config ${GIT_ROOT}/.pyink-config --check ${GIT_ROOT}
