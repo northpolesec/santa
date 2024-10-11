@@ -85,5 +85,3 @@ if [ -n "${BUILD_DEV_DISTRIBUTION_PKG}" ]; then
   fi
 
 fi
-
-
