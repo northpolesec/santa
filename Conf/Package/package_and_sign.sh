@@ -137,6 +137,15 @@ echo "productbuild migration pkg"
   --sign "${INSTALLER_SIGNING_IDENTITY}" --keychain "${INSTALLER_SIGNING_KEYCHAIN}" \
   "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg"
 
+echo "verifying migration pkg signature"
+/usr/sbin/pkgutil --check-signature "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" || die "bad pkg signature"
+
+echo "notarizing migration pkg"
+"${NOTARIZATION_TOOL}" --file "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg"
+
+echo "stapling migration pkg"
+/usr/bin/xcrun stapler staple "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" || die "failed to staple pkg"
+
 echo "wrapping pkg in dmg"
 /usr/bin/hdiutil create -fs HFS+ -format UDZO \
     -volname "${RELEASE_NAME}" \
