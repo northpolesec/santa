@@ -118,6 +118,14 @@ static bool IsGoogleSantaActiveEnabled() {
 }
 
 static void FinishInstall() {
+  // There is no work to do if there is no staged install.
+  // TODO: Add a more robust staged install check. An unprivileged user could create an empty
+  // /Applications/Santa_NPS.app directory, then reboot the system, leaving Santa.app empty and the
+  // sysx without any services.
+  if (![[NSFileManager defaultManager] fileExistsAtPath:@"/Applications/Santa_NPS.app"]) {
+    return;
+  }
+
   // Wait for com.google.santa.daemon to be removed.
   while (1) {
     // Record if com.google.santa.daemon is an active and enabled system extension.
@@ -130,9 +138,10 @@ static void FinishInstall() {
     MachServiceDeadWaiter google_santa("EQHXZ8M8AV.com.google.santa.daemon.xpc");
 
     // If com.google.santa.daemon was recorded as being active and enabled, wait for 1 second and
-    // check again. This should be enough time for com.google.santa.daemon to be updated or recover
-    // from a crash, preventing this loop from spinning too fast. It also prevents
-    // com.google.santa.daemon and com.northpolesec.santa.daemon from racing during a system reboot.
+    // check again. This should be enough time for com.google.santa.daemon to be updated or
+    // recover from a crash, preventing this loop from spinning too fast. It also prevents
+    // com.google.santa.daemon and com.northpolesec.santa.daemon from racing during a system
+    // reboot.
     if (google_santa_active_enabled) {
       LOGI(@"com.google.santa.daemon was active and enabled - waiting for removal");
       sleep(1);
@@ -143,7 +152,6 @@ static void FinishInstall() {
     break;
   }
 
-  // Rename Santa_NPS.app to Santa.app.
   // TODO: Check /Applications/Santa_NPS.app signature before finalizing the install.
   // TODO: Add tamper protection to /Applications/Santa.app.
   NSString *finish_install_script = [[NSBundle mainBundle] pathForResource:@"finish_install"

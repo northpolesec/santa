@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # This script is run by the NPS Santa sysx (com.northpolesec.santa.daemon) on
-# sysx startup, if the Google Santa sysx (com.google.santa.daemon) has been
-# removed.
+# sysx startup, if there is a staged NPS Santa install pending, and the Google
+# Santa sysx (com.google.santa.daemon) has been removed.
 # The script removes the rest of Google Santa's services and on-disk
 # artifacts, then finishes installing NPS Santa.
 
@@ -10,6 +10,8 @@ function die {
   echo "${@}"
   exit 2
 }
+
+[[ -d "/Applications/Santa_NPS.app" ]] || die "no staged install"
 
 # CONF_DIR is a required environment variable that points the directory that
 # contains NPS Santa launch job configurations. In the intended use case,
@@ -24,7 +26,6 @@ function die {
 /bin/launchctl remove com.google.santa.syncservice || true
 GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 [[ -n "${GUI_USER}" ]] && /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.google.santa || true
-/bin/rm -rf /Applications/Santa.app
 /bin/rm -f /Library/LaunchAgents/com.google.santa.plist
 /bin/rm -f /Library/LaunchDaemons/com.google.santa.bundleservice.plist
 /bin/rm -f /Library/LaunchDaemons/com.google.santa.metricservice.plist
@@ -41,6 +42,7 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 [[ -n "${GUI_USER}" ]] && /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.northpolesec.santa || true
 
 # Finish installing NPS Santa.
+/bin/rm -rf /Applications/Santa.app 
 /bin/mv /Applications/Santa_NPS.app /Applications/Santa.app
 
 # Create a symlink for santactl.
