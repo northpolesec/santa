@@ -55,15 +55,15 @@
 
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url 
-                    reply:(void (^)(BOOL authenticated))replyBlock {
+                    customURL:(NSString *)url
+                        reply:(void (^)(BOOL authenticated))replyBlock {
   self = [super initWithWindowNibName:@"MessageWindow"];
   if (self) {
     _event = event;
     _customMessage = message;
     _customURL = url;
     _replyBlock = replyBlock;
-//    _replyBlockSemaphore = dispatch_semaphore_create(0);
+    //    _replyBlockSemaphore = dispatch_semaphore_create(0);
     _progress = [NSProgress discreteProgressWithTotalUnitCount:1];
     [_progress addObserver:self
                 forKeyPath:@"fractionCompleted"
@@ -97,10 +97,7 @@
   NSURL *url = [SNTBlockMessage eventDetailURLForEvent:self.event customURL:self.customURL];
   BOOL isStandalone = [[SNTConfigurator configurator] enableStandaloneMode];
 
-  LOGE(@"PLM -- loadWindow isStandalone %d", isStandalone);
-
   if (!url && !isStandalone) {
-    LOGE(@"PLM -- No URL to open for event %@ removing button", self.event.idx);
     [self.openEventButton removeFromSuperview];
   } else if (isStandalone) {
     NSError *err;
@@ -170,7 +167,7 @@
 
 // Check if the user is able to authenticate using Touch ID. Returns YES if the
 // user is able to NO Otherwise
-- (BOOL) isAbleToAuthenticateInStandaloneMode:(NSError **)err {
+- (BOOL)isAbleToAuthenticateInStandaloneMode:(NSError **)err {
   LAContext *context = [[LAContext alloc] init];
 
   if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:err]) {
@@ -184,33 +181,23 @@
 - (void)approveBinaryForStandaloneMode {
   LAContext *context = [[LAContext alloc] init];
 
-  //dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-
   LOGE(@"PLM -- Attempting to authenticate user for standalone mode");
 
   [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
           localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]
                     reply:^(BOOL success, NSError *error) {
                       if (self.replyBlock == nil) {
-                        LOGE(@"PLM -- replyBlock is nil");
-   //                     dispatch_semaphore_signal(sema); 
                         return;
                       }
 
                       if (success) {
-                          LOGE(@"PLM -- User authenticated for standalone mode");
-                          self.replyBlock(YES);
-                          LOGE(@"PLM -- Finished calling reply block with YES");
+                        LOGD(@"User approved binary in standalone mode");
+                        self.replyBlock(YES);
                       } else {
-                          LOGE(@"PLM -- User failed to authenticate for standalone mode");
-                          self.replyBlock(NO);
+                        LOGD(@"User denied binary in standalone mode");
+                        self.replyBlock(NO);
                       }
-    //                  dispatch_semaphore_signal(sema); 
                     }];
-
-  //TODO do we need to use a semaphore here?
-  //dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-  //dispatch_semaphore_signal(self.replyBlockSemaphore);
 }
 
 - (IBAction)openEventDetails:(id)sender {
@@ -229,7 +216,6 @@
   [[NSWorkspace sharedWorkspace] openURL:url];
 
   if (self.replyBlock) {
-    LOGE(@"PLM -- Calling reply block with NO from openEventDetails");
     self.replyBlock(NO);
   }
 }
