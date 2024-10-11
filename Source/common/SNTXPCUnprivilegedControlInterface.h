@@ -52,11 +52,6 @@ struct RuleCounts {
 - (void)staticRuleCount:(void (^)(int64_t count))reply;
 
 ///
-/// Standalone rules
-///
-- (void)addStandaloneRule:(SNTRule *)rule reply:(void (^)(NSError *))reply;
-
-///
 ///  Decision ops
 ///
 
