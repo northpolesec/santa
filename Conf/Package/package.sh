@@ -77,4 +77,13 @@ if [ -n "${BUILD_DEV_DISTRIBUTION_PKG}" ]; then
     --distribution "${SCRIPT_PATH}/Distribution.xml" \
     --package-path "${PKG_OUT_DIR}" \
     "${PKG_OUT_DIR}/santa-dev.pkg"
+
+  if [ -n "${BUILD_DEV_MIGRATION_PKG}" ]; then
+    export PKG_OUT_DIR
+    export APP_VERSION
+    RELEASE_PACKAGE="${PKG_OUT_DIR}/santa-dev.pkg" BUILD_DEV_DISTRIBUTION_PKG=1 "${SCRIPT_PATH}/migration/package.sh"
+  fi
+
 fi
+
+
