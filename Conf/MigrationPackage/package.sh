@@ -71,4 +71,3 @@ if [ -n "${BUILD_DEV_DISTRIBUTION_PKG}" ]; then
     --package-path "${PKG_OUT_DIR}" \
     "${PKG_OUT_DIR}/santa-dev.pkg"
 fi
-
