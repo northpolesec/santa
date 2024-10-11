@@ -38,8 +38,8 @@ static const int kMaximumNotifications = 10;
 
 - (void)addEvent:(SNTStoredEvent *)event
   withCustomMessage:(NSString *)message
-       andCustomURL:(NSString *)url 
-       andReply:(void (^)(BOOL authenticated))reply {
+       andCustomURL:(NSString *)url
+           andReply:(void (^)(BOOL authenticated))reply {
   if (!event) return;
 
   if (self.pendingNotifications.count > kMaximumNotifications) {
@@ -56,7 +56,6 @@ static const int kMaximumNotifications = 10;
   }
 
   if (reply) {
-    // Copy the block
     d[@"reply"] = [reply copy];
   }
 
@@ -76,7 +75,7 @@ static const int kMaximumNotifications = 10;
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
                     andCustomURL:d[@"url"]
-                    andReply:d[@"reply"]];
+                        andReply:d[@"reply"]];
       // TODO if running in standalone mode, add the rules to the database
       [postedNotifications addObject:d];
     }

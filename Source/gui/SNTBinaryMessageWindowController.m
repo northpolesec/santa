@@ -63,7 +63,6 @@
     _customMessage = message;
     _customURL = url;
     _replyBlock = replyBlock;
-    //    _replyBlockSemaphore = dispatch_semaphore_create(0);
     _progress = [NSProgress discreteProgressWithTotalUnitCount:1];
     [_progress addObserver:self
                 forKeyPath:@"fractionCompleted"
@@ -181,7 +180,7 @@
 - (void)approveBinaryForStandaloneMode {
   LAContext *context = [[LAContext alloc] init];
 
-  LOGE(@"PLM -- Attempting to authenticate user for standalone mode");
+  LOGD(@"Attempting to authenticate user for standalone mode");
 
   [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
           localizedReason:[NSString stringWithFormat:@"Approve %@", self.event.signingID]

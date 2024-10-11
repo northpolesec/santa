@@ -26,7 +26,7 @@
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
                     customURL:(NSString *)url
-                    reply:(void (^)(BOOL authenticated))replyBlock;
+                        reply:(void (^)(BOOL authenticated))replyBlock;
 
 - (IBAction)showCertInfo:(id)sender;
 - (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash;
@@ -66,9 +66,8 @@
 @property(readonly) SNTStoredEvent *event;
 
 ///
-/// TODO(PLM) Fix comment
-/// The reply block to call when the user has authenticated via touch ID in standalone mode.
-///
+///  The reply block to call when the user has made a decision in standalone
+///  mode.
 @property(readonly, nonatomic) void (^replyBlock)(BOOL authenticated);
 
 ///
