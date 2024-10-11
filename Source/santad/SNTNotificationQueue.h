@@ -24,6 +24,6 @@
 - (void)addEvent:(SNTStoredEvent *)event
   withCustomMessage:(NSString *)message
        andCustomURL:(NSString *)url
-       andReply:(void (^)(BOOL authenticated))reply;
+           andReply:(void (^)(BOOL authenticated))reply;
 
 @end
