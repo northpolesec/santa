@@ -108,7 +108,6 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     if ([self notificationAlreadyQueued:pendingMsg]) {
       if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
         SNTBinaryMessageWindowController *bmwc = (SNTBinaryMessageWindowController *)pendingMsg;
-        LOGE(@"PLM -- Notification already queued, dropping");
         bmwc.replyBlock(NO);
       }
       return;
@@ -351,7 +350,6 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     [[SNTBinaryMessageWindowController alloc] initWithEvent:event customMsg:message 
                                               customURL:url reply:reply];
 
-  LOGE(@"PLM -- queueing message");
   [self queueMessage:pendingMsg];
 }
 

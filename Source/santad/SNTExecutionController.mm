@@ -404,22 +404,25 @@ static NSString *const kPrinterProxyPostMonterey =
           self->_ttyWriter->Write(targetProc, msg);
         }
 
+        void (^replyBlock)(BOOL) = ^void(BOOL authenticated) {
+        };
 
-        void (^replyBlock)(BOOL) = ^void(BOOL authenticated) {};
-
-        // Check if we're in standalone mode and create the rule wrapping it in a block. 
+        // Check if we're in standalone mode and create the rule wrapping it in a block.
         if ([[SNTConfigurator configurator] enableStandaloneMode]) {
           replyBlock = ^void(BOOL authenticated) {
-            LOGE(@"PLM -- User responded to block event for %@ with authenticated: %d", se.filePath, authenticated);
-            LOGE(@"PLM -- %@", NSThread.callStackSymbols);
+            LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
+                 authenticated);
             if (authenticated) {
               [self createRuleForStandaloneMode:YES event:se];
             }
           };
-        } 
+        }
 
         // Let the user know what happened in the GUI.
-        [self.notifierQueue addEvent:se withCustomMessage:cd.customMsg andCustomURL:cd.customURL andReply:replyBlock];
+        [self.notifierQueue addEvent:se
+                   withCustomMessage:cd.customMsg
+                        andCustomURL:cd.customURL
+                            andReply:replyBlock];
       }
     }
   }
@@ -494,31 +497,30 @@ static NSString *const kPrinterProxyPostMonterey =
   *sessions = [loggedInHosts copy];
 }
 
-- (void) createRuleForStandaloneMode:(BOOL) authenticated event:(SNTStoredEvent *)se {
-      SNTRuleType ruleType = SNTRuleTypeSigningID;
-      NSString *ruleIdentifier = se.signingID;
+- (void)createRuleForStandaloneMode:(BOOL)authenticated event:(SNTStoredEvent *)se {
+  SNTRuleType ruleType = SNTRuleTypeSigningID;
+  NSString *ruleIdentifier = se.signingID;
 
-      // Check here to see if the binary is validly signed if not
-      // then use a hash rule instead of a signing ID
-      if (se.signingChain.count == 0) {
-          LOGD(@"No certificate chain found for %@", se.filePath);
-          ruleType = SNTRuleTypeBinary;
-          ruleIdentifier = se.fileSHA256;
-      }
+  // Check here to see if the binary is validly signed if not
+  // then use a hash rule instead of a signing ID
+  if (se.signingChain.count == 0) {
+    LOGD(@"No certificate chain found for %@", se.filePath);
+    ruleType = SNTRuleTypeBinary;
+    ruleIdentifier = se.fileSHA256;
+  }
 
-      // Add rule to allow binary same as santactl rule.
-      SNTRule *newRule = [[SNTRule alloc] initWithIdentifier:ruleIdentifier
-                                                        state:SNTRuleStateAllow
-                                                         type:ruleType
-                                                    customMsg:@"Approved by user in standalone mode"
-                                                    timestamp:[[NSDate now] timeIntervalSince1970]];
-      NSError *err;
-      [self.ruleTable addRules:@[newRule] 
-                      ruleCleanup:SNTRuleCleanupNone 
-                      error:&err];
-      if (err) {
-          LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath, err.localizedDescription);
-      }
+  // Add rule to allow binary same as santactl rule.
+  SNTRule *newRule = [[SNTRule alloc] initWithIdentifier:ruleIdentifier
+                                                   state:SNTRuleStateAllow
+                                                    type:ruleType
+                                               customMsg:@"Approved by user in standalone mode"
+                                               timestamp:[[NSDate now] timeIntervalSince1970]];
+  NSError *err;
+  [self.ruleTable addRules:@[ newRule ] ruleCleanup:SNTRuleCleanupNone error:&err];
+  if (err) {
+    LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
+         err.localizedDescription);
+  }
 }
 
 @end

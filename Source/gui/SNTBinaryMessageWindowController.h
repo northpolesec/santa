@@ -71,11 +71,6 @@
 @property(readonly, nonatomic) void (^replyBlock)(BOOL authenticated);
 
 ///
-/// TODO(PLM) Fix this comment
-///
-//@property dispatch_semaphore_t replyBlockSemaphore;
-
-///
 ///  The root progress object. Child nodes are vended to santad to report on work being done.
 ///
 @property NSProgress *progress;
