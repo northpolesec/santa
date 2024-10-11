@@ -1,4 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -58,7 +59,7 @@
   id dncMock = OCMClassMock([NSDistributedNotificationCenter class]);
   OCMStub([dncMock defaultCenter]).andReturn(dncMock);
 
-  [sut postBlockNotification:ev withCustomMessage:@"" andCustomURL:@""];
+  [sut postBlockNotification:ev withCustomMessage:@"" andCustomURL:@"" andReply:^(BOOL authenticated){}];
 
   OCMVerify([dncMock postNotificationName:@"com.northpolesec.santa.notification.blockedeexecution"
                                    object:@"com.northpolesec.santa"
