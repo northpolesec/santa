@@ -12,8 +12,8 @@ function die {
 }
 
 # RELEASE_ROOT is a required environment variable that points to the root
-# of an extracted release tarball produced with the :release and :release_driver
-# rules in Santa's main BUILD file.
+# of a release tarball produced with the :release rule in Santa's
+# main BUILD file, or the root of an extracted release dir.
 [[ -n "${RELEASE_ROOT}" ]] || die "RELEASE_ROOT unset"
 
 # SIGNING_IDENTITY, SIGNING_TEAMID and SIGNING_KEYCHAIN are required environment
@@ -30,7 +30,7 @@ function die {
 [[ -n "${INSTALLER_SIGNING_KEYCHAIN}" ]] || die "INSTALLER_SIGNING_KEYCHAIN unset"
 
 # NOTARIZATION_TOOL is a required environment variable pointing to a wrapper
-# tool around the tool to use for notarization. The tool must take 2 flags:
+# tool around the tool to use for notarization. The tool must take 1 flag:
 #    --file
 #        - pointing at a zip file containing the artifact to notarize
 [[ -n "${NOTARIZATION_TOOL}" ]] || die "NOTARIZATION_TOOL unset"
@@ -40,6 +40,13 @@ function die {
 [[ -n "${ARTIFACTS_DIR}" ]] || die "ARTIFACTS_DIR unset"
 
 ################################################################################
+
+# Extract release, if necessary
+if [[ -f "${RELEASE_ROOT}" ]]; then
+  NEW_RELEASE_ROOT=$(mktemp -dt release_root)
+  tar xvzf "${RELEASE_ROOT}" -C "${NEW_RELEASE_ROOT}"
+  RELEASE_ROOT=${NEW_RELEASE_ROOT}
+fi
 
 readonly INPUT_APP="${RELEASE_ROOT}/binaries/Santa.app"
 readonly INPUT_SYSX="${INPUT_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension"
