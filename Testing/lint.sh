@@ -10,21 +10,19 @@ find ${GIT_ROOT} \( -name "*.m" -o -name "*.h" -o -name "*.mm" -o -name "*.cc" \
 go install github.com/bazelbuild/buildtools/buildifier@latest
 ~/go/bin/buildifier --lint=warn -r ${GIT_ROOT}
 
-if command -v virtualenv &> /dev/null
-then
-    echo ""
+if [ -d "./santa-venv" ]; then
+ echo "santa-venv already exists reusing".  
 else
-    echo "virtualenv not found. Installing..."
-    sudo pip3 install virtualenv
+ echo "Creating virtual environment ./santa-venv..."
+    python3 -m venv ./santa-venv
     if [ $? -eq 0 ]; then
-        echo "virtualenv has been successfully installed"
+        echo "Virtual environment ./santa-venv has been successfully created"
     else
-        echo "Failed to install virtualenv"
+        echo "Failed to create virtual environment ./santa-venv"
         exit 1
     fi
 fi
 
-virtualenv ./venv
-source ./venv/bin/activate
+source ./santa-venv/bin/activate
 python3 -m pip install -q pyink
 python3 -m pyink --config ${GIT_ROOT}/.pyink-config --check ${GIT_ROOT}
