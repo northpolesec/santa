@@ -30,7 +30,7 @@ function die {
 [[ -n "${INSTALLER_SIGNING_KEYCHAIN}" ]] || die "INSTALLER_SIGNING_KEYCHAIN unset"
 
 # NOTARIZATION_TOOL is a required environment variable pointing to a wrapper
-# tool around the tool to use for notarization. The tool must take 2 flags:
+# tool around the tool to use for notarization. The tool must take 1 flags:
 #    --file
 #        - pointing at a zip file containing the artifact to notarize
 [[ -n "${NOTARIZATION_TOOL}" ]] || die "NOTARIZATION_TOOL unset"
