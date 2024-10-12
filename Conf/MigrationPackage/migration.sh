@@ -7,7 +7,7 @@ do
   if [ -z "${GOOGLE_SANTA_ACTIVATED}" ]; then
     break;
   else
-    sleep 1
+    sleep 10
   fi
 done
 
