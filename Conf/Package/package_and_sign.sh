@@ -125,6 +125,27 @@ echo "notarizing pkg"
 echo "stapling pkg"
 /usr/bin/xcrun stapler staple "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" || die "failed to staple pkg"
 
+export APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "binaries/Santa.app/Contents/Info.plist")
+RELEASE_PACKAGE="${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" "${SCRIPT_PATH}/migration/package.sh"
+
+# Build signed distribution migration package.
+echo "productbuild migration pkg"
+/bin/mkdir -p "${SCRATCH}/${RELEASE_NAME}"
+/usr/bin/productbuild \
+  --distribution "${SCRIPT_PATH}/migration/Distribution.xml" \
+  --package-path "${SCRATCH}" \
+  --sign "${INSTALLER_SIGNING_IDENTITY}" --keychain "${INSTALLER_SIGNING_KEYCHAIN}" \
+  "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg"
+
+echo "verifying migration pkg signature"
+/usr/sbin/pkgutil --check-signature "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" || die "bad pkg signature"
+
+echo "notarizing migration pkg"
+"${NOTARIZATION_TOOL}" --file "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg"
+
+echo "stapling migration pkg"
+/usr/bin/xcrun stapler staple "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" || die "failed to staple pkg"
+
 echo "wrapping pkg in dmg"
 /usr/bin/hdiutil create -fs HFS+ -format UDZO \
     -volname "${RELEASE_NAME}" \
