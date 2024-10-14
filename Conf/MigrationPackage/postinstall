@@ -3,6 +3,6 @@
 # If the target volume is not /, do nothing
 [[ $3 != "/" ]] && exit 0
 
-# Load com.northpolesec.santa.bundleservice
+# Load com.northpolesec.santa.migration
 /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
 exit 0
