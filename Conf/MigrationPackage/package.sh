@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 function die {
   echo "${@}"
   exit 2
@@ -42,8 +44,8 @@ echo "creating migration pkg"
 /bin/mkdir -p "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa" \
   "${APP_PKG_ROOT}/Library/LaunchDaemons"
 /bin/cp -vX "${RELEASE_PACKAGE}" "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa/santa.pkg"
-/bin/cp -vX "conf/migration/com.northpolesec.santa.migration.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "conf/migration/migration.sh" "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa/"
+/bin/cp -vX "${SCRIPT_PATH}/com.northpolesec.santa.migration.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vX "${SCRIPT_PATH}/migration.sh" "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa/"
 /bin/cp -vXL "${SCRIPT_PATH}/preinstall" "${APP_PKG_SCRIPTS}/"
 /bin/cp -vXL "${SCRIPT_PATH}/postinstall" "${APP_PKG_SCRIPTS}/"
 /bin/chmod +x "${APP_PKG_SCRIPTS}/"*

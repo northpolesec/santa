@@ -6,6 +6,8 @@
 # DMG. It also outputs a single release tarball.
 # All of the following environment variables are required.
 
+set -e
+
 function die {
   echo "${@}"
   exit 2
