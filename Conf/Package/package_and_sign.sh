@@ -61,6 +61,7 @@ readonly RELEASE_NAME="santa-$(/usr/bin/plutil -extract CFBundleShortVersionStri
 
 readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
 
+readonly PKG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.pkg"
 readonly DMG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.dmg"
 readonly TAR_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.tar.gz"
 
@@ -153,6 +154,9 @@ echo "notarizing migration pkg"
 
 echo "stapling migration pkg"
 /usr/bin/xcrun stapler staple "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" || die "failed to staple pkg"
+
+echo "copying pkg to output"
+cp "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" "${PKG_PATH}"
 
 echo "wrapping pkg in dmg"
 /usr/bin/hdiutil create -fs HFS+ -format UDZO \
