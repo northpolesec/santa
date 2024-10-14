@@ -13,6 +13,6 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Google, LLC.</string>
+	<string>North Pole Security, Inc.</string>
 </dict>
 </plist>
