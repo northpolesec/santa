@@ -34,9 +34,9 @@ readonly SCRIPT_PATH="$(/usr/bin/dirname -- ${BASH_SOURCE[0]})"
 
 # Ensure _CodeSignature/CodeResources files have 0644 permissions so they can
 # be verified without using sudo.
-/usr/bin/find "binaries" -type f -name CodeResources -exec chmod 0644 {} \;
-/usr/bin/find "binaries" -type d -exec chmod 0755 {} \;
-/usr/bin/find "conf" -type f -name "com.northpolesec.santa*" -exec chmod 0644 {} \;
+/usr/bin/find "${RELEASE_ROOT}/binaries" -type f -name CodeResources -exec chmod 0644 {} \;
+/usr/bin/find "${RELEASE_ROOT}/binaries" -type d -exec chmod 0755 {} \;
+/usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.northpolesec.santa*" -exec chmod 0644 {} \;
 
 echo "creating app pkg"
 /bin/mkdir -p "${APP_PKG_ROOT}/Applications" \
@@ -44,12 +44,12 @@ echo "creating app pkg"
   "${APP_PKG_ROOT}/Library/LaunchDaemons" \
   "${APP_PKG_ROOT}/private/etc/asl" \
   "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-/bin/cp -vXR "binaries/Santa.app" "${APP_PKG_ROOT}/Applications/Santa.app"
-/bin/cp -vX "conf/com.northpolesec.santa.plist" "${APP_PKG_ROOT}/Library/LaunchAgents/"
-/bin/cp -vX "conf/com.northpolesec.santa.bundleservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "conf/com.northpolesec.santa.metricservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "conf/com.northpolesec.santa.syncservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
+/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/Applications/Santa.app"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.plist" "${APP_PKG_ROOT}/Library/LaunchAgents/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.bundleservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.metricservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.syncservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
 /bin/cp -vXL "${SCRIPT_PATH}/preinstall" "${APP_PKG_SCRIPTS}/"
 /bin/cp -vXL "${SCRIPT_PATH}/postinstall" "${APP_PKG_SCRIPTS}/"
 /bin/chmod +x "${APP_PKG_SCRIPTS}/"*
