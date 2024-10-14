@@ -29,8 +29,7 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 /usr/sbin/installer -pkg /Library/Caches/com.northpolesec.santa/santa.pkg -target /
 
 # Cleanup migration service and on-disk artifacts.
-/bin/rm /Library/Caches/com.northpolesec.santa/santa.pkg
-/bin/rm /Library/Caches/com.northpolesec.santa/migration.sh
+/bin/rm -rf /Library/Caches/com.northpolesec.santa/
 /bin/rm /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
 /bin/launchctl remove com.northpolesec.santa.migration
 
