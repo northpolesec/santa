@@ -111,14 +111,13 @@ echo "creating fresh release tarball"
 # Create the app pkg at "${SCRATCH}/app.pkg".
 export RELEASE_ROOT
 export PKG_OUT_DIR="${SCRATCH}"
-readonly SCRIPT_PATH="$(/usr/bin/dirname -- ${BASH_SOURCE[0]})"
-"${SCRIPT_PATH}/package.sh"
+"${RELEASE_ROOT}/conf/package.sh"
 
 # Build signed distribution package
 echo "productbuild pkg"
 /bin/mkdir -p "${SCRATCH}/${RELEASE_NAME}"
 /usr/bin/productbuild \
-  --distribution "${SCRIPT_PATH}/Distribution.xml" \
+  --distribution "${RELEASE_ROOT}/conf/Distribution.xml" \
   --package-path "${SCRATCH}" \
   --sign "${INSTALLER_SIGNING_IDENTITY}" --keychain "${INSTALLER_SIGNING_KEYCHAIN}" \
   "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg"
@@ -133,13 +132,13 @@ echo "stapling pkg"
 /usr/bin/xcrun stapler staple "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" || die "failed to staple pkg"
 
 export APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "binaries/Santa.app/Contents/Info.plist")
-RELEASE_PACKAGE="${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" "${SCRIPT_PATH}/migration/package.sh"
+RELEASE_PACKAGE="${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" "${RELEASE_ROOT}/conf/migration/package.sh"
 
 # Build signed distribution migration package.
 echo "productbuild migration pkg"
 /bin/mkdir -p "${SCRATCH}/${RELEASE_NAME}"
 /usr/bin/productbuild \
-  --distribution "${SCRIPT_PATH}/migration/Distribution.xml" \
+  --distribution "${RELEASE_ROOT}/conf/migration/Distribution.xml" \
   --package-path "${SCRATCH}" \
   --sign "${INSTALLER_SIGNING_IDENTITY}" --keychain "${INSTALLER_SIGNING_KEYCHAIN}" \
   "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg"
