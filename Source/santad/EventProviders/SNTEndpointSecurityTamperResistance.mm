@@ -145,7 +145,6 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
     [SNTEndpointSecurityTamperResistance getProtectedPaths];
   protectedPaths.push_back({"/Library/SystemExtensions", WatchItemPathType::kPrefix});
   protectedPaths.push_back({"/bin/launchctl", WatchItemPathType::kLiteral});
-  protectedPaths.push_back({"/Applications/Santa.app", WatchItemPathType::kPrefix});
 
   // Begin watching the protected set
   [super muteTargetPaths:protectedPaths];
@@ -194,7 +193,8 @@ es_auth_result_t ValidateLaunchctlExec(const Message &esMsg) {
 }
 
 + (std::vector<std::pair<std::string, WatchItemPathType>>)getProtectedPaths {
-  std::vector<std::pair<std::string, WatchItemPathType>> protectedPathsCopy;
+  std::vector<std::pair<std::string, WatchItemPathType>>
+    protectedPathsCopy(sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]));
 
   for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); i++) {
     protectedPathsCopy.emplace_back(std::string(kProtectedFiles[i].first),
