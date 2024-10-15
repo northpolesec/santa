@@ -210,8 +210,14 @@ es_auth_result_t ValidateLaunchctlExec(const Message &esMsg) {
   // in order to use them here efficiently, but will need to make the
   // `SNTDatabaseController` an ObjC++ file.
   for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); i++) {
-    if (path == kProtectedFiles[i].first) {
-      return true;
+    auto pf = kProtectedFiles[i];
+    switch (pf.second) {
+      case WatchItemPathType::kLiteral:
+        if (path == pf.first) return true;
+        break;
+      case WatchItemPathType::kPrefix:
+        if (path.find(pf.first) == 0) return true;
+        break;
     }
   }
   return false;
