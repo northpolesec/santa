@@ -183,7 +183,7 @@ es_auth_result_t ValidateLaunchctlExec(const Message &esMsg) {
   std::vector<std::pair<std::string, WatchItemPathType>> protectedPathsCopy(
     sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]));
 
-  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); i++) {
+  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); ++i) {
     protectedPathsCopy.emplace_back(std::string(kProtectedFiles[i].first),
                                     kProtectedFiles[i].second);
   }
@@ -196,7 +196,7 @@ es_auth_result_t ValidateLaunchctlExec(const Message &esMsg) {
   // now they live as NSStrings. We should make them `std::string_view` types
   // in order to use them here efficiently, but will need to make the
   // `SNTDatabaseController` an ObjC++ file.
-  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); i++) {
+  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); ++i) {
     auto pf = kProtectedFiles[i];
     switch (pf.second) {
       case WatchItemPathType::kLiteral:
