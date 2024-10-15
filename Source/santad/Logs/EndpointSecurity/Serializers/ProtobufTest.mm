@@ -248,6 +248,10 @@ void SerializeAndCheck(es_event_type_t eventType,
     es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
     es_message_t esMsg = MakeESMessage(eventType, &proc);
     esMsg.process->tty = &ttyFile;
+    esMsg.process->codesigning_flags = CS_SIGNED | CS_HARD | CS_KILL;
+    esMsg.process->signing_id = MakeESStringToken("my_signing_id");
+    esMsg.process->team_id = MakeESStringToken("my_team_id");
+    memset(esMsg.process->cdhash, 'A', sizeof(esMsg.process->cdhash));
     esMsg.version = cur_version;
 
     mockESApi->SetExpectationsRetainReleaseMessage();
@@ -334,6 +338,10 @@ void SerializeAndCheckNonESEvents(
     es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
     es_message_t esMsg = MakeESMessage(eventType, &proc);
     esMsg.process->tty = &ttyFile;
+    esMsg.process->codesigning_flags = CS_SIGNED | CS_HARD | CS_KILL;
+    esMsg.process->signing_id = MakeESStringToken("my_signing_id");
+    esMsg.process->team_id = MakeESStringToken("my_team_id");
+    memset(esMsg.process->cdhash, 'A', sizeof(esMsg.process->cdhash));
     esMsg.version = cur_version;
 
     messageSetup(mockESApi, &esMsg);
