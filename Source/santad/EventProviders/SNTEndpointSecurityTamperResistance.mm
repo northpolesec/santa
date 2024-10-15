@@ -30,8 +30,6 @@ using santa::Logger;
 using santa::Message;
 using santa::WatchItemPathType;
 
-static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa-driver";
-
 constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
   {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral},
   {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral},
