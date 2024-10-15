@@ -176,6 +176,11 @@ using santa::NSStringToUTF8String;
     c->set_valid_until([cert.validUntil timeIntervalSince1970]);
   }
 
+  // Only send this field if this event is a standalone approval.
+  if (event.standaloneApproval) {
+    e->set_standalone_approval(event.standaloneApproval);
+  }
+
   return *e;
 }
 

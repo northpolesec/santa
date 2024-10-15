@@ -234,6 +234,7 @@ message Event {
   string quarantine_agent_bundle_id = 27        [json_name="quarantine_agent_bundle_id"];
 
   repeated Certificate signing_chain = 28       [json_name="signing_chain"];
+  bool standalone_approval = 29                 [json_name="standalone_approval"];
 }
 
 message EventUploadRequest {

@@ -522,6 +522,19 @@ static NSString *const kPrinterProxyPostMonterey =
     LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
          err.localizedDescription);
   }
+
+
+  if ([[SNTConfigurator configurator] syncBaseURL]) {
+    // Log an event so that if Santa is configured to use a sync service
+    // it knows this was approved by the user in standalone mode.
+    SNTStoredEvent *newEvent = [se copy];
+    newEvent.decision = SNTEventStateAllow;
+    newEvent.standaloneApproval = YES;
+
+    dispatch_async(_eventQueue, ^{
+      [self.syncdQueue addEvents:@[ se ] isFromBundle:NO];
+    });
+  }
 }
 
 @end

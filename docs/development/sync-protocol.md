@@ -236,6 +236,7 @@ sequenceDiagram
 | signing_id | NO | string | Signing ID of the binary that was executed | "EQHXZ8M8AV:com.google.Chrome" |
 | team_id | NO | string | Team ID of the binary that was executed | "EQHXZ8M8AV" |
 | cdhash | NO | string | CDHash of the binary that was executed | "dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a" |
+| standalone_approval | NO | bool | Indicates that this approval was the result of a standalone authentication by the user. | true |
 
 #### Signing Chain Objects
 
