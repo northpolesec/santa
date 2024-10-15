@@ -32,6 +32,12 @@ using santa::WatchItemPathType;
 
 static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa-driver";
 
+constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
+  {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral},
+  {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral},
+  {"/Applications/Santa.app", WatchItemPathType::kPrefix},
+};
+
 @implementation SNTEndpointSecurityTamperResistance {
   std::shared_ptr<Logger> _logger;
 }
@@ -62,7 +68,7 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
       if ([SNTEndpointSecurityTamperResistance
             isProtectedPath:esMsg->event.unlink.target->path.data]) {
         result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt to delete Santa databases!");
+        LOGW(@"Preventing attempt to delete important Santa files!");
       }
       break;
     }
@@ -135,18 +141,14 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
   [super enableTargetPathWatching];
 
   // Get the set of protected paths
-  std::set<std::string> protectedPaths = [SNTEndpointSecurityTamperResistance getProtectedPaths];
-
-  // Iterate the set, and create a vector of literals to mute
-  std::vector<std::pair<std::string, WatchItemPathType>> watchPaths;
-  for (const auto &path : protectedPaths) {
-    watchPaths.push_back({path, WatchItemPathType::kLiteral});
-  }
-  watchPaths.push_back({"/Library/SystemExtensions", WatchItemPathType::kPrefix});
-  watchPaths.push_back({"/bin/launchctl", WatchItemPathType::kLiteral});
+  std::vector<std::pair<std::string, WatchItemPathType>> protectedPaths =
+    [SNTEndpointSecurityTamperResistance getProtectedPaths];
+  protectedPaths.push_back({"/Library/SystemExtensions", WatchItemPathType::kPrefix});
+  protectedPaths.push_back({"/bin/launchctl", WatchItemPathType::kLiteral});
+  protectedPaths.push_back({"/Applications/Santa.app", WatchItemPathType::kPrefix});
 
   // Begin watching the protected set
-  [super muteTargetPaths:watchPaths];
+  [super muteTargetPaths:protectedPaths];
 
   [super subscribeAndClearCache:{
                                   ES_EVENT_TYPE_AUTH_KEXTLOAD,
@@ -189,6 +191,30 @@ es_auth_result_t ValidateLaunchctlExec(const Message &esMsg) {
   }
 
   return ES_AUTH_RESULT_ALLOW;
+}
+
++ (std::vector<std::pair<std::string, WatchItemPathType>>)getProtectedPaths {
+  std::vector<std::pair<std::string, WatchItemPathType>> protectedPathsCopy;
+
+  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); i++) {
+    protectedPathsCopy.emplace_back(std::string(kProtectedFiles[i].first),
+                                    kProtectedFiles[i].second);
+  }
+
+  return protectedPathsCopy;
+}
+
++ (bool)isProtectedPath:(const std::string_view)path {
+  // TODO(mlw): These values should come from `SNTDatabaseController`. But right
+  // now they live as NSStrings. We should make them `std::string_view` types
+  // in order to use them here efficiently, but will need to make the
+  // `SNTDatabaseController` an ObjC++ file.
+  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); i++) {
+    if (path == kProtectedFiles[i].first) {
+      return true;
+    }
+  }
+  return false;
 }
 
 @end

@@ -82,8 +82,6 @@
 
 - (bool)handleContextMessage:(santa::Message &)esMsg;
 
-+ (std::set<std::string>)getProtectedPaths;
-+ (bool)isProtectedPath:(const std::string_view)path;
 + (bool)populateAuditTokenSelf:(audit_token_t *)tok;
 
 @end

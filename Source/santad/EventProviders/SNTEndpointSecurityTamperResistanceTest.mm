@@ -41,6 +41,10 @@ static constexpr std::string_view kRulesDBPath = "/private/var/db/santa/rules.db
 static constexpr std::string_view kBenignPath = "/some/other/path";
 static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa-driver";
 
+@interface SNTEndpointSecurityTamperResistance (Testing)
++ (bool)isProtectedPath:(std::string_view)path;
+@end
+
 @interface SNTEndpointSecurityTamperResistanceTest : XCTestCase
 @end
 
@@ -272,6 +276,16 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
   XCTAssertTrue(OCMVerifyAll(mockTamperClient));
 
   [mockTamperClient stopMocking];
+}
+
+- (void)testIsProtectedPath {
+  XCTAssertTrue(
+    [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/rules.db"]);
+  XCTAssertTrue(
+    [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/events.db"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance isProtectedPath:"/Applications/Santa.app"]);
+
+  XCTAssertFalse([SNTEndpointSecurityTamperResistance isProtectedPath:"/not/a/db/path"]);
 }
 
 @end
