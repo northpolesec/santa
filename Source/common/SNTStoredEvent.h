@@ -126,6 +126,11 @@
 @property SNTEventState decision;
 
 ///
+///  Was this approval made as a result of a standalone mode authentication.
+///
+@property BOOL standaloneApproval;
+
+///
 ///  NSArray of logged in users when the decision was made.
 ///
 @property NSArray *loggedInUsers;
