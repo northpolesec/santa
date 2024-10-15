@@ -376,7 +376,7 @@ static NSString *const kPrinterProxyPostMonterey =
         // message to santad to perform the upload logic for bundles.
         // See syncBundleEvent:relatedEvents: for more info.
         se.needsBundleHash = YES;
-      } else if (config.syncBaseURL) {
+      } else if (config.syncBaseURL && !config.enableStandaloneMode) {
         // So the server has something to show the user straight away, initiate an event
         // upload for the blocked binary rather than waiting for the next sync.
         dispatch_async(_eventQueue, ^{
@@ -526,9 +526,10 @@ static NSString *const kPrinterProxyPostMonterey =
   if ([[SNTConfigurator configurator] syncBaseURL]) {
     // Log an event so that if Santa is configured to use a sync service
     // it knows this was approved by the user in standalone mode.
-    SNTStoredEvent *newEvent = [se copy];
-    newEvent.decision = SNTEventStateAllow;
-    newEvent.standaloneApproval = YES;
+    if (authenticated) {
+      se.decision = SNTEventStateAllow;
+      se.standaloneApproval = YES;
+    }
 
     dispatch_async(_eventQueue, ^{
       [self.syncdQueue addEvents:@[ se ] isFromBundle:NO];
