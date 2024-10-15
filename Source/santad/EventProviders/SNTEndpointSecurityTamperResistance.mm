@@ -111,6 +111,16 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
       break;
     }
 
+    case ES_EVENT_TYPE_AUTH_KEXTLOAD: {
+      // TODO(mlw): Since we don't package the kext anymore, we should consider removing this.
+      // TODO(mlw): Consider logging when kext loads are attempted.
+      if (strcmp(esMsg->event.kextload.identifier.data, kSantaKextIdentifier.data()) == 0) {
+        result = ES_AUTH_RESULT_DENY;
+        LOGW(@"Preventing attempt to load Santa kext!");
+      }
+      break;
+    }
+
     default:
       // Unexpected event type, this is a programming error
       [NSException raise:@"Invalid event type"
@@ -138,6 +148,7 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
   [super muteTargetPaths:protectedPaths];
 
   [super subscribeAndClearCache:{
+                                  ES_EVENT_TYPE_AUTH_KEXTLOAD,
                                   ES_EVENT_TYPE_AUTH_SIGNAL,
                                   ES_EVENT_TYPE_AUTH_EXEC,
                                   ES_EVENT_TYPE_AUTH_UNLINK,
@@ -203,7 +214,7 @@ es_auth_result_t ValidateLaunchctlExec(const Message &esMsg) {
         if (path == pf.first) return true;
         break;
       case WatchItemPathType::kPrefix:
-        if (path.find(pf.first) == 0) return true;
+        if (path.rfind(pf.first, 0) == 0) return true;
         break;
     }
   }
