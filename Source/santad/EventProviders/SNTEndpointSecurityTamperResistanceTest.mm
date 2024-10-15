@@ -49,8 +49,10 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
   std::set<es_event_type_t> expectedEventSubs{
-    ES_EVENT_TYPE_AUTH_KEXTLOAD, ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
-    ES_EVENT_TYPE_AUTH_UNLINK,   ES_EVENT_TYPE_AUTH_RENAME,
+    ES_EVENT_TYPE_AUTH_SIGNAL,
+    ES_EVENT_TYPE_AUTH_EXEC,
+    ES_EVENT_TYPE_AUTH_UNLINK,
+    ES_EVENT_TYPE_AUTH_RENAME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -206,28 +208,6 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
       Message msg(mockESApi, &esMsg);
       esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
       esMsg.event.rename.destination.existing_file = kv.first;
-
-      [mockTamperClient
-             handleMessage:std::move(msg)
-        recordEventMetrics:^(EventDisposition d) {
-          XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                             : EventDisposition::kDropped);
-          dispatch_semaphore_signal(semaMetrics);
-        }];
-
-      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
-      XCTAssertEqual(gotAuthResult, kv.second);
-      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
-    }
-  }
-
-  // Check KEXTLOAD tamper events
-  {
-    esMsg.event_type = ES_EVENT_TYPE_AUTH_KEXTLOAD;
-
-    for (const auto &kv : kextIdToResult) {
-      Message msg(mockESApi, &esMsg);
-      esMsg.event.kextload.identifier = *kv.first;
 
       [mockTamperClient
              handleMessage:std::move(msg)

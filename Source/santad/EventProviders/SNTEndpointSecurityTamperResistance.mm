@@ -30,8 +30,6 @@ using santa::Logger;
 using santa::Message;
 using santa::WatchItemPathType;
 
-static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa-driver";
-
 @implementation SNTEndpointSecurityTamperResistance {
   std::shared_ptr<Logger> _logger;
 }
@@ -107,16 +105,6 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
       break;
     }
 
-    case ES_EVENT_TYPE_AUTH_KEXTLOAD: {
-      // TODO(mlw): Since we don't package the kext anymore, we should consider removing this.
-      // TODO(mlw): Consider logging when kext loads are attempted.
-      if (strcmp(esMsg->event.kextload.identifier.data, kSantaKextIdentifier.data()) == 0) {
-        result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt to load Santa kext!");
-      }
-      break;
-    }
-
     default:
       // Unexpected event type, this is a programming error
       [NSException raise:@"Invalid event type"
@@ -149,7 +137,6 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
   [super muteTargetPaths:watchPaths];
 
   [super subscribeAndClearCache:{
-                                  ES_EVENT_TYPE_AUTH_KEXTLOAD,
                                   ES_EVENT_TYPE_AUTH_SIGNAL,
                                   ES_EVENT_TYPE_AUTH_EXEC,
                                   ES_EVENT_TYPE_AUTH_UNLINK,
