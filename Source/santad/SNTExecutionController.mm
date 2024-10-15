@@ -523,7 +523,6 @@ static NSString *const kPrinterProxyPostMonterey =
          err.localizedDescription);
   }
 
-
   if ([[SNTConfigurator configurator] syncBaseURL]) {
     // Log an event so that if Santa is configured to use a sync service
     // it knows this was approved by the user in standalone mode.
