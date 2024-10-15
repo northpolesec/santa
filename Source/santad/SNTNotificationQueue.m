@@ -1,4 +1,5 @@
 /// Copyright 2016 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -38,8 +39,10 @@ static const int kMaximumNotifications = 10;
 
 - (void)addEvent:(SNTStoredEvent *)event
   withCustomMessage:(NSString *)message
-       andCustomURL:(NSString *)url {
+       andCustomURL:(NSString *)url
+           andReply:(void (^)(BOOL authenticated))reply {
   if (!event) return;
+
   if (self.pendingNotifications.count > kMaximumNotifications) {
     LOGI(@"Pending GUI notification count is over %d, dropping.", kMaximumNotifications);
     return;
@@ -52,6 +55,11 @@ static const int kMaximumNotifications = 10;
   if (url) {
     d[@"url"] = url;
   }
+
+  if (reply) {
+    d[@"reply"] = [reply copy];
+  }
+
   @synchronized(self.pendingNotifications) {
     [self.pendingNotifications addObject:d];
   }
@@ -67,7 +75,9 @@ static const int kMaximumNotifications = 10;
     for (NSDictionary *d in self.pendingNotifications) {
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
-                    andCustomURL:d[@"url"]];
+                    andCustomURL:d[@"url"]
+                        andReply:d[@"reply"]];
+      // TODO if running in standalone mode, add the rules to the database
       [postedNotifications addObject:d];
     }
     [self.pendingNotifications removeObjectsInArray:postedNotifications];

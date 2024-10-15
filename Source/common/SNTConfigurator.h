@@ -1,4 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -309,6 +310,14 @@
 ///  Defaults to NO.
 ///
 @property(readonly, nonatomic) BOOL enableSilentTTYMode;
+
+///
+///  When standalonemode is enabled, Santa will let a user allow a
+///  binary using biometric authentication.
+///
+///  Defaults to NO.
+///
+@property(readonly, nonatomic) BOOL enableStandaloneMode;
 
 ///
 /// The text to display when opening Santa.app.

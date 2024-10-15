@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Unload the supporting services. 
+# Unload the supporting services.
 # If a user is logged in, also unload the GUI agent.
 # If the target volume is not /, do nothing
 

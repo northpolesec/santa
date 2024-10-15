@@ -11,7 +11,7 @@ go install github.com/bazelbuild/buildtools/buildifier@latest
 ~/go/bin/buildifier --lint=warn -r ${GIT_ROOT}
 
 if [ -d "./santa-venv" ]; then
- echo "santa-venv already exists reusing".  
+ echo "santa-venv already exists reusing"
 else
  echo "Creating virtual environment ./santa-venv..."
     python3 -m venv ./santa-venv

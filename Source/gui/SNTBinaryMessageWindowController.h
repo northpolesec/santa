@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -25,7 +26,8 @@
 
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url;
+                    customURL:(NSString *)url
+                        reply:(void (^)(BOOL authenticated))replyBlock;
 
 - (IBAction)showCertInfo:(id)sender;
 - (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash;
@@ -63,6 +65,11 @@
 ///  The execution event that this window is for
 ///
 @property(readonly) SNTStoredEvent *event;
+
+///
+///  The reply block to call when the user has made a decision in standalone
+///  mode.
+@property(readonly, nonatomic) void (^replyBlock)(BOOL authenticated);
 
 ///
 ///  The root progress object. Child nodes are vended to santad to report on work being done.
