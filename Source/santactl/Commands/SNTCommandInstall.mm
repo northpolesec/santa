@@ -40,10 +40,7 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 + (NSString *)longHelpText {
-  return @"Instruct the daemon to install Santa.app.\n"
-         @"\n"
-         @"  --path {path}: Path to the Santa.app bundle to install.\n"
-         @"\n";
+  return @"Instruct the daemon to install Santa.app.\n\n";
 }
 
 + (BOOL)isHidden {
@@ -51,27 +48,12 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
-  NSString *path;
+  NSString *installFromPath = @"/Library/Caches/com.northpolesec.santa/Santa.app";
 
-  for (NSUInteger i = 0; i < arguments.count; ++i) {
-    NSString *arg = arguments[i];
-
-    if ([arg caseInsensitiveCompare:@"--path"] == NSOrderedSame) {
-      if (++i > arguments.count - 1) {
-        [self printErrorUsageAndExit:@"--path requires an argument"];
-      }
-      path = arguments[i];
-    }
-  }
-
-  if (!path) {
-    [self printErrorUsageAndExit:@"No path specified"];
-  }
-
-  LOGI(@"Asking daemon to install: %@", path);
+  LOGI(@"Asking daemon to install: %@", installFromPath);
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  [[self.daemonConn remoteObjectProxy] installSantaApp:(NSString *)path
+  [[self.daemonConn remoteObjectProxy] installSantaApp:installFromPath
                                                  reply:^(BOOL success) {
                                                    LOGI(@"Got reply from daemon: %d", success);
                                                    dispatch_semaphore_signal(sema);
@@ -79,6 +61,7 @@ REGISTER_COMMAND_NAME(@"install")
 
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) > 0) {
     LOGW(@"Timed out waiting for install to complete.");
+    exit(EXIT_FAILURE);
   }
 
   exit(EXIT_SUCCESS);
