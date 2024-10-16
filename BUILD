@@ -5,7 +5,14 @@ package(
     default_visibility = ["//:santa_package_group"],
 )
 
-licenses(["notice"])
+exports_files([
+    "LICENSE",
+    "Conf/install_services.sh",
+    "Conf/com.northpolesec.santa.bundleservice.plist",
+    "Conf/com.northpolesec.santa.metricservice.plist",
+    "Conf/com.northpolesec.santa.plist",
+    "Conf/com.northpolesec.santa.syncservice.plist",
+])
 
 exports_files(["LICENSE"])
 

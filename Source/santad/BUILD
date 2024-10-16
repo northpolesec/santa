@@ -866,6 +866,13 @@ macos_bundle(
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:daemon_dev",
     }),
+    resources = [
+        "//:Conf/com.northpolesec.santa.bundleservice.plist",
+        "//:Conf/com.northpolesec.santa.metricservice.plist",
+        "//:Conf/com.northpolesec.santa.plist",
+        "//:Conf/com.northpolesec.santa.syncservice.plist",
+        "//:Conf/install_services.sh",
+    ],
     version = "//:version",
     visibility = ["//:santa_package_group"],
     deps = [":santad_main"],
