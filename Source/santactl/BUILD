@@ -36,6 +36,17 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTCommandInstall",
+    srcs = ["Commands/SNTCommandInstall.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+        "@MOLXPCConnection",
+    ],
+)
+
+objc_library(
     name = "santactl_lib",
     srcs = [
         "Commands/SNTCommandFileInfo.m",
@@ -58,6 +69,7 @@ objc_library(
     sdk_dylibs = ["libz"],
     sdk_frameworks = ["IOKit"],
     deps = [
+        ":SNTCommandInstall",
         ":SNTCommandPrintLog",
         ":santactl_cmd",
         "//Source/common:SNTCachedDecision",
