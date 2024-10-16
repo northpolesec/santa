@@ -63,7 +63,7 @@
 ///
 /// Control Ops
 ///
-- (void)installSantaApp:(NSString*)appPath reply:(void (^)(BOOL))reply;
+- (void)installSantaApp:(NSString *)appPath reply:(void (^)(BOOL))reply;
 
 @end
 

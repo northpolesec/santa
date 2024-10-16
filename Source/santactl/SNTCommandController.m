@@ -52,7 +52,7 @@ static NSMutableDictionary *registeredCommands;
 
     if (!hidden) {
       [helpText appendFormat:@"\t%*s - %@\n", longestCommandName, [cmdName UTF8String],
-                            [command shortHelpText]];
+                             [command shortHelpText]];
     }
   }
 

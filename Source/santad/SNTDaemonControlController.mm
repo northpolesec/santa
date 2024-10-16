@@ -387,7 +387,7 @@ double watchdogRAMPeak = 0;
 
 #pragma mark Control Ops
 
-- (void)installSantaApp:(NSString*)appPath reply:(void (^)(BOOL))reply {
+- (void)installSantaApp:(NSString *)appPath reply:(void (^)(BOOL))reply {
   LOGI(@"Got to the install path: %@", appPath);
   reply(YES);
 }

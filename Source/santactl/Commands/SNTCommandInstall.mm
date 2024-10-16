@@ -71,11 +71,11 @@ REGISTER_COMMAND_NAME(@"install")
   LOGI(@"Asking daemon to install: %@", path);
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  [[self.daemonConn remoteObjectProxy] installSantaApp:(NSString*)path reply:^(BOOL success){
-    LOGI(@"Got reply from daemon: %d", success);
-    dispatch_semaphore_signal(sema);
-  }];
-
+  [[self.daemonConn remoteObjectProxy] installSantaApp:(NSString *)path
+                                                 reply:^(BOOL success) {
+                                                   LOGI(@"Got reply from daemon: %d", success);
+                                                   dispatch_semaphore_signal(sema);
+                                                 }];
 
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) > 0) {
     LOGW(@"Timed out waiting for install to complete.");
