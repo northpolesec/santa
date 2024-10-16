@@ -36,7 +36,7 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 + (NSString *)shortHelpText {
-  return @"Instruct the daemon to install Santa.app."
+  return @"Instruct the daemon to install Santa.app.";
 }
 
 + (NSString *)longHelpText {
