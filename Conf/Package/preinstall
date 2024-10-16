@@ -1,19 +1,9 @@
 #!/bin/bash
 
-# Unload the supporting services. 
-# If a user is logged in, also unload the GUI agent.
 # If the target volume is not /, do nothing
-
 [[ $3 != "/" ]] && exit 0
 
-/bin/launchctl remove com.northpolesec.santa.bundleservice || true
-/bin/launchctl remove com.northpolesec.santa.metricservice || true
-/bin/launchctl remove com.northpolesec.santa.syncservice || true
+/bin/launchctl remove com.northpolesec.santa.migration || true
+/bin/rm -rf /Library/Caches/com.northpolesec.santa
 
-/bin/rm -rf /Applications/Santa.app
-
-GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
-[[ -z "${GUI_USER}" ]] && exit 0
-
-/bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.northpolesec.santa
 exit 0

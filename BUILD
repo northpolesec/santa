@@ -112,12 +112,8 @@ genrule(
         "Conf/Package/package_and_sign.sh",
         "Conf/Package/postinstall",
         "Conf/Package/preinstall",
-        "Conf/MigrationPackage/Distribution.xml",
-        "Conf/MigrationPackage/package.sh",
-        "Conf/MigrationPackage/postinstall",
-        "Conf/MigrationPackage/preinstall",
-        "Conf/MigrationPackage/migration.sh",
-        "Conf/MigrationPackage/com.northpolesec.santa.migration.plist",
+        "Conf/Package/migration.sh",
+        "Conf/com.northpolesec.santa.migration.plist",
     ],
     outs = ["santa-release.tar.gz"],
     cmd = select({
@@ -138,12 +134,7 @@ genrule(
       for SRC in $(SRCS); do
         if [[ "$$(dirname $${SRC})" == *"Conf"* ]]; then
           mkdir -p $(@D)/conf
-          if [[ "$$(dirname $${SRC})" == *"MigrationPackage"* ]]; then
-            mkdir -p $(@D)/conf/migration
-            cp -H $${SRC} $(@D)/conf/migration/
-          else
-            cp -H $${SRC} $(@D)/conf/
-          fi
+          cp -H $${SRC} $(@D)/conf/
         fi
       done
 
@@ -202,7 +193,7 @@ genrule(
     outs = ["santa-dev.pkg"],
     cmd = """
   tar -xzvf $(<)
-  RELEASE_ROOT=. PKG_OUT_DIR=$(@D) BUILD_DEV_DISTRIBUTION_PKG=1 BUILD_DEV_MIGRATION_PKG=1 \
+  RELEASE_ROOT=. PKG_OUT_DIR=$(@D) BUILD_DEV_DISTRIBUTION_PKG=1 \
     ./conf/package.sh
   """,
 )

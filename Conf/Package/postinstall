@@ -1,32 +1,53 @@
 #!/bin/bash
 
-# Load com.northpolesec.santa.daemon and supporting services.
-# If a user is logged in, also load the GUI agent.
-# If the target volume is not /, do nothing
+# Santa is installed to /Library/Caches/com.northpolesec.santa/Santa.app. This
+# postinstall script moves it to /Applications/Santa.app, if Santa is not
+# running, or asks com.northpolesec.santa.daemon to finish the install.
 
+# If the target volume is not /, do nothing
 [[ $3 != "/" ]] && exit 0
 
-# Restart syslogd to pick up ASL configuration change
-/usr/bin/killall -HUP syslogd
+# Check if an unsupported version of Santa is running.
+GOOGLE_SANTA_ACTIVATED="$(/usr/bin/systemextensionsctl list com.apple.system_extension.endpoint_security |
+                          /usr/bin/grep -E '^.+EQHXZ8M8AV.+com\.google\.santa\.daemon.+activated.+$')"
+if [ -z "${GOOGLE_SANTA_ACTIVATED}" ]; then
+  # An unsupported version of Santa IS NOT running, attempt to install.
 
-# Create hopefully useful symlink for santactl
-mkdir -p /usr/local/bin
-/bin/ln -sf /Applications/Santa.app/Contents/MacOS/santactl /usr/local/bin/santactl
+  # Remove the com.northpolesec.santa.migration launch job, as it is not
+  # needed. 
+  /bin/rm /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
 
-# Load com.northpolesec.santa.daemon
-/Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
+  # Attempt to remove the current install of Santa, if any. If this command
+  # succeeds, Santa is not currently running and this script should finish the
+  # install. If Santa is running, its tamper protections will prevent removal
+  # of /Applications/Santa.app.
+  /bin/rm -rf /Applications/Santa.app
+  if [ $? -eq 0 ]; then
+    # Removal was successful.
+    # Install Santa and load the system extension. The system extension will
+    # finish loading the rest of Santa's configs and helper services.
+    /bin/mv /Library/Caches/com.northpolesec.santa/Santa.app /Applications/Santa.app
+    /Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
+  else
+    # Tamper protections are enabled, ask Santa to install the update. If the
+    # update is valid, the system extension will take care of finishing the
+    # install.
+    /Applications/Santa.app/Contents/MacOS/santactl install
+  fi
 
-# Load com.northpolesec.santa.bundleservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist
+  # Cleanup cache dir.
+  /bin/rm -rf /Library/Caches/com.northpolesec.santa
 
-# Load com.northpolesec.santa.metricservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist
+  # Create a symlink for santactl.
+  /bin/mkdir -p /usr/local/bin
+  /bin/ln -s /Applications/Santa.app/Contents/MacOS/santactl /usr/local/bin 2>/dev/null
+else
+  # An unsupported version of Santa IS running.
 
-# Load com.northpolesec.santa.syncservice
-/bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist
+  # Load the com.northpolesec.santa.migration launch job. It will wait for the
+  # unsupported version of Santa to be removed, then trigger an install of the
+  # new version.
+  /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
+fi
 
-GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
-[[ -z "${GUI_USER}" ]] && exit 0
-
-/bin/launchctl asuser "${GUI_USER}" /bin/launchctl load /Library/LaunchAgents/com.northpolesec.santa.plist
 exit 0
