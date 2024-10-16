@@ -30,8 +30,6 @@ readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
 readonly APP_PKG_ROOT="${SCRATCH}/app_pkg_root"
 readonly APP_PKG_SCRIPTS="${SCRATCH}/pkg_scripts"
 
-readonly SCRIPT_PATH="$(/usr/bin/dirname -- ${BASH_SOURCE[0]})"
-
 /bin/mkdir -p "${APP_PKG_ROOT}" "${APP_PKG_SCRIPTS}"
 
 # Ensure _CodeSignature/CodeResources files have 0644 permissions so they can
@@ -41,19 +39,15 @@ readonly SCRIPT_PATH="$(/usr/bin/dirname -- ${BASH_SOURCE[0]})"
 /usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.northpolesec.santa*" -exec chmod 0644 {} \;
 
 echo "creating app pkg"
-/bin/mkdir -p "${APP_PKG_ROOT}/Applications" \
-  "${APP_PKG_ROOT}/Library/LaunchAgents" \
+/bin/mkdir -p "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa" \
   "${APP_PKG_ROOT}/Library/LaunchDaemons" \
-  "${APP_PKG_ROOT}/private/etc/asl" \
   "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/Applications/Santa.app"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.plist" "${APP_PKG_ROOT}/Library/LaunchAgents/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.bundleservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.metricservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.syncservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
+/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/migration.sh" "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.migration.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
-/bin/cp -vXL "${SCRIPT_PATH}/preinstall" "${APP_PKG_SCRIPTS}/"
-/bin/cp -vXL "${SCRIPT_PATH}/postinstall" "${APP_PKG_SCRIPTS}/"
+/bin/cp -vXL "${RELEASE_ROOT}/conf/preinstall" "${APP_PKG_SCRIPTS}/"
+/bin/cp -vXL "${RELEASE_ROOT}/conf/postinstall" "${APP_PKG_SCRIPTS}/"
 /bin/chmod +x "${APP_PKG_SCRIPTS}/"*
 
 # Disable bundle relocation.
@@ -64,7 +58,7 @@ echo "creating app pkg"
 /usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
 
 # Build app package
-readonly APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "binaries/Santa.app/Contents/Info.plist")
+readonly APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${RELEASE_ROOT}/binaries/Santa.app/Contents/Info.plist")
 /usr/bin/pkgbuild --identifier "com.northpolesec.santa" \
   --version "${APP_VERSION}" \
   --root "${APP_PKG_ROOT}" \
@@ -76,14 +70,7 @@ readonly APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -
 if [ -n "${BUILD_DEV_DISTRIBUTION_PKG}" ]; then
   echo "productbuild pkg"
   /usr/bin/productbuild \
-    --distribution "${SCRIPT_PATH}/Distribution.xml" \
+    --distribution "${RELEASE_ROOT}/conf/Distribution.xml" \
     --package-path "${PKG_OUT_DIR}" \
     "${PKG_OUT_DIR}/santa-dev.pkg"
-
-  if [ -n "${BUILD_DEV_MIGRATION_PKG}" ]; then
-    export PKG_OUT_DIR
-    export APP_VERSION
-    RELEASE_PACKAGE="${PKG_OUT_DIR}/santa-dev.pkg" BUILD_DEV_DISTRIBUTION_PKG=1 "${SCRIPT_PATH}/migration/package.sh"
-  fi
-
 fi
