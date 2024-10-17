@@ -26,12 +26,75 @@ import santa_common_SNTStoredEvent
                                       customURL: NSString?,
                                       uiStateCallback: ((Bool) -> Void)?) -> NSViewController {
     return NSHostingController(rootView:SNTBinaryMessageWindowView(
-      window:window, event:event, customMsg:customMsg, customURL:customURL, uiStateCallback:uiStateCallback).frame(minWidth:520, minHeight:540).fixedSize())
+      window:window, event:event, customMsg:customMsg, customURL:customURL, uiStateCallback:uiStateCallback).frame(minWidth:520, minHeight:340).fixedSize())
+  }
+}
+
+struct SNTBinaryMessageEventExpandedView: View {
+  let e: SNTStoredEvent?
+
+  @Environment(\.presentationMode) var presentationMode
+
+  func addLabel(@ViewBuilder closure: () -> some View) -> some View {
+    HStack(spacing:5.0) {
+      VStack(alignment:.leading, spacing:2.0) {
+        closure()
+      }.frame(alignment:.leading)
+      Spacer()
+    }.frame(width:400).fixedSize()
+  }
+
+  var body: some View {
+    VStack(spacing: 20.0) {
+      Spacer()
+
+      addLabel {
+        Text("Path").bold().font(Font.system(size:12.0))
+        Text(e?.filePath ?? "unknown").textSelection(.enabled)
+      }
+
+      if let signingID = e?.signingID {
+        addLabel {
+          Text("Signing ID").bold().font(Font.system(size:12.0))
+          Text(signingID).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+        }
+      }
+
+      addLabel {
+        Text("CDHash").bold().font(Font.system(size:12.0))
+        Text(e?.cdhash ?? "unknown").font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+      }
+
+      addLabel {
+        Text("SHA-256").bold().font(Font.system(size:12.0))
+        Text(e?.fileSHA256 ?? "unknown").font(Font.system(size:12.0).monospaced()).frame(width:240).textSelection(.enabled)
+      }
+
+      addLabel {
+          Text("Parent").bold().font(Font.system(size:12.0))
+          Text("\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
+      }
+
+      addLabel {
+        Text("User").bold().font(Font.system(size:12.0))
+        Text(e?.executingUser ?? "").textSelection(.enabled)
+      }
+
+      Spacer()
+
+      Button("Dismiss") {
+        presentationMode.wrappedValue.dismiss()
+      }
+
+      Spacer()
+    }.frame(width:520).fixedSize()
   }
 }
 
 struct SNTBinaryMessageEventView: View {
   let e: SNTStoredEvent? 
+
+  @State private var isShowingDetails = false
 
   func addLabel(@ViewBuilder closure: () -> some View) -> some View {
     HStack(spacing:5.0) {
@@ -58,11 +121,11 @@ struct SNTBinaryMessageEventView: View {
           Text("Application").bold().font(Font.system(size:12.0))
           Text(bundleName).textSelection(.enabled)
         }
-      }
-
-      addLabel() {
-        Text("Filename").bold().font(Font.system(size:12.0))
-        Text(e?.filePath ?? "unknown").textSelection(.enabled)
+      } else if let filePath = e?.filePath {
+        addLabel {
+          Text("Filename").bold().font(Font.system(size:12.0))
+          Text((filePath as NSString).lastPathComponent).textSelection(.enabled)
+        }
       }
 
       if let publisher = Publisher(e?.signingChain, e?.teamID) {
@@ -72,27 +135,15 @@ struct SNTBinaryMessageEventView: View {
         }
       }
 
-      addLabel {
-        if let signingID = e?.signingID {
-          Text("Signing ID").bold().font(Font.system(size:12.0))
-          Text(signingID).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
-        } else if let sha256 = e?.fileSHA256 {
-          Text("SHA-256").bold().font(Font.system(size:12.0))
-          Text(sha256).font(Font.system(size:12.0).monospaced()).frame(width:240).textSelection(.enabled)
-        }
-      }
+      Spacer()
 
-      addLabel {
-          Text("Parent").bold().font(Font.system(size:12.0))
-          Text("\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
-      }
-
-      addLabel {
-        Text("User").bold().font(Font.system(size:12.0))
-        Text(e?.executingUser ?? "").textSelection(.enabled)
+      Button("More Details...") {
+        isShowingDetails = true
       }
 
       Spacer()
+    }.sheet(isPresented: $isShowingDetails) {
+      SNTBinaryMessageEventExpandedView(e: e)
     }
   }
 }
