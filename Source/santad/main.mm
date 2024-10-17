@@ -85,6 +85,19 @@ static void SantaWatchdog(void *context) {
   }
 }
 
+void InstallServices() {
+  NSString *install_services_script = [[NSBundle mainBundle] pathForResource:@"install_services"
+                                                                      ofType:@"sh"];
+  NSTask *task = [[NSTask alloc] init];
+  task.launchPath = @"/bin/bash";
+  task.arguments = @[ install_services_script ];
+  task.environment = @{@"CONF_DIR" : [[NSBundle mainBundle] resourcePath]};
+  NSError *error;
+  if (![task launchAndReturnError:&error]) {
+    LOGE(@"install_services.sh error: %@", error);
+  }
+}
+
 int main(int argc, char *argv[]) {
   @autoreleasepool {
     // Do not wait on child processes
@@ -98,6 +111,8 @@ int main(int argc, char *argv[]) {
       printf("%s (build %s)\n", [product_version UTF8String], [build_version UTF8String]);
       return 0;
     }
+
+    InstallServices();
 
     dispatch_queue_t watchdog_queue = dispatch_queue_create(
       "com.northpolesec.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
