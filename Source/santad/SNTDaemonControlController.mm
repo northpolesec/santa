@@ -15,6 +15,7 @@
 
 #import "Source/santad/SNTDaemonControlController.h"
 
+#include <Foundation/Foundation.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
 
@@ -396,7 +397,7 @@ double watchdogRAMPeak = 0;
 
   BOOL isDir;
   if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir] || !isDir) {
-    LOGE(@"Path provided is not a directory");
+    LOGE(@"Installation path is not a directory: %@", path);
     return NO;
   }
 

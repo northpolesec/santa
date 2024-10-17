@@ -49,17 +49,26 @@ REGISTER_COMMAND_NAME(@"install")
 
 - (void)runWithArguments:(NSArray *)arguments {
   NSString *installFromPath = @"/Library/Caches/com.northpolesec.santa/Santa.app";
+  int64_t secondsToWait = 15;
 
   LOGI(@"Asking daemon to install: %@", installFromPath);
+  LOGI(@"...Waitng for up to %lld seconds...", secondsToWait);
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  [[self.daemonConn remoteObjectProxy] installSantaApp:installFromPath
-                                                 reply:^(BOOL success) {
-                                                   LOGI(@"Got reply from daemon: %d", success);
-                                                   dispatch_semaphore_signal(sema);
-                                                 }];
+  [[self.daemonConn remoteObjectProxy]
+    installSantaApp:installFromPath
+              reply:^(BOOL success) {
+                if (success) {
+                  LOGI(@"Installation was successful");
+                } else {
+                  LOGI(@"Installation unsuccessful. Please consult logs for more information.");
+                }
 
-  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) > 0) {
+                dispatch_semaphore_signal(sema);
+              }];
+
+  if (dispatch_semaphore_wait(sema,
+                              dispatch_time(DISPATCH_TIME_NOW, secondsToWait * NSEC_PER_SEC)) > 0) {
     LOGW(@"Timed out waiting for install to complete.");
     exit(EXIT_FAILURE);
   }
