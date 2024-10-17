@@ -82,7 +82,8 @@
 
   self.window =
     [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable | NSWindowStyleMaskTitled
+                                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
+                                          NSWindowStyleMaskTitled
                                   backing:NSBackingStoreBuffered
                                     defer:NO];
   self.window.titlebarAppearsTransparent = YES;
@@ -90,14 +91,14 @@
   [self.window standardWindowButton:NSWindowZoomButton].hidden = YES;
   [self.window standardWindowButton:NSWindowCloseButton].hidden = YES;
   [self.window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
-  self.window.contentViewController =
-    [SNTBinaryMessageWindowViewFactory createWithWindow:self.window
-                                                  event:self.event
-                                              customMsg:self.customMessage
-                                              customURL:self.customURL
-                                              uiStateCallback:^(BOOL preventNotificationsForADay) {
+  self.window.contentViewController = [SNTBinaryMessageWindowViewFactory
+    createWithWindow:self.window
+               event:self.event
+           customMsg:self.customMessage
+           customURL:self.customURL
+     uiStateCallback:^(BOOL preventNotificationsForADay) {
        self.silenceFutureNotifications = preventNotificationsForADay;
-    }];
+     }];
 
   self.window.delegate = self;
 
