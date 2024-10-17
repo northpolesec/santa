@@ -56,40 +56,40 @@ struct SNTBinaryMessageEventView: View {
       if let bundleName = e?.fileBundleName {
         addLabel() {
           Text("Application").bold().font(Font.system(size:12.0))
-          Text(bundleName)
+          Text(bundleName).textSelection(.enabled)
         }
       }
 
       addLabel() {
         Text("Filename").bold().font(Font.system(size:12.0))
-        Text(e?.filePath ?? "unknown")
+        Text(e?.filePath ?? "unknown").textSelection(.enabled)
       }
 
       if let publisher = Publisher(e?.signingChain, e?.teamID) {
         addLabel() {
           Text("Publisher").bold().font(Font.system(size:12.0))
-          Text(publisher)
+          Text(publisher).textSelection(.enabled)
         }
       }
 
       addLabel {
         if let signingID = e?.signingID {
           Text("Signing ID").bold().font(Font.system(size:12.0))
-          Text(signingID).font(Font.system(size:12.0).monospaced())
+          Text(signingID).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
         } else if let sha256 = e?.fileSHA256 {
           Text("SHA-256").bold().font(Font.system(size:12.0))
-          Text(sha256).font(Font.system(size:12.0).monospaced()).frame(width:240)
+          Text(sha256).font(Font.system(size:12.0).monospaced()).frame(width:240).textSelection(.enabled)
         }
       }
 
       addLabel {
           Text("Parent").bold().font(Font.system(size:12.0))
-          Text("\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))")
+          Text("\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
       }
 
       addLabel {
         Text("User").bold().font(Font.system(size:12.0))
-        Text(e?.executingUser ?? "")
+        Text(e?.executingUser ?? "").textSelection(.enabled)
       }
 
       Spacer()
