@@ -18,5 +18,9 @@
 	<false/>
 	<key>KeepAlive</key>
 	<false/>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>com.northpolesec.santa</string>
+	</array>
 </dict>
 </plist>
