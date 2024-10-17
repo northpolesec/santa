@@ -479,9 +479,9 @@ double watchdogRAMPeak = 0;
     return;
   }
 
-  [self reloadSystemExtension];
-
   reply(YES);
+
+  [self reloadSystemExtension];
 }
 
 @end
