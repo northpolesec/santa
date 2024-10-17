@@ -1,4 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,6 +16,8 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+
+@class MOLCertificate;
 
 ///
 ///  Represents an event stored in the database.
@@ -93,7 +96,7 @@
 ///  If the executed file was signed, this is an NSArray of MOLCertificate's
 ///  representing the signing chain.
 ///
-@property NSArray *signingChain;
+@property NSArray<MOLCertificate *> *signingChain;
 
 ///
 /// If the executed file was signed, this is the Team ID if present in the signature information.

@@ -20,6 +20,17 @@ swift_library(
 )
 
 swift_library(
+    name = "SNTBinaryMessageWindowView",
+    srcs = ["SNTBinaryMessageWindowView.swift"],
+    generates_header = 1,
+    deps = [
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTStoredEvent",
+    ],
+)
+
+swift_library(
     name = "SNTDeviceMessageWindowView",
     srcs = [
         "SNTDeviceMessageWindowView.swift",
@@ -47,8 +58,6 @@ objc_library(
     srcs = [
         "SNTAboutWindowController.h",
         "SNTAboutWindowController.m",
-        "SNTAccessibleTextField.h",
-        "SNTAccessibleTextField.m",
         "SNTAppDelegate.h",
         "SNTAppDelegate.m",
         "SNTBinaryMessageWindowController.h",
@@ -66,9 +75,6 @@ objc_library(
     hdrs = [
         "SNTNotificationManager.h",
     ],
-    data = [
-        "Resources/MessageWindow.xib",
-    ],
     sdk_frameworks = [
         "IOKit",
         "SecurityInterface",
@@ -77,6 +83,7 @@ objc_library(
     ],
     deps = [
         ":SNTAboutWindowView",
+        ":SNTBinaryMessageWindowView",
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         "//Source/common:CertificateHelpers",
