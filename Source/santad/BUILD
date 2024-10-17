@@ -732,6 +732,7 @@ objc_library(
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "@FMDB",
+        "@MOLCodesignChecker",
         "@MOLXPCConnection",
     ],
 )
