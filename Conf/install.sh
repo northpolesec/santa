@@ -18,56 +18,26 @@ if [[ -z "${BINARIES}" || -z "${CONF}" ]]; then
   fi
 fi
 
-# Unload bundle service
-/bin/launchctl remove com.northpolesec.santa.bundleservice >/dev/null 2>&1
+# Attempt to remove the current install of Santa, if any. If this command
+# succeeds, Santa is not currently running and this script should finish the
+# install. If Santa is running, its tamper protections will prevent removal
+# of /Applications/Santa.app.
+/bin/rm -rf /Applications/Santa.app >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  # Removal was successful.
+  # Install Santa and load the system extension. The system extension will
+  # finish loading the rest of Santa's configs and helper services.
+  /bin/cp -r ${BINARIES}/Santa.app /Applications/
+  /Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
+else
+  # Tamper protections are enabled, ask Santa to install the update. If the
+  # update is valid, the system extension will take care of finishing the
+  # install.
+  /bin/mkdir /Library/Caches/com.northpolesec.santa
+  /bin/cp -r ${BINARIES}/Santa.app /Library/Caches/com.northpolesec.santa/
+  /Applications/Santa.app/Contents/MacOS/santactl install
+  # Cleanup cache dir.
+  /bin/rm -rf /Library/Caches/com.northpolesec.santa
+fi
 
-# Unload metric service
-/bin/launchctl remove com.northpolesec.santa.metricservice >/dev/null 2>&1
-
-# Unload sync service
-/bin/launchctl remove com.northpolesec.santa.syncservice >/dev/null 2>&1
-
-# Determine if anyone is logged into the GUI
-GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
-
-# Unload GUI agent if someone is logged in.
-[[ -n "${GUI_USER}" ]] && \
-  /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.northpolesec.santa
-
-# Remove the current version.
-/bin/rm -rf /Applications/Santa.app 2>&1
-
-# Copy new files.
-/bin/mkdir -p /var/db/santa
-
-/bin/cp -r ${BINARIES}/Santa.app /Applications
-
-/bin/mkdir -p /usr/local/bin
-/bin/ln -s /Applications/Santa.app/Contents/MacOS/santactl /usr/local/bin 2>/dev/null
-
-/bin/cp ${CONF}/com.northpolesec.santa.plist /Library/LaunchAgents
-/bin/cp ${CONF}/com.northpolesec.santa.bundleservice.plist /Library/LaunchDaemons
-/bin/cp ${CONF}/com.northpolesec.santa.metricservice.plist /Library/LaunchDaemons
-/bin/cp ${CONF}/com.northpolesec.santa.syncservice.plist /Library/LaunchDaemons
-/bin/cp ${CONF}/com.northpolesec.santa.newsyslog.conf /etc/newsyslog.d/
-
-# Reload syslogd to pick up ASL configuration change.
-/usr/bin/killall -HUP syslogd
-
-# Load com.northpolesec.santa.daemon
-/Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
-
-# Load com.northpolesec.santa.bundleservice
-/bin/launchctl load /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist
-
-# Load com.northpolesec.santa.metricservice
-/bin/launchctl load /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist
-
-# Load com.northpolesec.santa.syncservice
-/bin/launchctl load /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist
-
-# Load GUI agent if someone is logged in.
-[[ -z "${GUI_USER}" ]] && exit 0
-
-/bin/launchctl asuser "${GUI_USER}" /bin/launchctl load -w /Library/LaunchAgents/com.northpolesec.santa.plist
 exit 0
