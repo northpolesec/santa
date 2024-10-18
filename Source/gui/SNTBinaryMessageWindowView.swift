@@ -178,21 +178,23 @@ struct SNTBinaryMessageEventView: View {
 
     HStack {
       Button(action: { isShowingDetails = true}) {
-        Text("\(Text("M").underline())ore Details").foregroundColor(.blue)
-        Image(systemName:"info.circle").foregroundColor(.blue)
+        HStack(spacing:2.0) {
+          Text("\(Text("M").underline())ore Details").foregroundColor(.blue)
+          Image(systemName:"info.circle").foregroundColor(.blue)
+        }
       }
-          .buttonStyle(ScalingButtonStyle())
-          .keyboardShortcut("m", modifiers: .command)
+      .buttonStyle(ScalingButtonStyle())
+      .keyboardShortcut("m", modifiers: .command)
 
       Button(action: copyDetailsToClipboard) {
-        Text("\(Text("C").underline())opy Details").foregroundColor(.blue)
-        Image(systemName:"pencil.and.list.clipboard").foregroundColor(.blue)
+        HStack(spacing:2.0) {
+          Text("\(Text("C").underline())opy Details").foregroundColor(.blue)
+          Image(systemName:"pencil.and.list.clipboard").foregroundColor(.blue)
+        }
       }
-          .buttonStyle(ScalingButtonStyle())
-          .keyboardShortcut("c", modifiers: .command)
+      .buttonStyle(ScalingButtonStyle())
+      .keyboardShortcut("c", modifiers: .command)
     }
-
-    Spacer()
   }
 
   func copyDetailsToClipboard() {
@@ -252,7 +254,7 @@ struct SNTBinaryMessageWindowView: View {
 
       Toggle(isOn: $preventFutureNotifications) {
         Text("Prevent future notifications for this application for a day").font(Font.system(size: 11.0));
-      }
+      }.padding(10.0)
 
       HStack(spacing:15) {
         if c.eventDetailURL != nil {
