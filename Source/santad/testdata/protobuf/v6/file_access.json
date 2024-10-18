@@ -33,7 +33,12 @@
   },
   "is_platform_binary": true,
   "is_es_client": true,
-  "cs_flags": 0,
+  "code_signature": {
+   "cdhash": "QUFBQUFBQUFBQUFBQUFBQUFBQUE=",
+   "signing_id": "my_signing_id",
+   "team_id": "my_team_id"
+  },
+  "cs_flags": 536871680,
   "executable": {
    "path": "foo",
    "truncated": false,
