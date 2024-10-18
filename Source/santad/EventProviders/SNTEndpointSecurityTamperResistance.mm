@@ -128,8 +128,12 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
                   format:@"Invalid tamper resistance event type: %d", esMsg->event_type];
   }
 
-  // Do not cache denied operations so that each tamper attempt is logged
-  [self respondToMessage:esMsg withAuthResult:result cacheable:result == ES_AUTH_RESULT_ALLOW];
+  // Do not cache denied operations so that each tamper attempt is logged.
+  // Do not cache ES_EVENT_TYPE_AUTH_OPEN events.
+  [self respondToMessage:esMsg
+          withAuthResult:result
+               cacheable:(esMsg->event_type != ES_EVENT_TYPE_AUTH_OPEN &&
+                          result == ES_AUTH_RESULT_ALLOW)];
 
   // For this client, a processed event is one that was found to be violating anti-tamper policy
   recordEventMetrics(result == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
