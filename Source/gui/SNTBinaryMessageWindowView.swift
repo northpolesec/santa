@@ -19,6 +19,10 @@ import santa_common_SNTBlockMessage
 import santa_common_SNTConfigurator
 import santa_common_SNTStoredEvent
 
+let MAX_OUTER_VIEW_WIDTH = 560.0
+let MAX_OUTER_VIEW_HEIGHT = 340.0
+let MAX_BUTTON_AREA_WIDTH = 300.0
+
 @objc public class SNTBinaryMessageWindowViewFactory : NSObject {
   @objc public static func createWith(window: NSWindow,
                                       event: SNTStoredEvent,
@@ -26,7 +30,13 @@ import santa_common_SNTStoredEvent
                                       customURL: NSString?,
                                       uiStateCallback: ((Bool) -> Void)?) -> NSViewController {
     return NSHostingController(rootView:SNTBinaryMessageWindowView(
-      window:window, event:event, customMsg:customMsg, customURL:customURL, uiStateCallback:uiStateCallback).frame(minWidth:520, minHeight:340).fixedSize())
+      window:window,
+      event:event,
+      customMsg:customMsg,
+      customURL:customURL,
+      uiStateCallback:uiStateCallback).frame(
+        minWidth:MAX_OUTER_VIEW_WIDTH,
+        minHeight:MAX_OUTER_VIEW_HEIGHT).fixedSize())
   }
 }
 
@@ -41,7 +51,7 @@ struct SNTBinaryMessageEventExpandedView: View {
         closure()
       }.frame(alignment:.leading)
       Spacer()
-    }.frame(width:400).fixedSize()
+    }.frame(width:MAX_OUTER_VIEW_WIDTH - 60).fixedSize()
   }
 
   var body: some View {
@@ -60,24 +70,22 @@ struct SNTBinaryMessageEventExpandedView: View {
         }
       }
 
-      addLabel {
-        Text("CDHash").bold().font(Font.system(size:12.0))
-        Text(e?.cdhash ?? "unknown").font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+      if let cdHash = e?.cdhash {
+        addLabel {
+          Text("CDHash").bold().font(Font.system(size:12.0))
+          Text(cdHash).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+        }
       }
 
       addLabel {
         Text("SHA-256").bold().font(Font.system(size:12.0))
+        // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
         Text(e?.fileSHA256 ?? "unknown").font(Font.system(size:12.0).monospaced()).frame(width:240).textSelection(.enabled)
       }
 
       addLabel {
           Text("Parent").bold().font(Font.system(size:12.0))
           Text("\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
-      }
-
-      addLabel {
-        Text("User").bold().font(Font.system(size:12.0))
-        Text(e?.executingUser ?? "").textSelection(.enabled)
       }
 
       Spacer()
@@ -87,64 +95,130 @@ struct SNTBinaryMessageEventExpandedView: View {
       }
 
       Spacer()
-    }.frame(width:520).fixedSize()
+    }.frame(width:MAX_OUTER_VIEW_WIDTH - 20).fixedSize()
+  }
+}
+
+struct ScalingButtonStyle: ButtonStyle {
+  func makeBody(configuration: Self.Configuration) -> some View {
+      configuration.label
+          .foregroundColor(.white)
+          .cornerRadius(40)
+          .scaleEffect(configuration.isPressed ? 0.8 : 0.9)
   }
 }
 
 struct SNTBinaryMessageEventView: View {
   let e: SNTStoredEvent? 
+  let customURL: NSString?
 
   @State private var isShowingDetails = false
 
-  func addLabel(@ViewBuilder closure: () -> some View) -> some View {
-    HStack(spacing:5.0) {
-      VStack(alignment:.leading, spacing:2.0) {
-        closure()
-      }.frame(alignment:.leading)
-      Spacer()
-    }.frame(width:400).fixedSize()
-  }
-
   var body: some View {
-    VStack(spacing: 20.0) {
-      Spacer()
+    Spacer()
 
-      if e!.needsBundleHash {
-        addLabel() {
-          Text("Bundle Hash").bold().font(Font.system(size:12.0))
-          ProgressView()
+    HStack(spacing: 20.0) {
+      VStack(alignment:.trailing, spacing:10.0) {
+        if e?.needsBundleHash ?? false {
+          Text("Bundle Hash")
         }
+
+        if e?.fileBundleName != "" {
+          Text("Application").bold().font(Font.system(size:12.0))
+        } else if e?.filePath != "" {
+          Text("Filename").bold().font(Font.system(size:12.0))
+        }
+
+        if Publisher(e?.signingChain, e?.teamID) != "" {
+          Text("Publisher").bold().font(Font.system(size:12.0))
+        }
+
+        Text("User").bold().font(Font.system(size:12.0))
       }
 
-      if let bundleName = e?.fileBundleName {
-        addLabel() {
-          Text("Application").bold().font(Font.system(size:12.0))
-          Text(bundleName).textSelection(.enabled)
+      Divider()
+
+      VStack(alignment:.leading, spacing:10.0) {
+        if e?.needsBundleHash ?? false {
+          // TODO: Implement bundle hashing
+          ProgressView()
+
+          /*
+            To be implemented in the near future...
+
+            if (!self.event.needsBundleHash) {
+              [self.bundleHashLabel removeFromSuperview];
+              [self.hashingIndicator removeFromSuperview];
+              [self.foundFileCountLabel removeFromSuperview];
+            } else {
+              self.openEventButton.enabled = NO;
+              self.hashingIndicator.indeterminate = YES;
+              [self.hashingIndicator startAnimation:self];
+              self.bundleHashLabel.hidden = YES;
+              self.foundFileCountLabel.stringValue = @"";
+            }
+          */
         }
-      } else if let filePath = e?.filePath {
-        addLabel {
-          Text("Filename").bold().font(Font.system(size:12.0))
+
+        if let bundleName = e?.fileBundleName {
+          Text(bundleName).textSelection(.enabled)
+        } else if let filePath = e?.filePath {
           Text((filePath as NSString).lastPathComponent).textSelection(.enabled)
         }
-      }
 
-      if let publisher = Publisher(e?.signingChain, e?.teamID) {
-        addLabel() {
-          Text("Publisher").bold().font(Font.system(size:12.0))
+        if let publisher = Publisher(e?.signingChain, e?.teamID) {
           Text(publisher).textSelection(.enabled)
         }
+
+        Text(e?.executingUser ?? "").textSelection(.enabled)
       }
-
-      Spacer()
-
-      Button("More Details...") {
-        isShowingDetails = true
-      }
-
-      Spacer()
     }.sheet(isPresented: $isShowingDetails) {
       SNTBinaryMessageEventExpandedView(e: e)
     }
+
+    HStack {
+      Button(action: { isShowingDetails = true}) {
+        Text("\(Text("M").underline())ore Details").foregroundColor(.blue)
+        Image(systemName:"info.circle").foregroundColor(.blue)
+      }
+          .buttonStyle(ScalingButtonStyle())
+          .keyboardShortcut("m", modifiers: .command)
+
+      Button(action: copyDetailsToClipboard) {
+        Text("\(Text("C").underline())opy Details").foregroundColor(.blue)
+        Image(systemName:"pencil.and.list.clipboard").foregroundColor(.blue)
+      }
+          .buttonStyle(ScalingButtonStyle())
+          .keyboardShortcut("c", modifiers: .command)
+    }
+
+    Spacer()
+  }
+
+  func copyDetailsToClipboard() {
+    var s = "Santa blocked \(e?.fileBundleName ?? "an application:")"
+    if let publisher = Publisher(e?.signingChain, e?.teamID) {
+      s += "\nPublisher: \(publisher)"
+    }
+    s += "\nUser     : \(e?.executingUser ?? "unknown")"
+    s += "\nPath     : \(e?.filePath ?? "unknown")"
+
+    if let signingID = e?.signingID {
+      s += "\nSigningID: \(signingID)"
+    }
+    if let cdhash = e?.cdhash {
+      s += "\nCDHash   : \(cdhash)"
+    }
+    s += "\nSHA-256  : \(e?.fileSHA256 ?? "unknown")"
+    s += "\nParent   : \(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))"
+
+    let url = SNTBlockMessage.eventDetailURL(for:e, customURL:customURL as String?)
+    s += "\nURL      : \(url?.absoluteString ?? "unknown")"
+    s += "\n"
+
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString(s, forType: .string)
   }
 }
 
@@ -157,19 +231,26 @@ struct SNTBinaryMessageWindowView: View {
 
   let c = SNTConfigurator()
 
-  @State public var checked = false
+  @State public var preventFutureNotifications = false
 
   var body: some View {
     VStack(spacing:15.0) {
-      Spacer()
-
-      Text("Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+      HStack {
+        ZStack {
+          Image(nsImage: NSImage(named: "AppIcon") ?? NSImage())
+              .resizable()
+              .frame(maxWidth:32, maxHeight:32)
+              .offset(x:-75)
+              .saturation(0.75)
+          Text("Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+        }
+      }
 
       Text(AttributedString(SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMsg as String?)))
 
-      SNTBinaryMessageEventView(e: event!)
+      SNTBinaryMessageEventView(e: event!, customURL: customURL)
 
-      Toggle(isOn: $checked) {
+      Toggle(isOn: $preventFutureNotifications) {
         Text("Prevent future notifications for this application for a day").font(Font.system(size: 11.0));
       }
 
@@ -177,9 +258,9 @@ struct SNTBinaryMessageWindowView: View {
         if c.eventDetailURL != nil {
           Button(action: openButton, label: {
             if let edt = c.eventDetailText {
-              Text(edt).frame(maxWidth:150.0)
+              Text(edt).frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
             } else {
-              Text("Open...")
+              Text("Open...").frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
             }
           })
           .buttonStyle(.borderedProminent)
@@ -187,21 +268,21 @@ struct SNTBinaryMessageWindowView: View {
         }
         Button(action: dismissButton, label: {
           if let dmt = c.dismissText {
-            Text(dmt).frame(maxWidth:150.0)
+            Text(dmt).frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
           } else {
-            Text("Dismiss").frame(maxWidth:150.0)
+            Text("Dismiss").frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
           }
         })
-      }.frame(maxWidth:300.0)
+        .keyboardShortcut(KeyboardShortcut(.escape, modifiers:.command))
+      }.frame(maxWidth:MAX_BUTTON_AREA_WIDTH)
 
       Spacer()
-      Spacer()
-    }.frame(maxWidth:600.0, minHeight:400.0).fixedSize()
+    }.frame(maxWidth:MAX_OUTER_VIEW_WIDTH, minHeight:MAX_OUTER_VIEW_HEIGHT).fixedSize()
   }
 
   func openButton() {
     if let callback = uiStateCallback {
-      callback(self.checked)
+      callback(self.preventFutureNotifications)
     }
 
     let url = SNTBlockMessage.eventDetailURL(for:event, customURL:customURL as String?)
@@ -213,7 +294,7 @@ struct SNTBinaryMessageWindowView: View {
 
   func dismissButton() {
     if let callback = uiStateCallback {
-      callback(self.checked)
+      callback(self.preventFutureNotifications)
     }
     window?.close()
   }
