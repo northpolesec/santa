@@ -33,7 +33,7 @@ else
   # Tamper protections are enabled, ask Santa to install the update. If the
   # update is valid, the system extension will take care of finishing the
   # install.
-  /bin/mkdir /Library/Caches/com.northpolesec.santa
+  /bin/mkdir -p /Library/Caches/com.northpolesec.santa
   /bin/cp -r ${BINARIES}/Santa.app /Library/Caches/com.northpolesec.santa/
   /Applications/Santa.app/Contents/MacOS/santactl install
   # Cleanup cache dir.
