@@ -96,8 +96,8 @@
                event:self.event
            customMsg:self.customMessage
            customURL:self.customURL
-     uiStateCallback:^(BOOL preventNotificationsForADay) {
-       self.silenceFutureNotifications = preventNotificationsForADay;
+     uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+       self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
      }];
 
   self.window.delegate = self;

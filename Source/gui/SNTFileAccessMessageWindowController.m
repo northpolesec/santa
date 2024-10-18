@@ -61,7 +61,7 @@
                        .absoluteString
           customText:self.customText
      uiStateCallback:^(BOOL preventNotificationsForADay) {
-       self.silenceFutureNotifications = preventNotificationsForADay;
+       self.silenceFutureNotificationsPeriod = preventNotificationsForADay ? 86400 : 0;
      }];
 
   self.window.delegate = self;
