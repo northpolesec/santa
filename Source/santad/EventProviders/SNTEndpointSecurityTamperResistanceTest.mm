@@ -15,11 +15,11 @@
 
 #include <EndpointSecurity/ESTypes.h>
 #import <OCMock/OCMock.h>
-#include "Source/common/SNTCommonEnums.h"
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <stdlib.h>
+#include "Source/common/SNTCommonEnums.h"
 
 #include <map>
 #include <memory>
@@ -40,7 +40,8 @@ using santa::WatchItemPathType;
 
 static constexpr std::string_view kEventsDBPath = "/private/var/db/santa/events.db";
 static constexpr std::string_view kRulesDBPath = "/private/var/db/santa/rules.db";
-static constexpr std::string_view kSantaAppPrefixPath = "/Applications/Santa.app/Contents/Info.plist";
+static constexpr std::string_view kSantaAppPrefixPath =
+  "/Applications/Santa.app/Contents/Info.plist";
 static constexpr std::string_view kBenignPath = "/some/other/path";
 
 @interface SNTEndpointSecurityTamperResistance (Testing)
@@ -55,11 +56,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
   std::set<es_event_type_t> expectedEventSubs{
-    ES_EVENT_TYPE_AUTH_SIGNAL,
-    ES_EVENT_TYPE_AUTH_EXEC,
-    ES_EVENT_TYPE_AUTH_UNLINK,
-    ES_EVENT_TYPE_AUTH_RENAME,
-    ES_EVENT_TYPE_AUTH_OPEN,
+    ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
+    ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
