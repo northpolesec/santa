@@ -75,7 +75,7 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
       if ([SNTEndpointSecurityTamperResistance
             isProtectedPath:esMsg->event.rename.source->path.data]) {
         result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt to rename Santa databases!");
+        LOGW(@"Preventing attempt to rename important Santa files!");
         break;
       }
 
@@ -83,11 +83,22 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
         if ([SNTEndpointSecurityTamperResistance
               isProtectedPath:esMsg->event.rename.destination.existing_file->path.data]) {
           result = ES_AUTH_RESULT_DENY;
-          LOGW(@"Preventing attempt to overwrite Santa databases!");
+          LOGW(@"Preventing attempt to overwrite important Santa files!");
           break;
         }
       }
 
+      break;
+    }
+
+    case ES_EVENT_TYPE_AUTH_OPEN: {
+      if ((esMsg->event.open.fflag & FWRITE) &&
+          [SNTEndpointSecurityTamperResistance isProtectedPath:esMsg->event.open.file->path.data]) {
+        LOGW(@"Preventing attempt to open important Santa files as writable!");
+        result = ES_AUTH_RESULT_DENY;
+        break;
+      }
+      result = ES_AUTH_RESULT_ALLOW;
       break;
     }
 
@@ -117,8 +128,12 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
                   format:@"Invalid tamper resistance event type: %d", esMsg->event_type];
   }
 
-  // Do not cache denied operations so that each tamper attempt is logged
-  [self respondToMessage:esMsg withAuthResult:result cacheable:result == ES_AUTH_RESULT_ALLOW];
+  // Do not cache denied operations so that each tamper attempt is logged.
+  // Do not cache ES_EVENT_TYPE_AUTH_OPEN events.
+  [self respondToMessage:esMsg
+          withAuthResult:result
+               cacheable:(esMsg->event_type != ES_EVENT_TYPE_AUTH_OPEN &&
+                          result == ES_AUTH_RESULT_ALLOW)];
 
   // For this client, a processed event is one that was found to be violating anti-tamper policy
   recordEventMetrics(result == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
@@ -142,6 +157,7 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
                                   ES_EVENT_TYPE_AUTH_EXEC,
                                   ES_EVENT_TYPE_AUTH_UNLINK,
                                   ES_EVENT_TYPE_AUTH_RENAME,
+                                  ES_EVENT_TYPE_AUTH_OPEN,
                                 }];
 }
 
