@@ -55,47 +55,57 @@ struct SNTBinaryMessageEventExpandedView: View {
   }
 
   var body: some View {
-    VStack(spacing: 20.0) {
-      Spacer()
+    HStack(spacing: 20.0) {
+      VStack(spacing: 20.0) {
+        Spacer()
 
-      addLabel {
-        Text("Path").bold().font(Font.system(size:12.0))
-        Text(e?.filePath ?? "unknown").textSelection(.enabled)
-      }
-
-      if let signingID = e?.signingID {
         addLabel {
-          Text("Signing ID").bold().font(Font.system(size:12.0))
-          Text(signingID).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+          Text("Path").bold().font(Font.system(size:12.0))
+          Text(e?.filePath ?? "unknown").textSelection(.enabled)
         }
-      }
 
-      if let cdHash = e?.cdhash {
+        Divider()
+
+        if let signingID = e?.signingID {
+          addLabel {
+            Text("Signing ID").bold().font(Font.system(size:12.0))
+            Text(signingID).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+          }
+        }
+
+        Divider()
+
+        if let cdHash = e?.cdhash {
+          addLabel {
+            Text("CDHash").bold().font(Font.system(size:12.0))
+            Text(cdHash).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+          }
+        }
+
+        Divider()
+
         addLabel {
-          Text("CDHash").bold().font(Font.system(size:12.0))
-          Text(cdHash).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+          Text("SHA-256").bold().font(Font.system(size:12.0))
+          // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
+          Text(e?.fileSHA256 ?? "unknown").font(Font.system(size:12.0).monospaced()).frame(width:240).textSelection(.enabled)
         }
-      }
 
-      addLabel {
-        Text("SHA-256").bold().font(Font.system(size:12.0))
-        // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
-        Text(e?.fileSHA256 ?? "unknown").font(Font.system(size:12.0).monospaced()).frame(width:240).textSelection(.enabled)
-      }
+        Divider()
 
-      addLabel {
-          Text("Parent").bold().font(Font.system(size:12.0))
-          Text("\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
-      }
+        addLabel {
+            Text("Parent").bold().font(Font.system(size:12.0))
+            Text("\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
+        }
 
-      Spacer()
+        Spacer()
 
-      Button("Dismiss") {
-        presentationMode.wrappedValue.dismiss()
-      }
+        Button("Dismiss") {
+          presentationMode.wrappedValue.dismiss()
+        }
 
-      Spacer()
-    }.frame(width:MAX_OUTER_VIEW_WIDTH - 20).fixedSize()
+        Spacer()
+      }.frame(maxWidth:MAX_OUTER_VIEW_WIDTH - 20).fixedSize()
+    }.frame(width:MAX_OUTER_VIEW_WIDTH - 20).fixedSize().background(Color.gray.opacity(0.2))
   }
 }
 
