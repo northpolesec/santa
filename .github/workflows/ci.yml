@@ -30,7 +30,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@90b352333885f9fb6bf262d8e659f01b6219cc25 # ratchet:bazel-contrib/setup-bazel@0.9.0
         with:
           bazelisk-cache: true
-          disk-cache: ${{ runner.os }}
+          disk-cache: ${{ matrix.os }}
           repository-cache: true
       - name: Build Userspace
         run: bazel build --apple_generate_dsym -c opt :release --define=SANTA_BUILD_TYPE=adhoc
@@ -46,7 +46,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@90b352333885f9fb6bf262d8e659f01b6219cc25 # ratchet:bazel-contrib/setup-bazel@0.9.0
         with:
           bazelisk-cache: true
-          disk-cache: true
+          disk-cache: ${{ matrix.os }}
           repository-cache: true
       - name: Run All Tests
         run: bazel test :unit_tests --define=SANTA_BUILD_TYPE=adhoc --test_output=errors
