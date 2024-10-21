@@ -1,19 +1,21 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include <EndpointSecurity/ESTypes.h>
 #import <OCMock/OCMock.h>
+#include "Source/common/SNTCommonEnums.h"
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -38,8 +40,8 @@ using santa::WatchItemPathType;
 
 static constexpr std::string_view kEventsDBPath = "/private/var/db/santa/events.db";
 static constexpr std::string_view kRulesDBPath = "/private/var/db/santa/rules.db";
+static constexpr std::string_view kSantaAppPrefixPath = "/Applications/Santa.app/Contents/Info.plist";
 static constexpr std::string_view kBenignPath = "/some/other/path";
-static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa-driver";
 
 @interface SNTEndpointSecurityTamperResistance (Testing)
 + (bool)isProtectedPath:(std::string_view)path;
@@ -57,6 +59,7 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
     ES_EVENT_TYPE_AUTH_EXEC,
     ES_EVENT_TYPE_AUTH_UNLINK,
     ES_EVENT_TYPE_AUTH_RENAME,
+    ES_EVENT_TYPE_AUTH_OPEN,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -101,20 +104,14 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
 
   es_file_t fileEventsDB = MakeESFile(kEventsDBPath.data());
   es_file_t fileRulesDB = MakeESFile(kRulesDBPath.data());
+  es_file_t fileSantaAppPrefix = MakeESFile(kSantaAppPrefixPath.data());
   es_file_t fileBenign = MakeESFile(kBenignPath.data());
-
-  es_string_token_t santaTok = MakeESStringToken(kSantaKextIdentifier.data());
-  es_string_token_t benignTok = MakeESStringToken(kBenignPath.data());
 
   std::map<es_file_t *, es_auth_result_t> pathToResult{
     {&fileEventsDB, ES_AUTH_RESULT_DENY},
     {&fileRulesDB, ES_AUTH_RESULT_DENY},
+    {&fileSantaAppPrefix, ES_AUTH_RESULT_DENY},
     {&fileBenign, ES_AUTH_RESULT_ALLOW},
-  };
-
-  std::map<es_string_token_t *, es_auth_result_t> kextIdToResult{
-    {&santaTok, ES_AUTH_RESULT_DENY},
-    {&benignTok, ES_AUTH_RESULT_ALLOW},
   };
 
   std::map<std::pair<pid_t, pid_t>, es_auth_result_t> pidsToResult{
@@ -249,6 +246,30 @@ static constexpr std::string_view kSantaKextIdentifier = "com.northpolesec.santa
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
       XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check OPEN tamper events
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
+    for (const auto &kv : pathToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.open.file = kv.first;
+      esMsg.event.open.fflag = FWRITE;
+
+      [mockTamperClient
+             handleMessage:std::move(msg)
+        recordEventMetrics:^(EventDisposition d) {
+          XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                             : EventDisposition::kDropped);
+          dispatch_semaphore_signal(semaMetrics);
+        }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+
+      XCTAssertEqual(gotAuthResult, kv.second);
+      // OPEN events are currently never cached
+      XCTAssertFalse(gotCachable);
     }
   }
 
