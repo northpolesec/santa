@@ -75,7 +75,7 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
       if ([SNTEndpointSecurityTamperResistance
             isProtectedPath:esMsg->event.rename.source->path.data]) {
         result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt to rename important Santa files!!");
+        LOGW(@"Preventing attempt to rename important Santa files!");
         break;
       }
 
