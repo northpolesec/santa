@@ -129,7 +129,7 @@ struct SNTBinaryMessageEventExpandedView: View {
 
         addLabel {
             Text("Parent").bold().font(Font.system(size:12.0))
-            Text("\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
+            Text(verbatim: "\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
         }
 
         Spacer()
@@ -138,7 +138,7 @@ struct SNTBinaryMessageEventExpandedView: View {
       HStack {
         Button(action: { copyDetailsToClipboard(e:e, customURL:customURL as String?) }) {
           HStack(spacing:2.0) {
-            Text("Copy Details").foregroundColor(.blue)
+            Text("Copy Details", comment:"Copy Details button in more details dialog").foregroundColor(.blue)
             Image(systemName:"pencil.and.list.clipboard").foregroundColor(.blue)
           }
         }
@@ -149,7 +149,7 @@ struct SNTBinaryMessageEventExpandedView: View {
 
         Button(action: { presentationMode.wrappedValue.dismiss() }) {
           HStack(spacing:2.0) {
-            Text("Dismiss").foregroundColor(.blue)
+            Text("Dismiss", comment:"Dismiss button in more details dialog").foregroundColor(.blue)
             Image(systemName:"xmark.circle").foregroundColor(.blue)
           }
         }
@@ -175,9 +175,11 @@ struct SNTBinaryMessageEventView: View {
 
     HStack(spacing: 20.0) {
       VStack(alignment:.trailing, spacing:10.0) {
+        /*
         if e?.needsBundleHash ?? false {
           Text("Bundle Hash")
         }
+        */
 
         if e?.fileBundleName != "" {
           Text("Application").bold().font(Font.system(size:12.0))
@@ -195,6 +197,7 @@ struct SNTBinaryMessageEventView: View {
       Divider()
 
       VStack(alignment:.leading, spacing:10.0) {
+        /*
         if e?.needsBundleHash ?? false {
           // TODO: Implement bundle hashing
           ProgressView()
@@ -215,6 +218,7 @@ struct SNTBinaryMessageEventView: View {
             }
           */
         }
+        */
 
         if let bundleName = e?.fileBundleName {
           Text(bundleName).textSelection(.enabled)
@@ -235,7 +239,7 @@ struct SNTBinaryMessageEventView: View {
     ZStack {
       Button(action: { isShowingDetails = true }) {
         HStack(spacing:2.0) {
-          Text("More Details").foregroundColor(.blue)
+          Text("More Details", comment:"More Details button in binary block dialog").foregroundColor(.blue)
           Image(systemName:"info.circle").foregroundColor(.blue)
         }
       }
@@ -245,7 +249,7 @@ struct SNTBinaryMessageEventView: View {
 
       // This button is hidden and exists only to allow using the Cmd+D keyboard shortcut
       // to copy the event details to the clipboard even if the "More Details" button hasn't been pressed.
-      Button(action: { copyDetailsToClipboard(e:e, customURL:customURL as String?) }) { Text("Copy Details") }
+      Button(action: { copyDetailsToClipboard(e:e, customURL:customURL as String?) }) { Text(verbatim:"Copy Details") }
       .buttonStyle(ScalingButtonStyle())
       .opacity(0.0) // Invisible!
       .keyboardShortcut("d", modifiers: .command)
@@ -290,11 +294,14 @@ struct SNTBinaryMessageWindowView: View {
               .frame(maxWidth:32, maxHeight:32)
               .offset(x:-75)
               .saturation(0.5)
-          Text("Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+          Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
         }
       }
 
-      Text(AttributedString(SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMsg as String?))).multilineTextAlignment(.center)
+      Spacer()
+
+      let blockMessage = SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMsg as String?)
+      Text(AttributedString(blockMessage)).multilineTextAlignment(.center).frame(maxWidth:MAX_OUTER_VIEW_WIDTH - 60).fixedSize()
 
       SNTBinaryMessageEventView(e: event!, customURL: customURL)
 
@@ -327,7 +334,7 @@ struct SNTBinaryMessageWindowView: View {
             }
           })
           .buttonStyle(.borderedProminent)
-          .keyboardShortcut(KeyboardShortcut("\r", modifiers:.command))
+          .keyboardShortcut("\r", modifiers:.command)
           .help("⌘ ⏎")
         }
 
@@ -342,7 +349,7 @@ struct SNTBinaryMessageWindowView: View {
             }
           }
         })
-        .keyboardShortcut(KeyboardShortcut(.escape, modifiers:.command))
+        .keyboardShortcut(.escape, modifiers:.command)
         .help("⌘ Esc")
       }.frame(maxWidth:MAX_BUTTON_AREA_WIDTH)
 

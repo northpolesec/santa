@@ -131,6 +131,7 @@ macos_application(
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",
     }),
+    strings = glob(["Resources/**/*.strings"]),
     version = "//:version",
     visibility = ["//:santa_package_group"],
     deps = [":SantaGUI_lib"],

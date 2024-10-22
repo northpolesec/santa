@@ -14,7 +14,7 @@ struct SNTAboutWindowView: View {
 
   var body: some View {
     VStack(spacing:20.0) {
-      Text("Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+      Text(verbatim:"Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
 
       if let t = c.aboutText {
         Text(t).multilineTextAlignment(.center)
@@ -23,7 +23,7 @@ struct SNTAboutWindowView: View {
         Santa is an application control system for macOS.
 
         There are no user-configurable settings.
-        """).multilineTextAlignment(.center)
+        """, comment:"Explanation in About view").multilineTextAlignment(.center)
       }
 
       HStack {
