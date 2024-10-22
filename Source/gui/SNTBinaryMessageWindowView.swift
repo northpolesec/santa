@@ -71,18 +71,17 @@ struct SNTBinaryMessageEventExpandedView: View {
             Text("Signing ID").bold().font(Font.system(size:12.0))
             Text(signingID).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
           }
+          Divider()
         }
 
-        Divider()
 
         if let cdHash = e?.cdhash {
           addLabel {
             Text("CDHash").bold().font(Font.system(size:12.0))
             Text(cdHash).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
           }
+          Divider()
         }
-
-        Divider()
 
         addLabel {
           Text("SHA-256").bold().font(Font.system(size:12.0))
