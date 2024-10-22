@@ -197,12 +197,12 @@ struct SNTBinaryMessageEventView: View {
 
       Button(action: copyDetailsToClipboard) {
         HStack(spacing:2.0) {
-          Text("\(Text("C").underline())opy Details").foregroundColor(.blue)
+          Text("Copy \(Text("D").underline())etails").foregroundColor(.blue)
           Image(systemName:"pencil.and.list.clipboard").foregroundColor(.blue)
         }
       }
       .buttonStyle(ScalingButtonStyle())
-      .keyboardShortcut("c", modifiers: .command)
+      .keyboardShortcut("d", modifiers: .command)
     }
   }
 
