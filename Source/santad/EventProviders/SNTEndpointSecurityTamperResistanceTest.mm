@@ -283,6 +283,14 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   XCTAssertTrue(
     [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/events.db"]);
   XCTAssertTrue([SNTEndpointSecurityTamperResistance isProtectedPath:"/Applications/Santa.app"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance
+    isProtectedPath:"/Library/LaunchAgents/com.northpolesec.santa.plist"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance
+    isProtectedPath:"/Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance
+    isProtectedPath:"/Library/LaunchAgents/com.google.santa.plist"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance
+    isProtectedPath:"/Library/LaunchDaemons/com.google.santa.syncservice.plist"]);
 
   XCTAssertFalse([SNTEndpointSecurityTamperResistance isProtectedPath:"/not/a/db/path"]);
 }

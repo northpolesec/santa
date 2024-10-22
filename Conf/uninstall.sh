@@ -24,6 +24,10 @@ user=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/rm -f /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist
 /bin/rm -f /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist
 /bin/rm -f /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist
+/bin/rm -f /Library/LaunchAgents/com.google.santa.plist
+/bin/rm -f /Library/LaunchDaemons/com.google.santa.bundleservice.plist
+/bin/rm -f /Library/LaunchDaemons/com.google.santa.metricservice.plist
+/bin/rm -f /Library/LaunchDaemons/com.google.santa.syncservice.plist
 /bin/rm -f /private/etc/asl/com.northpolesec.santa.asl.conf
 /bin/rm -f /private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf
 /bin/rm -f /usr/local/bin/santactl # just a symlink

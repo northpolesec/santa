@@ -96,6 +96,7 @@ void InstallServices() {
   if (![task launchAndReturnError:&error]) {
     LOGE(@"install_services.sh error: %@", error);
   }
+  [task waitUntilExit];
 }
 
 int main(int argc, char *argv[]) {

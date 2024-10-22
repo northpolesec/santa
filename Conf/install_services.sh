@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script is run by the NPS Santa sysx (com.northpolesec.santa.daemon) on
-# sysx startup.
+# sysx startup, before tamper protections are brought up.
 
 function die {
   echo "${@}"
@@ -15,11 +15,36 @@ function die {
 
 ################################################################################
 
+#
+# Migration support.
+#
+
+# Remove unsupported versions of Santa.
+/bin/launchctl remove com.google.santa.bundleservice || true
+/bin/launchctl remove com.google.santa.metricservice || true
+/bin/launchctl remove com.google.santa.syncservice || true
+GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
+[[ -n "${GUI_USER}" ]] && /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.google.santa || true
+/bin/rm /Library/LaunchAgents/com.google.santa.plist
+/bin/rm /Library/LaunchDaemons/com.google.santa.bundleservice.plist
+/bin/rm /Library/LaunchDaemons/com.google.santa.metricservice.plist
+/bin/rm /Library/LaunchDaemons/com.google.santa.syncservice.plist
+
+# Plant an empty placeholder file at the paths for the unsupported version's
+# services. These paths will be tamper protected once
+# com.northpolesec.santa.daemon finishes starting up. Creating the file now,
+# allows the tamper client to skip subscribing to file creation events.
+/usr/bin/touch /Library/LaunchAgents/com.google.santa.plist
+/usr/bin/touch /Library/LaunchDaemons/com.google.santa.bundleservice.plist
+/usr/bin/touch /Library/LaunchDaemons/com.google.santa.metricservice.plist
+/usr/bin/touch /Library/LaunchDaemons/com.google.santa.syncservice.plist
+
+################################################################################
+
 # Unload NPS Santa services in preparation for installation / update.
 /bin/launchctl remove com.northpolesec.santa.bundleservice || true
 /bin/launchctl remove com.northpolesec.santa.metricservice || true
 /bin/launchctl remove com.northpolesec.santa.syncservice || true
-GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 [[ -n "${GUI_USER}" ]] && /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.northpolesec.santa || true
 
 # Install the launch jobs.
