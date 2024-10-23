@@ -40,8 +40,44 @@ let MAX_BUTTON_AREA_WIDTH = 300.0
   }
 }
 
+struct ScalingButtonStyle: ButtonStyle {
+  func makeBody(configuration: Self.Configuration) -> some View {
+      configuration.label
+          .foregroundColor(.white)
+          .cornerRadius(40)
+          .scaleEffect(configuration.isPressed ? 0.8 : 0.9)
+  }
+}
+
+func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
+  var s = "Santa blocked \(e?.fileBundleName ?? "an application:")"
+  if let publisher = Publisher(e?.signingChain, e?.teamID) {
+    s += "\nPublisher: \(publisher)"
+  }
+  s += "\nUser     : \(e?.executingUser ?? "unknown")"
+  s += "\nPath     : \(e?.filePath ?? "unknown")"
+
+  if let signingID = e?.signingID {
+    s += "\nSigningID: \(signingID)"
+  }
+  if let cdhash = e?.cdhash {
+    s += "\nCDHash   : \(cdhash)"
+  }
+  s += "\nSHA-256  : \(e?.fileSHA256 ?? "unknown")"
+  s += "\nParent   : \(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))"
+
+  let url = SNTBlockMessage.eventDetailURL(for:e, customURL:customURL as String?)
+  s += "\nURL      : \(url?.absoluteString ?? "unknown")"
+  s += "\n"
+
+  let pasteboard = NSPasteboard.general
+  pasteboard.clearContents()
+  pasteboard.setString(s, forType: .string)
+}
+
 struct SNTBinaryMessageEventExpandedView: View {
   let e: SNTStoredEvent?
+  let customURL: NSString?
 
   @Environment(\.presentationMode) var presentationMode
 
@@ -98,22 +134,33 @@ struct SNTBinaryMessageEventExpandedView: View {
 
         Spacer()
 
-        Button("Dismiss") {
-          presentationMode.wrappedValue.dismiss()
+
+      HStack {
+        Button(action: { copyDetailsToClipboard(e:e, customURL:customURL as String?) }) {
+          HStack(spacing:2.0) {
+            Text("Copy Details").foregroundColor(.blue)
+            Image(systemName:"pencil.and.list.clipboard").foregroundColor(.blue)
+          }
         }
+        .buttonStyle(ScalingButtonStyle())
+        .keyboardShortcut("d", modifiers: .command)
+        .help("⌘ d")
+
+
+        Button(action: { presentationMode.wrappedValue.dismiss() }) {
+          HStack(spacing:2.0) {
+            Text("Dismiss").foregroundColor(.blue)
+            Image(systemName:"xmark.circle").foregroundColor(.blue)
+          }
+        }
+        .buttonStyle(ScalingButtonStyle())
+        .keyboardShortcut(.escape, modifiers: .command)
+        .help("⌘ Esc")
+      }
 
         Spacer()
       }.frame(maxWidth:MAX_OUTER_VIEW_WIDTH - 20).fixedSize()
     }.frame(width:MAX_OUTER_VIEW_WIDTH - 20).fixedSize().background(Color.gray.opacity(0.2))
-  }
-}
-
-struct ScalingButtonStyle: ButtonStyle {
-  func makeBody(configuration: Self.Configuration) -> some View {
-      configuration.label
-          .foregroundColor(.white)
-          .cornerRadius(40)
-          .scaleEffect(configuration.isPressed ? 0.8 : 0.9)
   }
 }
 
@@ -182,55 +229,30 @@ struct SNTBinaryMessageEventView: View {
         Text(e?.executingUser ?? "").textSelection(.enabled)
       }
     }.sheet(isPresented: $isShowingDetails) {
-      SNTBinaryMessageEventExpandedView(e: e)
+      SNTBinaryMessageEventExpandedView(e: e, customURL:customURL)
     }
 
-    HStack {
-      Button(action: { isShowingDetails = true}) {
+    ZStack {
+      Button(action: { isShowingDetails = true }) {
         HStack(spacing:2.0) {
-          Text("\(Text("M").underline())ore Details").foregroundColor(.blue)
+          Text("More Details").foregroundColor(.blue)
           Image(systemName:"info.circle").foregroundColor(.blue)
         }
       }
       .buttonStyle(ScalingButtonStyle())
       .keyboardShortcut("m", modifiers: .command)
+      .help("⌘ m")
 
-      Button(action: copyDetailsToClipboard) {
-        HStack(spacing:2.0) {
-          Text("Copy \(Text("D").underline())etails").foregroundColor(.blue)
-          Image(systemName:"pencil.and.list.clipboard").foregroundColor(.blue)
-        }
-      }
+      // This button is hidden and exists only to allow using the Cmd+D keyboard shortcut
+      // to copy the event details to the clipboard even if the "More Details" button hasn't been pressed.
+      Button(action: { copyDetailsToClipboard(e:e, customURL:customURL as String?) }) { Text("Copy Details") }
       .buttonStyle(ScalingButtonStyle())
+      .opacity(0.0) // Invisible!
       .keyboardShortcut("d", modifiers: .command)
+      .help("⌘ d")
     }
   }
 
-  func copyDetailsToClipboard() {
-    var s = "Santa blocked \(e?.fileBundleName ?? "an application:")"
-    if let publisher = Publisher(e?.signingChain, e?.teamID) {
-      s += "\nPublisher: \(publisher)"
-    }
-    s += "\nUser     : \(e?.executingUser ?? "unknown")"
-    s += "\nPath     : \(e?.filePath ?? "unknown")"
-
-    if let signingID = e?.signingID {
-      s += "\nSigningID: \(signingID)"
-    }
-    if let cdhash = e?.cdhash {
-      s += "\nCDHash   : \(cdhash)"
-    }
-    s += "\nSHA-256  : \(e?.fileSHA256 ?? "unknown")"
-    s += "\nParent   : \(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))"
-
-    let url = SNTBlockMessage.eventDetailURL(for:e, customURL:customURL as String?)
-    s += "\nURL      : \(url?.absoluteString ?? "unknown")"
-    s += "\n"
-
-    let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-    pasteboard.setString(s, forType: .string)
-  }
 }
 
 struct SNTBinaryMessageWindowView: View {
@@ -267,12 +289,12 @@ struct SNTBinaryMessageWindowView: View {
               .resizable()
               .frame(maxWidth:32, maxHeight:32)
               .offset(x:-75)
-              .saturation(0.75)
+              .saturation(0.5)
           Text("Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
         }
       }
 
-      Text(AttributedString(SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMsg as String?)))
+      Text(AttributedString(SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMsg as String?))).multilineTextAlignment(.center)
 
       SNTBinaryMessageEventView(e: event!, customURL: customURL)
 
@@ -306,6 +328,7 @@ struct SNTBinaryMessageWindowView: View {
           })
           .buttonStyle(.borderedProminent)
           .keyboardShortcut(KeyboardShortcut("\r", modifiers:.command))
+          .help("⌘ ⏎")
         }
 
         Button(action: dismissButton, label: {
@@ -320,6 +343,7 @@ struct SNTBinaryMessageWindowView: View {
           }
         })
         .keyboardShortcut(KeyboardShortcut(.escape, modifiers:.command))
+        .help("⌘ Esc")
       }.frame(maxWidth:MAX_BUTTON_AREA_WIDTH)
 
       Spacer()
