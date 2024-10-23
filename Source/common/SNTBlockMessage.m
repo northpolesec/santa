@@ -78,14 +78,16 @@ static id ValueOrNull(id value) {
   } else if (event.decision == SNTEventStateBlockUnknown) {
     message = [[SNTConfigurator configurator] unknownBlockMessage];
     if (!message) {
-      message = @"The following application has been blocked from executing<br />"
-                @"because its trustworthiness cannot be determined.";
+      message = NSLocalizedString(
+        @"DefaultApplicationBlockedUnknownMessage",
+        @"The default message to show the user when an unknown application is blocked");
     }
   } else {
     message = [[SNTConfigurator configurator] bannedBlockMessage];
     if (!message) {
-      message = @"The following application has been blocked from executing<br />"
-                @"because it has been deemed malicious.";
+      message = NSLocalizedString(
+        @"DefaultApplicationBlockedBannedMessage",
+        @"The default message to show the user when a banned application is blocked");
     }
   }
   return [SNTBlockMessage formatMessage:message];
@@ -97,7 +99,9 @@ static id ValueOrNull(id value) {
   if (!message.length) {
     message = [[SNTConfigurator configurator] fileAccessBlockMessage];
     if (!message.length) {
-      message = @"Access to a file has been denied.";
+      message =
+        NSLocalizedString(@"DefaultFileBlockedMessage",
+                          @"The default message to show the user when access to a file is blocked");
     }
   }
   return [SNTBlockMessage formatMessage:message];

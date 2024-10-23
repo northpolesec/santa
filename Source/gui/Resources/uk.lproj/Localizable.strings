@@ -1,0 +1,87 @@
+/* No comment provided by engineer. */
+"Access to a protected resource was denied." = "Відмовлено в доступі до захищеного ресурсу.";
+
+/* No comment provided by engineer. */
+"Application" = "Заявка";
+
+/* No comment provided by engineer. */
+"Bundle Hash" = "Пакетний хеш";
+
+/* No comment provided by engineer. */
+"CDHash" = "CDHash";
+
+/* Copy Details button in binary block dialog */
+"Copy Details" = "Деталі копіювання";
+
+/* The default message to show the user when a banned application is blocked */
+"DefaultApplicationBlockedBannedMessage" = "Наступну програму було заблоковано для виконання,<br />оскільки її було визнано шкідливою";
+
+/* The default message to show the user when an unknown application is blocked */
+"DefaultApplicationBlockedUnknownMessage" = "Наступна програма була заблокована для виконання,<br />оскільки не може бути визначена її достовірність";
+
+/* The default message to show the user when access to a file is blocked */
+"DefaultFileBlockedMessage" = "Відмовлено у доступі до файлу";
+
+/* No comment provided by engineer. */
+"Device BSD Path" = "Шлях BSD пристрою";
+
+/* No comment provided by engineer. */
+"Device Name" = "Назва пристрою";
+
+/* No comment provided by engineer. */
+"Dismiss" = "Звільнити";
+
+/* No comment provided by engineer. */
+"Dismiss & Silence" = "Звільнити і замовкнути";
+
+/* No comment provided by engineer. */
+"Filename" = "Ім'я файлу";
+
+/* More Details button in binary block dialog */
+"More Details" = "Детальніше";
+
+/* No comment provided by engineer. */
+"More Info..." = "Більше інформації...";
+
+/* No comment provided by engineer. */
+"Mounting devices is blocked" = "Монтажные устройства заблокированы";
+
+/* No comment provided by engineer. */
+"OK" = "Окей";
+
+/* No comment provided by engineer. */
+"Open Event..." = "Відкрита подія...";
+
+/* No comment provided by engineer. */
+"Open..." = "Відкрито...";
+
+/* No comment provided by engineer. */
+"Parent" = "Батько";
+
+/* No comment provided by engineer. */
+"Path" = "Шлях";
+
+/* No comment provided by engineer. */
+"Prevent future notifications for this application for " = "Запобігти майбутнім сповіщенням для цієї заявки для ";
+
+/* No comment provided by engineer. */
+"Publisher" = "Видавець";
+
+/* No comment provided by engineer. */
+"Remount Mode" = "Режим перевстановлення";
+
+/* Explanation in About view */
+"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa - система управління додатками для macOS.\n\nНемає налаштувань, що налаштовуються користувачем.";
+
+/* No comment provided by engineer. */
+"SHA-256" = "SHA-256";
+
+/* No comment provided by engineer. */
+"Signing ID" = "Signing ID";
+
+/* No comment provided by engineer. */
+"unknown" = "невідомо";
+
+/* No comment provided by engineer. */
+"User" = "Користувач";
+
