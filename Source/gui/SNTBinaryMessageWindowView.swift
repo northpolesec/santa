@@ -264,22 +264,16 @@ struct SNTBinaryMessageWindowView: View {
 
   let c = SNTConfigurator()
 
-  @State public var preventFutureNotifications = false
-
   let preventNotificationPeriods: [TimeInterval] = [86400, 604800, 2678400]
+  @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = 86400
-  let dateFormatter = DateComponentsFormatter()
 
-  init(window: NSWindow, event: SNTStoredEvent?, customMsg: NSString?, customURL: NSString?, uiStateCallback: ((TimeInterval) -> Void)?) {
-    self.window = window
-    self.event = event
-    self.customMsg = customMsg
-    self.customURL = customURL
-    self.uiStateCallback = uiStateCallback
-
-    dateFormatter.unitsStyle = .spellOut
-    dateFormatter.allowedUnits = [.day, .month, .weekOfMonth]
-  }
+  let dateFormatter : DateComponentsFormatter = {
+    let df = DateComponentsFormatter()
+    df.unitsStyle = .spellOut
+    df.allowedUnits = [.day, .month, .weekOfMonth]
+    return df
+  }()
 
   var body: some View {
     VStack(spacing:15.0) {

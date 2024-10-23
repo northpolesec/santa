@@ -60,8 +60,8 @@
                                                              customURL:self.customURL]
                        .absoluteString
           customText:self.customText
-     uiStateCallback:^(BOOL preventNotificationsForADay) {
-       self.silenceFutureNotificationsPeriod = preventNotificationsForADay ? 86400 : 0;
+     uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+       self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
      }];
 
   self.window.delegate = self;

@@ -24,7 +24,7 @@ import santa_common_SNTFileAccessEvent
                                       customMessage: NSAttributedString?,
                                       customURL: NSString?,
                                       customText: NSString?,
-                                      uiStateCallback: ((Bool) -> Void)?) -> NSViewController {
+                                      uiStateCallback: ((TimeInterval) -> Void)?) -> NSViewController {
     return NSHostingController(rootView:SNTFileAccessMessageWindowView(window:window,
                                                                        event:event,
                                                                        customMessage:customMessage,
@@ -113,10 +113,20 @@ struct SNTFileAccessMessageWindowView: View {
   let customMessage: NSAttributedString?
   let customURL: String?
   let customText: String?
-  let uiStateCallback: ((Bool) -> Void)?
+  let uiStateCallback: ((TimeInterval) -> Void)?
 
   @Environment(\.openURL) var openURL
-  @State public var checked = false
+
+  let preventNotificationPeriods: [TimeInterval] = [86400, 604800, 2678400]
+  @State public var preventFutureNotifications = false
+  @State public var preventFutureNotificationPeriod: TimeInterval = 86400
+
+  let dateFormatter : DateComponentsFormatter = {
+    let df = DateComponentsFormatter()
+    df.unitsStyle = .spellOut
+    df.allowedUnits = [.day, .month, .weekOfMonth]
+    return df
+  }()
 
   var body: some View {
     VStack(spacing:20.0) {
@@ -131,10 +141,26 @@ struct SNTFileAccessMessageWindowView: View {
 
       Event(e: event!, window: window)
 
-      Toggle(isOn: $checked) {
-        Text("Prevent future notifications for this application for a day")
-          .font(Font.system(size: 11.0));
-      }
+      // TODO: Make a shared view component for this "prevent notifications" checkbox and picker, as it's
+      // useful in multiple views.
+      // Create a wrapper binding around $preventFutureNotificationsPeriod so that we can automatically
+      // check the checkbox if the user has selected a new period.
+      let pi = Binding<TimeInterval>(get: { return self.preventFutureNotificationPeriod }, set: {
+        self.preventFutureNotifications = true
+        self.preventFutureNotificationPeriod = $0
+      })
+
+      Toggle(isOn: $preventFutureNotifications) {
+        HStack(spacing:0.0) {
+          Text("Prevent future notifications for this application for ").font(Font.system(size: 11.0));
+          Picker("", selection: pi) {
+            ForEach(preventNotificationPeriods, id: \.self) { period in
+              let text = dateFormatter.string(from: period) ?? "unknown"
+              Text(text).font(Font.system(size: 11.0))
+            }
+          }.fixedSize()
+        }
+      }.padding(10.0)
 
       VStack(spacing:15) {
           if customURL != nil {
@@ -171,8 +197,12 @@ struct SNTFileAccessMessageWindowView: View {
   }
 
   func dismissButton() {
-    if let block = uiStateCallback {
-      block(self.checked)
+    if let callback = uiStateCallback {
+      if self.preventFutureNotifications {
+        callback(self.preventFutureNotificationPeriod)
+      } else {
+        callback(0)
+      }
     }
     window?.close()
   }
