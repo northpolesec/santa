@@ -25,6 +25,8 @@
 
 @interface SNTBlockMessage : NSObject
 
+NS_ASSUME_NONNULL_BEGIN
+
 ///
 ///  Return a message suitable for presenting to the user.
 ///
@@ -38,8 +40,8 @@
 ///  if the rule that blocked this file included one, formatted using
 ///  +[SNTBlockMessage formatMessage].
 ///
-+ (NSAttributedString *)attributedBlockMessageForEvent:(SNTStoredEvent *)event
-                                         customMessage:(NSString *)customMessage;
++ (NSAttributedString *)attributedBlockMessageForEvent:(nullable SNTStoredEvent *)event
+                                         customMessage:(nullable NSString *)customMessage;
 
 + (NSAttributedString *)attributedBlockMessageForFileAccessEvent:(SNTFileAccessEvent *)event
                                                    customMessage:(NSString *)customMessage;
@@ -48,12 +50,16 @@
 ///  Return a URL generated from the EventDetailURL configuration key
 ///  after replacing templates in the URL with values from the event.
 ///
-+ (NSURL *)eventDetailURLForEvent:(SNTStoredEvent *)event customURL:(NSString *)url;
-+ (NSURL *)eventDetailURLForFileAccessEvent:(SNTFileAccessEvent *)event customURL:(NSString *)url;
++ (nullable NSURL *)eventDetailURLForEvent:(nullable SNTStoredEvent *)event
+                                 customURL:(nullable NSString *)url;
++ (nullable NSURL *)eventDetailURLForFileAccessEvent:(nullable SNTFileAccessEvent *)event
+                                           customURL:(nullable NSString *)url;
 
 ///
 ///  Strip HTML from a string, replacing <br /> with newline.
 ///
 + (NSString *)stringFromHTML:(NSString *)html;
+
+NS_ASSUME_NONNULL_END
 
 @end

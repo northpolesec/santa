@@ -33,7 +33,7 @@ struct SNTDeviceMessageWindowView: View {
 
   var body: some View {
     VStack(spacing:20.0) {
-      Text("Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+      Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
 
       if let t = customMsg {
         if #available(macOS 12.0, *) {

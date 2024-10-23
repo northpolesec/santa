@@ -53,7 +53,7 @@ struct Property : View {
             Image(systemName: "info.circle.fill")
           }.buttonStyle(BorderlessButtonStyle())
         }
-        Text(lbl + ":")
+        Text(verbatim: lbl + ":")
           .frame(alignment: .trailing)
           .lineLimit(1)
           .font(.system(size: 12, weight: .bold))
@@ -131,7 +131,7 @@ struct SNTFileAccessMessageWindowView: View {
   var body: some View {
     VStack(spacing:20.0) {
       Spacer()
-      Text("Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+      Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
 
       if let msg = customMessage {
         Text(AttributedString(msg)).multilineTextAlignment(.center).padding(15.0)

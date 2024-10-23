@@ -1,0 +1,87 @@
+/* No comment provided by engineer. */
+"Access to a protected resource was denied." = "Access to a protected resource was denied.";
+
+/* No comment provided by engineer. */
+"Application" = "Application";
+
+/* No comment provided by engineer. */
+"Bundle Hash" = "Bundle Hash";
+
+/* No comment provided by engineer. */
+"CDHash" = "CDHash";
+
+/* Copy Details button in more details dialog */
+"Copy Details" = "Copy Details";
+
+/* The default message to show the user when a banned application is blocked */
+"DefaultApplicationBlockedBannedMessage" = "The following application has been blocked from<br />executing because it has been deemed malicious";
+
+/* The default message to show the user when an unknown application is blocked */
+"DefaultApplicationBlockedUnknownMessage" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";
+
+/* The default message to show the user when access to a file is blocked */
+"DefaultFileBlockedMessage" = "Access to a file has been denied";
+
+/* No comment provided by engineer. */
+"Device BSD Path" = "Device BSD Path";
+
+/* No comment provided by engineer. */
+"Device Name" = "Device Name";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "Dismiss";
+
+/* No comment provided by engineer. */
+"Dismiss & Silence" = "Dismiss & Silence";
+
+/* No comment provided by engineer. */
+"Filename" = "Filename";
+
+/* More Details button in binary block dialog */
+"More Details" = "More Details";
+
+/* No comment provided by engineer. */
+"More Info..." = "More Info...";
+
+/* No comment provided by engineer. */
+"Mounting devices is blocked" = "Mounting devices is blocked";
+
+/* No comment provided by engineer. */
+"OK" = "OK";
+
+/* No comment provided by engineer. */
+"Open Event..." = "Open Event...";
+
+/* No comment provided by engineer. */
+"Open..." = "Open...";
+
+/* No comment provided by engineer. */
+"Parent" = "Parent";
+
+/* No comment provided by engineer. */
+"Path" = "Path";
+
+/* No comment provided by engineer. */
+"Prevent future notifications for this application for " = "Prevent future notifications for this application for ";
+
+/* No comment provided by engineer. */
+"Publisher" = "Publisher";
+
+/* No comment provided by engineer. */
+"Remount Mode" = "Remount Mode";
+
+/* Explanation in About view */
+"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa is an application control system for macOS.\n\nThere are no user-configurable settings.";
+
+/* No comment provided by engineer. */
+"SHA-256" = "SHA-256";
+
+/* No comment provided by engineer. */
+"Signing ID" = "Signing ID";
+
+/* No comment provided by engineer. */
+"unknown" = "unknown";
+
+/* No comment provided by engineer. */
+"User" = "User";
+
