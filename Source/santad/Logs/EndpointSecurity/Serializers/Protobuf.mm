@@ -78,7 +78,7 @@ using santa::RealGroup;
 using santa::RealUser;
 using santa::StringTokenToStringView;
 
-namespace pbv1 = ::santa::pb::v1;
+namespace pbv1 = ::santa::telemetry::v1;
 
 namespace santa {
 
@@ -206,9 +206,9 @@ static inline void EncodeFileInfoLight(::pbv1::FileInfoLight *pb_file, const es_
   pb_file->set_truncated(es_file->path_truncated);
 }
 
-static inline void EncodeAnnotations(std::function<::pbv1::process_tree::Annotations *()> lazy_f,
+static inline void EncodeAnnotations(std::function<::pbv1::ProcessTreeAnnotations *()> lazy_f,
                                      const EnrichedProcess &enriched_proc) {
-  if (std::optional<pbv1::process_tree::Annotations> proc_annotations = enriched_proc.annotations();
+  if (std::optional<pbv1::ProcessTreeAnnotations> proc_annotations = enriched_proc.annotations();
       proc_annotations) {
     *lazy_f() = *proc_annotations;
   }

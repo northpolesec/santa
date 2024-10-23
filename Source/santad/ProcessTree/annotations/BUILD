@@ -8,7 +8,7 @@ cc_library(
     name = "annotator",
     hdrs = ["annotator.h"],
     deps = [
-        "//Source/santad/ProcessTree:process_tree_cc_proto",
+        "@northpole_protos//telemetry:cc_proto_library_wrapper",
     ],
 )
 
@@ -20,8 +20,8 @@ cc_library(
         ":annotator",
         "//Source/santad/ProcessTree:process",
         "//Source/santad/ProcessTree:process_tree",
-        "//Source/santad/ProcessTree:process_tree_cc_proto",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@northpole_protos//telemetry:cc_proto_library_wrapper",
     ],
 )
 
@@ -31,7 +31,7 @@ santa_unit_test(
     deps = [
         ":originator",
         "//Source/santad/ProcessTree:process",
-        "//Source/santad/ProcessTree:process_tree_cc_proto",
         "//Source/santad/ProcessTree:process_tree_test_helpers",
+        "@northpole_protos//telemetry:cc_proto_library_wrapper",
     ],
 )

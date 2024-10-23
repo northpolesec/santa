@@ -20,10 +20,10 @@
 
 #include "Source/santad/ProcessTree/process.h"
 #include "Source/santad/ProcessTree/process_tree.h"
-#include "Source/santad/ProcessTree/process_tree.pb.h"
 #include "absl/container/flat_hash_map.h"
+#include "telemetry/proto_include_wrapper.h"
 
-namespace ptpb = ::santa::pb::v1::process_tree;
+namespace ptpb = ::santa::telemetry::v1;
 
 namespace santa::santad::process_tree {
 
@@ -38,12 +38,13 @@ void OriginatorAnnotator::AnnotateFork(ProcessTree &tree, const Process &parent,
 void OriginatorAnnotator::AnnotateExec(ProcessTree &tree,
                                        const Process &orig_process,
                                        const Process &new_process) {
-  static const absl::flat_hash_map<std::string, ptpb::Annotations::Originator>
+  static const absl::flat_hash_map<std::string,
+                                   ptpb::ProcessTreeAnnotations::Originator>
       originator_programs = {
-          {"/usr/bin/login",
-           ptpb::Annotations::Originator::Annotations_Originator_LOGIN},
-          {"/usr/sbin/cron",
-           ptpb::Annotations::Originator::Annotations_Originator_CRON},
+          {"/usr/bin/login", ptpb::ProcessTreeAnnotations::Originator::
+                                 ProcessTreeAnnotations_Originator_LOGIN},
+          {"/usr/sbin/cron", ptpb::ProcessTreeAnnotations::Originator::
+                                 ProcessTreeAnnotations_Originator_CRON},
       };
 
   if (auto annotation = tree.GetAnnotation<OriginatorAnnotator>(orig_process)) {
@@ -58,8 +59,8 @@ void OriginatorAnnotator::AnnotateExec(ProcessTree &tree,
   }
 }
 
-std::optional<ptpb::Annotations> OriginatorAnnotator::Proto() const {
-  auto annotation = ptpb::Annotations();
+std::optional<ptpb::ProcessTreeAnnotations> OriginatorAnnotator::Proto() const {
+  auto annotation = ptpb::ProcessTreeAnnotations();
   annotation.set_originator(originator_);
   return annotation;
 }

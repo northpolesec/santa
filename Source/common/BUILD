@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
@@ -6,31 +5,6 @@ package(
 )
 
 licenses(["notice"])
-
-proto_library(
-    name = "santa_proto",
-    srcs = ["santa.proto"],
-    deps = [
-        "//Source/santad/ProcessTree:process_tree_proto",
-        "@com_google_protobuf//:any_proto",
-        "@com_google_protobuf//:timestamp_proto",
-    ],
-)
-
-cc_proto_library(
-    name = "santa_cc_proto",
-    deps = [":santa_proto"],
-)
-
-# Note: Simple wrapper for a `cc_proto_library` target which cannot be directly
-# depended upon by an `objc_library` target.
-cc_library(
-    name = "santa_cc_proto_library_wrapper",
-    hdrs = ["santa_proto_include_wrapper.h"],
-    deps = [
-        ":santa_cc_proto",
-    ],
-)
 
 objc_library(
     name = "SystemResources",
