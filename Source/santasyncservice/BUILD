@@ -1,21 +1,10 @@
 load("@build_bazel_rules_apple//apple:macos.bzl", "macos_command_line_application")
-load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 load("//:helper.bzl", "santa_unit_test")
 
 licenses(["notice"])
 
 package(
     default_visibility = ["//:santa_package_group"],
-)
-
-proto_library(
-    name = "sync_v1_proto",
-    srcs = ["syncv1.proto"],
-)
-
-cc_proto_library(
-    name = "sync_v1_cc_proto",
-    deps = [":sync_v1_proto"],
 )
 
 objc_library(
@@ -59,7 +48,6 @@ objc_library(
     deps = [
         ":FCM_lib",
         ":broadcaster_lib",
-        ":sync_v1_cc_proto",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTFileInfo",
@@ -76,6 +64,7 @@ objc_library(
         "@MOLCertificate",
         "@MOLXPCConnection",
         "@com_google_protobuf//src/google/protobuf/json",
+        "@northpole_protos//sync:v1_cc_proto",
     ],
 )
 
@@ -115,7 +104,6 @@ santa_unit_test(
     deps = [
         ":FCM_lib",
         ":broadcaster_lib",
-        ":sync_v1_cc_proto",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDropRootPrivs",
@@ -133,6 +121,7 @@ santa_unit_test(
         "@MOLXPCConnection",
         "@OCMock",
         "@com_google_protobuf//src/google/protobuf/json",
+        "@northpole_protos//sync:v1_cc_proto",
     ],
 )
 
