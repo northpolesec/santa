@@ -244,7 +244,7 @@ struct SNTBinaryMessageWindowView: View {
 
   @State public var preventFutureNotifications = false
 
-  let preventNotificationPeriods: [TimeInterval] = [86400, 604800, 2592000]
+  let preventNotificationPeriods: [TimeInterval] = [86400, 604800, 2678400]
   @State public var preventFutureNotificationPeriod: TimeInterval = 86400
   let dateFormatter = DateComponentsFormatter()
 
@@ -256,7 +256,7 @@ struct SNTBinaryMessageWindowView: View {
     self.uiStateCallback = uiStateCallback
 
     dateFormatter.unitsStyle = .spellOut
-    dateFormatter.allowedUnits = [.hour, .day, .month]
+    dateFormatter.allowedUnits = [.day, .month, .weekOfMonth]
   }
 
   var body: some View {
