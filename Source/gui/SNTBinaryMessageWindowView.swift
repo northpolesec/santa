@@ -28,7 +28,7 @@ let MAX_BUTTON_AREA_WIDTH = 300.0
                                       event: SNTStoredEvent,
                                       customMsg: NSString?,
                                       customURL: NSString?,
-                                      uiStateCallback: ((Bool) -> Void)?) -> NSViewController {
+                                      uiStateCallback: ((TimeInterval) -> Void)?) -> NSViewController {
     return NSHostingController(rootView:SNTBinaryMessageWindowView(
       window:window,
       event:event,
@@ -238,11 +238,26 @@ struct SNTBinaryMessageWindowView: View {
   let event: SNTStoredEvent?
   let customMsg: NSString?
   let customURL: NSString?
-  let uiStateCallback: ((Bool) -> Void)?
+  let uiStateCallback: ((TimeInterval) -> Void)?
 
   let c = SNTConfigurator()
 
   @State public var preventFutureNotifications = false
+
+  let preventNotificationPeriods: [TimeInterval] = [86400, 604800, 2678400]
+  @State public var preventFutureNotificationPeriod: TimeInterval = 86400
+  let dateFormatter = DateComponentsFormatter()
+
+  init(window: NSWindow, event: SNTStoredEvent?, customMsg: NSString?, customURL: NSString?, uiStateCallback: ((TimeInterval) -> Void)?) {
+    self.window = window
+    self.event = event
+    self.customMsg = customMsg
+    self.customURL = customURL
+    self.uiStateCallback = uiStateCallback
+
+    dateFormatter.unitsStyle = .spellOut
+    dateFormatter.allowedUnits = [.day, .month, .weekOfMonth]
+  }
 
   var body: some View {
     VStack(spacing:15.0) {
@@ -261,11 +276,26 @@ struct SNTBinaryMessageWindowView: View {
 
       SNTBinaryMessageEventView(e: event!, customURL: customURL)
 
+      // Create a wrapper binding around $preventFutureNotificationsPeriod so that we can automatically
+      // check the checkbox if the user has selected a new period.
+      let pi = Binding<TimeInterval>(get: { return self.preventFutureNotificationPeriod }, set: {
+        self.preventFutureNotifications = true
+        self.preventFutureNotificationPeriod = $0
+      })
+
       Toggle(isOn: $preventFutureNotifications) {
-        Text("Prevent future notifications for this application for a day").font(Font.system(size: 11.0));
+        HStack(spacing:0.0) {
+          Text("Prevent future notifications for this application for ").font(Font.system(size: 11.0));
+          Picker("", selection: pi) {
+            ForEach(preventNotificationPeriods, id: \.self) { period in
+              let text = dateFormatter.string(from: period) ?? "unknown"
+              Text(text).font(Font.system(size: 11.0))
+            }
+          }.fixedSize()
+        }
       }.padding(10.0)
 
-      HStack(spacing:15) {
+      HStack(spacing:15.0) {
         if c.eventDetailURL != nil {
           Button(action: openButton, label: {
             if let edt = c.eventDetailText {
@@ -277,11 +307,16 @@ struct SNTBinaryMessageWindowView: View {
           .buttonStyle(.borderedProminent)
           .keyboardShortcut(KeyboardShortcut("\r", modifiers:.command))
         }
+
         Button(action: dismissButton, label: {
           if let dmt = c.dismissText {
             Text(dmt).frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
           } else {
-            Text("Dismiss").frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
+            if self.preventFutureNotifications {
+              Text("Dismiss & Silence").frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
+            } else {
+              Text("Dismiss").frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
+            }
           }
         })
         .keyboardShortcut(KeyboardShortcut(.escape, modifiers:.command))
@@ -293,7 +328,11 @@ struct SNTBinaryMessageWindowView: View {
 
   func openButton() {
     if let callback = uiStateCallback {
-      callback(self.preventFutureNotifications)
+      if self.preventFutureNotifications {
+        callback(self.preventFutureNotificationPeriod)
+      } else {
+        callback(0)
+      }
     }
 
     let url = SNTBlockMessage.eventDetailURL(for:event, customURL:customURL as String?)
@@ -305,7 +344,11 @@ struct SNTBinaryMessageWindowView: View {
 
   func dismissButton() {
     if let callback = uiStateCallback {
-      callback(self.preventFutureNotifications)
+      if self.preventFutureNotifications {
+        callback(self.preventFutureNotificationPeriod)
+      } else {
+        callback(0)
+      }
     }
     window?.close()
   }

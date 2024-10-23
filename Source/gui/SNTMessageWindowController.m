@@ -32,10 +32,11 @@
 - (void)windowWillClose:(NSNotification *)notification {
   if (!self.delegate) return;
 
-  if (self.silenceFutureNotifications) {
-    [self.delegate windowDidCloseSilenceHash:[self messageHash]];
+  if (self.silenceFutureNotificationsPeriod) {
+    [self.delegate windowDidCloseSilenceHash:[self messageHash]
+                                withInterval:self.silenceFutureNotificationsPeriod];
   } else {
-    [self.delegate windowDidCloseSilenceHash:nil];
+    [self.delegate windowDidCloseSilenceHash:nil withInterval:0];
   }
 }
 

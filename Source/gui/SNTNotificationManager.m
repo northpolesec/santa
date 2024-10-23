@@ -13,6 +13,7 @@
 ///    limitations under the License.
 
 #import "Source/gui/SNTNotificationManager.h"
+#include <Foundation/Foundation.h>
 
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
@@ -58,8 +59,11 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   return self;
 }
 
-- (void)windowDidCloseSilenceHash:(NSString *)hash {
-  if (hash) [self updateSilenceDate:[NSDate date] forHash:hash];
+- (void)windowDidCloseSilenceHash:(NSString *)hash withInterval:(NSTimeInterval)interval {
+  if (hash) {
+    NSDate *d = [[NSDate date] dateByAddingTimeInterval:interval];
+    [self updateSilenceDate:d forHash:hash];
+  }
 
   [self.pendingNotifications removeObject:self.currentWindowController];
   self.currentWindowController = nil;
@@ -112,16 +116,15 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     NSDate *silenceDate = [ud objectForKey:silencedNotificationsKey][messageHash];
     if ([silenceDate isKindOfClass:[NSDate class]]) {
-      NSDate *oneDayAgo = [NSDate dateWithTimeIntervalSinceNow:-86400];
-      if ([silenceDate compare:[NSDate date]] == NSOrderedDescending) {
-        LOGI(@"Notification silence: date is in the future, ignoring");
-        [self updateSilenceDate:nil forHash:messageHash];
-      } else if ([silenceDate compare:oneDayAgo] == NSOrderedAscending) {
-        LOGI(@"Notification silence: date is more than one day ago, ignoring");
-        [self updateSilenceDate:nil forHash:messageHash];
-      } else {
-        LOGI(@"Notification silence: dropping notification for %@", messageHash);
-        return;
+      switch ([silenceDate compare:[NSDate date]]) {
+        case NSOrderedDescending:
+          LOGI(@"Notification silence: dropping notification for %@", messageHash);
+          return;
+        case NSOrderedAscending:
+          LOGI(@"Notification silence: silence has expired, deleting");
+          [self updateSilenceDate:nil forHash:messageHash];
+          break;
+        default: break;
       }
     }
 

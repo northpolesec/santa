@@ -11,10 +11,11 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
+
 #import <Cocoa/Cocoa.h>
 
 @protocol SNTMessageWindowControllerDelegate
-- (void)windowDidCloseSilenceHash:(NSString *)hash;
+- (void)windowDidCloseSilenceHash:(NSString *)hash withInterval:(NSTimeInterval)interval;
 @end
 
 @interface SNTMessageWindowController : NSWindowController <NSWindowDelegate>
@@ -26,8 +27,8 @@
 /// notifications.
 - (NSString *)messageHash;
 
-///  Linked to checkbox in UI to prevent future notifications for the given event.
-@property BOOL silenceFutureNotifications;
+///  Linked to checkbox in UI to prevent future notifications for the given event for a given period
+@property NSTimeInterval silenceFutureNotificationsPeriod;
 
 @property(weak) id<SNTMessageWindowControllerDelegate> delegate;
 
