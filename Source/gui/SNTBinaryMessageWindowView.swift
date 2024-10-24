@@ -174,7 +174,6 @@ struct MoreDetailsView: View {
 }
 
 struct SNTBinaryMessageEventView: View {
-  let window: NSWindow?
   let e: SNTStoredEvent? 
   let customURL: NSString?
   @StateObject var bundleProgress: SNTBundleProgress
@@ -184,12 +183,6 @@ struct SNTBinaryMessageEventView: View {
   var body: some View {
     HStack(spacing: 20.0) {
       VStack(alignment:.trailing, spacing:10.0) {
-        /*
-        if e?.needsBundleHash ?? false {
-          Text("Bundle Hash")
-        }
-        */
-
         if e?.fileBundleName != "" {
           Text("Application").bold().font(Font.system(size:12.0))
         } else if e?.filePath != "" {
@@ -253,7 +246,7 @@ struct SNTBinaryMessageWindowView: View {
 
   var body: some View {
     SNTMessageView(SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMsg as String?)) {
-      SNTBinaryMessageEventView(window: window, e: event!, customURL: customURL, bundleProgress: bundleProgress)
+      SNTBinaryMessageEventView(e: event!, customURL: customURL, bundleProgress: bundleProgress)
 
       SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
 
@@ -270,8 +263,7 @@ struct SNTBinaryMessageWindowView: View {
       }
 
       HStack(spacing:15.0) {
-        if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
-        } else if c.eventDetailURL != nil {
+        if c.eventDetailURL != nil && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) {
           OpenEventButton(customText:c.eventDetailText, action:openButton)
         }
         DismissButton(customText: c.dismissText, silence: preventFutureNotifications, action: dismissButton)
