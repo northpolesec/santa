@@ -14,13 +14,13 @@
 "Copy Details" = "Копия Подробности";
 
 /* The default message to show the user when a banned application is blocked */
-"DefaultApplicationBlockedBannedMessage" = "Следующее приложение было заблокировано для выполнения,<br />поскольку оно было признано вредоносным";
+"The following application has been blocked from<br />executing because it has been deemed malicious" = "Следующее приложение было заблокировано для выполнения,<br />поскольку оно было признано вредоносным";
 
 /* The default message to show the user when an unknown application is blocked */
-"DefaultApplicationBlockedUnknownMessage" = "Следующее приложение было заблокировано для выполнения,<br />поскольку его надежность не может быть определена";
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Следующее приложение было заблокировано для выполнения,<br />поскольку его надежность не может быть определена";
 
 /* The default message to show the user when access to a file is blocked */
-"DefaultFileBlockedMessage" = "Доступ к файлу был запрещен";
+"Access to a file has been denied" = "Доступ к файлу был запрещен";
 
 /* No comment provided by engineer. */
 "Device BSD Path" = "Устройство BSD Path";
