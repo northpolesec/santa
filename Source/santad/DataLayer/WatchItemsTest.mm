@@ -24,6 +24,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -53,7 +54,8 @@ namespace santa {
 extern bool ParseConfig(NSDictionary *config,
                         std::vector<std::shared_ptr<WatchItemPolicy>> &policies, NSError **err);
 extern bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err);
-extern bool ParseConfigSingleWatchItem(NSString *name, NSDictionary *watch_item,
+extern bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
+                                       NSDictionary *watch_item,
                                        std::vector<std::shared_ptr<WatchItemPolicy>> &policies,
                                        NSError **err);
 extern std::variant<Unit, PathAndTypeVec> VerifyConfigWatchItemPaths(NSArray<id> *paths,
@@ -86,7 +88,7 @@ static constexpr std::string_view kBadPolicyPath("__BAD_PATH__");
 static constexpr std::string_view kVersion("v0.1");
 
 static std::shared_ptr<WatchItemPolicy> MakeBadPolicy() {
-  return std::make_shared<WatchItemPolicy>(kBadPolicyName, kBadPolicyPath);
+  return std::make_shared<WatchItemPolicy>(kBadPolicyName, kVersion, kBadPolicyPath);
 }
 
 static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
@@ -731,26 +733,26 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   NSError *err;
 
   // There must be valid Paths in a watch item
-  XCTAssertFalse(ParseConfigSingleWatchItem(@"", @{}, policies, &err));
+  XCTAssertFalse(ParseConfigSingleWatchItem(@"", "", @{}, policies, &err));
   XCTAssertFalse(
-    ParseConfigSingleWatchItem(@"", @{kWatchItemConfigKeyPaths : @[ @"" ]}, policies, &err));
+    ParseConfigSingleWatchItem(@"", "", @{kWatchItemConfigKeyPaths : @[ @"" ]}, policies, &err));
   XCTAssertTrue(
-    ParseConfigSingleWatchItem(@"", @{kWatchItemConfigKeyPaths : @[ @"a" ]}, policies, &err));
+    ParseConfigSingleWatchItem(@"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ]}, policies, &err));
 
   // Empty options are fine
   XCTAssertTrue(ParseConfigSingleWatchItem(
-    @"", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @{}}, policies,
+    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @{}}, policies,
     &err));
 
   // If an Options key exist, it must be a dictionary type
   XCTAssertFalse(ParseConfigSingleWatchItem(
-    @"", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @[]}, policies,
+    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @[]}, policies,
     &err));
   XCTAssertFalse(ParseConfigSingleWatchItem(
-    @"", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @""}, policies,
+    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @""}, policies,
     &err));
   XCTAssertFalse(ParseConfigSingleWatchItem(
-    @"", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @(0)}, policies,
+    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @(0)}, policies,
     &err));
 
   // Options keys must be valid types
@@ -765,14 +767,14 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
          ]) {
       // Parse bool option with invliad type
       XCTAssertFalse(ParseConfigSingleWatchItem(
-        @"",
+        @"", "",
         @{kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{key : @""}},
         policies, &err));
 
       // Parse bool option with valid type
       XCTAssertTrue(ParseConfigSingleWatchItem(
-        @"",
+        @"", "",
         @{kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{key : @(0)}},
         policies, &err));
@@ -782,7 +784,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
     // kWatchItemConfigKeyOptionsCustomMessage - Invalid type
     XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", @{
+      @"", "", @{
         kWatchItemConfigKeyPaths : @[ @"a" ],
         kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsCustomMessage : @[]}
       },
@@ -790,7 +792,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
     // kWatchItemConfigKeyOptionsCustomMessage zero length
     XCTAssertTrue(ParseConfigSingleWatchItem(
-      @"", @{
+      @"", "", @{
         kWatchItemConfigKeyPaths : @[ @"a" ],
         kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsCustomMessage : @""}
       },
@@ -798,7 +800,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
     // kWatchItemConfigKeyOptionsCustomMessage valid "normal" length
     XCTAssertTrue(ParseConfigSingleWatchItem(
-      @"", @{
+      @"", "", @{
         kWatchItemConfigKeyPaths : @[ @"a" ],
         kWatchItemConfigKeyOptions :
           @{kWatchItemConfigKeyOptionsCustomMessage : @"This is a custom message"}
@@ -807,7 +809,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
     // kWatchItemConfigKeyOptionsCustomMessage Invalid "long" length
     XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", @{
+      @"", "", @{
         kWatchItemConfigKeyPaths : @[ @"a" ],
         kWatchItemConfigKeyOptions :
           @{kWatchItemConfigKeyOptionsCustomMessage : RepeatedString(@"A", 4096)}
@@ -818,19 +820,19 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // If processes are specified, they must be valid format
   // Note: Full tests in `testVerifyConfigWatchItemProcesses`
   XCTAssertFalse(ParseConfigSingleWatchItem(
-    @"", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyProcesses : @""}, policies,
+    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyProcesses : @""}, policies,
     &err));
 
   // Test the policy vector is populated as expected
 
   // Test default options with no processes
   policies.clear();
-  XCTAssertTrue(
-    ParseConfigSingleWatchItem(@"rule", @{kWatchItemConfigKeyPaths : @[ @"a" ]}, policies, &err));
+  XCTAssertTrue(ParseConfigSingleWatchItem(
+    @"rule", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ]}, policies, &err));
   XCTAssertEqual(policies.size(), 1);
   XCTAssertEqual(
     *policies[0].get(),
-    WatchItemPolicy("rule", "a", kWatchItemPolicyDefaultPathType,
+    WatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType,
                     kWatchItemPolicyDefaultAllowReadAccess, kWatchItemPolicyDefaultAuditOnly,
                     kWatchItemPolicyDefaultInvertProcessExceptions));
 
@@ -841,7 +843,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
     WatchItemPolicy::Process("pb", "", "", {}, "", std::nullopt),
   };
 
-  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", @{
+  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, @{
     kWatchItemConfigKeyPaths :
       @[ @"a", @{kWatchItemConfigKeyPathsPath : @"b", kWatchItemConfigKeyPathsIsPrefix : @(YES)} ],
     kWatchItemConfigKeyOptions : @{
@@ -861,11 +863,11 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   XCTAssertEqual(policies.size(), 2);
   XCTAssertEqual(*policies[0].get(),
-                 WatchItemPolicy("rule", "a", kWatchItemPolicyDefaultPathType, true, false, true,
-                                 true, false, "", nil, nil, procs));
+                 WatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType, true,
+                                 false, true, true, false, "", nil, nil, procs));
   XCTAssertEqual(*policies[1].get(),
-                 WatchItemPolicy("rule", "b", WatchItemPathType::kPrefix, true, false, true, true,
-                                 false, "", nil, nil, procs));
+                 WatchItemPolicy("rule", kVersion, "b", WatchItemPathType::kPrefix, true, false,
+                                 true, true, false, "", nil, nil, procs));
 }
 
 - (void)testState {

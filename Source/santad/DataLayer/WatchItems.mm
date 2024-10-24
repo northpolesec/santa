@@ -424,7 +424,8 @@ std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary
 ///   ... See VerifyConfigWatchItemProcesses for more details ...
 ///   </array>
 /// </dict>
-bool ParseConfigSingleWatchItem(NSString *name, NSDictionary *watch_item,
+bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
+                                NSDictionary *watch_item,
                                 std::vector<std::shared_ptr<WatchItemPolicy>> &policies,
                                 NSError **err) {
   if (!VerifyConfigKey(watch_item, kWatchItemConfigKeyPaths, [NSArray class], err, true)) {
@@ -494,7 +495,7 @@ bool ParseConfigSingleWatchItem(NSString *name, NSDictionary *watch_item,
 
   for (const PathAndTypePair &path_type_pair : std::get<PathAndTypeVec>(path_list)) {
     policies.push_back(std::make_shared<WatchItemPolicy>(
-      NSStringToUTF8StringView(name), path_type_pair.first, path_type_pair.second,
+      NSStringToUTF8StringView(name), policy_version, path_type_pair.first, path_type_pair.second,
       allow_read_access, audit_only, invert_process_exceptions, enable_silent_mode,
       enable_silent_tty_mode,
       NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
@@ -565,6 +566,7 @@ bool ParseConfig(NSDictionary *config, std::vector<std::shared_ptr<WatchItemPoli
   }
 
   NSDictionary *watch_items = config[kWatchItemConfigKeyWatchItems];
+  std::string policy_version = NSStringToUTF8String(config[kWatchItemConfigKeyVersion]);
 
   for (id key in watch_items) {
     if (![key isKindOfClass:[NSString class]]) {
@@ -592,7 +594,7 @@ bool ParseConfig(NSDictionary *config, std::vector<std::shared_ptr<WatchItemPoli
       return false;
     }
 
-    if (!ParseConfigSingleWatchItem(key, watch_items[key], policies, err)) {
+    if (!ParseConfigSingleWatchItem(key, policy_version, watch_items[key], policies, err)) {
       PopulateError(err, [NSString stringWithFormat:@"In watch item '%@': %@", key,
                                                     (err && *err) ? (*err).localizedDescription
                                                                   : @"Unknown failure"]);
