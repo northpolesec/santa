@@ -208,8 +208,9 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
   }
 
   // Do not cache denied operations so that each tamper attempt is logged.
-  // Do not cache ES_EVENT_TYPE_AUTH_OPEN events.
-  [self respondToMessage:esMsg withAuthResult:result cacheable:cacheable];
+  [self respondToMessage:esMsg
+          withAuthResult:result
+               cacheable:(cacheable && result == ES_AUTH_RESULT_ALLOW)];
 
   // For this client, a processed event is one that was found to be violating anti-tamper policy
   recordEventMetrics(result == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
