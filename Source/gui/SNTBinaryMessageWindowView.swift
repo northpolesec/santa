@@ -187,7 +187,7 @@ struct SNTBinaryMessageEventView: View {
           Text("Filename").bold().font(Font.system(size:12.0))
         }
 
-        if Publisher(e?.signingChain, e?.teamID) != "" {
+        if Publisher(e?.signingChain, e?.teamID) != nil {
           Text("Publisher").bold().font(Font.system(size:12.0))
         }
 
