@@ -23,12 +23,14 @@ function die {
 /bin/launchctl remove com.google.santa.bundleservice || true
 /bin/launchctl remove com.google.santa.metricservice || true
 /bin/launchctl remove com.google.santa.syncservice || true
+/bin/launchctl remove com.google.santad || true
 GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 [[ -n "${GUI_USER}" ]] && /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.google.santa || true
 /bin/rm /Library/LaunchAgents/com.google.santa.plist
 /bin/rm /Library/LaunchDaemons/com.google.santa.bundleservice.plist
 /bin/rm /Library/LaunchDaemons/com.google.santa.metricservice.plist
 /bin/rm /Library/LaunchDaemons/com.google.santa.syncservice.plist
+/bin/rm /Library/LaunchDaemons/com.google.santad.plist
 
 ################################################################################
 
