@@ -14,14 +14,10 @@
 
 import SwiftUI
 
-import santa_common_CertificateHelpers
 import santa_common_SNTBlockMessage
 import santa_common_SNTConfigurator
 import santa_common_SNTStoredEvent
-
-let MAX_OUTER_VIEW_WIDTH = 560.0
-let MAX_OUTER_VIEW_HEIGHT = 340.0
-let MAX_BUTTON_AREA_WIDTH = 300.0
+import santa_gui_SNTMessageView
 
 @objc public class SNTBinaryMessageWindowViewFactory : NSObject {
   @objc public static func createWith(window: NSWindow,
@@ -29,29 +25,19 @@ let MAX_BUTTON_AREA_WIDTH = 300.0
                                       customMsg: NSString?,
                                       customURL: NSString?,
                                       uiStateCallback: ((TimeInterval) -> Void)?) -> NSViewController {
-    return NSHostingController(rootView:SNTBinaryMessageWindowView(
-      window:window,
-      event:event,
-      customMsg:customMsg,
-      customURL:customURL,
-      uiStateCallback:uiStateCallback).frame(
-        minWidth:MAX_OUTER_VIEW_WIDTH,
-        minHeight:MAX_OUTER_VIEW_HEIGHT).fixedSize())
-  }
-}
-
-struct ScalingButtonStyle: ButtonStyle {
-  func makeBody(configuration: Self.Configuration) -> some View {
-      configuration.label
-          .foregroundColor(.white)
-          .cornerRadius(40)
-          .scaleEffect(configuration.isPressed ? 0.8 : 0.9)
+    return NSHostingController(rootView:SNTBinaryMessageWindowView(window:window,
+                                                                   event:event,
+                                                                   customMsg:customMsg,
+                                                                   customURL:customURL,
+                                                                   uiStateCallback:uiStateCallback)
+        .fixedSize()
+    )
   }
 }
 
 func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
   var s = "Santa blocked \(e?.fileBundleName ?? "an application:")"
-  if let publisher = Publisher(e?.signingChain, e?.teamID) {
+  if let publisher = e?.publisherInfo {
     s += "\nPublisher: \(publisher)"
   }
   s += "\nUser     : \(e?.executingUser ?? "unknown")"
@@ -75,7 +61,7 @@ func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
   pasteboard.setString(s, forType: .string)
 }
 
-struct SNTBinaryMessageEventExpandedView: View {
+struct MoreDetailsView: View {
   let e: SNTStoredEvent?
   let customURL: NSString?
 
@@ -85,9 +71,11 @@ struct SNTBinaryMessageEventExpandedView: View {
     HStack(spacing:5.0) {
       VStack(alignment:.leading, spacing:2.0) {
         closure()
-      }.frame(alignment:.leading)
+      }
       Spacer()
-    }.frame(width:MAX_OUTER_VIEW_WIDTH - 60).fixedSize()
+    }
+    .frame(minWidth:MAX_OUTER_VIEW_WIDTH - 60)
+    .fixedSize()
   }
 
   var body: some View {
@@ -129,7 +117,7 @@ struct SNTBinaryMessageEventExpandedView: View {
 
         addLabel {
             Text("Parent").bold().font(Font.system(size:12.0))
-            Text(verbatim: "\(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))").textSelection(.enabled)
+            Text(verbatim: "\(e?.parentName ?? "") (\(e?.ppid.stringValue ?? "unknown"))").textSelection(.enabled)
         }
 
         Spacer()
@@ -165,14 +153,13 @@ struct SNTBinaryMessageEventExpandedView: View {
 }
 
 struct SNTBinaryMessageEventView: View {
+  let window: NSWindow?
   let e: SNTStoredEvent? 
   let customURL: NSString?
 
   @State private var isShowingDetails = false
 
   var body: some View {
-    Spacer()
-
     HStack(spacing: 20.0) {
       VStack(alignment:.trailing, spacing:10.0) {
         /*
@@ -187,7 +174,7 @@ struct SNTBinaryMessageEventView: View {
           Text("Filename").bold().font(Font.system(size:12.0))
         }
 
-        if Publisher(e?.signingChain, e?.teamID) != nil {
+        if e?.publisherInfo != "" {
           Text("Publisher").bold().font(Font.system(size:12.0))
         }
 
@@ -226,26 +213,18 @@ struct SNTBinaryMessageEventView: View {
           Text((filePath as NSString).lastPathComponent).textSelection(.enabled)
         }
 
-        if let publisher = Publisher(e?.signingChain, e?.teamID) {
+        if let publisher = e?.publisherInfo {
           Text(publisher).textSelection(.enabled)
         }
 
         Text(e?.executingUser ?? "").textSelection(.enabled)
       }
     }.sheet(isPresented: $isShowingDetails) {
-      SNTBinaryMessageEventExpandedView(e: e, customURL:customURL)
+      MoreDetailsView(e: e, customURL:customURL)
     }
 
     ZStack {
-      Button(action: { isShowingDetails = true }) {
-        HStack(spacing:2.0) {
-          Text("More Details", comment:"More Details button in binary block dialog").foregroundColor(.blue)
-          Image(systemName:"info.circle").foregroundColor(.blue)
-        }
-      }
-      .buttonStyle(ScalingButtonStyle())
-      .keyboardShortcut("m", modifiers: .command)
-      .help("⌘ m")
+      MoreDetailsButton($isShowingDetails)
 
       // This button is hidden and exists only to allow using the Cmd+D keyboard shortcut
       // to copy the event details to the clipboard even if the "More Details" button hasn't been pressed.
@@ -256,7 +235,6 @@ struct SNTBinaryMessageEventView: View {
       .help("⌘ d")
     }
   }
-
 }
 
 struct SNTBinaryMessageWindowView: View {
@@ -266,89 +244,29 @@ struct SNTBinaryMessageWindowView: View {
   let customURL: NSString?
   let uiStateCallback: ((TimeInterval) -> Void)?
 
+  @Environment(\.openURL) var openURL
+
+  @State public var preventFutureNotifications = false
+  @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
+
   let c = SNTConfigurator()
 
-  let preventNotificationPeriods: [TimeInterval] = [86400, 604800, 2678400]
-  @State public var preventFutureNotifications = false
-  @State public var preventFutureNotificationPeriod: TimeInterval = 86400
-
-  let dateFormatter : DateComponentsFormatter = {
-    let df = DateComponentsFormatter()
-    df.unitsStyle = .spellOut
-    df.allowedUnits = [.day, .month, .weekOfMonth]
-    return df
-  }()
-
   var body: some View {
-    VStack(spacing:15.0) {
-      HStack {
-        ZStack {
-          Image(nsImage: NSImage(named: "AppIcon") ?? NSImage())
-              .resizable()
-              .frame(maxWidth:32, maxHeight:32)
-              .offset(x:-75)
-              .saturation(0.5)
-          Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
-        }
-      }
+    SNTMessageView(SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMsg as String?)) {
+      SNTBinaryMessageEventView(window: window, e: event!, customURL: customURL)
 
-      Spacer()
-
-      let blockMessage = SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMsg as String?)
-      Text(AttributedString(blockMessage)).multilineTextAlignment(.center).frame(maxWidth:MAX_OUTER_VIEW_WIDTH - 60).fixedSize()
-
-      SNTBinaryMessageEventView(e: event!, customURL: customURL)
-
-      // Create a wrapper binding around $preventFutureNotificationsPeriod so that we can automatically
-      // check the checkbox if the user has selected a new period.
-      let pi = Binding<TimeInterval>(get: { return self.preventFutureNotificationPeriod }, set: {
-        self.preventFutureNotifications = true
-        self.preventFutureNotificationPeriod = $0
-      })
-
-      Toggle(isOn: $preventFutureNotifications) {
-        HStack(spacing:0.0) {
-          Text("Prevent future notifications for this application for ").font(Font.system(size: 11.0));
-          Picker("", selection: pi) {
-            ForEach(preventNotificationPeriods, id: \.self) { period in
-              let text = dateFormatter.string(from: period) ?? "unknown"
-              Text(text).font(Font.system(size: 11.0))
-            }
-          }.fixedSize()
-        }
-      }.padding(10.0)
+      SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
 
       HStack(spacing:15.0) {
         if c.eventDetailURL != nil {
-          Button(action: openButton, label: {
-            if let edt = c.eventDetailText {
-              Text(edt).frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
-            } else {
-              Text("Open...").frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
-            }
-          })
-          .buttonStyle(.borderedProminent)
-          .keyboardShortcut("\r", modifiers:.command)
-          .help("⌘ ⏎")
+          OpenEventButton(customText:c.eventDetailText, action:openButton)
         }
-
-        Button(action: dismissButton, label: {
-          if let dmt = c.dismissText {
-            Text(dmt).frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
-          } else {
-            if self.preventFutureNotifications {
-              Text("Dismiss & Silence").frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
-            } else {
-              Text("Dismiss").frame(maxWidth:MAX_BUTTON_AREA_WIDTH / 2)
-            }
-          }
-        })
-        .keyboardShortcut(.escape, modifiers:.command)
-        .help("⌘ Esc")
-      }.frame(maxWidth:MAX_BUTTON_AREA_WIDTH)
+        DismissButton(customText: c.dismissText, silence: preventFutureNotifications, action: dismissButton)
+      }
 
       Spacer()
-    }.frame(maxWidth:MAX_OUTER_VIEW_WIDTH, minHeight:MAX_OUTER_VIEW_HEIGHT).fixedSize()
+    }
+    .fixedSize()
   }
 
   func openButton() {
@@ -363,7 +281,7 @@ struct SNTBinaryMessageWindowView: View {
     let url = SNTBlockMessage.eventDetailURL(for:event, customURL:customURL as String?)
     window?.close()
     if let url = url {
-      NSWorkspace.shared.open(url)
+      openURL(url)
     }
   }
 

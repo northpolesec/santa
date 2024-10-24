@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -51,18 +52,23 @@
     [self.window orderOut:sender];
   }
 
-  self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                            styleMask:NSWindowStyleMaskBorderless
-                                              backing:NSBackingStoreBuffered
-                                                defer:NO];
+  self.window =
+    [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
+                                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
+                                          NSWindowStyleMaskTitled
+                                  backing:NSBackingStoreBuffered
+                                    defer:NO];
+  self.window.titlebarAppearsTransparent = YES;
+  self.window.movableByWindowBackground = YES;
+  [self.window standardWindowButton:NSWindowZoomButton].hidden = YES;
+  [self.window standardWindowButton:NSWindowCloseButton].hidden = YES;
+  [self.window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
 
   self.window.contentViewController = [SNTFileAccessMessageWindowViewFactory
     createWithWindow:self.window
                event:self.event
-       customMessage:self.attributedCustomMessage
-           customURL:[SNTBlockMessage eventDetailURLForFileAccessEvent:self.event
-                                                             customURL:self.customURL]
-                       .absoluteString
+       customMessage:self.customMessage
+           customURL:self.customURL
           customText:self.customText
      uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
        self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
@@ -71,11 +77,6 @@
   self.window.delegate = self;
 
   [super showWindow:sender];
-}
-
-- (NSAttributedString *)attributedCustomMessage {
-  return [SNTBlockMessage attributedBlockMessageForFileAccessEvent:self.event
-                                                     customMessage:self.customMessage];
 }
 
 - (NSString *)messageHash {

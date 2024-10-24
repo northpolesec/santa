@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,6 +16,8 @@
 #import "Source/common/SNTStoredEvent.h"
 
 #import <MOLCertificate/MOLCertificate.h>
+
+#import "Source/common/CertificateHelpers.h"
 
 @implementation SNTStoredEvent
 
@@ -137,6 +140,14 @@
 - (NSString *)description {
   return
     [NSString stringWithFormat:@"SNTStoredEvent[%@] with SHA-256: %@", self.idx, self.fileSHA256];
+}
+
+- (NSString *)publisherInfo {
+  return Publisher(self.signingChain, self.teamID);
+}
+
+- (NSArray *)signingChainCertRefs {
+  return CertificateChain(self.signingChain);
 }
 
 #pragma clang diagnostic pop

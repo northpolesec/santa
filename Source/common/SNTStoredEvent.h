@@ -161,4 +161,17 @@
 @property NSDate *quarantineTimestamp;
 @property NSString *quarantineAgentBundleID;
 
+///
+/// A generated string representing the publisher based on the signingChain
+///
+@property(readonly) NSString *publisherInfo;
+
+///
+/// Return an array of the underlying SecCertificateRef's of the signingChain
+///
+/// WARNING: If the refs need to be used for a long time be careful to properly
+/// CFRetain/CFRelease the returned items.
+///
+@property(readonly) NSArray *signingChainCertRefs;
+
 @end

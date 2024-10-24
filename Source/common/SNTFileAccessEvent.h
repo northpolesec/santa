@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -36,18 +37,5 @@
 /// If the process is part of a bundle, the name of the application
 ///
 @property NSString *application;
-
-///
-/// A string representing the publisher based on the signingChain
-///
-@property(readonly) NSString *publisherInfo;
-
-///
-/// Return an array of the underlying SecCertificateRef's of the signingChain
-///
-/// WARNING: If the refs need to be used for a long time be careful to properly
-/// CFRetain/CFRelease the returned items.
-///
-@property(readonly) NSArray *signingChainCertRefs;
 
 @end

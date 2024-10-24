@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,16 +13,17 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-import SecurityInterface
 import SwiftUI
 
+import santa_common_SNTBlockMessage
 import santa_common_SNTFileAccessEvent
+import santa_gui_SNTMessageView
 
 @available(macOS 13, *)
 @objc public class SNTFileAccessMessageWindowViewFactory : NSObject {
   @objc public static func createWith(window: NSWindow,
                                       event: SNTFileAccessEvent,
-                                      customMessage: NSAttributedString?,
+                                      customMessage: NSString?,
                                       customURL: NSString?,
                                       customText: NSString?,
                                       uiStateCallback: ((TimeInterval) -> Void)?) -> NSViewController {
@@ -31,169 +33,162 @@ import santa_common_SNTFileAccessEvent
                                                                        customURL:customURL as String?,
                                                                        customText:customText as String?,
                                                                        uiStateCallback:uiStateCallback)
-      .frame(width:800, height:600))
+      .frame(minWidth:MAX_OUTER_VIEW_WIDTH, minHeight:MAX_OUTER_VIEW_HEIGHT)
+      .fixedSize()
+    )
   }
 }
 
-@available(macOS 13, *)
-struct Property : View {
-  var lbl: String
-  var val: String
-  var propertyAction: (() -> Void)? = nil
+struct MoreDetailsView: View {
+  let e: SNTFileAccessEvent
+
+  @Environment(\.presentationMode) var presentationMode
+
+  func addLabel(@ViewBuilder closure: () -> some View) -> some View {
+    HStack(spacing:5.0) {
+      VStack(alignment:.leading, spacing:2.0) {
+        closure()
+      }
+      Spacer()
+    }.frame(width:MAX_OUTER_VIEW_WIDTH - 60).fixedSize()
+  }
 
   var body: some View {
-    let width: CGFloat? = 150
+    HStack(spacing: 20.0) {
+      VStack(spacing: 20.0) {
+        Spacer()
 
-    HStack(spacing: 5) {
-      HStack {
-        if let block = propertyAction {
-          Button(action: {
-            block()
-          }) {
-            Image(systemName: "info.circle.fill")
-          }.buttonStyle(BorderlessButtonStyle())
+        addLabel {
+          Text("Path").bold().font(Font.system(size:12.0))
+          Text(e.filePath).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
         }
-        Text(verbatim: lbl + ":")
-          .frame(alignment: .trailing)
-          .lineLimit(1)
-          .font(.system(size: 12, weight: .bold))
-          .padding(Edge.Set.horizontal, 10)
-      }.frame(width: width, alignment: .trailing)
 
-      Text(val)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-    }
+        Divider()
 
+        if let signingID = e.signingID {
+          addLabel {
+            Text("Signing ID").bold().font(Font.system(size:12.0))
+            Text(signingID).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+          }
+          Divider()
+        }
+
+
+        if let cdHash = e.cdhash {
+          addLabel {
+            Text("CDHash").bold().font(Font.system(size:12.0))
+            Text(cdHash).font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+          }
+          Divider()
+        }
+
+        addLabel {
+          Text("SHA-256").bold().font(Font.system(size:12.0))
+          // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
+          Text(e.fileSHA256).font(Font.system(size:12.0).monospaced()).frame(width:240).textSelection(.enabled)
+        }
+
+        Divider()
+
+        addLabel {
+          Text("Parent").bold().font(Font.system(size:12.0))
+          Text(verbatim: "\(e.parentName ?? "") (\(e.ppid.stringValue))").font(Font.system(size:12.0).monospaced()).textSelection(.enabled)
+        }
+
+        Spacer()
+
+        Button(action: { presentationMode.wrappedValue.dismiss() }) {
+          HStack(spacing:2.0) {
+            Text("Dismiss", comment:"Dismiss button in more details dialog").foregroundColor(.blue)
+            Image(systemName:"xmark.circle").foregroundColor(.blue)
+          }
+        }
+        .buttonStyle(ScalingButtonStyle())
+        .keyboardShortcut(.escape, modifiers: .command)
+        .help("⌘ Esc")
+
+        Spacer()
+      }.frame(maxWidth:MAX_OUTER_VIEW_WIDTH - 20).fixedSize()
+    }.frame(width:MAX_OUTER_VIEW_WIDTH - 20).fixedSize().background(Color.gray.opacity(0.2))
   }
 }
 
-@available(macOS 13, *)
 struct Event: View {
   let e: SNTFileAccessEvent
   let window: NSWindow?
 
+  @State private var isShowingDetails = false
+
   var body: some View {
-    VStack(spacing:10) {
-      Property(lbl: "Path Accessed", val: e.accessedPath)
-      Property(lbl: "Rule Name", val: e.ruleName)
-      Property(lbl: "Rule Version", val: e.ruleVersion)
+    HStack(spacing: 20.0) {
+      VStack(alignment:.trailing, spacing:10.0) {
+        Text("Path Accessed").bold().font(Font.system(size:12.0))
+        Text("Rule Name").bold()
+        Text("Rule Version").bold()
+        Text("Application").bold()
+      }
 
       Divider()
-        .frame(width: 700)
 
-      if let app = e.application {
-        Property(lbl: "Application", val: app)
-      }
+      VStack(alignment:.leading, spacing:10.0) {
+        Text(e.accessedPath).textSelection(.enabled)
+        Text(e.ruleName).textSelection(.enabled)
+        // TODO: Why is this always temp_version?
+        Text(e.ruleVersion).textSelection(.enabled)
 
-      if let pub = e.publisherInfo {
-        Property(lbl: "Publisher", val: pub) {
-          SFCertificatePanel.shared()
-                .beginSheet(for: window,
-                            modalDelegate: nil,
-                            didEnd: nil,
-                            contextInfo: nil,
-                            certificates: e.signingChainCertRefs,
-                            showGroup: true)
+        if let app = e.application {
+          Text(app).textSelection(.enabled)
+        } else {
+          Text((e.filePath as NSString).lastPathComponent).textSelection(.enabled)
         }
       }
-
-      Property(lbl: "Name", val: (e.filePath as NSString).lastPathComponent)
-      Property(lbl: "Path", val: e.filePath)
-      Property(lbl: "Identifier", val: e.fileSHA256)
-      Property(lbl: "Parent", val: e.parentName + " (" + e.ppid.stringValue + ")")
+    }.sheet(isPresented: $isShowingDetails) {
+      MoreDetailsView(e: e)
     }
+
+    Spacer()
+
+    MoreDetailsButton($isShowingDetails)
   }
 }
 
-@available(macOS 13, *)
 struct SNTFileAccessMessageWindowView: View {
   let window: NSWindow?
   let event: SNTFileAccessEvent?
-  let customMessage: NSAttributedString?
+  let customMessage: NSString?
   let customURL: String?
   let customText: String?
   let uiStateCallback: ((TimeInterval) -> Void)?
 
   @Environment(\.openURL) var openURL
 
-  let preventNotificationPeriods: [TimeInterval] = [86400, 604800, 2678400]
   @State public var preventFutureNotifications = false
-  @State public var preventFutureNotificationPeriod: TimeInterval = 86400
-
-  let dateFormatter : DateComponentsFormatter = {
-    let df = DateComponentsFormatter()
-    df.unitsStyle = .spellOut
-    df.allowedUnits = [.day, .month, .weekOfMonth]
-    return df
-  }()
+  @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
   var body: some View {
-    VStack(spacing:20.0) {
-      Spacer()
-      Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
-
-      if let msg = customMessage {
-        Text(AttributedString(msg)).multilineTextAlignment(.center).padding(15.0)
-      } else {
-        Text("Access to a protected resource was denied.").multilineTextAlignment(.center).padding(15.0)
-      }
-
+    SNTMessageView(SNTBlockMessage.attributedBlockMessage(for:event, customMessage:customMessage as String?)) {
       Event(e: event!, window: window)
 
-      // TODO: Make a shared view component for this "prevent notifications" checkbox and picker, as it's
-      // useful in multiple views.
-      // Create a wrapper binding around $preventFutureNotificationsPeriod so that we can automatically
-      // check the checkbox if the user has selected a new period.
-      let pi = Binding<TimeInterval>(get: { return self.preventFutureNotificationPeriod }, set: {
-        self.preventFutureNotifications = true
-        self.preventFutureNotificationPeriod = $0
-      })
+      SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
 
-      Toggle(isOn: $preventFutureNotifications) {
-        HStack(spacing:0.0) {
-          Text("Prevent future notifications for this application for ").font(Font.system(size: 11.0));
-          Picker("", selection: pi) {
-            ForEach(preventNotificationPeriods, id: \.self) { period in
-              let text = dateFormatter.string(from: period) ?? "unknown"
-              Text(text).font(Font.system(size: 11.0))
-            }
-          }.fixedSize()
-        }
-      }.padding(10.0)
-
-      VStack(spacing:15) {
+      HStack(spacing:15.0) {
           if customURL != nil {
-            Button(action: openButton, label: {
-
-              Text(customText ?? "Open Event...").frame(maxWidth:.infinity)
-            })
-            .buttonStyle(.borderedProminent)
-            .keyboardShortcut(.defaultAction)
+            OpenEventButton(customText:customText, action:openButton)
           }
-          Button(action: dismissButton, label: {
-            Text("Dismiss").frame(maxWidth:.infinity)
-          })
-          .keyboardShortcut(.return)
-      }.frame(width: 220)
+          DismissButton(silence: preventFutureNotifications, action: dismissButton)
+      }
 
       Spacer()
-
-    }.frame(maxWidth:800.0).fixedSize()
+    }
+    .fixedSize()
   }
 
   func openButton() {
-    guard let urlString = customURL else {
-      print("No URL available")
-      return
+    let url = SNTBlockMessage.eventDetailURL(for:event, customURL:customURL as String?)
+    window?.close()
+    if let url = url {
+      openURL(url)
     }
-
-    guard let url = URL(string: urlString) else {
-      print("Failed to create URL")
-      return
-    }
-
-    openURL(url)
   }
 
   func dismissButton() {
@@ -205,38 +200,5 @@ struct SNTFileAccessMessageWindowView: View {
       }
     }
     window?.close()
-  }
-}
-
-@available(macOS 13, *)
-func testFileAccessEvent() -> SNTFileAccessEvent {
-  let faaEvent = SNTFileAccessEvent()
-
-  faaEvent.accessedPath = "/accessed/path"
-  faaEvent.ruleVersion = "watched_path.v1"
-  faaEvent.ruleName = "watched_path"
-  faaEvent.fileSHA256 = "b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670"
-  faaEvent.filePath = "/Applications/gShoe.app/Contents/MacOS/gShoe"
-  faaEvent.application = "gShoe"
-  faaEvent.teamID = "ZMCG7MLDV9"
-  faaEvent.signingID = "com.northpolesec.gShoe"
-  faaEvent.executingUser = "nobody"
-  faaEvent.pid = 456
-  faaEvent.ppid = 123
-  faaEvent.parentName = "gLauncher"
-
-  return faaEvent
-}
-
-// Enable previews in Xcode.
-@available(macOS 13, *)
-struct SNTFileAccessMessageWindowView_Previews: PreviewProvider {
-  static var previews: some View {
-    SNTFileAccessMessageWindowView(window: nil,
-                                    event: testFileAccessEvent(),
-                            customMessage: nil,
-                                customURL: nil,
-                               customText: nil,
-                          uiStateCallback: nil)
   }
 }

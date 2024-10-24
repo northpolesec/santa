@@ -1,4 +1,5 @@
 /// Copyright 2016 Google Inc. All rights reserved.
+/// Copyright 2014 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -43,8 +44,9 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSAttributedString *)attributedBlockMessageForEvent:(nullable SNTStoredEvent *)event
                                          customMessage:(nullable NSString *)customMessage;
 
-+ (NSAttributedString *)attributedBlockMessageForFileAccessEvent:(SNTFileAccessEvent *)event
-                                                   customMessage:(NSString *)customMessage;
++ (NSAttributedString *)attributedBlockMessageForFileAccessEvent:
+                          (nullable SNTFileAccessEvent *)event
+                                                   customMessage:(nullable NSString *)customMessage;
 
 ///
 ///  Return a URL generated from the EventDetailURL configuration key
