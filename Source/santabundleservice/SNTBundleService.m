@@ -143,7 +143,7 @@
 
   // Counts used as additional progress information in SantaGUI
   __block atomic_llong binaryCount = 0;
-  __block volatile int64_t sentBinaryCount = 0;
+  __block volatile int64_t completedUnits = 0;
 
   // Account for 80% of the work
   NSProgress *p;
@@ -158,9 +158,11 @@
       if (progress.isCancelled) return;
 
       dispatch_sync(dispatch_get_main_queue(), ^{
-        p.completedUnitCount++;
-        if (progress && ((i % 500) == 0 || binaryCount > sentBinaryCount)) {
-          sentBinaryCount = binaryCount;
+        // Update the UI for every 1% of work completed.
+        ++completedUnits;
+        if ((((double)completedUnits / subpaths.count) -
+             ((double)p.completedUnitCount / subpaths.count)) > 0.01) {
+          p.completedUnitCount = completedUnits;
           [[self.notifierConnection remoteObjectProxy] updateCountsForEvent:event
                                                                 binaryCount:binaryCount
                                                                   fileCount:i

@@ -18,6 +18,7 @@
 #import "Source/gui/SNTMessageWindowController.h"
 
 @class SNTStoredEvent;
+@class SNTBundleProgress;
 
 ///
 ///  Controller for a single message window.
@@ -41,12 +42,7 @@
 ///
 /// Is displayed if calculating the bundle hash is taking a bit.
 ///
-@property(weak) IBOutlet NSProgressIndicator *hashingIndicator;
-
-///
-/// Is displayed if calculating the bundle hash is taking a bit.
-///
-@property(weak) IBOutlet NSTextField *foundFileCountLabel;
+@property(readonly) SNTBundleProgress *bundleProgress;
 
 ///
 ///  The execution event that this window is for

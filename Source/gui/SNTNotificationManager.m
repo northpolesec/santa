@@ -28,6 +28,7 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/gui/SNTBinaryMessageWindowController.h"
+#import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 #import "Source/gui/SNTDeviceMessageWindowController.h"
 #import "Source/gui/SNTFileAccessMessageWindowController.h"
 #import "Source/gui/SNTMessageWindowController.h"
@@ -210,7 +211,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event
                     withController:(SNTBinaryMessageWindowController *)withController {
-  withController.foundFileCountLabel.stringValue = @"Searching for files...";
+  withController.bundleProgress.label = @"Searching for files...";
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   MOLXPCConnection *bc = [SNTXPCBundleServiceInterface configuredConnection];
@@ -388,9 +389,11 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
     if ([controller.event.idx isEqual:event.idx]) {
       dispatch_async(dispatch_get_main_queue(), ^{
-        controller.foundFileCountLabel.stringValue =
-          [NSString stringWithFormat:@"%llu binaries / %llu %@", binaryCount,
-                                     hashedCount ?: fileCount, hashedCount ? @"hashed" : @"files"];
+        NSString *fileLabel =
+          [NSString stringWithFormat:@"%llu binaries / %llu files", binaryCount, fileCount];
+        NSString *hashedLabel =
+          [NSString stringWithFormat:@"%llu hashed / %llu binaries", hashedCount, binaryCount];
+        controller.bundleProgress.label = hashedCount ? hashedLabel : fileLabel;
       });
     }
   }
