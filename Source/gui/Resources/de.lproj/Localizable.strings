@@ -14,13 +14,13 @@
 "Copy Details" = "Details kopieren";
 
 /* The default message to show the user when a banned application is blocked */
-"DefaultApplicationBlockedBannedMessage" = "Die folgende Applikation wurde blockiert,<br />da sie als schädlich eingestuft wurde";
+"The following application has been blocked from<br />executing because it has been deemed malicious" = "Die folgende Applikation wurde blockiert,<br />da sie als schädlich eingestuft wurde";
 
 /* The default message to show the user when an unknown application is blocked */
-"DefaultApplicationBlockedUnknownMessage" = "Die folgende Applikation wurde blockiert,<br />da ihre Vertrauenswürdigkeit nicht überprüft werden kann";
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Die folgende Applikation wurde blockiert,<br />da ihre Vertrauenswürdigkeit nicht überprüft werden kann";
 
 /* The default message to show the user when access to a file is blocked */
-"DefaultFileBlockedMessage" = "Der Zugriff auf die Datei wurde verweigert";
+"Access to a file has been denied" = "Der Zugriff auf die Datei wurde verweigert";
 
 /* No comment provided by engineer. */
 "Device BSD Path" = "Device BSD-Pfad";
