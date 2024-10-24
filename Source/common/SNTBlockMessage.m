@@ -79,14 +79,16 @@ static id ValueOrNull(id value) {
     message = [[SNTConfigurator configurator] unknownBlockMessage];
     if (!message) {
       message = NSLocalizedString(
-        @"The following application has been blocked from executing<br />because its trustworthiness cannot be determined",
+        @"The following application has been blocked from executing<br />because its "
+        @"trustworthiness cannot be determined",
         @"The default message to show the user when an unknown application is blocked");
     }
   } else {
     message = [[SNTConfigurator configurator] bannedBlockMessage];
     if (!message) {
       message = NSLocalizedString(
-        @"The following application has been blocked from<br />executing because it has been deemed malicious",
+        @"The following application has been blocked from<br />executing because it has been "
+        @"deemed malicious",
         @"The default message to show the user when a banned application is blocked");
     }
   }
