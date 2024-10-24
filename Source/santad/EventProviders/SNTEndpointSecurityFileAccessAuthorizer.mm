@@ -20,6 +20,7 @@
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 #include <bsm/libbsm.h>
+#include <pwd.h>
 #include <sys/fcntl.h>
 #include <sys/types.h>
 
@@ -708,6 +709,9 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
       event.ppid = @(audit_token_to_pid(msg->process->parent_audit_token));
       event.parentName = StringToNSString(msg.ParentProcessName());
       event.signingChain = cd.certChain;
+
+      struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
+      if (user) event.executingUser = @(user->pw_name);
 
       std::pair<NSString *, NSString *> linkInfo = self->_watchItems->EventDetailLinkInfo(policy);
 

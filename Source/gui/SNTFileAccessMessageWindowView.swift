@@ -123,24 +123,27 @@ struct Event: View {
     HStack(spacing: 20.0) {
       VStack(alignment:.trailing, spacing:10.0) {
         Text("Path Accessed").bold().font(Font.system(size:12.0))
+        Text("Application").bold()
+        Text("User").bold()
         Text("Rule Name").bold()
         Text("Rule Version").bold()
-        Text("Application").bold()
       }
 
       Divider()
 
       VStack(alignment:.leading, spacing:10.0) {
         Text(e.accessedPath).textSelection(.enabled)
-        Text(e.ruleName).textSelection(.enabled)
-        // TODO: Why is this always temp_version?
-        Text(e.ruleVersion).textSelection(.enabled)
-
         if let app = e.application {
           Text(app).textSelection(.enabled)
         } else {
           Text((e.filePath as NSString).lastPathComponent).textSelection(.enabled)
         }
+        Text(e.executingUser ?? "unknown").textSelection(.enabled)
+
+        Text(e.ruleName).textSelection(.enabled)
+        // TODO: Why is this always temp_version?
+        Text(e.ruleVersion).textSelection(.enabled)
+
       }
     }.sheet(isPresented: $isShowingDetails) {
       MoreDetailsView(e: e)
