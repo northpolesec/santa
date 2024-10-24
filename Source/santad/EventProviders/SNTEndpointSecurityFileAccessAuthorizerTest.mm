@@ -358,7 +358,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                                                      decisionCache:nil
                                                          ttyWriter:nullptr];
 
-  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "/foo");
+  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "ver", "/foo");
 
   FileAccessPolicyDecision result;
   PathTarget target = {.path = "/some/random/path", .isReadable = true};
@@ -626,7 +626,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                    FileAccessPolicyDecision::kNoPolicy);
   }
 
-  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "/foo");
+  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "ver", "/foo");
   policy->processes.push_back(policyProc);
   auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicy>>(policy);
 

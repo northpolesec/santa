@@ -66,7 +66,7 @@ struct WatchItemPolicy {
     std::optional<bool> platform_binary;
   };
 
-  WatchItemPolicy(std::string_view n, std::string_view p,
+  WatchItemPolicy(std::string_view n, std::string_view v, std::string_view p,
                   WatchItemPathType pt = kWatchItemPolicyDefaultPathType,
                   bool ara = kWatchItemPolicyDefaultAllowReadAccess,
                   bool ao = kWatchItemPolicyDefaultAuditOnly,
@@ -75,6 +75,7 @@ struct WatchItemPolicy {
                   bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode, std::string_view cm = "",
                   NSString *edu = nil, NSString *edt = nil, std::vector<Process> procs = {})
       : name(n),
+        version(v),
         path(p),
         path_type(pt),
         allow_read_access(ara),
@@ -92,8 +93,9 @@ struct WatchItemPolicy {
   bool operator==(const WatchItemPolicy &other) const {
     // Note: custom_message, event_detail_url, and event_detail_text are not currently considered
     // for equality purposes
-    return name == other.name && path == other.path && path_type == other.path_type &&
-           allow_read_access == other.allow_read_access && audit_only == other.audit_only &&
+    return name == other.name && version == other.version && path == other.path &&
+           path_type == other.path_type && allow_read_access == other.allow_read_access &&
+           audit_only == other.audit_only &&
            invert_process_exceptions == other.invert_process_exceptions && silent == other.silent &&
            silent_tty == other.silent_tty && processes == other.processes;
   }
@@ -101,6 +103,7 @@ struct WatchItemPolicy {
   bool operator!=(const WatchItemPolicy &other) const { return !(*this == other); }
 
   std::string name;
+  std::string version;  // WIP - No current way to control via config
   std::string path;
   WatchItemPathType path_type;
   bool allow_read_access;
@@ -112,9 +115,6 @@ struct WatchItemPolicy {
   std::optional<NSString *> event_detail_url;
   std::optional<NSString *> event_detail_text;
   std::vector<Process> processes;
-
-  // WIP - No current way to control via config
-  std::string version = "temp_version";
 };
 
 }  // namespace santa
