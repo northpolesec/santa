@@ -30,15 +30,6 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/rm /Library/LaunchDaemons/com.google.santa.metricservice.plist
 /bin/rm /Library/LaunchDaemons/com.google.santa.syncservice.plist
 
-# Plant an empty placeholder file at the paths for the unsupported version's
-# services. These paths will be tamper protected once
-# com.northpolesec.santa.daemon finishes starting up. Creating the file now,
-# allows the tamper client to skip subscribing to file creation events.
-/usr/bin/touch /Library/LaunchAgents/com.google.santa.plist
-/usr/bin/touch /Library/LaunchDaemons/com.google.santa.bundleservice.plist
-/usr/bin/touch /Library/LaunchDaemons/com.google.santa.metricservice.plist
-/usr/bin/touch /Library/LaunchDaemons/com.google.santa.syncservice.plist
-
 ################################################################################
 
 # Unload NPS Santa services in preparation for installation / update.

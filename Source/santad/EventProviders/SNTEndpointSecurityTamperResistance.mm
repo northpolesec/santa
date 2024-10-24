@@ -39,10 +39,6 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
   {"/Applications/Santa.app", WatchItemPathType::kPrefix},
   {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix},
   {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix},
-
-  // Prevent unsupported versions of Santa from loading services.
-  {"/Library/LaunchAgents/com.google.santa.", WatchItemPathType::kPrefix},
-  {"/Library/LaunchDaemons/com.google.santa.", WatchItemPathType::kPrefix},
 };
 
 @implementation SNTEndpointSecurityTamperResistance {
