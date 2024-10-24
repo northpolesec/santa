@@ -57,17 +57,19 @@ void RemoveLegacyLaunchdPlists() {
   };
 
   for (const auto &plist : legacyPlists) {
-    // Note: As currently written, all legacy plists will be removed when any of the individual plists
-    // are attempted to be loaded. This is a bit overkill in that each plist will be removed 5 times, but
-    // not a big deal. If the unlink error is that the file doesn't exist, the log warning is suppressed.
+    // Note: As currently written, all legacy plists will be removed when any of the individual
+    // plists are attempted to be loaded. This is a bit overkill in that each plist will be removed
+    // 5 times, but not a big deal. If the unlink error is that the file doesn't exist, the log
+    // warning is suppressed.
     if (unlinkat(AT_FDCWD, plist.data(), AT_SYMLINK_NOFOLLOW_ANY) != 0 && errno != ENOENT) {
       LOGW(@"Unable to remove legacy plist \"%s\": %d: %s", plist.data(), errno, strerror(errno));
     }
   }
 }
 
-/// Return a pair of whether or not to allow the exec and whether or not the ES response should be cached.
-/// If the exec is not launchctl, the response can be cached, otherwise the response should not be cached.
+/// Return a pair of whether or not to allow the exec and whether or not the ES response should be
+/// cached. If the exec is not launchctl, the response can be cached, otherwise the response should
+/// not be cached.
 std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
   es_string_token_t exec_path = esMsg->event.exec.target->executable->path;
   if (strncmp(exec_path.data, "/bin/launchctl", exec_path.length) != 0) {
@@ -89,8 +91,6 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
   if (safe_commands.find(std::string(arg.data, arg.length)) != safe_commands.end()) {
     return {ES_AUTH_RESULT_ALLOW, false};
   }
-
-
 
   for (int i = 2; i < argCount; i++) {
     es_string_token_t arg = esApi->ExecArg(&esMsg->event.exec, i);
@@ -179,9 +179,9 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
         break;
       }
       result = ES_AUTH_RESULT_ALLOW;
-      // OPEN events are not currently cacheable because we haven't yet implemented a method to respond
-      // with a subset of allowed flags. This could be changed in the future if desired, but currently
-      // this is not a hot enough path to worry about.
+      // OPEN events are not currently cacheable because we haven't yet implemented a method to
+      // respond with a subset of allowed flags. This could be changed in the future if desired, but
+      // currently this is not a hot enough path to worry about.
       cacheable = NO;
       break;
     }
@@ -209,9 +209,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 
   // Do not cache denied operations so that each tamper attempt is logged.
   // Do not cache ES_EVENT_TYPE_AUTH_OPEN events.
-  [self respondToMessage:esMsg
-          withAuthResult:result
-               cacheable:cacheable];
+  [self respondToMessage:esMsg withAuthResult:result cacheable:cacheable];
 
   // For this client, a processed event is one that was found to be violating anti-tamper policy
   recordEventMetrics(result == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
