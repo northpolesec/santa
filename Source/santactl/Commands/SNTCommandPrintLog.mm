@@ -20,16 +20,17 @@
 #include <string>
 
 #include "Source/common/SNTLogging.h"
-#include "Source/common/santa_proto_include_wrapper.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/binaryproto_proto_include_wrapper.h"
 #include "google/protobuf/any.pb.h"
 
+#include "telemetry/proto_include_wrapper.h"
+
 using JsonPrintOptions = google::protobuf::json::PrintOptions;
 using google::protobuf::json::MessageToJsonString;
 using santa::fsspool::binaryproto::LogBatch;
-namespace pbv1 = ::santa::pb::v1;
+namespace pbv1 = ::santa::telemetry::v1;
 
 @interface SNTCommandPrintLog : SNTCommand <SNTCommandProtocol>
 @end

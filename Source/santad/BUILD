@@ -503,7 +503,7 @@ objc_library(
     hdrs = ["EventProviders/EndpointSecurity/EnrichedTypes.h"],
     deps = [
         ":EndpointSecurityMessage",
-        "//Source/santad/ProcessTree:process_tree_cc_proto",
+        "@northpole_protos//telemetry:cc_proto_library_wrapper",
     ],
 )
 
@@ -593,9 +593,9 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:String",
-        "//Source/common:santa_cc_proto_library_wrapper",
         "@com_google_absl//absl/status",
         "@com_google_protobuf//src/google/protobuf/json",
+        "@northpole_protos//telemetry:cc_proto_library_wrapper",
     ],
 )
 
@@ -630,10 +630,10 @@ objc_library(
     deps = [
         ":EndpointSecurityWriter",
         "//Source/common:SNTLogging",
-        "//Source/common:santa_cc_proto_library_wrapper",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
         "@com_google_absl//absl/strings",
+        "@northpole_protos//telemetry:cc_proto_library_wrapper",
     ],
 )
 
@@ -1078,11 +1078,11 @@ santa_unit_test(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredEvent",
         "//Source/common:TestUtils",
-        "//Source/common:santa_cc_proto_library_wrapper",
         "@OCMock",
         "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest",
         "@com_google_protobuf//src/google/protobuf/json",
+        "@northpole_protos//telemetry:cc_proto_library_wrapper",
     ],
 )
 

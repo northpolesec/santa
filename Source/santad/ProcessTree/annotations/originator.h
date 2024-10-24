@@ -18,7 +18,7 @@
 
 #include "Source/santad/ProcessTree/annotations/annotator.h"
 #include "Source/santad/ProcessTree/process.h"
-#include "Source/santad/ProcessTree/process_tree.pb.h"
+#include "telemetry/proto_include_wrapper.h"
 
 namespace santa::santad::process_tree {
 
@@ -27,10 +27,10 @@ class OriginatorAnnotator : public Annotator {
   // Disabling clang format due to local/remote version differences.
   // clang-format off
   OriginatorAnnotator()
-      : originator_(::santa::pb::v1::process_tree::Annotations::Originator::
-                        Annotations_Originator_UNSPECIFIED) {};
+      : originator_(::santa::telemetry::v1::ProcessTreeAnnotations::Originator::
+                        ProcessTreeAnnotations_Originator_UNSPECIFIED) {};
   explicit OriginatorAnnotator(
-      ::santa::pb::v1::process_tree::Annotations::Originator originator)
+      ::santa::telemetry::v1::ProcessTreeAnnotations::Originator originator)
       : originator_(originator) {};
   // clang-format on
 
@@ -39,11 +39,11 @@ class OriginatorAnnotator : public Annotator {
   void AnnotateExec(ProcessTree &tree, const Process &orig_process,
                     const Process &new_process) override;
 
-  std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
+  std::optional<::santa::telemetry::v1::ProcessTreeAnnotations> Proto()
       const override;
 
  private:
-  ::santa::pb::v1::process_tree::Annotations::Originator originator_;
+  ::santa::telemetry::v1::ProcessTreeAnnotations::Originator originator_;
 };
 
 }  // namespace santa::santad::process_tree

@@ -27,12 +27,12 @@
 
 #include "Source/santad/ProcessTree/annotations/annotator.h"
 #include "Source/santad/ProcessTree/process.h"
-#include "Source/santad/ProcessTree/process_tree.pb.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
+#include "telemetry/proto_include_wrapper.h"
 
 namespace santa::santad::process_tree {
 
@@ -192,13 +192,13 @@ void ProcessTree::AnnotateProcess(const Process &p,
   map_[p.pid_]->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
 }
 
-std::optional<::santa::pb::v1::process_tree::Annotations>
+std::optional<::santa::telemetry::v1::ProcessTreeAnnotations>
 ProcessTree::ExportAnnotations(const Pid p) {
   auto proc = Get(p);
   if (!proc || (*proc)->annotations_.empty()) {
     return std::nullopt;
   }
-  ::santa::pb::v1::process_tree::Annotations a;
+  ::santa::telemetry::v1::ProcessTreeAnnotations a;
   for (const auto &[_, annotation] : (*proc)->annotations_) {
     if (auto x = annotation->Proto(); x) a.MergeFrom(*x);
   }

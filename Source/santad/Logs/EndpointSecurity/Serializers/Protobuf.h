@@ -23,10 +23,10 @@
 
 #include "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
-#include "Source/common/santa_proto_include_wrapper.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "telemetry/proto_include_wrapper.h"
 
 namespace santa {
 
@@ -75,16 +75,16 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) override;
 
  private:
-  ::santa::pb::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena);
-  ::santa::pb::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
-                                                    const santa::EnrichedEventType &msg);
-  ::santa::pb::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
-                                                    const santa::Message &msg);
-  ::santa::pb::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
-                                                    struct timespec event_time,
-                                                    struct timespec processed_time);
+  ::santa::telemetry::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena);
+  ::santa::telemetry::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
+                                                           const santa::EnrichedEventType &msg);
+  ::santa::telemetry::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
+                                                           const santa::Message &msg);
+  ::santa::telemetry::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
+                                                           struct timespec event_time,
+                                                           struct timespec processed_time);
 
-  std::vector<uint8_t> FinalizeProto(::santa::pb::v1::SantaMessage *santa_msg);
+  std::vector<uint8_t> FinalizeProto(::santa::telemetry::v1::SantaMessage *santa_msg);
 
   std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
   // Toggle for transforming protobuf output to its JSON form.

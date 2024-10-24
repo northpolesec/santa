@@ -16,7 +16,7 @@
 
 #include <optional>
 
-#include "Source/santad/ProcessTree/process_tree.pb.h"
+#include "telemetry/proto_include_wrapper.h"
 
 namespace santa::santad::process_tree {
 
@@ -31,7 +31,7 @@ class Annotator {
                             const Process &child) = 0;
   virtual void AnnotateExec(ProcessTree &tree, const Process &orig_process,
                             const Process &new_process) = 0;
-  virtual std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
+  virtual std::optional<::santa::telemetry::v1::ProcessTreeAnnotations> Proto()
       const = 0;
 };
 
