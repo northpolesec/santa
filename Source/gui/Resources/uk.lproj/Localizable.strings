@@ -20,7 +20,7 @@
 "DefaultApplicationBlockedUnknownMessage" = "Наступна програма була заблокована для виконання,<br />оскільки не може бути визначена її достовірність";
 
 /* The default message to show the user when access to a file is blocked */
-"DefaultFileBlockedMessage" = "Відмовлено у доступі до файлу";
+"Access to a file has been denied" = "Відмовлено у доступі до файлу";
 
 /* No comment provided by engineer. */
 "Device BSD Path" = "Шлях BSD пристрою";
