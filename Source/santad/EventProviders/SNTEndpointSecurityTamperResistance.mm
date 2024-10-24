@@ -140,7 +140,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 - (void)handleMessage:(Message &&)esMsg
    recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   es_auth_result_t result = ES_AUTH_RESULT_ALLOW;
-  BOOL cacheable = YES;
+  bool cacheable = true;
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_UNLINK: {
       if ([SNTEndpointSecurityTamperResistance
@@ -182,7 +182,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
       // OPEN events are not currently cacheable because we haven't yet implemented a method to
       // respond with a subset of allowed flags. This could be changed in the future if desired, but
       // currently this is not a hot enough path to worry about.
-      cacheable = NO;
+      cacheable = false;
       break;
     }
 
