@@ -31,10 +31,14 @@ using santa::Logger;
 using santa::Message;
 using santa::WatchItemPathType;
 
+// The ES client process (com.northpolesec.santa.daemon) will be the only process allowed to
+// modify these file paths.
 constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
   {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral},
   {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral},
   {"/Applications/Santa.app", WatchItemPathType::kPrefix},
+  {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix},
+  {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix},
 };
 
 @implementation SNTEndpointSecurityTamperResistance {
