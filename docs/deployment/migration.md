@@ -13,12 +13,22 @@ If you are not currently running Google Santa, you can skip this doc and go stra
 ## Migration Steps
 
 ### 1. Configure System Extensions
-First, update your MDM configuration to allow both Google and NPS system extensions simultaneously. This dual-authorization is temporary but necessary for a seamless transition.
+- First, update your MDM configuration to allow both Google and NPS system extensions simultaneously. This dual-authorization is temporary but necessary for a seamless transition.
+- Also deploy a TCC full disk access MDM configuration for NPS Santa
+- See [Getting Started](getting-started.md) for examples of the system extention and TCC MDM configurations for NPS Santa.
 
 ### 2. Install NPS Santa
 Deploy the NPS Santa installer to your systems. The installer is designed with built-in migration support:
 - NPS Santa will remain dormant after installation
 - It will automatically monitor for Google Santa removal
+- At this point NPS Santa will NOT apear in `systemextensionsctl list`
+```
+% systemextensionsctl list
+1 extension(s)
+--- com.apple.system_extension.endpoint_security
+enabled	active	teamID	bundleID (version)	name	[state]
+*	*	EQHXZ8M8AV	com.google.santa.daemon (2024.9/2024.9.674285143)	santad	[activated enabled]
+```
 
 ### 3. Remove Google Santa Authorization
 Through your MDM:
@@ -26,6 +36,17 @@ Through your MDM:
 - This will trigger the automatic unloading of Google Santa
 - NPS Santa will detect the removal and will finish loading itself
 
+### 4. Verification
+- NPS Santa should now installed and running.
+```
+% systemextensionsctl list
+2 extension(s)
+--- com.apple.system_extension.endpoint_security
+enabled	active	teamID	bundleID (version)	name	[state]
+		EQHXZ8M8AV	com.google.santa.daemon (2024.9/2024.9.674285143)	santad	[terminated waiting to uninstall on reboot]
+*	*	ZMCG7MLDV9	com.northpolesec.santa.daemon (2024.10/2024.10.49)	santad	[activated enabled]
+```
+
 ## Notes
-- No reboot is required during this process
+- The terminated Google Santa entry will be cleared on the next reboot. In a terminated state, Google Santa does not affect NPS Santa.
 - Security coverage is maintained throughout the transition
