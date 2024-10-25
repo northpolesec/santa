@@ -13,7 +13,7 @@ If you are not currently running Google Santa, you can skip this doc and go stra
 
 ## Prerequisites
 - Active Google Santa installation
-- MDM (Mobile Device Management)
+- MDM (Mobile Device Management) - If you do not use an MDM jump to [2. Install NPS Santa](#2.-Install-NPS-Santa)
 - NPS Santa installer package
 
 ## Migration Steps
@@ -46,6 +46,10 @@ Through your MDM:
 
 Note: To minimize security coverage downtime, ensure the NPS Santa installer has run before removing Google Santa from the allowed system extensions list
 
+If you do not use an MDM:
+- Remove Google Santa by dragging `/Applications/Santa.app` to the trash
+- Respond to the admin authentication popup dialog
+
 ### 4. Verification
 - NPS Santa should now installed and running.
 ```
@@ -59,4 +63,4 @@ enabled	active	teamID	bundleID (version)	name	[state]
 
 ## Notes
 - The terminated Google Santa entry will be cleared on the next reboot. In a terminated state, Google Santa does not affect NPS Santa.
-- Security coverage downtime is kept to a minimum throughout the transition 
+- Security coverage downtime is kept to a minimum throughout the transition
