@@ -798,17 +798,10 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 }
 
 - (NSString *)bannedUSBBlockMessage {
-  if (!self.configState[kBannedUSBBlockMessage]) {
-    return @"The following device has been blocked from mounting.";
-  }
-
   return self.configState[kBannedUSBBlockMessage];
 }
 
 - (NSString *)remountUSBBlockMessage {
-  if (!self.configState[kRemountUSBBlockMessage]) {
-    return @"The following device has been remounted with reduced permissions.";
-  }
   return self.configState[kRemountUSBBlockMessage];
 }
 

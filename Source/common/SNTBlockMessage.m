@@ -15,6 +15,7 @@
 #import "Source/common/SNTBlockMessage.h"
 
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTDeviceEvent.h"
 #import "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
@@ -104,6 +105,28 @@ static id ValueOrNull(id value) {
       message =
         NSLocalizedString(@"Access to a file has been denied",
                           @"The default message to show the user when access to a file is blocked");
+    }
+  }
+  return [SNTBlockMessage formatMessage:message];
+}
+
++ (NSAttributedString *)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent *)event {
+  SNTConfigurator *c = [SNTConfigurator configurator];
+  NSString *message;
+  if ([c remountUSBMode]) {
+    message = [c remountUSBBlockMessage];
+    if (!message.length) {
+      message =
+        NSLocalizedString(@"The following device has been remounted with reduced permissions",
+                          @"The default message to show the user when a USB device is remounted "
+                          @"with reduced permissions");
+    }
+  } else {
+    message = [c bannedUSBBlockMessage];
+    if (!message.length) {
+      message = NSLocalizedString(
+        @"The following device has been blocked from mounting",
+        @"The default message to show the user when a USB device is blocked from mounting");
     }
   }
   return [SNTBlockMessage formatMessage:message];

@@ -44,6 +44,8 @@ swift_library(
     ],
     generates_header = 1,
     deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
     ],

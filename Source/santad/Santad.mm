@@ -109,11 +109,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                          startupPreferences:[configurator onStartUSBOptions]];
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event) {
-    [[notifier_queue.notifierConnection remoteObjectProxy]
-      postUSBBlockNotification:event
-             withCustomMessage:([configurator remountUSBMode]
-                                  ? [configurator remountUSBBlockMessage]
-                                  : [configurator bannedUSBBlockMessage])];
+    [[notifier_queue.notifierConnection remoteObjectProxy] postUSBBlockNotification:event];
   };
 
   SNTEndpointSecurityRecorder *monitor_client =
