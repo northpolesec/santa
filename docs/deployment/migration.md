@@ -13,7 +13,7 @@ If you are not currently running Google Santa, you can skip this doc and go stra
 
 ## Prerequisites
 - Active Google Santa installation
-- MDM (Mobile Device Management) - If you do not use an MDM jump to [2. Install NPS Santa](#2.-Install-NPS-Santa)
+- MDM (Mobile Device Management) - If you do not use an MDM jump to [2. Install NPS Santa](#2-install-nps-santa)
 - NPS Santa installer package
 
 ## Migration Steps
@@ -36,7 +36,8 @@ enabled	active	teamID	bundleID (version)	name	[state]
 *	*	EQHXZ8M8AV	com.google.santa.daemon (2024.9/2024.9.674285143)	santad	[activated enabled]
 ```
 
-Note: To avoid system extension authorization popups, ensure the MDM has applied configurations from #1 before deploying the NPS Santa installer.
+>[!WARNING]
+>To avoid system extension authorization popups, ensure the MDM has applied configurations from #1 before deploying the NPS Santa installer.
 
 ### 3. Remove Google Santa Authorization
 Through your MDM:
@@ -44,7 +45,8 @@ Through your MDM:
 - This will trigger the automatic unloading of Google Santa
 - NPS Santa will detect the removal and will finish loading itself within second
 
-Note: To minimize security coverage downtime, ensure the NPS Santa installer has run before removing Google Santa from the allowed system extensions list
+>[!WARNING]
+>To minimize security coverage downtime, ensure the NPS Santa installer has run before removing Google Santa from the allowed system extensions list
 
 If you do not use an MDM:
 - Remove Google Santa by dragging `/Applications/Santa.app` to the trash
