@@ -21,7 +21,7 @@ If you are not currently running Google Santa, you can skip this doc and go stra
 ### 1. Configure System Extensions
 - First, update your MDM configuration to allow both Google and NPS system extensions simultaneously. This dual-authorization is temporary but necessary for a seamless transition.
 - Also deploy a TCC full disk access MDM configuration for NPS Santa
-- See [Getting Started](getting-started.md) for examples of the system extention and TCC MDM configurations for NPS Santa.
+- See [Getting Started](./getting-started.md) for examples of the system extention and TCC MDM configurations for NPS Santa.
 
 ### 2. Install NPS Santa
 Deploy the lastest NPS Santa [release](https://github.com/northpolesec/santa/releases) to your systems. The installer is designed with built-in migration support:
