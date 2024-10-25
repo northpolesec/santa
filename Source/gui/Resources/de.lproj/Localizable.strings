@@ -19,12 +19,6 @@
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "Der Zugriff auf die Datei wurde verweigert";
 
-/* No comment provided by engineer. */
-"Device BSD Path" = "Device BSD-Pfad";
-
-/* No comment provided by engineer. */
-"Device Name" = "Gerätename";
-
 /* Dismiss button in more details dialog */
 "Dismiss" = "Ignorieren";
 
