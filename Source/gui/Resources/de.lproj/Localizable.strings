@@ -1,7 +1,4 @@
 /* No comment provided by engineer. */
-"Access to a protected resource was denied." = "Der Zugriff auf eine geschützte Ressource wurde verweigert.";
-
-/* No comment provided by engineer. */
 "Application" = "Applikation";
 
 /* No comment provided by engineer. */
@@ -42,18 +39,6 @@
 
 /* No comment provided by engineer. */
 "More Info..." = "Mehr Informationen...";
-
-/* No comment provided by engineer. */
-"Mounting devices is blocked" = "Das Mounten von Geräten ist blockiert";
-
-/* No comment provided by engineer. */
-"OK" = "OK";
-
-/* No comment provided by engineer. */
-"Open Event..." = "Ereignis öffnen...";
-
-/* No comment provided by engineer. */
-"Open..." = "Öffnen...";
 
 /* No comment provided by engineer. */
 "Parent" = "Übergeordneter Prozess";

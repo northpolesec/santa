@@ -115,7 +115,7 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
 
 public func DismissButton(customText: String? = nil, silence: Bool?, action: @escaping () -> Void) -> some View {
   Button(action: action, label: {
-    let t = customText ?? (silence ?? false ? String(localized:"Dismiss & Silence") : String(localized:"Dismiss"))
+    let t = customText ?? (silence ?? false ? NSLocalizedString("Dismiss & Silence", comment:"") : NSLocalizedString("Dismiss", comment:""))
     Text(t).frame(minWidth:150.0)
   })
   .keyboardShortcut(.escape, modifiers:.command)
