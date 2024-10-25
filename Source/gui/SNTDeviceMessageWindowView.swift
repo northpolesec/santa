@@ -27,16 +27,15 @@ import santa_gui_SNTMessageView
 
 struct SNTDeviceMessageWindowView: View {
   let window: NSWindow?
-  let event: SNTDeviceEvent?
+  let event: SNTDeviceEvent
 
   var body: some View {
     SNTMessageView(SNTBlockMessage.attributedBlockMessage(for:event)) {
       HStack(spacing: 20.0) {
         VStack(alignment:.trailing, spacing:10.0) {
-          Text("Device Name").bold().font(Font.system(size:12.0))
-          Text("Device BSD Path").bold().font(Font.system(size:12.0))
+          Text("Path").bold().font(Font.system(size:12.0))
 
-          if event!.remountArgs?.count ?? 0 > 0 {
+          if event.remountArgs?.count ?? 0 > 0 {
             Text("Remount Mode").bold().font(Font.system(size:12.0))
           }
         }
@@ -44,11 +43,10 @@ struct SNTDeviceMessageWindowView: View {
         Divider()
 
         VStack(alignment:.leading, spacing:10.0) {
-          Text(event!.mntonname)
-          Text(event!.mntfromname)
+          Text(event.mntonname)
 
-          if event!.remountArgs?.count ?? 0 > 0 {
-            Text(event!.readableRemountArgs())
+          if event.remountArgs?.count ?? 0 > 0 {
+            Text(event.readableRemountArgs())
           }
         }
       }
