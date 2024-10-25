@@ -167,6 +167,7 @@ objc_library(
     hdrs = ["SNTBlockMessage.h"],
     deps = [
         ":SNTConfigurator",
+        ":SNTDeviceEvent",
         ":SNTFileAccessEvent",
         ":SNTLogging",
         ":SNTStoredEvent",
@@ -182,6 +183,7 @@ objc_library(
     module_name = "santa_common_SNTBlockMessage",
     deps = [
         ":SNTConfigurator",
+        ":SNTDeviceEvent",
         ":SNTFileAccessEvent",
         ":SNTLogging",
         ":SNTStoredEvent",

@@ -19,9 +19,8 @@
 #import <Foundation/Foundation.h>
 #endif
 
-#import "Source/common/SNTFileAccessEvent.h"
-#import "Source/common/SNTStoredEvent.h"
-
+@class SNTFileAccessEvent;
+@class SNTDeviceEvent;
 @class SNTStoredEvent;
 
 @interface SNTBlockMessage : NSObject
@@ -47,6 +46,8 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSAttributedString *)attributedBlockMessageForFileAccessEvent:
                           (nullable SNTFileAccessEvent *)event
                                                    customMessage:(nullable NSString *)customMessage;
+
++ (NSAttributedString *)attributedBlockMessageForDeviceEvent:(nullable SNTDeviceEvent *)event;
 
 ///
 ///  Return a URL generated from the EventDetailURL configuration key
