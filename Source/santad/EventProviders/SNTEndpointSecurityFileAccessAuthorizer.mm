@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 #include <bsm/libbsm.h>
+#include <pwd.h>
 #include <sys/fcntl.h>
 #include <sys/types.h>
 
@@ -701,11 +703,15 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
       event.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
       event.filePath = StringToNSString(msg->process->executable->path.data);
       event.teamID = cd.teamID ?: @"<unknown team id>";
-      event.teamID = cd.signingID ?: @"<unknown signing id>";
+      event.signingID = cd.signingID ?: @"<unknown signing id>";
+      event.cdhash = cd.cdhash ?: @"<unknown CDHash>";
       event.pid = @(audit_token_to_pid(msg->process->audit_token));
       event.ppid = @(audit_token_to_pid(msg->process->parent_audit_token));
       event.parentName = StringToNSString(msg.ParentProcessName());
       event.signingChain = cd.certChain;
+
+      struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
+      if (user) event.executingUser = @(user->pw_name);
 
       std::pair<NSString *, NSString *> linkInfo = self->_watchItems->EventDetailLinkInfo(policy);
 

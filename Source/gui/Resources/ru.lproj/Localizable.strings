@@ -1,0 +1,81 @@
+/* The default message to show the user when access to a file is blocked */
+"Access to a file has been denied" = "Доступ к файлу был запрещен";
+
+/* No comment provided by engineer. */
+"Application" = "Приложение";
+
+/* No comment provided by engineer. */
+"Bundle Hash" = "Бандл-хэш";
+
+/* No comment provided by engineer. */
+"CDHash" = "CDHash";
+
+/* Copy Details button in binary block dialog */
+"Copy Details" = "Копия Подробности";
+
+/* No comment provided by engineer. */
+"Dismiss" = "Увольте";
+
+/* No comment provided by engineer. */
+"Dismiss & Silence" = "Отказ и молчание";
+
+/* No comment provided by engineer. */
+"Filename" = "Имя файла";
+
+/* More Details button in binary block dialog */
+"More Details" = "Подробнее";
+
+/* No comment provided by engineer. */
+"More Info..." = "Дополнительная информация...";
+
+/* No comment provided by engineer. */
+"Parent" = "Родитель";
+
+/* No comment provided by engineer. */
+"Path" = "Путь";
+
+/* No comment provided by engineer. */
+"Path Accessed" = "Доступ к пути";
+
+/* No comment provided by engineer. */
+"Prevent future notifications for this application for " = "Предотвращение будущих уведомлений для этого приложения для ";
+
+/* No comment provided by engineer. */
+"Publisher" = "Издатель";
+
+/* No comment provided by engineer. */
+"Remount Mode" = "Режим демонтажа";
+
+/* No comment provided by engineer. */
+"Rule Name" = "Название правила";
+
+/* No comment provided by engineer. */
+"Rule Version" = "Версия правил";
+
+/* Explanation in About view */
+"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa - это система управления приложениями для macOS.\n\nНет никаких настраиваемых пользователем параметров.";
+
+/* No comment provided by engineer. */
+"SHA-256" = "SHA-256";
+
+/* No comment provided by engineer. */
+"Signing ID" = "Signing ID";
+
+/* The default message to show the user when a banned application is blocked */
+"The following application has been blocked from<br />executing because it has been deemed malicious" = "Следующее приложение было заблокировано для выполнения,<br />поскольку оно было признано вредоносным";
+
+/* The default message to show the user when an unknown application is blocked */
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Следующее приложение было заблокировано для выполнения,<br />поскольку его надежность не может быть определена";
+
+/* The default message to show the user when a USB device is blocked from mounting */
+"The following device has been blocked from mounting" = "Следующее устройство было заблокировано для установки";
+
+/* The default message to show the user when a USB device is remounted with reduced permissions */
+"The following device has been remounted with reduced permissions" = "Следующее устройство было перемонтировано с пониженными разрешениями";
+
+/* No comment provided by engineer. */
+"unknown" = "неизвестно";
+
+/* No comment provided by engineer. */
+"User" = "Пользователь";
+

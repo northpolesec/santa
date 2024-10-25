@@ -15,6 +15,7 @@
 #import "Source/common/SNTBlockMessage.h"
 
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTDeviceEvent.h"
 #import "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
@@ -78,14 +79,18 @@ static id ValueOrNull(id value) {
   } else if (event.decision == SNTEventStateBlockUnknown) {
     message = [[SNTConfigurator configurator] unknownBlockMessage];
     if (!message) {
-      message = @"The following application has been blocked from executing<br />"
-                @"because its trustworthiness cannot be determined.";
+      message = NSLocalizedString(
+        @"The following application has been blocked from executing<br />because its "
+        @"trustworthiness cannot be determined",
+        @"The default message to show the user when an unknown application is blocked");
     }
   } else {
     message = [[SNTConfigurator configurator] bannedBlockMessage];
     if (!message) {
-      message = @"The following application has been blocked from executing<br />"
-                @"because it has been deemed malicious.";
+      message = NSLocalizedString(
+        @"The following application has been blocked from<br />executing because it has been "
+        @"deemed malicious",
+        @"The default message to show the user when a banned application is blocked");
     }
   }
   return [SNTBlockMessage formatMessage:message];
@@ -97,7 +102,31 @@ static id ValueOrNull(id value) {
   if (!message.length) {
     message = [[SNTConfigurator configurator] fileAccessBlockMessage];
     if (!message.length) {
-      message = @"Access to a file has been denied.";
+      message =
+        NSLocalizedString(@"Access to a file has been denied",
+                          @"The default message to show the user when access to a file is blocked");
+    }
+  }
+  return [SNTBlockMessage formatMessage:message];
+}
+
++ (NSAttributedString *)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent *)event {
+  SNTConfigurator *c = [SNTConfigurator configurator];
+  NSString *message;
+  if ([c remountUSBMode]) {
+    message = [c remountUSBBlockMessage];
+    if (!message.length) {
+      message =
+        NSLocalizedString(@"The following device has been remounted with reduced permissions",
+                          @"The default message to show the user when a USB device is remounted "
+                          @"with reduced permissions");
+    }
+  } else {
+    message = [c bannedUSBBlockMessage];
+    if (!message.length) {
+      message = NSLocalizedString(
+        @"The following device has been blocked from mounting",
+        @"The default message to show the user when a USB device is blocked from mounting");
     }
   }
   return [SNTBlockMessage formatMessage:message];

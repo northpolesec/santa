@@ -27,7 +27,7 @@
 #import "Source/santasyncservice/SNTSyncState.h"
 
 #include <google/protobuf/arena.h>
-#include "Source/santasyncservice/syncv1.pb.h"
+#include "sync/v1.pb.h"
 namespace pbv1 = ::santa::sync::v1;
 
 using santa::NSStringToUTF8String;

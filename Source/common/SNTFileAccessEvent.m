@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -13,8 +14,6 @@
 /// limitations under the License.
 
 #import "Source/common/SNTFileAccessEvent.h"
-
-#import "Source/common/CertificateHelpers.h"
 
 @implementation SNTFileAccessEvent
 
@@ -35,13 +34,6 @@
     _##o = [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [c class], nil] \
                                    forKey:@(#o)];                                                \
   } while (0)
-
-- (instancetype)init {
-  self = [super init];
-  if (self) {
-  }
-  return self;
-}
 
 + (BOOL)supportsSecureCoding {
   return YES;
@@ -69,14 +61,6 @@
 - (NSString *)description {
   return [NSString
     stringWithFormat:@"SNTFileAccessEvent: Accessed: %@, By: %@", self.accessedPath, self.filePath];
-}
-
-- (NSString *)publisherInfo {
-  return Publisher(self.signingChain, self.teamID);
-}
-
-- (NSArray *)signingChainCertRefs {
-  return CertificateChain(self.signingChain);
 }
 
 @end

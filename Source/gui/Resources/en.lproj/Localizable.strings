@@ -1,0 +1,81 @@
+/* The default message to show the user when access to a file is blocked */
+"Access to a file has been denied" = "Access to a file has been denied";
+
+/* No comment provided by engineer. */
+"Application" = "Application";
+
+/* No comment provided by engineer. */
+"Bundle Hash" = "Bundle Hash";
+
+/* No comment provided by engineer. */
+"CDHash" = "CDHash";
+
+/* Copy Details button in more details dialog */
+"Copy Details" = "Copy Details";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "Dismiss";
+
+/* No comment provided by engineer. */
+"Dismiss & Silence" = "Dismiss & Silence";
+
+/* No comment provided by engineer. */
+"Filename" = "Filename";
+
+/* More Details button */
+"More Details" = "More Details";
+
+/* No comment provided by engineer. */
+"More Info..." = "More Info...";
+
+/* No comment provided by engineer. */
+"Parent" = "Parent";
+
+/* No comment provided by engineer. */
+"Path" = "Path";
+
+/* No comment provided by engineer. */
+"Path Accessed" = "Path Accessed";
+
+/* No comment provided by engineer. */
+"Prevent future notifications for this application for " = "Prevent future notifications for this application for ";
+
+/* No comment provided by engineer. */
+"Publisher" = "Publisher";
+
+/* No comment provided by engineer. */
+"Remount Mode" = "Remount Mode";
+
+/* No comment provided by engineer. */
+"Rule Name" = "Rule Name";
+
+/* No comment provided by engineer. */
+"Rule Version" = "Rule Version";
+
+/* Explanation in About view */
+"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa is an application control system for macOS.\n\nThere are no user-configurable settings.";
+
+/* No comment provided by engineer. */
+"SHA-256" = "SHA-256";
+
+/* No comment provided by engineer. */
+"Signing ID" = "Signing ID";
+
+/* The default message to show the user when an unknown application is blocked */
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";
+
+/* The default message to show the user when a banned application is blocked */
+"The following application has been blocked from<br />executing because it has been deemed malicious" = "The following application has been blocked from<br />executing because it has been deemed malicious";
+
+/* The default message to show the user when a USB device is blocked from mounting */
+"The following device has been blocked from mounting" = "The following device has been blocked from mounting";
+
+/* The default message to show the user when a USB device is remounted with reduced permissions */
+"The following device has been remounted with reduced permissions" = "The following device has been remounted with reduced permissions";
+
+/* No comment provided by engineer. */
+"unknown" = "unknown";
+
+/* No comment provided by engineer. */
+"User" = "User";
+

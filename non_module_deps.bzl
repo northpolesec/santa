@@ -41,11 +41,8 @@ objc_library(
     visibility = ["//visibility:public"],
 )
 """,
-        commit = "afd2c6924e8a36cb872bc475248b978f743c6050",  # tag = v3.9.1
-        patch_args = ["-p1"],
-        patches = ["//external_patches/OCMock:503.patch"],
+        commit = "2c0bfd373289f4a7716db5d6db471640f91a6507",  # tag = v3.9.4
         remote = "https://github.com/erikdoe/ocmock",
-        shallow_since = "1635703064 +0100",
     )
 
 non_module_deps = module_extension(implementation = _non_module_deps_impl)

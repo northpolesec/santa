@@ -34,6 +34,17 @@ jobs:
           repository-cache: true
       - name: Build Userspace
         run: bazel build --apple_generate_dsym -c opt :release --define=SANTA_BUILD_TYPE=adhoc
+  check_localization:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - name: Check missing localization strings
+        run: |
+          ./Testing/localization.py
+          if [[ -n "$(git diff)" ]]; then
+            git diff
+            exit 1 # return an error if localization.py made changes
+          fi
   unit_tests:
     strategy:
       fail-fast: false

@@ -13,6 +13,12 @@ exports_files([
 ])
 
 swift_library(
+    name = "SNTMessageView",
+    srcs = ["SNTMessageView.swift"],
+    module_name = "santa_gui_SNTMessageView",
+)
+
+swift_library(
     name = "SNTAboutWindowView",
     srcs = ["SNTAboutWindowView.swift"],
     generates_header = 1,
@@ -24,6 +30,7 @@ swift_library(
     srcs = ["SNTBinaryMessageWindowView.swift"],
     generates_header = 1,
     deps = [
+        ":SNTMessageView",
         "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredEvent",
@@ -37,6 +44,8 @@ swift_library(
     ],
     generates_header = 1,
     deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
     ],
@@ -49,6 +58,8 @@ swift_library(
     ],
     generates_header = 1,
     deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTFileAccessEvent",
     ],
 )
@@ -131,6 +142,7 @@ macos_application(
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",
     }),
+    strings = glob(["Resources/**/*.strings"]),
     version = "//:version",
     visibility = ["//:santa_package_group"],
     deps = [":SantaGUI_lib"],

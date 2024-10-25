@@ -28,7 +28,7 @@ NS_ASSUME_NONNULL_BEGIN
 // The device event this window is for.
 @property(readonly) SNTDeviceEvent *event;
 
-- (instancetype)initWithEvent:(SNTDeviceEvent *)event message:(nullable NSString *)message;
+- (instancetype)initWithEvent:(SNTDeviceEvent *)event;
 
 @end
 

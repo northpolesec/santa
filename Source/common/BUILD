@@ -167,6 +167,7 @@ objc_library(
     hdrs = ["SNTBlockMessage.h"],
     deps = [
         ":SNTConfigurator",
+        ":SNTDeviceEvent",
         ":SNTFileAccessEvent",
         ":SNTLogging",
         ":SNTStoredEvent",
@@ -182,6 +183,7 @@ objc_library(
     module_name = "santa_common_SNTBlockMessage",
     deps = [
         ":SNTConfigurator",
+        ":SNTDeviceEvent",
         ":SNTFileAccessEvent",
         ":SNTLogging",
         ":SNTStoredEvent",
@@ -221,7 +223,6 @@ objc_library(
         "Foundation",
     ],
     deps = [
-        ":CertificateHelpers",
         ":SNTStoredEvent",
     ],
 )
@@ -338,6 +339,7 @@ objc_library(
     hdrs = ["SNTStoredEvent.h"],
     module_name = "santa_common_SNTStoredEvent",
     deps = [
+        ":CertificateHelpers",
         ":SNTCommonEnums",
         "@MOLCertificate",
     ],

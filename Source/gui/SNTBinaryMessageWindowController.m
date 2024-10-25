@@ -50,6 +50,7 @@
                 forKeyPath:@"fractionCompleted"
                    options:NSKeyValueObservingOptionNew
                    context:NULL];
+    _bundleProgress = [[SNTBundleProgress alloc] init];
   }
   return self;
 }
@@ -65,10 +66,7 @@
   if ([keyPath isEqualToString:@"fractionCompleted"]) {
     dispatch_async(dispatch_get_main_queue(), ^{
       NSProgress *progress = object;
-      if (progress.fractionCompleted != 0.0) {
-        self.hashingIndicator.indeterminate = NO;
-      }
-      self.hashingIndicator.doubleValue = progress.fractionCompleted;
+      self.bundleProgress.fractionCompleted = progress.fractionCompleted;
     });
   }
 }
@@ -96,8 +94,9 @@
                event:self.event
            customMsg:self.customMessage
            customURL:self.customURL
-     uiStateCallback:^(BOOL preventNotificationsForADay) {
-       self.silenceFutureNotifications = preventNotificationsForADay;
+      bundleProgress:self.bundleProgress
+     uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+       self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
      }];
 
   self.window.delegate = self;
@@ -115,16 +114,8 @@
   // UI updates must happen on the main thread.
   dispatch_async(dispatch_get_main_queue(), ^{
     if ([self.event.idx isEqual:event.idx]) {
-      if (bundleHash) {
-        [self.bundleHashLabel setHidden:NO];
-      } else {
-        [self.bundleHashLabel removeFromSuperview];
-        [self.bundleHashTitle removeFromSuperview];
-      }
       self.event.fileBundleHash = bundleHash;
-      [self.foundFileCountLabel removeFromSuperview];
-      [self.hashingIndicator setHidden:YES];
-      // [self.openEventButton setEnabled:YES];
+      self.bundleProgress.isFinished = YES;
     }
   });
 }
