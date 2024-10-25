@@ -1,3 +1,9 @@
+---
+title: Migration
+parent: Deployment
+nav_order: 7
+---
+
 # Migrating from Google Santa to NPS Santa
 
 ## Overview
