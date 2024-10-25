@@ -7,7 +7,7 @@ nav_order: 7
 # Migrating from Google Santa to NPS Santa
 
 ## Overview
-This guide outlines the migration process from Google Santa to NPS Santa, designed to ensure a smooth transition with zero security coverage gaps.
+This guide outlines the migration process from Google Santa to NPS Santa, designed to ensure a smooth transition with minimal security coverage gaps.
 
 If you are not currently running Google Santa, you can skip this doc and go straight to [Getting Started](getting-started.md).
 
@@ -40,7 +40,9 @@ enabled	active	teamID	bundleID (version)	name	[state]
 Through your MDM:
 - Remove Google Santa from the allowed system extensions list
 - This will trigger the automatic unloading of Google Santa
-- NPS Santa will detect the removal and will finish loading itself
+- NPS Santa will detect the removal and will finish loading itself within second
+
+Note: To minimize security coverage downtime, ensure the NPS Santa installer has run before removing Google Santa from the allowed system extensions list
 
 ### 4. Verification
 - NPS Santa should now installed and running.
@@ -55,4 +57,4 @@ enabled	active	teamID	bundleID (version)	name	[state]
 
 ## Notes
 - The terminated Google Santa entry will be cleared on the next reboot. In a terminated state, Google Santa does not affect NPS Santa.
-- Security coverage is maintained throughout the transition
+- Security coverage downtime is kept to a minimum throughout the transition 
