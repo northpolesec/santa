@@ -36,6 +36,8 @@ enabled	active	teamID	bundleID (version)	name	[state]
 *	*	EQHXZ8M8AV	com.google.santa.daemon (2024.9/2024.9.674285143)	santad	[activated enabled]
 ```
 
+Note: To avoid system extension authorization popups, ensure the MDM has applied configurations from #1 before deploying the NPS Santa installer.
+
 ### 3. Remove Google Santa Authorization
 Through your MDM:
 - Remove Google Santa from the allowed system extensions list
