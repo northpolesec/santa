@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -110,7 +111,14 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   if ([SNTConfigurator configurator].enableSilentMode) return;
 
   dispatch_async(dispatch_get_main_queue(), ^{
-    if ([self notificationAlreadyQueued:pendingMsg]) return;
+    if ([self notificationAlreadyQueued:pendingMsg]) {
+      // Make sure we clear the reply block so we don't leak memory.
+      if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
+        SNTBinaryMessageWindowController *bmwc = (SNTBinaryMessageWindowController *)pendingMsg;
+        bmwc.replyBlock(NO);
+      }
+      return;
+    }
 
     // See if this message has been user-silenced.
     NSString *messageHash = [pendingMsg messageHash];
@@ -336,14 +344,18 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
-                 andCustomURL:(NSString *)url {
+                 andCustomURL:(NSString *)url
+                     andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
   }
 
   SNTBinaryMessageWindowController *pendingMsg =
-    [[SNTBinaryMessageWindowController alloc] initWithEvent:event customMsg:message customURL:url];
+    [[SNTBinaryMessageWindowController alloc] initWithEvent:event
+                                                  customMsg:message
+                                                  customURL:url
+                                                      reply:replyBlock];
 
   [self queueMessage:pendingMsg];
 }

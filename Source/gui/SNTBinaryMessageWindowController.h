@@ -27,7 +27,8 @@
 
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url;
+                    customURL:(NSString *)url
+                        reply:(void (^)(BOOL authenticated))replyBlock;
 
 - (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash;
 
@@ -48,6 +49,11 @@
 ///  The execution event that this window is for
 ///
 @property(readonly) SNTStoredEvent *event;
+
+///
+///  The reply block to call when the user has made a decision in standalone
+///  mode.
+@property(readonly, nonatomic) void (^replyBlock)(BOOL authenticated);
 
 ///
 ///  The root progress object. Child nodes are vended to santad to report on work being done.

@@ -149,6 +149,19 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
   .help("⌘ Return")
 }
 
+// StandaloneButton is only used in Standalone mode. It's a replacement for the
+// Open event button.
+public func StandaloneButton(action: @escaping () -> Void) -> some View {
+  Button(
+    action: action,
+    label: {
+      Text(NSLocalizedString("Approve", comment: "Default text for Approve")).frame(maxWidth: 200.0)
+    }
+  )
+  .keyboardShortcut(.return, modifiers: .command)
+  .help("⌘ Return")
+}
+
 public func DismissButton(
   customText: String? = nil,
   silence: Bool?,

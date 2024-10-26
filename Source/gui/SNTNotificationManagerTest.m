@@ -58,7 +58,11 @@
   id dncMock = OCMClassMock([NSDistributedNotificationCenter class]);
   OCMStub([dncMock defaultCenter]).andReturn(dncMock);
 
-  [sut postBlockNotification:ev withCustomMessage:@"" andCustomURL:@""];
+  [sut postBlockNotification:ev
+           withCustomMessage:@""
+                andCustomURL:@""
+                    andReply:^(BOOL authenticated){
+                    }];
 
   OCMVerify([dncMock postNotificationName:@"com.northpolesec.santa.notification.blockedeexecution"
                                    object:@"com.northpolesec.santa"

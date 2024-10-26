@@ -63,11 +63,12 @@ typedef NS_ENUM(NSInteger, SNTRuleState) {
 
   SNTRuleStateAllowCompiler = 5,
   SNTRuleStateAllowTransitive = 6,
+  SNTRuleStateAllowLocalBinary = 7,
+  SNTRuleStateAllowLocalSigningID = 8,
 };
 
 typedef NS_ENUM(NSInteger, SNTClientMode) {
   SNTClientModeUnknown,
-
   SNTClientModeMonitor = 1,
   SNTClientModeLockdown = 2,
 };

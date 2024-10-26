@@ -34,7 +34,9 @@ import santa_gui_SNTMessageView
     customMsg: NSString?,
     customURL: NSString?,
     bundleProgress: SNTBundleProgress,
-    uiStateCallback: ((TimeInterval) -> Void)?
+    uiStateCallback: ((TimeInterval) -> Void)?,
+    standaloneErrorMessage: String?,
+    replyCallback: ((Bool, () -> Void) -> Void)?
   ) -> NSViewController {
     return NSHostingController(
       rootView: SNTBinaryMessageWindowView(
@@ -43,7 +45,9 @@ import santa_gui_SNTMessageView
         customMsg: customMsg,
         customURL: customURL,
         bundleProgress: bundleProgress,
-        uiStateCallback: uiStateCallback
+        uiStateCallback: uiStateCallback,
+        standaloneErrorMessage: standaloneErrorMessage,
+        replyCallback: replyCallback
       )
       .fixedSize()
     )
@@ -238,10 +242,8 @@ struct SNTBinaryMessageEventView: View {
         .keyboardShortcut("d", modifiers: .command)
         .help("⌘ d")
       }
-
       Spacer()
     }
-
   }
 }
 
@@ -252,6 +254,8 @@ struct SNTBinaryMessageWindowView: View {
   let customURL: NSString?
   @StateObject var bundleProgress: SNTBundleProgress
   let uiStateCallback: ((TimeInterval) -> Void)?
+  let standaloneErrorMessage: String?
+  let replyCallback: ((Bool, () -> Void) -> Void)?
 
   @Environment(\.openURL) var openURL
 
@@ -266,30 +270,37 @@ struct SNTBinaryMessageWindowView: View {
     ) {
       SNTBinaryMessageEventView(e: event!, customURL: customURL, bundleProgress: bundleProgress)
 
-      VStack(spacing: 15.0) {
-        SNTNotificationSilenceView(
-          silence: $preventFutureNotifications,
-          period: $preventFutureNotificationPeriod
-        )
+      SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
 
-        if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
-          if bundleProgress.fractionCompleted == 0.0 {
-            ProgressView {
-              Text(bundleProgress.label)
-            }.progressViewStyle(.linear)
-          } else {
-            ProgressView(value: bundleProgress.fractionCompleted) {
-              Text(bundleProgress.label)
+      if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
+        if bundleProgress.fractionCompleted == 0.0 {
+          ProgressView() {
+            Text(bundleProgress.label)
+          }.progressViewStyle(.linear)
+        } else {
+          ProgressView(value: bundleProgress.fractionCompleted) {
+            Text(bundleProgress.label)
+          }
+        }
+
+        // Display the standalone error message to the user if one is provided.
+        if c.enableStandaloneMode {
+          if let errorMessage = standaloneErrorMessage {
+            if errorMessage != "" {
+              Text(errorMessage).foregroundColor(.red)
             }
           }
         }
 
         HStack(spacing: 15.0) {
           if !(c.eventDetailURL?.isEmpty ?? false)
-            && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished)
+            && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && !c.enableStandaloneMode
           {
             OpenEventButton(customText: c.eventDetailText, action: openButton)
+          } else if addStandaloneButton() {
+            StandaloneButton(action: standAloneButton)
           }
+
           DismissButton(
             customText: c.dismissText,
             silence: preventFutureNotifications,
@@ -303,6 +314,17 @@ struct SNTBinaryMessageWindowView: View {
     .fixedSize()
   }
 
+
+  func addStandaloneButton() -> Bool {
+    var shouldDisplay = c.enableStandaloneMode
+    if let errorMessage = standaloneErrorMessage {
+      if errorMessage != "" {
+        shouldDisplay = false
+      }
+    }
+    return shouldDisplay
+  }
+
   func openButton() {
     if let callback = uiStateCallback {
       if self.preventFutureNotifications {
@@ -312,10 +334,25 @@ struct SNTBinaryMessageWindowView: View {
       }
     }
 
-    let url = SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String?)
-    window?.close()
-    if let url = url {
+    if let callback = replyCallback {
+      callback(false) { window?.close() }
+    }
+
+    let detailsURL = SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String?)
+
+    if let url = detailsURL {
       openURL(url)
+    }
+  }
+
+  // This button is only shown when the standalone mode is enabled in place of
+  // the "Open Event" button.
+  func standAloneButton() {
+    // This should prompt for TouchID or password.
+    if let callback = replyCallback {
+      callback(true) {
+        self.window?.close()
+      }
     }
   }
 
@@ -327,6 +364,10 @@ struct SNTBinaryMessageWindowView: View {
         callback(0)
       }
     }
-    window?.close()
+
+    // Close the window after responding to the block.
+    if let callback = replyCallback {
+      callback(false) { window?.close() }
+    }
   }
 }

@@ -31,6 +31,7 @@ also known as mobileconfig files, which are in an Apple-specific XML format.
 | EnableBadSignatureProtection       | Bool       | If true, binaries with a bad signing chain will be blocked even in MONITOR mode, **unless** the binary is allowed by an explicit rule. Defaults to false. |
 | EnablePageZeroProtection           | Bool       | If true, 32-bit binaries that are missing the `__PAGEZERO` segment will be blocked even in MONITOR mode, **unless** the binary is allowed by an explicit rule. Defaults to true. |
 | EnableSilentMode                   | Bool       | If true, Santa will not post any GUI notifications. This can be a very confusing experience for users, use with caution. Defaults to false. |
+| EnableStandaloneMode                   | Bool       | If true, Santa will allow the local user to approve binaries provided they successfully authenticate with TouchID. Use with caution. Defaults to false. |
 | EnableTransitiveRules              | Bool       | If true, Santa will respect compiler rule types and create allow rules for the executables they produce. Defaults to false. |
 | EnableSilentTTYMode                | Bool       | If true, Santa will not post any TTY notifications. This can be a very confusing experience for users, use with caution. Defaults to false. |
 | ~~EnableForkAndExitLogging~~       | Bool       | DEPRECATED. Please use `Telemetry` instead. If true, Santa will log FORK and EXIT event types. Defaults to false. |

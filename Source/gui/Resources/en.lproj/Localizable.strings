@@ -4,6 +4,9 @@
 /* No comment provided by engineer. */
 "Application" = "Application";
 
+/* Default text for Approve */
+"Approve" = "Approve";
+
 /* No comment provided by engineer. */
 "Bundle Hash" = "Bundle Hash";
 

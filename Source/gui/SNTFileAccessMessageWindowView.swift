@@ -193,7 +193,6 @@ struct SNTFileAccessMessageWindowView: View {
           }
           DismissButton(silence: preventFutureNotifications, action: dismissButton)
         }
-
         Spacer()
       }
     }

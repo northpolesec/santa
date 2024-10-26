@@ -38,10 +38,15 @@ static const int kMaximumNotifications = 10;
 
 - (void)addEvent:(SNTStoredEvent *)event
   withCustomMessage:(NSString *)message
-       andCustomURL:(NSString *)url {
-  if (!event) return;
+       andCustomURL:(NSString *)url
+           andReply:(void (^)(BOOL authenticated))reply {
+  if (!event) {
+    if (reply) reply(NO);
+    return;
+  }
   if (self.pendingNotifications.count > kMaximumNotifications) {
     LOGI(@"Pending GUI notification count is over %d, dropping.", kMaximumNotifications);
+    if (reply) reply(NO);
     return;
   }
 
@@ -52,6 +57,15 @@ static const int kMaximumNotifications = 10;
   if (url) {
     d[@"url"] = url;
   }
+
+  if (reply) {
+    // Copy the block to the heap so it can be called later.
+    //
+    // This is necessary because the block is allocated on the stack in the
+    // Execution controller which exits.
+    d[@"reply"] = [reply copy];
+  }
+
   @synchronized(self.pendingNotifications) {
     [self.pendingNotifications addObject:d];
   }
@@ -67,7 +81,8 @@ static const int kMaximumNotifications = 10;
     for (NSDictionary *d in self.pendingNotifications) {
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
-                    andCustomURL:d[@"url"]];
+                    andCustomURL:d[@"url"]
+                        andReply:d[@"reply"]];
       [postedNotifications addObject:d];
     }
     [self.pendingNotifications removeObjectsInArray:postedNotifications];

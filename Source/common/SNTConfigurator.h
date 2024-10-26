@@ -319,6 +319,14 @@
 @property(readonly, nonatomic) BOOL enableSilentTTYMode;
 
 ///
+///  When standalonemode is enabled, Santa will let a user allow a
+///  binary using TouchID / Password.
+///
+///  Defaults to NO.
+///
+@property(readonly, nonatomic) BOOL enableStandaloneMode;
+
+///
 /// The text to display when opening Santa.app.
 /// If unset, the default text will be displayed.
 ///

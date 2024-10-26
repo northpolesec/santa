@@ -1,6 +1,9 @@
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "Der Zugriff auf eine Datei wurde verweigert";
 
+/* No comment provided by engineer.  */
+"Approve" = "Genehmigen";
+
 /* No comment provided by engineer. */
 "Application" = "Applikation";
 

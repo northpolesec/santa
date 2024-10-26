@@ -124,6 +124,11 @@
 @property NSDate *occurrenceDate;
 
 ///
+///  Was this event approved as a result of a standalone mode authentication.
+///
+@property BOOL standaloneApproval;
+
+///
 ///  The decision santad returned.
 ///
 @property SNTEventState decision;

@@ -1,4 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -150,6 +151,8 @@ REGISTER_COMMAND_NAME(@"status")
     enableTransitiveRules = response;
   }];
 
+  BOOL enableStandAloneMode = [[SNTConfigurator configurator] enableStandaloneMode];
+
   __block BOOL watchItemsEnabled = NO;
   __block uint64_t watchItemsRuleCount = 0;
   __block NSString *watchItemsPolicyVersion = nil;
@@ -199,6 +202,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"driver_connected" : @(YES),
         @"mode" : clientMode ?: @"null",
         @"transitive_rules" : @(enableTransitiveRules),
+        @"standalone_mode" : @(enableStandAloneMode),
         @"log_type" : eventLogType,
         @"file_logging" : @(fileLogging),
         @"watchdog_cpu_events" : @(cpuEvents),
@@ -264,6 +268,10 @@ REGISTER_COMMAND_NAME(@"status")
 
     if (enableTransitiveRules) {
       printf("  %-25s | %s\n", "Transitive Rules", (enableTransitiveRules ? "Yes" : "No"));
+    }
+
+    if (enableStandAloneMode) {
+      printf("  %-25s | %s\n", "Standalone Mode", (enableStandAloneMode ? "Yes" : "No"));
     }
 
     printf("  %-25s | %s\n", "Log Type", [eventLogType UTF8String]);
