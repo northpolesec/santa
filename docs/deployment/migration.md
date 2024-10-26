@@ -19,7 +19,7 @@ straight to [Getting Started](getting-started.md).
 - MDM (Mobile Device Management)
     - If you do not use an MDM jump to
 [Installing NPS Santa](#2-install-nps-santa)
-- NPS Santa installer package
+- A method to deploy the NPS Santa installer package
 
 ## Migration Steps
 
@@ -32,11 +32,11 @@ for a seamless transition.
 extention and TCC MDM configurations for NPS Santa.
 
 ### 2. Install NPS Santa
-Deploy the lastest NPS Santa [release](https://github.com/northpolesec/santa/releases)
+Deploy the latest NPS Santa [release](https://github.com/northpolesec/santa/releases)
 to your systems. The installer is designed with built-in migration support:
 - NPS Santa will remain dormant after installation
 - It will automatically monitor for Google Santa removal
-- At this point NPS Santa will **not** apear in `systemextensionsctl list`
+- At this point NPS Santa will **not** appear in `systemextensionsctl list`
 
 ```
 % systemextensionsctl list
