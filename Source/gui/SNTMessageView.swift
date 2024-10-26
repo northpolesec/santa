@@ -82,7 +82,7 @@ public struct SNTNotificationSilenceView: View {
 }
 
 public struct ScalingButtonStyle: ButtonStyle {
-  public init() {} 
+  public init() {}
 
   public func makeBody(configuration: Self.Configuration) -> some View {
       configuration.label
