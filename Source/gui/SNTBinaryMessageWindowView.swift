@@ -117,7 +117,7 @@ struct MoreDetailsView: View {
             Text("Bundle Hash").bold().font(Font.system(size:12.0))
             Text(bundleHash).font(Font.system(size:12.0).monospaced()).frame(width:240).textSelection(.enabled)
           }
-          Divider() 
+          Divider()
         }
 
         if let cdHash = e?.cdhash {
@@ -174,7 +174,7 @@ struct MoreDetailsView: View {
 }
 
 struct SNTBinaryMessageEventView: View {
-  let e: SNTStoredEvent? 
+  let e: SNTStoredEvent?
   let customURL: NSString?
   @StateObject var bundleProgress: SNTBundleProgress
 
