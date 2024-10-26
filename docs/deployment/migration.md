@@ -4,18 +4,20 @@ parent: Deployment
 nav_order: 7
 ---
 
-# Migrating from Google Santa to NPS Santa
+# Migrating from Google Santa to North Pole Security Santa
 
 ## Overview
-This guide outlines the migration process from Google Santa to NPS Santa,
-designed to ensure a smooth transition with minimal security coverage gaps.
+This guide outlines the migration process from Google Santa to North Pole
+Security (NPS) Santa, designed to ensure a smooth transition with minimal
+security coverage gaps.
 
 If you are not currently running Google Santa, you can skip this doc and go
 straight to [Getting Started](getting-started.md).
 
 ## Prerequisites
 - Active Google Santa installation
-- MDM (Mobile Device Management) - If you do not use an MDM jump to
+- MDM (Mobile Device Management)
+    - If you do not use an MDM jump to
 [Installing NPS Santa](#2-install-nps-santa)
 - NPS Santa installer package
 
@@ -52,7 +54,7 @@ configurations from #1 before deploying the NPS Santa installer.
 Through your MDM:
 - Remove Google Santa from the allowed system extensions list
 - This will trigger the automatic unloading of Google Santa
-- NPS Santa will detect the removal and will finish loading itself within second
+- NPS Santa will detect the removal and will finish loading itself within seconds
 
 {: .warning }
 To minimize security coverage downtime, ensure the NPS Santa installer has run
@@ -74,7 +76,5 @@ enabled	active	teamID	bundleID (version)	name	[state]
 *	*	ZMCG7MLDV9	com.northpolesec.santa.daemon (2024.10/2024.10.49)	santad	[activated enabled]
 ```
 
-## Notes
-- The terminated Google Santa entry will be cleared on the next reboot. In a
+The terminated Google Santa entry will be cleared on the next reboot. In a
 terminated state, Google Santa does not affect NPS Santa.
-- Security coverage downtime is kept to a minimum throughout the transition
