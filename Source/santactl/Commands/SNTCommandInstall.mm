@@ -52,7 +52,7 @@ REGISTER_COMMAND_NAME(@"install")
   int64_t secondsToWait = 15;
 
   LOGI(@"Asking daemon to install: %@", installFromPath);
-  LOGI(@"...Waitng for up to %lld seconds...", secondsToWait);
+  LOGI(@"...Waiting for up to %lld seconds...", secondsToWait);
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   [[self.daemonConn remoteObjectProxy]
