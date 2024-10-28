@@ -44,16 +44,17 @@ disclosure reporting.
   the events database. In LOCKDOWN mode, only listed binaries are allowed to
   run.
 
-* Event logging: When the system extension is loaded, all binary launches are logged. When in either mode, all unknown or denied binaries are stored in the database to enable later aggregation.
+* Event logging: When the system extension is loaded, all binary launches are
+  logged. When in either mode, all unknown or denied binaries are stored in the
+  database to enable later aggregation.
 
-* Certificate-based rules, with override levels: Instead of relying on a
+* Signature-based rules, with override levels: Instead of relying on a
   binary's hash (or 'fingerprint'), executables can be allowed/blocked by their
-  signing certificate. You can therefore allow/block all binaries by a
-  given publisher that were signed with that cert across version updates. A
-  binary can only be allowed by its certificate if its signature validates
-  correctly but a rule for a binary's fingerprint will override a decision for
-  a certificate; i.e. you can allowlist a certificate while blocking a binary
-  signed with that certificate, or vice-versa.
+  code signature (through CDHash, Certificate, TeamID or SigningID rules). You
+  can therefore allow/block all binaries signed by a publisher or all versions
+  of a signed binary. Rules are applied in most-specific order, which allows you
+  to allow all binaries by a given publisher while blocking one specific
+  signing ID or binary (or vice-versa).
 
 * Path-based rules (via NSRegularExpression/ICU): This allows a similar feature
   to that found in Managed Client (the precursor to configuration profiles,
@@ -91,13 +92,12 @@ running on your computer.
 Santa is part of a defense-in-depth strategy, and you should continue to
 protect hosts in whatever other ways you see fit.
 
-# Security and Performance-Related Features
-
 # Known Issues
 
 * Santa only blocks execution (execve and variants), it doesn't protect against
   dynamic libraries loaded with dlopen, libraries on disk that have been
-  replaced, or libraries loaded using `DYLD_INSERT_LIBRARIES`.
+  replaced, or libraries loaded using `DYLD_INSERT_LIBRARIES`. Other parts of
+  macOS will usually protect against these avenues, as long as SIP is enabled.
 
 * Scripts: Santa is currently written to ignore any execution that isn't a
   binary. This is because after weighing the administration cost vs the
