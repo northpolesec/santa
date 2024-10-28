@@ -13,6 +13,7 @@
 /// limitations under the License.
 
 import SwiftUI
+
 import santa_common_SNTBlockMessage
 import santa_common_SNTConfigurator
 import santa_common_SNTStoredEvent

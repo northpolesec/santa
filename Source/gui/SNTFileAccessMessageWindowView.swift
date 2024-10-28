@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import SwiftUI
+
 import santa_common_SNTBlockMessage
 import santa_common_SNTFileAccessEvent
 import santa_gui_SNTMessageView

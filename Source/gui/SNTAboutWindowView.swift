@@ -1,4 +1,5 @@
 import SwiftUI
+
 import santa_common_SNTConfigurator
 
 @objc public class SNTAboutWindowViewFactory: NSObject {
