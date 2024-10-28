@@ -48,7 +48,7 @@ disclosure reporting.
   logged. When in either mode, all unknown or denied binaries are stored in the
   database to enable later aggregation.
 
-* Signature-based rules, with override levels: Instead of relying on a
+* Code signing-based rules, with override levels: Instead of relying on a
   binary's hash (or 'fingerprint'), executables can be allowed/blocked by their
   code signature (through CDHash, Certificate, TeamID or SigningID rules). You
   can therefore allow/block all binaries signed by a publisher or all versions
