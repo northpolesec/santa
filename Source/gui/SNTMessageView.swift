@@ -67,7 +67,8 @@ public struct SNTNotificationSilenceView: View {
       set: {
         silence = true
         period = $0
-      })
+      }
+    )
 
     Toggle(isOn: $silence) {
       HStack(spacing: 0.0) {
@@ -118,7 +119,11 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
   .help("⌘ Return")
 }
 
-public func DismissButton(customText: String? = nil, silence: Bool?, action: @escaping () -> Void)
+public func DismissButton(
+  customText: String? = nil,
+  silence: Bool?,
+  action: @escaping () -> Void
+)
   -> some View
 {
   Button(

@@ -166,7 +166,8 @@ struct MoreDetailsView: View {
           Button(action: { presentationMode.wrappedValue.dismiss() }) {
             HStack(spacing: 2.0) {
               Text("Dismiss", comment: "Dismiss button in more details dialog").foregroundColor(
-                .blue)
+                .blue
+              )
               Image(systemName: "xmark.circle").foregroundColor(.blue)
             }
           }
@@ -261,7 +262,9 @@ struct SNTBinaryMessageWindowView: View {
       SNTBinaryMessageEventView(e: event!, customURL: customURL, bundleProgress: bundleProgress)
 
       SNTNotificationSilenceView(
-        silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
+        silence: $preventFutureNotifications,
+        period: $preventFutureNotificationPeriod
+      )
 
       if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
         if bundleProgress.fractionCompleted == 0.0 {
@@ -282,7 +285,10 @@ struct SNTBinaryMessageWindowView: View {
           OpenEventButton(customText: c.eventDetailText, action: openButton)
         }
         DismissButton(
-          customText: c.dismissText, silence: preventFutureNotifications, action: dismissButton)
+          customText: c.dismissText,
+          silence: preventFutureNotifications,
+          action: dismissButton
+        )
       }
 
       Spacer()

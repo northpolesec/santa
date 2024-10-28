@@ -21,7 +21,8 @@ import santa_gui_SNTMessageView
 @objc public class SNTDeviceMessageWindowViewFactory: NSObject {
   @objc public static func createWith(window: NSWindow, event: SNTDeviceEvent) -> NSViewController {
     return NSHostingController(
-      rootView: SNTDeviceMessageWindowView(window: window, event: event).fixedSize())
+      rootView: SNTDeviceMessageWindowView(window: window, event: event).fixedSize()
+    )
   }
 }
 

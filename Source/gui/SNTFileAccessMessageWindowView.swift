@@ -181,7 +181,9 @@ struct SNTFileAccessMessageWindowView: View {
       Event(e: event!, window: window)
 
       SNTNotificationSilenceView(
-        silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
+        silence: $preventFutureNotifications,
+        period: $preventFutureNotificationPeriod
+      )
 
       HStack(spacing: 15.0) {
         if customURL != nil {

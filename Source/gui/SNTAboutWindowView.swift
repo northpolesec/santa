@@ -4,7 +4,8 @@ import santa_common_SNTConfigurator
 @objc public class SNTAboutWindowViewFactory: NSObject {
   @objc public static func createWith(window: NSWindow) -> NSViewController {
     return NSHostingController(
-      rootView: SNTAboutWindowView(w: window).frame(width: 400, height: 200))
+      rootView: SNTAboutWindowView(w: window).frame(width: 400, height: 200)
+    )
   }
 }
 
@@ -24,7 +25,8 @@ struct SNTAboutWindowView: View {
           Santa is an application control system for macOS.
 
           There are no user-configurable settings.
-          """, comment: "Explanation in About view"
+          """,
+          comment: "Explanation in About view"
         ).multilineTextAlignment(.center)
       }
 
