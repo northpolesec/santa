@@ -43,6 +43,9 @@ jobs:
           ./Testing/localization.py
           if [[ -n "$(git diff)" ]]; then
             git diff
+            echo "Base localization has not been updated. Please run:"
+            echo "    ./Testing/localization.py"
+            echo "and commit any changes it makes."
             exit 1 # return an error if localization.py made changes
           fi
   unit_tests:
