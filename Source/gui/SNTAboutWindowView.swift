@@ -2,9 +2,11 @@ import SwiftUI
 
 import santa_common_SNTConfigurator
 
-@objc public class SNTAboutWindowViewFactory : NSObject {
+@objc public class SNTAboutWindowViewFactory: NSObject {
   @objc public static func createWith(window: NSWindow) -> NSViewController {
-    return NSHostingController(rootView:SNTAboutWindowView(w:window).frame(width:400, height:200))
+    return NSHostingController(
+      rootView: SNTAboutWindowView(w: window).frame(width: 400, height: 200)
+    )
   }
 }
 
@@ -13,17 +15,20 @@ struct SNTAboutWindowView: View {
   let c = SNTConfigurator()
 
   var body: some View {
-    VStack(spacing:20.0) {
-      Text(verbatim:"Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+    VStack(spacing: 20.0) {
+      Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
 
       if let t = c.aboutText {
         Text(t).multilineTextAlignment(.center)
       } else {
-        Text("""
-        Santa is an application control system for macOS.
+        Text(
+          """
+          Santa is an application control system for macOS.
 
-        There are no user-configurable settings.
-        """, comment:"Explanation in About view").multilineTextAlignment(.center)
+          There are no user-configurable settings.
+          """,
+          comment: "Explanation in About view"
+        ).multilineTextAlignment(.center)
       }
 
       HStack {
@@ -60,4 +65,3 @@ struct SNTAboutWindow_Previews: PreviewProvider {
     SNTAboutWindowView(w: nil)
   }
 }
-
