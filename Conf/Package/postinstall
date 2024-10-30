@@ -35,6 +35,11 @@ if [ -z "${GOOGLE_SANTA_ACTIVATED}" ]; then
     /Applications/Santa.app/Contents/MacOS/santactl install
   fi
 
+  # Although Santa isn't running, we still try to move any lingering newsyslog
+  # config that might exist. If any changes had been made to a previous Santa
+  # deployment, that same config will continue to be used here.
+  /bin/mv -f /private/etc/newsyslog.d/com.google.santa.newsyslog.conf /private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf || true
+
   # Cleanup cache dir.
   /bin/rm -rf /Library/Caches/com.northpolesec.santa
 
