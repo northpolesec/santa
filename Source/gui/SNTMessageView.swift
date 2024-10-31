@@ -17,7 +17,8 @@ public struct SNTMessageView<Content: View>: View {
   }
 
   func SpecialDateIs(month: Int, day: Int) -> Bool {
-    return enableFunFonts && Calendar.current.dateComponents([.month, .day], from: self.now) == DateComponents(month: month, day: day)
+    return enableFunFonts
+      && Calendar.current.dateComponents([.month, .day], from: self.now) == DateComponents(month: month, day: day)
   }
 
   public var body: some View {
