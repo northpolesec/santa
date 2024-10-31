@@ -20,7 +20,6 @@ public struct SNTMessageView<Content: View>: View {
             .resizable()
             .frame(maxWidth: 32, maxHeight: 32)
             .offset(x: -75)
-            .saturation(0.5)
           Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
         }
       }
