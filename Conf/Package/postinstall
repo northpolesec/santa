@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Santa is installed to /Library/Caches/com.northpolesec.santa/Santa.app. This
+# Santa is installed to /var/db/santa/migration/Santa.app. This
 # postinstall script moves it to /Applications/Santa.app, if Santa is not
 # running, or asks com.northpolesec.santa.daemon to finish the install.
 
@@ -26,7 +26,7 @@ if [ -z "${GOOGLE_SANTA_ACTIVATED}" ]; then
     # Removal was successful.
     # Install Santa and load the system extension. The system extension will
     # finish loading the rest of Santa's configs and helper services.
-    /bin/mv /Library/Caches/com.northpolesec.santa/Santa.app /Applications/Santa.app
+    /bin/mv /var/db/santa/migration/Santa.app /Applications/Santa.app
     /Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
   else
     # Tamper protections are enabled, ask Santa to install the update. If the
@@ -35,8 +35,13 @@ if [ -z "${GOOGLE_SANTA_ACTIVATED}" ]; then
     /Applications/Santa.app/Contents/MacOS/santactl install
   fi
 
+  # Although Santa isn't running, we still try to move any lingering newsyslog
+  # config that might exist. If any changes had been made to a previous Santa
+  # deployment, that same config will continue to be used here.
+  /bin/mv -f /private/etc/newsyslog.d/com.google.santa.newsyslog.conf /private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf || true
+
   # Cleanup cache dir.
-  /bin/rm -rf /Library/Caches/com.northpolesec.santa
+  /bin/rm -rf /var/db/santa/migration
 
   # Create a symlink for santactl.
   /bin/mkdir -p /usr/local/bin

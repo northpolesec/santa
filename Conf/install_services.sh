@@ -31,8 +31,17 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/rm /Library/LaunchDaemons/com.google.santa.metricservice.plist
 /bin/rm /Library/LaunchDaemons/com.google.santa.syncservice.plist
 /bin/rm /Library/LaunchDaemons/com.google.santad.plist
+# Move Google's newsyslog config file in case any changes were made so that the
+# same configuration continues to apply.
+/bin/mv -f /private/etc/newsyslog.d/com.google.santa.newsyslog.conf /private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf || true
 
 ################################################################################
+
+# Remove lingering migration launchd plist. This can stick around when upgrading
+# NPS Santa due to tamper protections of the previous version of NPS preventing
+# the deletion. While this is benign, we can take the opportunity to remove the
+# artifact here.
+/bin/rm -f /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
 
 # Unload NPS Santa services in preparation for installation / update.
 /bin/launchctl remove com.northpolesec.santa.bundleservice || true
@@ -51,5 +60,3 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist
 /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist
 [[ -n "${GUI_USER}" ]] && /bin/launchctl asuser "${GUI_USER}" /bin/launchctl load /Library/LaunchAgents/com.northpolesec.santa.plist
-
-exit 0

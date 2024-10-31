@@ -39,11 +39,11 @@ readonly APP_PKG_SCRIPTS="${SCRATCH}/pkg_scripts"
 /usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.northpolesec.santa*" -exec chmod 0644 {} \;
 
 echo "creating app pkg"
-/bin/mkdir -p "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa" \
+/bin/mkdir -p "${APP_PKG_ROOT}/var/db/santa/migration" \
   "${APP_PKG_ROOT}/Library/LaunchDaemons" \
   "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/migration.sh" "${APP_PKG_ROOT}/Library/Caches/com.northpolesec.santa/"
+/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/var/db/santa/migration/"
+/bin/cp -vX "${RELEASE_ROOT}/conf/migration.sh" "${APP_PKG_ROOT}/var/db/santa/migration/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.migration.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
 /bin/cp -vXL "${RELEASE_ROOT}/conf/preinstall" "${APP_PKG_SCRIPTS}/"

@@ -54,6 +54,10 @@ void RemoveLegacyLaunchdPlists() {
     "/Library/LaunchDaemons/com.google.santa.metricservice.plist",
     "/Library/LaunchDaemons/com.google.santa.syncservice.plist",
     "/Library/LaunchAgents/com.google.santa.plist",
+    // Assume that NPS Santa has already migrated any existing Google newsyslog
+    // config and we can simply remove a new config file that was just laid
+    // down as part of a Google Santa install that is being prevented from running.
+    "/private/etc/newsyslog.d/com.google.santa.newsyslog.conf",
   };
 
   for (const auto &plist : legacyPlists) {

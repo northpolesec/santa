@@ -4,6 +4,6 @@
 [[ $3 != "/" ]] && exit 0
 
 /bin/launchctl remove com.northpolesec.santa.migration || true
-/bin/rm -rf /Library/Caches/com.northpolesec.santa
+/bin/rm -rf /var/db/santa/migration
 
 exit 0

@@ -48,7 +48,7 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
-  NSString *installFromPath = @"/Library/Caches/com.northpolesec.santa/Santa.app";
+  NSString *installFromPath = @"/var/db/santa/migration/Santa.app";
   int64_t secondsToWait = 15;
 
   LOGI(@"Asking daemon to install: %@", installFromPath);
