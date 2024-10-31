@@ -181,19 +181,21 @@ struct SNTFileAccessMessageWindowView: View {
     ) {
       Event(e: event!, window: window)
 
-      SNTNotificationSilenceView(
-        silence: $preventFutureNotifications,
-        period: $preventFutureNotificationPeriod
-      )
+      VStack(spacing: 15.0) {
+        SNTNotificationSilenceView(
+          silence: $preventFutureNotifications,
+          period: $preventFutureNotificationPeriod
+        )
 
-      HStack(spacing: 15.0) {
-        if customURL != nil {
-          OpenEventButton(customText: customText, action: openButton)
+        HStack(spacing: 15.0) {
+          if customURL != nil {
+            OpenEventButton(customText: customText, action: openButton)
+          }
+          DismissButton(silence: preventFutureNotifications, action: dismissButton)
         }
-        DismissButton(silence: preventFutureNotifications, action: dismissButton)
-      }
 
-      Spacer()
+        Spacer()
+      }
     }
     .fixedSize()
   }

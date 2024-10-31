@@ -20,7 +20,7 @@ public struct SNTMessageView<Content: View>: View {
             .resizable()
             .frame(maxWidth: 32, maxHeight: 32)
             .offset(x: -75)
-            .saturation(0.5)
+            .saturation(0.9)
           Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
         }
       }
@@ -80,7 +80,7 @@ public struct SNTNotificationSilenceView: View {
           }
         }.fixedSize()
       }
-    }.padding(10.0)
+    }
   }
 }
 
@@ -112,7 +112,7 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
     action: action,
     label: {
       let t = customText ?? String(localized: "Open...")
-      Text(t).frame(minWidth: 150.0)
+      Text(t).frame(maxWidth: 200.0)
     }
   )
   .keyboardShortcut(.return, modifiers: .command)
@@ -134,7 +134,7 @@ public func DismissButton(
         ?? (silence ?? false
           ? NSLocalizedString("Dismiss & Silence", comment: "")
           : NSLocalizedString("Dismiss", comment: ""))
-      Text(t).frame(minWidth: 150.0)
+      Text(t).frame(maxWidth: 200.0)
     }
   )
   .keyboardShortcut(.escape, modifiers: .command)
