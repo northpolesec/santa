@@ -12,8 +12,6 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
-#ifdef DEBUG
-
 #import <Foundation/Foundation.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
 
@@ -59,5 +57,3 @@ REGISTER_COMMAND_NAME(@"flushcache")
 }
 
 @end
-
-#endif

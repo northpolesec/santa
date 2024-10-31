@@ -57,13 +57,13 @@ objc_library(
         "Commands/SNTCommandStatus.m",
         "Commands/SNTCommandSync.m",
         "Commands/SNTCommandVersion.m",
+        "Commands/SNTCommandFlushCache.m",
         "main.m",
     ] + select({
         "//:opt_build": [],
         "//conditions:default": [
             "Commands/SNTCommandBundleInfo.m",
             "Commands/SNTCommandCheckCache.m",
-            "Commands/SNTCommandFlushCache.m",
         ],
     }),
     sdk_dylibs = ["libz"],
