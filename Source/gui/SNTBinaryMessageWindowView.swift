@@ -225,25 +225,24 @@ struct SNTBinaryMessageEventView: View {
       MoreDetailsView(e: e, customURL: customURL, bundleProgress: bundleProgress)
     }
 
-
     VStack(spacing: 2.0) {
-        Spacer()
+      Spacer()
 
-        ZStack {
-          MoreDetailsButton($isShowingDetails)
+      ZStack {
+        MoreDetailsButton($isShowingDetails)
 
-          // This button is hidden and exists only to allow using the Cmd+D keyboard shortcut
-          // to copy the event details to the clipboard even if the "More Details" button hasn't been pressed.
-          Button(action: { copyDetailsToClipboard(e: e, customURL: customURL as String?) }) {
-            Text(verbatim: "Copy Details")
-          }
-          .buttonStyle(ScalingButtonStyle())
-          .opacity(0.0)  // Invisible!
-          .keyboardShortcut("d", modifiers: .command)
-          .help("⌘ d")
+        // This button is hidden and exists only to allow using the Cmd+D keyboard shortcut
+        // to copy the event details to the clipboard even if the "More Details" button hasn't been pressed.
+        Button(action: { copyDetailsToClipboard(e: e, customURL: customURL as String?) }) {
+          Text(verbatim: "Copy Details")
         }
+        .buttonStyle(ScalingButtonStyle())
+        .opacity(0.0)  // Invisible!
+        .keyboardShortcut("d", modifiers: .command)
+        .help("⌘ d")
+      }
 
-        Spacer()
+      Spacer()
     }
 
   }
@@ -271,35 +270,35 @@ struct SNTBinaryMessageWindowView: View {
       SNTBinaryMessageEventView(e: event!, customURL: customURL, bundleProgress: bundleProgress)
 
       VStack(spacing: 15.0) {
-          SNTNotificationSilenceView(
-            silence: $preventFutureNotifications,
-            period: $preventFutureNotificationPeriod
+        SNTNotificationSilenceView(
+          silence: $preventFutureNotifications,
+          period: $preventFutureNotificationPeriod
+        )
+
+        if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
+          if bundleProgress.fractionCompleted == 0.0 {
+            ProgressView {
+              Text(bundleProgress.label)
+            }.progressViewStyle(.linear)
+          } else {
+            ProgressView(value: bundleProgress.fractionCompleted) {
+              Text(bundleProgress.label)
+            }
+          }
+        }
+
+        HStack(spacing: 15.0) {
+          if c.eventDetailURL != nil
+            && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished)
+          {
+            OpenEventButton(customText: c.eventDetailText, action: openButton)
+          }
+          DismissButton(
+            customText: c.dismissText,
+            silence: preventFutureNotifications,
+            action: dismissButton
           )
-
-          if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
-            if bundleProgress.fractionCompleted == 0.0 {
-              ProgressView {
-                Text(bundleProgress.label)
-              }.progressViewStyle(.linear)
-            } else {
-              ProgressView(value: bundleProgress.fractionCompleted) {
-                Text(bundleProgress.label)
-              }
-            }
-          }
-
-          HStack(spacing: 15.0) {
-            if c.eventDetailURL != nil
-              && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished)
-            {
-              OpenEventButton(customText: c.eventDetailText, action: openButton)
-            }
-            DismissButton(
-              customText: c.dismissText,
-              silence: preventFutureNotifications,
-              action: dismissButton
-            )
-          }
+        }
       }
 
       Spacer()
