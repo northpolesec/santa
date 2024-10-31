@@ -156,9 +156,11 @@ struct Event: View {
       MoreDetailsView(e: e)
     }
 
-    Spacer()
-
-    MoreDetailsButton($isShowingDetails)
+    VStack(spacing: 2.0) {
+      Spacer()
+      MoreDetailsButton($isShowingDetails)
+      Spacer()
+    }
   }
 }
 
