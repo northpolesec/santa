@@ -28,11 +28,11 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/mv -f /private/etc/newsyslog.d/com.google.santa.newsyslog.conf /private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf || true
 
 # Install NPS Santa.
-/bin/mv /Library/Caches/com.northpolesec.santa/Santa.app /Applications/Santa.app
+/bin/mv /var/db/santa/migration/Santa.app /Applications/Santa.app
 /Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
 
 # Cleanup migration service and on-disk artifacts.
-/bin/rm -rf /Library/Caches/com.northpolesec.santa/
+/bin/rm -rf /var/db/santa/migration/
 /bin/rm /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
 /bin/launchctl remove com.northpolesec.santa.migration
 
