@@ -1,4 +1,5 @@
 import SwiftUI
+import santa_common_SNTConfigurator
 
 public let MAX_OUTER_VIEW_WIDTH = 560.0
 public let MAX_OUTER_VIEW_HEIGHT = 340.0
@@ -7,21 +8,39 @@ public struct SNTMessageView<Content: View>: View {
   let blockMessage: NSAttributedString
   @ViewBuilder let content: Content
 
+  let now: Date = Date()
+  let enableFunFonts: Bool = SNTConfigurator().funFontsOnSpecificDays
+
   public init(_ blockMessage: NSAttributedString, @ViewBuilder content: () -> Content) {
     self.content = content()
     self.blockMessage = blockMessage
+  }
+
+  func SpecialDateIs(month: Int, day: Int) -> Bool {
+    return enableFunFonts && Calendar.current.dateComponents([.month, .day], from: self.now) == DateComponents(month: month, day: day)
   }
 
   public var body: some View {
     VStack(spacing: 10.0) {
       HStack {
         ZStack {
-          Image(nsImage: NSImage(named: "AppIcon") ?? NSImage())
+          let image = Image(nsImage: NSImage(named: "AppIcon") ?? NSImage())
             .resizable()
             .frame(maxWidth: 32, maxHeight: 32)
             .offset(x: -75)
             .saturation(0.9)
-          Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+          if SpecialDateIs(month: 4, day: 1) {
+            image
+            Text(verbatim: "Santa").font(Font.custom("ComicSansMS", size: 34.0))
+          } else if SpecialDateIs(month: 5, day: 4) {
+            image.offset(x: -20)
+            Text(verbatim: "Santa").font(Font.custom("StarJedi", size: 34.0))
+          } else if SpecialDateIs(month: 10, day: 31) {
+            Text(verbatim: "🎃 Santa   ").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+          } else {
+            image
+            Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+          }
         }
       }
 
