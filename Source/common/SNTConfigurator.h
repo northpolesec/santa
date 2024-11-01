@@ -391,6 +391,11 @@
 ///
 @property(readonly, nonatomic) NSString *modeNotificationLockdown;
 
+///
+///  If this is set to true, the UI will use different fonts on April 1st, May 4th and October 31st.
+///
+@property(readonly, nonatomic) BOOL funFontsOnSpecificDays;
+
 #pragma mark - Sync Settings
 
 ///

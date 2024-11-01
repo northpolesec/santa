@@ -16,6 +16,7 @@ swift_library(
     name = "SNTMessageView",
     srcs = ["SNTMessageView.swift"],
     module_name = "santa_gui_SNTMessageView",
+    deps = ["//Source/common:SNTConfigurator"],
 )
 
 swift_library(
@@ -122,6 +123,7 @@ macos_application(
         "//Source/santametricservice": "MacOS",
         "//Source/santasyncservice": "MacOS",
         "//Source/santad:com.northpolesec.santa.daemon": "Library/SystemExtensions",
+        "Resources/Fonts/StarJedi.ttf": ".",
     },
     app_icons = glob(["Resources/Images.xcassets/**"]),
     bundle_id = "com.northpolesec.santa",

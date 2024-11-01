@@ -105,6 +105,7 @@ static NSString *const kRemountUSBBlockMessage = @"RemountUSBBlockMessage";
 
 static NSString *const kModeNotificationMonitor = @"ModeNotificationMonitor";
 static NSString *const kModeNotificationLockdown = @"ModeNotificationLockdown";
+static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
 
 static NSString *const kEnablePageZeroProtectionKey = @"EnablePageZeroProtection";
 static NSString *const kEnableBadSignatureProtectionKey = @"EnableBadSignatureProtection";
@@ -235,6 +236,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kRemountUSBBlockMessage : string,
       kModeNotificationMonitor : string,
       kModeNotificationLockdown : string,
+      kFunFontsOnSpecificDays : number,
       kStaticRules : array,
       kSyncBaseURLKey : string,
       kSyncEnableProtoTransfer : number,
@@ -433,6 +435,10 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 }
 
 + (NSSet *)keyPathsForValuesAffectingModeNotificationLockdown {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingFunFontsOnSpecificDays {
   return [self configStateSet];
 }
 
@@ -811,6 +817,10 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 
 - (NSString *)modeNotificationLockdown {
   return self.configState[kModeNotificationLockdown];
+}
+
+- (BOOL)funFontsOnSpecificDays {
+  return [self.configState[kFunFontsOnSpecificDays] boolValue];
 }
 
 - (NSString *)syncClientAuthCertificateFile {
