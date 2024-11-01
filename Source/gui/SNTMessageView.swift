@@ -34,8 +34,8 @@ public struct SNTMessageView<Content: View>: View {
             image
             Text(verbatim: "Santa").font(Font.custom("ComicSansMS", size: 34.0))
           } else if SpecialDateIs(month: 5, day: 4) {
-            image.offset(x: -20)
-            Text(verbatim: "Santa").font(Font.custom("StarJedi", size: 34.0))
+            // $ and # are the Rebel Alliance and Galactic Empire logos in the StarJedi font.
+            Text(verbatim: "$  Santa  #").font(Font.custom("StarJedi", size: 34.0))
           } else if SpecialDateIs(month: 10, day: 31) {
             Text(verbatim: "🎃 Santa   ").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
           } else {
