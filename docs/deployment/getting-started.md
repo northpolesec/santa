@@ -23,4 +23,6 @@ This page shows you the process to get started with your deployment of Santa.
 
     The notifications modified through this profile are different to the main Santa GUI pop-ups. To configure the [Santa GUI](../binaries/santa-gui.md) notifications, use the [configuration profile](configuration.md) (in step 2).
 
+1. (Optional) Suppress "Background Items Added" notifications. When Santa installs helper services a notification will popup, unless suppressed with a `com.apple.servicemanagement` MDM profile. A example profile can be found [here](./servicemanagement.santa.example.mobileconfig).
+
 1. Install the latest Santa package from [GitHub](https://github.com/northpolesec/santa/releases) (where you can also find release notes). The package is distributed as a `PKG` wrapped inside a `DMG`, both of which are properly signed and can be validated.
