@@ -50,6 +50,7 @@ objc_library(
     name = "santactl_lib",
     srcs = [
         "Commands/SNTCommandFileInfo.m",
+        "Commands/SNTCommandFlushCache.m",
         "Commands/SNTCommandMetrics.h",
         "Commands/SNTCommandMetrics.m",
         "Commands/SNTCommandRule.h",
@@ -63,7 +64,6 @@ objc_library(
         "//conditions:default": [
             "Commands/SNTCommandBundleInfo.m",
             "Commands/SNTCommandCheckCache.m",
-            "Commands/SNTCommandFlushCache.m",
         ],
     }),
     sdk_dylibs = ["libz"],

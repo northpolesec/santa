@@ -17,6 +17,7 @@
 
 #include <EndpointSecurity/ESTypes.h>
 #include <bsm/libbsm.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/errno.h>
@@ -65,7 +66,12 @@ void RemoveLegacyLaunchdPlists() {
     // plists are attempted to be loaded. This is a bit overkill in that each plist will be removed
     // 5 times, but not a big deal. If the unlink error is that the file doesn't exist, the log
     // warning is suppressed.
-    if (unlinkat(AT_FDCWD, plist.data(), AT_SYMLINK_NOFOLLOW_ANY) != 0 && errno != ENOENT) {
+    int flag = 0;
+    if (@available(macOS 14.0, *)) {
+      // Support for AT_SYMLINK_NOFOLLOW_ANY in unlinkat(2) wasn't introduced until macOS 14.
+      flag = AT_SYMLINK_NOFOLLOW_ANY;
+    }
+    if (unlinkat(AT_FDCWD, plist.data(), flag) != 0 && errno != ENOENT) {
       LOGW(@"Unable to remove legacy plist \"%s\": %d: %s", plist.data(), errno, strerror(errno));
     }
   }
