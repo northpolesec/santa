@@ -43,7 +43,7 @@ REGISTER_COMMAND_NAME(@"flushcache")
 + (NSString *)longHelpText {
   return @"Flushes the authorization caches.\n"
          @"\n"
-         @"IMPORTANT: This command is mainly for development purposes only.\n";
+         @"IMPORTANT: This command is intended for development purposes only.\n";
 }
 
 + (BOOL)isHidden {

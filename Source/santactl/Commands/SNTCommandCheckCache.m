@@ -47,7 +47,7 @@ REGISTER_COMMAND_NAME(@"checkcache")
 + (NSString *)longHelpText {
   return @"Prints the authorization status of a file in the cache.\n"
          @"\n"
-         @"IMPORTANT: This command is mainly for development purposes only.\n";
+         @"IMPORTANT: This command is intended for development purposes only.\n";
 }
 
 + (BOOL)isHidden {
