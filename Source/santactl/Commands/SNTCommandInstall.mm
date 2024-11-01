@@ -40,7 +40,7 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 + (NSString *)longHelpText {
-  return @"Instruct the daemon to install Santa.app.\n\n";
+  return @"Instruct the daemon to install Santa.app.\n";
 }
 
 + (BOOL)isHidden {
