@@ -25,7 +25,7 @@ public struct SNTMessageView<Content: View>: View {
     VStack(spacing: 10.0) {
       HStack {
         ZStack {
-          let image = Image(nsImage: NSImage(named: "AppIcon") ?? NSImage())
+          let image = Image(nsImage: NSImage(named: "MessageIcon") ?? NSImage())
             .resizable()
             .frame(maxWidth: 32, maxHeight: 32)
             .offset(x: -75)
