@@ -106,8 +106,8 @@ macos_command_line_application(
         "--options library,kill,runtime",
     ],
     infoplists = [
-       "Info.plist",
-       "//Source/common:CommitHash",
+        "Info.plist",
+        "//Source/common:CommitHash",
     ],
     minimum_os_version = "12.0",
     provisioning_profile = select({

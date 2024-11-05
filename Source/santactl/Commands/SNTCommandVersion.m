@@ -76,7 +76,8 @@ REGISTER_COMMAND_NAME(@"version")
     commitHash = [commitHash substringToIndex:8];
   }
 
-  return [NSString stringWithFormat:@"%@ (build %@, commit %@)", productVersion, buildVersion, commitHash];
+  return [NSString
+    stringWithFormat:@"%@ (build %@, commit %@)", productVersion, buildVersion, commitHash];
 }
 
 - (NSString *)santadVersion {
