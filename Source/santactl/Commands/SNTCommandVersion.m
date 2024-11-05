@@ -70,7 +70,14 @@ REGISTER_COMMAND_NAME(@"version")
   if (!dict[@"CFBundleVersion"]) return @"";
   NSString *productVersion = dict[@"CFBundleShortVersionString"];
   NSString *buildVersion = [[dict[@"CFBundleVersion"] componentsSeparatedByString:@"."] lastObject];
-  return [NSString stringWithFormat:@"%@ (build %@)", productVersion, buildVersion];
+
+  NSString *commitHash = dict[@"SNTCommitHash"];
+  if (commitHash.length > 8) {
+    commitHash = [commitHash substringToIndex:8];
+  }
+
+  return [NSString
+    stringWithFormat:@"%@ (build %@, commit %@)", productVersion, buildVersion, commitHash];
 }
 
 - (NSString *)santadVersion {
