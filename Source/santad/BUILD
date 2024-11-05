@@ -860,7 +860,10 @@ macos_bundle(
         # Non-adhoc builds get their entitlements from the provisioning profile.
         "//conditions:default": None,
     }),
-    infoplists = ["Info.plist"],
+    infoplists = [
+        "Info.plist",
+        "//Source/common:CommitHash",
+    ],
     linkopts = ["-execute"],
     minimum_os_version = "12.0",
     provisioning_profile = select({

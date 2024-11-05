@@ -548,3 +548,16 @@ objc_library(
         "@com_google_googletest//:gtest",
     ],
 )
+
+genrule(
+    name = "CommitHash",
+    outs = ["CommitHash.plist"],
+    stamp = 1,
+    local = 1,
+    message = "Generating CommitHash.plist",
+    cmd = """
+    STABLE_GIT_COMMIT=$$(awk '/STABLE_GIT_COMMIT/ { print $$2 }' bazel-out/stable-status.txt)
+    defaults write $${PWD}/$(@) SNTCommitHash -string $${STABLE_GIT_COMMIT:-unset}
+    """,
+)
+

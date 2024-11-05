@@ -138,7 +138,10 @@ macos_application(
         # Non-adhoc builds get thier entitlements from the provisioning profile.
         "//conditions:default": None,
     }),
-    infoplists = ["Info.plist"],
+    infoplists = [
+        "Info.plist",
+        "//Source/common:CommitHash",
+    ],
     minimum_os_version = "12.0",
     provisioning_profile = select({
         "//:adhoc_build": None,
