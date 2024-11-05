@@ -2,6 +2,9 @@
 
 [![license](https://img.shields.io/github/license/northpolesec/santa)](https://github.com/northpolesec/santa/blob/main/LICENSE)
 [![CI](https://github.com/northpolesec/santa/actions/workflows/ci.yml/badge.svg)](https://github.com/northpolesec/santa/actions/workflows/ci.yml)
+[![latest release](https://img.shields.io/github/v/release/northpolesec/santa.svg)](https://github.com/northpolesec/santa/releases/latest)
+[![latest release date](https://img.shields.io/github/release-date/northpolesec/santa.svg)](https://github.com/northpolesec/santa/releases/latest)
+[![downloads](https://img.shields.io/github/downloads/northpolesec/santa/latest/total)](https://github.com/northpolesec/santa/releases/latest)
 
 <p align="center">
     <img src="./docs/images/nps-logo-256.png" height="128" alt="Santa Icon" />
