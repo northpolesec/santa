@@ -28,6 +28,9 @@
 /* No comment provided by engineer. */
 "More Info..." = "Mehr Informationen...";
 
+/* Default text for Open button */
+"Open..." = "Öffnen...";
+
 /* No comment provided by engineer. */
 "Parent" = "Übergeordneter Prozess";
 

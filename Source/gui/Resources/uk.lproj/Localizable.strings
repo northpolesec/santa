@@ -28,6 +28,9 @@
 /* No comment provided by engineer. */
 "More Info..." = "Більше інформації...";
 
+/* Default text for Open button */
+"Open..." = "Відкрито...";
+
 /* No comment provided by engineer. */
 "Parent" = "Батько";
 
