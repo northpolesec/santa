@@ -27,6 +27,7 @@ public struct SNTMessageView<Content: View>: View {
         ZStack {
           let image = Image(nsImage: NSImage(named: "MessageIcon") ?? NSImage())
             .resizable()
+            .scaledToFill()
             .frame(maxWidth: 32, maxHeight: 32)
             .offset(x: -75)
             .saturation(0.9)
