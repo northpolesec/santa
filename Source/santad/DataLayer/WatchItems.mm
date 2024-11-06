@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -56,6 +57,7 @@ NSString *const kWatchItemConfigKeyOptions = @"Options";
 NSString *const kWatchItemConfigKeyOptionsAllowReadAccess = @"AllowReadAccess";
 NSString *const kWatchItemConfigKeyOptionsAuditOnly = @"AuditOnly";
 NSString *const kWatchItemConfigKeyOptionsInvertProcessExceptions = @"InvertProcessExceptions";
+NSString *const kWatchItemConfigKeyOptionsRuleType = @"RuleType";
 NSString *const kWatchItemConfigKeyOptionsEnableSilentMode = @"EnableSilentMode";
 NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode = @"EnableSilentTTYMode";
 NSString *const kWatchItemConfigKeyOptionsCustomMessage = @"BlockMessage";
@@ -155,6 +157,16 @@ static inline bool GetBoolValue(NSDictionary *options, NSString *key, bool defau
   return options[key] ? [options[key] boolValue] : default_value;
 }
 
+WatchItemRuleType GetRuleType(NSString *rule_type) {
+  if ([rule_type isEqualToString:@"FILE_WITH_PROC_EXCEPTIONS"]) {
+    return WatchItemRuleType::kFileWithProcessExceptions;
+  } else if ([rule_type isEqualToString:@"FILE_WITH_TARGETED_PROCS"]) {
+    return WatchItemRuleType::kFileWithTargetedProcesses;
+  } else {
+    return kWatchItemPolicyDefaultRuleType;
+  }
+}
+
 // Given a length, returns a ValidatorBlock that confirms the
 // string is a valid hex string of the given length.
 ValidatorBlock HexValidator(NSUInteger expected_length) {
@@ -183,6 +195,17 @@ ValidatorBlock LenRangeValidator(NSUInteger min_length, NSUInteger max_length) {
       return false;
     }
 
+    return true;
+  };
+}
+
+ValidatorBlock StringSetValidator(NSArray<NSString *> *allowed_values) {
+  return ^bool(NSString *val, NSError **err) {
+    if ([allowed_values containsObject:val]) {
+      PopulateError(err, [NSString stringWithFormat:@"Invalid value. Got: \"%@\". Allowed: %@", val,
+                                                    allowed_values]);
+      return false;
+    }
     return true;
   };
 }
@@ -459,6 +482,16 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
       }
     }
 
+    NSArray<NSString *> *rule_types = @[
+      @"FILE_WITH_PROC_EXCEPTIONS", @"FILE_WITH_TARGETED_PROCS", @"PROC_WITH_FILE_EXCEPTIONS",
+      @"PROC_WITH_TARGETED_FILES"
+    ];
+
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsRuleType, [NSString class], err, false,
+                         StringSetValidator(rule_types))) {
+      return false;
+    }
+
     if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsCustomMessage, [NSString class], err,
                          false,
                          LenRangeValidator(0, kWatchItemConfigOptionCustomMessageMaxLength))) {
@@ -480,9 +513,6 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
                                         kWatchItemPolicyDefaultAllowReadAccess);
   bool audit_only =
     GetBoolValue(options, kWatchItemConfigKeyOptionsAuditOnly, kWatchItemPolicyDefaultAuditOnly);
-  bool invert_process_exceptions =
-    GetBoolValue(options, kWatchItemConfigKeyOptionsInvertProcessExceptions,
-                 kWatchItemPolicyDefaultInvertProcessExceptions);
   bool enable_silent_mode = GetBoolValue(options, kWatchItemConfigKeyOptionsEnableSilentMode,
                                          kWatchItemPolicyDefaultEnableSilentMode);
   bool enable_silent_tty_mode = GetBoolValue(options, kWatchItemConfigKeyOptionsEnableSilentTTYMode,
@@ -493,10 +523,22 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
     return false;
   }
 
+  WatchItemRuleType rule_type = kWatchItemPolicyDefaultRuleType;
+  if (options[kWatchItemConfigKeyOptionsRuleType]) {
+    rule_type = GetRuleType(options[kWatchItemConfigKeyOptionsRuleType]);
+  } else if (options[kWatchItemConfigKeyOptionsInvertProcessExceptions]) {
+    // Convert deprecated config option to the new WatchItemRuleType option
+    if ([options[kWatchItemConfigKeyOptionsInvertProcessExceptions] boolValue]) {
+      rule_type = WatchItemRuleType::kFileWithTargetedProcesses;
+    } else {
+      rule_type = WatchItemRuleType::kFileWithProcessExceptions;
+    }
+  }
+
   for (const PathAndTypePair &path_type_pair : std::get<PathAndTypeVec>(path_list)) {
     policies.push_back(std::make_shared<WatchItemPolicy>(
       NSStringToUTF8StringView(name), policy_version, path_type_pair.first, path_type_pair.second,
-      allow_read_access, audit_only, invert_process_exceptions, enable_silent_mode,
+      allow_read_access, audit_only, rule_type, enable_silent_mode,
       enable_silent_tty_mode,
       NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
       options[kWatchItemConfigKeyOptionsEventDetailURL],

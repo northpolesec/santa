@@ -40,6 +40,7 @@ extern NSString *const kWatchItemConfigKeyOptions;
 extern NSString *const kWatchItemConfigKeyOptionsAllowReadAccess;
 extern NSString *const kWatchItemConfigKeyOptionsAuditOnly;
 extern NSString *const kWatchItemConfigKeyOptionsInvertProcessExceptions;
+extern NSString *const kWatchItemConfigKeyOptionsRuleType;
 extern NSString *const kWatchItemConfigKeyOptionsEnableSilentMode;
 extern NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode;
 extern NSString *const kWatchItemConfigKeyOptionsCustomMessage;

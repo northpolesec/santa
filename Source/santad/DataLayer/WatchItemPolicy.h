@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -30,10 +31,16 @@ enum class WatchItemPathType {
   kLiteral,
 };
 
+enum class WatchItemRuleType {
+  kFileWithProcessExceptions,
+  kFileWithTargetedProcesses,
+};
+
 static constexpr WatchItemPathType kWatchItemPolicyDefaultPathType = WatchItemPathType::kLiteral;
 static constexpr bool kWatchItemPolicyDefaultAllowReadAccess = false;
 static constexpr bool kWatchItemPolicyDefaultAuditOnly = true;
 static constexpr bool kWatchItemPolicyDefaultInvertProcessExceptions = false;
+static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType = WatchItemRuleType::kFileWithProcessExceptions;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
 
@@ -70,7 +77,7 @@ struct WatchItemPolicy {
                   WatchItemPathType pt = kWatchItemPolicyDefaultPathType,
                   bool ara = kWatchItemPolicyDefaultAllowReadAccess,
                   bool ao = kWatchItemPolicyDefaultAuditOnly,
-                  bool ipe = kWatchItemPolicyDefaultInvertProcessExceptions,
+                  WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
                   bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                   bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode, std::string_view cm = "",
                   NSString *edu = nil, NSString *edt = nil, std::vector<Process> procs = {})
@@ -80,7 +87,7 @@ struct WatchItemPolicy {
         path_type(pt),
         allow_read_access(ara),
         audit_only(ao),
-        invert_process_exceptions(ipe),
+        rule_type(rt),
         silent(esm),
         silent_tty(estm),
         custom_message(cm.length() == 0 ? std::nullopt : std::make_optional<std::string>(cm)),
@@ -96,7 +103,7 @@ struct WatchItemPolicy {
     return name == other.name && version == other.version && path == other.path &&
            path_type == other.path_type && allow_read_access == other.allow_read_access &&
            audit_only == other.audit_only &&
-           invert_process_exceptions == other.invert_process_exceptions && silent == other.silent &&
+           rule_type == other.rule_type && silent == other.silent &&
            silent_tty == other.silent_tty && processes == other.processes;
   }
 
@@ -108,7 +115,7 @@ struct WatchItemPolicy {
   WatchItemPathType path_type;
   bool allow_read_access;
   bool audit_only;
-  bool invert_process_exceptions;
+  WatchItemRuleType rule_type;
   bool silent;
   bool silent_tty;
   std::optional<std::string> custom_message;
