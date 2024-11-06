@@ -41,6 +41,9 @@ class Enricher {
   virtual EnrichedProcess Enrich(
       const es_process_t &es_proc,
       EnrichOptions options = EnrichOptions::kDefault);
+  virtual std::optional<EnrichedProcess> Enrich(
+      const es_process_t *es_proc,
+      EnrichOptions options = EnrichOptions::kDefault);
   virtual EnrichedFile Enrich(const es_file_t &es_file,
                               EnrichOptions options = EnrichOptions::kDefault);
 

@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 /// This file groups all of the enriched message types - that is the
 /// objects that are constructed to hold all enriched event data prior
@@ -25,6 +26,7 @@
 #include <string>
 #include <variant>
 
+#include "Source/common/Platform.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessTree/process_tree.pb.h"
 
@@ -159,8 +161,10 @@ class EnrichedEventType {
     return enrichment_time_;
   }
 
- private:
+ protected:
   Message es_msg_;
+
+ private:
   EnrichedProcess instigator_;
   struct timespec enrichment_time_;
 };
@@ -435,14 +439,157 @@ class EnrichedLoginLogout : public EnrichedEventType {
   EnrichedLoginLogout(EnrichedLoginLogout &&) = default;
 };
 
-using EnrichedType = std::variant<
-    EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit, EnrichedFork,
-    EnrichedLink, EnrichedRename, EnrichedUnlink, EnrichedCSInvalidated,
-    EnrichedLoginWindowSessionLogin, EnrichedLoginWindowSessionLogout,
-    EnrichedLoginWindowSessionLock, EnrichedLoginWindowSessionUnlock,
-    EnrichedScreenSharingAttach, EnrichedScreenSharingDetach,
-    EnrichedOpenSSHLogin, EnrichedOpenSSHLogout, EnrichedLoginLogin,
-    EnrichedLoginLogout>;
+// Base class for authentication event types that contain instigator
+// information. Note that beginning in macOS 15 instigator information
+// is optional. If complete process info is missing, the audit token
+// of the instigator is still made available.
+class EnrichedAuthenticationWithInstigator : public EnrichedEventType {
+ public:
+  EnrichedAuthenticationWithInstigator(
+      Message &&es_msg, EnrichedProcess instigator,
+      std::optional<EnrichedProcess> enriched_auth_instigator)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        enriched_auth_instigator_(std::move(enriched_auth_instigator)) {}
+
+  virtual ~EnrichedAuthenticationWithInstigator() = default;
+
+  EnrichedAuthenticationWithInstigator(
+      EnrichedAuthenticationWithInstigator &&) = default;
+
+  virtual const es_process_t *AuthInstigator() const = 0;
+  virtual std::optional<audit_token_t> AuthInstigatorToken() const = 0;
+
+  const std::optional<EnrichedProcess> &EnrichedAuthInstigator() const {
+    return enriched_auth_instigator_;
+  }
+
+ private:
+  std::optional<EnrichedProcess> enriched_auth_instigator_;
+};
+
+class EnrichedAuthenticationOD : public EnrichedAuthenticationWithInstigator {
+ public:
+  using EnrichedAuthenticationWithInstigator::
+      EnrichedAuthenticationWithInstigator;
+
+  EnrichedAuthenticationOD(EnrichedAuthenticationOD &&) = default;
+
+  const es_process_t *AuthInstigator() const override {
+#if HAVE_MACOS_13
+    return es_msg_->event.authentication->data.od->instigator;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> AuthInstigatorToken() const override {
+#if HAVE_MACOS_15
+    return es_msg_->version >= 8
+               ? std::make_optional<audit_token_t>(
+                     es_msg_->event.authentication->data.od->instigator_token)
+               : std::nullopt;
+#else
+    return std::nullopt;
+#endif
+  }
+};
+
+class EnrichedAuthenticationTouchID
+    : public EnrichedAuthenticationWithInstigator {
+ public:
+  EnrichedAuthenticationTouchID(
+      Message &&es_msg, EnrichedProcess instigator,
+      std::optional<EnrichedProcess> auth_instigator,
+      std::optional<std::shared_ptr<std::string>> username)
+      : EnrichedAuthenticationWithInstigator(std::move(es_msg),
+                                             std::move(instigator),
+                                             std::move(auth_instigator)),
+        username_(std::move(username)) {}
+
+  EnrichedAuthenticationTouchID(EnrichedAuthenticationTouchID &&) = default;
+
+  const es_process_t *AuthInstigator() const override {
+#if HAVE_MACOS_13
+    return es_msg_->event.authentication->data.touchid->instigator;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> AuthInstigatorToken() const override {
+#if HAVE_MACOS_15
+    return es_msg_->version >= 8 ? std::make_optional<audit_token_t>(
+                                       es_msg_->event.authentication->data
+                                           .touchid->instigator_token)
+                                 : std::nullopt;
+#else
+    return std::nullopt;
+#endif
+  }
+
+  const std::optional<std::shared_ptr<std::string>> &Username() const {
+    return username_;
+  }
+
+ private:
+  std::optional<std::shared_ptr<std::string>> username_;
+};
+
+class EnrichedAuthenticationToken
+    : public EnrichedAuthenticationWithInstigator {
+ public:
+  using EnrichedAuthenticationWithInstigator::
+      EnrichedAuthenticationWithInstigator;
+
+  EnrichedAuthenticationToken(EnrichedAuthenticationToken &&) = default;
+
+  const es_process_t *AuthInstigator() const override {
+#if HAVE_MACOS_13
+    return es_msg_->event.authentication->data.token->instigator;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> AuthInstigatorToken() const override {
+#if HAVE_MACOS_15
+    return es_msg_->version >= 8 ? std::make_optional<audit_token_t>(
+                                       es_msg_->event.authentication->data
+                                           .token->instigator_token)
+                                 : std::nullopt;
+#else
+    return std::nullopt;
+#endif
+  }
+};
+
+class EnrichedAuthenticationAutoUnlock : public EnrichedEventType {
+ public:
+  EnrichedAuthenticationAutoUnlock(Message &&es_msg, EnrichedProcess instigator,
+                                   std::optional<uid_t> uid)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        uid_(std::move(uid)) {}
+
+  EnrichedAuthenticationAutoUnlock(EnrichedAuthenticationAutoUnlock &&) =
+      default;
+
+  inline std::optional<uid_t> UID() const { return uid_; }
+
+ private:
+  std::optional<uid_t> uid_;
+};
+
+using EnrichedType =
+    std::variant<EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit,
+                 EnrichedFork, EnrichedLink, EnrichedRename, EnrichedUnlink,
+                 EnrichedCSInvalidated, EnrichedLoginWindowSessionLogin,
+                 EnrichedLoginWindowSessionLogout,
+                 EnrichedLoginWindowSessionLock,
+                 EnrichedLoginWindowSessionUnlock, EnrichedScreenSharingAttach,
+                 EnrichedScreenSharingDetach, EnrichedOpenSSHLogin,
+                 EnrichedOpenSSHLogout, EnrichedLoginLogin, EnrichedLoginLogout,
+                 EnrichedAuthenticationOD, EnrichedAuthenticationTouchID,
+                 EnrichedAuthenticationToken, EnrichedAuthenticationAutoUnlock>;
 
 class EnrichedMessage {
  public:

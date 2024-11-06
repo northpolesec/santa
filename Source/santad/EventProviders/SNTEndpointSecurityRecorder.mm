@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #include <os/base.h>
@@ -178,6 +179,11 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
   // data as close to the source event as possible.
   std::unique_ptr<EnrichedMessage> enrichedMessage = _enricher->Enrich(std::move(esMsg));
 
+  if (!enrichedMessage) {
+    recordEventMetrics(EventDisposition::kDropped);
+    return;
+  }
+
   // Asynchronously log the message
   [self processEnrichedMessage:std::move(enrichedMessage)
                        handler:^(std::unique_ptr<EnrichedMessage> msg) {
@@ -203,6 +209,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
 #if HAVE_MACOS_13
   if (@available(macOS 13.0, *)) {
     events.insert({
+      ES_EVENT_TYPE_NOTIFY_AUTHENTICATION,
       ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN,
       ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT,
       ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN,
