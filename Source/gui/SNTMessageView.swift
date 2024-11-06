@@ -132,7 +132,7 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
   Button(
     action: action,
     label: {
-      let t = customText ?? String(localized: "Open...")
+      let t = customText ?? NSLocalizedString("Open...", comment: "Default text for Open button")
       Text(t).frame(maxWidth: 200.0)
     }
   )
