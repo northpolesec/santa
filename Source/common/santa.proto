@@ -757,6 +757,126 @@ message OpenSSH {
   }
 }
 
+// Information related to OpenDirectory authentication
+message AuthenticationOD {
+  // The process that emitted the authentication event
+  optional ProcessInfoLight instigator = 1;
+
+  // The process that triggered authentication
+  // Note: Due internal system limitations, the process that triggered the
+  // event may have already exited before the event could be generated. This
+  // results in only a small subset of the information from the triggering
+  // process to be reported.
+  oneof auth_instigator {
+    ProcessInfoLight process = 2;
+    ProcessID fallback_id = 3;
+  }
+
+  // OD record type against which OD is authenticating
+  // Typically "Users"
+  optional string record_type = 4;
+
+  // OD record name against which OD is authenticating
+  // For record type "Users", this is the username.
+  optional string record_name = 5;
+
+  // OD node against which OD is authenticating
+  // Typically one of "/Local/Default", "/LDAPv3/<server>" or
+  // "/Active Directory/<domain>".
+  optional string node_name = 6;
+
+  // If node_name is "/Local/Default", this is the path of the database
+  // against which OD is authenticating.
+  optional string db_path = 7;
+}
+
+// Information related to TouchID authentication
+message AuthenticationTouchID {
+  // The process that emitted the authentication event
+  optional ProcessInfoLight instigator = 1;
+
+  // The process that triggered authentication
+  // Note: Due internal system limitations, the process that triggered the
+  // event may have already exited before the event could be generated. This
+  // results in only a small subset of the information from the triggering
+  // process to be reported.
+  oneof auth_instigator {
+    ProcessInfoLight process = 2;
+    ProcessID fallback_id = 3;
+  }
+
+  enum Mode {
+    MODE_UNKNOWN = 0;
+    MODE_VERIFICATION = 1;
+    MODE_IDENTIFICATION = 2;
+  }
+
+  // The mode of authentication used
+  optional Mode mode = 4;
+
+  // If authentication was successful, will be populated with the authenticated
+  // user.
+  optional UserInfo user = 5;
+}
+
+// Information related to token-based authentication
+message AuthenticationToken {
+  // The process that emitted the authentication event
+  optional ProcessInfoLight instigator = 1;
+
+  // The process that triggered authentication
+  // Note: Due internal system limitations, the process that triggered the
+  // event may have already exited before the event could be generated. This
+  // results in only a small subset of the information from the triggering
+  // process to be reported.
+  oneof auth_instigator {
+    ProcessInfoLight process = 2;
+    ProcessID fallback_id = 3;
+  }
+
+  // Hash of the public key which CryptoTokenKit is authenticating
+  optional string pubkey_hash = 4;
+
+  // Token identifier of the event which CryptoTokenKit is authenticating
+  optional string token_id = 5;
+
+  // This will be available if token is used for GSS PKINIT authentication for
+  // obtaining a kerberos TGT.  NULL in all other cases.
+  optional string kerberos_principal = 6;
+}
+
+// Information related to auto unlock authentication
+message AuthenticationAutoUnlock {
+  // The process that emitted the authentication event
+  optional ProcessInfoLight instigator = 1;
+
+  // Username for which the authentication was attempted
+  UserInfo user_info = 2;
+
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    // Unlock the machine using Apple Watch
+    TYPE_MACHINE_UNLOCK = 1;
+
+    // Approve an authorization prompt using Apple Watch
+    TYPE_AUTH_PROMPT = 2;
+  }
+
+  // Purpose of the authentication
+  Type type = 3;
+}
+
+// Information related to various authentication events
+message Authentication {
+  optional bool success = 1;
+  oneof event {
+    AuthenticationOD authentication_od = 2;
+    AuthenticationTouchID authentication_touch_id = 3;
+    AuthenticationToken authentication_token = 4;
+    AuthenticationAutoUnlock authentication_auto_unlock = 5;
+  }
+}
+
 // A message encapsulating a single event
 message SantaMessage {
   // Machine ID of the host emitting this log
@@ -788,6 +908,7 @@ message SantaMessage {
     LoginLogout login_logout = 24;
     ScreenSharing screen_sharing = 25;
     OpenSSH open_ssh = 26;
+    Authentication authentication = 27;
   };
 }
 
