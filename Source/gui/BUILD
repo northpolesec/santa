@@ -8,10 +8,6 @@ package(
     default_visibility = ["//:santa_package_group"],
 )
 
-exports_files([
-    "Resources/Images.xcassets/AppIcon.appiconset/santa-hat-icon-256.png",
-])
-
 swift_library(
     name = "SNTMessageView",
     srcs = ["SNTMessageView.swift"],
