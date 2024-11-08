@@ -223,7 +223,7 @@ struct SNTBinaryMessageEventView: View {
           // lineLimit(1) BUT there is what appears to be a bug in that once the text is
           // selected it grows to the full size of the window.
           if publisher.count > 50 {
-            Text(publisher.prefix(50) + "…").help(publisher)
+            Text(verbatim: publisher.prefix(50) + "…").help(publisher)
           } else {
             Text(publisher)
           }
