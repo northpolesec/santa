@@ -157,14 +157,27 @@ static inline bool GetBoolValue(NSDictionary *options, NSString *key, bool defau
   return options[key] ? [options[key] boolValue] : default_value;
 }
 
-WatchItemRuleType GetRuleType(NSString *rule_type) {
-  if ([rule_type isEqualToString:@"FILE_WITH_PROC_EXCEPTIONS"]) {
-    return WatchItemRuleType::kFileWithProcessExceptions;
-  } else if ([rule_type isEqualToString:@"FILE_WITH_TARGETED_PROCS"]) {
-    return WatchItemRuleType::kFileWithTargetedProcesses;
+std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type) {
+  if ([[rule_type lowercaseString] isEqualToString:@"pathswithallowedprocesses"]) {
+    return WatchItemRuleType::kPathsWithAllowedProcesses;
+  } else if ([[rule_type lowercaseString] isEqualToString:@"pathswithdeniedprocesses"]) {
+    return WatchItemRuleType::kPathsWithDeniedProcesses;
   } else {
-    return kWatchItemPolicyDefaultRuleType;
+    return std::nullopt;
   }
+}
+
+// The given function is expected to return std::nullopt when it
+// is provided an invalid value.
+template <typename T>
+ValidatorBlock ValidValuesValidator(std::function<std::optional<T>(NSString *)> f) {
+  return ^bool(NSString *val, NSError **err) {
+    if (!f(val).has_value()) {
+      PopulateError(err, [NSString stringWithFormat:@"Invalid value. Got: \"%@\"", val]);
+      return false;
+    }
+    return true;
+  };
 }
 
 // Given a length, returns a ValidatorBlock that confirms the
@@ -195,17 +208,6 @@ ValidatorBlock LenRangeValidator(NSUInteger min_length, NSUInteger max_length) {
       return false;
     }
 
-    return true;
-  };
-}
-
-ValidatorBlock StringSetValidator(NSArray<NSString *> *allowed_values) {
-  return ^bool(NSString *val, NSError **err) {
-    if ([allowed_values containsObject:val]) {
-      PopulateError(err, [NSString stringWithFormat:@"Invalid value. Got: \"%@\". Allowed: %@", val,
-                                                    allowed_values]);
-      return false;
-    }
     return true;
   };
 }
@@ -429,8 +431,10 @@ std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary
 ///     <false/>
 ///     <key>AuditOnly</key>
 ///     <false/>
-///     <key>InvertProcessExceptions</key>
+///     <key>InvertProcessExceptions</key> <!-- Deprecated -->
 ///     <false/>
+///     <key>RuleType</key>
+///     <string>PathsWithAllowedProcesses</string>
 ///     <key>EnableSilentMode</key>
 ///     <true/>
 ///     <key>EnableSilentTTYMode</key>
@@ -482,13 +486,8 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
       }
     }
 
-    NSArray<NSString *> *rule_types = @[
-      @"FILE_WITH_PROC_EXCEPTIONS", @"FILE_WITH_TARGETED_PROCS", @"PROC_WITH_FILE_EXCEPTIONS",
-      @"PROC_WITH_TARGETED_FILES"
-    ];
-
     if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsRuleType, [NSString class], err, false,
-                         StringSetValidator(rule_types))) {
+                         ValidValuesValidator<WatchItemRuleType>(GetRuleType))) {
       return false;
     }
 
@@ -525,13 +524,13 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
 
   WatchItemRuleType rule_type = kWatchItemPolicyDefaultRuleType;
   if (options[kWatchItemConfigKeyOptionsRuleType]) {
-    rule_type = GetRuleType(options[kWatchItemConfigKeyOptionsRuleType]);
+    rule_type = GetRuleType(options[kWatchItemConfigKeyOptionsRuleType]).value_or(kWatchItemPolicyDefaultRuleType);
   } else if (options[kWatchItemConfigKeyOptionsInvertProcessExceptions]) {
     // Convert deprecated config option to the new WatchItemRuleType option
     if ([options[kWatchItemConfigKeyOptionsInvertProcessExceptions] boolValue]) {
-      rule_type = WatchItemRuleType::kFileWithTargetedProcesses;
+      rule_type = WatchItemRuleType::kPathsWithDeniedProcesses;
     } else {
-      rule_type = WatchItemRuleType::kFileWithProcessExceptions;
+      rule_type = WatchItemRuleType::kPathsWithAllowedProcesses;
     }
   }
 

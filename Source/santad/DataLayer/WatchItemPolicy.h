@@ -32,15 +32,14 @@ enum class WatchItemPathType {
 };
 
 enum class WatchItemRuleType {
-  kFileWithProcessExceptions,
-  kFileWithTargetedProcesses,
+  kPathsWithAllowedProcesses,
+  kPathsWithDeniedProcesses,
 };
 
 static constexpr WatchItemPathType kWatchItemPolicyDefaultPathType = WatchItemPathType::kLiteral;
 static constexpr bool kWatchItemPolicyDefaultAllowReadAccess = false;
 static constexpr bool kWatchItemPolicyDefaultAuditOnly = true;
-static constexpr bool kWatchItemPolicyDefaultInvertProcessExceptions = false;
-static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType = WatchItemRuleType::kFileWithProcessExceptions;
+static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType = WatchItemRuleType::kPathsWithAllowedProcesses;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
 
