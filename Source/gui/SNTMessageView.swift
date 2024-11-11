@@ -60,7 +60,7 @@ public struct SNTMessageView<Content: View>: View {
     }
     .padding([.leading, .trailing], 40.0)
     .padding([.top, .bottom], 10.0)
-    .frame(maxWidth:MAX_OUTER_VIEW_WIDTH)
+    .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
   }
 }
 
