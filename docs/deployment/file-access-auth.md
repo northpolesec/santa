@@ -16,31 +16,32 @@ To enable this feature, the `FileAccessPolicyPlist` key in the main [Santa confi
 
 ## Configuration
 
-| Key                       | Parent       | Type       | Required | Santa Version | Description |
-| :------------------------ | :----------- | :--------- | :------- | :------------ | :---------- |
-| `Version`                 | `<Root>`     | String     | Yes      | v2023.1+      | Version of the configuration. Will be reported in events. |
-| `EventDetailURL`          | `<Root>`     | String     | No       | v2023.8+      | When the user gets a block notification, a button can be displayed which will take them to a web page with more information about that event. This URL will be used for all rules unless overridden by a rule-specific option. See the [EventDetailURL](#eventdetailurl) section below.  |
-| `EventDetailText`         | `<Root>`     | String     | No       | v2023.8+      | Related to `EventDetailURL`, controls the button text that will be displayed. (max length = 48 chars) |
-| `WatchItems`              | `<Root>`     | Dictionary | No       | v2023.1+      | The set of configuration items that will be monitored by Santa. |
-| `<Name>`                  | `WatchItems` | Dictionary | No       | v2023.1+      | A unique name that identifies a single watch item rule. This value will be reported in events. The name must be a legal C identifier (i.e., must conform to the regex `[A-Za-z_][A-Za-z0-9_]*`). |
-| `Paths`                   | `<Name>`     | Array      | Yes      | v2023.1+      | A list of either String or Dictionary types that contain path globs to monitor. String type entires will have default values applied for the attributes that can be manually set with the Dictionary type. |
-| `Path`                    | `Paths`      | String     | Yes      | v2023.1+      | The path glob to monitor. |
-| `IsPrefix`                | `Paths`      | Boolean    | No       | v2023.1+      | Whether or not the path glob represents a prefix path. (Default = `false`) |
-| `Options`                 | `<Name>`     | Dictionary | No       | v2023.1+      | Customizes the actions for a given rule. |
-| `AllowReadAccess`         | `Options`    | Boolean    | No       | v2023.1+      | If true, indicates the rule will **not** be applied to actions that are read-only access (e.g., opening a watched path for reading, or cloning a watched path). If false, the rule will apply both to read-only access and access that could modify the watched path. (Default = `false`) |
-| `AuditOnly`               | `Options`    | Boolean    | No       | v2023.1+      | If true, operations violating the rule will only be logged. If false, operations violating the rule will be denied and logged. (Default = `true`) |
-| `InvertProcessExceptions` | `Options`    | Boolean    | No       | v2023.5+      | If true, logic is inverted for the list of processes defined by the `Processes` key such that the list becomes the set of processes that will be denied or allowed but audited. (Default = `false`) |
-| `EnableSilentMode`        | `Options`    | String     | No       | v2023.7+      | If true, Santa will not display a GUI dialog when this rule is violated. |
-| `EnableSilentTTYMode`     | `Options`    | String     | No       | v2023.7+      | If true, Santa will not post a message to the controlling TTY when this rule is violated. |
-| `EventDetailURL`          | `Options`    | String     | No       | v2023.8+      | Rule-specific URL that overrides the top-level `EventDetailURL`. |
-| `EventDetailText`         | `Options`    | String     | No       | v2023.8+      | Rule-specific button text that overrides the top-level `EventDetailText`. |
-| `Processes`               | `<Name>`     | Array      | No       | v2023.1+      | A list of dictionaries defining processes that are allowed to access paths matching the globs defined with the `Paths` key. For a process performing the operation to be considered a match, it must match all defined attributes of at least one entry in the list. |
-| `BinaryPath`              | `Processes`  | String     | No       | v2023.1+      | A path literal that an instigating process must be executed from. |
-| `TeamID`                  | `Processes`  | String     | No       | v2023.1+      | Team ID of the instigating process. |
-| `CertificateSha256`       | `Processes`  | String     | No       | v2023.1+      | SHA256 of the leaf certificate of the instigating process. |
-| `CDHash`                  | `Processes`  | String     | No       | v2023.1+      | CDHash of the instigating process. |
-| `SigningID`               | `Processes`  | String     | No       | v2023.1+      | Signing ID of the instigating process. |
-| `PlatformBinary`          | `Processes`  | Boolean    | No       | v2023.2+      | Whether or not the instigating process is a platform binary. |
+| Key                           | Parent       | Type       | Required | Santa Version | Description |
+| :---------------------------- | :----------- | :--------- | :------- | :------------ | :---------- |
+| `Version`                     | `<Root>`     | String     | Yes      | v2023.1+      | Version of the configuration. Will be reported in events. |
+| `EventDetailURL`              | `<Root>`     | String     | No       | v2023.8+      | When the user gets a block notification, a button can be displayed which will take them to a web page with more information about that event. This URL will be used for all rules unless overridden by a rule-specific option. See the [EventDetailURL](#eventdetailurl) section below.  |
+| `EventDetailText`             | `<Root>`     | String     | No       | v2023.8+      | Related to `EventDetailURL`, controls the button text that will be displayed. (max length = 48 chars) |
+| `WatchItems`                  | `<Root>`     | Dictionary | No       | v2023.1+      | The set of configuration items that will be monitored by Santa. |
+| `<Name>`                      | `WatchItems` | Dictionary | No       | v2023.1+      | A unique name that identifies a single watch item rule. This value will be reported in events. The name must be a legal C identifier (i.e., must conform to the regex `[A-Za-z_][A-Za-z0-9_]*`). |
+| `Paths`                       | `<Name>`     | Array      | Yes      | v2023.1+      | A list of either String or Dictionary types that contain path globs to monitor. String type entires will have default values applied for the attributes that can be manually set with the Dictionary type. |
+| `Path`                        | `Paths`      | String     | Yes      | v2023.1+      | The path glob to monitor. |
+| `IsPrefix`                    | `Paths`      | Boolean    | No       | v2023.1+      | Whether or not the path glob represents a prefix path. (Default = `false`) |
+| `Options`                     | `<Name>`     | Dictionary | No       | v2023.1+      | Customizes the actions for a given rule. |
+| `AllowReadAccess`             | `Options`    | Boolean    | No       | v2023.1+      | If true, indicates the rule will **not** be applied to actions that are read-only access (e.g., opening a watched path for reading, or cloning a watched path). If false, the rule will apply both to read-only access and access that could modify the watched path. (Default = `false`) |
+| `AuditOnly`                   | `Options`    | Boolean    | No       | v2023.1+      | If true, operations violating the rule will only be logged. If false, operations violating the rule will be denied and logged. (Default = `true`) |
+| ~~`InvertProcessExceptions`~~ | `Options`    | Boolean    | No       | v2023.5+      | DEPRECATED. Please use `RuleType` instead. If false, behaves like `RuleType` `PathsWithAllowedProcesses`. If true, behaves like `RuleType` `PathsWithDeniedProcesses`. This setting is overriden if `RuleType` is set. |
+| `RuleType`                    | `Options`    | String     | No       | v2024.11      | Defines how `Paths` and `Processes` are interpreted.<br />`PathsWithAllowedProcesses`: Default. Access to the defined `Paths` will be denied (or audited) for all processes that **don't match** items in the `Processes` array.<br />`PathsWithDeniedProcesses`: Access to the defined `Paths` will be denied (or audited) for all processes that **match** items in the `Processes` array. |
+| `EnableSilentMode`            | `Options`    | Boolean    | No       | v2023.7+      | If true, Santa will not display a GUI dialog when this rule is violated. |
+| `EnableSilentTTYMode`         | `Options`    | Boolean    | No       | v2023.7+      | If true, Santa will not post a message to the controlling TTY when this rule is violated. |
+| `EventDetailURL`              | `Options`    | String     | No       | v2023.8+      | Rule-specific URL that overrides the top-level `EventDetailURL`. |
+| `EventDetailText`             | `Options`    | String     | No       | v2023.8+      | Rule-specific button text that overrides the top-level `EventDetailText`. |
+| `Processes`                   | `<Name>`     | Array      | No       | v2023.1+      | A list of dictionaries defining processes that are allowed to access paths matching the globs defined with the `Paths` key. For a process performing the operation to be considered a match, it must match all defined attributes of at least one entry in the list. |
+| `BinaryPath`                  | `Processes`  | String     | No       | v2023.1+      | A path literal that an instigating process must be executed from. |
+| `TeamID`                      | `Processes`  | String     | No       | v2023.1+      | Team ID of the instigating process. |
+| `CertificateSha256`           | `Processes`  | String     | No       | v2023.1+      | SHA256 of the leaf certificate of the instigating process. |
+| `CDHash`                      | `Processes`  | String     | No       | v2023.1+      | CDHash of the instigating process. |
+| `SigningID`                   | `Processes`  | String     | No       | v2023.1+      | Signing ID of the instigating process. |
+| `PlatformBinary`              | `Processes`  | Boolean    | No       | v2023.2+      | Whether or not the instigating process is a platform binary. |
 
 ### EventDetailURL
 When the user gets a file access block notification, a button can be displayed
