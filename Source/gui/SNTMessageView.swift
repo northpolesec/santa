@@ -1,4 +1,5 @@
 import SwiftUI
+
 import santa_common_SNTConfigurator
 
 public let MAX_OUTER_VIEW_WIDTH = 560.0
@@ -48,7 +49,7 @@ public struct SNTMessageView<Content: View>: View {
 
       Spacer()
 
-      Text(AttributedString(blockMessage))
+      AttributedText(blockMessage)
         .multilineTextAlignment(.center)
         .padding([.leading, .trailing], 15.0)
         .fixedSize()
@@ -160,4 +161,20 @@ public func DismissButton(
   )
   .keyboardShortcut(.escape, modifiers: .command)
   .help("⌘ Esc")
+}
+
+// AttributedText is like Text() but it supports all the features of NSAttributedString()
+// by using NSTextField under the hood.
+struct AttributedText: NSViewRepresentable {
+  private let attributedString: NSAttributedString
+
+  init(_ attributedString: NSAttributedString) {
+    self.attributedString = attributedString
+  }
+
+  func makeNSView(context: Context) -> NSTextField {
+    NSTextField(labelWithAttributedString: self.attributedString)
+  }
+
+  func updateNSView(_ textField: NSTextField, context: Context) {}
 }
