@@ -683,6 +683,13 @@
 + (instancetype)configurator NS_SWIFT_NAME(configurator());
 
 ///
+///  Replace the shared configurator with a custom one using a static config.
+///
+#ifdef DEBUG
++ (void)overrideConfig:(NSDictionary *)config;
+#endif
+
+///
 ///  Clear the sync server configuration from the effective configuration.
 ///
 - (void)clearSyncState;

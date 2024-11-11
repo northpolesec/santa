@@ -311,14 +311,30 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 // The returned value is marked unsafe_unretained to avoid unnecessary retain/release handling.
 // The object returned is guaranteed to exist for the lifetime of the process so there's no need
 // to do this handling.
-+ (__unsafe_unretained instancetype)configurator {
-  static SNTConfigurator *sharedConfigurator;
+static SNTConfigurator *sharedConfigurator = nil;
++ (instancetype)configurator {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     sharedConfigurator = [[SNTConfigurator alloc] init];
   });
   return sharedConfigurator;
 }
+
+#ifdef DEBUG
+- (instancetype)initWithStaticConfig:(NSDictionary *)config {
+  self = [super init];
+  if (self) {
+    _configState = [config mutableCopy];
+    _syncState = [config mutableCopy];
+  }
+  return self;
+}
+
++ (void)overrideConfig:(NSDictionary *)config {
+  (void)[SNTConfigurator configurator];  // burn the onceToken
+  sharedConfigurator = [[SNTConfigurator alloc] initWithStaticConfig:config];
+}
+#endif
 
 + (NSSet *)syncAndConfigStateSet {
   static NSSet *set;
