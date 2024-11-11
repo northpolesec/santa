@@ -210,26 +210,16 @@ struct SNTBinaryMessageEventView: View {
 
       VStack(alignment: .leading, spacing: 10.0) {
         if let bundleName = e?.fileBundleName {
-          Text(bundleName)
+          TextWithLimit(bundleName)
         } else if let filePath = e?.filePath {
-          Text((filePath as NSString).lastPathComponent)
+          TextWithLimit((filePath as NSString).lastPathComponent)
         }
 
         if let publisher = e?.publisherInfo {
-          // The publisher field can be quite long, so limit its size and add the full
-          // string as s tooltip so hovering over the field will show the full label.
-          //
-          // This /could/ be done by setting the frame(maxWidth:), truncationMode(.head) and
-          // lineLimit(1) BUT there is what appears to be a bug in that once the text is
-          // selected it grows to the full size of the window.
-          if publisher.count > 50 {
-            Text(verbatim: publisher.prefix(50) + "…").help(publisher)
-          } else {
-            Text(publisher)
-          }
+          TextWithLimit(publisher)
         }
 
-        Text(e?.executingUser ?? "")
+        TextWithLimit(e?.executingUser ?? "")
       }.textSelection(.enabled)
     }.sheet(isPresented: $isShowingDetails) {
       MoreDetailsView(e: e, customURL: customURL, bundleProgress: bundleProgress)

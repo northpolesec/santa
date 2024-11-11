@@ -141,15 +141,13 @@ struct Event: View {
       VStack(alignment: .leading, spacing: 10.0) {
         Text(e.accessedPath).textSelection(.enabled)
         if let app = e.application {
-          Text(app).textSelection(.enabled)
+          TextWithLimit(app).textSelection(.enabled)
         } else {
-          Text((e.filePath as NSString).lastPathComponent).textSelection(.enabled)
+          TextWithLimit((e.filePath as NSString).lastPathComponent).textSelection(.enabled)
         }
-        Text(e.executingUser ?? "unknown").textSelection(.enabled)
-
-        Text(e.ruleName).textSelection(.enabled)
-        // TODO: Why is this always temp_version?
-        Text(e.ruleVersion).textSelection(.enabled)
+        TextWithLimit(e.executingUser ?? "unknown").textSelection(.enabled)
+        TextWithLimit(e.ruleName).textSelection(.enabled)
+        TextWithLimit(e.ruleVersion).textSelection(.enabled)
 
       }
     }.sheet(isPresented: $isShowingDetails) {

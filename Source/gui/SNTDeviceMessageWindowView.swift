@@ -46,10 +46,10 @@ struct SNTDeviceMessageWindowView: View {
         Divider()
 
         VStack(alignment: .leading, spacing: 10.0) {
-          Text(event.mntonname)
+          TextWithLimit(event.mntonname)
 
           if event.remountArgs?.count ?? 0 > 0 {
-            Text(event.readableRemountArgs())
+            TextWithLimit(event.readableRemountArgs())
           }
         }
       }
