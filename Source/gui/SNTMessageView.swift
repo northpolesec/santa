@@ -60,6 +60,7 @@ public struct SNTMessageView<Content: View>: View {
     }
     .padding([.leading, .trailing], 40.0)
     .padding([.top, .bottom], 10.0)
+    .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
   }
 }
 
@@ -161,6 +162,28 @@ public func DismissButton(
   )
   .keyboardShortcut(.escape, modifiers: .command)
   .help("⌘ Esc")
+}
+
+// TextWithLimit is like Text() but it supports a limit on the number of characters in the
+// string before truncating with an ellipsis. Text() technically handles this by setting
+// lineLimit(1) and a maxWidth on frame but if the text is selectable, when selected it
+// will expand out of the limits of the frame right up to the edge of the window.
+public struct TextWithLimit: View {
+  private var text: String
+  private var limit: Int
+
+  public init(_ text: String, _ limit: Int = 50) {
+    self.text = text
+    self.limit = limit
+  }
+
+  public var body: some View {
+    if self.text.count > self.limit {
+      Text(verbatim: self.text.prefix(self.limit) + "…").help(self.text)
+    } else {
+      Text(self.text)
+    }
+  }
 }
 
 // AttributedText is like Text() but it supports all the features of NSAttributedString()
