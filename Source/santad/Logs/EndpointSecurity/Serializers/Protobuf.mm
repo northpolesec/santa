@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -42,41 +43,6 @@ using google::protobuf::Arena;
 using google::protobuf::Timestamp;
 using JsonPrintOptions = google::protobuf::json::PrintOptions;
 using google::protobuf::json::MessageToJsonString;
-
-using santa::EffectiveGroup;
-using santa::EffectiveUser;
-using santa::EndpointSecurityAPI;
-using santa::EnrichedClose;
-using santa::EnrichedCSInvalidated;
-using santa::EnrichedEventType;
-using santa::EnrichedExchange;
-using santa::EnrichedExec;
-using santa::EnrichedExit;
-using santa::EnrichedFile;
-using santa::EnrichedFork;
-using santa::EnrichedLink;
-using santa::EnrichedLoginLogin;
-using santa::EnrichedLoginLogout;
-using santa::EnrichedLoginWindowSessionLock;
-using santa::EnrichedLoginWindowSessionLogin;
-using santa::EnrichedLoginWindowSessionLogout;
-using santa::EnrichedLoginWindowSessionUnlock;
-using santa::EnrichedOpenSSHLogin;
-using santa::EnrichedOpenSSHLogout;
-using santa::EnrichedProcess;
-using santa::EnrichedRename;
-using santa::EnrichedScreenSharingAttach;
-using santa::EnrichedScreenSharingDetach;
-using santa::EnrichedUnlink;
-using santa::Message;
-using santa::MountFromName;
-using santa::NonNull;
-using santa::NSStringToUTF8StringView;
-using santa::Pid;
-using santa::Pidversion;
-using santa::RealGroup;
-using santa::RealUser;
-using santa::StringTokenToStringView;
 
 namespace pbv1 = ::santa::pb::v1;
 
@@ -978,6 +944,22 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogout &msg) 
                  msg->event.login_logout->username);
 
   return FinalizeProto(santa_msg);
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD &msg) {
+  return {};
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouchID &msg) {
+  return {};
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToken &msg) {
+  return {};
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAutoUnlock &msg) {
+  return {};
 }
 
 #endif  // HAVE_MACOS_13

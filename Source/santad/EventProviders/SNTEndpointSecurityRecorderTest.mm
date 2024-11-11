@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include <EndpointSecurity/ESTypes.h>
 #import <OCMock/OCMock.h>
@@ -97,6 +98,7 @@ class MockLogger : public Logger {
 #if HAVE_MACOS_13
   if (@available(macOS 13.0, *)) {
     expectedEventSubs.insert({
+      ES_EVENT_TYPE_NOTIFY_AUTHENTICATION,
       ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN,
       ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT,
       ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK,
@@ -148,7 +150,12 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   mockESApi->SetExpectationsESNewClient();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  std::unique_ptr<EnrichedMessage> enrichedMsg = std::unique_ptr<EnrichedMessage>(nullptr);
+  // Create a fake enriched message. It isn't used other than to inject a valid
+  // returned object from a mocked Enrich method. The purpose is to ensure the
+  // check in the recorder that a message is enriched always succeeds.
+  es_message_t fakeEnrichedMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXIT, NULL);
+  std::unique_ptr<EnrichedMessage> enrichedMsg = std::make_unique<EnrichedMessage>(EnrichedMessage(
+    santa::EnrichedExit(Message(mockESApi, &fakeEnrichedMsg), santa::EnrichedProcess())));
 
   auto mockEnricher = std::make_shared<MockEnricher>();
 

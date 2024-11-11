@@ -503,6 +503,7 @@ objc_library(
     hdrs = ["EventProviders/EndpointSecurity/EnrichedTypes.h"],
     deps = [
         ":EndpointSecurityMessage",
+        "//Source/common:Platform",
         "//Source/santad/ProcessTree:process_tree_cc_proto",
     ],
 )
@@ -1223,6 +1224,7 @@ santa_unit_test(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":MockEndpointSecurityAPI",
+        "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTMetricSet",
         "//Source/common:TestUtils",

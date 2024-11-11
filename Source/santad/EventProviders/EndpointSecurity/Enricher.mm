@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 
@@ -86,6 +87,36 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
       return std::make_unique<EnrichedMessage>(
         EnrichedCSInvalidated(std::move(es_msg), Enrich(*es_msg->process)));
 #if HAVE_MACOS_13
+    case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION:
+      switch (es_msg->event.authentication->type) {
+        case ES_AUTHENTICATION_TYPE_OD:
+          return std::make_unique<EnrichedMessage>(
+            EnrichedAuthenticationOD(std::move(es_msg), Enrich(*es_msg->process),
+                                     Enrich(es_msg->event.authentication->data.od->instigator)));
+        case ES_AUTHENTICATION_TYPE_TOUCHID:
+          return std::make_unique<EnrichedMessage>(EnrichedAuthenticationTouchID(
+            std::move(es_msg), Enrich(*es_msg->process),
+            Enrich(es_msg->event.authentication->data.touchid->instigator),
+            es_msg->event.authentication->data.touchid->has_uid
+              ? UsernameForUID(es_msg->event.authentication->data.touchid->uid.uid)
+              : std::nullopt));
+        case ES_AUTHENTICATION_TYPE_TOKEN:
+          return std::make_unique<EnrichedMessage>(EnrichedAuthenticationToken(
+            std::move(es_msg), Enrich(*es_msg->process),
+            Enrich(es_msg->event.authentication->data.token->instigator)));
+        case ES_AUTHENTICATION_TYPE_AUTO_UNLOCK:
+          return std::make_unique<EnrichedMessage>(EnrichedAuthenticationAutoUnlock(
+            std::move(es_msg), Enrich(*es_msg->process),
+            UIDForUsername(
+              StringTokenToStringView(es_msg->event.authentication->data.auto_unlock->username))));
+
+        // Note: There is a case here where future OS versions could add new authentication types
+        // that did not exist in the SDK used to build the current running version of Santa. Return
+        // nullptr here to signal to the caller that event processing should not continue. Santa
+        // would have to be updated and rebuilt with the new SDK in order to properly handle the new
+        // types.
+        default: return nullptr;
+      }
     case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN:
       return std::make_unique<EnrichedMessage>(EnrichedLoginWindowSessionLogin(
         std::move(es_msg), Enrich(*es_msg->process),
@@ -126,6 +157,11 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
       LOGE(@"Attempting to enrich an unhandled event type: %d", es_msg->event_type);
       exit(EXIT_FAILURE);
   }
+}
+
+std::optional<EnrichedProcess> Enricher::Enrich(const es_process_t *es_proc,
+                                                EnrichOptions options) {
+  return es_proc ? std::make_optional<EnrichedProcess>(Enrich(*es_proc, options)) : std::nullopt;
 }
 
 EnrichedProcess Enricher::Enrich(const es_process_t &es_proc, EnrichOptions options) {
