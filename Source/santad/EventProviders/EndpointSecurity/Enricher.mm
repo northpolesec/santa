@@ -110,11 +110,10 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
             UIDForUsername(
               StringTokenToStringView(es_msg->event.authentication->data.auto_unlock->username))));
 
-        // Note: return nullptr here rather than exit. Unlike the programmer error case
-        // below which results in an exit, here we have a case of potentially new
-        // authentication types being added in the future for this one event type. If
-        // that happens, we don't want versions of Santa compiled for an older SDK to
-        // start exiting due to an unknown type.
+        // Note: There is a case here where future OS versions could add new authentication types that
+        // did not exist in the SDK used to build the current running version of Santa. Return nullptr
+        // here to signal to the caller that event processing should not continue. Santa would have to
+        // be updated and rebuilt with the new SDK in order to properly handle the new types.
         default: return nullptr;
       }
     case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN:
