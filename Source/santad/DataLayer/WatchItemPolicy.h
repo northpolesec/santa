@@ -39,7 +39,8 @@ enum class WatchItemRuleType {
 static constexpr WatchItemPathType kWatchItemPolicyDefaultPathType = WatchItemPathType::kLiteral;
 static constexpr bool kWatchItemPolicyDefaultAllowReadAccess = false;
 static constexpr bool kWatchItemPolicyDefaultAuditOnly = true;
-static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType = WatchItemRuleType::kPathsWithAllowedProcesses;
+static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType =
+  WatchItemRuleType::kPathsWithAllowedProcesses;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
 
@@ -101,9 +102,8 @@ struct WatchItemPolicy {
     // for equality purposes
     return name == other.name && version == other.version && path == other.path &&
            path_type == other.path_type && allow_read_access == other.allow_read_access &&
-           audit_only == other.audit_only &&
-           rule_type == other.rule_type && silent == other.silent &&
-           silent_tty == other.silent_tty && processes == other.processes;
+           audit_only == other.audit_only && rule_type == other.rule_type &&
+           silent == other.silent && silent_tty == other.silent_tty && processes == other.processes;
   }
 
   bool operator!=(const WatchItemPolicy &other) const { return !(*this == other); }

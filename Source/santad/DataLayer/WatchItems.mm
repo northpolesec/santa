@@ -524,7 +524,8 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
 
   WatchItemRuleType rule_type = kWatchItemPolicyDefaultRuleType;
   if (options[kWatchItemConfigKeyOptionsRuleType]) {
-    rule_type = GetRuleType(options[kWatchItemConfigKeyOptionsRuleType]).value_or(kWatchItemPolicyDefaultRuleType);
+    rule_type = GetRuleType(options[kWatchItemConfigKeyOptionsRuleType])
+                  .value_or(kWatchItemPolicyDefaultRuleType);
   } else if (options[kWatchItemConfigKeyOptionsInvertProcessExceptions]) {
     // Convert deprecated config option to the new WatchItemRuleType option
     if ([options[kWatchItemConfigKeyOptionsInvertProcessExceptions] boolValue]) {
@@ -537,8 +538,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
   for (const PathAndTypePair &path_type_pair : std::get<PathAndTypeVec>(path_list)) {
     policies.push_back(std::make_shared<WatchItemPolicy>(
       NSStringToUTF8StringView(name), policy_version, path_type_pair.first, path_type_pair.second,
-      allow_read_access, audit_only, rule_type, enable_silent_mode,
-      enable_silent_tty_mode,
+      allow_read_access, audit_only, rule_type, enable_silent_mode, enable_silent_tty_mode,
       NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
       options[kWatchItemConfigKeyOptionsEventDetailURL],
       options[kWatchItemConfigKeyOptionsEventDetailText], std::get<PolicyProcessVec>(proc_list)));
