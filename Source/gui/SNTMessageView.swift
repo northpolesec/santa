@@ -179,7 +179,7 @@ public struct TextWithLimit: View {
 
   public var body: some View {
     if self.text.count > self.limit {
-      Text(self.text.prefix(self.limit) + "…").help(self.text)
+      Text(verbatim:self.text.prefix(self.limit) + "…").help(self.text)
     } else {
       Text(self.text)
     }
