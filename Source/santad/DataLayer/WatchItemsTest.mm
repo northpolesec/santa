@@ -817,10 +817,10 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
     },
     policies, &err));
 
-    // kWatchItemConfigKeyOptionsRuleType - Invalid rule type
+    // kWatchItemConfigKeyOptionsRuleType - Invalid RuleType value
     XCTAssertFalse(ParseConfigSingleWatchItem(@"", "", @{
       kWatchItemConfigKeyPaths : @[ @"a" ],
-      kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @"InvalidRule"}
+      kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @"InvalidValue"}
     },
     policies, &err));
 
@@ -843,7 +843,6 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
     policies, &err));
     XCTAssertEqual(policies.size(), 1);
     XCTAssertEqual(policies[0].get()->rule_type, santa::WatchItemRuleType::kPathsWithDeniedProcesses);
-    NSLog(@"got err: %@", err);
 
     // kWatchItemConfigKeyOptionsCustomMessage - Invalid type
     XCTAssertFalse(ParseConfigSingleWatchItem(
