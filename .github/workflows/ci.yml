@@ -50,11 +50,7 @@ jobs:
             exit 1 # return an error if localization.py made changes
           fi
   unit_tests_on_latest:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-15]
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
       - name: Setup Bazel
@@ -69,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-13, macos-14, macos-15]
+        os: [macos-13, macos-14]
     runs-on: ${{ matrix.os }}
     needs: unit_tests_on_latest
     steps:
