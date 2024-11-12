@@ -163,7 +163,7 @@ Configured path globs represent a point in time. That is, path globs are expande
 
 Within the main Santa configuration, the `FileAccessPolicyUpdateIntervalSec` key controls how often any changes to the configuration are applied as well as re-evaluating configured path globs to match the current state of the filesystem. This has a minimum value of 15 seconds.
 
-`**` syntax is not supported, only `*` is supported for wildcards.
+Glob pattern support is provided by the libc `glob(3)` function. Extended glob patterns, such as globstar (`**`), are not supported.
 
 ### Prefix and Glob Path Evaluation
 
