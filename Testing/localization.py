@@ -11,6 +11,7 @@ def regen_base_localization():
   """Re-generation the English localization file using genstrings."""
   files_to_localize = [
       f.as_posix() for f in pathlib.Path('Source/gui').glob('*.swift')
+      if f.name not in ['SNTTestGUI.swift']
   ]
   files_to_localize.append('Source/common/SNTBlockMessage.m')
 
