@@ -635,10 +635,11 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
     }
   }
 
-  // If the `invert_process_exceptions` option is set, the decision should be
-  // inverted from allowed to denied or vice versa. Note that this inversion
-  // must be made prior to checking the policy's audit-only flag.
-  if (policy->invert_process_exceptions) {
+  // If the RuleType option was configured to contain a list of denied processes,
+  // the decision should be inverted from allowed to denied or vice versa.
+  // Note that this inversion must be made prior to checking the policy's
+  // audit-only flag.
+  if (policy->rule_type == santa::WatchItemRuleType::kPathsWithDeniedProcesses) {
     if (decision == FileAccessPolicyDecision::kAllowed) {
       decision = FileAccessPolicyDecision::kDenied;
     } else {

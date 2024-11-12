@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <variant>
 #include <vector>
@@ -35,8 +37,8 @@
 
 using santa::kWatchItemPolicyDefaultAllowReadAccess;
 using santa::kWatchItemPolicyDefaultAuditOnly;
-using santa::kWatchItemPolicyDefaultInvertProcessExceptions;
 using santa::kWatchItemPolicyDefaultPathType;
+using santa::kWatchItemPolicyDefaultRuleType;
 using santa::Unit;
 using santa::WatchItemPathType;
 using santa::WatchItemPolicy;
@@ -62,6 +64,8 @@ extern std::variant<Unit, PathAndTypeVec> VerifyConfigWatchItemPaths(NSArray<id>
                                                                      NSError **err);
 extern std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary *watch_item,
                                                                            NSError **err);
+extern std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type);
+
 class WatchItemsPeer : public WatchItems {
  public:
   using WatchItems::WatchItems;
@@ -76,6 +80,7 @@ class WatchItemsPeer : public WatchItems {
 
 }  // namespace santa
 
+using santa::GetRuleType;
 using santa::IsWatchItemNameValid;
 using santa::ParseConfig;
 using santa::ParseConfigSingleWatchItem;
@@ -170,6 +175,29 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
 - (void)createTestDirStructure:(NSArray *)fs {
   [self createTestDirStructure:fs rootedAt:self.testDir];
+}
+
+- (void)testGetRuleType {
+  std::optional<santa::WatchItemRuleType> ruleType;
+
+  ruleType = GetRuleType(@"PathsWithAllowedProcesses");
+  XCTAssertTrue(ruleType.has_value());
+  XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kPathsWithAllowedProcesses);
+
+  ruleType = GetRuleType(@"PAthSWITHallowedProCesSES");
+  XCTAssertTrue(ruleType.has_value());
+  XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kPathsWithAllowedProcesses);
+
+  ruleType = GetRuleType(@"PathsWithDeniedProcesses");
+  XCTAssertTrue(ruleType.has_value());
+  XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kPathsWithDeniedProcesses);
+
+  ruleType = GetRuleType(@"paTHswIThdENieDProCEssES");
+  XCTAssertTrue(ruleType.has_value());
+  XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kPathsWithDeniedProcesses);
+
+  ruleType = GetRuleType(@"InvertExceptions");
+  XCTAssertFalse(ruleType.has_value());
 }
 
 - (void)testReloadScenarios {
@@ -782,6 +810,51 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
     // Check other option keys
 
+    // kWatchItemConfigKeyOptionsRuleType - Invalid type
+    XCTAssertFalse(ParseConfigSingleWatchItem(
+      @"", "", @{
+        kWatchItemConfigKeyPaths : @[ @"a" ],
+        kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @[]}
+      },
+      policies, &err));
+
+    // kWatchItemConfigKeyOptionsRuleType - Invalid RuleType value
+    XCTAssertFalse(ParseConfigSingleWatchItem(
+      @"", "", @{
+        kWatchItemConfigKeyPaths : @[ @"a" ],
+        kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @"InvalidValue"}
+      },
+      policies, &err));
+
+    // kWatchItemConfigKeyOptionsRuleType - Override
+    // kWatchItemConfigKeyOptionsInvertProcessExceptions
+    policies.clear();
+    XCTAssertTrue(ParseConfigSingleWatchItem(
+      @"", "", @{
+        kWatchItemConfigKeyPaths : @[ @"a" ],
+        kWatchItemConfigKeyOptions : @{
+          kWatchItemConfigKeyOptionsRuleType : @"PathsWithAllowedProcesses",
+          kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)
+        }
+      },
+      policies, &err));
+    XCTAssertEqual(policies.size(), 1);
+    XCTAssertEqual(policies[0].get()->rule_type,
+                   santa::WatchItemRuleType::kPathsWithAllowedProcesses);
+
+    // kWatchItemConfigKeyOptionsRuleType - kWatchItemConfigKeyOptionsInvertProcessExceptions used
+    // as fallback
+    policies.clear();
+    XCTAssertTrue(ParseConfigSingleWatchItem(
+      @"", "", @{
+        kWatchItemConfigKeyPaths : @[ @"a" ],
+        kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)}
+      },
+      policies, &err));
+    XCTAssertEqual(policies.size(), 1);
+    XCTAssertEqual(policies[0].get()->rule_type,
+                   santa::WatchItemRuleType::kPathsWithDeniedProcesses);
+
     // kWatchItemConfigKeyOptionsCustomMessage - Invalid type
     XCTAssertFalse(ParseConfigSingleWatchItem(
       @"", "", @{
@@ -834,7 +907,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
     *policies[0].get(),
     WatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType,
                     kWatchItemPolicyDefaultAllowReadAccess, kWatchItemPolicyDefaultAuditOnly,
-                    kWatchItemPolicyDefaultInvertProcessExceptions));
+                    kWatchItemPolicyDefaultRuleType));
 
   // Test multiple paths, options, and processes
   policies.clear();
@@ -849,7 +922,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
     kWatchItemConfigKeyOptions : @{
       kWatchItemConfigKeyOptionsAllowReadAccess : @(YES),
       kWatchItemConfigKeyOptionsAuditOnly : @(NO),
-      kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES),
+      kWatchItemConfigKeyOptionsRuleType : @"PathsWithDeniedProcesses",
       kWatchItemConfigKeyOptionsEnableSilentMode : @(YES),
       kWatchItemConfigKeyOptionsEnableSilentMode : @(NO),
       kWatchItemConfigKeyOptionsCustomMessage : @"",
@@ -864,10 +937,12 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertEqual(policies.size(), 2);
   XCTAssertEqual(*policies[0].get(),
                  WatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType, true,
-                                 false, true, true, false, "", nil, nil, procs));
+                                 false, santa::WatchItemRuleType::kPathsWithDeniedProcesses, true,
+                                 false, "", nil, nil, procs));
   XCTAssertEqual(*policies[1].get(),
                  WatchItemPolicy("rule", kVersion, "b", WatchItemPathType::kPrefix, true, false,
-                                 true, true, false, "", nil, nil, procs));
+                                 santa::WatchItemRuleType::kPathsWithDeniedProcesses, true, false,
+                                 "", nil, nil, procs));
 }
 
 - (void)testState {

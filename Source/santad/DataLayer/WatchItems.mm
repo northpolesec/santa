@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -56,6 +57,7 @@ NSString *const kWatchItemConfigKeyOptions = @"Options";
 NSString *const kWatchItemConfigKeyOptionsAllowReadAccess = @"AllowReadAccess";
 NSString *const kWatchItemConfigKeyOptionsAuditOnly = @"AuditOnly";
 NSString *const kWatchItemConfigKeyOptionsInvertProcessExceptions = @"InvertProcessExceptions";
+NSString *const kWatchItemConfigKeyOptionsRuleType = @"RuleType";
 NSString *const kWatchItemConfigKeyOptionsEnableSilentMode = @"EnableSilentMode";
 NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode = @"EnableSilentTTYMode";
 NSString *const kWatchItemConfigKeyOptionsCustomMessage = @"BlockMessage";
@@ -153,6 +155,29 @@ static std::vector<uint8_t> HexStringToBytes(NSString *str) {
 
 static inline bool GetBoolValue(NSDictionary *options, NSString *key, bool default_value) {
   return options[key] ? [options[key] boolValue] : default_value;
+}
+
+std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type) {
+  if ([[rule_type lowercaseString] isEqualToString:@"pathswithallowedprocesses"]) {
+    return WatchItemRuleType::kPathsWithAllowedProcesses;
+  } else if ([[rule_type lowercaseString] isEqualToString:@"pathswithdeniedprocesses"]) {
+    return WatchItemRuleType::kPathsWithDeniedProcesses;
+  } else {
+    return std::nullopt;
+  }
+}
+
+// The given function is expected to return std::nullopt when it
+// is provided an invalid value.
+template <typename T>
+ValidatorBlock ValidValuesValidator(std::function<std::optional<T>(NSString *)> f) {
+  return ^bool(NSString *val, NSError **err) {
+    if (!f(val).has_value()) {
+      PopulateError(err, [NSString stringWithFormat:@"Invalid value. Got: \"%@\"", val]);
+      return false;
+    }
+    return true;
+  };
 }
 
 // Given a length, returns a ValidatorBlock that confirms the
@@ -406,8 +431,10 @@ std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary
 ///     <false/>
 ///     <key>AuditOnly</key>
 ///     <false/>
-///     <key>InvertProcessExceptions</key>
+///     <key>InvertProcessExceptions</key> <!-- Deprecated -->
 ///     <false/>
+///     <key>RuleType</key>
+///     <string>PathsWithAllowedProcesses</string>
 ///     <key>EnableSilentMode</key>
 ///     <true/>
 ///     <key>EnableSilentTTYMode</key>
@@ -459,6 +486,11 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
       }
     }
 
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsRuleType, [NSString class], err, false,
+                         ValidValuesValidator<WatchItemRuleType>(GetRuleType))) {
+      return false;
+    }
+
     if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsCustomMessage, [NSString class], err,
                          false,
                          LenRangeValidator(0, kWatchItemConfigOptionCustomMessageMaxLength))) {
@@ -480,9 +512,6 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
                                         kWatchItemPolicyDefaultAllowReadAccess);
   bool audit_only =
     GetBoolValue(options, kWatchItemConfigKeyOptionsAuditOnly, kWatchItemPolicyDefaultAuditOnly);
-  bool invert_process_exceptions =
-    GetBoolValue(options, kWatchItemConfigKeyOptionsInvertProcessExceptions,
-                 kWatchItemPolicyDefaultInvertProcessExceptions);
   bool enable_silent_mode = GetBoolValue(options, kWatchItemConfigKeyOptionsEnableSilentMode,
                                          kWatchItemPolicyDefaultEnableSilentMode);
   bool enable_silent_tty_mode = GetBoolValue(options, kWatchItemConfigKeyOptionsEnableSilentTTYMode,
@@ -493,11 +522,23 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
     return false;
   }
 
+  WatchItemRuleType rule_type = kWatchItemPolicyDefaultRuleType;
+  if (options[kWatchItemConfigKeyOptionsRuleType]) {
+    rule_type = GetRuleType(options[kWatchItemConfigKeyOptionsRuleType])
+                  .value_or(kWatchItemPolicyDefaultRuleType);
+  } else if (options[kWatchItemConfigKeyOptionsInvertProcessExceptions]) {
+    // Convert deprecated config option to the new WatchItemRuleType option
+    if ([options[kWatchItemConfigKeyOptionsInvertProcessExceptions] boolValue]) {
+      rule_type = WatchItemRuleType::kPathsWithDeniedProcesses;
+    } else {
+      rule_type = WatchItemRuleType::kPathsWithAllowedProcesses;
+    }
+  }
+
   for (const PathAndTypePair &path_type_pair : std::get<PathAndTypeVec>(path_list)) {
     policies.push_back(std::make_shared<WatchItemPolicy>(
       NSStringToUTF8StringView(name), policy_version, path_type_pair.first, path_type_pair.second,
-      allow_read_access, audit_only, invert_process_exceptions, enable_silent_mode,
-      enable_silent_tty_mode,
+      allow_read_access, audit_only, rule_type, enable_silent_mode, enable_silent_tty_mode,
       NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
       options[kWatchItemConfigKeyOptionsEventDetailURL],
       options[kWatchItemConfigKeyOptionsEventDetailText], std::get<PolicyProcessVec>(proc_list)));
