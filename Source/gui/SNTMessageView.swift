@@ -10,7 +10,7 @@ public struct SNTMessageView<Content: View>: View {
   @ViewBuilder let content: Content
 
   let now: Date = Date()
-  let enableFunFonts: Bool = SNTConfigurator().funFontsOnSpecificDays
+  let enableFunFonts: Bool = SNTConfigurator.configurator().funFontsOnSpecificDays
 
   public init(_ blockMessage: NSAttributedString, @ViewBuilder content: () -> Content) {
     self.content = content()
