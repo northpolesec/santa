@@ -358,7 +358,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                                                      decisionCache:nil
                                                          ttyWriter:nullptr];
 
-  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "/foo");
+  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "ver", "/foo");
 
   FileAccessPolicyDecision result;
   PathTarget target = {.path = "/some/random/path", .isReadable = true};
@@ -462,7 +462,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 - (void)testPolicyProcessMatchesESProcess {
   const char *instigatingCertHash = "abc123";
   const char *teamId = "myvalidtid";
-  const char *signingId = "com.google.test";
+  const char *signingId = "com.northpolesec.test";
   std::vector<uint8_t> cdhashBytes(CS_CDHASH_LEN);
   std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
   es_file_t esFile = MakeESFile("foo");
@@ -626,7 +626,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                    FileAccessPolicyDecision::kNoPolicy);
   }
 
-  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "/foo");
+  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "ver", "/foo");
   policy->processes.push_back(policyProc);
   auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicy>>(policy);
 
@@ -683,10 +683,12 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                    FileAccessPolicyDecision::kAllowedAuditOnly);
   }
 
-  // The remainder of the tests set the policy's `invert_process_exceptions` option
-  policy->invert_process_exceptions = true;
+  // The remainder of the tests set the policy's `rule_type` option to
+  // invert process exceptions
+  policy->rule_type = santa::WatchItemRuleType::kPathsWithDeniedProcesses;
 
-  // If no exceptions for inverted policy, operations are allowed
+  // If the policy wasn't matched, but the rule type specifies denied processes,
+  // then the operation should be allowed.
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
       .ignoringNonObjectArgs()
@@ -698,8 +700,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                    FileAccessPolicyDecision::kAllowed);
   }
 
-  // For audit only policies with no exception matches and inverted exceptions, operations are
-  // allowed
+  // For audit only policies with no process match and the rule type specifies
+  // denied processes, operations are allowed.
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
       .ignoringNonObjectArgs()
@@ -711,8 +713,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                    FileAccessPolicyDecision::kAllowed);
   }
 
-  // For audit only policies with exception match and inverted exceptions, operations are allowed
-  // audit only
+  // For audit only policies with matched process details and the rule type specifies
+  // denied processes, operations are allowed audit only.
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
       .ignoringNonObjectArgs()
@@ -722,6 +724,19 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
                    FileAccessPolicyDecision::kAllowedAuditOnly);
+  }
+
+  // For policies with matched process details and the rule type specifies
+  // denied processes, operations are denied.
+  {
+    OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
+      .ignoringNonObjectArgs()
+      .andReturn(true);
+    policy->audit_only = false;
+    XCTAssertEqual([accessClient applyPolicy:optionalPolicy
+                                   forTarget:target
+                                   toMessage:Message(mockESApi, &esMsg)],
+                   FileAccessPolicyDecision::kDenied);
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());

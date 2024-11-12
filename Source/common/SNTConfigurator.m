@@ -36,7 +36,7 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 }
 
 @interface SNTConfigurator ()
-/// A NSUserDefaults object set to use the com.google.santa suite.
+/// A NSUserDefaults object set to use the com.northpolesec.santa suite.
 @property(readonly, nonatomic) NSUserDefaults *defaults;
 
 /// Keys and expected value types.
@@ -68,7 +68,7 @@ NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist
 #endif
 
 /// The domain used by mobileconfig.
-static NSString *const kMobileConfigDomain = @"com.google.santa";
+static NSString *const kMobileConfigDomain = @"com.northpolesec.santa";
 
 /// The keys managed by a mobileconfig.
 static NSString *const kStaticRules = @"StaticRules";
@@ -105,6 +105,7 @@ static NSString *const kRemountUSBBlockMessage = @"RemountUSBBlockMessage";
 
 static NSString *const kModeNotificationMonitor = @"ModeNotificationMonitor";
 static NSString *const kModeNotificationLockdown = @"ModeNotificationLockdown";
+static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
 
 static NSString *const kEnablePageZeroProtectionKey = @"EnablePageZeroProtection";
 static NSString *const kEnableBadSignatureProtectionKey = @"EnableBadSignatureProtection";
@@ -235,6 +236,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kRemountUSBBlockMessage : string,
       kModeNotificationMonitor : string,
       kModeNotificationLockdown : string,
+      kFunFontsOnSpecificDays : number,
       kStaticRules : array,
       kSyncBaseURLKey : string,
       kSyncEnableProtoTransfer : number,
@@ -288,7 +290,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
     _syncStateAccessAuthorizerBlock = syncStateAccessAuthorizer;
 
     _defaults = [NSUserDefaults standardUserDefaults];
-    [_defaults addSuiteNamed:@"com.google.santa"];
+    [_defaults addSuiteNamed:@"com.northpolesec.santa"];
     _configState = [self readForcedConfig];
     [self cacheStaticRules];
 
@@ -368,7 +370,12 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 }
 
 + (NSSet *)keyPathsForValuesAffectingStaticRules {
-  return [self configStateSet];
+  static NSSet *set;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    set = [NSSet setWithObject:NSStringFromSelector(@selector(cachedStaticRules))];
+  });
+  return set;
 }
 
 + (NSSet *)keyPathsForValuesAffectingSyncBaseURL {
@@ -428,6 +435,10 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 }
 
 + (NSSet *)keyPathsForValuesAffectingModeNotificationLockdown {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingFunFontsOnSpecificDays {
   return [self configStateSet];
 }
 
@@ -793,17 +804,10 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 }
 
 - (NSString *)bannedUSBBlockMessage {
-  if (!self.configState[kBannedUSBBlockMessage]) {
-    return @"The following device has been blocked from mounting.";
-  }
-
   return self.configState[kBannedUSBBlockMessage];
 }
 
 - (NSString *)remountUSBBlockMessage {
-  if (!self.configState[kRemountUSBBlockMessage]) {
-    return @"The following device has been remounted with reduced permissions.";
-  }
   return self.configState[kRemountUSBBlockMessage];
 }
 
@@ -813,6 +817,10 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 
 - (NSString *)modeNotificationLockdown {
   return self.configState[kModeNotificationLockdown];
+}
+
+- (BOOL)funFontsOnSpecificDays {
+  return [self.configState[kFunFontsOnSpecificDays] boolValue];
 }
 
 - (NSString *)syncClientAuthCertificateFile {
@@ -1300,9 +1308,9 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 }
 
 - (void)startWatchingDefaults {
-  // Only com.google.santa.daemon should listen.
+  // Only com.northpolesec.santa.daemon should listen.
   NSString *processName = [[NSProcessInfo processInfo] processName];
-  if (![processName isEqualToString:@"com.google.santa.daemon"]) return;
+  if (![processName isEqualToString:@"com.northpolesec.santa.daemon"]) return;
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(defaultsChanged:)
                                                name:NSUserDefaultsDidChangeNotification

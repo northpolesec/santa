@@ -85,26 +85,18 @@ static void SantaWatchdog(void *context) {
   }
 }
 
-void CleanupAndReExec() {
-  LOGI(@"com.google.santa.daemon is running from an unexpected path: cleaning up");
-  NSFileManager *fm = [NSFileManager defaultManager];
-  [fm removeItemAtPath:@"/Library/LaunchDaemons/com.google.santad.plist" error:NULL];
-
-  LOGI(@"loading com.google.santa.daemon as a SystemExtension");
-  NSTask *t = [[NSTask alloc] init];
-  t.launchPath = [@(kSantaAppPath) stringByAppendingString:@"/Contents/MacOS/Santa"];
-  t.arguments = @[ @"--load-system-extension" ];
-  [t launch];
-  [t waitUntilExit];
-
-  t = [[NSTask alloc] init];
-  t.launchPath = @"/bin/launchctl";
-  t.arguments = @[ @"remove", @"com.google.santad" ];
-  [t launch];
-  [t waitUntilExit];
-
-  // This exit will likely never be called because the above launchctl command will kill us.
-  exit(0);
+void InstallServices() {
+  NSString *install_services_script = [[NSBundle mainBundle] pathForResource:@"install_services"
+                                                                      ofType:@"sh"];
+  NSTask *task = [[NSTask alloc] init];
+  task.launchPath = @"/bin/bash";
+  task.arguments = @[ install_services_script ];
+  task.environment = @{@"CONF_DIR" : [[NSBundle mainBundle] resourcePath]};
+  NSError *error;
+  if (![task launchAndReturnError:&error]) {
+    LOGE(@"install_services.sh error: %@", error);
+  }
+  [task waitUntilExit];
 }
 
 int main(int argc, char *argv[]) {
@@ -121,14 +113,10 @@ int main(int argc, char *argv[]) {
       return 0;
     }
 
-    // Ensure Santa daemon is started as a system extension
-    if ([pi.arguments.firstObject isEqualToString:@(kSantaDPath)]) {
-      // Does not return
-      CleanupAndReExec();
-    }
+    InstallServices();
 
     dispatch_queue_t watchdog_queue = dispatch_queue_create(
-      "com.google.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
+      "com.northpolesec.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
     dispatch_source_t watchdog_timer =
       dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, watchdog_queue);
 

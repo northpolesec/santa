@@ -16,7 +16,7 @@ certificates and binaries before switching the fleet to Lockdown mode.
 ##### Event Data
 
 Events begin their life as an
-[SNTStoredEvent](https://github.com/google/santa/blob/master/Source/common/SNTStoredEvent.h)
+[SNTStoredEvent](https://github.com/northpolesec/santa/blob/master/Source/common/SNTStoredEvent.h)
 object. The SNTStoredEvent class is just a simple storage class that has
 properties for all the relevant bits of information. More importantly the class
 implements the
@@ -27,7 +27,7 @@ events sqlite3 database on disk and sent over XPC to another process.
 Events are temporarily stored in a database until they are uploaded. The format
 is subject the change; accessing the events database directly will most likely
 break in future releases. If direct access to the events database is required,
-raise a [issue on the Santa GitHub](https://github.com/google/santa/issues).
+raise a [issue on the Santa GitHub](https://github.com/northpolesec/santa/issues).
 
 ###### JSON
 

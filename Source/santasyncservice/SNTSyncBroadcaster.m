@@ -30,7 +30,7 @@
   if (self) {
     _logListeners = [NSMutableArray array];
     _broadcastQueue =
-      dispatch_queue_create("com.google.santa.syncservice.broadcast", DISPATCH_QUEUE_SERIAL);
+      dispatch_queue_create("com.northpolesec.santa.syncservice.broadcast", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }

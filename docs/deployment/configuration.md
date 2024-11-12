@@ -61,7 +61,7 @@ also known as mobileconfig files, which are in an Apple-specific XML format.
 | MachineIDPlist                     | String     | The path to a plist that contains the MachineOwnerKey / value pair. |
 | MachineIDKey                       | String     | The key to use on MachineIDPlist. |
 | EventLogType                       | String     | Defines how event logs are stored. Options are 1) syslog: Sent to ULS. 2) filelog: Sent to a file on disk. Use EventLogPath to specify a path. 3) protobuf (BETA): Sent to file on disk using a maildir-like format. 4) json (BETA): Same as file but output is one JSON object per line 5) null: Don't output any event logs. Defaults to filelog. |
-| EventLogPath                       | String     | If EventLogType is set to filelog or json, EventLogPath will provide the path to save logs. Defaults to /var/db/santa/santa.log. If you change this value ensure you also update com.google.santa.newsyslog.conf with the new path. |
+| EventLogPath                       | String     | If EventLogType is set to filelog or json, EventLogPath will provide the path to save logs. Defaults to /var/db/santa/santa.log. If you change this value ensure you also update com.northpolesec.santa.newsyslog.conf with the new path. |
 | SpoolDirectory                     | String     | If EventLogType is set to protobuf, SpoolDirectory will provide the base directory used to save files according to a maildir-like format. Defaults to /var/db/santa/spool. |
 | SpoolDirectoryFileSizeThresholdKB  | Integer    | If EventLogType is set to protobuf, SpoolDirectoryFileSizeThresholdKB defines the per-file size limit for files stored in the spool directory. Events are buffered in memory until this threshold would be exceeded (or SpoolDirectoryEventMaxFlushTimeSec is exceeded). Defaults to 100. |
 | SpoolDirectorySizeThresholdMB      | Integer    | If EventLogType is set to protobuf, SpoolDirectorySizeThresholdMB defines the total combined size limit of all files in the spool directory. Once the threshold is met, no more events will be saved. Defaults to 100. |
@@ -86,7 +86,7 @@ also known as mobileconfig files, which are in an Apple-specific XML format.
 | OverrideFileAccessAction           | String     | Defines a global override policy that applies to the enforcement of all `FileAccessPolicy` rules. Allowed values are: `AUDIT_ONLY` (no access will be blocked, only logged), `DISABLE` (no access will be blocked or logged), `none` (enforce policy as defined in each rule). Defaults to `NONE`. Note: `AUDITONLY` without an underscore is deprecated. |
 | SyncClientContentEncoding          | String     | Sets the Content-Encoding header for requests sent to the sync service. Acceptable values are "deflate", "gzip", "none". Defaults to deflate. |
 | SyncExtraHeaders                   | Dictionary | Dictionary of additional headers to include in all requests made to the sync server. System managed headers such as Content-Length, Host, WWW-Authenticate etc will be ignored. |
-| EnableDebugLogging                 | Bool       | If true, the client will log additional debug messages to the Apple Unified Log.  For example, transitive rule creation logs can be viewed with `log stream --predicate 'sender=="com.google.santa.daemon"'`. Defaults to false. |
+| EnableDebugLogging                 | Bool       | If true, the client will log additional debug messages to the Apple Unified Log.  For example, transitive rule creation logs can be viewed with `log stream --predicate 'sender=="com.northpolesec.santa.daemon"'`. Defaults to false. |
 | EntitlementsPrefixFilter           | Array      | Array of strings of entitlement prefixes that should not be logged (for example: `com.apple.private`). No default. |
 | EntitlementsTeamIDFilter           | Array      | Array of TeamID strings. Entitlements from processes with a matching TeamID in the code signature will not be logged. Use the value `platform` to filter entitlements from platform binaries. No default. |
 | [StaticRules](#static-rules)       | Array      | Array of rule dictionaries. The rules defined in this key take precedence over any rules in the rules database. |
@@ -144,7 +144,7 @@ are sent via the sync server. Details on this structure are defined in the
 documentation.
 
 Additionally, the
-[example configuration](https://github.com/google/santa/blob/d5195b55d2784776fa078096f59137d22da55b06/docs/deployment/com.google.santa.example.mobileconfig#L45)
+[example configuration](https://github.com/northpolesec/santa/blob/main/docs/deployment/com.northpolesec.santa.example.mobileconfig#L45)
 has a demonstration on how to define static rules.
 
 ### Example Configuration Profile
@@ -152,11 +152,11 @@ has a demonstration on how to define static rules.
 Here is an example of a configuration profile that could be set. It was
 generated with Tim Sutton's great
 [mcxToProfile](https://github.com/timsutton/mcxToProfile) tool. A copy is also
-available [here](com.google.santa.example.mobileconfig).
+available [here](com.northpolesec.santa.example.mobileconfig).
 
 A few key points to when creating your configuration profile:
 
-* `com.google.santa` needs to be the key inside `PayloadContent`
+* `com.northpolesec.santa` needs to be the key inside `PayloadContent`
 * The `PayloadScope` needs to be `System`
 
 ```xml
@@ -169,7 +169,7 @@ A few key points to when creating your configuration profile:
 		<dict>
 			<key>PayloadContent</key>
 			<dict>
-				<key>com.google.santa</key>
+				<key>com.northpolesec.santa</key>
 				<dict>
 					<key>Forced</key>
 					<array>
@@ -229,11 +229,11 @@ A few key points to when creating your configuration profile:
 		</dict>
 	</array>
 	<key>PayloadDescription</key>
-	<string>com.google.santa</string>
+	<string>com.northpolesec.santa</string>
 	<key>PayloadDisplayName</key>
-	<string>com.google.santa</string>
+	<string>com.northpolesec.santa</string>
 	<key>PayloadIdentifier</key>
-	<string>com.google.santa</string>
+	<string>com.northpolesec.santa</string>
 	<key>PayloadOrganization</key>
 	<string></string>
 	<key>PayloadRemovalDisallowed</key>
@@ -305,4 +305,4 @@ example when an app is launched from a directory considered private to a user.
 An example payload for this use case is provided [here](tcc.configuration-profile-policy.santa.example.mobileconfig)
 
 This would be used alongside a payload allowing [notifications](notificationsettings.santa.example.mobileconfig) to be sent,
-and for allowing the [system extension](https://github.com/google/santa/blob/main/docs/deployment/system-extension-policy.santa.example.mobileconfig) to be loaded without end user interaction.
+and for allowing the [system extension](https://github.com/northpolesec/santa/blob/main/docs/deployment/system-extension-policy.santa.example.mobileconfig) to be loaded without end user interaction.

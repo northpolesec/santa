@@ -1,0 +1,84 @@
+/* No comment provided by engineer. */
+"Application" = "Заявка";
+
+/* No comment provided by engineer. */
+"Bundle Hash" = "Пакетний хеш";
+
+/* No comment provided by engineer. */
+"CDHash" = "CDHash";
+
+/* Copy Details button in binary block dialog */
+"Copy Details" = "Деталі копіювання";
+
+/* The default message to show the user when access to a file is blocked */
+"Access to a file has been denied" = "Відмовлено у доступі до файлу";
+
+/* No comment provided by engineer. */
+"Dismiss" = "Звільнити";
+
+/* No comment provided by engineer. */
+"Dismiss & Silence" = "Звільнити і замовкнути";
+
+/* No comment provided by engineer. */
+"Filename" = "Ім'я файлу";
+
+/* More Details button in binary block dialog */
+"More Details" = "Детальніше";
+
+/* No comment provided by engineer. */
+"More Info..." = "Більше інформації...";
+
+/* Default text for Open button */
+"Open..." = "Відкрито...";
+
+/* No comment provided by engineer. */
+"Parent" = "Батько";
+
+/* No comment provided by engineer. */
+"Path" = "Шлях";
+
+/* No comment provided by engineer. */
+"Path Accessed" = "Шлях, до якого звернулися";
+
+/* No comment provided by engineer. */
+"Prevent future notifications for this application for " = "Запобігти майбутнім сповіщенням для цієї заявки для ";
+
+/* No comment provided by engineer. */
+"Publisher" = "Видавець";
+
+/* No comment provided by engineer. */
+"Remount Mode" = "Режим перевстановлення";
+
+/* No comment provided by engineer. */
+"Rule Name" = "Назва правила";
+
+/* No comment provided by engineer. */
+"Rule Version" = "Версія правила";
+
+/* Explanation in About view */
+"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa - система управління додатками для macOS.\n\nНемає налаштувань, що налаштовуються користувачем.";
+
+/* No comment provided by engineer. */
+"SHA-256" = "SHA-256";
+
+/* No comment provided by engineer. */
+"Signing ID" = "Signing ID";
+
+/* The default message to show the user when a banned application is blocked */
+"The following application has been blocked from<br />executing because it has been deemed malicious" = "Наступну програму було заблоковано для виконання,<br />оскільки її було визнано шкідливою";
+
+/* The default message to show the user when an unknown application is blocked */
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Наступна програма була заблокована для виконання,<br />оскільки не може бути визначена її достовірність";
+
+/* The default message to show the user when a USB device is blocked from mounting */
+"The following device has been blocked from mounting" = "Наступний пристрій заблоковано для встановлення";
+
+/* The default message to show the user when a USB device is remounted with reduced permissions */
+"The following device has been remounted with reduced permissions" = "Наступний пристрій було перевстановлено зі зменшеними дозволами";
+
+/* No comment provided by engineer. */
+"unknown" = "невідомо";
+
+/* No comment provided by engineer. */
+"User" = "Користувач";
+

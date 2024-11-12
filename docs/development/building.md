@@ -14,7 +14,7 @@ personal forks.
 Clone the source and change into the directory.
 
 ```sh
-git clone https://github.com/google/santa
+git clone https://github.com/northpolesec/santa
 cd santa
 ```
 
@@ -42,7 +42,7 @@ bazel build //Source/gui:Santa
 
 This will build and sign all of the santa components (UI and services).
 
-For developers who do not have access to Google's code signing certificate and
+For developers who do not have access to North Pole's code signing certificate and
 provisioning profiles, use the `--define=SANTA_BUILD_TYPE=adhoc` flag. This will
 adhoc sign Santa and does not require provisioning profiles.
 
@@ -60,7 +60,7 @@ Santa components. For this reason, there's a special rule in the Santa BUILD
 file that will build Santa, unload Santa if it's running, install the new
 Santa in the right place and attempt to load it.
 
-Non-adhoc debug builds of Santa can only be run by Google developers. This is
+Non-adhoc debug builds of Santa can only be run by North Pole developers. This is
 because of bundle id and provisioning profile restrictions bound to Apple
 developer accounts.
 
@@ -68,7 +68,7 @@ developer accounts.
 bazel run :reload
 ```
 
-Non-Google developers can use an adhoc build to run development builds of Santa.
+Non-North Pole developers can use an adhoc build to run development builds of Santa.
 System Integrity Protection (SIP) will need to be disabled in order to run an
 adhoc build.
 
@@ -98,7 +98,7 @@ this new adhoc build will show up as a second instance of Santa. Remove the
 non-adhoc instance like so:
 
 ```sh
-systemextensionsctl uninstall EQHXZ8M8AV com.google.santa.daemon
+systemextensionsctl uninstall ZMCG7MLDV9 com.northpolesec.santa.daemon
 ```
 
 #### IDE Setup
@@ -117,7 +117,7 @@ Bazel build rules. To use this:
 #### Debugging
 
 lldb can be used to debug Santa, similarly to any other project, with some
-exceptions. lldb can attach to com.google.santa.daemon, however any breakpoints
+exceptions. lldb can attach to com.northpolesec.santa.daemon, however any breakpoints
 in the decision making codepath can deadlock the machine.
 
 #### Tests
@@ -157,7 +157,7 @@ For example to point Santa at a sync server running on localhost here would be t
 
 Creates a release build of Santa with a version based of the newest tag. Also
 saves the dsym files for each component of Santa. This makes debugging and
-interpreting future crashes much easier. Releases are handled by Google internal
+interpreting future crashes much easier. Releases are handled by North Pole internal
 infrastructure.
 
 ```sh

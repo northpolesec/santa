@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -58,6 +59,10 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogout &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogin &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogout &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationOD &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationAutoUnlock &) override;
 #endif
 
   std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,

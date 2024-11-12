@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 #include <bsm/libbsm.h>
+#include <pwd.h>
 #include <sys/fcntl.h>
 #include <sys/types.h>
 
@@ -99,7 +101,7 @@ class ProcessSet {
  public:
   ProcessSet() {
     q_ = dispatch_queue_create(
-      "com.google.santa.daemon.faa",
+      "com.northpolesec.santa.daemon.faa",
       dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
                                               QOS_CLASS_USER_INTERACTIVE, 0));
   };
@@ -633,10 +635,11 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
     }
   }
 
-  // If the `invert_process_exceptions` option is set, the decision should be
-  // inverted from allowed to denied or vice versa. Note that this inversion
-  // must be made prior to checking the policy's audit-only flag.
-  if (policy->invert_process_exceptions) {
+  // If the RuleType option was configured to contain a list of denied processes,
+  // the decision should be inverted from allowed to denied or vice versa.
+  // Note that this inversion must be made prior to checking the policy's
+  // audit-only flag.
+  if (policy->rule_type == santa::WatchItemRuleType::kPathsWithDeniedProcesses) {
     if (decision == FileAccessPolicyDecision::kAllowed) {
       decision = FileAccessPolicyDecision::kDenied;
     } else {
@@ -701,11 +704,15 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
       event.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
       event.filePath = StringToNSString(msg->process->executable->path.data);
       event.teamID = cd.teamID ?: @"<unknown team id>";
-      event.teamID = cd.signingID ?: @"<unknown signing id>";
+      event.signingID = cd.signingID ?: @"<unknown signing id>";
+      event.cdhash = cd.cdhash ?: @"<unknown CDHash>";
       event.pid = @(audit_token_to_pid(msg->process->audit_token));
       event.ppid = @(audit_token_to_pid(msg->process->parent_audit_token));
       event.parentName = StringToNSString(msg.ParentProcessName());
       event.signingChain = cd.certChain;
+
+      struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
+      if (user) event.executingUser = @(user->pw_name);
 
       std::pair<NSString *, NSString *> linkInfo = self->_watchItems->EventDetailLinkInfo(policy);
 

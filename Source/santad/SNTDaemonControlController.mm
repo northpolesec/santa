@@ -1,19 +1,22 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
 
+#include <Foundation/Foundation.h>
+#import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
 
 #include <memory>
@@ -165,7 +168,7 @@ double watchdogRAMPeak = 0;
 
   // Do not return any rules if syncBaseURL is set and return an error.
   if (config.syncBaseURL) {
-    reply(@[], [NSError errorWithDomain:@"com.google.santad"
+    reply(@[], [NSError errorWithDomain:@"com.northpolesec.santad"
                                    code:403  // (TODO) define error code
                                userInfo:@{NSLocalizedDescriptionKey : @"SyncBaseURL is set"}]);
     return;
@@ -382,6 +385,103 @@ double watchdogRAMPeak = 0;
                                   break;
                               }
                             }];
+}
+
+#pragma mark Control Ops
+
+- (BOOL)verifyPathIsSanta:(NSString *)path {
+  if (path.length == 0) {
+    LOGE(@"No path provided");
+    return NO;
+  }
+
+  BOOL isDir;
+  if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir] || !isDir) {
+    LOGE(@"Installation path is not a directory: %@", path);
+    return NO;
+  }
+
+  NSError *err;
+  MOLCodesignChecker *cc = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&err];
+
+  if (err) {
+    LOGE(@"Failed to validate install path: %@", err);
+    return NO;
+  }
+
+  if (![cc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
+      ![cc.signingID isEqualToString:@"com.northpolesec.santa"]) {
+    LOGE(@"Unexpected application: %@:%@", cc.teamID, cc.signingID);
+    return NO;
+  }
+
+  return YES;
+}
+
+- (void)setAppOwnershipAndPermissions:(NSString *)path {
+  NSFileManager *fm = [NSFileManager defaultManager];
+  NSDirectoryEnumerator<NSURL *> *dirEnumerator = [fm enumeratorAtURL:[NSURL fileURLWithPath:path]
+                                           includingPropertiesForKeys:nil
+                                                              options:0
+                                                         errorHandler:nil];
+
+  NSDictionary<NSFileAttributeKey, id> *attrs = @{
+    NSFileOwnerAccountID : @(0),       // root
+    NSFileGroupOwnerAccountID : @(0),  // wheel
+  };
+
+  void (^SetAttrs)(NSString *) = ^void(NSString *filePath) {
+    NSError *error;
+    if (![fm setAttributes:attrs ofItemAtPath:filePath error:&error]) {
+      LOGW(@"Unable to set ownership: %@: %@", filePath, error);
+    }
+  };
+
+  for (NSURL *file in dirEnumerator) {
+    SetAttrs(file.path);
+  }
+
+  SetAttrs(path);
+}
+
+- (void)reloadSystemExtension {
+  LOGI(@"Trigger SystemExtension activation");
+  NSTask *t = [[NSTask alloc] init];
+  t.launchPath = [@(kSantaAppPath) stringByAppendingString:@"/Contents/MacOS/Santa"];
+  t.arguments = @[ @"--load-system-extension" ];
+  [t launch];
+}
+
+- (void)installSantaApp:(NSString *)tempPath reply:(void (^)(BOOL))reply {
+  LOGI(@"Trigger Santa installation from: %@", tempPath);
+
+  if (![self verifyPathIsSanta:tempPath]) {
+    LOGE(@"Unable to verify Santa for installation: %@", tempPath);
+    reply(NO);
+    return;
+  }
+
+  [self setAppOwnershipAndPermissions:tempPath];
+
+  NSString *installPath = @(kSantaAppPath);
+  NSFileManager *fm = [NSFileManager defaultManager];
+  NSError *error;
+
+  if (![fm removeItemAtPath:installPath error:&error]) {
+    LOGE(@"Failed to remove %@: %@", installPath, error);
+    reply(NO);
+    return;
+  }
+
+  if (![fm moveItemAtPath:tempPath toPath:installPath error:&error]) {
+    LOGE(@"Failed to remove %@: %@", installPath, error);
+    reply(NO);
+    return;
+  }
+
+  reply(YES);
+
+  [self reloadSystemExtension];
 }
 
 @end

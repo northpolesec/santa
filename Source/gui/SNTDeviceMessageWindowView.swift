@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,77 +15,56 @@
 
 import SwiftUI
 
+import santa_common_SNTBlockMessage
 import santa_common_SNTConfigurator
 import santa_common_SNTDeviceEvent
+import santa_gui_SNTMessageView
 
-@objc public class SNTDeviceMessageWindowViewFactory : NSObject {
-  @objc public static func createWith(window: NSWindow, event: SNTDeviceEvent, customMsg: NSAttributedString?) -> NSViewController {
-    return NSHostingController(rootView:SNTDeviceMessageWindowView(window:window, event:event, customMsg:customMsg).frame(width:450, height:300))
+@objc public class SNTDeviceMessageWindowViewFactory: NSObject {
+  @objc public static func createWith(window: NSWindow, event: SNTDeviceEvent) -> NSViewController {
+    return NSHostingController(
+      rootView: SNTDeviceMessageWindowView(window: window, event: event).fixedSize()
+    )
   }
 }
 
 struct SNTDeviceMessageWindowView: View {
   let window: NSWindow?
-  let event: SNTDeviceEvent?
-  let customMsg: NSAttributedString?
-
-  let c = SNTConfigurator()
-
+  let event: SNTDeviceEvent
 
   var body: some View {
-    VStack(spacing:20.0) {
-      Text("Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+    SNTMessageView(SNTBlockMessage.attributedBlockMessage(for: event)) {
+      HStack(spacing: 20.0) {
+        VStack(alignment: .trailing, spacing: 10.0) {
+          Text("Path").bold().font(Font.system(size: 12.0))
 
-      if let t = customMsg {
-        if #available(macOS 12.0, *) {
-          let a = AttributedString(t)
-          Text(a).multilineTextAlignment(.center).padding(15.0)
-        } else {
-          Text(t.description).multilineTextAlignment(.center).padding(15.0)
-        }
-      } else {
-        Text("Mounting devices is blocked")
-      }
-
-      HStack(spacing:5.0) {
-        VStack(alignment: .trailing, spacing: 8.0) {
-          Text("Device Name").bold()
-          Text("Device BSD Path").bold()
-
-          if event!.remountArgs?.count ?? 0 > 0 {
-            Text("Remount Mode").bold()
+          if event.remountArgs?.count ?? 0 > 0 {
+            Text("Remount Mode").bold().font(Font.system(size: 12.0))
           }
         }
-        Spacer().frame(width: 10.0)
-        VStack(alignment: .leading, spacing: 8.0) {
-          Text(event!.mntonname)
-          Text(event!.mntfromname)
 
-          if event!.remountArgs?.count ?? 0 > 0 {
-            Text(event!.readableRemountArgs())
+        Divider()
+
+        VStack(alignment: .leading, spacing: 10.0) {
+          TextWithLimit(event.mntonname)
+
+          if event.remountArgs?.count ?? 0 > 0 {
+            TextWithLimit(event.readableRemountArgs())
           }
         }
       }
 
-      HStack {
-        Button(action: dismissButton) {
-          Text("OK").frame(width: 90.0)
-        }
-        .keyboardShortcut(.defaultAction)
+      Spacer()
 
-      }.padding(10.0)
-    }
+      HStack(spacing: 15.0) {
+        DismissButton(customText: nil, silence: nil, action: dismissButton)
+      }
+
+      Spacer()
+    }.fixedSize()
   }
 
   func dismissButton() {
     window?.close()
   }
 }
-
-// Enable previews in Xcode.
-struct SNTDeviceMessageWindowView_Previews: PreviewProvider {
-  static var previews: some View {
-    SNTDeviceMessageWindowView(window: nil, event: nil, customMsg: nil)
-  }
-}
-

@@ -1,33 +1,9 @@
 #!/bin/bash
 
-# Unload the kernel extension, santad, sync client
-# If a user is logged in, also unload the GUI agent.
 # If the target volume is not /, do nothing
-
 [[ $3 != "/" ]] && exit 0
 
-/bin/launchctl remove com.google.santad || true
-/bin/launchctl remove com.google.santa.bundleservice || true
-/bin/launchctl remove com.google.santa.metricservice || true
-/bin/launchctl remove com.google.santa.syncservice || true
+/bin/launchctl remove com.northpolesec.santa.migration || true
+/bin/rm -rf /var/db/santa/migration
 
-/bin/sleep 1
-
-/sbin/kextunload -b com.google.santa-driver >/dev/null 2>&1 || true
-
-# Remove cruft from old Santa versions
-/bin/rm -f /usr/libexec/santad
-/bin/rm -f /usr/sbin/santactl
-/bin/launchctl remove com.google.santasync
-/bin/rm -f /Library/LaunchDaemons/com.google.santasync.plist
-/bin/rm -rf /Applications/Santa.app
-/bin/rm -rf /Library/Extensions/santa-driver.kext
-
-/bin/sleep 1
-
-GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
-[[ -z "${GUI_USER}" ]] && exit 0
-
-/bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.google.santagui
-/bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.google.santa
 exit 0

@@ -43,7 +43,7 @@ MONITOR or `2` for LOCKDOWN.
 ```
 
 Install your new configuration profile, it will overwrite any old
-`com.google.santa` profiles you may have already install. See the
+`com.northpolesec.santa` profiles you may have already install. See the
 [configuration](../deployment/configuration.md) document for more details.
 
 ###### Change modes with a sync server

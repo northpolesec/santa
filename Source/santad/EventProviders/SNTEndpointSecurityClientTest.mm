@@ -443,13 +443,6 @@ using santa::WatchItemPathType;
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
-- (void)testIsProtectedPath {
-  XCTAssertTrue([SNTEndpointSecurityClient isProtectedPath:"/private/var/db/santa/rules.db"]);
-  XCTAssertTrue([SNTEndpointSecurityClient isProtectedPath:"/private/var/db/santa/events.db"]);
-
-  XCTAssertFalse([SNTEndpointSecurityClient isProtectedPath:"/not/a/db/path"]);
-}
-
 - (void)testProcessMessageHandlerBadEventType {
   es_file_t proc_file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&proc_file);

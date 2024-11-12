@@ -1,0 +1,84 @@
+/* The default message to show the user when access to a file is blocked */
+"Access to a file has been denied" = "Der Zugriff auf eine Datei wurde verweigert";
+
+/* No comment provided by engineer. */
+"Application" = "Applikation";
+
+/* No comment provided by engineer. */
+"Bundle Hash" = "Bundle-Hash";
+
+/* No comment provided by engineer. */
+"CDHash" = "CDHash";
+
+/* Copy Details button in more details dialog */
+"Copy Details" = "Details kopieren";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "Ignorieren";
+
+/* No comment provided by engineer. */
+"Dismiss & Silence" = "Ignorieren & Stummschalten";
+
+/* No comment provided by engineer. */
+"Filename" = "Dateiname";
+
+/* More Details button in binary block dialog */
+"More Details" = "Mehr Details";
+
+/* No comment provided by engineer. */
+"More Info..." = "Mehr Informationen...";
+
+/* Default text for Open button */
+"Open..." = "Öffnen...";
+
+/* No comment provided by engineer. */
+"Parent" = "Übergeordneter Prozess";
+
+/* No comment provided by engineer. */
+"Path" = "Pfad";
+
+/* No comment provided by engineer. */
+"Path Accessed" = "Zugriffspfad";
+
+/* No comment provided by engineer. */
+"Prevent future notifications for this application for " = "Benachrichtigungen für diese Applikation unterdrücken für ";
+
+/* No comment provided by engineer. */
+"Publisher" = "Herausgeber";
+
+/* No comment provided by engineer. */
+"Remount Mode" = "Remount-Modus";
+
+/* No comment provided by engineer. */
+"Rule Name" = "Regelname";
+
+/* No comment provided by engineer. */
+"Rule Version" = "Regelversion";
+
+/* Explanation in About view */
+"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa ist ein Applikationskontrollsystem für macOS.\n\nEs gibt keine benutzerkonfigurierbaren Einstellungen.";
+
+/* No comment provided by engineer. */
+"SHA-256" = "SHA-256";
+
+/* No comment provided by engineer. */
+"Signing ID" = "Signing ID";
+
+/* The default message to show the user when an unknown application is blocked */
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Die folgende Applikation wurde blockiert,<br />da ihre Vertrauenswürdigkeit nicht überprüft werden kann";
+
+/* The default message to show the user when a banned application is blocked */
+"The following application has been blocked from<br />executing because it has been deemed malicious" = "Die folgende Applikation wurde blockiert,<br />da sie als schädlich eingestuft wurde";
+
+/* The default message to show the user when a USB device is blocked from mounting */
+"The following device has been blocked from mounting" = "Das Mounten des folgenden Geräts wurde blockiert";
+
+/* The default message to show the user when a USB device is remounted with reduced permissions */
+"The following device has been remounted with reduced permissions" = "Das folgende Gerät wurde mit reduzierten Berechtigungen gemountet";
+
+/* No comment provided by engineer. */
+"unknown" = "unbekannt";
+
+/* No comment provided by engineer. */
+"User" = "Benutzer";
+

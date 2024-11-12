@@ -1,40 +1,19 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"
-
-using santa::EnrichedClose;
-using santa::EnrichedCSInvalidated;
-using santa::EnrichedExchange;
-using santa::EnrichedExec;
-using santa::EnrichedExit;
-using santa::EnrichedFork;
-using santa::EnrichedLink;
-using santa::EnrichedLoginLogin;
-using santa::EnrichedLoginLogout;
-using santa::EnrichedLoginWindowSessionLock;
-using santa::EnrichedLoginWindowSessionLogin;
-using santa::EnrichedLoginWindowSessionLogout;
-using santa::EnrichedLoginWindowSessionUnlock;
-using santa::EnrichedOpenSSHLogin;
-using santa::EnrichedOpenSSHLogout;
-using santa::EnrichedProcess;
-using santa::EnrichedRename;
-using santa::EnrichedScreenSharingAttach;
-using santa::EnrichedScreenSharingDetach;
-using santa::EnrichedUnlink;
-using santa::Message;
 
 namespace santa {
 
@@ -117,6 +96,22 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginLogin &) {
 }
 
 std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginLogout &) {
+  return {};
+}
+
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationOD &) {
+  return {};
+}
+
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationTouchID &) {
+  return {};
+}
+
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationToken &) {
+  return {};
+}
+
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationAutoUnlock &) {
   return {};
 }
 

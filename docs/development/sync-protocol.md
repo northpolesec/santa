@@ -140,7 +140,7 @@ The JSON object has the following keys:
 | enable_bundles              | Use previous setting                        | boolean | Enable bundle scanning | true |
 | enable_transitive_rules     | Use previous setting                        | boolean | Whether or not to enable transitive allowlisting | true |
 | batch_size                  | Use a Santa-defined default value           | integer | Number of events to upload at a time | 128 |
-| full_sync_interval          | Defaults to 600 seconds                     | integer | Number of seconds between full syncs. Note: Santa enforces a minimum value of 60. The default value will be used if a smaller value is provided. | 600 |
+| full_sync_interval          | Defaults to 600 seconds                     | uint32 | Number of seconds between full syncs. Note: Santa enforces a minimum value of 60. The default value will be used if a smaller value is provided. | 600 |
 | client_mode                 | Use previous setting                        | string  | Operating mode to set for the client | either `MONITOR` or `LOCKDOWN` |
 | allowed_path_regex          | Use previous setting                        | string  | Regular expression to allow a binary to execute from a path | "/Users/markowsk/foo/.\*" |
 | blocked_path_regex          | Use previous setting                        | string  | Regular expression to block a binary from executing by path | "/tmp/" |
@@ -223,8 +223,8 @@ sequenceDiagram
 | file_bundle_version | NO | string | The bundle version string | "9999.1.1" |
 | file_bundle_version_string | NO | string | Bundle short version string | "2.3.4" |
 | file_bundle_hash | NO | string | SHA256 hash of all executables in the bundle | "7466e3687f540bcb7792c6d14d5a186667dbe18a85021857b42effe9f0370805" |
-| file_bundle_hash_millis | NO | float64 | The time in milliseconds it took to find all of the binaries, hash and produce the bundle_hash | 1234775 |
-| file_bundle_binary_count | NO | integer | The number of binaries in a bundle | 13 |
+| file_bundle_hash_millis | NO | uint32 | The time in milliseconds it took to find all of the binaries, hash and produce the bundle_hash | 1234775 |
+| file_bundle_binary_count | NO | uint32 | The number of binaries in a bundle | 13 |
 | pid | NO | int | Process id of the executable that was blocked | 1234 |
 | ppid | NO | int | Parent process id of the executable that was blocked | 456 |
 | parent_name | NO | Parent process short command name of the executable that was blocked | "bar" |
@@ -294,7 +294,7 @@ sequenceDiagram
     "execution_time": 1657764366.475035,
     "file_sha256": "8621d92262aef379d3cfe9e099f287be5b996a281995b5cc64932f7d62f3dc85",
     "decision": "ALLOW_BINARY",
-    "file_bundle_id": "com.google.santa.syncservice",
+    "file_bundle_id": "com.northpolesec.santa.syncservice",
     "file_bundle_version_string": "9999.1.1",
     "pid": 2595,
     "current_sessions": [
@@ -304,7 +304,7 @@ sequenceDiagram
       "markowsky@ttys003"
     ],
     "team_id": "EQHXZ8M8AV",
-    "signing_id": "EQHXZ8M8AV:com.google.santa",
+    "signing_id": "EQHXZ8M8AV:com.northpolesec.santa",
     "cdhash": "dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a"
   }]
 }

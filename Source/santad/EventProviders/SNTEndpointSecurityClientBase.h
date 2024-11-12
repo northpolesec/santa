@@ -1,4 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -79,8 +80,8 @@
 
 - (bool)clearCache;
 
-+ (std::set<std::string>)getProtectedPaths;
-+ (bool)isProtectedPath:(const std::string_view)path;
+- (bool)handleContextMessage:(santa::Message &)esMsg;
+
 + (bool)populateAuditTokenSelf:(audit_token_t *)tok;
 
 @end

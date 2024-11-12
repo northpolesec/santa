@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ATSApplicationFontsPath</key>
+	<string>Fonts</string>
 	<key>CFBundleExecutable</key>
 	<string>Santa</string>
 	<key>CFBundleIconFile</key>
@@ -24,8 +26,13 @@
 	<string>${MACOSX_VERSION_MIN}</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>LSLaunchModifiers</key>
+	<dict>
+		<key>LSLaunchModifierDoNotAddToRecentApplications</key>
+		<true/>
+	</dict>
 	<key>NSHumanReadableCopyright</key>
-	<string>Google LLC.</string>
+	<string>North Pole Security, Inc.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

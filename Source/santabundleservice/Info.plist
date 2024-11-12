@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>santabundleservice</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.google.santa.bundleservice</string>
+	<string>com.northpolesec.santa.bundleservice</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -21,6 +21,6 @@
 	<key>CFBundleVersion</key>
 	<string>${SANTA_VERSION}</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Google LLC.</string>
+	<string>North Pole Security, Inc.</string>
 </dict>
 </plist>

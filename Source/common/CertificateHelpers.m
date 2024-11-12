@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -21,19 +22,21 @@ NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID) {
 
   if ([leafCert.commonName isEqualToString:@"Apple Mac OS Application Signing"]) {
     return [NSString stringWithFormat:@"App Store (Team ID: %@)", teamID];
+  } else if ([leafCert.commonName hasPrefix:@"Developer ID Application"]) {
+    // Developer ID Application certs have the company name in the OrgName field
+    // but also include it in the CommonName and we don't want to print it twice.
+    return [NSString stringWithFormat:@"%@ (%@)", leafCert.orgName, teamID];
   } else if (leafCert.commonName && leafCert.orgName) {
     return [NSString stringWithFormat:@"%@ - %@", leafCert.orgName, leafCert.commonName];
   } else if (leafCert.commonName) {
     return leafCert.commonName;
-  } else if (leafCert.orgName) {
-    return leafCert.orgName;
   } else {
     return nil;
   }
 }
 
 NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs) {
-  NSMutableArray *certArray = [NSMutableArray arrayWithCapacity:[certs count]];
+  NSMutableArray *certArray = [NSMutableArray arrayWithCapacity:certs.count];
   for (MOLCertificate *cert in certs) {
     [certArray addObject:(id)cert.certRef];
   }

@@ -30,7 +30,7 @@
 }
 
 + (NSString *)serviceID {
-  return @"com.google.santa.bundleservice";
+  return @"com.northpolesec.santa.bundleservice";
 }
 
 + (MOLXPCConnection *)configuredConnection {

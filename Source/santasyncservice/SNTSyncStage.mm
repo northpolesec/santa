@@ -205,7 +205,7 @@ using santa::NSStringToUTF8String;
     }
     LOGE(@"HTTP Response: %ld %@", code, errStr);
     if (error != NULL) {
-      *error = [NSError errorWithDomain:@"com.google.santa.syncservice"
+      *error = [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
                                    code:code
                                userInfo:@{NSLocalizedDescriptionKey : errStr ?: @""}];
     }
@@ -231,7 +231,7 @@ using santa::NSStringToUTF8String;
     if (!message->ParseFromString(std::string((const char *)data.bytes, data.length))) {
       NSString *errStr = @"Failed to parse response proto into message";
       SLOGE(@"%@", errStr);
-      return [NSError errorWithDomain:@"com.google.santa.syncservice"
+      return [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
                                  code:4
                              userInfo:@{NSLocalizedDescriptionKey : errStr}];
     }
@@ -249,7 +249,7 @@ using santa::NSStringToUTF8String;
     NSString *errStr = [NSString stringWithFormat:@"Failed to parse response JSON into message: %s",
                                                   status.ToString().c_str()];
     SLOGE(@"%@", errStr);
-    return [NSError errorWithDomain:@"com.google.santa.syncservice"
+    return [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
                                code:3
                            userInfo:@{NSLocalizedDescriptionKey : errStr}];
   }

@@ -320,6 +320,22 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "SNTEndpointSecurityTreeAwareClientTest",
+    srcs = ["EventProviders/SNTEndpointSecurityTreeAwareClientTest.mm"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":EndpointSecurityMessage",
+        ":Metrics",
+        ":MockEndpointSecurityAPI",
+        ":SNTEndpointSecurityTreeAwareClient",
+        "//Source/common:TestUtils",
+        "@OCMock",
+    ],
+)
+
 objc_library(
     name = "SNTEndpointSecurityRecorder",
     srcs = ["EventProviders/SNTEndpointSecurityRecorder.mm"],
@@ -487,6 +503,7 @@ objc_library(
     hdrs = ["EventProviders/EndpointSecurity/EnrichedTypes.h"],
     deps = [
         ":EndpointSecurityMessage",
+        "//Source/common:Platform",
         "//Source/santad/ProcessTree:process_tree_cc_proto",
     ],
 )
@@ -716,6 +733,7 @@ objc_library(
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "@FMDB",
+        "@MOLCodesignChecker",
         "@MOLXPCConnection",
     ],
 )
@@ -830,26 +848,36 @@ objc_library(
 )
 
 macos_bundle(
-    name = "com.google.santa.daemon",
+    name = "com.northpolesec.santa.daemon",
     bundle_extension = "systemextension",
-    bundle_id = "com.google.santa.daemon",
+    bundle_id = "com.northpolesec.santa.daemon",
     codesignopts = [
         "--timestamp",
         "--force",
         "--options library,kill,runtime",
     ],
     entitlements = select({
-        "//:adhoc_build": "com.google.santa.daemon.systemextension-adhoc.entitlements",
+        "//:adhoc_build": "com.northpolesec.santa.daemon.systemextension-adhoc.entitlements",
         # Non-adhoc builds get their entitlements from the provisioning profile.
         "//conditions:default": None,
     }),
-    infoplists = ["Info.plist"],
+    infoplists = [
+        "Info.plist",
+        "//Source/common:CommitHash",
+    ],
     linkopts = ["-execute"],
     minimum_os_version = "12.0",
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:daemon_dev",
     }),
+    resources = [
+        "//:Conf/com.northpolesec.santa.bundleservice.plist",
+        "//:Conf/com.northpolesec.santa.metricservice.plist",
+        "//:Conf/com.northpolesec.santa.plist",
+        "//:Conf/com.northpolesec.santa.syncservice.plist",
+        "//:Conf/install_services.sh",
+    ],
     version = "//:version",
     visibility = ["//:santa_package_group"],
     deps = [":santad_main"],
@@ -1196,6 +1224,7 @@ santa_unit_test(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":MockEndpointSecurityAPI",
+        "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTMetricSet",
         "//Source/common:TestUtils",
@@ -1442,6 +1471,7 @@ test_suite(
         ":SNTEndpointSecurityFileAccessAuthorizerTest",
         ":SNTEndpointSecurityRecorderTest",
         ":SNTEndpointSecurityTamperResistanceTest",
+        ":SNTEndpointSecurityTreeAwareClientTest",
         ":SNTEventTableTest",
         ":SNTExecutionControllerTest",
         ":SNTPolicyProcessorTest",

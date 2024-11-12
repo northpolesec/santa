@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -17,6 +18,7 @@
 #import "Source/gui/SNTMessageWindowController.h"
 
 @class SNTStoredEvent;
+@class SNTBundleProgress;
 
 ///
 ///  Controller for a single message window.
@@ -27,7 +29,6 @@
                     customMsg:(NSString *)message
                     customURL:(NSString *)url;
 
-- (IBAction)showCertInfo:(id)sender;
 - (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash;
 
 ///  Reference to the "Bundle Hash" label in the XIB. Used to remove if application
@@ -41,23 +42,7 @@
 ///
 /// Is displayed if calculating the bundle hash is taking a bit.
 ///
-@property(weak) IBOutlet NSProgressIndicator *hashingIndicator;
-
-///
-/// Is displayed if calculating the bundle hash is taking a bit.
-///
-@property(weak) IBOutlet NSTextField *foundFileCountLabel;
-
-///
-///  Reference to the "Open Event" button in the XIB. Used to either remove the button
-///  if it isn't needed or set its title if it is.
-///
-@property(weak) IBOutlet NSButton *openEventButton;
-
-///
-///   Reference to the "Dismiss Event" button in the XIB. Used to update its title.
-///
-@property(weak) IBOutlet NSButton *dismissEventButton;
+@property(readonly) SNTBundleProgress *bundleProgress;
 
 ///
 ///  The execution event that this window is for

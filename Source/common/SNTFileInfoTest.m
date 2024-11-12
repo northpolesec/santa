@@ -142,7 +142,7 @@
 
   XCTAssertNotNil([sut bundle]);
 
-  XCTAssertEqualObjects([sut bundleIdentifier], @"com.google.santa.BundleExample");
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.BundleExample");
   XCTAssertEqualObjects([sut bundleName], @"BundleExample");
   XCTAssertEqualObjects([sut bundleVersion], @"1");
   XCTAssertEqualObjects([sut bundleShortVersionString], @"1.0");
@@ -156,7 +156,7 @@
 
   XCTAssertNotNil([sut bundle]);
 
-  XCTAssertEqualObjects([sut bundleIdentifier], @"com.google.santa.UnitTest.SNTFileInfoTest");
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.UnitTest.SNTFileInfoTest");
   XCTAssertNotNil([sut bundleVersion]);
   XCTAssertNotNil([sut bundleShortVersionString]);
 
@@ -174,7 +174,7 @@
 
   XCTAssertNotNil([sut bundle]);
 
-  XCTAssertEqualObjects([sut bundleIdentifier], @"com.google.santa.UnitTest.SNTFileInfoTest");
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.UnitTest.SNTFileInfoTest");
   XCTAssertNotNil([sut bundleVersion]);
   XCTAssertNotNil([sut bundleShortVersionString]);
   XCTAssertEqualObjects([sut bundlePath], path);
@@ -192,7 +192,7 @@
 
   XCTAssertNotNil([sut bundle]);
 
-  XCTAssertEqualObjects([sut bundleIdentifier], @"com.google.santa.BundleExample");
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.BundleExample");
   XCTAssertEqualObjects([sut bundleName], @"BundleExample");
   XCTAssertEqualObjects([sut bundleVersion], @"1");
   XCTAssertEqualObjects([sut bundleShortVersionString], @"1.0");
@@ -205,7 +205,7 @@
 
   XCTAssertNotNil([sut bundle]);
 
-  XCTAssertEqualObjects([sut bundleIdentifier], @"com.google.santa.BundleExample");
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.BundleExample");
   XCTAssertEqualObjects([sut bundleName], @"BundleExample");
   XCTAssertEqualObjects([sut bundleVersion], @"1");
   XCTAssertEqualObjects([sut bundleShortVersionString], @"1.0");
@@ -215,7 +215,7 @@
 
   XCTAssertNotNil([sut bundle]);
 
-  XCTAssertEqualObjects([sut bundleIdentifier], @"com.google.santa.UnitTest.SNTFileInfoTest");
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.UnitTest.SNTFileInfoTest");
   XCTAssertNotNil([sut bundleVersion]);
   XCTAssertNotNil([sut bundleShortVersionString]);
 

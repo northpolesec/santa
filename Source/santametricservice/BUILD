@@ -58,13 +58,16 @@ test_suite(
 
 macos_command_line_application(
     name = "santametricservice",
-    bundle_id = "com.google.santa.metricservice",
+    bundle_id = "com.northpolesec.santa.metricservice",
     codesignopts = [
         "--timestamp",
         "--force",
         "--options library,kill,runtime",
     ],
-    infoplists = ["Info.plist"],
+    infoplists = [
+        "Info.plist",
+        "//Source/common:CommitHash",
+    ],
     minimum_os_version = "12.0",
     provisioning_profile = select({
         "//:adhoc_build": None,

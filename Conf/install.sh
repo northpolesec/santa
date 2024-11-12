@@ -18,71 +18,26 @@ if [[ -z "${BINARIES}" || -z "${CONF}" ]]; then
   fi
 fi
 
-# Unload santad and scheduled sync job.
-/bin/launchctl remove com.google.santad >/dev/null 2>&1
+# Attempt to remove the current install of Santa, if any. If this command
+# succeeds, Santa is not currently running and this script should finish the
+# install. If Santa is running, its tamper protections will prevent removal
+# of /Applications/Santa.app.
+/bin/rm -rf /Applications/Santa.app >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  # Removal was successful.
+  # Install Santa and load the system extension. The system extension will
+  # finish loading the rest of Santa's configs and helper services.
+  /bin/cp -r ${BINARIES}/Santa.app /Applications/
+  /Applications/Santa.app/Contents/MacOS/Santa --load-system-extension
+else
+  # Tamper protections are enabled, ask Santa to install the update. If the
+  # update is valid, the system extension will take care of finishing the
+  # install.
+  /bin/mkdir -p /var/db/santa/migration
+  /bin/cp -r ${BINARIES}/Santa.app /var/db/santa/migration/
+  /Applications/Santa.app/Contents/MacOS/santactl install
+  # Cleanup cache dir.
+  /bin/rm -rf /var/db/santa/migration
+fi
 
-# Unload bundle service
-/bin/launchctl remove com.google.santa.bundleservice >/dev/null 2>&1
-
-# Unload metric service
-/bin/launchctl remove com.google.santa.metricservice >/dev/null 2>&1
-
-# Unload sync service
-/bin/launchctl remove com.google.santa.syncservice >/dev/null 2>&1
-
-# Unload kext.
-/sbin/kextunload -b com.google.santa-driver >/dev/null 2>&1
-
-# Determine if anyone is logged into the GUI
-GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
-
-# Unload GUI agent if someone is logged in.
-[[ -n "${GUI_USER}" ]] && \
-  /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.google.santagui
-[[ -n "$GUI_USER" ]] && \
-  /bin/launchctl asuser "${GUI_USER}" /bin/launchctl remove com.google.santa
-
-# Cleanup cruft from old versions
-/bin/launchctl remove com.google.santasync >/dev/null 2>&1
-/bin/rm /Library/LaunchDaemons/com.google.santasync.plist >/dev/null 2>&1
-/bin/rm /usr/libexec/santad >/dev/null 2>&1
-/bin/rm /usr/sbin/santactl >/dev/null 2>&1
-/bin/rm -rf /Applications/Santa.app 2>&1
-/bin/rm -rf /Library/Extensions/santa-driver.kext 2>&1
-/bin/rm /etc/asl/com.google.santa.asl.conf
-
-# Copy new files.
-/bin/mkdir -p /var/db/santa
-
-/bin/cp -r ${BINARIES}/Santa.app /Applications
-
-/bin/mkdir -p /usr/local/bin
-/bin/ln -s /Applications/Santa.app/Contents/MacOS/santactl /usr/local/bin 2>/dev/null
-
-/bin/cp ${CONF}/com.google.santa.plist /Library/LaunchAgents
-/bin/cp ${CONF}/com.google.santa.bundleservice.plist /Library/LaunchDaemons
-/bin/cp ${CONF}/com.google.santa.metricservice.plist /Library/LaunchDaemons
-/bin/cp ${CONF}/com.google.santa.syncservice.plist /Library/LaunchDaemons
-/bin/cp ${CONF}/com.google.santad.plist /Library/LaunchDaemons
-/bin/cp ${CONF}/com.google.santa.newsyslog.conf /etc/newsyslog.d/
-
-# Reload syslogd to pick up ASL configuration change.
-/usr/bin/killall -HUP syslogd
-
-# Load com.google.santa.daemon
-/bin/launchctl load /Library/LaunchDaemons/com.google.santad.plist
-
-# Load com.google.santa.bundleservice
-/bin/launchctl load /Library/LaunchDaemons/com.google.santa.bundleservice.plist
-
-# Load com.google.santa.metricservice
-/bin/launchctl load /Library/LaunchDaemons/com.google.santa.metricservice.plist
-
-# Load com.google.santa.syncservice
-/bin/launchctl load /Library/LaunchDaemons/com.google.santa.syncservice.plist
-
-# Load GUI agent if someone is logged in.
-[[ -z "${GUI_USER}" ]] && exit 0
-
-/bin/launchctl asuser "${GUI_USER}" /bin/launchctl load -w /Library/LaunchAgents/com.google.santa.plist
 exit 0

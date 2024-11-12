@@ -30,7 +30,7 @@
 #import "Source/santasyncservice/SNTSyncState.h"
 
 #include <google/protobuf/arena.h>
-#include "Source/santasyncservice/syncv1.pb.h"
+#include "sync/v1.pb.h"
 namespace pbv1 = ::santa::sync::v1;
 
 using santa::NSStringToUTF8String;
@@ -150,8 +150,8 @@ using santa::NSStringToUTF8String;
   e->set_file_bundle_version(NSStringToUTF8String(event.fileBundleVersion));
   e->set_file_bundle_version_string(NSStringToUTF8String(event.fileBundleVersionString));
   e->set_file_bundle_hash(NSStringToUTF8String(event.fileBundleHash));
-  e->set_file_bundle_hash_millis([event.fileBundleHashMilliseconds longLongValue]);
-  e->set_file_bundle_binary_count([event.fileBundleBinaryCount longLongValue]);
+  e->set_file_bundle_hash_millis([event.fileBundleHashMilliseconds unsignedIntValue]);
+  e->set_file_bundle_binary_count([event.fileBundleBinaryCount unsignedIntValue]);
 
   e->set_pid([event.pid unsignedIntValue]);
   e->set_ppid([event.ppid unsignedIntValue]);

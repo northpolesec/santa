@@ -1,7 +1,7 @@
 name: sanitizers
 on:
   schedule:
-    - cron: '0 16 * * *'
+    - cron: '0 15 * * *'
   workflow_dispatch:
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
             --runs_per_test 5 -t- :unit_tests \
             --define=SANTA_BUILD_TYPE=adhoc
       - name: Upload logs
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4.4.0
         if: failure()
         with:
           name: logs

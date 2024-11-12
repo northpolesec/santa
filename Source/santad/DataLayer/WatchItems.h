@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -40,6 +41,7 @@ extern NSString *const kWatchItemConfigKeyOptions;
 extern NSString *const kWatchItemConfigKeyOptionsAllowReadAccess;
 extern NSString *const kWatchItemConfigKeyOptionsAuditOnly;
 extern NSString *const kWatchItemConfigKeyOptionsInvertProcessExceptions;
+extern NSString *const kWatchItemConfigKeyOptionsRuleType;
 extern NSString *const kWatchItemConfigKeyOptionsEnableSilentMode;
 extern NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode;
 extern NSString *const kWatchItemConfigKeyOptionsCustomMessage;

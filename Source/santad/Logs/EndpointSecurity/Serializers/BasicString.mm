@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
 
@@ -34,36 +35,6 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #import "Source/santad/SNTDecisionCache.h"
-
-using santa::EndpointSecurityAPI;
-using santa::EnrichedClose;
-using santa::EnrichedCSInvalidated;
-using santa::EnrichedEventType;
-using santa::EnrichedExchange;
-using santa::EnrichedExec;
-using santa::EnrichedExit;
-using santa::EnrichedFork;
-using santa::EnrichedLink;
-using santa::EnrichedLoginLogin;
-using santa::EnrichedLoginLogout;
-using santa::EnrichedLoginWindowSessionLock;
-using santa::EnrichedLoginWindowSessionLogin;
-using santa::EnrichedLoginWindowSessionLogout;
-using santa::EnrichedLoginWindowSessionUnlock;
-using santa::EnrichedOpenSSHLogin;
-using santa::EnrichedOpenSSHLogout;
-using santa::EnrichedProcess;
-using santa::EnrichedRename;
-using santa::EnrichedScreenSharingAttach;
-using santa::EnrichedScreenSharingDetach;
-using santa::EnrichedUnlink;
-using santa::Message;
-using santa::MountFromName;
-using santa::NonNull;
-using santa::Pid;
-using santa::Pidversion;
-using santa::RealGroup;
-using santa::RealUser;
 
 namespace santa {
 
@@ -644,6 +615,38 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogout &ms
   AppendInstigator(str, msg);
   AppendEventUser(str, msg->event.login_logout->username,
                   std::make_optional<uid_t>(msg->event.login_logout->uid));
+
+  return FinalizeString(str);
+}
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationOD &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=AUTHENTICATION_OD");
+
+  return FinalizeString(str);
+}
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationTouchID &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=AUTHENTICATION_TOUCHID");
+
+  return FinalizeString(str);
+}
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationToken &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=AUTHENTICATION_TOKEN");
+
+  return FinalizeString(str);
+}
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationAutoUnlock &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=AUTHENTICATION_AUTO_UNLOCK");
 
   return FinalizeString(str);
 }

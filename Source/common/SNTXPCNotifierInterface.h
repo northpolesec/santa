@@ -26,7 +26,7 @@
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
                  andCustomURL:(NSString *)url;
-- (void)postUSBBlockNotification:(SNTDeviceEvent *)event withCustomMessage:(NSString *)message;
+- (void)postUSBBlockNotification:(SNTDeviceEvent *)event;
 - (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event
                           customMessage:(NSString *)message
                               customURL:(NSString *)url

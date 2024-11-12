@@ -7,7 +7,7 @@ Want to contribute? Great! First, read this page (including the small print at t
 
 ### Before you contribute
 Before we can use your code, you must sign the
-[Google Individual Contributor License Agreement](https://developers.google.com/open-source/cla/individual)
+[North Pole Security Individual Contributor License Agreement](https://docs.google.com/document/d/18yCxw0GiX4YEe4LqBVsXGAmsVX1aKsXfu7sA0bABfsA/pub)
 (CLA), which you can do online. The CLA is necessary mainly because you own the
 copyright to your changes, even after your contribution becomes part of our
 codebase, so we need your permission to use and distribute your code. We also
@@ -17,7 +17,7 @@ the CLA until after you've submitted your code for review and a member has
 approved it, but you must do it before we can put your code into our codebase.
 
 Before you start working on a larger contribution, you should get in touch with
-us first through the [issue tracker](https://github.com/google/santa/issues)
+us first through the [issue tracker](https://github.com/northpolesec/santa/issues)
 with your idea so that we can help out and possibly guide you. Co-ordinating
 large changes ahead of time can avoid frustration later on.
 
@@ -46,4 +46,4 @@ All submissions related to the use of different identifiers should adhere to the
 
 ### The small print
 Contributions made by corporations are covered by a different agreement than
-the one above, the [Software Grant and Corporate Contributor License Agreement](https://developers.google.com/open-source/cla/corporate).
+the one above, the [Software Grant and Corporate Contributor License Agreement](https://docs.google.com/document/d/1pdmZedxtdaAr4_DT-QH_o0ETn2ybSzWclN51Q9c03vU/pub)

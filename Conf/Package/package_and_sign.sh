@@ -6,9 +6,16 @@
 # DMG. It also outputs a single release tarball.
 # All of the following environment variables are required.
 
+set -e
+
+function die {
+  echo "${@}"
+  exit 2
+}
+
 # RELEASE_ROOT is a required environment variable that points to the root
-# of an extracted release tarball produced with the :release and :release_driver
-# rules in Santa's main BUILD file.
+# of a release tarball produced with the :release rule in Santa's
+# main BUILD file, or the root of an extracted release dir.
 [[ -n "${RELEASE_ROOT}" ]] || die "RELEASE_ROOT unset"
 
 # SIGNING_IDENTITY, SIGNING_TEAMID and SIGNING_KEYCHAIN are required environment
@@ -25,7 +32,7 @@
 [[ -n "${INSTALLER_SIGNING_KEYCHAIN}" ]] || die "INSTALLER_SIGNING_KEYCHAIN unset"
 
 # NOTARIZATION_TOOL is a required environment variable pointing to a wrapper
-# tool around the tool to use for notarization. The tool must take 2 flags:
+# tool around the tool to use for notarization. The tool must take 1 flag:
 #    --file
 #        - pointing at a zip file containing the artifact to notarize
 [[ -n "${NOTARIZATION_TOOL}" ]] || die "NOTARIZATION_TOOL unset"
@@ -36,28 +43,25 @@
 
 ################################################################################
 
-function die {
-  echo "${@}"
-  exit 2
-}
+# Extract release, if necessary
+if [[ -f "${RELEASE_ROOT}" ]]; then
+  NEW_RELEASE_ROOT=$(mktemp -dt release_root)
+  tar xvzf "${RELEASE_ROOT}" -C "${NEW_RELEASE_ROOT}"
+  RELEASE_ROOT=${NEW_RELEASE_ROOT}
+fi
 
 readonly INPUT_APP="${RELEASE_ROOT}/binaries/Santa.app"
-readonly INPUT_SYSX="${INPUT_APP}/Contents/Library/SystemExtensions/com.google.santa.daemon.systemextension"
+readonly INPUT_SYSX="${INPUT_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension"
 readonly INPUT_SANTACTL="${INPUT_APP}/Contents/MacOS/santactl"
 readonly INPUT_SANTABS="${INPUT_APP}/Contents/MacOS/santabundleservice"
 readonly INPUT_SANTAMS="${INPUT_APP}/Contents/MacOS/santametricservice"
 readonly INPUT_SANTASS="${INPUT_APP}/Contents/MacOS/santasyncservice"
 
-readonly RELEASE_NAME="santa-$(/usr/bin/defaults read "${INPUT_APP}/Contents/Info.plist" CFBundleShortVersionString)"
+readonly RELEASE_NAME="santa-$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${INPUT_APP}/Contents/Info.plist")"
 
-readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}/santa-"XXXXXX)
-readonly APP_PKG_ROOT="${SCRATCH}/app_pkg_root"
-readonly APP_PKG_SCRIPTS="${SCRATCH}/pkg_scripts"
+readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
 
-readonly SCRIPT_PATH="$(/usr/bin/dirname -- ${BASH_SOURCE[0]})"
-
-/bin/mkdir -p "${APP_PKG_ROOT}" "${APP_PKG_SCRIPTS}"
-
+readonly PKG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.pkg"
 readonly DMG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.dmg"
 readonly TAR_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.tar.gz"
 
@@ -78,7 +82,7 @@ for ARTIFACT in "${INPUT_SYSX}" "${INPUT_APP}"; do
   /usr/bin/zip -9r "${SCRATCH}/${BN}.zip" "${ARTIFACT}"
 
   echo "notarizing ${BN}"
-  PBID=$(/usr/bin/defaults read "${ARTIFACT}/Contents/Info.plist" CFBundleIdentifier)
+  PBID=$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "${ARTIFACT}/Contents/Info.plist")
   "${NOTARIZATION_TOOL}" --file "${SCRATCH}/${BN}.zip"
 done
 
@@ -94,7 +98,7 @@ done
 # be verified without using sudo.
 /usr/bin/find "${RELEASE_ROOT}/binaries" -type f -name CodeResources -exec chmod 0644 {} \;
 /usr/bin/find "${RELEASE_ROOT}/binaries" -type d -exec chmod 0755 {} \;
-/usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.google.santa*" -exec chmod 0644 {} \;
+/usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.northpolesec.santa*" -exec chmod 0644 {} \;
 
 echo "verifying signatures"
 /usr/bin/codesign -vv -R="certificate leaf[subject.OU] = ${SIGNING_TEAMID}" \
@@ -107,44 +111,16 @@ echo "creating fresh release tarball"
 /bin/cp -r "${RELEASE_ROOT}/dsym" "${SCRATCH}/tar_root/${RELEASE_NAME}"
 /usr/bin/tar -C "${SCRATCH}/tar_root" -czvf "${TAR_PATH}" "${RELEASE_NAME}" || die "failed to create release tarball"
 
-echo "creating app pkg"
-/bin/mkdir -p "${APP_PKG_ROOT}/Applications" \
-  "${APP_PKG_ROOT}/Library/LaunchAgents" \
-  "${APP_PKG_ROOT}/Library/LaunchDaemons" \
-  "${APP_PKG_ROOT}/private/etc/asl" \
-  "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/Applications/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santad.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.plist" "${APP_PKG_ROOT}/Library/LaunchAgents/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.bundleservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.metricservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.syncservice.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.asl.conf" "${APP_PKG_ROOT}/private/etc/asl/"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.google.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
-/bin/cp -vXL "${SCRIPT_PATH}/preinstall" "${APP_PKG_SCRIPTS}/"
-/bin/cp -vXL "${SCRIPT_PATH}/postinstall" "${APP_PKG_SCRIPTS}/"
-/bin/chmod +x "${APP_PKG_SCRIPTS}/"*
-
-# Disable bundle relocation.
-/usr/bin/pkgbuild --analyze --root "${APP_PKG_ROOT}" "${SCRATCH}/component.plist"
-/usr/bin/plutil -replace BundleIsRelocatable -bool NO "${SCRATCH}/component.plist"
-/usr/bin/plutil -replace BundleIsVersionChecked -bool NO "${SCRATCH}/component.plist"
-/usr/bin/plutil -replace BundleOverwriteAction -string upgrade "${SCRATCH}/component.plist"
-/usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
-
-# Build app package
-/usr/bin/pkgbuild --identifier "com.google.santa" \
-  --version "$(echo "${RELEASE_NAME}" | cut -d - -f2)" \
-  --root "${APP_PKG_ROOT}" \
-  --component-plist "${SCRATCH}/component.plist" \
-  --scripts "${APP_PKG_SCRIPTS}" \
-  "${SCRATCH}/app.pkg"
+# Create the app pkg at "${SCRATCH}/app.pkg".
+export RELEASE_ROOT
+export PKG_OUT_DIR="${SCRATCH}"
+"${RELEASE_ROOT}/conf/package.sh"
 
 # Build signed distribution package
 echo "productbuild pkg"
 /bin/mkdir -p "${SCRATCH}/${RELEASE_NAME}"
 /usr/bin/productbuild \
-  --distribution "${SCRIPT_PATH}/Distribution.xml" \
+  --distribution "${RELEASE_ROOT}/conf/Distribution.xml" \
   --package-path "${SCRATCH}" \
   --sign "${INSTALLER_SIGNING_IDENTITY}" --keychain "${INSTALLER_SIGNING_KEYCHAIN}" \
   "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg"
@@ -157,6 +133,9 @@ echo "notarizing pkg"
 
 echo "stapling pkg"
 /usr/bin/xcrun stapler staple "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" || die "failed to staple pkg"
+
+echo "copying pkg to output"
+cp "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg" "${PKG_PATH}"
 
 echo "wrapping pkg in dmg"
 /usr/bin/hdiutil create -fs HFS+ -format UDZO \

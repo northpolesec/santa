@@ -145,6 +145,7 @@ objc_library(
     name = "CertificateHelpers",
     srcs = ["CertificateHelpers.m"],
     hdrs = ["CertificateHelpers.h"],
+    module_name = "santa_common_CertificateHelpers",
     deps = [
         "@MOLCertificate",
     ],
@@ -166,6 +167,7 @@ objc_library(
     hdrs = ["SNTBlockMessage.h"],
     deps = [
         ":SNTConfigurator",
+        ":SNTDeviceEvent",
         ":SNTFileAccessEvent",
         ":SNTLogging",
         ":SNTStoredEvent",
@@ -178,8 +180,10 @@ objc_library(
     srcs = ["SNTBlockMessage.m"],
     hdrs = ["SNTBlockMessage.h"],
     defines = ["SANTAGUI"],
+    module_name = "santa_common_SNTBlockMessage",
     deps = [
         ":SNTConfigurator",
+        ":SNTDeviceEvent",
         ":SNTFileAccessEvent",
         ":SNTLogging",
         ":SNTStoredEvent",
@@ -219,7 +223,6 @@ objc_library(
         "Foundation",
     ],
     deps = [
-        ":CertificateHelpers",
         ":SNTStoredEvent",
     ],
 )
@@ -334,7 +337,9 @@ objc_library(
     name = "SNTStoredEvent",
     srcs = ["SNTStoredEvent.m"],
     hdrs = ["SNTStoredEvent.h"],
+    module_name = "santa_common_SNTStoredEvent",
     deps = [
+        ":CertificateHelpers",
         ":SNTCommonEnums",
         "@MOLCertificate",
     ],
@@ -542,4 +547,16 @@ objc_library(
         "@OCMock",
         "@com_google_googletest//:gtest",
     ],
+)
+
+genrule(
+    name = "CommitHash",
+    outs = ["CommitHash.plist"],
+    cmd = """
+    STABLE_GIT_COMMIT=$$(awk '/STABLE_GIT_COMMIT/ { print $$2 }' bazel-out/stable-status.txt)
+    defaults write $${PWD}/$(@) SNTCommitHash -string $${STABLE_GIT_COMMIT:-unset}
+    """,
+    local = 1,
+    message = "Generating CommitHash.plist",
+    stamp = 1,
 )

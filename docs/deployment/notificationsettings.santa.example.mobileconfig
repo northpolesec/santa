@@ -13,7 +13,7 @@
 					<key>BadgesEnabled</key>
 					<true/>
 					<key>BundleIdentifier</key>
-					<string>com.google.santa</string>
+					<string>com.northpolesec.santa</string>
 					<key>CriticalAlertEnabled</key>
 					<true/>
 					<key>NotificationsEnabled</key>
@@ -29,7 +29,7 @@
 			<key>PayloadDisplayName</key>
 			<string>Notifications Payload</string>
 			<key>PayloadIdentifier</key>
-			<string>com.google.santa.notificationsettings.F1817DA0-0044-43DD-9540-36EBC60FDA8F</string>
+			<string>com.northpolesec.santa.notificationsettings.F1817DA0-0044-43DD-9540-36EBC60FDA8F</string>
 			<key>PayloadOrganization</key>
 			<string></string>
 			<key>PayloadType</key>
@@ -47,7 +47,7 @@
 	<key>PayloadEnabled</key>
 	<true/>
 	<key>PayloadIdentifier</key>
-	<string>com.google.santa.notificationsettings.069CA123-6129-46A5-8FD1-49322E5A5755</string>
+	<string>com.northpolesec.santa.notificationsettings.069CA123-6129-46A5-8FD1-49322E5A5755</string>
 	<key>PayloadOrganization</key>
 	<string></string>
 	<key>PayloadRemovalDisallowed</key>

@@ -1,4 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,6 +16,8 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+
+@class MOLCertificate;
 
 ///
 ///  Represents an event stored in the database.
@@ -93,7 +96,7 @@
 ///  If the executed file was signed, this is an NSArray of MOLCertificate's
 ///  representing the signing chain.
 ///
-@property NSArray *signingChain;
+@property NSArray<MOLCertificate *> *signingChain;
 
 ///
 /// If the executed file was signed, this is the Team ID if present in the signature information.
@@ -157,5 +160,18 @@
 @property NSString *quarantineRefererURL;
 @property NSDate *quarantineTimestamp;
 @property NSString *quarantineAgentBundleID;
+
+///
+/// A generated string representing the publisher based on the signingChain
+///
+@property(readonly) NSString *publisherInfo;
+
+///
+/// Return an array of the underlying SecCertificateRef's of the signingChain
+///
+/// WARNING: If the refs need to be used for a long time be careful to properly
+/// CFRetain/CFRelease the returned items.
+///
+@property(readonly) NSArray *signingChainCertRefs;
 
 @end

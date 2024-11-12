@@ -571,7 +571,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
   if (message) d[NSLocalizedFailureReasonErrorKey] = message;
 
-  *error = [NSError errorWithDomain:@"com.google.santad.ruletable" code:code userInfo:d];
+  *error = [NSError errorWithDomain:@"com.northpolesec.santad.ruletable" code:code userInfo:d];
   return YES;
 }
 #pragma mark Querying

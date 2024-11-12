@@ -36,7 +36,7 @@ RateLimiter::RateLimiter(std::shared_ptr<Metrics> metrics, Processor processor, 
       reset_mach_time_(0),
       reset_duration_ns_(reset_duration * NSEC_PER_SEC) {
   q_ = dispatch_queue_create(
-    "com.google.santa.daemon.rate_limiter",
+    "com.northpolesec.santa.daemon.rate_limiter",
     dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
                                             QOS_CLASS_USER_INTERACTIVE, 0));
 }

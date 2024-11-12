@@ -36,9 +36,22 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTCommandInstall",
+    srcs = ["Commands/SNTCommandInstall.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+        "@MOLXPCConnection",
+    ],
+)
+
+objc_library(
     name = "santactl_lib",
     srcs = [
+        "Commands/SNTCommandCheckCache.m",
         "Commands/SNTCommandFileInfo.m",
+        "Commands/SNTCommandFlushCache.m",
         "Commands/SNTCommandMetrics.h",
         "Commands/SNTCommandMetrics.m",
         "Commands/SNTCommandRule.h",
@@ -51,13 +64,12 @@ objc_library(
         "//:opt_build": [],
         "//conditions:default": [
             "Commands/SNTCommandBundleInfo.m",
-            "Commands/SNTCommandCheckCache.m",
-            "Commands/SNTCommandFlushCache.m",
         ],
     }),
     sdk_dylibs = ["libz"],
     sdk_frameworks = ["IOKit"],
     deps = [
+        ":SNTCommandInstall",
         ":SNTCommandPrintLog",
         ":santactl_cmd",
         "//Source/common:SNTCachedDecision",
@@ -87,13 +99,16 @@ objc_library(
 
 macos_command_line_application(
     name = "santactl",
-    bundle_id = "com.google.santa.ctl",
+    bundle_id = "com.northpolesec.santa.ctl",
     codesignopts = [
         "--timestamp",
         "--force",
         "--options library,kill,runtime",
     ],
-    infoplists = ["Info.plist"],
+    infoplists = [
+        "Info.plist",
+        "//Source/common:CommitHash",
+    ],
     minimum_os_version = "12.0",
     provisioning_profile = select({
         "//:adhoc_build": None,

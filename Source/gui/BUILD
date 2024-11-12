@@ -8,9 +8,12 @@ package(
     default_visibility = ["//:santa_package_group"],
 )
 
-exports_files([
-    "Resources/Images.xcassets/AppIcon.appiconset/santa-hat-icon-256.png",
-])
+swift_library(
+    name = "SNTMessageView",
+    srcs = ["SNTMessageView.swift"],
+    module_name = "santa_gui_SNTMessageView",
+    deps = ["//Source/common:SNTConfigurator"],
+)
 
 swift_library(
     name = "SNTAboutWindowView",
@@ -20,12 +23,26 @@ swift_library(
 )
 
 swift_library(
+    name = "SNTBinaryMessageWindowView",
+    srcs = ["SNTBinaryMessageWindowView.swift"],
+    generates_header = 1,
+    deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTStoredEvent",
+    ],
+)
+
+swift_library(
     name = "SNTDeviceMessageWindowView",
     srcs = [
         "SNTDeviceMessageWindowView.swift",
     ],
     generates_header = 1,
     deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
     ],
@@ -38,6 +55,8 @@ swift_library(
     ],
     generates_header = 1,
     deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTFileAccessEvent",
     ],
 )
@@ -47,8 +66,6 @@ objc_library(
     srcs = [
         "SNTAboutWindowController.h",
         "SNTAboutWindowController.m",
-        "SNTAccessibleTextField.h",
-        "SNTAccessibleTextField.m",
         "SNTAppDelegate.h",
         "SNTAppDelegate.m",
         "SNTBinaryMessageWindowController.h",
@@ -66,9 +83,6 @@ objc_library(
     hdrs = [
         "SNTNotificationManager.h",
     ],
-    data = [
-        "Resources/MessageWindow.xib",
-    ],
     sdk_frameworks = [
         "IOKit",
         "SecurityInterface",
@@ -77,6 +91,7 @@ objc_library(
     ],
     deps = [
         ":SNTAboutWindowView",
+        ":SNTBinaryMessageWindowView",
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         "//Source/common:CertificateHelpers",
@@ -103,10 +118,11 @@ macos_application(
         "//Source/santabundleservice": "MacOS",
         "//Source/santametricservice": "MacOS",
         "//Source/santasyncservice": "MacOS",
-        "//Source/santad:com.google.santa.daemon": "Library/SystemExtensions",
+        "//Source/santad:com.northpolesec.santa.daemon": "Library/SystemExtensions",
+        "Resources/Fonts/StarJedi.ttf": ".",
     },
     app_icons = glob(["Resources/Images.xcassets/**"]),
-    bundle_id = "com.google.santa",
+    bundle_id = "com.northpolesec.santa",
     bundle_name = "Santa",
     codesignopts = [
         "--timestamp",
@@ -118,12 +134,16 @@ macos_application(
         # Non-adhoc builds get thier entitlements from the provisioning profile.
         "//conditions:default": None,
     }),
-    infoplists = ["Info.plist"],
+    infoplists = [
+        "Info.plist",
+        "//Source/common:CommitHash",
+    ],
     minimum_os_version = "12.0",
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",
     }),
+    strings = glob(["Resources/**/*.strings"]),
     version = "//:version",
     visibility = ["//:santa_package_group"],
     deps = [":SantaGUI_lib"],

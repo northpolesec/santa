@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include "Source/santad/Metrics.h"
 
@@ -44,6 +45,7 @@ static NSString *const kEventTypeAuthSignal = @"AuthSignal";
 static NSString *const kEventTypeAuthTruncate = @"AuthTruncate";
 static NSString *const kEventTypeAuthUnlink = @"AuthUnlink";
 static NSString *const kEventTypeNotifyClose = @"NotifyClose";
+static NSString *const kEventTypeNotifyCodesigningInvalidated = @"NotifyCodesigningInvalidated";
 static NSString *const kEventTypeNotifyExchangedata = @"NotifyExchangedata";
 static NSString *const kEventTypeNotifyExec = @"NotifyExec";
 static NSString *const kEventTypeNotifyExit = @"NotifyExit";
@@ -54,6 +56,7 @@ static NSString *const kEventTypeNotifyUnlink = @"NotifyUnlink";
 static NSString *const kEventTypeNotifyUnmount = @"NotifyUnmount";
 static NSString *const kPseudoEventTypeGlobal = @"Global";
 #if HAVE_MACOS_13
+static NSString *const kEventTypeNotifyAuthentication = @"NotifyAuthentication";
 static NSString *const kEventTypeNotifyLoginLogin = @"NotifyLoginLogin";
 static NSString *const kEventTypeNotifyLoginLogout = @"NotifyLoginLogout";
 static NSString *const kEventTypeNotifyLWSessionLogin = @"NotifyLWSessionLogin";
@@ -120,6 +123,7 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
     case ES_EVENT_TYPE_AUTH_TRUNCATE: return kEventTypeAuthTruncate;
     case ES_EVENT_TYPE_AUTH_UNLINK: return kEventTypeAuthUnlink;
     case ES_EVENT_TYPE_NOTIFY_CLOSE: return kEventTypeNotifyClose;
+    case ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED: return kEventTypeNotifyCodesigningInvalidated;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: return kEventTypeNotifyExchangedata;
     case ES_EVENT_TYPE_NOTIFY_EXEC: return kEventTypeNotifyExec;
     case ES_EVENT_TYPE_NOTIFY_EXIT: return kEventTypeNotifyExit;
@@ -129,6 +133,7 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
     case ES_EVENT_TYPE_NOTIFY_UNLINK: return kEventTypeNotifyUnlink;
     case ES_EVENT_TYPE_NOTIFY_UNMOUNT: return kEventTypeNotifyUnmount;
 #if HAVE_MACOS_13
+    case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION: return kEventTypeNotifyAuthentication;
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN: return kEventTypeNotifyLoginLogin;
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT: return kEventTypeNotifyLoginLogout;
     case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN: return kEventTypeNotifyLWSessionLogin;
@@ -209,7 +214,7 @@ NSString *const StatResultToString(StatResult result) {
 }
 
 std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t interval) {
-  dispatch_queue_t q = dispatch_queue_create("com.google.santa.santametricsservice.q",
+  dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.santametricsservice.q",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
 
   dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
@@ -284,7 +289,7 @@ Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t in
       run_on_first_start_(run_on_first_start) {
   SetInterval(interval_);
 
-  events_q_ = dispatch_queue_create("com.google.santa.santametricsservice.events_q",
+  events_q_ = dispatch_queue_create("com.northpolesec.santa.santametricsservice.events_q",
                                     DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
 }
 

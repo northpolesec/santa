@@ -9,7 +9,7 @@ Santa is a binary and file access authorization system for macOS. It consists of
 
 It is named Santa because it keeps track of binaries that are naughty or nice.
 
-The project and the latest release is available on [**GitHub**](https://github.com/google/santa).
+The project and the latest release is available on [**GitHub**](https://github.com/northpolesec/santa).
 
 ## Features
 

@@ -21,19 +21,18 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface SNTDeviceMessageWindowController ()
-@property(copy, nullable) NSString *customMessage;
-@end
-
 @implementation SNTDeviceMessageWindowController
 
-- (instancetype)initWithEvent:(SNTDeviceEvent *)event message:(nullable NSString *)message {
+- (instancetype)initWithEvent:(SNTDeviceEvent *)event {
   self = [super init];
   if (self) {
     _event = event;
-    _customMessage = message;
   }
   return self;
+}
+
+- (void)windowDidResize:(NSNotification *)notification {
+  [self.window center];
 }
 
 - (void)showWindow:(id)sender {
@@ -41,20 +40,21 @@ NS_ASSUME_NONNULL_BEGIN
 
   self.window =
     [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskTitled
+                                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
+                                          NSWindowStyleMaskTitled
                                   backing:NSBackingStoreBuffered
                                     defer:NO];
+  self.window.titlebarAppearsTransparent = YES;
+  self.window.movableByWindowBackground = YES;
+  [self.window standardWindowButton:NSWindowZoomButton].hidden = YES;
+  [self.window standardWindowButton:NSWindowCloseButton].hidden = YES;
+  [self.window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
+
   self.window.contentViewController =
-    [SNTDeviceMessageWindowViewFactory createWithWindow:self.window
-                                                  event:self.event
-                                              customMsg:self.attributedCustomMessage];
+    [SNTDeviceMessageWindowViewFactory createWithWindow:self.window event:self.event];
   self.window.delegate = self;
 
   [super showWindow:sender];
-}
-
-- (NSAttributedString *)attributedCustomMessage {
-  return [SNTBlockMessage formatMessage:self.customMessage];
 }
 
 - (NSString *)messageHash {

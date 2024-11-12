@@ -10,42 +10,69 @@ on:
       - main
     paths:
       - 'Source/**'
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
       - name: Run linters
         run: ./Testing/lint.sh
   build_userspace:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, macos-13, macos-14]
+        os: [macos-13, macos-14, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@90b352333885f9fb6bf262d8e659f01b6219cc25 # ratchet:bazel-contrib/setup-bazel@0.9.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ matrix.os }}
+          repository-cache: true
       - name: Build Userspace
         run: bazel build --apple_generate_dsym -c opt :release --define=SANTA_BUILD_TYPE=adhoc
+  check_localization:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - name: Check missing localization strings
+        run: |
+          ./Testing/localization.py
+          if [[ -n "$(git diff)" ]]; then
+            git diff
+            echo "Base localization has not been updated. Please run:"
+            echo "    ./Testing/localization.py"
+            echo "and commit any changes it makes."
+            exit 1 # return an error if localization.py made changes
+          fi
   unit_tests:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, macos-13, macos-14]
+        os: [macos-13, macos-14, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@90b352333885f9fb6bf262d8e659f01b6219cc25 # ratchet:bazel-contrib/setup-bazel@0.9.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ matrix.os }}
+          repository-cache: true
       - name: Run All Tests
         run: bazel test :unit_tests --define=SANTA_BUILD_TYPE=adhoc --test_output=errors
-  test_coverage:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
-      - name: Generate test coverage
-        run: sh ./generate_cov.sh
-      - name: Coveralls
-        uses: coverallsapp/github-action@09b709cf6a16e30b0808ba050c7a6e8a5ef13f8d # ratchet:coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ./bazel-out/_coverage/_coverage_report.dat
-          flag-name: Unit
+# test_coverage:
+#   runs-on: macos-14
+#   steps:
+#     - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
+#     - name: Generate test coverage
+#       run: sh ./generate_cov.sh
+#     - name: Coveralls
+#       uses: coverallsapp/github-action@09b709cf6a16e30b0808ba050c7a6e8a5ef13f8d # ratchet:coverallsapp/github-action@master
+#       with:
+#         github-token: ${{ secrets.GITHUB_TOKEN }}
+#         path-to-lcov: ./bazel-out/_coverage/_coverage_report.dat
+#         flag-name: Unit

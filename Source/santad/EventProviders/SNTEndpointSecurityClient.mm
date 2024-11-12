@@ -46,9 +46,6 @@ using santa::Metrics;
 using santa::Processor;
 using santa::WatchItemPathType;
 
-constexpr std::string_view kProtectedFiles[] = {"/private/var/db/santa/rules.db",
-                                                "/private/var/db/santa/events.db"};
-
 @interface SNTEndpointSecurityClient ()
 @property(nonatomic) double defaultBudget;
 @property(nonatomic) int64_t minAllowedHeadroom;
@@ -85,12 +82,12 @@ constexpr std::string_view kProtectedFiles[] = {"/private/var/db/santa/rules.db"
     _maxAllowedHeadroom = 5 * NSEC_PER_SEC;
 
     _authQueue = dispatch_queue_create(
-      "com.google.santa.daemon.auth_queue",
+      "com.northpolesec.santa.daemon.auth_queue",
       dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL,
                                               QOS_CLASS_USER_INTERACTIVE, 0));
 
     _notifyQueue = dispatch_queue_create(
-      "com.google.santa.daemon.notify_queue",
+      "com.northpolesec.santa.daemon.notify_queue",
       dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL,
                                               QOS_CLASS_UTILITY, 0));
   }
@@ -345,30 +342,6 @@ constexpr std::string_view kProtectedFiles[] = {"/private/var/db/santa/rules.db"
       dispatch_semaphore_wait(deadlineExpiredSema, DISPATCH_TIME_FOREVER);
     }
   });
-}
-
-+ (std::set<std::string>)getProtectedPaths {
-  std::set<std::string> protectedPathsCopy;
-
-  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); i++) {
-    protectedPathsCopy.insert(std::string(kProtectedFiles[i]));
-  }
-
-  return protectedPathsCopy;
-}
-
-+ (bool)isProtectedPath:(const std::string_view)path {
-  // TODO(mlw): These values should come from `SNTDatabaseController`. But right
-  // now they live as NSStrings. We should make them `std::string_view` types
-  // in order to use them here efficiently, but will need to make the
-  // `SNTDatabaseController` an ObjC++ file.
-  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); i++) {
-    if (path == kProtectedFiles[i]) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 @end
