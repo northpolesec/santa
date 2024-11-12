@@ -16,7 +16,6 @@
 import SwiftUI
 
 import santa_common_SNTBlockMessage
-import santa_common_SNTConfigurator
 import santa_common_SNTDeviceEvent
 import santa_gui_SNTMessageView
 

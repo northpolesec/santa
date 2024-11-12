@@ -680,7 +680,7 @@
 ///
 ///  Retrieve an initialized singleton configurator object using the default file path.
 ///
-+ (instancetype)configurator;
++ (instancetype)configurator NS_SWIFT_NAME(configurator());
 
 ///
 ///  Clear the sync server configuration from the effective configuration.

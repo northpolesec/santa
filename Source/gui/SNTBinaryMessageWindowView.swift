@@ -261,7 +261,7 @@ struct SNTBinaryMessageWindowView: View {
   @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
-  let c = SNTConfigurator()
+  let c = SNTConfigurator.configurator()!
 
   var body: some View {
     SNTMessageView(
