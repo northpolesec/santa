@@ -27,32 +27,17 @@ static id ValueOrNull(id value) {
 
 @implementation SNTBlockMessage
 
-+ (NSAttributedString *)formatMessage:(NSString *)message {
-  NSString *htmlHeader =
-    @"<html><head><style>"
-    @"body {"
-    @"  font-family: 'Lucida Grande', 'Helvetica', sans-serif;"
-    @"  font-size: 13px;"
-    @"  color: %@;"
-    @"  text-align: center;"
-    @"}"
++ (NSAttributedString *)formatMessage:(NSString *)message withFallback:(NSString *)fallback {
+  if (!message.length) return [[NSAttributedString alloc] initWithString:fallback];
 
-    // Supported in beta WebKit. Not sure if it is dynamic when used with NSAttributedString.
-    @"@media (prefers-color-scheme: dark) {"
-    @"  body {"
-    @"    color: #ddd;"
-    @"  }"
-    @"}"
-    @"</style></head><body>";
-
-  // Support Dark Mode. Note, the returned NSAttributedString is static and does not update when
-  // the OS switches modes.
-  NSString *mode = [NSUserDefaults.standardUserDefaults stringForKey:@"AppleInterfaceStyle"];
-  BOOL dark = [mode isEqualToString:@"Dark"];
-  htmlHeader = [NSString stringWithFormat:htmlHeader, dark ? @"#ddd" : @"#333"];
-
+  NSString *htmlHeader = @"<html><head><style>"
+                         @"body {"
+                         @"  font-family: 'Lucida Grande', 'Helvetica', sans-serif;"
+                         @"  font-size: 13px;"
+                         @"  text-align: center;"
+                         @"}"
+                         @"</style></head><body>";
   NSString *htmlFooter = @"</body></html>";
-
   NSString *fullHTML = [NSString stringWithFormat:@"%@%@%@", htmlHeader, message, htmlFooter];
 
 #ifdef SANTAGUI
@@ -65,7 +50,7 @@ static id ValueOrNull(id value) {
 #else
   NSString *strippedHTML = [self stringFromHTML:fullHTML];
   if (!strippedHTML) {
-    return [[NSAttributedString alloc] initWithString:@"This binary has been blocked."];
+    return [[NSAttributedString alloc] initWithString:fallback];
   }
   return [[NSAttributedString alloc] initWithString:strippedHTML];
 #endif
@@ -73,73 +58,65 @@ static id ValueOrNull(id value) {
 
 + (NSAttributedString *)attributedBlockMessageForEvent:(SNTStoredEvent *)event
                                          customMessage:(NSString *)customMessage {
-  NSString *message;
+  NSString *defaultBlockedMessage = NSLocalizedString(
+    @"The following application has been blocked from executing\nbecause its trustworthiness "
+    @"cannot be determined",
+    @"The default message to show the user when an unknown application is blocked");
+  NSString *defaultBannedMessage =
+    NSLocalizedString(@"The following application has been blocked from\nexecuting because it has "
+                      @"been deemed malicious",
+                      @"The default message to show the user when a banned application is blocked");
+
   if (customMessage.length) {
-    message = customMessage;
+    return [self formatMessage:customMessage
+                  withFallback:event.decision == SNTEventStateBlockUnknown ? defaultBlockedMessage
+                                                                           : defaultBannedMessage];
   } else if (event.decision == SNTEventStateBlockUnknown) {
-    message = [[SNTConfigurator configurator] unknownBlockMessage];
-    if (!message.length) {
-      message = NSLocalizedString(
-        @"The following application has been blocked from executing<br />because its "
-        @"trustworthiness cannot be determined",
-        @"The default message to show the user when an unknown application is blocked");
-    }
-  } else {
-    message = [[SNTConfigurator configurator] bannedBlockMessage];
-    if (!message.length) {
-      message = NSLocalizedString(
-        @"The following application has been blocked from<br />executing because it has been "
-        @"deemed malicious",
-        @"The default message to show the user when a banned application is blocked");
-    }
+    return [self formatMessage:[[SNTConfigurator configurator] unknownBlockMessage]
+                  withFallback:defaultBlockedMessage];
   }
-  return [SNTBlockMessage formatMessage:message];
+  return [self formatMessage:[[SNTConfigurator configurator] bannedBlockMessage]
+                withFallback:defaultBannedMessage];
 }
 
 + (NSAttributedString *)attributedBlockMessageForFileAccessEvent:(SNTFileAccessEvent *)event
                                                    customMessage:(NSString *)customMessage {
-  NSString *message = customMessage;
-  if (!message.length) {
-    message = [[SNTConfigurator configurator] fileAccessBlockMessage];
-    if (!message.length) {
-      message =
-        NSLocalizedString(@"Access to a file has been denied",
-                          @"The default message to show the user when access to a file is blocked");
-    }
-  }
-  return [SNTBlockMessage formatMessage:message];
+  NSString *defaultBlockedMesage =
+    NSLocalizedString(@"Access to a file has been denied",
+                      @"The default message to show the user when access to a file is blocked");
+
+  return [SNTBlockMessage
+    formatMessage:customMessage ?: [[SNTConfigurator configurator] fileAccessBlockMessage]
+     withFallback:defaultBlockedMesage];
 }
 
 + (NSAttributedString *)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent *)event {
-  SNTConfigurator *c = [SNTConfigurator configurator];
-  NSString *message;
-  if ([c remountUSBMode]) {
-    message = [c remountUSBBlockMessage];
-    if (!message.length) {
-      message =
-        NSLocalizedString(@"The following device has been remounted with reduced permissions",
-                          @"The default message to show the user when a USB device is remounted "
-                          @"with reduced permissions");
-    }
-  } else {
-    message = [c bannedUSBBlockMessage];
-    if (!message.length) {
-      message = NSLocalizedString(
-        @"The following device has been blocked from mounting",
-        @"The default message to show the user when a USB device is blocked from mounting");
-    }
+  NSString *defaultRemountMessage =
+    NSLocalizedString(@"The following device has been remounted with reduced permissions",
+                      @"The default message to show the user when a USB device is remounted with "
+                      @"reduced permissions");
+  NSString *defaultBannedMessage = NSLocalizedString(
+    @"The following device has been blocked from mounting",
+    @"The default message to show the user when a USB device is blocked from mounting");
+
+  if ([[SNTConfigurator configurator] remountUSBMode]) {
+    return [SNTBlockMessage formatMessage:[[SNTConfigurator configurator] remountUSBBlockMessage]
+                             withFallback:defaultRemountMessage];
   }
-  return [SNTBlockMessage formatMessage:message];
+  return [SNTBlockMessage formatMessage:[[SNTConfigurator configurator] bannedUSBBlockMessage]
+                           withFallback:defaultBannedMessage];
 }
 
 + (NSString *)stringFromHTML:(NSString *)html {
   NSError *error;
-  NSXMLDocument *xml = [[NSXMLDocument alloc] initWithXMLString:html options:0 error:&error];
+  NSXMLDocument *xml = [[NSXMLDocument alloc]
+    initWithXMLString:html
+              options:NSXMLDocumentIncludeContentTypeDeclaration | NSXMLNodeCompactEmptyElement |
+                      NSXMLNodeLoadExternalEntitiesNever | NSXMLNodeNeverEscapeContents
+                error:&error];
 
-  if (!xml && error.code == NSXMLParserEmptyDocumentError) {
-    html = [NSString stringWithFormat:@"<html><body>%@</body></html>", html];
-    xml = [[NSXMLDocument alloc] initWithXMLString:html options:0 error:&error];
-    if (!xml) return html;
+  if (error) {
+    return nil;
   }
 
   // Strip any HTML tags out of the message. Also remove any content inside <style> tags and
@@ -154,7 +131,7 @@ static id ValueOrNull(id value) {
     @"</xsl:stylesheet>";
   NSData *data = [xml objectByApplyingXSLTString:stripXslt arguments:NULL error:&error];
   if (error || ![data isKindOfClass:[NSData class]]) {
-    return html;
+    return nil;
   }
   return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
