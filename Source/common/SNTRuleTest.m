@@ -233,6 +233,7 @@
     @"rule_type" : @"TEAMID",
     @"custom_msg" : @"A custom block message",
     @"custom_url" : @"https://example.com",
+    @"comment" : @"",
   };
 
   SNTRule *sut = [[SNTRule alloc] initWithDictionary:expectedTeamID];
@@ -245,6 +246,7 @@
     @"rule_type" : @"BINARY",
     @"custom_msg" : @"",
     @"custom_url" : @"",
+    @"comment" : @"",
   };
 
   sut = [[SNTRule alloc] initWithDictionary:expectedBinary];
