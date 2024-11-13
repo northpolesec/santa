@@ -28,7 +28,9 @@ static id ValueOrNull(id value) {
 @implementation SNTBlockMessage
 
 + (NSAttributedString *)formatMessage:(NSString *)message withFallback:(NSString *)fallback {
-  if (!message.length) return [[NSAttributedString alloc] initWithString:fallback];
+  if (!message.length) {
+    message = fallback;
+  }
 
   NSString *htmlHeader = @"<html><head><style>"
                          @"body {"
@@ -50,6 +52,7 @@ static id ValueOrNull(id value) {
 #else
   NSString *strippedHTML = [self stringFromHTML:fullHTML];
   if (!strippedHTML) {
+    fallback = [fallback stringByReplacingOccurrencesOfString:@"<br />" withString:@"\n"];
     return [[NSAttributedString alloc] initWithString:fallback];
   }
   return [[NSAttributedString alloc] initWithString:strippedHTML];
@@ -59,11 +62,11 @@ static id ValueOrNull(id value) {
 + (NSAttributedString *)attributedBlockMessageForEvent:(SNTStoredEvent *)event
                                          customMessage:(NSString *)customMessage {
   NSString *defaultBlockedMessage = NSLocalizedString(
-    @"The following application has been blocked from executing\nbecause its trustworthiness "
+    @"The following application has been blocked from executing<br />because its trustworthiness "
     @"cannot be determined",
     @"The default message to show the user when an unknown application is blocked");
   NSString *defaultBannedMessage =
-    NSLocalizedString(@"The following application has been blocked from\nexecuting because it has "
+    NSLocalizedString(@"The following application has been blocked from<br />executing because it has "
                       @"been deemed malicious",
                       @"The default message to show the user when a banned application is blocked");
 
@@ -116,6 +119,7 @@ static id ValueOrNull(id value) {
                 error:&error];
 
   if (error) {
+    LOGW(@"Failed to parse HTML message: %@", error);
     return nil;
   }
 
@@ -131,6 +135,7 @@ static id ValueOrNull(id value) {
     @"</xsl:stylesheet>";
   NSData *data = [xml objectByApplyingXSLTString:stripXslt arguments:NULL error:&error];
   if (error || ![data isKindOfClass:[NSData class]]) {
+    LOGW(@"Failed to strip HTML message: %@", error);
     return nil;
   }
   return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
