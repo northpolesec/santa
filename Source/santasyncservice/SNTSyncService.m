@@ -16,6 +16,7 @@
 
 #import <MOLXPCConnection/MOLXPCConnection.h>
 
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDropRootPrivs.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -48,6 +49,11 @@
       LOGE(@"Failed to drop root privileges. Exiting.");
       exit(1);
     }
+
+    // Initialize SNTConfigurator ONLY after privileges have been dropped.
+    [SNTConfigurator configurator];
+    NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
+    LOGI(@"Started, version %@", infoDict[@"CFBundleVersion"]);
 
     // Dropping root privileges to the 'nobody' user causes the default NSURLCache to throw
     // sandbox errors, which are benign but annoying. This line disables the cache entirely.

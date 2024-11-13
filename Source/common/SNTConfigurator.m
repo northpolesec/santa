@@ -1324,9 +1324,9 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (void)startWatchingDefaults {
-  // Only com.northpolesec.santa.daemon should listen.
+  // santactl is not a long running daemon, it does not need to watch for config changes.
   NSString *processName = [[NSProcessInfo processInfo] processName];
-  if (![processName isEqualToString:@"com.northpolesec.santa.daemon"]) return;
+  if ([processName isEqualToString:@"santactl"]) return;
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(defaultsChanged:)
                                                name:NSUserDefaultsDidChangeNotification

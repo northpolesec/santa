@@ -16,14 +16,16 @@
 
 #import <MOLXPCConnection/MOLXPCConnection.h>
 
-#import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #import "Source/santasyncservice/SNTSyncService.h"
 
 int main(int argc, const char *argv[]) {
   @autoreleasepool {
-    NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
-    LOGI(@"Started, version %@", infoDict[@"CFBundleVersion"]);
+    // The LOG* functions make use of SNTConfigurator, which if initialized now will fail to update
+    // values after SNTSyncService drops privileges. Since SNTConfigurator is a singleton, we need
+    // to initialize it after privileges are dropped. To that end, don't log until after privileges
+    // are dropped.
+
     MOLXPCConnection *c =
       [[MOLXPCConnection alloc] initServerWithName:[SNTXPCSyncServiceInterface serviceID]];
     c.privilegedInterface = c.unprivilegedInterface =
