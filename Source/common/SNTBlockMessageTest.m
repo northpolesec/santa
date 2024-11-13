@@ -41,7 +41,7 @@
 
 - (void)testFormatMessage {
   NSString *input = @"Testing with somé Ünicode çharacters";
-  NSAttributedString *got = [SNTBlockMessage formatMessage:input];
+  NSAttributedString *got = [SNTBlockMessage formatMessage:input withFallback:@""];
   XCTAssertEqualObjects([got string], input);
 }
 

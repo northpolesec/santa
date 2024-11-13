@@ -33,7 +33,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///  In SantaGUI this will return an NSAttributedString with links and formatting included
 ///  while for santad all HTML will be properly stripped.
 ///
-+ (NSAttributedString *)formatMessage:(NSString *)message;
++ (NSAttributedString *)formatMessage:(NSString *)message withFallback:(NSString *)fallback;
 
 ///
 ///  Uses either the configured message depending on the event type or a custom message
