@@ -65,10 +65,10 @@
 "Signing ID" = "Signing ID";
 
 /* The default message to show the user when an unknown application is blocked */
-"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Die folgende Applikation wurde blockiert,<br />da ihre Vertrauenswürdigkeit nicht überprüft werden kann";
+"The following application has been blocked from executing\nbecause its trustworthiness cannot be determined" = "Die folgende Applikation wurde blockiert,\nda ihre Vertrauenswürdigkeit nicht überprüft werden kann";
 
 /* The default message to show the user when a banned application is blocked */
-"The following application has been blocked from<br />executing because it has been deemed malicious" = "Die folgende Applikation wurde blockiert,<br />da sie als schädlich eingestuft wurde";
+"The following application has been blocked from\nexecuting because it has been deemed malicious" = "Die folgende Applikation wurde blockiert,\nda sie als schädlich eingestuft wurde";
 
 /* The default message to show the user when a USB device is blocked from mounting */
 "The following device has been blocked from mounting" = "Das Mounten des folgenden Geräts wurde blockiert";
