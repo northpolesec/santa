@@ -242,6 +242,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     newVersion = 7;
   }
 
+  if (version < 8) {
+    [db executeUpdate:@"ALTER TABLE 'rules' ADD 'comment' TEXT"];
+    newVersion = 8;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -313,7 +318,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                                              state:[rs intForColumn:@"state"]
                                               type:[rs intForColumn:@"type"]
                                          customMsg:[rs stringForColumn:@"custommsg"]
-                                         timestamp:[rs intForColumn:@"timestamp"]];
+                                         timestamp:[rs intForColumn:@"timestamp"]
+                                           comment:[rs stringForColumn:@"comment"]];
   r.customURL = [rs stringForColumn:@"customurl"];
   return r;
 }
@@ -394,7 +400,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                                          state:SNTRuleStateAllow
                                           type:SNTRuleTypeCertificate
                                      customMsg:nil
-                                     timestamp:0];
+                                     timestamp:0
+                                       comment:nil];
   }
 
   return rule;
@@ -435,11 +442,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
           return;
         }
       } else {
-        if (![db executeUpdate:@"INSERT OR REPLACE INTO rules "
-                               @"(identifier, state, type, custommsg, customurl, timestamp) "
-                               @"VALUES (?, ?, ?, ?, ?, ?);",
-                               rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
-                               rule.customURL, @(rule.timestamp)]) {
+        if (![db
+              executeUpdate:@"INSERT OR REPLACE INTO rules "
+                            @"(identifier, state, type, custommsg, customurl, timestamp, comment) "
+                            @"VALUES (?, ?, ?, ?, ?, ?, ?);",
+                            rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
+                            rule.customURL, @(rule.timestamp), rule.comment]) {
           [self fillError:error
                      code:SNTRuleTableErrorInsertOrReplaceFailed
                   message:[db lastErrorMessage]];

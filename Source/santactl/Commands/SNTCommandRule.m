@@ -76,7 +76,8 @@ REGISTER_COMMAND_NAME(@"rule")
 #ifdef DEBUG
     @"    --force: allow manual changes even when SyncBaseUrl is set\n"
 #endif
-    @"    --message {message}: custom message\n"
+    @"    --message {message}: custom message to show when binary is blocked\n"
+    @"    --comment {comment}: comment to attach to a new rule\n"
     @"    --clean: when importing rules via JSON clear all non-transitive rules before importing\n"
     @"    --clean-all: when importing rules via JSON clear all rules before importing\n"
     @"\n"
@@ -182,6 +183,11 @@ REGISTER_COMMAND_NAME(@"rule")
         [self printErrorUsageAndExit:@"--message requires an argument"];
       }
       newRule.customMsg = arguments[i];
+    } else if ([arg caseInsensitiveCompare:@"--comment"] == NSOrderedSame) {
+      if (++i > arguments.count - 1) {
+        [self printErrorUsageAndExit:@"--comment requires an argument"];
+      }
+      newRule.comment = arguments[i];
 #ifdef DEBUG
     } else if ([arg caseInsensitiveCompare:@"--force"] == NSOrderedSame) {
       // Don't do anything special.
@@ -271,6 +277,10 @@ REGISTER_COMMAND_NAME(@"rule")
       } else if (cs.platformBinary) {
         newRule.identifier = [NSString stringWithFormat:@"platform:%@", cs.signingID];
       }
+    }
+
+    if (!newRule.comment) {
+      newRule.comment = [NSString stringWithFormat:@"Rule created from %@", path];
     }
   }
 

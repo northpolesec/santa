@@ -53,13 +53,19 @@
 @property(readonly) NSUInteger timestamp;
 
 ///
+///  A comment attached to this rule. This is intended only for local rules.
+///
+@property(copy) NSString *comment;
+
+///
 ///  Designated initializer.
 ///
 - (instancetype)initWithIdentifier:(NSString *)identifier
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
                          customMsg:(NSString *)customMsg
-                         timestamp:(NSUInteger)timestamp;
+                         timestamp:(NSUInteger)timestamp
+                           comment:(NSString *)comment;
 
 ///
 ///  Initialize with a default timestamp: current time if rule state is transitive, 0 otherwise.
