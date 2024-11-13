@@ -312,7 +312,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 // The object returned is guaranteed to exist for the lifetime of the process so there's no need
 // to do this handling.
 static SNTConfigurator *sharedConfigurator = nil;
-+ (instancetype)configurator {
++ (__unsafe_unretained instancetype)configurator {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     sharedConfigurator = [[SNTConfigurator alloc] init];
