@@ -65,10 +65,10 @@ static id ValueOrNull(id value) {
     @"The following application has been blocked from executing<br />because its trustworthiness "
     @"cannot be determined",
     @"The default message to show the user when an unknown application is blocked");
-  NSString *defaultBannedMessage =
-    NSLocalizedString(@"The following application has been blocked from<br />executing because it has "
-                      @"been deemed malicious",
-                      @"The default message to show the user when a banned application is blocked");
+  NSString *defaultBannedMessage = NSLocalizedString(
+    @"The following application has been blocked from<br />executing because it has "
+    @"been deemed malicious",
+    @"The default message to show the user when a banned application is blocked");
 
   if (customMessage.length) {
     return [self formatMessage:customMessage
