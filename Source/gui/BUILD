@@ -149,6 +149,30 @@ macos_application(
     deps = [":SantaGUI_lib"],
 )
 
+swift_library(
+    name = "SNTTestGUI_lib",
+    srcs = ["SNTTestGUI.swift"],
+    deps = [
+        ":SNTBinaryMessageWindowView",
+        ":SNTDeviceMessageWindowView",
+        ":SNTFileAccessMessageWindowView",
+        ":SNTMessageView",
+        "//Source/common:SNTDeviceEvent",
+    ],
+)
+
+macos_application(
+    name = "SNTTestGUI",
+    app_icons = glob(["Resources/Images.xcassets/**"]),
+    bundle_id = "com.northpolesec.santatestgui",
+    bundle_name = "SantaTestGUI",
+    infoplists = ["Info.plist"],
+    minimum_os_version = "14.0",
+    strings = glob(["Resources/**/*.strings"]),
+    version = "//:version",
+    deps = [":SNTTestGUI_lib"],
+)
+
 santa_unit_test(
     name = "SNTNotificationManagerTest",
     srcs = [

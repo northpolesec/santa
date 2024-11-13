@@ -78,7 +78,7 @@ static id ValueOrNull(id value) {
     message = customMessage;
   } else if (event.decision == SNTEventStateBlockUnknown) {
     message = [[SNTConfigurator configurator] unknownBlockMessage];
-    if (!message) {
+    if (!message.length) {
       message = NSLocalizedString(
         @"The following application has been blocked from executing<br />because its "
         @"trustworthiness cannot be determined",
@@ -86,7 +86,7 @@ static id ValueOrNull(id value) {
     }
   } else {
     message = [[SNTConfigurator configurator] bannedBlockMessage];
-    if (!message) {
+    if (!message.length) {
       message = NSLocalizedString(
         @"The following application has been blocked from<br />executing because it has been "
         @"deemed malicious",

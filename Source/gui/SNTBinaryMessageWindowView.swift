@@ -288,7 +288,7 @@ struct SNTBinaryMessageWindowView: View {
         }
 
         HStack(spacing: 15.0) {
-          if c.eventDetailURL != nil
+          if c.eventDetailURL.count > 0
             && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished)
           {
             OpenEventButton(customText: c.eventDetailText, action: openButton)
