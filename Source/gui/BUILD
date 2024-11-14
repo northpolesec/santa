@@ -163,6 +163,9 @@ swift_library(
 
 macos_application(
     name = "SNTTestGUI",
+    additional_contents = {
+        "Resources/Fonts/StarJedi.ttf": ".",
+    },
     app_icons = glob(["Resources/Images.xcassets/**"]),
     bundle_id = "com.northpolesec.santatestgui",
     bundle_name = "SantaTestGUI",
