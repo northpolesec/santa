@@ -27,6 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <optional>
 #include <string>
 
 #import "Source/common/SNTCachedDecision.h"
@@ -125,38 +126,32 @@ std::string GetFileAccessPolicyDecisionString(FileAccessPolicyDecision decision)
   }
 }
 
-static inline void AppendProcess(std::string &str, const es_process_t *es_proc) {
+static inline void AppendProcess(std::string &str, const es_process_t *es_proc,
+                                 const std::string prefix = "") {
   char bname[MAXPATHLEN];
-  str.append("|pid=");
+  str.append("|" + prefix + "pid=");
   str.append(std::to_string(Pid(es_proc->audit_token)));
-  str.append("|ppid=");
+  str.append("|" + prefix + "ppid=");
   str.append(std::to_string(es_proc->original_ppid));
-  str.append("|process=");
+  str.append("|" + prefix + "process=");
   str.append(basename_r(FilePath(es_proc->executable).Sanitized().data(), bname) ?: "");
-  str.append("|processpath=");
+  str.append("|" + prefix + "processpath=");
   str.append(FilePath(es_proc->executable).Sanitized());
 }
 
 static inline void AppendUserGroup(std::string &str, const audit_token_t &tok,
                                    const std::optional<std::shared_ptr<std::string>> &user,
-                                   const std::optional<std::shared_ptr<std::string>> &group) {
-  str.append("|uid=");
+                                   const std::optional<std::shared_ptr<std::string>> &group,
+                                   const std::string prefix = "") {
+  str.append("|" + prefix + "uid=");
   str.append(std::to_string(RealUser(tok)));
-  str.append("|user=");
+  str.append("|" + prefix + "user=");
   str.append(user.has_value() ? user->get()->c_str() : "(null)");
-  str.append("|gid=");
+  str.append("|" + prefix + "gid=");
   str.append(std::to_string(RealGroup(tok)));
-  str.append("|group=");
+  str.append("|" + prefix + "group=");
   str.append(group.has_value() ? group->get()->c_str() : "(null)");
 }
-
-static inline void AppendInstigator(std::string &str, const EnrichedEventType &event) {
-  AppendProcess(str, event->process);
-  AppendUserGroup(str, event->process->audit_token, event.instigator().real_user(),
-                  event.instigator().real_group());
-}
-
-#if HAVE_MACOS_13
 
 static inline void AppendEventUser(std::string &str, const es_string_token_t &user,
                                    std::optional<uid_t> uid) {
@@ -169,6 +164,30 @@ static inline void AppendEventUser(std::string &str, const es_string_token_t &us
     str.append("|event_uid=");
     str.append(std::to_string(uid.value()));
   }
+}
+
+static inline void AppendInstigator(std::string &str, const es_process_t *es_proc,
+                                    const EnrichedProcess &enriched_proc,
+                                    const std::string prefix = "") {
+  AppendProcess(str, es_proc, prefix);
+  AppendUserGroup(str, es_proc->audit_token, enriched_proc.real_user(), enriched_proc.real_group(),
+                  prefix);
+}
+
+static inline void AppendInstigator(std::string &str, const EnrichedEventType &event,
+                                    const std::string prefix = "") {
+  AppendInstigator(str, event->process, event.instigator(), prefix);
+}
+
+#if HAVE_MACOS_13
+
+static inline void AppendEventUser(std::string &str,
+                                   const std::optional<std::shared_ptr<std::string>> &user,
+                                   uid_t uid) {
+  es_string_token_t user_token = {.length = user.has_value() ? user.value()->length() : 0,
+                                  .data = user.has_value() ? user.value()->c_str() : NULL};
+
+  AppendEventUser(str, user_token, std::make_optional<uid_t>(uid));
 }
 
 static inline void AppendGraphicalSession(std::string &str, es_graphical_session_id_t session_id) {
@@ -619,18 +638,78 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogout &ms
   return FinalizeString(str);
 }
 
+static void AppendAuthInstigatorOrFallback(std::string &str,
+                                           const EnrichedAuthenticationWithInstigator &auth_event) {
+  if (auth_event.AuthInstigator() && auth_event.EnrichedAuthInstigator().has_value()) {
+    AppendInstigator(str, auth_event.AuthInstigator(), auth_event.EnrichedAuthInstigator().value(),
+                     "auth_");
+  } else if (auth_event->version >= 8) {
+    if (auth_event.AuthInstigatorToken().has_value()) {
+      str.append("|auth_pid=");
+      str.append(std::to_string(Pid(auth_event.AuthInstigatorToken().value())));
+    }
+    if (auth_event.AuthInstigatorToken().has_value()) {
+      str.append("|auth_pidver=");
+      str.append(std::to_string(Pidversion(auth_event.AuthInstigatorToken().value())));
+    }
+  }
+}
+
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationOD &msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=AUTHENTICATION_OD");
+  str.append("|success=");
+  str.append(msg->event.authentication->success ? "true" : "false");
+
+  AppendInstigator(str, msg);
+  AppendAuthInstigatorOrFallback(str, msg);
+
+  str.append("|record_type=");
+  str.append(msg->event.authentication->data.od->record_type.data);
+  str.append("|record_name=");
+  str.append(msg->event.authentication->data.od->record_name.data);
+  str.append("|node_name=");
+  str.append(msg->event.authentication->data.od->node_name.data);
+
+  // db_path is optional
+  if (msg->event.authentication->data.od->db_path.length > 0) {
+    str.append("|db_path=");
+    str.append(msg->event.authentication->data.od->db_path.data);
+  }
 
   return FinalizeString(str);
+}
+
+std::string GetAuthenticationTouchIDModeString(es_touchid_mode_t mode) {
+  switch (mode) {
+    case ES_TOUCHID_MODE_VERIFICATION: return "VERIFICATION";
+    case ES_TOUCHID_MODE_IDENTIFICATION: return "IDENTIFICATION";
+    default: return "UNKNOWN";
+  }
 }
 
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationTouchID &msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=AUTHENTICATION_TOUCHID");
+  str.append("|success=");
+  str.append(msg->event.authentication->success ? "true" : "false");
+
+  AppendInstigator(str, msg);
+
+  AppendAuthInstigatorOrFallback(str, msg);
+  // AppendAuthInstigatorOrFallback(
+  //   str, msg->version, msg->event.authentication->data.touchid->instigator,
+  //   msg->event.authentication->data.touchid->instigator_token, msg.AuthInstigator());
+
+  str.append("|touchid_mode=");
+  str.append(
+    GetAuthenticationTouchIDModeString(msg->event.authentication->data.touchid->touchid_mode));
+
+  if (msg->event.authentication->data.touchid->has_uid) {
+    AppendEventUser(str, msg.Username(), msg->event.authentication->data.touchid->uid.uid);
+  }
 
   return FinalizeString(str);
 }
@@ -639,14 +718,49 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
   std::string str = CreateDefaultString();
 
   str.append("action=AUTHENTICATION_TOKEN");
+  str.append("|success=");
+  str.append(msg->event.authentication->success ? "true" : "false");
+
+  AppendInstigator(str, msg);
+
+  AppendAuthInstigatorOrFallback(str, msg);
+
+  str.append("|pubkey_hash=");
+  str.append(msg->event.authentication->data.token->pubkey_hash.data);
+  str.append("|token_id=");
+  str.append(msg->event.authentication->data.token->token_id.data);
+
+  // kerberos_principal is optional
+  if (msg->event.authentication->data.token->kerberos_principal.length > 0) {
+    str.append("|kerberos_principal=");
+    str.append(msg->event.authentication->data.token->kerberos_principal.data);
+  }
 
   return FinalizeString(str);
+}
+
+std::string GetAuthenticationAutoUnlockTypeString(es_auto_unlock_type_t type) {
+  switch (type) {
+    case ES_AUTO_UNLOCK_MACHINE_UNLOCK: return "MACHINE_UNLOCK";
+    case ES_AUTO_UNLOCK_AUTH_PROMPT: return "AUTH_PROMPT";
+    default: return "UNKNOWN";
+  }
 }
 
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationAutoUnlock &msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=AUTHENTICATION_AUTO_UNLOCK");
+  str.append("|success=");
+  str.append(msg->event.authentication->success ? "true" : "false");
+
+  AppendInstigator(str, msg);
+
+  AppendEventUser(str, msg->event.authentication->data.auto_unlock->username, msg.UID());
+
+  str.append("|type=");
+  str.append(
+    GetAuthenticationAutoUnlockTypeString(msg->event.authentication->data.auto_unlock->type));
 
   return FinalizeString(str);
 }

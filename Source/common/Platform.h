@@ -31,8 +31,10 @@
 #define HAVE_MACOS_14 0
 #endif
 
+// Note: MAC_OS_X_VERSION_MAX_ALLOWED (non-underscore version) stopped
+// being correctly defined in the macOS 15 SDK. (FB15780730)
 #if defined(MAC_OS_VERSION_15_0) && \
-    MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_15_0
+    __MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_15_0
 #define HAVE_MACOS_15 1
 #else
 #define HAVE_MACOS_15 0
