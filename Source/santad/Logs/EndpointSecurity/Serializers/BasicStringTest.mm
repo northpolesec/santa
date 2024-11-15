@@ -564,8 +564,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
          "|record_name=my_rec_name|node_name=my_node_name|db_path=my_db_path|machineid=my_id\n";
 #else
   want = "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo|uid=-2"
-         "|user=nobody|gid=-1|group=nogroup|auth_pid=888|auth_pidver=999|record_type=my_rec_type"
-         "|record_name=my_rec_name|node_name=my_node_name|db_path=my_db_path|machineid=my_id\n";
+         "|user=nobody|gid=-1|group=nogroup|record_type=my_rec_type|record_name=my_rec_name"
+         "|node_name=my_node_name|db_path=my_db_path|machineid=my_id\n";
 #endif
 
   XCTAssertCppStringEqual(got, want);
@@ -632,8 +632,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
          "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
 #else
   want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-         "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=888|auth_pidver=999"
-         "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|touchid_mode=VERIFICATION|event_user=nobody"
+         "|event_uid=4294967294|machineid=my_id\n";
 #endif
 
   XCTAssertCppStringEqual(got, want);
@@ -699,8 +699,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
          "|token_id=my_tok_id|kerberos_principal=my_kerberos_principal|machineid=my_id\n";
 #else
   want = "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-         "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=888|auth_pidver=999|pubkey_hash=abc123"
-         "|token_id=my_tok_id|kerberos_principal=my_kerberos_principal|machineid=my_id\n";
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|pubkey_hash=abc123|token_id=my_tok_id"
+         "|kerberos_principal=my_kerberos_principal|machineid=my_id\n";
 #endif
 
   XCTAssertCppStringEqual(got, want);
