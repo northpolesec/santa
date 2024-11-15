@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -48,13 +49,9 @@ extern std::string GetReasonString(SNTEventState event_state);
 extern std::string GetModeString(SNTClientMode mode);
 extern std::string GetAccessTypeString(es_event_type_t event_type);
 extern std::string GetFileAccessPolicyDecisionString(FileAccessPolicyDecision decision);
+extern std::string GetAuthenticationTouchIDModeString(es_touchid_mode_t mode);
+extern std::string GetAuthenticationAutoUnlockTypeString(es_auto_unlock_type_t mode);
 }  // namespace santa
-
-using santa::GetAccessTypeString;
-using santa::GetDecisionString;
-using santa::GetFileAccessPolicyDecisionString;
-using santa::GetModeString;
-using santa::GetReasonString;
 
 std::string BasicStringSerializeMessage(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
                                         es_message_t *esMsg, SNTDecisionCache *decisionCache) {
@@ -506,6 +503,261 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   XCTAssertCppStringEqual(got, want);
 }
 
+- (void)testGetAuthenticationTouchIDModeString {
+  std::map<es_touchid_mode_t, std::string> touchIDModeToString{
+    {ES_TOUCHID_MODE_VERIFICATION, "VERIFICATION"},
+    {ES_TOUCHID_MODE_IDENTIFICATION, "IDENTIFICATION"},
+    {(es_touchid_mode_t)1234, "UNKNOWN"},
+  };
+
+  for (const auto &kv : touchIDModeToString) {
+    XCTAssertCppStringEqual(santa::GetAuthenticationTouchIDModeString(kv.first), kv.second);
+  }
+}
+
+- (void)testSerializeMessageAuthenticationOD {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, &proc);
+
+  es_file_t instigatorProcFile = MakeESFile("foo");
+  es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_event_authentication_od_t od = {
+    .instigator = &instigatorProc,
+    .record_type = MakeESStringToken("my_rec_type"),
+    .record_name = MakeESStringToken("my_rec_name"),
+    .node_name = MakeESStringToken("my_node_name"),
+    .db_path = MakeESStringToken("my_db_path"),
+#if HAVE_MACOS_15
+    .instigator_token = MakeAuditToken(654, 321),
+#endif
+  };
+
+  es_event_authentication_t auth = {
+    .success = true,
+    .type = ES_AUTHENTICATION_TYPE_OD,
+    .data.od = &od,
+  };
+
+  esMsg.event.authentication = &auth;
+  esMsg.version = 8;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want =
+    "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+    "|record_type=my_rec_type|record_name=my_rec_name|node_name=my_node_name"
+    "|db_path=my_db_path|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  // Simulate the auth instigator process exiting and only the fallback token exists
+  od.instigator = NULL;
+
+  got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
+  want = "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo|uid=-2"
+         "|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321|record_type=my_rec_type"
+         "|record_name=my_rec_name|node_name=my_node_name|db_path=my_db_path|machineid=my_id\n";
+#else
+  want = "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo|uid=-2"
+         "|user=nobody|gid=-1|group=nogroup|record_type=my_rec_type|record_name=my_rec_name"
+         "|node_name=my_node_name|db_path=my_db_path|machineid=my_id\n";
+#endif
+
+  XCTAssertCppStringEqual(got, want);
+
+  // This state shouldn't be possible to exist in older macOS versions where if the instigator
+  // process was null, the message was dropped by the kernel and not sent to the client. However
+  // testing this here as a preventative measure as this behavior isn't documented by ES.
+  esMsg.version = 7;
+  // db path is listed as optional. Ensure that is handled.
+  od.db_path = MakeESStringToken(NULL);
+
+  got = BasicStringSerializeMessage(&esMsg);
+  want = "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo|uid=-2"
+         "|user=nobody|gid=-1|group=nogroup|record_type=my_rec_type|record_name=my_rec_name"
+         "|node_name=my_node_name|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+- (void)testSerializeMessageAuthenticationTouchID {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, &proc);
+
+  es_file_t instigatorProcFile = MakeESFile("foo");
+  es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_event_authentication_touchid_t touchid = {
+    .instigator = &instigatorProc,
+    .touchid_mode = ES_TOUCHID_MODE_VERIFICATION,
+    .has_uid = true,
+    .uid.uid = NOBODY_UID,
+#if HAVE_MACOS_15
+    .instigator_token = MakeAuditToken(654, 321),
+#endif
+  };
+
+  es_event_authentication_t auth = {
+    .success = true,
+    .type = ES_AUTHENTICATION_TYPE_TOUCHID,
+    .data.touchid = &touchid,
+  };
+
+  esMsg.event.authentication = &auth;
+  esMsg.version = 8;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want =
+    "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+    "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  // Simulate the auth instigator process exiting and only the fallback token exists
+  touchid.instigator = NULL;
+
+  got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
+  want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321"
+         "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+#else
+  want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|touchid_mode=VERIFICATION|event_user=nobody"
+         "|event_uid=4294967294|machineid=my_id\n";
+#endif
+
+  XCTAssertCppStringEqual(got, want);
+
+  // This state shouldn't be possible to exist in older macOS versions where if the instigator
+  // process was null, the message was dropped by the kernel and not sent to the client. However
+  // testing this here as a preventative measure as this behavior isn't documented by ES.
+  esMsg.version = 7;
+  touchid.has_uid = false;
+
+  got = BasicStringSerializeMessage(&esMsg);
+  want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|touchid_mode=VERIFICATION|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+- (void)testSerializeMessageAuthenticationToken {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, &proc);
+
+  es_file_t instigatorProcFile = MakeESFile("foo");
+  es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_event_authentication_token_t token = {
+    .instigator = &instigatorProc,
+    .pubkey_hash = MakeESStringToken("abc123"),
+    .token_id = MakeESStringToken("my_tok_id"),
+    .kerberos_principal = MakeESStringToken("my_kerberos_principal"),
+#if HAVE_MACOS_15
+    .instigator_token = MakeAuditToken(654, 321),
+#endif
+  };
+
+  es_event_authentication_t auth = {
+    .success = true,
+    .type = ES_AUTHENTICATION_TYPE_TOKEN,
+    .data.token = &token,
+  };
+
+  esMsg.event.authentication = &auth;
+  esMsg.version = 8;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want =
+    "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+    "|pubkey_hash=abc123|token_id=my_tok_id|kerberos_principal=my_kerberos_principal"
+    "|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  // Simulate the auth instigator process exiting and only the fallback token exists
+  token.instigator = NULL;
+
+  got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
+  want = "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321|pubkey_hash=abc123"
+         "|token_id=my_tok_id|kerberos_principal=my_kerberos_principal|machineid=my_id\n";
+#else
+  want = "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|pubkey_hash=abc123|token_id=my_tok_id"
+         "|kerberos_principal=my_kerberos_principal|machineid=my_id\n";
+#endif
+
+  XCTAssertCppStringEqual(got, want);
+
+  // This state shouldn't be possible to exist in older macOS versions where if the instigator
+  // process was null, the message was dropped by the kernel and not sent to the client. However
+  // testing this here as a preventative measure as this behavior isn't documented by ES.
+  esMsg.version = 7;
+  token.kerberos_principal = MakeESStringToken(NULL);
+
+  got = BasicStringSerializeMessage(&esMsg);
+  want = "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|pubkey_hash=abc123|token_id=my_tok_id"
+         "|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+- (void)testGetAuthenticationAutoUnlockTypeString {
+  std::map<es_auto_unlock_type_t, std::string> autoUnlockTypeToString{
+    {ES_AUTO_UNLOCK_MACHINE_UNLOCK, "MACHINE_UNLOCK"},
+    {ES_AUTO_UNLOCK_AUTH_PROMPT, "AUTH_PROMPT"},
+    {(es_auto_unlock_type_t)1234, "UNKNOWN"},
+  };
+
+  for (const auto &kv : autoUnlockTypeToString) {
+    XCTAssertCppStringEqual(santa::GetAuthenticationAutoUnlockTypeString(kv.first), kv.second);
+  }
+}
+
+- (void)testSerializeMessageAuthenticationAutoUnlock {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, &proc);
+
+  es_event_authentication_auto_unlock_t auto_unlock = {
+    .username = MakeESStringToken("daemon"),
+    .type = ES_AUTO_UNLOCK_MACHINE_UNLOCK,
+  };
+
+  es_event_authentication_t auth = {
+    .success = true,
+    .type = ES_AUTHENTICATION_TYPE_AUTO_UNLOCK,
+    .data.auto_unlock = &auto_unlock,
+  };
+
+  esMsg.event.authentication = &auth;
+  esMsg.version = 8;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want = "action=AUTHENTICATION_AUTO_UNLOCK|success=true|pid=12|ppid=56|process=foo"
+                     "|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|event_user=daemon"
+                     "|event_uid=1|type=MACHINE_UNLOCK|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
 #endif  // HAVE_MACOS_13
 
 - (void)testGetAccessTypeString {
@@ -518,7 +770,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   };
 
   for (const auto &kv : accessTypeToString) {
-    XCTAssertCppStringEqual(GetAccessTypeString(kv.first), kv.second);
+    XCTAssertCppStringEqual(santa::GetAccessTypeString(kv.first), kv.second);
   }
 }
 
@@ -534,7 +786,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   };
 
   for (const auto &kv : policyDecisionToString) {
-    XCTAssertCppStringEqual(GetFileAccessPolicyDecisionString(kv.first), kv.second);
+    XCTAssertCppStringEqual(santa::GetFileAccessPolicyDecisionString(kv.first), kv.second);
   }
 }
 
@@ -665,7 +917,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   };
 
   for (const auto &kv : stateToDecision) {
-    XCTAssertCppStringEqual(GetDecisionString(kv.first), kv.second);
+    XCTAssertCppStringEqual(santa::GetDecisionString(kv.first), kv.second);
   }
 }
 
@@ -694,7 +946,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   };
 
   for (const auto &kv : stateToReason) {
-    XCTAssertCppStringEqual(GetReasonString(kv.first), kv.second);
+    XCTAssertCppStringEqual(santa::GetReasonString(kv.first), kv.second);
   }
 }
 
@@ -706,7 +958,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   };
 
   for (const auto &kv : modeToString) {
-    XCTAssertCppStringEqual(GetModeString(kv.first), kv.second);
+    XCTAssertCppStringEqual(santa::GetModeString(kv.first), kv.second);
   }
 }
 
