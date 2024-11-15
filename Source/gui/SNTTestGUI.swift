@@ -41,6 +41,13 @@ class SNTDebugStoredEvent: SNTStoredEvent {
   }
 }
 
+enum SpecialDates {
+  case Apr1
+  case May4
+  case Oct31
+  case Nov25
+}
+
 struct BinaryView: View {
   @State var application: String = "Bad Malware"
   @State var publisher: String = "Developer ID: Cozy Bear (X4P54F4992)"
@@ -49,10 +56,10 @@ struct BinaryView: View {
   @State var teamID: String = "9X9633G7QW"
   @State var path: String = "/Applications/Malware.app/Contents/MacOS"
   @State var parent: String = "launchd"
-  @State var ppid: String = "1"
 
   @State var bannedBlockMessage: String = ""
   @State var eventDetailURL: String = "http://sync-server-hostname/blockables/%bundle_or_file_identifier%"
+  @State var dateOverride: SpecialDates = .Nov25
 
   @State var customMsg: String = ""
   @State var customURL: String = ""
@@ -68,16 +75,13 @@ struct BinaryView: View {
           TextField(text: $teamID, label: { Text("TeamID") })
           TextField(text: $path, label: { Text("Path") })
           TextField(text: $parent, label: { Text("Parent") })
-          TextField(text: $ppid, label: { Text("PPID") })
         }
       }
-
-      Spacer()
 
       GroupBox(label: Label("Config Overrides", systemImage: "")) {
         Form {
           HStack {
-            TextField(text: $bannedBlockMessage, label: { Text("Banned Block Message") })
+            TextField(text: $bannedBlockMessage, label: { Text("Banned Block Message") }).frame(width: 550.0)
             Button(action: {
               bannedBlockMessage =
                 "<img src='https://static.wikia.nocookie.net/villains/images/8/8a/Robot_Santa.png/revision/latest?cb=20200520230856' /><br /><br />Isn't Santa fun?"
@@ -97,13 +101,24 @@ struct BinaryView: View {
             }
             Button(action: { eventDetailURL = "" }) { Text("Clear").font(Font.subheadline) }
           }
+          HStack {
+            Picker(selection: $dateOverride, label: Text("Date :")) {
+              Text("Nov 25").tag(SpecialDates.Nov25)
+              Text("Apr 1").tag(SpecialDates.Apr1)
+              Text("May 4").tag(SpecialDates.May4)
+              Text("Oct 31").tag(SpecialDates.Oct31)
+            }.pickerStyle(.segmented)
+          }
         }
       }
+
+      Divider()
 
       Button("Display") {
         SNTConfigurator.overrideConfig([
           "BannedBlockMessage": bannedBlockMessage,
           "EventDetailURL": eventDetailURL,
+          "FunFontsOnSpecificDays": true,
         ])
 
         let event = SNTDebugStoredEvent(staticPublisher: publisher)
@@ -114,8 +129,15 @@ struct BinaryView: View {
         event.filePath = path
         event.parentName = parent
         event.pid = 12345
-        event.ppid = NSNumber(value: Int(ppid) ?? 1)
+        event.ppid = 2511
         event.executingUser = NSUserName()
+
+        switch dateOverride {
+        case .Apr1: Date.overrideDate = Date(timeIntervalSince1970: 1711980915)
+        case .May4: Date.overrideDate = Date(timeIntervalSince1970: 1714832115)
+        case .Oct31: Date.overrideDate = Date(timeIntervalSince1970: 1730384115)
+        case .Nov25: Date.overrideDate = Date(timeIntervalSince1970: 1732544115)
+        }
 
         let window = NSWindow()
         ShowWindow(
@@ -206,7 +228,7 @@ struct testApp: App {
 
   var body: some Scene {
     Window("Main Window", id: "main") {
-      ContentView()
-    }
+      ContentView().frame(minWidth: 300.0).fixedSize()
+    }.windowResizability(.contentSize)
   }
 }
