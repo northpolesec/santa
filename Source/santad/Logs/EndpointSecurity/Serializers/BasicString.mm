@@ -697,11 +697,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
   str.append(msg->event.authentication->success ? "true" : "false");
 
   AppendInstigator(str, msg);
-
   AppendAuthInstigatorOrFallback(str, msg);
-  // AppendAuthInstigatorOrFallback(
-  //   str, msg->version, msg->event.authentication->data.touchid->instigator,
-  //   msg->event.authentication->data.touchid->instigator_token, msg.AuthInstigator());
 
   str.append("|touchid_mode=");
   str.append(
@@ -722,7 +718,6 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
   str.append(msg->event.authentication->success ? "true" : "false");
 
   AppendInstigator(str, msg);
-
   AppendAuthInstigatorOrFallback(str, msg);
 
   str.append("|pubkey_hash=");
@@ -755,7 +750,6 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationA
   str.append(msg->event.authentication->success ? "true" : "false");
 
   AppendInstigator(str, msg);
-
   AppendEventUser(str, msg->event.authentication->data.auto_unlock->username, msg.UID());
 
   str.append("|type=");
