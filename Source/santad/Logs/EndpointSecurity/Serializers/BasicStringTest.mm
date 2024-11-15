@@ -530,7 +530,9 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
     .record_name = MakeESStringToken("my_rec_name"),
     .node_name = MakeESStringToken("my_node_name"),
     .db_path = MakeESStringToken("my_db_path"),
+#if HAVE_MACOS_15
     .instigator_token = MakeAuditToken(654, 321),
+#endif
   };
 
   es_event_authentication_t auth = {
@@ -556,9 +558,15 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   od.instigator = NULL;
 
   got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
   want = "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo|uid=-2"
          "|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321|record_type=my_rec_type"
          "|record_name=my_rec_name|node_name=my_node_name|db_path=my_db_path|machineid=my_id\n";
+#else
+  want = "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo|uid=-2"
+         "|user=nobody|gid=-1|group=nogroup|auth_pid=888|auth_pidver=999|record_type=my_rec_type"
+         "|record_name=my_rec_name|node_name=my_node_name|db_path=my_db_path|machineid=my_id\n";
+#endif
 
   XCTAssertCppStringEqual(got, want);
 
@@ -591,7 +599,9 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
     .touchid_mode = ES_TOUCHID_MODE_VERIFICATION,
     .has_uid = true,
     .uid.uid = NOBODY_UID,
+#if HAVE_MACOS_15
     .instigator_token = MakeAuditToken(654, 321),
+#endif
   };
 
   es_event_authentication_t auth = {
@@ -616,9 +626,15 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   touchid.instigator = NULL;
 
   got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
   want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
          "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321"
          "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+#else
+  want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=888|auth_pidver=999"
+         "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+#endif
 
   XCTAssertCppStringEqual(got, want);
 
@@ -649,7 +665,9 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
     .pubkey_hash = MakeESStringToken("abc123"),
     .token_id = MakeESStringToken("my_tok_id"),
     .kerberos_principal = MakeESStringToken("my_kerberos_principal"),
+#if HAVE_MACOS_15
     .instigator_token = MakeAuditToken(654, 321),
+#endif
   };
 
   es_event_authentication_t auth = {
@@ -675,9 +693,15 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   token.instigator = NULL;
 
   got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
   want = "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
          "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321|pubkey_hash=abc123"
          "|token_id=my_tok_id|kerberos_principal=my_kerberos_principal|machineid=my_id\n";
+#else
+  want = "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=888|auth_pidver=999|pubkey_hash=abc123"
+         "|token_id=my_tok_id|kerberos_principal=my_kerberos_principal|machineid=my_id\n";
+#endif
 
   XCTAssertCppStringEqual(got, want);
 
