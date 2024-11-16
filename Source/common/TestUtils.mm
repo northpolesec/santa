@@ -119,12 +119,7 @@ void SleepMS(long ms) {
 }
 
 uint32_t MaxSupportedESMessageVersionForCurrentOS() {
-  // Note 1: This function only returns a subset of versions. This is due to the
-  // minimum supported OS build version as well as features in latest versions
-  // not currently being used. Capping the max means unnecessary duuplicate test
-  // JSON files are not needed.
-  //
-  // Note 2: The following table maps ES message versions to lmin macOS version:
+  // Note: The following table maps ES message versions to min macOS version:
   //   ES Version | macOS Version
   //            1 | 10.15.0
   //            2 | 10.15.4
@@ -132,9 +127,13 @@ uint32_t MaxSupportedESMessageVersionForCurrentOS() {
   //            4 | 11.0
   //            5 | 12.3
   //            6 | 13.0
-  //            7 | 14.0
+  //            7 | 13.3
   //            8 | 15.0
-  if (@available(macOS 13.0, *)) {
+  if (@available(macOS 15.0, *)) {
+    return 8;
+  } else if (@available(macOS 13.3, *)) {
+    return 7;
+  } else if (@available(macOS 13.0, *)) {
     return 6;
   } else if (@available(macOS 12.3, *)) {
     return 5;
