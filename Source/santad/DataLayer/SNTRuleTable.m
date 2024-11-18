@@ -24,6 +24,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
+#include "Source/common/SigningIDHelpers.h"
 
 static const uint32_t kRuleTableCurrentVersion = 7;
 
@@ -156,8 +157,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     cd.decision = SNTEventStateAllowBinary;
     cd.decisionExtra = systemBin ? @"critical system binary" : @"santa binary";
     cd.sha256 = binInfo.SHA256;
+    cd.signingID = FormatSigningID(csInfo);
+    cd.cdhash = csInfo.cdhash;
+    // Normalized by the FormatSigningID function so this will always have a
+    // prefix.
+    cd.teamID = [cd.signingID componentsSeparatedByString:@":"][0];
 
-    // Not needed, but nice for logging.
+    // Not needed, but nice for logging and events.
+    cd.certChain = csInfo.certificates;
     cd.certSHA256 = csInfo.leafCertificate.SHA256;
     cd.certCommonName = csInfo.leafCertificate.commonName;
 
