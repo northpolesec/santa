@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -71,6 +72,9 @@ extern ::pbv1::FileAccess::PolicyDecision GetPolicyDecision(FileAccessPolicyDeci
 #if HAVE_MACOS_13
 extern ::pbv1::SocketAddress::Type GetSocketAddressType(es_address_type_t type);
 extern ::pbv1::OpenSSHLogin::Result GetOpenSSHLoginResultType(es_openssh_login_result_type_t type);
+extern ::pbv1::AuthenticationTouchID::Mode GetAuthenticationTouchIDMode(es_touchid_mode_t mode);
+extern ::pbv1::AuthenticationAutoUnlock::Type GetAuthenticationAutoUnlockType(
+  es_auto_unlock_type_t type);
 #endif  // HAVE_MACOS_13
 }  // namespace santa
 
@@ -123,7 +127,10 @@ NSString *ConstructFilename(es_event_type_t eventType, NSString *variant = nil) 
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN: name = @"openssh_login"; break;
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT: name = @"openssh_logout"; break;
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN: name = @"login_login"; break;
-    default: XCTFail(@"Unhandled event type: %d", eventType); return nil;
+    case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION: name = @"authentication"; break;
+    default:
+      XCTFail(@"Failed to construct filename: Unhandled event type: %d", eventType);
+      return nil;
   }
 
   if (variant) {
@@ -180,6 +187,7 @@ const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &s
     case ::pbv1::SantaMessage::kScreenSharing: return santaMsg.screen_sharing();
     case ::pbv1::SantaMessage::kOpenSsh: return santaMsg.open_ssh();
     case ::pbv1::SantaMessage::kLoginLogout: return santaMsg.login_logout();
+    case ::pbv1::SantaMessage::kAuthentication: return santaMsg.authentication();
     case ::pbv1::SantaMessage::EVENT_NOT_SET:
       XCTFail(@"Protobuf message SantaMessage did not set an 'event' field");
       OS_FALLTHROUGH;
@@ -231,8 +239,8 @@ NSDictionary *FindDelta(NSDictionary *want, NSDictionary *got) {
 }
 
 void SerializeAndCheck(es_event_type_t eventType,
-                       void (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>,
-                                            es_message_t *),
+                       bool (^shouldHandleMessageSetup)(std::shared_ptr<MockEndpointSecurityAPI>,
+                                                        es_message_t *),
                        SNTDecisionCache *decisionCache, bool json, NSString *variant) {
   std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
@@ -250,9 +258,11 @@ void SerializeAndCheck(es_event_type_t eventType,
     esMsg.process->tty = &ttyFile;
     esMsg.version = cur_version;
 
-    mockESApi->SetExpectationsRetainReleaseMessage();
+    if (!shouldHandleMessageSetup(mockESApi, &esMsg)) {
+      continue;
+    }
 
-    messageSetup(mockESApi, &esMsg);
+    mockESApi->SetExpectationsRetainReleaseMessage();
 
     std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, decisionCache, json);
     std::unique_ptr<EnrichedMessage> enrichedMsg = Enricher().Enrich(Message(mockESApi, &esMsg));
@@ -311,6 +321,20 @@ void SerializeAndCheck(es_event_type_t eventType,
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+// Legacy variant. Now wraps `messageSetup` in a small block to always return `true`
+void SerializeAndCheck(es_event_type_t eventType,
+                       void (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>,
+                                            es_message_t *),
+                       SNTDecisionCache *decisionCache, bool json, NSString *variant) {
+  return SerializeAndCheck(
+    eventType,
+    ^bool(std::shared_ptr<MockEndpointSecurityAPI> esapi, es_message_t *msg) {
+      messageSetup(esapi, msg);
+      return true;
+    },
+    decisionCache, json, variant);
 }
 
 void SerializeAndCheckNonESEvents(
@@ -396,6 +420,13 @@ void SerializeAndCheckNonESEvents(
 - (void)tearDown {
   [self.mockConfigurator stopMocking];
   [self.mockDecisionCache stopMocking];
+}
+
+- (void)serializeAndCheckEvent:(es_event_type_t)eventType
+                       variant:(NSString *)variant
+      shouldHandleMessageSetup:(bool (^)(std::shared_ptr<MockEndpointSecurityAPI>,
+                                         es_message_t *))shouldHandleMessageSetup {
+  SerializeAndCheck(eventType, shouldHandleMessageSetup, self.mockDecisionCache, false, variant);
 }
 
 - (void)serializeAndCheckEvent:(es_event_type_t)eventType
@@ -1005,6 +1036,210 @@ void SerializeAndCheckNonESEvents(
   for (const auto &kv : esToSantaOpenSSHResultType) {
     XCTAssertEqual(GetOpenSSHLoginResultType(kv.first), kv.second);
   }
+}
+
+- (void)testSerializeMessageAuthenticationOD {
+  es_file_t instigatorProcTarget = MakeESFile("foo", MakeStat(300));
+  __block es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+  __block es_event_authentication_od_t authenticationOD = {
+    .instigator = &instigatorProc,
+    .record_type = MakeESStringToken("my_rec_type"),
+    .record_name = MakeESStringToken("my_rec_name"),
+    .node_name = MakeESStringToken("my_node_name"),
+    .db_path = MakeESStringToken("my_db_path"),
+#if HAVE_MACOS_15
+    .instigator_token = MakeAuditToken(98, 76),
+#endif
+  };
+
+  __block es_event_authentication_t authenticationEvent = {
+    .success = true,
+    .type = ES_AUTHENTICATION_TYPE_OD,
+    .data.od = &authenticationOD,
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                       variant:@"od"
+      shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                     es_message_t *esMsg) {
+        esMsg->event.authentication = &authenticationEvent;
+        return true;
+      }];
+
+  if (@available(macOS 15.0, *)) {
+    authenticationOD.instigator = nullptr;
+    [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                         variant:@"od_missing_auth_instigator"
+        shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                       es_message_t *esMsg) {
+          if (esMsg->version < 8) {
+            return false;
+          }
+
+          esMsg->event.authentication = &authenticationEvent;
+
+          return true;
+        }];
+  }
+}
+
+- (void)testGetAuthenticationTouchIDMode {
+  std::map<es_touchid_mode_t, ::pbv1::AuthenticationTouchID::Mode> esToSantaTouchIDMode{
+    {ES_TOUCHID_MODE_VERIFICATION, ::pbv1::AuthenticationTouchID::MODE_VERIFICATION},
+    {ES_TOUCHID_MODE_IDENTIFICATION, ::pbv1::AuthenticationTouchID::MODE_IDENTIFICATION},
+    {(es_touchid_mode_t)1234, ::pbv1::AuthenticationTouchID::MODE_UNKNOWN},
+  };
+
+  for (const auto &kv : esToSantaTouchIDMode) {
+    XCTAssertEqual(santa::GetAuthenticationTouchIDMode(kv.first), kv.second);
+  }
+}
+
+- (void)testSerializeMessageAuthenticationTouchID {
+  es_file_t instigatorProcTarget = MakeESFile("foo", MakeStat(300));
+  __block es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+  __block es_event_authentication_touchid_t authenticationTouchID = {
+    .instigator = &instigatorProc,
+    .touchid_mode = ES_TOUCHID_MODE_VERIFICATION,
+    .has_uid = true,
+    .uid =
+      {
+        .uid = NOBODY_UID,
+      },
+#if HAVE_MACOS_15
+    .instigator_token = MakeAuditToken(98, 76),
+#endif
+  };
+
+  __block es_event_authentication_t authenticationEvent = {
+    .success = true,
+    .type = ES_AUTHENTICATION_TYPE_TOUCHID,
+    .data.touchid = &authenticationTouchID,
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                       variant:@"touchid"
+      shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                     es_message_t *esMsg) {
+        esMsg->event.authentication = &authenticationEvent;
+        return true;
+      }];
+
+  authenticationTouchID.touchid_mode = ES_TOUCHID_MODE_IDENTIFICATION;
+  authenticationTouchID.has_uid = false;
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                       variant:@"touchid_no_uid"
+      shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                     es_message_t *esMsg) {
+        esMsg->event.authentication = &authenticationEvent;
+        return true;
+      }];
+
+  if (@available(macOS 15.0, *)) {
+    authenticationTouchID.instigator = nullptr;
+    [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                         variant:@"touchid_missing_auth_instigator"
+        shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                       es_message_t *esMsg) {
+          if (esMsg->version < 8) {
+            return false;
+          }
+
+          esMsg->event.authentication = &authenticationEvent;
+
+          return true;
+        }];
+  }
+}
+
+- (void)testSerializeMessageAuthenticationToken {
+  es_file_t instigatorProcTarget = MakeESFile("foo", MakeStat(300));
+  __block es_process_t instigatorProc =
+    MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+  __block es_event_authentication_token_t authenticationToken = {
+    .instigator = &instigatorProc,
+    .pubkey_hash = MakeESStringToken("my_pubkey_hash"),
+    .token_id = MakeESStringToken("my_token_id"),
+    .kerberos_principal = MakeESStringToken("my_kerberos_principal"),
+#if HAVE_MACOS_15
+    .instigator_token = MakeAuditToken(98, 76),
+#endif
+  };
+
+  __block es_event_authentication_t authenticationEvent = {
+    .success = true,
+    .type = ES_AUTHENTICATION_TYPE_TOKEN,
+    .data.token = &authenticationToken,
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                       variant:@"token"
+      shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                     es_message_t *esMsg) {
+        esMsg->event.authentication = &authenticationEvent;
+        return true;
+      }];
+
+  if (@available(macOS 15.0, *)) {
+    authenticationToken.instigator = nullptr;
+    [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                         variant:@"token_missing_auth_instigator"
+        shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                       es_message_t *esMsg) {
+          if (esMsg->version < 8) {
+            return false;
+          }
+
+          esMsg->event.authentication = &authenticationEvent;
+
+          return true;
+        }];
+  }
+}
+
+- (void)testGetAuthenticationAutoUnlockType {
+  std::map<es_auto_unlock_type_t, ::pbv1::AuthenticationAutoUnlock::Type> esToSantaAutoUnlockType{
+    {ES_AUTO_UNLOCK_MACHINE_UNLOCK, ::pbv1::AuthenticationAutoUnlock::TYPE_MACHINE_UNLOCK},
+    {ES_AUTO_UNLOCK_AUTH_PROMPT, ::pbv1::AuthenticationAutoUnlock::TYPE_AUTH_PROMPT},
+    {(es_auto_unlock_type_t)1234, ::pbv1::AuthenticationAutoUnlock::TYPE_UNKNOWN},
+  };
+
+  for (const auto &kv : esToSantaAutoUnlockType) {
+    XCTAssertEqual(santa::GetAuthenticationAutoUnlockType(kv.first), kv.second);
+  }
+}
+
+- (void)testSerializeMessageAuthenticationAutoUnlock {
+  __block es_event_authentication_auto_unlock_t authenticationAutoUnlock = {
+    .username = MakeESStringToken("nobody"),
+    .type = ES_AUTO_UNLOCK_MACHINE_UNLOCK,
+  };
+
+  __block es_event_authentication_t authenticationEvent = {
+    .success = true,
+    .type = ES_AUTHENTICATION_TYPE_AUTO_UNLOCK,
+    .data.auto_unlock = &authenticationAutoUnlock,
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                       variant:@"auto_unlock"
+      shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                     es_message_t *esMsg) {
+        esMsg->event.authentication = &authenticationEvent;
+        return true;
+      }];
+
+  authenticationAutoUnlock.username = MakeESStringToken("ThisUserShouldNotEverExistForTests");
+  authenticationAutoUnlock.type = ES_AUTO_UNLOCK_AUTH_PROMPT;
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
+                       variant:@"auto_unlock_missing_uid"
+      shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                     es_message_t *esMsg) {
+        esMsg->event.authentication = &authenticationEvent;
+        return true;
+      }];
 }
 
 #endif  // HAVE_MACOS_13
