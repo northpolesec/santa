@@ -258,7 +258,7 @@ struct SNTBinaryMessageWindowView: View {
   @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
-  let c = SNTConfigurator.configurator()!
+  let c = SNTConfigurator.configurator()
 
   var body: some View {
     SNTMessageView(
@@ -285,7 +285,7 @@ struct SNTBinaryMessageWindowView: View {
         }
 
         HStack(spacing: 15.0) {
-          if c.eventDetailURL?.count ?? 0 > 0
+          if !(c.eventDetailURL?.isEmpty ?? false)
             && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished)
           {
             OpenEventButton(customText: c.eventDetailText, action: openButton)

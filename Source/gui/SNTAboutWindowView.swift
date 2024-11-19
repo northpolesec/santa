@@ -12,7 +12,7 @@ import santa_common_SNTConfigurator
 
 struct SNTAboutWindowView: View {
   let w: NSWindow?
-  let c = SNTConfigurator.configurator()!
+  let c = SNTConfigurator.configurator()
 
   var body: some View {
     VStack(spacing: 20.0) {
