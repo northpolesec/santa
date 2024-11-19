@@ -796,7 +796,7 @@ message AuthenticationTouchID {
   optional ProcessInfoLight instigator = 1;
 
   // The process that triggered authentication
-  // Note: Due macOS system limitations, the process that triggered the
+  // Note: Due to macOS system limitations, the process that triggered the
   // event may have already exited before the event could be generated. This
   // results in only a small subset of the information from the triggering
   // process to be reported.
