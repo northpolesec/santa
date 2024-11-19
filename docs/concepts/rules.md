@@ -123,7 +123,6 @@ If no rules are found that apply, scopes are then searched. See the
 
 ## Rule Layering
 
-
 Since Santa is a first match system, there are some interesting ways you can
 layer rules to achieve different policies.
 
