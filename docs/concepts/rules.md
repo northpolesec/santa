@@ -126,7 +126,7 @@ If no rules are found that apply, scopes are then searched. See the
 Since Santa is a first match system, there are some interesting ways you can
 layer rules to achieve different policies.
 
-For example if you want to allow all applications from a publisher (e.g.  North
+For example if you want to allow all applications from a publisher (e.g. North
 Pole Security) you might start with an allow rule for the Team ID to allow all
 applications from that publisher. However if you then need to prevent a specific
 cloud-storage application written by the same provider. You can then use a
