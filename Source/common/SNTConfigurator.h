@@ -18,8 +18,6 @@
 
 @class SNTRule;
 
-NS_ASSUME_NONNULL_BEGIN
-
 ///
 ///  Singleton that provides an interface for managing configuration values on disk
 ///  @note This class is designed as a singleton but that is not strictly enforced.
@@ -90,7 +88,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///  Set the regex of allowed paths as received from a sync server.
 ///
-- (void)setSyncServerAllowedPathRegex:(NSRegularExpression *)re;
+- (void)setSyncServerAllowedPathRegex:(nonnull NSRegularExpression *)re;
 
 ///
 ///  The regex of blocked paths. Regexes are specified in ICU format.
@@ -104,7 +102,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///  Set the regex of blocked paths as received from a sync server.
 ///
-- (void)setSyncServerBlockedPathRegex:(NSRegularExpression *)re;
+- (void)setSyncServerBlockedPathRegex:(nonnull NSRegularExpression *)re;
 
 ///
 ///  The regex of paths to log file changes for. Regexes are specified in ICU format.
@@ -202,7 +200,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// converted to the SNTEventLogType enum. If the key is not set, the default log
 /// type is returned.
 ///
-@property(readonly, nonatomic) NSString *eventLogTypeRaw;
+@property(nonnull, readonly, nonatomic) NSString *eventLogTypeRaw;
 
 ///
 ///  If eventLogType is set to Filelog, eventLogPath will provide the path to save logs.
@@ -210,7 +208,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
 ///
-@property(readonly, nonatomic) NSString *eventLogPath;
+@property(nonnull, readonly, nonatomic) NSString *eventLogPath;
 
 ///
 ///  If eventLogType is set to protobuf, spoolDirectory will provide the base path used for
@@ -219,7 +217,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
 ///
-@property(readonly, nonatomic) NSString *spoolDirectory;
+@property(nonnull, readonly, nonatomic) NSString *spoolDirectory;
 
 ///
 ///  If eventLogType is set to protobuf, spoolDirectoryFileSizeThresholdKB sets the per-file size
@@ -504,7 +502,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///  Set the action that will override file access policy config action
 ///
-- (void)setSyncServerOverrideFileAccessAction:(NSString *)action;
+- (void)setSyncServerOverrideFileAccessAction:(nonnull NSString *)action;
 
 ///
 ///  If set, this over-rides the default machine ID used for syncing.
@@ -682,20 +680,18 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///  Retrieve an initialized singleton configurator object using the default file path.
 ///
-+ (instancetype)configurator NS_SWIFT_NAME(configurator());
++ (nonnull instancetype)configurator NS_SWIFT_NAME(configurator());
 
 ///
 ///  Replace the shared configurator with a custom one using a static config.
 ///
 #ifdef DEBUG
-+ (void)overrideConfig:(NSDictionary *)config;
++ (void)overrideConfig:(nonnull NSDictionary *)config;
 #endif
 
 ///
 ///  Clear the sync server configuration from the effective configuration.
 ///
 - (void)clearSyncState;
-
-NS_ASSUME_NONNULL_END
 
 @end
