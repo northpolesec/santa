@@ -34,7 +34,7 @@
     "truncated": false
    }
   },
-  "process": {
+  "trigger_process": {
    "id": {
     "pid": 23,
     "pidversion": 45

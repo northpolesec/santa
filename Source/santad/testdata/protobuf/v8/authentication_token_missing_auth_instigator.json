@@ -34,7 +34,7 @@
     "truncated": false
    }
   },
-  "fallback_id": {
+  "trigger_id": {
    "pid": 98,
    "pidversion": 76
   },
