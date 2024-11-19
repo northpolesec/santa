@@ -984,8 +984,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD &
 
   EncodeProcessInfoLight(pb_od->mutable_instigator(), msg);
   EncodeAuthInstigatorOrFallback(
-    msg, [pb_od] { return pb_od->mutable_process(); },
-    [pb_od] { return pb_od->mutable_fallback_id(); });
+    msg, [pb_od] { return pb_od->mutable_trigger_process(); },
+    [pb_od] { return pb_od->mutable_trigger_id(); });
 
   EncodeStringToken([pb_od] { return pb_od->mutable_record_type(); }, es_od_event->record_type);
   EncodeStringToken([pb_od] { return pb_od->mutable_record_name(); }, es_od_event->record_name);
@@ -1015,8 +1015,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouc
 
   EncodeProcessInfoLight(pb_touchid->mutable_instigator(), msg);
   EncodeAuthInstigatorOrFallback(
-    msg, [pb_touchid] { return pb_touchid->mutable_process(); },
-    [pb_touchid] { return pb_touchid->mutable_fallback_id(); });
+    msg, [pb_touchid] { return pb_touchid->mutable_trigger_process(); },
+    [pb_touchid] { return pb_touchid->mutable_trigger_id(); });
 
   pb_touchid->set_mode(GetAuthenticationTouchIDMode(es_touchid_event->touchid_mode));
   if (es_touchid_event->has_uid) {
@@ -1038,8 +1038,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToke
 
   EncodeProcessInfoLight(pb_token->mutable_instigator(), msg);
   EncodeAuthInstigatorOrFallback(
-    msg, [pb_token] { return pb_token->mutable_process(); },
-    [pb_token] { return pb_token->mutable_fallback_id(); });
+    msg, [pb_token] { return pb_token->mutable_trigger_process(); },
+    [pb_token] { return pb_token->mutable_trigger_id(); });
 
   EncodeStringToken([pb_token] { return pb_token->mutable_pubkey_hash(); },
                     es_token_event->pubkey_hash);

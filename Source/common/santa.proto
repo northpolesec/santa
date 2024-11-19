@@ -763,13 +763,13 @@ message AuthenticationOD {
   optional ProcessInfoLight instigator = 1;
 
   // The process that triggered authentication
-  // Note: Due internal system limitations, the process that triggered the
+  // Note: Due to macOS system limitations, the process that triggered the
   // event may have already exited before the event could be generated. This
   // results in only a small subset of the information from the triggering
   // process to be reported.
   oneof auth_instigator {
-    ProcessInfoLight process = 2;
-    ProcessID fallback_id = 3;
+    ProcessInfoLight trigger_process = 2;
+    ProcessID trigger_id = 3;
   }
 
   // OD record type against which OD is authenticating
@@ -796,13 +796,13 @@ message AuthenticationTouchID {
   optional ProcessInfoLight instigator = 1;
 
   // The process that triggered authentication
-  // Note: Due internal system limitations, the process that triggered the
+  // Note: Due to macOS system limitations, the process that triggered the
   // event may have already exited before the event could be generated. This
   // results in only a small subset of the information from the triggering
   // process to be reported.
   oneof auth_instigator {
-    ProcessInfoLight process = 2;
-    ProcessID fallback_id = 3;
+    ProcessInfoLight trigger_process = 2;
+    ProcessID trigger_id = 3;
   }
 
   enum Mode {
@@ -825,13 +825,13 @@ message AuthenticationToken {
   optional ProcessInfoLight instigator = 1;
 
   // The process that triggered authentication
-  // Note: Due internal system limitations, the process that triggered the
+  // Note: Due to macOS system limitations, the process that triggered the
   // event may have already exited before the event could be generated. This
   // results in only a small subset of the information from the triggering
   // process to be reported.
   oneof auth_instigator {
-    ProcessInfoLight process = 2;
-    ProcessID fallback_id = 3;
+    ProcessInfoLight trigger_process = 2;
+    ProcessID trigger_id = 3;
   }
 
   // Hash of the public key which CryptoTokenKit is authenticating
