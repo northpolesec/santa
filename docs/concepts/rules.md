@@ -131,7 +131,7 @@ For example if you want to allow all applications from a publisher (e.g.  North
 Pole Security) you might start with an allow rule for the Team ID to allow all
 applications from that publisher. However if you then need to prevent a specific
 cloud-storage application written by the same provider. You can then use a
-higher precedence signing ID rule to block that company's cloud storage product
+higher precedence signing ID rule to block that company's cloud storage product.
 
 Using `santactl` this would look like the following:
 
