@@ -126,7 +126,7 @@ If no rules are found that apply, scopes are then searched. See the
 Since Santa is a first match system, there are some interesting ways you can
 layer rules to achieve different policies.
 
-For example if you want to allow all applications from a publisher (e.g.  the
+For example if you want to allow all applications from a publisher (e.g. the
 Acme software company) you might start with an allow rule for the Team ID
 (ABCDEF1234) to allow all applications from that publisher. 
 
