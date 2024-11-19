@@ -24,7 +24,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
-#include "Source/common/SigningIDHelpers.h"
+#import "Source/common/SigningIDHelpers.h"
 
 static const uint32_t kRuleTableCurrentVersion = 7;
 
