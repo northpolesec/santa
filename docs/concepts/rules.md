@@ -121,6 +121,29 @@ CDHash   →   Binary   →   Signing ID   →   Certificate   →   Team ID
 If no rules are found that apply, scopes are then searched. See the
 [scopes.md](scopes.md) document for more information on scopes.
 
+## Rule Layering
+
+Since Santa is a first match system, there are some interesting ways you can
+layer rules to achieve different policies.
+
+For example if you want to allow all applications from a publisher (e.g. the
+Acme software company) you might start with an allow rule for the Team ID
+(ABCDEF1234) to allow all applications from that publisher.
+
+However if you then need to prevent a specific cloud-storage application
+written by the same provider. You can then use a higher precedence signing ID
+rule to block that company's cloud storage product.
+
+Using `santactl` this would look like the following:
+
+```
+santactl rule --allow --teamid --identifier ABCDEF1234
+
+santactl rule --block \
+              --signingid \
+              --identifier ABCDEF1234:com.acme-example.cloud-storage
+```
+
 ### Rule Examples
 
 You can use the `santactl fileinfo` command to check the status of any given
