@@ -161,7 +161,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     cd.cdhash = csInfo.cdhash;
     // Normalized by the FormatSigningID function so this will always have a
     // prefix.
-    cd.teamID = [cd.signingID componentsSeparatedByString:@":"][0];
+    cd.teamID = [cd.signingID componentsSeparatedByString:@":"].firstObject;
 
     // Not needed, but nice for logging and events.
     cd.certChain = csInfo.certificates;
