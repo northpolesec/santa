@@ -128,7 +128,7 @@ layer rules to achieve different policies.
 
 For example if you want to allow all applications from a publisher (e.g. the
 Acme software company) you might start with an allow rule for the Team ID
-(ABCDEF1234) to allow all applications from that publisher. 
+(ABCDEF1234) to allow all applications from that publisher.
 
 However if you then need to prevent a specific cloud-storage application
 written by the same provider. You can then use a higher precedence signing ID
