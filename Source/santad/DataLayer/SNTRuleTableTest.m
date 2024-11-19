@@ -17,9 +17,12 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SigningIDHelpers.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 
 /// This test case actually tests SNTRuleTable and SNTRule
@@ -511,6 +514,23 @@
 
   r.state = SNTRuleStateRemove;
   XCTAssertEqual(YES, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
+}
+
+- (void)testCriticalBinariesProduceFullSigningInformation {
+  // Get the hash of the critical binary
+  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/usr/libexec/trustd"];
+  MOLCodesignChecker *csInfo = [fi codesignCheckerWithError:nil];
+
+  SNTCachedDecision *cd = self.sut.criticalSystemBinaries[fi.SHA256];
+
+  XCTAssertEqualObjects(fi.SHA256, cd.sha256, @"hashes should match");
+  XCTAssertEqualObjects(csInfo.leafCertificate.SHA256, cd.certSHA256, @"cert hashes should match");
+  XCTAssertEqualObjects(csInfo.cdhash, cd.cdhash, @"cdhashes should match");
+  XCTAssertEqualObjects(csInfo.certificates, cd.certChain, @"cert chains should match");
+  NSString *signingID = FormatSigningID(csInfo);
+  NSString *teamID = [signingID componentsSeparatedByString:@":"][0];
+  XCTAssertEqualObjects(signingID, cd.signingID, @"signing IDs should match");
+  XCTAssertEqualObjects(teamID, cd.teamID, @"team IDs should match");
 }
 
 @end
