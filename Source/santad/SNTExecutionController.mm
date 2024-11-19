@@ -156,6 +156,7 @@ static NSString *const kPrinterProxyPostMonterey =
   switch (eventType) {
     case SNTEventStateBlockBinary: eventTypeStr = kBlockBinary; break;
     case SNTEventStateAllowBinary: eventTypeStr = kAllowBinary; break;
+    case SNTEventStateAllowLocalBinary: eventTypeStr = kAllowLocalBinary; break;
     case SNTEventStateBlockCertificate: eventTypeStr = kBlockCertificate; break;
     case SNTEventStateAllowCertificate: eventTypeStr = kAllowCertificate; break;
     case SNTEventStateBlockTeamID: eventTypeStr = kBlockTeamID; break;

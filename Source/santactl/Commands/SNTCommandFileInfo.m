@@ -416,12 +416,14 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         case SNTEventStateAllowUnknown:
         case SNTEventStateBlockUnknown: [output appendString:@" (Unknown)"]; break;
         case SNTEventStateAllowBinary:
+        case SNTEventStateAllowLocalBinary:
         case SNTEventStateBlockBinary: [output appendString:@" (Binary)"]; break;
         case SNTEventStateAllowCertificate:
         case SNTEventStateBlockCertificate: [output appendString:@" (Certificate)"]; break;
         case SNTEventStateAllowTeamID:
         case SNTEventStateBlockTeamID: [output appendString:@" (TeamID)"]; break;
         case SNTEventStateAllowSigningID:
+        case SNTEventStateAllowLocalSigningID:
         case SNTEventStateBlockSigningID: [output appendString:@" (SigningID)"]; break;
         case SNTEventStateAllowCDHash:
         case SNTEventStateBlockCDHash: [output appendString:@" (CDHash)"]; break;

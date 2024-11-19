@@ -62,7 +62,7 @@ static const int kMaximumNotifications = 10;
     // Copy the block to the heap so it can be called later.
     //
     // This is necessary because the block is allocated on the stack in the
-    // Execution controller which exits.
+    // Execution controller which goes out of scope.
     d[@"reply"] = [reply copy];
   }
 

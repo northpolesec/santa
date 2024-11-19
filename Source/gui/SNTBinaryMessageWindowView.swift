@@ -282,16 +282,16 @@ struct SNTBinaryMessageWindowView: View {
             Text(bundleProgress.label)
           }
         }
+      }
 
-        // Display the standalone error message to the user if one is provided.
-        if c.enableStandaloneMode {
-          if let errorMessage = standaloneErrorMessage {
-            if errorMessage != "" {
-              Text(errorMessage).foregroundColor(.red)
-            }
+      // Display the standalone error message to the user if one is provided.
+      if c.enableStandaloneMode {
+        if let errorMessage = standaloneErrorMessage {
+          if errorMessage != "" {
+            Text(errorMessage).foregroundColor(.red)
           }
         }
-
+     }
         HStack(spacing: 15.0) {
           if !(c.eventDetailURL?.isEmpty ?? false)
             && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && !c.enableStandaloneMode
@@ -308,12 +308,9 @@ struct SNTBinaryMessageWindowView: View {
           )
         }
       }
-
       Spacer()
-    }
-    .fixedSize()
+    }.fixedSize()
   }
-
 
   func addStandaloneButton() -> Bool {
     var shouldDisplay = c.enableStandaloneMode
