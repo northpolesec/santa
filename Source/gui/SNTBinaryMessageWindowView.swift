@@ -94,14 +94,11 @@ struct MoreDetailsView: View {
       Spacer()
     }
     .frame(minWidth: MAX_OUTER_VIEW_WIDTH - 60)
-    .fixedSize()
   }
 
   var body: some View {
     HStack(spacing: 20.0) {
       VStack(spacing: 20.0) {
-        Spacer()
-
         addLabel {
           Text("Path").bold().font(Font.system(size: 12.0))
           Text(e?.filePath ?? "unknown").textSelection(.enabled)
@@ -178,7 +175,7 @@ struct MoreDetailsView: View {
         }
 
         Spacer()
-      }.frame(maxWidth: MAX_OUTER_VIEW_WIDTH - 20).fixedSize()
+      }.frame(maxWidth: MAX_OUTER_VIEW_WIDTH - 20).padding(20.0)
     }.frame(width: MAX_OUTER_VIEW_WIDTH - 20).fixedSize().background(Color.gray.opacity(0.2))
   }
 }
