@@ -22,6 +22,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
+#include "Source/common/TelemetryEventMap.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
@@ -130,6 +131,13 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
 
   [self.compilerController handleEvent:esMsg withLogger:self->_logger];
 
+  // The logger will take care of this, but we check early so we
+  // don't do any unnecessary work
+  if (!_logger->ShouldLog(santa::ESEventToTelemetryEvent(esMsg->event_type))) {
+    recordEventMetrics(EventDisposition::kDropped);
+    return;
+  }
+
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_CLOSE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: OS_FALLTHROUGH;
@@ -160,15 +168,6 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
         return;
       }
 
-      break;
-    }
-
-    case ES_EVENT_TYPE_NOTIFY_FORK: OS_FALLTHROUGH;
-    case ES_EVENT_TYPE_NOTIFY_EXIT: {
-      if (self.configurator.enableForkAndExitLogging == NO) {
-        recordEventMetrics(EventDisposition::kDropped);
-        return;
-      }
       break;
     }
 

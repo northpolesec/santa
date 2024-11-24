@@ -18,6 +18,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "Source/common/TelemetryEventMap.h"
+#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
@@ -25,7 +27,9 @@ class MockLogger : public santa::Logger {
  public:
   using Logger::Logger;
 
-  MockLogger() : Logger(nullptr, nullptr) {}
+  MockLogger() : Logger(santa::TelemetryEvent::kEverything, nullptr, nullptr) {}
+
+  MOCK_METHOD(void, Log, (std::unique_ptr<santa::EnrichedMessage>));
 
   MOCK_METHOD(void, LogFileAccess,
               (const std::string &policy_version,

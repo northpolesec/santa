@@ -1,22 +1,24 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
 #define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
 
 #include <memory>
 #include <string_view>
+#include "Source/common/TelemetryEventMap.h"
 
 #import <Foundation/Foundation.h>
 
@@ -39,13 +41,14 @@ namespace santa {
 class Logger {
  public:
   static std::unique_ptr<Logger> Create(std::shared_ptr<santa::EndpointSecurityAPI> esapi,
-                                        SNTEventLogType log_type, SNTDecisionCache *decision_cache,
-                                        NSString *event_log_path, NSString *spool_log_path,
-                                        size_t spool_dir_size_threshold,
+                                        TelemetryEvent telemetry_mask, SNTEventLogType log_type,
+                                        SNTDecisionCache *decision_cache, NSString *event_log_path,
+                                        NSString *spool_log_path, size_t spool_dir_size_threshold,
                                         size_t spool_file_size_threshold,
                                         uint64_t spool_flush_timeout_ms);
 
-  Logger(std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer);
+  Logger(TelemetryEvent telemetry_mask, std::shared_ptr<santa::Serializer> serializer,
+         std::shared_ptr<santa::Writer> writer);
 
   virtual ~Logger() = default;
 
@@ -65,9 +68,14 @@ class Logger {
 
   void Flush();
 
+  void SetTelemetryMask(TelemetryEvent mask);
+
+  inline bool ShouldLog(TelemetryEvent event) { return ((event & telemetry_mask_) == event); }
+
   friend class santa::LoggerPeer;
 
  private:
+  TelemetryEvent telemetry_mask_;
   std::shared_ptr<santa::Serializer> serializer_;
   std::shared_ptr<santa::Writer> writer_;
 };

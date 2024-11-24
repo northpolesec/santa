@@ -132,6 +132,7 @@ static NSString *const kEnableMachineIDDecoration = @"EnableMachineIDDecoration"
 static NSString *const kEnableForkAndExitLogging = @"EnableForkAndExitLogging";
 static NSString *const kIgnoreOtherEndpointSecurityClients = @"IgnoreOtherEndpointSecurityClients";
 static NSString *const kEnableDebugLogging = @"EnableDebugLogging";
+static NSString *const kTelemetryKey = @"Telemetry";
 
 static NSString *const kClientContentEncoding = @"SyncClientContentEncoding";
 
@@ -284,6 +285,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kEntitlementsPrefixFilterKey : array,
       kEntitlementsTeamIDFilterKey : array,
       kEnabledProcessAnnotations : array,
+      kTelemetryKey : array,
     };
 
     _syncStateFilePath = syncStateFilePath;
@@ -619,6 +621,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEntitlementsTeamIDFilter {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingTelemetry {
   return [self configStateSet];
 }
 
@@ -1038,6 +1044,18 @@ static SNTConfigurator *sharedConfigurator = nil;
   return number ? [number boolValue] : NO;
 }
 
+- (NSArray<NSString *> *)telemetry {
+  NSArray *events = self.configState[kTelemetryKey];
+
+  for (id event in events) {
+    if (![event isKindOfClass:[NSString class]]) {
+      return nil;
+    }
+  }
+
+  return events;
+}
+
 - (BOOL)ignoreOtherEndpointSecurityClients {
   NSNumber *number = self.configState[kIgnoreOtherEndpointSecurityClients];
   return number ? [number boolValue] : NO;
@@ -1285,9 +1303,9 @@ static SNTConfigurator *sharedConfigurator = nil;
   NSDictionary *overrides = [NSDictionary dictionaryWithContentsOfFile:kConfigOverrideFilePath];
   for (NSString *key in overrides) {
     id obj = overrides[key];
-    if (![obj isKindOfClass:self.forcedConfigKeyTypes[key]] ||
-        ([self.forcedConfigKeyTypes[key] isKindOfClass:[NSRegularExpression class]] &&
-         ![obj isKindOfClass:[NSString class]])) {
+    if (![obj isKindOfClass:self.forcedConfigKeyTypes[key]] &&
+        !(self.forcedConfigKeyTypes[key] == [NSRegularExpression class] &&
+          [obj isKindOfClass:[NSString class]])) {
       continue;
     }
 

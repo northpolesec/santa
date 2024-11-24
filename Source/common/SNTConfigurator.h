@@ -211,6 +211,13 @@
 @property(nonnull, readonly, nonatomic) NSString *eventLogPath;
 
 ///
+///  Array of strings of telemetry events that should be logged.
+///
+///  @note: This property is KVO compliant.
+///
+@property(nullable, readonly, nonatomic) NSArray<NSString *> *telemetry;
+
+///
 ///  If eventLogType is set to protobuf, spoolDirectory will provide the base path used for
 ///  saving logs using a maildir-like format.
 ///  Defaults to /var/db/santa/spool.

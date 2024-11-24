@@ -24,6 +24,7 @@
 #include <vector>
 
 #import "Source/common/SNTCommonEnums.h"
+#include "Source/common/TelemetryEventMap.h"
 #include "Source/common/TestUtils.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
@@ -52,6 +53,7 @@ using santa::Null;
 using santa::Protobuf;
 using santa::Spool;
 using santa::Syslog;
+using santa::TelemetryEvent;
 
 namespace santa {
 
@@ -60,7 +62,8 @@ class LoggerPeer : public Logger {
   // Make base class constructors visible
   using Logger::Logger;
 
-  LoggerPeer(std::unique_ptr<Logger> l) : Logger(l->serializer_, l->writer_) {}
+  LoggerPeer(std::unique_ptr<Logger> l)
+      : Logger(TelemetryEvent::kEverything, l->serializer_, l->writer_) {}
 
   std::shared_ptr<santa::Serializer> Serializer() { return serializer_; }
 
@@ -101,31 +104,33 @@ class MockWriter : public Null {
   // Ensure that the factory method creates expected serializers/writers pairs
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
-  XCTAssertEqual(nullptr, Logger::Create(mockESApi, (SNTEventLogType)123, nil, @"/tmp/temppy",
-                                         @"/tmp/spool", 1, 1, 1));
+  XCTAssertEqual(nullptr,
+                 Logger::Create(mockESApi, TelemetryEvent::kEverything, (SNTEventLogType)123, nil,
+                                @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
 
-  LoggerPeer logger(
-    Logger::Create(mockESApi, SNTEventLogTypeFilelog, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
+  LoggerPeer logger(Logger::Create(mockESApi, TelemetryEvent::kEverything, SNTEventLogTypeFilelog,
+                                   nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.Serializer()));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<File>(logger.Writer()));
 
-  logger = LoggerPeer(
-    Logger::Create(mockESApi, SNTEventLogTypeSyslog, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
+  logger = LoggerPeer(Logger::Create(mockESApi, TelemetryEvent::kEverything, SNTEventLogTypeSyslog,
+                                     nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.Serializer()));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Syslog>(logger.Writer()));
 
-  logger = LoggerPeer(
-    Logger::Create(mockESApi, SNTEventLogTypeNull, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
+  logger = LoggerPeer(Logger::Create(mockESApi, TelemetryEvent::kEverything, SNTEventLogTypeNull,
+                                     nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Empty>(logger.Serializer()));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Null>(logger.Writer()));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, SNTEventLogTypeProtobuf, nil, @"/tmp/temppy",
-                                     @"/tmp/spool", 1, 1, 1));
+  logger =
+    LoggerPeer(Logger::Create(mockESApi, TelemetryEvent::kEverything, SNTEventLogTypeProtobuf, nil,
+                              @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.Serializer()));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Spool>(logger.Writer()));
 
-  logger = LoggerPeer(
-    Logger::Create(mockESApi, SNTEventLogTypeJSON, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
+  logger = LoggerPeer(Logger::Create(mockESApi, TelemetryEvent::kEverything, SNTEventLogTypeJSON,
+                                     nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.Serializer()));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<File>(logger.Writer()));
 }
@@ -150,7 +155,7 @@ class MockWriter : public Null {
     EXPECT_CALL(*mockSerializer, SerializeMessage(testing::A<const EnrichedClose &>())).Times(1);
     EXPECT_CALL(*mockWriter, Write).Times(1);
 
-    Logger(mockSerializer, mockWriter).Log(std::move(enrichedMsg));
+    Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter).Log(std::move(enrichedMsg));
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -169,7 +174,8 @@ class MockWriter : public Null {
   EXPECT_CALL(*mockSerializer, SerializeAllowlist(testing::_, hash));
   EXPECT_CALL(*mockWriter, Write);
 
-  Logger(mockSerializer, mockWriter).LogAllowlist(Message(mockESApi, &msg), hash);
+  Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter)
+    .LogAllowlist(Message(mockESApi, &msg), hash);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
@@ -184,7 +190,7 @@ class MockWriter : public Null {
   EXPECT_CALL(*mockSerializer, SerializeBundleHashingEvent).Times((int)[events count]);
   EXPECT_CALL(*mockWriter, Write).Times((int)[events count]);
 
-  Logger(mockSerializer, mockWriter).LogBundleHashingEvents(events);
+  Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter).LogBundleHashingEvents(events);
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
@@ -197,7 +203,9 @@ class MockWriter : public Null {
   EXPECT_CALL(*mockSerializer, SerializeDiskAppeared);
   EXPECT_CALL(*mockWriter, Write);
 
-  Logger(mockSerializer, mockWriter).LogDiskAppeared(@{@"key" : @"value"});
+  Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter).LogDiskAppeared(@{
+    @"key" : @"value"
+  });
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
@@ -210,7 +218,9 @@ class MockWriter : public Null {
   EXPECT_CALL(*mockSerializer, SerializeDiskDisappeared);
   EXPECT_CALL(*mockWriter, Write);
 
-  Logger(mockSerializer, mockWriter).LogDiskDisappeared(@{@"key" : @"value"});
+  Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter).LogDiskDisappeared(@{
+    @"key" : @"value"
+  });
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
@@ -226,7 +236,7 @@ class MockWriter : public Null {
   EXPECT_CALL(*mockSerializer, SerializeFileAccess);
   EXPECT_CALL(*mockWriter, Write);
 
-  Logger(mockSerializer, mockWriter)
+  Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter)
     .LogFileAccess(
       "v1", "name", Message(mockESApi, &msg),
       EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
