@@ -31,6 +31,7 @@ swift_library(
         "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTCommonEnums",
     ],
 )
 

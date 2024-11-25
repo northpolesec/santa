@@ -16,6 +16,7 @@ import SwiftUI
 
 import santa_common_SNTBlockMessage
 import santa_common_SNTConfigurator
+import santa_common_SNTCommonEnums
 import santa_common_SNTStoredEvent
 import santa_gui_SNTMessageView
 
@@ -292,6 +293,7 @@ struct SNTBinaryMessageWindowView: View {
           }
         }
      }
+
         HStack(spacing: 15.0) {
           if !(c.eventDetailURL?.isEmpty ?? false)
             && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && !c.enableStandaloneMode
@@ -307,7 +309,6 @@ struct SNTBinaryMessageWindowView: View {
             action: dismissButton
           )
         }
-      }
       Spacer()
     }.fixedSize()
   }
@@ -315,10 +316,22 @@ struct SNTBinaryMessageWindowView: View {
   func addStandaloneButton() -> Bool {
     var shouldDisplay = c.enableStandaloneMode
     if let errorMessage = standaloneErrorMessage {
+
       if errorMessage != "" {
         shouldDisplay = false
       }
     }
+
+    let blockedUnknownEvent = SNTEventState.blockUnknown;
+
+    // Only display the standalone button if the event is for a block that fell
+    // was the result of a fall through.
+    if let decision = event?.decision {
+      if decision != blockedUnknownEvent {
+        shouldDisplay = false
+      }
+    }
+
     return shouldDisplay
   }
 
