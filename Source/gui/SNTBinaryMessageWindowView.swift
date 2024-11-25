@@ -292,23 +292,23 @@ struct SNTBinaryMessageWindowView: View {
             Text(errorMessage).foregroundColor(.red)
           }
         }
-     }
+      }
 
-        HStack(spacing: 15.0) {
-          if !(c.eventDetailURL?.isEmpty ?? false)
-            && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && !c.enableStandaloneMode
-          {
-            OpenEventButton(customText: c.eventDetailText, action: openButton)
-          } else if addStandaloneButton() {
-            StandaloneButton(action: standAloneButton)
-          }
-
-          DismissButton(
-            customText: c.dismissText,
-            silence: preventFutureNotifications,
-            action: dismissButton
-          )
+      HStack(spacing: 15.0) {
+        if !(c.eventDetailURL?.isEmpty ?? false)
+          && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && !c.enableStandaloneMode
+        {
+          OpenEventButton(customText: c.eventDetailText, action: openButton)
+        } else if addStandaloneButton() {
+          StandaloneButton(action: standAloneButton)
         }
+
+        DismissButton(
+          customText: c.dismissText,
+          silence: preventFutureNotifications,
+          action: dismissButton
+        )
+      }
       Spacer()
     }.fixedSize()
   }
