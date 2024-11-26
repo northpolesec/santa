@@ -1045,12 +1045,22 @@ static SNTConfigurator *sharedConfigurator = nil;
   return number ? [number boolValue] : NO;
 }
 
+// This method returns only the values that are of the expected string type.
+// The reasoning is that if a filter is attempted to be set, this method should
+// return some subset rather than `nil`. Since `nil` effectively means to log
+// everything, returning it would be akin to "failing open" even though some
+// filter configuration was attempted.
 - (NSArray<NSString *> *)telemetry {
-  NSArray *events = self.configState[kTelemetryKey];
+  NSArray *configuredEvents = self.configState[kTelemetryKey];
+  if (!configuredEvents) {
+    return nil;
+  }
 
-  for (id event in events) {
-    if (![event isKindOfClass:[NSString class]]) {
-      return nil;
+  NSMutableArray *events = [[NSMutableArray alloc] initWithCapacity:configuredEvents.count];
+
+  for (id event in configuredEvents) {
+    if ([event isKindOfClass:[NSString class]]) {
+      [events addObject:event];
     }
   }
 

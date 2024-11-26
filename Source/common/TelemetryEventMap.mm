@@ -64,7 +64,7 @@ TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry,
       mask |= EventNameToMask(santa::NSStringToUTF8StringView([event_name lowercaseString]));
     }
   } else {
-    mask = EventNameToMask("everything");
+    mask = TelemetryEvent::kEverything;
 
     if (enableForkAndExitLogging == false) {
       mask &= (~TelemetryEvent::kFork & ~TelemetryEvent::kExit);

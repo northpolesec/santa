@@ -400,31 +400,33 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                             FlushCacheReason::kEntitlementsPrefixFilterChanged);
               [authorizer_client clearCache];
             }],
-    [[SNTKVOManager alloc] initWithObject:configurator
-                                 selector:@selector(telemetry)
-                                     type:[NSArray class]
-                                 callback:^(NSArray *oldValue, NSArray *newValue) {
-                                   if (!oldValue && !newValue) {
-                                     return;
-                                   }
+    [[SNTKVOManager alloc]
+      initWithObject:configurator
+            selector:@selector(telemetry)
+                type:[NSArray class]
+            callback:^(NSArray *oldValue, NSArray *newValue) {
+              if (!oldValue && !newValue) {
+                return;
+              }
 
-                                   // Ensure the new array is composed of strings
-                                   for (id element in newValue) {
-                                     if (![element isKindOfClass:[NSString class]]) {
-                                       return;
-                                     }
-                                   }
+              // Ensure the new array is composed of strings
+              for (id element in newValue) {
+                if (![element isKindOfClass:[NSString class]]) {
+                  LOGW(@"Expected type in Telemetry config. Want String. Got: %@: value: %@",
+                       [element class], element);
+                  return;
+                }
+              }
 
-                                   if ([oldValue isEqualToArray:newValue]) {
-                                     return;
-                                   }
+              if ([oldValue isEqualToArray:newValue]) {
+                return;
+              }
 
-                                   LOGI(@"Telemetry changed: %@ -> %@",
-                                        [oldValue componentsJoinedByString:@","],
-                                        [newValue componentsJoinedByString:@","]);
-                                   logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(
-                                     newValue, configurator.enableForkAndExitLogging));
-                                 }],
+              LOGI(@"Telemetry changed: %@ -> %@", [oldValue componentsJoinedByString:@","],
+                   [newValue componentsJoinedByString:@","]);
+              logger->SetTelemetryMask(
+                santa::TelemetryConfigToBitmask(newValue, configurator.enableForkAndExitLogging));
+            }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(enableForkAndExitLogging)
                                      type:[NSNumber class]
