@@ -27,6 +27,7 @@
 #include "Source/common/Platform.h"
 #include "Source/common/PrefixTree.h"
 #import "Source/common/SNTConfigurator.h"
+#include "Source/common/TelemetryEventMap.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/Unit.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
@@ -36,7 +37,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
-#include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
 #include "Source/santad/Metrics.h"
 #import "Source/santad/SNTCompilerController.h"
 
@@ -48,6 +49,7 @@ using santa::Logger;
 using santa::Message;
 using santa::PrefixTree;
 using santa::Processor;
+using santa::TelemetryEvent;
 using santa::Unit;
 
 class MockEnricher : public Enricher {
@@ -60,13 +62,6 @@ class MockAuthResultCache : public AuthResultCache {
   using AuthResultCache::AuthResultCache;
 
   MOCK_METHOD(void, RemoveFromCache, (const es_file_t *));
-};
-
-class MockLogger : public Logger {
- public:
-  using Logger::Logger;
-
-  MOCK_METHOD(void, Log, (std::unique_ptr<EnrichedMessage>));
 };
 
 @interface SNTEndpointSecurityRecorderTest : XCTestCase
@@ -141,7 +136,8 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
 - (void)handleMessageShouldLog:(BOOL)shouldLog
          shouldRemoveFromCache:(BOOL)shouldRemoveFromCache
-                     withBlock:(TestHelperBlock)testBlock {
+                     withBlock:(TestHelperBlock)testBlock
+                 telemetryMask:(TelemetryEvent)telemetryMask {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLOSE, &proc, ActionType::Auth);
@@ -162,6 +158,8 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   if (shouldRemoveFromCache) {
     EXPECT_CALL(*mockAuthCache, RemoveFromCache).Times(1);
+  } else {
+    EXPECT_CALL(*mockAuthCache, RemoveFromCache).Times(0);
   }
   dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
 
@@ -170,12 +168,17 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   // properly handle the `processEnrichedMessage:handler:` block. Instead this
   // test will mock the `Log` method that is called in the handler block.
   __block dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  auto mockLogger = std::make_shared<MockLogger>(nullptr, nullptr);
+  auto mockLogger = std::make_shared<MockLogger>();
+  mockLogger->SetTelemetryMask(telemetryMask);
+
   if (shouldLog) {
     EXPECT_CALL(*mockEnricher, Enrich).WillOnce(testing::Return(std::move(enrichedMsg)));
     EXPECT_CALL(*mockLogger, Log).WillOnce(testing::InvokeWithoutArgs(^() {
       dispatch_semaphore_signal(sema);
     }));
+  } else {
+    EXPECT_CALL(*mockEnricher, Enrich).Times(0);
+    EXPECT_CALL(*mockLogger, Log).Times(0);
   }
 
   auto prefixTree = std::make_shared<PrefixTree<Unit>>();
@@ -194,6 +197,11 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   testBlock(&esMsg, mockESApi, mockCC, recorderClient, prefixTree, &sema, &semaMetrics);
 
+  // Ensure the deleter is called on the fake enriched message so that the underlying message gets
+  // released. Otherwise, various gmock warnings about uninteresting calls are printed because the
+  // object isn't deleted until after expectations are verified below.
+  enrichedMsg.reset();
+
   XCTAssertTrue(OCMVerifyAll(mockCC));
 
   XCTBubbleMockVerifyAndClearExpectations(mockAuthCache.get());
@@ -202,6 +210,15 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   XCTBubbleMockVerifyAndClearExpectations(mockLogger.get());
 
   [mockCC stopMocking];
+}
+
+- (void)handleMessageShouldLog:(BOOL)shouldLog
+         shouldRemoveFromCache:(BOOL)shouldRemoveFromCache
+                     withBlock:(TestHelperBlock)testBlock {
+  [self handleMessageShouldLog:shouldLog
+         shouldRemoveFromCache:shouldRemoveFromCache
+                     withBlock:testBlock
+                 telemetryMask:TelemetryEvent::kEverything];
 }
 
 - (void)testHandleEventCloseMappedWritableMatchesRegex {
@@ -399,7 +416,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
     Message msg(mockESApi, esMsg);
 
     OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
-    OCMExpect([self.mockConfigurator enableForkAndExitLogging]).andReturn(NO);
 
     [recorderClient handleMessage:std::move(msg)
                recordEventMetrics:^(EventDisposition d) {
@@ -410,7 +426,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
     XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
   };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:NO
+         shouldRemoveFromCache:NO
+                     withBlock:testBlock
+                 telemetryMask:santa::TelemetryConfigToBitmask(nil, false)];
 
   // FORK, EnableForkAndExitLogging is true
   testBlock =
@@ -423,7 +442,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
     Message msg(mockESApi, esMsg);
 
     OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
-    OCMExpect([self.mockConfigurator enableForkAndExitLogging]).andReturn(YES);
 
     [recorderClient handleMessage:std::move(msg)
                recordEventMetrics:^(EventDisposition d) {
@@ -434,7 +452,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
     XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
   };
 
-  [self handleMessageShouldLog:YES shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:YES
+         shouldRemoveFromCache:NO
+                     withBlock:testBlock
+                 telemetryMask:santa::TelemetryConfigToBitmask(nil, true)];
 
   XCTAssertTrue(OCMVerifyAll(self.mockConfigurator));
 }

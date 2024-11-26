@@ -357,6 +357,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:String",
+        "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
         "//Source/santad/ProcessTree:process_tree",
     ],
@@ -505,6 +506,7 @@ objc_library(
     deps = [
         ":EndpointSecurityMessage",
         "//Source/common:Platform",
+        "//Source/common:TelemetryEventMap",
         "//Source/santad/ProcessTree:process_tree_cc_proto",
     ],
 )
@@ -669,6 +671,7 @@ objc_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
+        "//Source/common:TelemetryEventMap",
     ],
 )
 
@@ -786,6 +789,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
+        "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
         "//Source/santad/ProcessTree:process_tree",
         "@MOLXPCConnection",
@@ -818,6 +822,7 @@ objc_library(
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCUnprivilegedControlInterface",
+        "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
         "//Source/santad/ProcessTree:process_tree",
         "//Source/santad/ProcessTree/annotations:originator",
@@ -909,8 +914,10 @@ objc_library(
     testonly = 1,
     hdrs = ["Logs/EndpointSecurity/MockLogger.h"],
     deps = [
+        ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
+        "//Source/common:TelemetryEventMap",
         "@com_google_googletest//:gtest",
     ],
 )
@@ -1175,6 +1182,7 @@ santa_unit_test(
         ":EndpointSecurityWriterSyslog",
         ":MockEndpointSecurityAPI",
         "//Source/common:SNTCommonEnums",
+        "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
         "@OCMock",
         "@com_google_googletest//:gtest",
@@ -1390,11 +1398,13 @@ santa_unit_test(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":MockEndpointSecurityAPI",
+        ":MockLogger",
         ":SNTCompilerController",
         ":SNTEndpointSecurityRecorder",
         "//Source/common:Platform",
         "//Source/common:PrefixTree",
         "//Source/common:SNTConfigurator",
+        "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
         "//Source/common:Unit",
         "@OCMock",

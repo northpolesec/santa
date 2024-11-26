@@ -162,6 +162,22 @@ objc_library(
 )
 
 objc_library(
+    name = "TelemetryEventMap",
+    srcs = ["TelemetryEventMap.mm"],
+    hdrs = ["TelemetryEventMap.h"],
+    deps = [
+      ":String",
+      "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+santa_unit_test(
+    name = "TelemetryEventMapTest",
+    srcs = ["TelemetryEventMapTest.mm"],
+    deps = [":TelemetryEventMap"],
+)
+
+objc_library(
     name = "SNTBlockMessage",
     srcs = ["SNTBlockMessage.m"],
     hdrs = ["SNTBlockMessage.h"],
@@ -529,6 +545,7 @@ test_suite(
         ":SantaCacheTest",
         ":ScopedCFTypeRefTest",
         ":ScopedIOObjectRefTest",
+        ":TelemetryEventMapTest",
     ],
     visibility = ["//:santa_package_group"],
 )

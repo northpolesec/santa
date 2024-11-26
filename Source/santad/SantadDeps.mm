@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include "Source/santad/SantadDeps.h"
 
@@ -20,6 +21,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#include "Source/common/TelemetryEventMap.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/DataLayer/WatchItems.h"
@@ -123,10 +125,11 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   size_t spool_dir_threshold_bytes = [configurator spoolDirectorySizeThresholdMB] * 1024 * 1024;
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
 
-  std::unique_ptr<::Logger> logger =
-    Logger::Create(esapi, [configurator eventLogType], [SNTDecisionCache sharedCache],
-                   [configurator eventLogPath], [configurator spoolDirectory],
-                   spool_dir_threshold_bytes, spool_file_threshold_bytes, spool_flush_timeout_ms);
+  std::unique_ptr<::Logger> logger = Logger::Create(
+    esapi, TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
+    [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
+    [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,
+    spool_flush_timeout_ms);
   if (!logger) {
     LOGE(@"Failed to create logger.");
     exit(EXIT_FAILURE);

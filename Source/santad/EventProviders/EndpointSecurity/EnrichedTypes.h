@@ -27,6 +27,7 @@
 #include <variant>
 
 #include "Source/common/Platform.h"
+#include "Source/common/TelemetryEventMap.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessTree/process_tree.pb.h"
 
@@ -593,11 +594,23 @@ using EnrichedType =
 
 class EnrichedMessage {
  public:
-  EnrichedMessage(EnrichedType &&msg) : msg_(std::move(msg)) {}
+  // Note: For now, all EnrichedType variants have a base class of
+  // EnrichedEventType. If this changes in the future, we'll need a more
+  // comprehensive solution for grabbing the TelemetryEvent type of T.
+  template <typename T>
+  EnrichedMessage(T &&event)
+      : telemetry_event_(ESEventToTelemetryEvent(event->event_type)),
+        msg_(std::move(event)) {}
 
   const EnrichedType &GetEnrichedMessage() { return msg_; }
 
+  inline TelemetryEvent GetTelemetryEvent() { return telemetry_event_; }
+
  private:
+  // Because the constructor requires moving the given argument into msg_,
+  // telemetry_event_ should be declared first to ensure the argument isn't
+  // in an unspecified state.
+  TelemetryEvent telemetry_event_;
   EnrichedType msg_;
 };
 

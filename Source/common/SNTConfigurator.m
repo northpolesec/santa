@@ -1,16 +1,17 @@
 /// Copyright 2014-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/common/SNTConfigurator.h"
 
@@ -132,6 +133,7 @@ static NSString *const kEnableMachineIDDecoration = @"EnableMachineIDDecoration"
 static NSString *const kEnableForkAndExitLogging = @"EnableForkAndExitLogging";
 static NSString *const kIgnoreOtherEndpointSecurityClients = @"IgnoreOtherEndpointSecurityClients";
 static NSString *const kEnableDebugLogging = @"EnableDebugLogging";
+static NSString *const kTelemetryKey = @"Telemetry";
 
 static NSString *const kClientContentEncoding = @"SyncClientContentEncoding";
 
@@ -284,6 +286,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kEntitlementsPrefixFilterKey : array,
       kEntitlementsTeamIDFilterKey : array,
       kEnabledProcessAnnotations : array,
+      kTelemetryKey : array,
     };
 
     _syncStateFilePath = syncStateFilePath;
@@ -619,6 +622,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEntitlementsTeamIDFilter {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingTelemetry {
   return [self configStateSet];
 }
 
@@ -1038,6 +1045,28 @@ static SNTConfigurator *sharedConfigurator = nil;
   return number ? [number boolValue] : NO;
 }
 
+// This method returns only the values that are of the expected string type.
+// The reasoning is that if a filter is attempted to be set, this method should
+// return some subset rather than `nil`. Since `nil` effectively means to log
+// everything, returning it would be akin to "failing open" even though some
+// filter configuration was attempted.
+- (NSArray<NSString *> *)telemetry {
+  NSArray *configuredEvents = self.configState[kTelemetryKey];
+  if (!configuredEvents) {
+    return nil;
+  }
+
+  NSMutableArray *events = [[NSMutableArray alloc] initWithCapacity:configuredEvents.count];
+
+  for (id event in configuredEvents) {
+    if ([event isKindOfClass:[NSString class]]) {
+      [events addObject:event];
+    }
+  }
+
+  return events;
+}
+
 - (BOOL)ignoreOtherEndpointSecurityClients {
   NSNumber *number = self.configState[kIgnoreOtherEndpointSecurityClients];
   return number ? [number boolValue] : NO;
@@ -1285,9 +1314,9 @@ static SNTConfigurator *sharedConfigurator = nil;
   NSDictionary *overrides = [NSDictionary dictionaryWithContentsOfFile:kConfigOverrideFilePath];
   for (NSString *key in overrides) {
     id obj = overrides[key];
-    if (![obj isKindOfClass:self.forcedConfigKeyTypes[key]] ||
-        ([self.forcedConfigKeyTypes[key] isKindOfClass:[NSRegularExpression class]] &&
-         ![obj isKindOfClass:[NSString class]])) {
+    if (![obj isKindOfClass:self.forcedConfigKeyTypes[key]] &&
+        !(self.forcedConfigKeyTypes[key] == [NSRegularExpression class] &&
+          [obj isKindOfClass:[NSString class]])) {
       continue;
     }
 
