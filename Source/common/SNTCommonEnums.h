@@ -71,6 +71,7 @@ typedef NS_ENUM(NSInteger, SNTClientMode) {
   SNTClientModeUnknown,
   SNTClientModeMonitor = 1,
   SNTClientModeLockdown = 2,
+  SNTClientModeStandalone = 3,
 };
 
 typedef NS_ENUM(uint64_t, SNTEventState) {

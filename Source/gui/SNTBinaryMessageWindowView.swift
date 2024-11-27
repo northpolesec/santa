@@ -286,7 +286,7 @@ struct SNTBinaryMessageWindowView: View {
       }
 
       // Display the standalone error message to the user if one is provided.
-      if c.enableStandaloneMode {
+      if c.clientMode == .standalone {
         if let errorMessage = standaloneErrorMessage {
           if errorMessage != "" {
             Text(errorMessage).foregroundColor(.red)
@@ -296,7 +296,7 @@ struct SNTBinaryMessageWindowView: View {
 
       HStack(spacing: 15.0) {
         if !(c.eventDetailURL?.isEmpty ?? false)
-          && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && !c.enableStandaloneMode
+          && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && !c.clientMode == .standalone
         {
           OpenEventButton(customText: c.eventDetailText, action: openButton)
         } else if addStandaloneButton() {
@@ -314,7 +314,7 @@ struct SNTBinaryMessageWindowView: View {
   }
 
   func addStandaloneButton() -> Bool {
-    var shouldDisplay = c.enableStandaloneMode
+    var shouldDisplay = c.clientMode == .standalone
     if let errorMessage = standaloneErrorMessage {
 
       if errorMessage != "" {

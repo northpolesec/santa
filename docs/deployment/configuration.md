@@ -22,7 +22,7 @@ also known as mobileconfig files, which are in an Apple-specific XML format.
 
 | Key                                | Value Type | Description                              |
 | ---------------------------------- | ---------- | ---------------------------------------- |
-| ClientMode\*                       | Integer    | 1 = MONITOR, 2 = LOCKDOWN, defaults to MONITOR |
+| ClientMode\*                       | Integer    | 1 = MONITOR, 2 = LOCKDOWN, 3 = STANDALONE defaults to MONITOR |
 | FailClosed                         | Bool       | If true and the ClientMode is LOCKDOWN: execution will be denied when there is an error reading or processing an executable file and when Santa has to make a default response just prior to deadlines expiring. Defaults to false. |
 | FileChangesRegex\*                 | String     | The regex of paths to log file changes. Regexes are specified in ICU format. |
 | AllowedPathRegex\*                 | String     | A regex to allow if the binary, certificate, or Team ID scopes did not allow/block execution.  Regexes are specified in ICU format. |
@@ -31,7 +31,6 @@ also known as mobileconfig files, which are in an Apple-specific XML format.
 | EnableBadSignatureProtection       | Bool       | If true, binaries with a bad signing chain will be blocked even in MONITOR mode, **unless** the binary is allowed by an explicit rule. Defaults to false. |
 | EnablePageZeroProtection           | Bool       | If true, 32-bit binaries that are missing the `__PAGEZERO` segment will be blocked even in MONITOR mode, **unless** the binary is allowed by an explicit rule. Defaults to true. |
 | EnableSilentMode                   | Bool       | If true, Santa will not post any GUI notifications. This can be a very confusing experience for users, use with caution. Defaults to false. |
-| EnableStandaloneMode                   | Bool       | If true, Santa will allow the local user to approve binaries provided they successfully authenticate with TouchID. Use with caution. Defaults to false. |
 | EnableTransitiveRules              | Bool       | If true, Santa will respect compiler rule types and create allow rules for the executables they produce. Defaults to false. |
 | EnableSilentTTYMode                | Bool       | If true, Santa will not post any TTY notifications. This can be a very confusing experience for users, use with caution. Defaults to false. |
 | ~~EnableForkAndExitLogging~~       | Bool       | DEPRECATED. Please use `Telemetry` instead. If true, Santa will log FORK and EXIT event types. Defaults to false. |

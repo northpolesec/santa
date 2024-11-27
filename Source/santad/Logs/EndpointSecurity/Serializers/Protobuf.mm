@@ -30,6 +30,7 @@
 #include <string_view>
 
 #import "Source/common/SNTCachedDecision.h"
+#include "Source/common/SNTCommonEnums.h"
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/String.h"
@@ -332,6 +333,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
   switch (mode) {
     case SNTClientModeMonitor: return ::pbv1::Execution::MODE_MONITOR;
     case SNTClientModeLockdown: return ::pbv1::Execution::MODE_LOCKDOWN;
+    case SNTClientModeStandalone: return ::pbv1::Execution::MODE_STANDALONE;
     case SNTClientModeUnknown: return ::pbv1::Execution::MODE_UNKNOWN;
     default: return ::pbv1::Execution::MODE_UNKNOWN;
   }

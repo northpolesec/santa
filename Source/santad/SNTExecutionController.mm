@@ -410,7 +410,8 @@ static NSString *const kPrinterProxyPostMonterey =
 
         // Only allow a user in standalone mode to override a block if an
         // explicit block rule is not set when using a sync service.
-        if (config.enableStandaloneMode && se.decision == SNTEventStateBlockUnknown) {
+        if (config.clientMode == SNTClientModeStandalone &&
+            se.decision == SNTEventStateBlockUnknown) {
           replyBlock = ^void(BOOL authenticated) {
             LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                  authenticated);

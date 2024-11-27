@@ -531,6 +531,7 @@ void SerializeAndCheckNonESEvents(
     {SNTClientModeUnknown, ::pbv1::Execution::MODE_UNKNOWN},
     {SNTClientModeMonitor, ::pbv1::Execution::MODE_MONITOR},
     {SNTClientModeLockdown, ::pbv1::Execution::MODE_LOCKDOWN},
+    {SNTClientModeStandalone, ::pbv1::Execution::MODE_STANDALONE},
     {(SNTClientMode)123, ::pbv1::Execution::MODE_UNKNOWN},
   };
 

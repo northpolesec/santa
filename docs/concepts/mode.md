@@ -29,14 +29,12 @@ has no rules or scopes that apply, then it will be blocked.
 
 ##### Standalone mode
 
-There is an optional setting called `Standalone Mode` that can be enabled via the `EnableStandaloneMode` key in the configuration profile.
-
 When Santa is in Standalone Mode it will allow the user to approve their own binaries provided they authenticate biometrically with Touch ID. Upon a successful authentication Santa will then add a `SigningID` rule for the binary if it is validly signed and a `BINARY` if it is not signed at all.
 
 When paired with Lockdown, it allows a user to quickly self approve in lieu of using a sync service. If one is using a sync service Events will still be sent up to that sync service.
 
 {: .note}
-Standalone mode will not override explicit block rules when Santa is configured to use a sync service.
+Standalone mode will not override explicit block rules when Santa is configured to use a sync service nor will it override static rules.
 
 ##### Changing Modes
 

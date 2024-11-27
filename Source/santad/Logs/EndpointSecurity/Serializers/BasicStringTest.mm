@@ -954,6 +954,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   std::map<SNTClientMode, std::string> modeToString = {
     {SNTClientModeMonitor, "M"},
     {SNTClientModeLockdown, "L"},
+    {SNTClientModeStandalone, "S"},
     {(SNTClientMode)123, "U"},
   };
 

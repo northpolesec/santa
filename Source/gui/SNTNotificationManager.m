@@ -15,6 +15,7 @@
 
 #import "Source/gui/SNTNotificationManager.h"
 #include <Foundation/Foundation.h>
+#include "Source/common/SNTCommonEnums.h"
 
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
@@ -306,6 +307,16 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     case SNTClientModeLockdown: {
       content.body = @"Switching into Lockdown mode";
       NSString *customMsg = [[SNTConfigurator configurator] modeNotificationLockdown];
+      if (!customMsg) break;
+      // If a custom message is added but as an empty string, disable notifications.
+      if (!customMsg.length) return;
+
+      content.body = [SNTBlockMessage stringFromHTML:customMsg];
+      break;
+    }
+    case SNTClientModeStandalone: {
+      content.body = @"Switching into Standalone mode";
+      NSString *customMsg = [[SNTConfigurator configurator] modeNotificationStandlone];
       if (!customMsg) break;
       // If a custom message is added but as an empty string, disable notifications.
       if (!customMsg.length) return;
