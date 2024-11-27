@@ -400,6 +400,12 @@
 @property(nullable, readonly, nonatomic) NSString *modeNotificationLockdown;
 
 ///
+///  The notification text to display when the client goes into STANDALONE mode.
+///  Defaults to "Switching into Lockdown mode"
+///
+@property(nullable, readonly, nonatomic) NSString *modeNotificationStandalone;
+
+///
 ///  If this is set to true, the UI will use different fonts on April 1st, May 4th and October 31st.
 ///
 @property(readonly, nonatomic) BOOL funFontsOnSpecificDays;

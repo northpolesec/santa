@@ -296,7 +296,7 @@ struct SNTBinaryMessageWindowView: View {
 
       HStack(spacing: 15.0) {
         if !(c.eventDetailURL?.isEmpty ?? false)
-          && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && !c.clientMode == .standalone
+          && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && c.clientMode != .standalone
         {
           OpenEventButton(customText: c.eventDetailText, action: openButton)
         } else if addStandaloneButton() {
