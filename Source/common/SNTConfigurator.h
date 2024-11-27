@@ -401,7 +401,7 @@
 
 ///
 ///  The notification text to display when the client goes into STANDALONE mode.
-///  Defaults to "Switching into Lockdown mode"
+///  Defaults to "Switching into Standalone mode"
 ///
 @property(nullable, readonly, nonatomic) NSString *modeNotificationStandalone;
 
