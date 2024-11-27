@@ -14,7 +14,7 @@ bazel_dep(name = "googletest", version = "1.14.0.bcr.1", repo_name = "com_google
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpole_protos")
 git_override(
     module_name = "protos",
-    commit = "20090d1730d5e7104c2d6ca81a72d0463b0d20d4",
+    commit = "94cfb8a50d435ca64c45e13d19663c7e7807569b",
     remote = "https://github.com/northpolesec/protos",
 )
 
