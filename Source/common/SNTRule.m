@@ -167,6 +167,10 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   } else if ([policyString isEqual:kRulePolicyAllowlistCompiler] ||
              [policyString isEqual:kRulePolicyAllowlistCompilerDeprecated]) {
     state = SNTRuleStateAllowCompiler;
+  } else if ([policyString isEqual:@"ALLOWLIST_LOCAL_BINARY"]) {
+    state = SNTRuleStateAllowLocalBinary;
+  } else if ([policyString isEqual:@"ALLOWLIST_LOCAL_SIGNINGID"]) {
+    state = SNTRuleStateAllowLocalSigningID;
   } else if ([policyString isEqual:kRulePolicyBlocklist] ||
              [policyString isEqual:kRulePolicyBlocklistDeprecated]) {
     state = SNTRuleStateBlock;
@@ -255,6 +259,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateSilentBlock: return kRulePolicySilentBlocklist;
     case SNTRuleStateRemove: return kRulePolicyRemove;
     case SNTRuleStateAllowTransitive: return @"AllowTransitive";
+    case SNTRuleStateAllowLocalBinary: return @"ALLOWLIST_LOCAL_BINARY"; 
+    case SNTRuleStateAllowLocalSigningID: return @"ALLOWLIST_LOCAL_SIGNINGID";
     // This should never be hit. But is here for completion.
     default: return @"Unknown";
   }

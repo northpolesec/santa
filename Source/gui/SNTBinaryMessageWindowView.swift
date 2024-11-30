@@ -36,8 +36,7 @@ import santa_gui_SNTMessageView
     customURL: NSString?,
     bundleProgress: SNTBundleProgress,
     uiStateCallback: ((TimeInterval) -> Void)?,
-    standaloneErrorMessage: String?,
-    replyCallback: ((Bool, () -> Void) -> Void)?
+    replyCallback: ((Bool) -> Void)?
   ) -> NSViewController {
     return NSHostingController(
       rootView: SNTBinaryMessageWindowView(
@@ -47,7 +46,6 @@ import santa_gui_SNTMessageView
         customURL: customURL,
         bundleProgress: bundleProgress,
         uiStateCallback: uiStateCallback,
-        standaloneErrorMessage: standaloneErrorMessage,
         replyCallback: replyCallback
       )
       .fixedSize()
@@ -255,8 +253,7 @@ struct SNTBinaryMessageWindowView: View {
   let customURL: NSString?
   @StateObject var bundleProgress: SNTBundleProgress
   let uiStateCallback: ((TimeInterval) -> Void)?
-  let standaloneErrorMessage: String?
-  let replyCallback: ((Bool, () -> Void) -> Void)?
+  let replyCallback: ((Bool) -> Void)?
 
   @Environment(\.openURL) var openURL
 
@@ -287,9 +284,10 @@ struct SNTBinaryMessageWindowView: View {
 
       // Display the standalone error message to the user if one is provided.
       if c.clientMode == .standalone {
-        if let errorMessage = standaloneErrorMessage {
-          if errorMessage != "" {
-            Text(errorMessage).foregroundColor(.red)
+        let result = CanAuthorizeWithTouchID()
+        if !result.0 {
+          if let errMsg = result.1 {
+            Text(errMsg.localizedDescription).foregroundColor(.red)
           }
         }
       }
@@ -315,11 +313,10 @@ struct SNTBinaryMessageWindowView: View {
 
   func addStandaloneButton() -> Bool {
     var shouldDisplay = c.clientMode == .standalone
-    if let errorMessage = standaloneErrorMessage {
 
-      if errorMessage != "" {
-        shouldDisplay = false
-      }
+    let result = CanAuthorizeWithTouchID()
+    if !result.0 {
+      shouldDisplay = false
     }
 
     let blockedUnknownEvent = SNTEventState.blockUnknown;
@@ -345,25 +342,45 @@ struct SNTBinaryMessageWindowView: View {
     }
 
     if let callback = replyCallback {
-      callback(false) { window?.close() }
+      callback(false)
     }
+
+    window?.close()
 
     let detailsURL = SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String?)
 
     if let url = detailsURL {
       openURL(url)
     }
+
   }
 
   // This button is only shown when the standalone mode is enabled in place of
   // the "Open Event" button.
   func standAloneButton() {
-    // This should prompt for TouchID or password.
-    if let callback = replyCallback {
-      callback(true) {
-        self.window?.close()
+    var msg = NSLocalizedString("Standalone Approval", comment: "Standalone approval message")
+
+    if let e = self.event {
+      let bundleName = e.fileBundleName ?? ""
+      let filePath = e.filePath ?? ""
+
+      if !bundleName.isEmpty {
+        msg = NSLocalizedString(bundleName, comment: "Bundle name")
+      } else if !filePath.isEmpty {
+        msg = NSLocalizedString(filePath, comment: "File path")
+      } 
+    } else {
+      // If we don't have an event, we can't fill in the message.
+      if let cb = self.replyCallback {
+        cb(false)
       }
+      return
     }
+
+    if let callback = self.replyCallback {
+      _ = AuthorizeViaTouchID(reason: msg, replyBlock: callback)
+    }
+    window?.close()
   }
 
   func dismissButton() {
@@ -377,7 +394,8 @@ struct SNTBinaryMessageWindowView: View {
 
     // Close the window after responding to the block.
     if let callback = replyCallback {
-      callback(false) { window?.close() }
+      callback(false)
     }
+    window?.close()
   }
 }

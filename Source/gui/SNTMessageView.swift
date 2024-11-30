@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 
 import santa_common_SNTConfigurator
 
@@ -149,8 +150,56 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
   .help("⌘ Return")
 }
 
+public func AuthorizeViaTouchID(
+  reason: String,
+  replyBlock: @escaping (Bool) -> Void
+) -> (Bool, NSError?) {
+  let context = LAContext()
+  let semaphore = DispatchSemaphore(value: 0)
+  var addRule: Bool = false
+  var error: NSError?
+
+  context.evaluatePolicy(
+    .deviceOwnerAuthenticationWithBiometrics,
+    localizedReason: reason
+  ) {
+    success,
+    authenticationError in
+    {
+      addRule = success
+      error = authenticationError as NSError?
+      semaphore.signal()
+    }()
+  }
+
+  semaphore.wait()
+  if error != nil {
+    replyBlock(false)
+    return (false, error)
+  }
+
+  replyBlock(addRule)
+  return (addRule, nil)
+}
+
+// CanAuthorizeWithTouchID checks if TouchID is available on the current device
+// and returns an error if it is not.
+public func CanAuthorizeWithTouchID() -> (Bool, NSError?) {
+  let context = LAContext()
+  var error: NSError?
+
+  if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+    return (true, nil)
+  } else {
+    return (false, error)
+  }
+}
+
 // StandaloneButton is only used in Standalone mode. It's a replacement for the
 // Open event button.
+//
+// It is intended to be used for all approvals in the future if in standalone
+// mode.
 public func StandaloneButton(action: @escaping () -> Void) -> some View {
   Button(
     action: action,
