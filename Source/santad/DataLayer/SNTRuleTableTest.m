@@ -16,6 +16,7 @@
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
+#include <stdint.h>
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
@@ -531,6 +532,12 @@
   NSString *teamID = [signingID componentsSeparatedByString:@":"][0];
   XCTAssertEqualObjects(signingID, cd.signingID, @"signing IDs should match");
   XCTAssertEqualObjects(teamID, cd.teamID, @"team IDs should match");
+}
+
+// This test ensures that we bump the constant on updates to the rule table
+// schema.
+- (void)testConstantVersionIsUpdated {
+  XCTAssertEqual([self.sut currentSupportedVersion], 8);
 }
 
 @end
