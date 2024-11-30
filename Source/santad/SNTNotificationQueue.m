@@ -38,7 +38,7 @@ static const int kMaximumNotifications = 10;
 
 - (void)addEvent:(SNTStoredEvent *)event
   withCustomMessage:(NSString *)message
-       andCustomURL:(NSString *)url
+          CustomURL:(NSString *)url
            andReply:(void (^)(BOOL authenticated))reply {
   if (!event) {
     if (reply) reply(NO);
@@ -81,7 +81,7 @@ static const int kMaximumNotifications = 10;
     for (NSDictionary *d in self.pendingNotifications) {
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
-                    andCustomURL:d[@"url"]
+                       CustomURL:d[@"url"]
                         andReply:d[@"reply"]];
       [postedNotifications addObject:d];
     }

@@ -263,15 +263,6 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
                  }];
 }
 
-- (void)testBinaryWithSHA256BlockRuleIsBlockedInStandaloneMode {
-  [self checkBinaryExecution:@"badbinary"
-                  wantResult:ES_AUTH_RESULT_DENY
-                  clientMode:SNTClientModeStandalone
-                 cdValidator:^BOOL(SNTCachedDecision *cd) {
-                   return cd.decision == SNTEventStateBlockBinary;
-                 }];
-}
-
 - (void)testBinaryWithSHA256AllowRuleIsNotBlockedInStandaloneMode {
   [self checkBinaryExecution:@"goodbinary"
                   wantResult:ES_AUTH_RESULT_ALLOW

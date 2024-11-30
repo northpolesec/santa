@@ -426,7 +426,7 @@ static NSString *const kPrinterProxyPostMonterey =
         // Let the user know what happened in the GUI.
         [self.notifierQueue addEvent:se
                    withCustomMessage:cd.customMsg
-                        andCustomURL:cd.customURL
+                           CustomURL:cd.customURL
                             andReply:replyBlock];
       }
     }

@@ -287,7 +287,7 @@ static void UpdateCachedDecisionSigningInfo(
 
   switch (mode) {
     case SNTClientModeMonitor: cd.decision = SNTEventStateAllowUnknown; return cd;
-    case SNTClientModeStandalone:  // Fallthrough
+    case SNTClientModeStandalone: [[fallthrough]];
     case SNTClientModeLockdown: cd.decision = SNTEventStateBlockUnknown; return cd;
     default: cd.decision = SNTEventStateBlockUnknown; return cd;
   }

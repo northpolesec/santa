@@ -316,7 +316,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     }
     case SNTClientModeStandalone: {
       content.body = @"Switching into Standalone mode";
-      NSString *customMsg = [[SNTConfigurator configurator] modeNotificationStandlone];
+      NSString *customMsg = [[SNTConfigurator configurator] modeNotificationStandalone];
       if (!customMsg) break;
       // If a custom message is added but as an empty string, disable notifications.
       if (!customMsg.length) return;
@@ -355,7 +355,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
-                 andCustomURL:(NSString *)url
+                    CustomURL:(NSString *)url
                      andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");

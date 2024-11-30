@@ -70,7 +70,6 @@
   ENCODE(self.quarantineRefererURL, @"quarantineRefererURL");
   ENCODE(self.quarantineTimestamp, @"quarantineTimestamp");
   ENCODE(self.quarantineAgentBundleID, @"quarantineAgentBundleID");
-  ENCODE([NSNumber numberWithBool:self.standaloneApproval], @"standaloneApproval");
 }
 
 - (instancetype)init {
@@ -118,7 +117,6 @@
     _quarantineRefererURL = DECODE(NSString, @"quarantineRefererURL");
     _quarantineTimestamp = DECODE(NSDate, @"quarantineTimestamp");
     _quarantineAgentBundleID = DECODE(NSString, @"quarantineAgentBundleID");
-    _standaloneApproval = [DECODE(NSNumber, @"standaloneApproval") boolValue];
   }
   return self;
 }

@@ -14,7 +14,6 @@
 /// limitations under the License.
 
 #import "Source/common/SNTConfigurator.h"
-#include "Source/common/SNTCommonEnums.h"
 
 #include <sys/stat.h>
 
