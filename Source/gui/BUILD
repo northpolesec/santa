@@ -85,11 +85,11 @@ objc_library(
         "SNTNotificationManager.h",
     ],
     sdk_frameworks = [
+        "LocalAuthentication",
         "IOKit",
         "SecurityInterface",
         "SystemExtensions",
         "UserNotifications",
-        "LocalAuthentication",
     ],
     deps = [
         ":SNTAboutWindowView",
