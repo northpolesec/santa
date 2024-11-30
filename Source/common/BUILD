@@ -166,8 +166,8 @@ objc_library(
     srcs = ["TelemetryEventMap.mm"],
     hdrs = ["TelemetryEventMap.h"],
     deps = [
-      ":String",
-      "@com_google_absl//absl/container:flat_hash_map",
+        ":String",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 

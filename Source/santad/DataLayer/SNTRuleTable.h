@@ -122,4 +122,9 @@
 ///
 - (uint32_t)currentSupportedVersion;
 
+///
+/// The current version of the rule table schema.
+///
+@property(readonly, nonatomic) uint32_t currentVersion;
+
 @end

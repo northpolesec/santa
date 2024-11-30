@@ -40,4 +40,9 @@
 - (void)inDatabase:(void (^)(FMDatabase *db))block;
 - (void)inTransaction:(void (^)(FMDatabase *db, BOOL *rollback))block;
 
+///
+/// @return The current version of the table schema.
+///
+@property(atomic) uint32_t currentSchemaVersion;
+
 @end

@@ -13,6 +13,7 @@
 ///    limitations under the License.
 
 #import "Source/santad/DataLayer/SNTDatabaseTable.h"
+#include <stdint.h>
 
 #include <sqlite3.h>
 
@@ -86,6 +87,7 @@
     LOGI(@"Updated %@ from version %d to %d", [self className], currentVersion, newVersion);
 
     [db setUserVersion:newVersion];
+    _currentSchemaVersion = newVersion;
   }];
 }
 
