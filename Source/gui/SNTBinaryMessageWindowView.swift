@@ -368,7 +368,7 @@ struct SNTBinaryMessageWindowView: View {
         msg = NSLocalizedString(bundleName, comment: "Bundle name")
       } else if !filePath.isEmpty {
         msg = NSLocalizedString(filePath, comment: "File path")
-      } 
+      }
     } else {
       // If we don't have an event, we can't fill in the message.
       if let cb = self.replyCallback {
