@@ -117,9 +117,4 @@
 @property(readonly, nonatomic)
   NSDictionary<NSString *, SNTCachedDecision *> *criticalSystemBinaries;
 
-///
-///  Current supported version of the rule table schema.
-///
-- (uint32_t)currentSupportedVersion;
-
 @end
