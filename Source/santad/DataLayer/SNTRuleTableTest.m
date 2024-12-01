@@ -539,8 +539,7 @@
 - (void)testConstantVersionIsUpdated {
   uint32_t expectedValue = 8;
   uint32_t constantVersion = [self.sut currentSupportedVersion];
-  XCTAssertEqual(expectedValue, [self.sut currentSchemaVersion],
-                 @"currentSchemaVersion should be 8");
+  XCTAssertEqual(expectedValue, [self.sut currentVersion], @"currentSchemaVersion should be 8");
   XCTAssertEqual(expectedValue, constantVersion, @"currentSupportedVersion should be 8");
 }
 

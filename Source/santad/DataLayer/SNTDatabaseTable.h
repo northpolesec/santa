@@ -43,6 +43,6 @@
 ///
 /// @return The current version of the table schema.
 ///
-@property(atomic) uint32_t currentSchemaVersion;
+@property(atomic, readonly) uint32_t currentVersion;
 
 @end

@@ -87,7 +87,7 @@
     LOGI(@"Updated %@ from version %d to %d", [self className], currentVersion, newVersion);
 
     [db setUserVersion:newVersion];
-    _currentSchemaVersion = newVersion;
+    _currentVersion = newVersion;
   }];
 }
 
