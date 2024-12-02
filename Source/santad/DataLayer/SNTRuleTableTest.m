@@ -538,7 +538,7 @@
 // schema.
 - (void)testConstantVersionIsUpdated {
   XCTAssertEqual([self.sut currentSupportedVersion], [self.sut currentVersion],
-      @"initialized database should update to the maximum supported version");
+                 @"initialized database should update to the maximum supported version");
 }
 
 @end
