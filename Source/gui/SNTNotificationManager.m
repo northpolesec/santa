@@ -355,7 +355,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
-                    CustomURL:(NSString *)url
+                    customURL:(NSString *)url
                      andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");

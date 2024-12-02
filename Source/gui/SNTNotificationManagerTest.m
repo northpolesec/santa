@@ -60,7 +60,7 @@
 
   [sut postBlockNotification:ev
            withCustomMessage:@""
-                   CustomURL:@""
+                   customURL:@""
                     andReply:^(BOOL authenticated){
                     }];
 

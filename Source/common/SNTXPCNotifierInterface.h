@@ -26,7 +26,7 @@
 @protocol SNTNotifierXPC
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
-                    CustomURL:(NSString *)url
+                    customURL:(NSString *)url
                      andReply:(void (^)(BOOL authenticated))reply;
 - (void)postUSBBlockNotification:(SNTDeviceEvent *)event;
 - (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event

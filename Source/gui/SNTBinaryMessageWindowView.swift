@@ -284,9 +284,9 @@ struct SNTBinaryMessageWindowView: View {
 
       // Display the standalone error message to the user if one is provided.
       if c.clientMode == .standalone {
-        let result = CanAuthorizeWithTouchID()
-        if !result.0 {
-          if let errMsg = result.1 {
+        let (canAuthz, err) = CanAuthorizeWithTouchID()
+        if !canAuthz {
+          if let errMsg = err {
             Text(errMsg.localizedDescription).foregroundColor(.red)
           }
         }
@@ -314,8 +314,8 @@ struct SNTBinaryMessageWindowView: View {
   func addStandaloneButton() -> Bool {
     var shouldDisplay = c.clientMode == .standalone
 
-    let result = CanAuthorizeWithTouchID()
-    if !result.0 {
+    let (canAuthz, _) = CanAuthorizeWithTouchID()
+    if !canAuthz {
       shouldDisplay = false
     }
 
