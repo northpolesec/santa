@@ -13,6 +13,7 @@
 ///    limitations under the License.
 
 #import "Source/santad/DataLayer/SNTDatabaseTable.h"
+#include <stdint.h>
 
 #include <sqlite3.h>
 
@@ -73,6 +74,15 @@
 - (uint32_t)currentSupportedVersion {
   [self doesNotRecognizeSelector:_cmd];
   return 0;
+}
+
+- (uint32_t)currentVersion {
+  __block uint32_t curVersion = 0;
+  [self.dbQ inDatabase:^(FMDatabase *db) {
+    curVersion = [db userVersion];
+  }];
+
+  return curVersion;
 }
 
 /// Called at the end of initialization to ensure the table in the

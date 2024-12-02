@@ -26,7 +26,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
 
-static const uint32_t kRuleTableCurrentVersion = 7;
+static const uint32_t kRuleTableCurrentVersion = 8;
 
 // TODO(nguyenphillip): this should be configurable.
 // How many rules must be in database before we start trying to remove transitive rules.

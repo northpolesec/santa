@@ -1,3 +1,4 @@
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -166,8 +167,8 @@ objc_library(
     srcs = ["TelemetryEventMap.mm"],
     hdrs = ["TelemetryEventMap.h"],
     deps = [
-      ":String",
-      "@com_google_absl//absl/container:flat_hash_map",
+        ":String",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 

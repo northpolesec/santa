@@ -40,4 +40,15 @@
 - (void)inDatabase:(void (^)(FMDatabase *db))block;
 - (void)inTransaction:(void (^)(FMDatabase *db, BOOL *rollback))block;
 
+///
+///  Current supported version of the table schema. This should be overriden in
+///  subclasses.
+///
+- (uint32_t)currentSupportedVersion;
+
+///
+/// @return The current version of the table schema.
+///
+- (uint32_t)currentVersion;
+
 @end
