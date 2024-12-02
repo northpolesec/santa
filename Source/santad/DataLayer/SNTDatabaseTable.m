@@ -76,6 +76,15 @@
   return 0;
 }
 
+- (uint32_t)currentVersion {
+  __block uint32_t curVersion = 0;
+  [self.dbQ inDatabase:^(FMDatabase *db) {
+    curVersion = [db userVersion];
+  }];
+
+  return curVersion;
+}
+
 /// Called at the end of initialization to ensure the table in the
 /// database exists and uses the latest schema.
 - (void)updateTableSchema {
@@ -87,7 +96,6 @@
     LOGI(@"Updated %@ from version %d to %d", [self className], currentVersion, newVersion);
 
     [db setUserVersion:newVersion];
-    _currentVersion = newVersion;
   }];
 }
 
