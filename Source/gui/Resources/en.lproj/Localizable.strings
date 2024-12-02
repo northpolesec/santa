@@ -67,6 +67,9 @@
 /* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
 
+/* Bundle name */
+"the application " = "the application ";
+
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";
 
