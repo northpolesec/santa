@@ -259,8 +259,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateSilentBlock: return kRulePolicySilentBlocklist;
     case SNTRuleStateRemove: return kRulePolicyRemove;
     case SNTRuleStateAllowTransitive: return @"AllowTransitive";
-    case SNTRuleStateAllowLocalBinary: return @"ALLOWLIST_LOCAL_BINARY";
-    case SNTRuleStateAllowLocalSigningID: return @"ALLOWLIST_LOCAL_SIGNINGID";
+    case SNTRuleStateAllowLocalBinary: return kRulePolicyAllowlistLocalBinary;
+    case SNTRuleStateAllowLocalSigningID: return kRulePolicyAllowlistLocalSigningID;
     // This should never be hit. But is here for completion.
     default: return @"Unknown";
   }
