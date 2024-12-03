@@ -167,9 +167,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   } else if ([policyString isEqual:kRulePolicyAllowlistCompiler] ||
              [policyString isEqual:kRulePolicyAllowlistCompilerDeprecated]) {
     state = SNTRuleStateAllowCompiler;
-  } else if ([policyString isEqual:@"ALLOWLIST_LOCAL_BINARY"]) {
+  } else if ([policyString isEqual:kRulePolicyAllowlistLocalBinary]) {
     state = SNTRuleStateAllowLocalBinary;
-  } else if ([policyString isEqual:@"ALLOWLIST_LOCAL_SIGNINGID"]) {
+  } else if ([policyString isEqual:kRulePolicyAllowlistLocalSigningID]) {
     state = SNTRuleStateAllowLocalSigningID;
   } else if ([policyString isEqual:kRulePolicyBlocklist] ||
              [policyString isEqual:kRulePolicyBlocklistDeprecated]) {
