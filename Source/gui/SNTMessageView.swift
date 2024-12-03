@@ -150,36 +150,14 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
   .help("⌘ Return")
 }
 
-public func AuthorizeViaTouchID(
-  reason: String,
-  replyBlock: @escaping (Bool) -> Void
-) -> (Bool, NSError?) {
-  let context = LAContext()
-  let semaphore = DispatchSemaphore(value: 0)
-  var addRule: Bool = false
-  var error: NSError?
-
-  context.evaluatePolicy(
-    .deviceOwnerAuthenticationWithBiometrics,
-    localizedReason: reason
-  ) {
-    success,
-    authenticationError in
-    {
-      addRule = success
-      error = authenticationError as NSError?
-      semaphore.signal()
-    }()
+public func AuthorizeViaTouchID(reason: String, replyBlock: @escaping (Bool) -> Void) {
+  LAContext().evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, error in
+    if error != nil {
+      replyBlock(false)
+    } else {
+      replyBlock(success)
+    }
   }
-
-  semaphore.wait()
-  if error != nil {
-    replyBlock(false)
-    return (false, error)
-  }
-
-  replyBlock(addRule)
-  return (addRule, nil)
 }
 
 // CanAuthorizeWithTouchID checks if TouchID is available on the current device
