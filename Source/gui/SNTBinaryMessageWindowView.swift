@@ -382,9 +382,13 @@ struct SNTBinaryMessageWindowView: View {
     }
 
     if let callback = self.replyCallback {
-      _ = AuthorizeViaTouchID(reason: msg, replyBlock: callback)
+      AuthorizeViaTouchID(reason: msg, replyBlock: { success in 
+        callback(success)
+        DispatchQueue.main.sync {
+          window?.close()
+        }
+      })
     }
-    window?.close()
   }
 
   func dismissButton() {
