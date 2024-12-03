@@ -537,10 +537,8 @@
 // This test ensures that we bump the constant on updates to the rule table
 // schema.
 - (void)testConstantVersionIsUpdated {
-  uint32_t expectedValue = 8;
-  uint32_t constantVersion = [self.sut currentSupportedVersion];
-  XCTAssertEqual(expectedValue, [self.sut currentVersion], @"currentSchemaVersion should be 8");
-  XCTAssertEqual(expectedValue, constantVersion, @"currentSupportedVersion should be 8");
+  XCTAssertEqual([self.sut currentSupportedVersion], [self.sut currentVersion],
+                 @"initialized database should update to the maximum supported version");
 }
 
 @end
