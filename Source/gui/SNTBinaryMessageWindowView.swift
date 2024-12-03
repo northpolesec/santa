@@ -381,12 +381,15 @@ struct SNTBinaryMessageWindowView: View {
     }
 
     if let callback = self.replyCallback {
-      AuthorizeViaTouchID(reason: msg, replyBlock: { success in 
-        callback(success)
-        DispatchQueue.main.sync {
-          window?.close()
+      AuthorizeViaTouchID(
+        reason: msg,
+        replyBlock: { success in
+          callback(success)
+          DispatchQueue.main.sync {
+            window?.close()
+          }
         }
-      })
+      )
     }
   }
 
