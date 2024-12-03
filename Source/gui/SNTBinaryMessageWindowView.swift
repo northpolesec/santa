@@ -358,8 +358,7 @@ struct SNTBinaryMessageWindowView: View {
   // This button is only shown when the standalone mode is enabled in place of
   // the "Open Event" button.
   func standAloneButton() {
-
-    var msg = "Allow execution of "
+    var msg = "allow execution of "
 
     if let e = self.event {
       let bundleName = e.fileBundleName ?? ""
