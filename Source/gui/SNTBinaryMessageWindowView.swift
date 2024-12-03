@@ -367,7 +367,7 @@ struct SNTBinaryMessageWindowView: View {
       let signingID = e.signingID ?? ""
 
       if !bundleName.isEmpty {
-        msg = NSLocalizedString("the application " + msg + bundleName, comment: "Bundle name")
+        msg = NSLocalizedString(msg + "the application " + bundleName, comment: "Bundle name")
       } else if !signingID.isEmpty {
         msg = NSLocalizedString(msg + signingID, comment: "Signing ID")
       } else if !filePath.isEmpty {
