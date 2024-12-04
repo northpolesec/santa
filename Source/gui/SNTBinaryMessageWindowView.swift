@@ -388,17 +388,22 @@ struct SNTBinaryMessageWindowView: View {
       )
     }
 
-    if let callback = self.replyCallback {
-      AuthorizeViaTouchID(
-        reason: msg,
-        replyBlock: { success in
-          callback(success)
-          DispatchQueue.main.sync {
-            window?.close()
-          }
+    // Force unwrap the callback because it should always be set and is a
+    // programming error if it isn't.
+    //
+    // Note: this may prevent other replyBlocks from being run, but should only
+    // crash the GUI process meaning policy decisions will still be enforced.
+    let callback = self.replyCallback!;
+
+    AuthorizeViaTouchID(
+      reason: msg,
+      replyBlock: { success in
+        callback(success)
+        DispatchQueue.main.sync {
+          window?.close()
         }
-      )
-    }
+      }
+    )
   }
 
   func dismissButton() {
