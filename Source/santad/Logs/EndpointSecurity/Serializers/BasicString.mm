@@ -26,6 +26,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include "Source/common/SNTCommonEnums.h"
 
 #include <optional>
 #include <string>
@@ -95,6 +96,7 @@ std::string GetModeString(SNTClientMode mode) {
   switch (mode) {
     case SNTClientModeMonitor: return "M";
     case SNTClientModeLockdown: return "L";
+    case SNTClientModeStandalone: return "S";
     default: return "U";
   }
 }

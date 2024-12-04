@@ -63,13 +63,15 @@ typedef NS_ENUM(NSInteger, SNTRuleState) {
 
   SNTRuleStateAllowCompiler = 5,
   SNTRuleStateAllowTransitive = 6,
+  SNTRuleStateAllowLocalBinary = 7,
+  SNTRuleStateAllowLocalSigningID = 8,
 };
 
 typedef NS_ENUM(NSInteger, SNTClientMode) {
   SNTClientModeUnknown,
-
   SNTClientModeMonitor = 1,
   SNTClientModeLockdown = 2,
+  SNTClientModeStandalone = 3,
 };
 
 typedef NS_ENUM(uint64_t, SNTEventState) {
@@ -98,6 +100,8 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateAllowTeamID = 1ULL << 47,
   SNTEventStateAllowSigningID = 1ULL << 48,
   SNTEventStateAllowCDHash = 1ULL << 49,
+  SNTEventStateAllowLocalBinary = 1ULL << 50,
+  SNTEventStateAllowLocalSigningID = 1ULL << 51,
 
   // Block and Allow masks
   SNTEventStateBlock = 0xFFFFFFULL << 16,

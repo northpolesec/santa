@@ -65,11 +65,13 @@ enum class PlatformBinaryState {
       {{SNTRuleTypeCDHash, SNTRuleStateBlock}, SNTEventStateBlockCDHash},
       {{SNTRuleTypeCDHash, SNTRuleStateSilentBlock}, SNTEventStateBlockCDHash},
       {{SNTRuleTypeBinary, SNTRuleStateAllow}, SNTEventStateAllowBinary},
+      {{SNTRuleTypeBinary, SNTRuleStateAllowLocalBinary}, SNTEventStateAllowLocalBinary},
       {{SNTRuleTypeBinary, SNTRuleStateAllowTransitive}, SNTEventStateAllowTransitive},
       {{SNTRuleTypeBinary, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompiler},
       {{SNTRuleTypeBinary, SNTRuleStateSilentBlock}, SNTEventStateBlockBinary},
       {{SNTRuleTypeBinary, SNTRuleStateBlock}, SNTEventStateBlockBinary},
       {{SNTRuleTypeSigningID, SNTRuleStateAllow}, SNTEventStateAllowSigningID},
+      {{SNTRuleTypeSigningID, SNTRuleStateAllowLocalSigningID}, SNTEventStateAllowLocalSigningID},
       {{SNTRuleTypeSigningID, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompiler},
       {{SNTRuleTypeSigningID, SNTRuleStateSilentBlock}, SNTEventStateBlockSigningID},
       {{SNTRuleTypeSigningID, SNTRuleStateBlock}, SNTEventStateBlockSigningID},
@@ -285,6 +287,7 @@ static void UpdateCachedDecisionSigningInfo(
 
   switch (mode) {
     case SNTClientModeMonitor: cd.decision = SNTEventStateAllowUnknown; return cd;
+    case SNTClientModeStandalone: [[fallthrough]];
     case SNTClientModeLockdown: cd.decision = SNTEventStateBlockUnknown; return cd;
     default: cd.decision = SNTEventStateBlockUnknown; return cd;
   }

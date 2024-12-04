@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 
 import santa_common_SNTConfigurator
 
@@ -143,6 +144,45 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
     label: {
       let t = customText ?? NSLocalizedString("Open...", comment: "Default text for Open button")
       Text(t).frame(maxWidth: 200.0)
+    }
+  )
+  .keyboardShortcut(.return, modifiers: .command)
+  .help("⌘ Return")
+}
+
+public func AuthorizeViaTouchID(reason: String, replyBlock: @escaping (Bool) -> Void) {
+  LAContext().evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, error in
+    if error != nil {
+      replyBlock(false)
+    } else {
+      replyBlock(success)
+    }
+  }
+}
+
+// CanAuthorizeWithTouchID checks if TouchID is available on the current device
+// and returns an error if it is not.
+public func CanAuthorizeWithTouchID() -> (Bool, NSError?) {
+  let context = LAContext()
+  var error: NSError?
+
+  if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+    return (true, nil)
+  } else {
+    return (false, error)
+  }
+}
+
+// StandaloneButton is only used in Standalone mode. It's a replacement for the
+// Open event button.
+//
+// It is intended to be used for all approvals in the future if in standalone
+// mode.
+public func StandaloneButton(action: @escaping () -> Void) -> some View {
+  Button(
+    action: action,
+    label: {
+      Text(NSLocalizedString("Approve", comment: "Default text for Approve")).frame(maxWidth: 200.0)
     }
   )
   .keyboardShortcut(.return, modifiers: .command)

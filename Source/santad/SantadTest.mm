@@ -236,6 +236,15 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
                  }];
 }
 
+- (void)testBinaryWithSHA256BlockRuleIsBlockedInStandaloneMode {
+  [self checkBinaryExecution:@"badbinary"
+                  wantResult:ES_AUTH_RESULT_DENY
+                  clientMode:SNTClientModeStandalone
+                 cdValidator:^BOOL(SNTCachedDecision *cd) {
+                   return cd.decision == SNTEventStateBlockBinary;
+                 }];
+}
+
 - (void)testBinaryWithSHA256BlockRuleIsBlockedInMonitorMode {
   [self checkBinaryExecution:@"badbinary"
                   wantResult:ES_AUTH_RESULT_DENY
@@ -249,6 +258,15 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   [self checkBinaryExecution:@"goodbinary"
                   wantResult:ES_AUTH_RESULT_ALLOW
                   clientMode:SNTClientModeLockdown
+                 cdValidator:^BOOL(SNTCachedDecision *cd) {
+                   return cd.decision == SNTEventStateAllowBinary;
+                 }];
+}
+
+- (void)testBinaryWithSHA256AllowRuleIsNotBlockedInStandaloneMode {
+  [self checkBinaryExecution:@"goodbinary"
+                  wantResult:ES_AUTH_RESULT_ALLOW
+                  clientMode:SNTClientModeStandalone
                  cdValidator:^BOOL(SNTCachedDecision *cd) {
                    return cd.decision == SNTEventStateAllowBinary;
                  }];
@@ -272,6 +290,15 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
                  }];
 }
 
+- (void)testBinaryWithCertificateAllowRuleIsNotBlockedInStandaloneMode {
+  [self checkBinaryExecution:@"goodcert"
+                  wantResult:ES_AUTH_RESULT_ALLOW
+                  clientMode:SNTClientModeStandalone
+                 cdValidator:^BOOL(SNTCachedDecision *cd) {
+                   return cd.decision == SNTEventStateAllowCertificate;
+                 }];
+}
+
 - (void)testBinaryWithCertificateAllowRuleIsNotBlockedInMonitorMode {
   [self checkBinaryExecution:@"goodcert"
                   wantResult:ES_AUTH_RESULT_ALLOW
@@ -290,6 +317,15 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
                  }];
 }
 
+- (void)testBinaryWithCertificateBlockRuleIsBlockedInStandaloneMode {
+  [self checkBinaryExecution:@"badcert"
+                  wantResult:ES_AUTH_RESULT_DENY
+                  clientMode:SNTClientModeStandalone
+                 cdValidator:^BOOL(SNTCachedDecision *cd) {
+                   return cd.decision == SNTEventStateBlockCertificate;
+                 }];
+}
+
 - (void)testBinaryWithCertificateBlockRuleIsBlockedInMonitorMode {
   [self checkBinaryExecution:@"badcert"
                   wantResult:ES_AUTH_RESULT_DENY
@@ -303,6 +339,19 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   [self checkBinaryExecution:@"allowed_teamid"
     wantResult:ES_AUTH_RESULT_ALLOW
     clientMode:SNTClientModeLockdown
+    cdValidator:^BOOL(SNTCachedDecision *cd) {
+      return cd.decision == SNTEventStateAllowTeamID;
+    }
+    messageSetup:^(es_message_t *msg) {
+      msg->event.exec.target->team_id = MakeESStringToken(kAllowedTeamID);
+      msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
+    }];
+}
+
+- (void)testBinaryWithTeamIDAllowRuleAndNoSigningIDMatchIsAllowedInStandaloneMode {
+  [self checkBinaryExecution:@"allowed_teamid"
+    wantResult:ES_AUTH_RESULT_ALLOW
+    clientMode:SNTClientModeStandalone
     cdValidator:^BOOL(SNTCachedDecision *cd) {
       return cd.decision == SNTEventStateAllowTeamID;
     }
@@ -338,6 +387,19 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
     }];
 }
 
+- (void)testBinaryWithTeamIDBlockRuleAndNoSigningIDMatchIsBlockedInStandaloneMode {
+  [self checkBinaryExecution:@"banned_teamid"
+    wantResult:ES_AUTH_RESULT_DENY
+    clientMode:SNTClientModeStandalone
+    cdValidator:^BOOL(SNTCachedDecision *cd) {
+      return cd.decision == SNTEventStateBlockTeamID;
+    }
+    messageSetup:^(es_message_t *msg) {
+      msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
+      msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
+    }];
+}
+
 - (void)testBinaryWithTeamIDBlockRuleAndNoSigningIDMatchIsBlockedInMonitorMode {
   [self checkBinaryExecution:@"banned_teamid"
     wantResult:ES_AUTH_RESULT_DENY
@@ -355,6 +417,19 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   [self checkBinaryExecution:@"banned_signingid"
     wantResult:ES_AUTH_RESULT_DENY
     clientMode:SNTClientModeLockdown
+    cdValidator:^BOOL(SNTCachedDecision *cd) {
+      return cd.decision == SNTEventStateBlockSigningID;
+    }
+    messageSetup:^(es_message_t *msg) {
+      msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
+      msg->event.exec.target->signing_id = MakeESStringToken(kBlockedSigningID);
+    }];
+}
+
+- (void)testBinaryWithSigningIDBlockRuleIsBlockedInStandaloneMode {
+  [self checkBinaryExecution:@"banned_signingid"
+    wantResult:ES_AUTH_RESULT_DENY
+    clientMode:SNTClientModeStandalone
     cdValidator:^BOOL(SNTCachedDecision *cd) {
       return cd.decision == SNTEventStateBlockSigningID;
     }
@@ -403,10 +478,36 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
     }];
 }
 
+- (void)testBinaryWithSigningIDAllowRuleIsAllowedInStandaloneMode {
+  [self checkBinaryExecution:@"allowed_signingid"
+    wantResult:ES_AUTH_RESULT_ALLOW
+    clientMode:SNTClientModeMonitor
+    cdValidator:^BOOL(SNTCachedDecision *cd) {
+      return cd.decision == SNTEventStateAllowSigningID;
+    }
+    messageSetup:^(es_message_t *msg) {
+      msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
+      msg->event.exec.target->signing_id = MakeESStringToken(kAllowedSigningID);
+    }];
+}
+
 - (void)testBinaryWithCDHashBlockRuleIsBlockedInLockdownMode {
   [self checkBinaryExecution:@"banned_cdhash"
     wantResult:ES_AUTH_RESULT_DENY
     clientMode:SNTClientModeLockdown
+    cdValidator:^BOOL(SNTCachedDecision *cd) {
+      return cd.decision == SNTEventStateBlockCDHash;
+    }
+    messageSetup:^(es_message_t *msg) {
+      SetBinaryDataFromHexString(kBlockedCDHash, msg->event.exec.target->cdhash,
+                                 sizeof(msg->event.exec.target->cdhash));
+    }];
+}
+
+- (void)testBinaryWithCDHashBlockRuleIsBlockedInStandaloneMode {
+  [self checkBinaryExecution:@"banned_cdhash"
+    wantResult:ES_AUTH_RESULT_DENY
+    clientMode:SNTClientModeStandalone
     cdValidator:^BOOL(SNTCachedDecision *cd) {
       return cd.decision == SNTEventStateBlockCDHash;
     }
@@ -455,10 +556,36 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
     }];
 }
 
+- (void)testBinaryWithCDHashAllowRuleIsAllowedInStandaloneMode {
+  [self checkBinaryExecution:@"allowed_cdhash"
+    wantResult:ES_AUTH_RESULT_ALLOW
+    clientMode:SNTClientModeMonitor
+    cdValidator:^BOOL(SNTCachedDecision *cd) {
+      return cd.decision == SNTEventStateAllowCDHash;
+    }
+    messageSetup:^(es_message_t *msg) {
+      SetBinaryDataFromHexString(kAllowedCDHash, msg->event.exec.target->cdhash,
+                                 sizeof(msg->event.exec.target->cdhash));
+    }];
+}
+
 - (void)testBinaryWithSHA256AllowRuleAndBlockedTeamIDRuleIsAllowedInLockdownMode {
   [self checkBinaryExecution:@"banned_teamid_allowed_binary"
     wantResult:ES_AUTH_RESULT_ALLOW
     clientMode:SNTClientModeLockdown
+    cdValidator:^BOOL(SNTCachedDecision *cd) {
+      return cd.decision == SNTEventStateAllowBinary;
+    }
+    messageSetup:^(es_message_t *msg) {
+      msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
+      msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
+    }];
+}
+
+- (void)testBinaryWithSHA256AllowRuleAndBlockedTeamIDRuleIsAllowedInStandaloneMode {
+  [self checkBinaryExecution:@"banned_teamid_allowed_binary"
+    wantResult:ES_AUTH_RESULT_ALLOW
+    clientMode:SNTClientModeStandalone
     cdValidator:^BOOL(SNTCachedDecision *cd) {
       return cd.decision == SNTEventStateAllowBinary;
     }
@@ -485,6 +612,15 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   [self checkBinaryExecution:@"noop"
                   wantResult:ES_AUTH_RESULT_DENY
                   clientMode:SNTClientModeLockdown
+                 cdValidator:^BOOL(SNTCachedDecision *cd) {
+                   return cd.decision == SNTEventStateBlockUnknown;
+                 }];
+}
+
+- (void)testBinaryWithoutBlockOrAllowRuleIsBlockedInStandaloneMode {
+  [self checkBinaryExecution:@"noop"
+                  wantResult:ES_AUTH_RESULT_DENY
+                  clientMode:SNTClientModeStandalone
                  cdValidator:^BOOL(SNTCachedDecision *cd) {
                    return cd.decision == SNTEventStateBlockUnknown;
                  }];

@@ -176,6 +176,9 @@ using santa::NSStringToUTF8String;
     c->set_valid_until([cert.validUntil timeIntervalSince1970]);
   }
 
+  // TODO: Add support the for Standalone Approval field so that a sync service
+  // can be notified that a user self approved a binary.
+
   return *e;
 }
 

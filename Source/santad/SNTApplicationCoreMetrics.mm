@@ -38,6 +38,7 @@ static void RegisterModeMetric(SNTMetricSet *metricSet) {
 
     switch (config.clientMode) {
       case SNTClientModeLockdown: [mode set:@"lockdown" forFieldValues:@[]]; break;
+      case SNTClientModeStandalone: [mode set:@"standalone" forFieldValues:@[]]; break;
       case SNTClientModeMonitor: [mode set:@"monitor" forFieldValues:@[]]; break;
       default:
         // Should never be reached.

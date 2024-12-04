@@ -4,6 +4,16 @@
 /* No comment provided by engineer. */
 "Application" = "Application";
 
+/* Default text for Approve */
+"Approve" = "Approve";
+
+/* File path
+   Signing ID */
+"authorize execution of " = "authorize execution of ";
+
+/* Bundle name */
+"authorize execution of the application " = "authorize execution of the application ";
+
 /* No comment provided by engineer. */
 "Bundle Hash" = "Bundle Hash";
 

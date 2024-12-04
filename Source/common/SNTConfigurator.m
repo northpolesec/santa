@@ -106,6 +106,7 @@ static NSString *const kRemountUSBBlockMessage = @"RemountUSBBlockMessage";
 
 static NSString *const kModeNotificationMonitor = @"ModeNotificationMonitor";
 static NSString *const kModeNotificationLockdown = @"ModeNotificationLockdown";
+static NSString *const kModeNotificationStandalone = @"ModeNotificationStandalone";
 static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
 
 static NSString *const kEnablePageZeroProtectionKey = @"EnablePageZeroProtection";
@@ -238,6 +239,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kRemountUSBBlockMessage : string,
       kModeNotificationMonitor : string,
       kModeNotificationLockdown : string,
+      kModeNotificationStandalone : string,
       kFunFontsOnSpecificDays : number,
       kStaticRules : array,
       kSyncBaseURLKey : string,
@@ -633,12 +635,12 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (SNTClientMode)clientMode {
   SNTClientMode cm = [self.syncState[kClientModeKey] longLongValue];
-  if (cm == SNTClientModeMonitor || cm == SNTClientModeLockdown) {
+  if (cm == SNTClientModeMonitor || cm == SNTClientModeLockdown || cm == SNTClientModeStandalone) {
     return cm;
   }
 
   cm = [self.configState[kClientModeKey] longLongValue];
-  if (cm == SNTClientModeMonitor || cm == SNTClientModeLockdown) {
+  if (cm == SNTClientModeMonitor || cm == SNTClientModeLockdown || cm == SNTClientModeStandalone) {
     return cm;
   }
 
@@ -646,14 +648,17 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (void)setSyncServerClientMode:(SNTClientMode)newMode {
-  if (newMode == SNTClientModeMonitor || newMode == SNTClientModeLockdown) {
+  if (newMode == SNTClientModeMonitor || newMode == SNTClientModeLockdown ||
+      newMode == SNTClientModeStandalone) {
     [self updateSyncStateForKey:kClientModeKey value:@(newMode)];
   }
 }
 
 - (BOOL)failClosed {
   NSNumber *n = self.configState[kFailClosedKey];
-  return [n boolValue] && self.clientMode == SNTClientModeLockdown;
+  BOOL runningInLockdownClientMode =
+    self.clientMode == SNTClientModeLockdown || self.clientMode == SNTClientModeStandalone;
+  return [n boolValue] && runningInLockdownClientMode;
 }
 
 - (BOOL)enableTransitiveRules {
@@ -840,6 +845,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSString *)modeNotificationLockdown {
   return self.configState[kModeNotificationLockdown];
+}
+
+- (NSString *)modeNotificationStandalone {
+  return self.configState[kModeNotificationStandalone];
 }
 
 - (BOOL)funFontsOnSpecificDays {

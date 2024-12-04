@@ -632,6 +632,18 @@
   XCTAssertEqual(self.syncState.clientMode, SNTClientModeLockdown);
 }
 
+- (void)testPreflightStandalone {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData *respData = [self dataFromFixture:@"sync_preflight_standalone.json"];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  [sut sync];
+
+  XCTAssertEqual(self.syncState.clientMode, SNTClientModeStandalone);
+}
+
 #pragma mark - SNTSyncEventUpload Tests
 
 - (void)testEventUploadBasic {

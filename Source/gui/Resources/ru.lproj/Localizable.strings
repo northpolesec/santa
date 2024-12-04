@@ -2,7 +2,16 @@
 "Access to a file has been denied" = "Доступ к файлу был запрещен";
 
 /* No comment provided by engineer. */
+"Approve" = "Утвердить";
+
+/* No comment provided by engineer. */
 "Application" = "Приложение";
+
+/* No comment provided by engineer. */
+"authorize execution of " = "разрешить исполнение ";
+
+/* No comment provided by engineer. */
+"authorize execution of the application " = "разрешить выполнение заявки ";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Бандл-хэш";

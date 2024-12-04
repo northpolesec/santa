@@ -110,6 +110,7 @@ The following table expands upon the above logic to list most of the permutation
     switch (cm) {
       case SNTClientModeMonitor: req->set_client_mode(::pbv1::MONITOR); break;
       case SNTClientModeLockdown: req->set_client_mode(::pbv1::LOCKDOWN); break;
+      case SNTClientModeStandalone: req->set_client_mode(::pbv1::STANDALONE); break;
       default: break;
     }
   }];
@@ -181,6 +182,7 @@ The following table expands upon the above logic to list most of the permutation
   switch (resp.client_mode()) {
     case ::pbv1::MONITOR: self.syncState.clientMode = SNTClientModeMonitor; break;
     case ::pbv1::LOCKDOWN: self.syncState.clientMode = SNTClientModeLockdown; break;
+    case ::pbv1::STANDALONE: self.syncState.clientMode = SNTClientModeStandalone; break;
     default: break;
   }
 

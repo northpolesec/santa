@@ -20,12 +20,14 @@
 
 const static NSString *kBlockBinary = @"BlockBinary";
 const static NSString *kAllowBinary = @"AllowBinary";
+const static NSString *kAllowLocalBinary = @"AllowLocalBinary";
 const static NSString *kBlockCertificate = @"BlockCertificate";
 const static NSString *kAllowCertificate = @"AllowCertificate";
 const static NSString *kBlockTeamID = @"BlockTeamID";
 const static NSString *kAllowTeamID = @"AllowTeamID";
 const static NSString *kBlockSigningID = @"BlockSigningID";
 const static NSString *kAllowSigningID = @"AllowSigningID";
+const static NSString *kAllowLocalSigningID = @"AllowLocalSigningID";
 const static NSString *kBlockCDHash = @"BlockCDHash";
 const static NSString *kAllowCDHash = @"AllowCDHash";
 const static NSString *kBlockScope = @"BlockScope";

@@ -29,6 +29,7 @@ swift_library(
     deps = [
         ":SNTMessageView",
         "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredEvent",
     ],
@@ -84,6 +85,7 @@ objc_library(
         "SNTNotificationManager.h",
     ],
     sdk_frameworks = [
+        "LocalAuthentication",
         "IOKit",
         "SecurityInterface",
         "SystemExtensions",

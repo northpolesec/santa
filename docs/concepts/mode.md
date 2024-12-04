@@ -27,6 +27,15 @@ Running Santa in Lockdown Mode will stop all blocked binaries and additionally
 will prevent all unknown binaries from running. This means that if the binary
 has no rules or scopes that apply, then it will be blocked.
 
+##### Standalone mode
+
+When Santa is in Standalone Mode it will allow the user to approve their own binaries provided they authenticate biometrically with Touch ID. Upon a successful authentication Santa will then add a `SigningID` rule for the binary if it is validly signed and a `BINARY` if it is not signed at all.
+
+When paired with Lockdown, it allows a user to quickly self approve in lieu of using a sync service. If one is using a sync service Events will still be sent up to that sync service.
+
+{: .note}
+Standalone mode will not override explicit block rules when Santa is configured to use a sync service nor will it override static rules.
+
 ##### Changing Modes
 
 There are two ways to change the running mode: changing the configuration

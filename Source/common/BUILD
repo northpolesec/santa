@@ -246,6 +246,7 @@ objc_library(
 
 objc_library(
     name = "SNTCommonEnums",
+    module_name = "santa_common_SNTCommonEnums",
     textual_hdrs = ["SNTCommonEnums.h"],
 )
 

@@ -1,5 +1,5 @@
-
 /// Copyright 2015-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -156,6 +156,7 @@ static NSString *const kPrinterProxyPostMonterey =
   switch (eventType) {
     case SNTEventStateBlockBinary: eventTypeStr = kBlockBinary; break;
     case SNTEventStateAllowBinary: eventTypeStr = kAllowBinary; break;
+    case SNTEventStateAllowLocalBinary: eventTypeStr = kAllowLocalBinary; break;
     case SNTEventStateBlockCertificate: eventTypeStr = kBlockCertificate; break;
     case SNTEventStateAllowCertificate: eventTypeStr = kAllowCertificate; break;
     case SNTEventStateBlockTeamID: eventTypeStr = kBlockTeamID; break;
@@ -404,8 +405,29 @@ static NSString *const kPrinterProxyPostMonterey =
           self->_ttyWriter->Write(targetProc, msg);
         }
 
+        void (^replyBlock)(BOOL) = ^void(BOOL authenticated) {
+        };
+
+        // Only allow a user in standalone mode to override a block if an
+        // explicit block rule is not set when using a sync service.
+        if (config.clientMode == SNTClientModeStandalone &&
+            se.decision == SNTEventStateBlockUnknown) {
+          replyBlock = ^void(BOOL authenticated) {
+            LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
+                 authenticated);
+            if (authenticated) {
+              // Create a rule for the binary that was allowed by the user in
+              // standalone mode and notify the sync service
+              [self createRuleForStandaloneModeEvent:se];
+            }
+          };
+        }
+
         // Let the user know what happened in the GUI.
-        [self.notifierQueue addEvent:se withCustomMessage:cd.customMsg andCustomURL:cd.customURL];
+        [self.notifierQueue addEvent:se
+                   withCustomMessage:cd.customMsg
+                           customURL:cd.customURL
+                            andReply:replyBlock];
       }
     }
   }
@@ -478,6 +500,40 @@ static NSString *const kPrinterProxyPostMonterey =
 
   *users = [loggedInUsers allObjects];
   *sessions = [loggedInHosts copy];
+}
+
+// Creates a rule for the binary that was allowed by the user in standalone mode.
+- (void)createRuleForStandaloneModeEvent:(SNTStoredEvent *)se {
+  SNTRuleType ruleType = SNTRuleTypeSigningID;
+  NSString *ruleIdentifier = se.signingID;
+  SNTRuleState newRuleState = SNTRuleStateAllowLocalSigningID;
+
+  // Check here to see if the binary is validly signed if not
+  // then use a hash rule instead of a signing ID
+  if (se.signingChain.count == 0) {
+    LOGD(@"No certificate chain found for %@", se.filePath);
+    ruleType = SNTRuleTypeBinary;
+    ruleIdentifier = se.fileSHA256;
+    newRuleState = SNTRuleStateAllowLocalBinary;
+  }
+
+  NSString *commentStr = [NSString stringWithFormat:@"%@", se.filePath];
+
+  // Add rule to allow binary same as santactl rule.
+  SNTRule *newRule = [[SNTRule alloc] initWithIdentifier:ruleIdentifier
+                                                   state:newRuleState
+                                                    type:ruleType
+                                               customMsg:@""
+                                               timestamp:[[NSDate now] timeIntervalSince1970]
+                                                 comment:commentStr];
+  NSError *err;
+  [self.ruleTable addRules:@[ newRule ] ruleCleanup:SNTRuleCleanupNone error:&err];
+  if (err) {
+    LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
+         err.localizedDescription);
+  }
+
+  // TODO: Notify the sync service of the new rule.
 }
 
 @end

@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,6 +15,7 @@
 
 #import "Source/gui/SNTNotificationManager.h"
 #include <Foundation/Foundation.h>
+#include "Source/common/SNTCommonEnums.h"
 
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
@@ -110,7 +112,14 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   if ([SNTConfigurator configurator].enableSilentMode) return;
 
   dispatch_async(dispatch_get_main_queue(), ^{
-    if ([self notificationAlreadyQueued:pendingMsg]) return;
+    if ([self notificationAlreadyQueued:pendingMsg]) {
+      // Make sure we clear the reply block so we don't leak memory.
+      if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
+        SNTBinaryMessageWindowController *bmwc = (SNTBinaryMessageWindowController *)pendingMsg;
+        bmwc.replyBlock(NO);
+      }
+      return;
+    }
 
     // See if this message has been user-silenced.
     NSString *messageHash = [pendingMsg messageHash];
@@ -305,6 +314,16 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
       content.body = [SNTBlockMessage stringFromHTML:customMsg];
       break;
     }
+    case SNTClientModeStandalone: {
+      content.body = @"Switching into Standalone mode";
+      NSString *customMsg = [[SNTConfigurator configurator] modeNotificationStandalone];
+      if (!customMsg) break;
+      // If a custom message is added but as an empty string, disable notifications.
+      if (!customMsg.length) return;
+
+      content.body = [SNTBlockMessage stringFromHTML:customMsg];
+      break;
+    }
     default: return;
   }
 
@@ -336,14 +355,18 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
-                 andCustomURL:(NSString *)url {
+                    customURL:(NSString *)url
+                     andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
   }
 
   SNTBinaryMessageWindowController *pendingMsg =
-    [[SNTBinaryMessageWindowController alloc] initWithEvent:event customMsg:message customURL:url];
+    [[SNTBinaryMessageWindowController alloc] initWithEvent:event
+                                                  customMsg:message
+                                                  customURL:url
+                                                      reply:replyBlock];
 
   [self queueMessage:pendingMsg];
 }

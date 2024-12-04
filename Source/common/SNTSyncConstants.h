@@ -116,6 +116,8 @@ extern NSString *const kRuleSHA256;
 extern NSString *const kRuleIdentifier;
 extern NSString *const kRulePolicy;
 extern NSString *const kRulePolicyAllowlist;
+extern NSString *const kRulePolicyAllowlistLocalBinary;
+extern NSString *const kRulePolicyAllowlistLocalSigningID;
 extern NSString *const kRulePolicyAllowlistDeprecated;
 extern NSString *const kRulePolicyAllowlistCompiler;
 extern NSString *const kRulePolicyAllowlistCompilerDeprecated;

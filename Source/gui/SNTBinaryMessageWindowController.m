@@ -17,8 +17,10 @@
 #import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 
 #include <AppKit/AppKit.h>
+#import <LocalAuthentication/LocalAuthentication.h>
 #import <MOLCertificate/MOLCertificate.h>
 #import <SecurityInterface/SFCertificatePanel.h>
+#include <dispatch/dispatch.h>
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/SNTBlockMessage.h"
@@ -39,12 +41,14 @@
 
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url {
+                    customURL:(NSString *)url
+                        reply:(void (^)(BOOL))replyBlock {
   self = [super init];
   if (self) {
     _event = event;
     _customMessage = message;
     _customURL = url;
+    _replyBlock = replyBlock;
     _progress = [NSProgress discreteProgressWithTotalUnitCount:1];
     [_progress addObserver:self
                 forKeyPath:@"fractionCompleted"
@@ -97,7 +101,8 @@
       bundleProgress:self.bundleProgress
      uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
        self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
-     }];
+     }
+       replyCallback:self.replyBlock];
 
   self.window.delegate = self;
 

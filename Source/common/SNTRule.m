@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -166,6 +167,10 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   } else if ([policyString isEqual:kRulePolicyAllowlistCompiler] ||
              [policyString isEqual:kRulePolicyAllowlistCompilerDeprecated]) {
     state = SNTRuleStateAllowCompiler;
+  } else if ([policyString isEqual:kRulePolicyAllowlistLocalBinary]) {
+    state = SNTRuleStateAllowLocalBinary;
+  } else if ([policyString isEqual:kRulePolicyAllowlistLocalSigningID]) {
+    state = SNTRuleStateAllowLocalSigningID;
   } else if ([policyString isEqual:kRulePolicyBlocklist] ||
              [policyString isEqual:kRulePolicyBlocklistDeprecated]) {
     state = SNTRuleStateBlock;
@@ -254,6 +259,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateSilentBlock: return kRulePolicySilentBlocklist;
     case SNTRuleStateRemove: return kRulePolicyRemove;
     case SNTRuleStateAllowTransitive: return @"AllowTransitive";
+    case SNTRuleStateAllowLocalBinary: return kRulePolicyAllowlistLocalBinary;
+    case SNTRuleStateAllowLocalSigningID: return kRulePolicyAllowlistLocalSigningID;
     // This should never be hit. But is here for completion.
     default: return @"Unknown";
   }

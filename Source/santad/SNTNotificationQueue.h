@@ -1,4 +1,5 @@
 /// Copyright 2016 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -23,6 +24,7 @@
 
 - (void)addEvent:(SNTStoredEvent *)event
   withCustomMessage:(NSString *)message
-       andCustomURL:(NSString *)url;
+          customURL:(NSString *)url
+           andReply:(void (^)(BOOL authenticated))reply;
 
 @end

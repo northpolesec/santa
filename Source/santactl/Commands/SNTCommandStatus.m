@@ -1,4 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -66,6 +67,7 @@ REGISTER_COMMAND_NAME(@"status")
     switch (cm) {
       case SNTClientModeMonitor: clientMode = @"Monitor"; break;
       case SNTClientModeLockdown: clientMode = @"Lockdown"; break;
+      case SNTClientModeStandalone: clientMode = @"Standalone"; break;
       default: clientMode = [NSString stringWithFormat:@"Unknown (%ld)", cm]; break;
     }
   }];

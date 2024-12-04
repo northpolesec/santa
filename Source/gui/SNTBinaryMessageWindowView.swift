@@ -16,6 +16,7 @@ import SwiftUI
 
 import santa_common_SNTBlockMessage
 import santa_common_SNTConfigurator
+import santa_common_SNTCommonEnums
 import santa_common_SNTStoredEvent
 import santa_gui_SNTMessageView
 
@@ -34,7 +35,8 @@ import santa_gui_SNTMessageView
     customMsg: NSString?,
     customURL: NSString?,
     bundleProgress: SNTBundleProgress,
-    uiStateCallback: ((TimeInterval) -> Void)?
+    uiStateCallback: ((TimeInterval) -> Void)?,
+    replyCallback: ((Bool) -> Void)?
   ) -> NSViewController {
     return NSHostingController(
       rootView: SNTBinaryMessageWindowView(
@@ -43,7 +45,8 @@ import santa_gui_SNTMessageView
         customMsg: customMsg,
         customURL: customURL,
         bundleProgress: bundleProgress,
-        uiStateCallback: uiStateCallback
+        uiStateCallback: uiStateCallback,
+        replyCallback: replyCallback
       )
       .fixedSize()
     )
@@ -238,10 +241,8 @@ struct SNTBinaryMessageEventView: View {
         .keyboardShortcut("d", modifiers: .command)
         .help("⌘ d")
       }
-
       Spacer()
     }
-
   }
 }
 
@@ -252,6 +253,7 @@ struct SNTBinaryMessageWindowView: View {
   let customURL: NSString?
   @StateObject var bundleProgress: SNTBundleProgress
   let uiStateCallback: ((TimeInterval) -> Void)?
+  let replyCallback: ((Bool) -> Void)?
 
   @Environment(\.openURL) var openURL
 
@@ -266,41 +268,68 @@ struct SNTBinaryMessageWindowView: View {
     ) {
       SNTBinaryMessageEventView(e: event!, customURL: customURL, bundleProgress: bundleProgress)
 
-      VStack(spacing: 15.0) {
-        SNTNotificationSilenceView(
-          silence: $preventFutureNotifications,
-          period: $preventFutureNotificationPeriod
-        )
+      SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
 
-        if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
-          if bundleProgress.fractionCompleted == 0.0 {
-            ProgressView {
-              Text(bundleProgress.label)
-            }.progressViewStyle(.linear)
-          } else {
-            ProgressView(value: bundleProgress.fractionCompleted) {
-              Text(bundleProgress.label)
-            }
+      if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
+        if bundleProgress.fractionCompleted == 0.0 {
+          ProgressView() {
+            Text(bundleProgress.label)
+          }.progressViewStyle(.linear)
+        } else {
+          ProgressView(value: bundleProgress.fractionCompleted) {
+            Text(bundleProgress.label)
           }
-        }
-
-        HStack(spacing: 15.0) {
-          if !(c.eventDetailURL?.isEmpty ?? false)
-            && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished)
-          {
-            OpenEventButton(customText: c.eventDetailText, action: openButton)
-          }
-          DismissButton(
-            customText: c.dismissText,
-            silence: preventFutureNotifications,
-            action: dismissButton
-          )
         }
       }
 
+      // Display the standalone error message to the user if one is provided.
+      if c.clientMode == .standalone {
+        let (canAuthz, err) = CanAuthorizeWithTouchID()
+        if !canAuthz {
+          if let errMsg = err {
+            Text(errMsg.localizedDescription).foregroundColor(.red)
+          }
+        }
+      }
+
+      HStack(spacing: 15.0) {
+        if !(c.eventDetailURL?.isEmpty ?? false)
+          && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && c.clientMode != .standalone
+        {
+          OpenEventButton(customText: c.eventDetailText, action: openButton)
+        } else if addStandaloneButton() {
+          StandaloneButton(action: standAloneButton)
+        }
+
+        DismissButton(
+          customText: c.dismissText,
+          silence: preventFutureNotifications,
+          action: dismissButton
+        )
+      }
       Spacer()
+    }.fixedSize()
+  }
+
+  func addStandaloneButton() -> Bool {
+    var shouldDisplay = c.clientMode == .standalone
+
+    let (canAuthz, _) = CanAuthorizeWithTouchID()
+    if !canAuthz {
+      shouldDisplay = false
     }
-    .fixedSize()
+
+    let blockedUnknownEvent = SNTEventState.blockUnknown;
+
+    // Only display the standalone button if the event is for a block that fell
+    // was the result of a fall through.
+    if let decision = event?.decision {
+      if decision != blockedUnknownEvent {
+        shouldDisplay = false
+      }
+    }
+
+    return shouldDisplay
   }
 
   func openButton() {
@@ -312,11 +341,69 @@ struct SNTBinaryMessageWindowView: View {
       }
     }
 
-    let url = SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String?)
+    if let callback = replyCallback {
+      callback(false)
+    }
+
     window?.close()
-    if let url = url {
+
+    let detailsURL = SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String?)
+
+    if let url = detailsURL {
       openURL(url)
     }
+
+  }
+
+  // This button is only shown when the standalone mode is enabled in place of
+  // the "Open Event" button.
+  func standAloneButton() {
+    guard let e = self.event else {
+      if let cb = self.replyCallback {
+        cb(false)
+      }
+      return
+    }
+
+    let bundleName = e.fileBundleName ?? ""
+    let filePath = e.filePath ?? ""
+    let signingID = e.signingID ?? ""
+
+    var msg = "authorize execution"
+
+    if !bundleName.isEmpty {
+      msg = NSLocalizedString(
+        "authorize execution of the application " + bundleName,
+        comment: "Bundle name"
+      )
+    } else if !signingID.isEmpty {
+      msg = NSLocalizedString(
+        "authorize execution of " + signingID,
+        comment: "Signing ID"
+      )
+    } else if !filePath.isEmpty {
+      msg = NSLocalizedString(
+        "authorize execution of " + filePath,
+        comment: "File path"
+      )
+    }
+
+    // Force unwrap the callback because it should always be set and is a
+    // programming error if it isn't.
+    //
+    // Note: this may prevent other replyBlocks from being run, but should only
+    // crash the GUI process meaning policy decisions will still be enforced.
+    let callback = self.replyCallback!;
+
+    AuthorizeViaTouchID(
+      reason: msg,
+      replyBlock: { success in
+        callback(success)
+        DispatchQueue.main.sync {
+          window?.close()
+        }
+      }
+    )
   }
 
   func dismissButton() {
@@ -326,6 +413,11 @@ struct SNTBinaryMessageWindowView: View {
       } else {
         callback(0)
       }
+    }
+
+    // Close the window after responding to the block.
+    if let callback = replyCallback {
+      callback(false)
     }
     window?.close()
   }

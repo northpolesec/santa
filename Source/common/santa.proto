@@ -298,6 +298,7 @@ message Execution {
     MODE_UNKNOWN = 0;
     MODE_LOCKDOWN = 1;
     MODE_MONITOR = 2;
+    MODE_STANDALONE = 3;
   }
   optional Mode mode = 11;
 

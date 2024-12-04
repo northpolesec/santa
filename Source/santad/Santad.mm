@@ -179,6 +179,11 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
                                                 FlushCacheReason::kClientModeChanged);
                   break;
+                case SNTClientModeStandalone:
+                  LOGI(@"Changed client mode to Standalone, flushing cache.");
+                  auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                                FlushCacheReason::kClientModeChanged);
+                  break;
                 case SNTClientModeMonitor: LOGI(@"Changed client mode to Monitor."); break;
                 default: LOGW(@"Changed client mode to unknown value."); break;
               }
