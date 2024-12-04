@@ -334,10 +334,15 @@ double watchdogRAMPeak = 0;
   self.notQueue.notifierConnection = c;
 }
 
+- (void)requestAPNSToken:(void (^)(NSString *))reply {
+  // Simply forward request to the active GUI (if any).
+  [self.notQueue.notifierConnection.remoteObjectProxy requestAPNSToken:reply];
+}
+
 #pragma mark syncd Ops
 
 - (void)pushNotifications:(void (^)(BOOL))reply {
-  [self.syncdQueue.syncConnection.remoteObjectProxy isFCMListening:^(BOOL response) {
+  [self.syncdQueue.syncConnection.remoteObjectProxy isPushConnected:^(BOOL response) {
     reply(response);
   }];
 }
