@@ -69,6 +69,8 @@
 - (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events fromBundle:(BOOL)isFromBundle;
 - (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
-- (void)isFCMListening:(void (^)(BOOL))reply;
+- (void)isPushConnected:(void (^)(BOOL))reply;
+- (void)APNSTokenChanged;
+- (void)handleAPNSMessage:(NSDictionary *)message;
 
 @end

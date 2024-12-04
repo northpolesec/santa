@@ -143,6 +143,8 @@ static NSString *const kFCMProject = @"FCMProject";
 static NSString *const kFCMEntity = @"FCMEntity";
 static NSString *const kFCMAPIKey = @"FCMAPIKey";
 
+static NSString *const kEnableAPNS = @"EnableAPNS";
+
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
 
@@ -279,6 +281,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFCMProject : string,
       kFCMEntity : string,
       kFCMAPIKey : string,
+      kEnableAPNS : number,
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
@@ -594,6 +597,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingFcmEnabled {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableAPNS {
   return [self configStateSet];
 }
 
@@ -1111,6 +1118,12 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (BOOL)fcmEnabled {
   return (self.fcmProject.length && self.fcmEntity.length && self.fcmAPIKey.length);
+}
+
+- (BOOL)enableAPNS {
+  // TODO: Consider supporting enablement from the sync server.
+  NSNumber *number = self.configState[kEnableAPNS];
+  return [number boolValue];
 }
 
 - (void)setBlockUSBMount:(BOOL)enabled {

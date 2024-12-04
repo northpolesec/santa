@@ -349,6 +349,11 @@ double watchdogRAMPeak = 0;
   self.notQueue.notifierConnection = c;
 }
 
+- (void)requestAPNSToken:(void (^)(NSString *))reply {
+  // Simply forward request to the active GUI (if any).
+  [self.notQueue.notifierConnection.remoteObjectProxy requestAPNSToken:reply];
+}
+
 #pragma mark syncd Ops
 
 - (void)pushNotifications:(void (^)(BOOL))reply {
@@ -358,7 +363,7 @@ double watchdogRAMPeak = 0;
   // sync operations.
   MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
   [conn resume];
-  [conn.remoteObjectProxy isFCMListening:^(BOOL response) {
+  [conn.remoteObjectProxy isPushConnected:^(BOOL response) {
     reply(response);
   }];
 }

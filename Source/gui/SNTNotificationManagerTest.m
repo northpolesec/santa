@@ -76,4 +76,40 @@
                        deliverImmediately:YES]);
 }
 
+- (void)testDidRegisterForAPNS {
+  SNTNotificationManager *nm = [[SNTNotificationManager alloc] init];
+  __block NSString *token;
+  XCTestExpectation *exp = [self expectationWithDescription:@"Wait for APNS token"];
+  [nm requestAPNSToken:^(NSString *reply) {
+    token = reply;
+    [exp fulfill];
+  }];
+  NSString *wantToken = @"123";
+  [nm didRegisterForAPNS:wantToken];
+  [self waitForExpectationsWithTimeout:5 handler:nil];
+  XCTAssertEqualObjects(token, wantToken);
+
+  // Subsequent requests should be handled by the cache.
+  token = nil;
+  [nm requestAPNSToken:^(NSString *reply) {
+    token = reply;
+  }];
+  XCTAssertEqualObjects(token, wantToken);
+
+  // Ensure multiple in-flight requests are handled.
+  nm = [[SNTNotificationManager alloc] init];
+  int wantCount = 5;
+  __block int count = 0;
+  for (int i = 0; i < wantCount; ++i) {
+    exp = [self expectationWithDescription:@"Wait for multiple requests for the APNS token"];
+    [nm requestAPNSToken:^(NSString *reply) {
+      ++count;
+      [exp fulfill];
+    }];
+  }
+  [nm didRegisterForAPNS:@"hello"];
+  [self waitForExpectationsWithTimeout:5 handler:nil];
+  XCTAssertEqual(count, wantCount);
+}
+
 @end

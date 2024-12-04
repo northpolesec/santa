@@ -81,8 +81,8 @@
   [self.syncManager postBundleEventToSyncServer:event reply:reply];
 }
 
-- (void)isFCMListening:(void (^)(BOOL))reply {
-  [self.syncManager isFCMListening:reply];
+- (void)isPushConnected:(void (^)(BOOL))reply {
+  [self.syncManager isPushConnected:reply];
 }
 
 // TODO(bur): Add support for santactl sync --debug to enable debug logging for that sync.
@@ -108,6 +108,14 @@
 - (void)spindown {
   LOGI(@"Spinning down.");
   exit(0);
+}
+
+- (void)APNSTokenChanged {
+  [self.syncManager APNSTokenChanged];
+}
+
+- (void)handleAPNSMessage:(NSDictionary *)message {
+  [self.syncManager handleAPNSMessage:message];
 }
 
 @end
