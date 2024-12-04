@@ -358,26 +358,34 @@ struct SNTBinaryMessageWindowView: View {
   // This button is only shown when the standalone mode is enabled in place of
   // the "Open Event" button.
   func standAloneButton() {
-    var msg = "allow execution of "
-
-    if let e = self.event {
-      let bundleName = e.fileBundleName ?? ""
-      let filePath = e.filePath ?? ""
-      let signingID = e.signingID ?? ""
-
-      if !bundleName.isEmpty {
-        msg = NSLocalizedString(msg + "the application " + bundleName, comment: "Bundle name")
-      } else if !signingID.isEmpty {
-        msg = NSLocalizedString(msg + signingID, comment: "Signing ID")
-      } else if !filePath.isEmpty {
-        msg = NSLocalizedString(msg + filePath, comment: "File path")
-      }
-    } else {
-      // If we don't have an event, we can't fill in the message.
+    guard let e = self.event else {
       if let cb = self.replyCallback {
         cb(false)
       }
       return
+    }
+
+    let bundleName = e.fileBundleName ?? ""
+    let filePath = e.filePath ?? ""
+    let signingID = e.signingID ?? ""
+
+    var msg = "authorize execution"
+
+    if !bundleName.isEmpty {
+      msg = NSLocalizedString(
+        "authorize execution of the application " + bundleName,
+        comment: "Bundle name"
+      )
+    } else if !signingID.isEmpty {
+      msg = NSLocalizedString(
+        "authorize execution of " + signingID,
+        comment: "Signing ID"
+      )
+    } else if !filePath.isEmpty {
+      msg = NSLocalizedString(
+        "authorize execution of " + filePath,
+        comment: "File path"
+      )
     }
 
     if let callback = self.replyCallback {

@@ -4,8 +4,11 @@
 /* No comment provided by engineer. */
 "Application" = "Заявка";
 
-/* No comment provided by engineer */
-"the application " = "додаток ";
+/* No Comment provided by engineer. */
+"authorize execution of " = "дозволити виконання ";
+
+/* No Comment provided by engineer. */
+"authorize execution of the application " = "дозволити виконання заявки ";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Пакетний хеш";

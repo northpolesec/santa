@@ -7,6 +7,13 @@
 /* Default text for Approve */
 "Approve" = "Approve";
 
+/* File path
+   Signing ID */
+"authorize execution of " = "authorize execution of ";
+
+/* Bundle name */
+"authorize execution of the application " = "authorize execution of the application ";
+
 /* No comment provided by engineer. */
 "Bundle Hash" = "Bundle Hash";
 
@@ -66,9 +73,6 @@
 
 /* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
-
-/* Bundle name */
-"the application " = "the application ";
 
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";

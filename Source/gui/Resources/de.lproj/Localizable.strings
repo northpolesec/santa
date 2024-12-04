@@ -8,7 +8,10 @@
 "Application" = "Applikation";
 
 /* No comment provided by engineer. */
-"the application " = "die applikation ";
+"authorize execution of " = "genehmigen die Ausführung von ";
+
+/* No comment provided by engineer. */
+"authorize execution of the application " = "Die Ausführung der Anwendung autorisieren ";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Bundle-Hash";

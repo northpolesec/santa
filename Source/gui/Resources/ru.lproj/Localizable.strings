@@ -8,7 +8,10 @@
 "Application" = "Приложение";
 
 /* No comment provided by engineer. */
-"the application " = "приложение ";
+"authorize execution of " = "разрешить исполнение ";
+
+/* No comment provided by engineer. */
+"authorize execution of the application " = "разрешить выполнение заявки ";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Бандл-хэш";
