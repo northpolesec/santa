@@ -801,7 +801,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (BOOL)enableStandalonePasswordFallback {
   NSNumber *number = self.configState[kEnableStandalonePasswordFallbackKey];
-  return number ? [number boolValue] : NO;
+  return number ? [number boolValue] : YES;
 }
 
 - (BOOL)enableSilentMode {
