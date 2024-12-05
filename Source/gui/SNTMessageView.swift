@@ -151,7 +151,11 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
 }
 
 public func AuthorizeViaTouchID(reason: String, replyBlock: @escaping (Bool) -> Void) {
-  LAContext().evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, error in
+  let policy: LAPolicy =
+    SNTConfigurator.configurator().enableStandalonePasswordFallback
+    ? .deviceOwnerAuthentication : .deviceOwnerAuthenticationWithBiometrics
+
+  LAContext().evaluatePolicy(policy, localizedReason: reason) { success, error in
     if error != nil {
       replyBlock(false)
     } else {
@@ -166,7 +170,11 @@ public func CanAuthorizeWithTouchID() -> (Bool, NSError?) {
   let context = LAContext()
   var error: NSError?
 
-  if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+  let policy: LAPolicy =
+    SNTConfigurator.configurator().enableStandalonePasswordFallback
+    ? .deviceOwnerAuthentication : .deviceOwnerAuthenticationWithBiometrics
+
+  if context.canEvaluatePolicy(policy, error: &error) {
     return (true, nil)
   } else {
     return (false, error)

@@ -27,14 +27,26 @@ Running Santa in Lockdown Mode will stop all blocked binaries and additionally
 will prevent all unknown binaries from running. This means that if the binary
 has no rules or scopes that apply, then it will be blocked.
 
-##### Standalone mode
+##### Standalone mode (Beta)
 
-When Santa is in Standalone Mode it will allow the user to approve their own binaries provided they authenticate biometrically with Touch ID. Upon a successful authentication Santa will then add a `SigningID` rule for the binary if it is validly signed and a `BINARY` if it is not signed at all.
+When Santa is in Standalone Mode it will allow the user to approve their own
+binaries provided they authenticate biometrically with TouchID. Upon a
+successful authentication Santa will then add a `SIGNINGID` rule for the binary
+if it is validly signed and a `BINARY` if it is not signed at all.
 
-When paired with Lockdown, it allows a user to quickly self approve in lieu of using a sync service. If one is using a sync service Events will still be sent up to that sync service.
+This allows a user to quickly self approve in lieu of using a sync service. If
+one is using a sync service Events will still be sent up to that sync service.
+
+Standalone mode typically requires TouchID  or password to approve binary
+execution.
+
+The configuration option `EnableStandalonePasswordFallback` can be disabled to
+make Standalone mode require physical access. When disabled only TouchID will be
+used for self-approval because this requires a physical interaction and cannot
+be spoofed by other software acting as a mouse/keyboard.
 
 {: .note}
-Standalone mode will not override explicit block rules when Santa is configured to use a sync service nor will it override static rules.
+Standalone mode will not override explicit block rules nor will it override static rules.
 
 ##### Changing Modes
 
@@ -44,7 +56,7 @@ profile and with a sync server configuration.
 ###### Change modes with the configuration profile
 
 Set the `ClientMode` in your configuration profile to the integer value `1` for
-MONITOR or `2` for LOCKDOWN.
+`MONITOR`, `2` for `LOCKDOWN`, or `3` for `STANDALONE`.
 
 ```xml
 <key>ClientMode</key>
@@ -58,4 +70,4 @@ Install your new configuration profile, it will overwrite any old
 ###### Change modes with a sync server
 
 The mode is set in the preflight sync stage. Use the key `client_mode` and a
-value of `MONITOR` or `LOCKDOWN`.
+value of `MONITOR`, `LOCKDOWN`, or `STANDALONE`.

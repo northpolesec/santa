@@ -92,6 +92,7 @@ static NSString *const kMachineOwnerPlistKeyKey = @"MachineOwnerKey";
 static NSString *const kMachineIDPlistFileKey = @"MachineIDPlist";
 static NSString *const kMachineIDPlistKeyKey = @"MachineIDKey";
 
+static NSString *const kEnableStandalonePasswordFallbackKey = @"EnableStandalonePasswordFallback";
 static NSString *const kEnableSilentModeKey = @"EnableSilentMode";
 static NSString *const kEnableSilentTTYModeKey = @"EnableSilentTTYMode";
 static NSString *const kAboutTextKey = @"AboutText";
@@ -226,6 +227,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
       kEnableBadSignatureProtectionKey : number,
+      kEnableStandalonePasswordFallbackKey : number,
       kEnableSilentModeKey : number,
       kEnableSilentTTYModeKey : number,
       kAboutTextKey : string,
@@ -416,6 +418,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEnablePageZeroProtection {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableStandalonePasswordFallback {
   return [self configStateSet];
 }
 
@@ -791,6 +797,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (BOOL)enableBadSignatureProtection {
   NSNumber *number = self.configState[kEnableBadSignatureProtectionKey];
   return number ? [number boolValue] : NO;
+}
+
+- (BOOL)enableStandalonePasswordFallback {
+  NSNumber *number = self.configState[kEnableStandalonePasswordFallbackKey];
+  return number ? [number boolValue] : YES;
 }
 
 - (BOOL)enableSilentMode {
