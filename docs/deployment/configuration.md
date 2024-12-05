@@ -30,6 +30,7 @@ also known as mobileconfig files, which are in an Apple-specific XML format.
 | FileChangesPrefixFilters           | Array      | Array of path prefix strings. When an event is logged, if the target path (e.g. the file being written/removed/etc ) matches a prefix it will not be logged. |
 | EnableBadSignatureProtection       | Bool       | If true, binaries with a bad signing chain will be blocked even in MONITOR mode, **unless** the binary is allowed by an explicit rule. Defaults to false. |
 | EnablePageZeroProtection           | Bool       | If true, 32-bit binaries that are missing the `__PAGEZERO` segment will be blocked even in MONITOR mode, **unless** the binary is allowed by an explicit rule. Defaults to true. |
+| EnableStandalonePasswordFallback   | Bool       | If true, Santa will fallback to password authorization for Standalone mode. |
 | EnableSilentMode                   | Bool       | If true, Santa will not post any GUI notifications. This can be a very confusing experience for users, use with caution. Defaults to false. |
 | EnableTransitiveRules              | Bool       | If true, Santa will respect compiler rule types and create allow rules for the executables they produce. Defaults to false. |
 | EnableSilentTTYMode                | Bool       | If true, Santa will not post any TTY notifications. This can be a very confusing experience for users, use with caution. Defaults to false. |

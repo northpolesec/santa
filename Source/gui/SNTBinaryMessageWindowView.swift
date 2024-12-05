@@ -383,7 +383,7 @@ struct SNTBinaryMessageWindowView: View {
       )
     } else if !filePath.isEmpty {
       msg = NSLocalizedString(
-        "authorize execution of " + filePath,
+        "authorize execution of " + (filePath as NSString).lastPathComponent,
         comment: "File path"
       )
     }

@@ -301,6 +301,19 @@
 #pragma mark - GUI Settings
 
 ///
+///  When in Standalone mode, Santa normally requires TouchID for authorization.
+///  This is slightly safer than password authentication because it requires a physical
+///  interaction that cannot be spoofed by tools that can type into the dialog.
+///
+///  However, for users on desktop machines or using clamshell mode standalone mode is
+///  unusable without the ability to fallback to a password. If this option is enabled,
+///  TouchID is preferred but password fallback is available.
+///
+///  Defaults to NO.
+///
+@property(readonly, nonatomic) BOOL enableStandalonePasswordFallback;
+
+///
 ///  When silent mode is enabled, Santa will never show notifications for
 ///  blocked processes.
 ///
