@@ -37,9 +37,13 @@ if it is validly signed and a `BINARY` if it is not signed at all.
 This allows a user to quickly self approve in lieu of using a sync service. If
 one is using a sync service Events will still be sent up to that sync service.
 
-Standalone mode typically requires TouchID  or password to approve binary execution.
+Standalone mode typically requires TouchID  or password to approve binary
+execution.
 
-The configuration option `EnableStandalonePasswordFallback` can be disabled to make Standalone mode require physical access. When disabled only TouchID will be used for self-approval because this requires a physical interaction and cannot be spoofed by other software acting as a mouse/keyboard.
+The configuration option `EnableStandalonePasswordFallback` can be disabled to
+make Standalone mode require physical access. When disabled only TouchID will be
+used for self-approval because this requires a physical interaction and cannot
+be spoofed by other software acting as a mouse/keyboard.
 
 {: .note}
 Standalone mode will not override explicit block rules nor will it override static rules.
