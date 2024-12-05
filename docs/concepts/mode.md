@@ -46,8 +46,7 @@ use-case is important there is a configuration option
 password authentication when TouchID is not available.
 
 {: .note}
-Standalone mode will not override explicit block rules when Santa is configured
-to use a sync service nor will it override static rules.
+Standalone mode will not override explicit block rules nor will it override static rules.
 
 ##### Changing Modes
 
