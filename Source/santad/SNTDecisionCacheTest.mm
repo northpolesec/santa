@@ -33,8 +33,8 @@ SNTCachedDecision *MakeCachedDecision(struct stat sb, SNTEventState decision) {
   cd.decision = decision;
   cd.sha256 = @"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
   cd.vnodeId = {
-    .fsid = sb.st_dev,
-    .fileid = sb.st_ino,
+      .fsid = sb.st_dev,
+      .fileid = sb.st_ino,
   };
 
   return cd;
@@ -85,10 +85,10 @@ SNTCachedDecision *MakeCachedDecision(struct stat sb, SNTEventState decision) {
   OCMStub([self.mockDatabaseController ruleTable]).andReturn(self.mockRuleDatabase);
 
   OCMExpect([self.mockRuleDatabase
-    resetTimestampForRule:[OCMArg checkWithBlock:^BOOL(SNTRule *rule) {
-      return [rule.identifier isEqualToString:cd.sha256] &&
-             rule.state == SNTRuleStateAllowTransitive && rule.type == SNTRuleTypeBinary;
-    }]]);
+      resetTimestampForRule:[OCMArg checkWithBlock:^BOOL(SNTRule *rule) {
+        return [rule.identifier isEqualToString:cd.sha256] &&
+               rule.state == SNTRuleStateAllowTransitive && rule.type == SNTRuleTypeBinary;
+      }]]);
 
   [dc resetTimestampForCachedDecision:sb];
 

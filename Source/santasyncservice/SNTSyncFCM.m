@@ -126,8 +126,9 @@ static const uint32_t kDefaultConnectDelayMaxSeconds = 10;
     _messageHandler = messageHandler;
 
     _authSession = [[MOLAuthenticatingURLSession alloc]
-      initWithSessionConfiguration:sessionConfiguration
-                                     ?: [NSURLSessionConfiguration defaultSessionConfiguration]];
+        initWithSessionConfiguration:sessionConfiguration
+                                         ?: [NSURLSessionConfiguration
+                                                defaultSessionConfiguration]];
     _authSession.dataTaskDidReceiveDataBlock = [self dataTaskDidReceiveDataBlock];
     _authSession.taskDidCompleteWithErrorBlock = [self taskDidCompleteWithErrorBlock];
 
@@ -407,7 +408,7 @@ static const uint32_t kDefaultConnectDelayMaxSeconds = 10;
 
 - (void)setCheckinAuthorization:(NSMutableURLRequest *)URLRequest {
   NSString *a = [NSString
-    stringWithFormat:@"checkin %@:%@ %@", self.androidID, self.securityToken, self.versionInfo];
+      stringWithFormat:@"checkin %@:%@ %@", self.androidID, self.securityToken, self.versionInfo];
   [URLRequest addValue:a forHTTPHeaderField:@"Authorization"];
   [URLRequest addValue:self.apiKey forHTTPHeaderField:@"X-Goog-Api-Key"];
 }

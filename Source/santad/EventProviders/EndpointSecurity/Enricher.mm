@@ -45,70 +45,70 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
   switch (es_msg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_CLOSE:
       return std::make_unique<EnrichedMessage>(EnrichedClose(
-        std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.close.target)));
+          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.close.target)));
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA:
       return std::make_unique<EnrichedMessage>(EnrichedExchange(
-        std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.exchangedata.file1),
-        Enrich(*es_msg->event.exchangedata.file2)));
+          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.exchangedata.file1),
+          Enrich(*es_msg->event.exchangedata.file2)));
     case ES_EVENT_TYPE_NOTIFY_EXEC:
       return std::make_unique<EnrichedMessage>(EnrichedExec(
-        std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.exec.target),
-        (es_msg->version >= 2 && es_msg->event.exec.script)
-          ? std::make_optional(Enrich(*es_msg->event.exec.script))
-          : std::nullopt,
-        (es_msg->version >= 3 && es_msg->event.exec.cwd)
-          ? std::make_optional(Enrich(*es_msg->event.exec.cwd))
-          : std::nullopt));
+          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.exec.target),
+          (es_msg->version >= 2 && es_msg->event.exec.script)
+              ? std::make_optional(Enrich(*es_msg->event.exec.script))
+              : std::nullopt,
+          (es_msg->version >= 3 && es_msg->event.exec.cwd)
+              ? std::make_optional(Enrich(*es_msg->event.exec.cwd))
+              : std::nullopt));
     case ES_EVENT_TYPE_NOTIFY_FORK:
       return std::make_unique<EnrichedMessage>(EnrichedFork(
-        std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.fork.child)));
+          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.fork.child)));
     case ES_EVENT_TYPE_NOTIFY_EXIT:
       return std::make_unique<EnrichedMessage>(
-        EnrichedExit(std::move(es_msg), Enrich(*es_msg->process)));
+          EnrichedExit(std::move(es_msg), Enrich(*es_msg->process)));
     case ES_EVENT_TYPE_NOTIFY_LINK:
       return std::make_unique<EnrichedMessage>(
-        EnrichedLink(std::move(es_msg), Enrich(*es_msg->process),
-                     Enrich(*es_msg->event.link.source), Enrich(*es_msg->event.link.target_dir)));
+          EnrichedLink(std::move(es_msg), Enrich(*es_msg->process),
+                       Enrich(*es_msg->event.link.source), Enrich(*es_msg->event.link.target_dir)));
     case ES_EVENT_TYPE_NOTIFY_RENAME: {
       if (es_msg->event.rename.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
         return std::make_unique<EnrichedMessage>(EnrichedRename(
-          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.rename.source),
-          std::nullopt, Enrich(*es_msg->event.rename.destination.new_path.dir)));
+            std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.rename.source),
+            std::nullopt, Enrich(*es_msg->event.rename.destination.new_path.dir)));
       } else {
         return std::make_unique<EnrichedMessage>(EnrichedRename(
-          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.rename.source),
-          Enrich(*es_msg->event.rename.destination.existing_file), std::nullopt));
+            std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.rename.source),
+            Enrich(*es_msg->event.rename.destination.existing_file), std::nullopt));
       }
     }
     case ES_EVENT_TYPE_NOTIFY_UNLINK:
       return std::make_unique<EnrichedMessage>(EnrichedUnlink(
-        std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.unlink.target)));
+          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.unlink.target)));
     case ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED:
       return std::make_unique<EnrichedMessage>(
-        EnrichedCSInvalidated(std::move(es_msg), Enrich(*es_msg->process)));
+          EnrichedCSInvalidated(std::move(es_msg), Enrich(*es_msg->process)));
 #if HAVE_MACOS_13
     case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION:
       switch (es_msg->event.authentication->type) {
         case ES_AUTHENTICATION_TYPE_OD:
           return std::make_unique<EnrichedMessage>(
-            EnrichedAuthenticationOD(std::move(es_msg), Enrich(*es_msg->process),
-                                     Enrich(es_msg->event.authentication->data.od->instigator)));
+              EnrichedAuthenticationOD(std::move(es_msg), Enrich(*es_msg->process),
+                                       Enrich(es_msg->event.authentication->data.od->instigator)));
         case ES_AUTHENTICATION_TYPE_TOUCHID:
           return std::make_unique<EnrichedMessage>(EnrichedAuthenticationTouchID(
-            std::move(es_msg), Enrich(*es_msg->process),
-            Enrich(es_msg->event.authentication->data.touchid->instigator),
-            es_msg->event.authentication->data.touchid->has_uid
-              ? UsernameForUID(es_msg->event.authentication->data.touchid->uid.uid)
-              : std::nullopt));
+              std::move(es_msg), Enrich(*es_msg->process),
+              Enrich(es_msg->event.authentication->data.touchid->instigator),
+              es_msg->event.authentication->data.touchid->has_uid
+                  ? UsernameForUID(es_msg->event.authentication->data.touchid->uid.uid)
+                  : std::nullopt));
         case ES_AUTHENTICATION_TYPE_TOKEN:
           return std::make_unique<EnrichedMessage>(EnrichedAuthenticationToken(
-            std::move(es_msg), Enrich(*es_msg->process),
-            Enrich(es_msg->event.authentication->data.token->instigator)));
+              std::move(es_msg), Enrich(*es_msg->process),
+              Enrich(es_msg->event.authentication->data.token->instigator)));
         case ES_AUTHENTICATION_TYPE_AUTO_UNLOCK:
           return std::make_unique<EnrichedMessage>(EnrichedAuthenticationAutoUnlock(
-            std::move(es_msg), Enrich(*es_msg->process),
-            UIDForUsername(
-              StringTokenToStringView(es_msg->event.authentication->data.auto_unlock->username))));
+              std::move(es_msg), Enrich(*es_msg->process),
+              UIDForUsername(StringTokenToStringView(
+                  es_msg->event.authentication->data.auto_unlock->username))));
 
         // Note: There is a case here where future OS versions could add new authentication types
         // that did not exist in the SDK used to build the current running version of Santa. Return
@@ -119,38 +119,38 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
       }
     case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN:
       return std::make_unique<EnrichedMessage>(EnrichedLoginWindowSessionLogin(
-        std::move(es_msg), Enrich(*es_msg->process),
-        UIDForUsername(StringTokenToStringView(es_msg->event.lw_session_login->username))));
+          std::move(es_msg), Enrich(*es_msg->process),
+          UIDForUsername(StringTokenToStringView(es_msg->event.lw_session_login->username))));
     case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT:
       return std::make_unique<EnrichedMessage>(EnrichedLoginWindowSessionLogout(
-        std::move(es_msg), Enrich(*es_msg->process),
-        UIDForUsername(StringTokenToStringView(es_msg->event.lw_session_logout->username))));
+          std::move(es_msg), Enrich(*es_msg->process),
+          UIDForUsername(StringTokenToStringView(es_msg->event.lw_session_logout->username))));
     case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK:
       return std::make_unique<EnrichedMessage>(EnrichedLoginWindowSessionLock(
-        std::move(es_msg), Enrich(*es_msg->process),
-        UIDForUsername(StringTokenToStringView(es_msg->event.lw_session_lock->username))));
+          std::move(es_msg), Enrich(*es_msg->process),
+          UIDForUsername(StringTokenToStringView(es_msg->event.lw_session_lock->username))));
     case ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK:
       return std::make_unique<EnrichedMessage>(EnrichedLoginWindowSessionUnlock(
-        std::move(es_msg), Enrich(*es_msg->process),
-        UIDForUsername(StringTokenToStringView(es_msg->event.lw_session_unlock->username))));
+          std::move(es_msg), Enrich(*es_msg->process),
+          UIDForUsername(StringTokenToStringView(es_msg->event.lw_session_unlock->username))));
     case ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH:
       return std::make_unique<EnrichedMessage>(
-        EnrichedScreenSharingAttach(std::move(es_msg), Enrich(*es_msg->process)));
+          EnrichedScreenSharingAttach(std::move(es_msg), Enrich(*es_msg->process)));
     case ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH:
       return std::make_unique<EnrichedMessage>(
-        EnrichedScreenSharingDetach(std::move(es_msg), Enrich(*es_msg->process)));
+          EnrichedScreenSharingDetach(std::move(es_msg), Enrich(*es_msg->process)));
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN:
       return std::make_unique<EnrichedMessage>(
-        EnrichedOpenSSHLogin(std::move(es_msg), Enrich(*es_msg->process)));
+          EnrichedOpenSSHLogin(std::move(es_msg), Enrich(*es_msg->process)));
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT:
       return std::make_unique<EnrichedMessage>(
-        EnrichedOpenSSHLogout(std::move(es_msg), Enrich(*es_msg->process)));
+          EnrichedOpenSSHLogout(std::move(es_msg), Enrich(*es_msg->process)));
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN:
       return std::make_unique<EnrichedMessage>(
-        EnrichedLoginLogin(std::move(es_msg), Enrich(*es_msg->process)));
+          EnrichedLoginLogin(std::move(es_msg), Enrich(*es_msg->process)));
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT:
       return std::make_unique<EnrichedMessage>(
-        EnrichedLoginLogout(std::move(es_msg), Enrich(*es_msg->process)));
+          EnrichedLoginLogout(std::move(es_msg), Enrich(*es_msg->process)));
 #endif
     default:
       // This is a programming error
@@ -165,15 +165,15 @@ std::optional<EnrichedProcess> Enricher::Enrich(const es_process_t *es_proc,
 }
 
 EnrichedProcess Enricher::Enrich(const es_process_t &es_proc, EnrichOptions options) {
-  return EnrichedProcess(UsernameForUID(audit_token_to_euid(es_proc.audit_token), options),
-                         UsernameForGID(audit_token_to_egid(es_proc.audit_token), options),
-                         UsernameForUID(audit_token_to_ruid(es_proc.audit_token), options),
-                         UsernameForGID(audit_token_to_rgid(es_proc.audit_token), options),
-                         Enrich(*es_proc.executable, options),
-                         process_tree_
-                           ? process_tree_->ExportAnnotations(
-                               santa::santad::process_tree::PidFromAuditToken(es_proc.audit_token))
-                           : std::nullopt);
+  return EnrichedProcess(
+      UsernameForUID(audit_token_to_euid(es_proc.audit_token), options),
+      UsernameForGID(audit_token_to_egid(es_proc.audit_token), options),
+      UsernameForUID(audit_token_to_ruid(es_proc.audit_token), options),
+      UsernameForGID(audit_token_to_rgid(es_proc.audit_token), options),
+      Enrich(*es_proc.executable, options),
+      process_tree_ ? process_tree_->ExportAnnotations(
+                          santa::santad::process_tree::PidFromAuditToken(es_proc.audit_token))
+                    : std::nullopt);
 }
 
 EnrichedFile Enricher::Enrich(const es_file_t &es_file, EnrichOptions options) {

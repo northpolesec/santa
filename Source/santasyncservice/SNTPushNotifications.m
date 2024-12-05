@@ -142,7 +142,7 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
       [self.delegate ruleSync];
     } else {
       uint32_t delaySeconds =
-        arc4random_uniform((uint32_t)self.pushNotificationsGlobalRuleSyncDeadline);
+          arc4random_uniform((uint32_t)self.pushNotificationsGlobalRuleSyncDeadline);
       LOGD(@"Global rule_sync, staggering: %u second delay", delaySeconds);
       [self.delegate ruleSyncSecondsFromNow:delaySeconds];
     }

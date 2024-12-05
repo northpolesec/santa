@@ -163,48 +163,48 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 }
 
 + (NSString *)longHelpText {
-  return
-    [NSString stringWithFormat:
-                @"The details provided will be the same ones Santa uses to make a decision\n"
-                @"about executables. This includes SHA-256, SHA-1, code signing information and\n"
-                @"the type of file."
-                @"\n"
-                @"Usage: santactl fileinfo [options] [file-paths]\n"
-                @"    --recursive (-r): Search directories recursively.\n"
-                @"                      Incompatible with --bundleinfo.\n"
-                @"    --json: Output in JSON format.\n"
-                @"    --key: Search and return this one piece of information.\n"
-                @"           You may specify multiple keys by repeating this flag.\n"
-                @"           Valid Keys:\n"
-                @"%@\n"
-                @"           Valid keys when using --cert-index:\n"
-                @"%@\n"
-                @"    --cert-index: Supply an integer corresponding to a certificate of the\n"
-                @"                  signing chain to show info only for that certificate.\n"
-                @"                     0 up to n for the leaf certificate up to the root\n"
-                @"                    -1 down to -n-1 for the root certificate down to the leaf\n"
-                @"                  Incompatible with --bundleinfo."
-                @"\n"
-                @"    --filter: Use predicates of the form 'key=regex' to filter out which files\n"
-                @"              are displayed. Valid keys are the same as for --key. Value is a\n"
-                @"              case-insensitive regular expression which must match anywhere in\n"
-                @"              the keyed property value for the file's info to be displayed.\n"
-                @"              You may specify multiple filters by repeating this flag.\n"
-                @"              If multiple filters are specified, any match will display the\n"
-                @"              file.\n"
-                @"    --filter-inclusive: If multiple filters are specified, they must all match\n"
-                @"                        for the file to be displayed.\n"
-                @"    --bundleinfo: If the file is part of a bundle, will also display bundle\n"
-                @"                  hash information and hashes of all bundle executables.\n"
-                @"                  Incompatible with --recursive and --cert-index.\n"
-                @"\n"
-                @"Examples: santactl fileinfo --cert-index 1 --key SHA-256 --json /usr/bin/yes\n"
-                @"          santactl fileinfo --key SHA-256 --json /usr/bin/yes\n"
-                @"          santactl fileinfo /usr/bin/yes /bin/*\n"
-                @"          santactl fileinfo /usr/bin -r --key Path --key SHA-256 --key Rule\n"
-                @"          santactl fileinfo /usr/bin/* --filter Type=Script --filter Path=zip",
-                formattedStringForKeyArray(self.fileInfoKeys),
-                formattedStringForKeyArray(self.signingChainKeys)];
+  return [NSString
+      stringWithFormat:
+          @"The details provided will be the same ones Santa uses to make a decision\n"
+          @"about executables. This includes SHA-256, SHA-1, code signing information and\n"
+          @"the type of file."
+          @"\n"
+          @"Usage: santactl fileinfo [options] [file-paths]\n"
+          @"    --recursive (-r): Search directories recursively.\n"
+          @"                      Incompatible with --bundleinfo.\n"
+          @"    --json: Output in JSON format.\n"
+          @"    --key: Search and return this one piece of information.\n"
+          @"           You may specify multiple keys by repeating this flag.\n"
+          @"           Valid Keys:\n"
+          @"%@\n"
+          @"           Valid keys when using --cert-index:\n"
+          @"%@\n"
+          @"    --cert-index: Supply an integer corresponding to a certificate of the\n"
+          @"                  signing chain to show info only for that certificate.\n"
+          @"                     0 up to n for the leaf certificate up to the root\n"
+          @"                    -1 down to -n-1 for the root certificate down to the leaf\n"
+          @"                  Incompatible with --bundleinfo."
+          @"\n"
+          @"    --filter: Use predicates of the form 'key=regex' to filter out which files\n"
+          @"              are displayed. Valid keys are the same as for --key. Value is a\n"
+          @"              case-insensitive regular expression which must match anywhere in\n"
+          @"              the keyed property value for the file's info to be displayed.\n"
+          @"              You may specify multiple filters by repeating this flag.\n"
+          @"              If multiple filters are specified, any match will display the\n"
+          @"              file.\n"
+          @"    --filter-inclusive: If multiple filters are specified, they must all match\n"
+          @"                        for the file to be displayed.\n"
+          @"    --bundleinfo: If the file is part of a bundle, will also display bundle\n"
+          @"                  hash information and hashes of all bundle executables.\n"
+          @"                  Incompatible with --recursive and --cert-index.\n"
+          @"\n"
+          @"Examples: santactl fileinfo --cert-index 1 --key SHA-256 --json /usr/bin/yes\n"
+          @"          santactl fileinfo --key SHA-256 --json /usr/bin/yes\n"
+          @"          santactl fileinfo /usr/bin/yes /bin/*\n"
+          @"          santactl fileinfo /usr/bin -r --key Path --key SHA-256 --key Rule\n"
+          @"          santactl fileinfo /usr/bin/* --filter Type=Script --filter Path=zip",
+          formattedStringForKeyArray(self.fileInfoKeys),
+          formattedStringForKeyArray(self.signingChainKeys)];
 }
 
 + (NSArray<NSString *> *)fileInfoKeys {
@@ -217,7 +217,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 
 + (NSArray<NSString *> *)signingChainKeys {
   return
-    @[ kSHA256, kSHA1, kCommonName, kOrganization, kOrganizationalUnit, kValidFrom, kValidUntil ];
+      @[ kSHA256, kSHA1, kCommonName, kOrganization, kOrganizationalUnit, kValidFrom, kValidUntil ];
 }
 
 - (instancetype)initWithDaemonConnection:(MOLXPCConnection *)daemonConn {
@@ -249,7 +249,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     };
 
     _printQueue =
-      dispatch_queue_create("com.northpolesec.santactl.print_queue", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_create("com.northpolesec.santactl.print_queue", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }
@@ -392,26 +392,26 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     NSString *signingID = FormatSigningID(csc);
 
     struct RuleIdentifiers identifiers = {
-      .cdhash = cdhash,
-      .binarySHA256 = fileInfo.SHA256,
-      .signingID = signingID,
-      .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
-      .teamID = teamID,
+        .cdhash = cdhash,
+        .binarySHA256 = fileInfo.SHA256,
+        .signingID = signingID,
+        .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
+        .teamID = teamID,
     };
 
     [[cmd.daemonConn remoteObjectProxy]
-      decisionForFilePath:fileInfo.path
-              identifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
-                    reply:^(SNTEventState s) {
-                      state = s;
-                      dispatch_semaphore_signal(sema);
-                    }];
+        decisionForFilePath:fileInfo.path
+                identifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
+                      reply:^(SNTEventState s) {
+                        state = s;
+                        dispatch_semaphore_signal(sema);
+                      }];
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
       cmd.daemonUnavailable = YES;
       return kCommunicationErrorMsg;
     } else {
       NSMutableString *output =
-        (SNTEventStateAllow & state) ? @"Allowed".mutableCopy : @"Blocked".mutableCopy;
+          (SNTEventStateAllow & state) ? @"Allowed".mutableCopy : @"Blocked".mutableCopy;
       switch (state) {
         case SNTEventStateAllowUnknown:
         case SNTEventStateBlockUnknown: [output appendString:@" (Unknown)"]; break;
@@ -735,10 +735,10 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     // output info because there's a chance that we can bail out early if a filter doesn't match.
     // However we also don't want to recompute info, so we save any values that we plan to show.
     BOOL shouldOutput =
-      [self shouldOutputValueToDictionary:outputDict
-                              valueForKey:^NSString *(NSString *key) {
-                                return self.propertyMap[key](self, fileInfo) ?: @"";
-                              }];
+        [self shouldOutputValueToDictionary:outputDict
+                                valueForKey:^NSString *(NSString *key) {
+                                  return self.propertyMap[key](self, fileInfo) ?: @"";
+                                }];
     if (!shouldOutput) {
       return;
     }
@@ -764,22 +764,24 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
       [[bc remoteObjectProxy]
-        hashBundleBinariesForEvent:se
-                             reply:^(NSString *hash, NSArray<SNTStoredEvent *> *events,
-                                     NSNumber *time) {
-                               bundleInfo[kBundleHash] = hash;
+          hashBundleBinariesForEvent:se
+                               reply:^(NSString *hash, NSArray<SNTStoredEvent *> *events,
+                                       NSNumber *time) {
+                                 bundleInfo[kBundleHash] = hash;
 
-                               NSMutableArray *bundleHashes = [[NSMutableArray alloc] init];
+                                 NSMutableArray *bundleHashes = [[NSMutableArray alloc] init];
 
-                               for (SNTStoredEvent *event in events) {
-                                 [bundleHashes
-                                   addObject:@{kSHA256 : event.fileSHA256, kPath : event.filePath}];
-                               }
+                                 for (SNTStoredEvent *event in events) {
+                                   [bundleHashes addObject:@{
+                                     kSHA256 : event.fileSHA256,
+                                     kPath : event.filePath
+                                   }];
+                                 }
 
-                               bundleInfo[kBundleHashes] = bundleHashes;
-                               [[bc remoteObjectProxy] spindown];
-                               dispatch_semaphore_signal(sema);
-                             }];
+                                 bundleInfo[kBundleHashes] = bundleHashes;
+                                 [[bc remoteObjectProxy] spindown];
+                                 dispatch_semaphore_signal(sema);
+                               }];
 
       int secondsToWait = 30;
       if (dispatch_semaphore_wait(sema,
@@ -800,7 +802,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   // b) is there only one key?
   // c) are we displaying a cert?
   BOOL singleKey =
-    (self.outputKeyList.count == 1 && ![self.outputKeyList.firstObject isEqual:kSigningChain]);
+      (self.outputKeyList.count == 1 && ![self.outputKeyList.firstObject isEqual:kSigningChain]);
   NSMutableString *output = [NSMutableString string];
   if (self.jsonOutput) {
     [output appendString:[self jsonStringForDictionary:outputDict]];
@@ -814,7 +816,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           [output appendFormat:@"%@\n", outputDict[key]];
         } else {
           [output
-            appendFormat:@"%-*s: %@\n", (int)self.maxKeyWidth, key.UTF8String, outputDict[key]];
+              appendFormat:@"%-*s: %@\n", (int)self.maxKeyWidth, key.UTF8String, outputDict[key]];
         }
       }
     }
@@ -863,8 +865,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       NSScanner *scanner = [NSScanner scannerWithString:arguments[i]];
       if (![scanner scanInt:&index] || !scanner.atEnd) {
         [self printErrorUsageAndExit:
-                [NSString stringWithFormat:@"\n\"%@\" is an invalid argument for --cert-index\n",
-                                           arguments[i]]];
+                  [NSString stringWithFormat:@"\n\"%@\" is an invalid argument for --cert-index\n",
+                                             arguments[i]]];
       }
       self.certIndex = @(index);
     } else if ([arg caseInsensitiveCompare:@"--key"] == NSOrderedSame) {
@@ -883,19 +885,19 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       if (range.location == NSNotFound || range.location == 0 ||
           range.location == arguments[i].length - 1) {
         [self printErrorUsageAndExit:
-                [NSString stringWithFormat:@"\n\"%@\" is an invalid filter predicate.\n"
-                                           @"Filter predicates must be of the form key=regex"
-                                           @" (with no spaces around \"=\")",
-                                           arguments[i]]];
+                  [NSString stringWithFormat:@"\n\"%@\" is an invalid filter predicate.\n"
+                                             @"Filter predicates must be of the form key=regex"
+                                             @" (with no spaces around \"=\")",
+                                             arguments[i]]];
       }
       NSString *key = [arguments[i] substringToIndex:range.location];
       NSString *rhs = [arguments[i] substringFromIndex:range.location + 1];
       // Convert right-hand side of '=' into a regular expression object.
       NSError *error;
       NSRegularExpression *regex =
-        [NSRegularExpression regularExpressionWithPattern:rhs
-                                                  options:NSRegularExpressionCaseInsensitive
-                                                    error:&error];
+          [NSRegularExpression regularExpressionWithPattern:rhs
+                                                    options:NSRegularExpressionCaseInsensitive
+                                                      error:&error];
       if (error) {
         [self printErrorUsageAndExit:[NSString stringWithFormat:@"\n\"%@\" is an invalid regular "
                                                                 @"expression in filter argument.\n",
@@ -912,7 +914,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
                [arg caseInsensitiveCompare:@"-b"] == NSOrderedSame) {
       if (self.recursive || self.certIndex) {
         [self printErrorUsageAndExit:
-                @"\n--bundleinfo is incompatible with --recursive and --cert-index"];
+                  @"\n--bundleinfo is incompatible with --recursive and --cert-index"];
       }
       self.bundleInfo = YES;
     } else if ([arg caseInsensitiveCompare:@"--filter-inclusive"] == NSOrderedSame) {
@@ -927,17 +929,17 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     NSArray *validKeys = [[self class] signingChainKeys];
     for (NSString *key in keys) {
       if (![validKeys containsObject:key]) {
-        [self
-          printErrorUsageAndExit:
-            [NSString stringWithFormat:@"\n\"%@\" is an invalid key when using --cert-index", key]];
+        [self printErrorUsageAndExit:
+                  [NSString
+                      stringWithFormat:@"\n\"%@\" is an invalid key when using --cert-index", key]];
       }
     }
     for (NSString *key in filters) {
       if (![validKeys containsObject:key]) {
-        [self
-          printErrorUsageAndExit:
-            [NSString
-              stringWithFormat:@"\n\"%@\" is an invalid filter key when using --cert-index", key]];
+        [self printErrorUsageAndExit:
+                  [NSString
+                      stringWithFormat:@"\n\"%@\" is an invalid filter key when using --cert-index",
+                                       key]];
       }
     }
   } else {
@@ -945,12 +947,13 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     for (NSString *key in keys) {
       if (![validKeys containsObject:key]) {
         [self
-          printErrorUsageAndExit:[NSString stringWithFormat:@"\n\"%@\" is an invalid key", key]];
+            printErrorUsageAndExit:[NSString stringWithFormat:@"\n\"%@\" is an invalid key", key]];
       }
     }
     for (NSString *key in filters) {
       if (![validKeys containsObject:key] || [key isEqualToString:kSigningChain]) {
-        [self printErrorUsageAndExit:[NSString
+        [self
+            printErrorUsageAndExit:[NSString
                                        stringWithFormat:@"\n\"%@\" is an invalid filter key", key]];
       }
     }

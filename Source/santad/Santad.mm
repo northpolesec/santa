@@ -88,11 +88,11 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   SNTConfigurator *configurator = [SNTConfigurator configurator];
 
   SNTDaemonControlController *dc =
-    [[SNTDaemonControlController alloc] initWithAuthResultCache:auth_result_cache
-                                              notificationQueue:notifier_queue
-                                                     syncdQueue:syncd_queue
-                                                         logger:logger
-                                                     watchItems:watch_items];
+      [[SNTDaemonControlController alloc] initWithAuthResultCache:auth_result_cache
+                                                notificationQueue:notifier_queue
+                                                       syncdQueue:syncd_queue
+                                                           logger:logger
+                                                       watchItems:watch_items];
 
   control_connection.exportedObject = dc;
   [control_connection resume];
@@ -102,57 +102,60 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   }
 
   SNTEndpointSecurityDeviceManager *device_client =
-    [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:esapi
-                                                    metrics:metrics
-                                                     logger:logger
-                                            authResultCache:auth_result_cache
-                                              blockUSBMount:[configurator blockUSBMount]
-                                             remountUSBMode:[configurator remountUSBMode]
-                                         startupPreferences:[configurator onStartUSBOptions]];
+      [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:esapi
+                                                      metrics:metrics
+                                                       logger:logger
+                                              authResultCache:auth_result_cache
+                                                blockUSBMount:[configurator blockUSBMount]
+                                               remountUSBMode:[configurator remountUSBMode]
+                                           startupPreferences:[configurator onStartUSBOptions]];
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event) {
     [[notifier_queue.notifierConnection remoteObjectProxy] postUSBBlockNotification:event];
   };
 
   SNTEndpointSecurityRecorder *monitor_client =
-    [[SNTEndpointSecurityRecorder alloc] initWithESAPI:esapi
-                                               metrics:metrics
-                                                logger:logger
-                                              enricher:enricher
-                                    compilerController:compiler_controller
-                                       authResultCache:auth_result_cache
-                                            prefixTree:prefix_tree
-                                           processTree:process_tree];
+      [[SNTEndpointSecurityRecorder alloc] initWithESAPI:esapi
+                                                 metrics:metrics
+                                                  logger:logger
+                                                enricher:enricher
+                                      compilerController:compiler_controller
+                                         authResultCache:auth_result_cache
+                                              prefixTree:prefix_tree
+                                             processTree:process_tree];
 
   SNTEndpointSecurityAuthorizer *authorizer_client =
-    [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:esapi
-                                                 metrics:metrics
-                                          execController:exec_controller
-                                      compilerController:compiler_controller
-                                         authResultCache:auth_result_cache];
+      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:esapi
+                                                   metrics:metrics
+                                            execController:exec_controller
+                                        compilerController:compiler_controller
+                                           authResultCache:auth_result_cache];
 
   SNTEndpointSecurityTamperResistance *tamper_client =
-    [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:esapi metrics:metrics logger:logger];
+      [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:esapi
+                                                         metrics:metrics
+                                                          logger:logger];
 
   if (@available(macOS 13.0, *)) {
     SNTEndpointSecurityFileAccessAuthorizer *access_authorizer_client =
-      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:esapi
-                                                             metrics:metrics
-                                                              logger:logger
-                                                          watchItems:watch_items
-                                                            enricher:enricher
-                                                       decisionCache:[SNTDecisionCache sharedCache]
-                                                           ttyWriter:tty_writer];
+        [[SNTEndpointSecurityFileAccessAuthorizer alloc]
+            initWithESAPI:esapi
+                  metrics:metrics
+                   logger:logger
+               watchItems:watch_items
+                 enricher:enricher
+            decisionCache:[SNTDecisionCache sharedCache]
+                ttyWriter:tty_writer];
     watch_items->RegisterClient(access_authorizer_client);
 
-    access_authorizer_client.fileAccessBlockCallback =
-      ^(SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {
-        [[notifier_queue.notifierConnection remoteObjectProxy]
+    access_authorizer_client.fileAccessBlockCallback = ^(
+        SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {
+      [[notifier_queue.notifierConnection remoteObjectProxy]
           postFileAccessBlockNotification:event
                             customMessage:customMsg
                                 customURL:customURL
                                customText:customText];
-      };
+    };
   }
 
   EstablishSyncServiceConnection(syncd_queue);
@@ -160,118 +163,119 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   NSMutableArray<SNTKVOManager *> *kvoObservers = [[NSMutableArray alloc] init];
   [kvoObservers addObjectsFromArray:@[
     [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(clientMode)
-                type:[NSNumber class]
-            callback:^(NSNumber *oldValue, NSNumber *newValue) {
-              if ([oldValue longLongValue] == [newValue longLongValue]) {
-                // Note: This case apparently can happen and if not checked
-                // will result in excessive notification messages sent to the
-                // user when calling `postClientModeNotification` below
-                return;
-              }
+        initWithObject:configurator
+              selector:@selector(clientMode)
+                  type:[NSNumber class]
+              callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                if ([oldValue longLongValue] == [newValue longLongValue]) {
+                  // Note: This case apparently can happen and if not checked
+                  // will result in excessive notification messages sent to the
+                  // user when calling `postClientModeNotification` below
+                  return;
+                }
 
-              SNTClientMode clientMode = (SNTClientMode)[newValue longLongValue];
+                SNTClientMode clientMode = (SNTClientMode)[newValue longLongValue];
 
-              switch (clientMode) {
-                case SNTClientModeLockdown:
-                  LOGI(@"Changed client mode to Lockdown, flushing cache.");
-                  auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
-                                                FlushCacheReason::kClientModeChanged);
-                  break;
-                case SNTClientModeStandalone:
-                  LOGI(@"Changed client mode to Standalone, flushing cache.");
-                  auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
-                                                FlushCacheReason::kClientModeChanged);
-                  break;
-                case SNTClientModeMonitor: LOGI(@"Changed client mode to Monitor."); break;
-                default: LOGW(@"Changed client mode to unknown value."); break;
-              }
+                switch (clientMode) {
+                  case SNTClientModeLockdown:
+                    LOGI(@"Changed client mode to Lockdown, flushing cache.");
+                    auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                                  FlushCacheReason::kClientModeChanged);
+                    break;
+                  case SNTClientModeStandalone:
+                    LOGI(@"Changed client mode to Standalone, flushing cache.");
+                    auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                                  FlushCacheReason::kClientModeChanged);
+                    break;
+                  case SNTClientModeMonitor: LOGI(@"Changed client mode to Monitor."); break;
+                  default: LOGW(@"Changed client mode to unknown value."); break;
+                }
 
-              [[notifier_queue.notifierConnection remoteObjectProxy]
-                postClientModeNotification:clientMode];
-            }],
+                [[notifier_queue.notifierConnection remoteObjectProxy]
+                    postClientModeNotification:clientMode];
+              }],
     [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(syncBaseURL)
-                type:[NSURL class]
-            callback:^(NSURL *oldValue, NSURL *newValue) {
-              if ((!newValue && !oldValue) ||
-                  ([newValue.absoluteString isEqualToString:oldValue.absoluteString])) {
-                return;
-              }
+        initWithObject:configurator
+              selector:@selector(syncBaseURL)
+                  type:[NSURL class]
+              callback:^(NSURL *oldValue, NSURL *newValue) {
+                if ((!newValue && !oldValue) ||
+                    ([newValue.absoluteString isEqualToString:oldValue.absoluteString])) {
+                  return;
+                }
 
-              if (newValue) {
-                LOGI(@"Establishing a new sync service connection with SyncBaseURL: %@", newValue);
-                [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
-                                                         selector:@selector(clearSyncState)
-                                                           object:nil];
-                [[syncd_queue.syncConnection remoteObjectProxy] spindown];
-                EstablishSyncServiceConnection(syncd_queue);
-              } else {
-                LOGI(@"SyncBaseURL removed, spinning down sync service");
-                [[syncd_queue.syncConnection remoteObjectProxy] spindown];
-                // Keep the syncState active for 10 min in case com.apple.ManagedClient is
-                // flapping.
-                [[SNTConfigurator configurator] performSelector:@selector(clearSyncState)
-                                                     withObject:nil
-                                                     afterDelay:600];
-              }
-            }],
+                if (newValue) {
+                  LOGI(@"Establishing a new sync service connection with SyncBaseURL: %@",
+                       newValue);
+                  [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
+                                                           selector:@selector(clearSyncState)
+                                                             object:nil];
+                  [[syncd_queue.syncConnection remoteObjectProxy] spindown];
+                  EstablishSyncServiceConnection(syncd_queue);
+                } else {
+                  LOGI(@"SyncBaseURL removed, spinning down sync service");
+                  [[syncd_queue.syncConnection remoteObjectProxy] spindown];
+                  // Keep the syncState active for 10 min in case com.apple.ManagedClient is
+                  // flapping.
+                  [[SNTConfigurator configurator] performSelector:@selector(clearSyncState)
+                                                       withObject:nil
+                                                       afterDelay:600];
+                }
+              }],
     [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(exportMetrics)
-                type:[NSNumber class]
-            callback:^(NSNumber *oldValue, NSNumber *newValue) {
-              BOOL oldBool = [oldValue boolValue];
-              BOOL newBool = [newValue boolValue];
-              if (oldBool == NO && newBool == YES) {
-                LOGI(@"metricsExport changed NO -> YES, starting to export metrics");
-                metrics->StartPoll();
-              } else if (oldBool == YES && newBool == NO) {
-                LOGI(@"metricsExport changed YES -> NO, stopping export of metrics");
-                metrics->StopPoll();
-              }
-            }],
+        initWithObject:configurator
+              selector:@selector(exportMetrics)
+                  type:[NSNumber class]
+              callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                BOOL oldBool = [oldValue boolValue];
+                BOOL newBool = [newValue boolValue];
+                if (oldBool == NO && newBool == YES) {
+                  LOGI(@"metricsExport changed NO -> YES, starting to export metrics");
+                  metrics->StartPoll();
+                } else if (oldBool == YES && newBool == NO) {
+                  LOGI(@"metricsExport changed YES -> NO, stopping export of metrics");
+                  metrics->StopPoll();
+                }
+              }],
     [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(metricExportInterval)
-                type:[NSNumber class]
-            callback:^(NSNumber *oldValue, NSNumber *newValue) {
-              uint64_t oldInterval = [oldValue unsignedIntValue];
-              uint64_t newInterval = [newValue unsignedIntValue];
-              LOGI(@"MetricExportInterval changed from %llu to %llu restarting export", oldInterval,
-                   newInterval);
-              metrics->SetInterval(newInterval);
-            }],
+        initWithObject:configurator
+              selector:@selector(metricExportInterval)
+                  type:[NSNumber class]
+              callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                uint64_t oldInterval = [oldValue unsignedIntValue];
+                uint64_t newInterval = [newValue unsignedIntValue];
+                LOGI(@"MetricExportInterval changed from %llu to %llu restarting export",
+                     oldInterval, newInterval);
+                metrics->SetInterval(newInterval);
+              }],
     [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(allowedPathRegex)
-                type:[NSRegularExpression class]
-            callback:^(NSRegularExpression *oldValue, NSRegularExpression *newValue) {
-              if ((!newValue && !oldValue) ||
-                  ([newValue.pattern isEqualToString:oldValue.pattern])) {
-                return;
-              }
+        initWithObject:configurator
+              selector:@selector(allowedPathRegex)
+                  type:[NSRegularExpression class]
+              callback:^(NSRegularExpression *oldValue, NSRegularExpression *newValue) {
+                if ((!newValue && !oldValue) ||
+                    ([newValue.pattern isEqualToString:oldValue.pattern])) {
+                  return;
+                }
 
-              LOGI(@"Changed allowlist regex, flushing cache");
-              auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
-                                            FlushCacheReason::kPathRegexChanged);
-            }],
+                LOGI(@"Changed allowlist regex, flushing cache");
+                auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                              FlushCacheReason::kPathRegexChanged);
+              }],
     [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(blockedPathRegex)
-                type:[NSRegularExpression class]
-            callback:^(NSRegularExpression *oldValue, NSRegularExpression *newValue) {
-              if ((!newValue && !oldValue) ||
-                  ([newValue.pattern isEqualToString:oldValue.pattern])) {
-                return;
-              }
+        initWithObject:configurator
+              selector:@selector(blockedPathRegex)
+                  type:[NSRegularExpression class]
+              callback:^(NSRegularExpression *oldValue, NSRegularExpression *newValue) {
+                if ((!newValue && !oldValue) ||
+                    ([newValue.pattern isEqualToString:oldValue.pattern])) {
+                  return;
+                }
 
-              LOGI(@"Changed denylist regex, flushing cache");
-              auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
-                                            FlushCacheReason::kPathRegexChanged);
-            }],
+                LOGI(@"Changed denylist regex, flushing cache");
+                auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                              FlushCacheReason::kPathRegexChanged);
+              }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(blockUSBMount)
                                      type:[NSNumber class]
@@ -326,112 +330,112 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    LOGI(@"StaticRules set has changed, flushing cache.");
                                    auth_result_cache->FlushCache(
-                                     FlushCacheMode::kAllCaches,
-                                     FlushCacheReason::kStaticRulesChanged);
+                                       FlushCacheMode::kAllCaches,
+                                       FlushCacheReason::kStaticRulesChanged);
                                  }],
     [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(eventLogType)
-                type:[NSNumber class]
-            callback:^(NSNumber *oldValue, NSNumber *newValue) {
-              NSInteger oldLogType = [oldValue integerValue];
-              NSInteger newLogType = [newValue integerValue];
+        initWithObject:configurator
+              selector:@selector(eventLogType)
+                  type:[NSNumber class]
+              callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                NSInteger oldLogType = [oldValue integerValue];
+                NSInteger newLogType = [newValue integerValue];
 
-              if (oldLogType == newLogType) {
-                return;
-              }
-
-              LOGW(@"EventLogType config changed (%ld --> %ld). Restarting...", oldLogType,
-                   newLogType);
-
-              dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-
-              dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-                logger->Flush();
-                metrics->Export();
-
-                dispatch_semaphore_signal(sema);
-              });
-
-              // Wait for a short amount of time for outstanding data to flush
-              dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
-
-              // Forcefully exit. The daemon will be restarted immediately.
-              exit(EXIT_SUCCESS);
-            }],
-    [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(entitlementsTeamIDFilter)
-                type:[NSArray class]
-            callback:^(NSArray<NSString *> *oldValue, NSArray<NSString *> *newValue) {
-              if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
-                return;
-              }
-
-              LOGI(@"EntitlementsTeamIDFilter changed. '%@' --> '%@'. Flushing caches.", oldValue,
-                   newValue);
-
-              // Get the value from the configurator since that method ensures proper structure
-              [exec_controller
-                updateEntitlementsTeamIDFilter:[configurator entitlementsTeamIDFilter]];
-
-              // Clear the AuthResultCache, then clear the ES cache to ensure
-              // future execs get SNTCachedDecision entitlement values filtered
-              // with the new settings.
-              auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
-                                            FlushCacheReason::kEntitlementsTeamIDFilterChanged);
-              [authorizer_client clearCache];
-            }],
-    [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(entitlementsPrefixFilter)
-                type:[NSArray class]
-            callback:^(NSArray<NSString *> *oldValue, NSArray<NSString *> *newValue) {
-              if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
-                return;
-              }
-
-              LOGI(@"EntitlementsPrefixFilter changed. '%@' --> '%@'. Flushing caches.", oldValue,
-                   newValue);
-
-              // Get the value from the configurator since that method ensures proper structure
-              [exec_controller
-                updateEntitlementsPrefixFilter:[configurator entitlementsPrefixFilter]];
-
-              // Clear the AuthResultCache, then clear the ES cache to ensure
-              // future execs get SNTCachedDecision entitlement values filtered
-              // with the new settings.
-              auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
-                                            FlushCacheReason::kEntitlementsPrefixFilterChanged);
-              [authorizer_client clearCache];
-            }],
-    [[SNTKVOManager alloc]
-      initWithObject:configurator
-            selector:@selector(telemetry)
-                type:[NSArray class]
-            callback:^(NSArray *oldValue, NSArray *newValue) {
-              if (!oldValue && !newValue) {
-                return;
-              }
-
-              // Ensure the new array is composed of strings
-              for (id element in newValue) {
-                if (![element isKindOfClass:[NSString class]]) {
-                  LOGW(@"Expected type in Telemetry config. Want String. Got: %@: value: %@",
-                       [element class], element);
+                if (oldLogType == newLogType) {
                   return;
                 }
-              }
 
-              if ([oldValue isEqualToArray:newValue]) {
-                return;
-              }
+                LOGW(@"EventLogType config changed (%ld --> %ld). Restarting...", oldLogType,
+                     newLogType);
 
-              LOGI(@"Telemetry changed: %@ -> %@", [oldValue componentsJoinedByString:@","],
-                   [newValue componentsJoinedByString:@","]);
-              logger->SetTelemetryMask(
-                santa::TelemetryConfigToBitmask(newValue, configurator.enableForkAndExitLogging));
-            }],
+                dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+                  logger->Flush();
+                  metrics->Export();
+
+                  dispatch_semaphore_signal(sema);
+                });
+
+                // Wait for a short amount of time for outstanding data to flush
+                dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
+
+                // Forcefully exit. The daemon will be restarted immediately.
+                exit(EXIT_SUCCESS);
+              }],
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
+              selector:@selector(entitlementsTeamIDFilter)
+                  type:[NSArray class]
+              callback:^(NSArray<NSString *> *oldValue, NSArray<NSString *> *newValue) {
+                if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
+                  return;
+                }
+
+                LOGI(@"EntitlementsTeamIDFilter changed. '%@' --> '%@'. Flushing caches.", oldValue,
+                     newValue);
+
+                // Get the value from the configurator since that method ensures proper structure
+                [exec_controller
+                    updateEntitlementsTeamIDFilter:[configurator entitlementsTeamIDFilter]];
+
+                // Clear the AuthResultCache, then clear the ES cache to ensure
+                // future execs get SNTCachedDecision entitlement values filtered
+                // with the new settings.
+                auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                              FlushCacheReason::kEntitlementsTeamIDFilterChanged);
+                [authorizer_client clearCache];
+              }],
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
+              selector:@selector(entitlementsPrefixFilter)
+                  type:[NSArray class]
+              callback:^(NSArray<NSString *> *oldValue, NSArray<NSString *> *newValue) {
+                if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
+                  return;
+                }
+
+                LOGI(@"EntitlementsPrefixFilter changed. '%@' --> '%@'. Flushing caches.", oldValue,
+                     newValue);
+
+                // Get the value from the configurator since that method ensures proper structure
+                [exec_controller
+                    updateEntitlementsPrefixFilter:[configurator entitlementsPrefixFilter]];
+
+                // Clear the AuthResultCache, then clear the ES cache to ensure
+                // future execs get SNTCachedDecision entitlement values filtered
+                // with the new settings.
+                auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                              FlushCacheReason::kEntitlementsPrefixFilterChanged);
+                [authorizer_client clearCache];
+              }],
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
+              selector:@selector(telemetry)
+                  type:[NSArray class]
+              callback:^(NSArray *oldValue, NSArray *newValue) {
+                if (!oldValue && !newValue) {
+                  return;
+                }
+
+                // Ensure the new array is composed of strings
+                for (id element in newValue) {
+                  if (![element isKindOfClass:[NSString class]]) {
+                    LOGW(@"Expected type in Telemetry config. Want String. Got: %@: value: %@",
+                         [element class], element);
+                    return;
+                  }
+                }
+
+                if ([oldValue isEqualToArray:newValue]) {
+                  return;
+                }
+
+                LOGI(@"Telemetry changed: %@ -> %@", [oldValue componentsJoinedByString:@","],
+                     [newValue componentsJoinedByString:@","]);
+                logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(
+                    newValue, configurator.enableForkAndExitLogging));
+              }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(enableForkAndExitLogging)
                                      type:[NSNumber class]
@@ -446,7 +450,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    LOGI(@"enableForkAndExitLogging changed %d -> %d", oldBool,
                                         newBool);
                                    logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(
-                                     configurator.telemetry, newBool));
+                                       configurator.telemetry, newBool));
                                  }],
   ]];
 
@@ -454,21 +458,22 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     // Only watch file access auth keys on mac 13 and newer
     [kvoObservers addObjectsFromArray:@[
       [[SNTKVOManager alloc]
-        initWithObject:configurator
-              selector:@selector(fileAccessPolicyPlist)
-                  type:[NSString class]
-              callback:^(NSString *oldValue, NSString *newValue) {
-                if ([configurator fileAccessPolicy]) {
-                  // Ignore any changes to this key if fileAccessPolicy is set
-                  return;
-                }
+          initWithObject:configurator
+                selector:@selector(fileAccessPolicyPlist)
+                    type:[NSString class]
+                callback:^(NSString *oldValue, NSString *newValue) {
+                  if ([configurator fileAccessPolicy]) {
+                    // Ignore any changes to this key if fileAccessPolicy is set
+                    return;
+                  }
 
-                if ((oldValue && !newValue) || (newValue && ![oldValue isEqualToString:newValue])) {
-                  LOGI(@"Filesystem monitoring policy config path changed: %@ -> %@", oldValue,
-                       newValue);
-                  watch_items->SetConfigPath(newValue);
-                }
-              }],
+                  if ((oldValue && !newValue) ||
+                      (newValue && ![oldValue isEqualToString:newValue])) {
+                    LOGI(@"Filesystem monitoring policy config path changed: %@ -> %@", oldValue,
+                         newValue);
+                    watch_items->SetConfigPath(newValue);
+                  }
+                }],
       [[SNTKVOManager alloc] initWithObject:configurator
                                    selector:@selector(fileAccessPolicy)
                                        type:[NSDictionary class]
@@ -476,7 +481,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      if ((oldValue && !newValue) ||
                                          (newValue && ![oldValue isEqualToDictionary:newValue])) {
                                        LOGI(
-                                         @"Filesystem monitoring policy embedded config changed");
+                                           @"Filesystem monitoring policy embedded config changed");
                                        watch_items->SetConfig(newValue);
                                      }
                                    }],

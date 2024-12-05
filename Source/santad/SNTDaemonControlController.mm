@@ -73,7 +73,7 @@ double watchdogRAMPeak = 0;
   if (self) {
     _logger = logger;
     _policyProcessor =
-      [[SNTPolicyProcessor alloc] initWithRuleTable:[SNTDatabaseController ruleTable]];
+        [[SNTPolicyProcessor alloc] initWithRuleTable:[SNTDatabaseController ruleTable]];
     _authResultCache = authResultCache;
     _watchItems = std::move(watchItems);
     _notQueue = notQueue;
@@ -104,13 +104,13 @@ double watchdogRAMPeak = 0;
 - (void)databaseRuleCounts:(void (^)(RuleCounts ruleTypeCounts))reply {
   SNTRuleTable *rdb = [SNTDatabaseController ruleTable];
   RuleCounts ruleCounts{
-    .binary = [rdb binaryRuleCount],
-    .certificate = [rdb certificateRuleCount],
-    .compiler = [rdb compilerRuleCount],
-    .transitive = [rdb transitiveRuleCount],
-    .teamID = [rdb teamIDRuleCount],
-    .signingID = [rdb signingIDRuleCount],
-    .cdhash = [rdb cdhashRuleCount],
+      .binary = [rdb binaryRuleCount],
+      .certificate = [rdb certificateRuleCount],
+      .compiler = [rdb compilerRuleCount],
+      .transitive = [rdb transitiveRuleCount],
+      .teamID = [rdb teamIDRuleCount],
+      .signingID = [rdb signingIDRuleCount],
+      .cdhash = [rdb cdhashRuleCount],
   };
 
   reply(ruleCounts);
@@ -125,7 +125,7 @@ double watchdogRAMPeak = 0;
   // In particular, the addition of allowlist compiler rules should cause a cache flush.
   // We also flush cache if a allowlist compiler rule is replaced with a allowlist rule.
   BOOL flushCache =
-    ((cleanupType != SNTRuleCleanupNone) || [ruleTable addedRulesShouldFlushDecisionCache:rules]);
+      ((cleanupType != SNTRuleCleanupNone) || [ruleTable addedRulesShouldFlushDecisionCache:rules]);
 
   NSError *error;
   [ruleTable addRules:rules ruleCleanup:cleanupType error:&error];
@@ -344,7 +344,7 @@ double watchdogRAMPeak = 0;
 
 - (void)postRuleSyncNotificationWithCustomMessage:(NSString *)message reply:(void (^)(void))reply {
   [[self.notQueue.notifierConnection remoteObjectProxy]
-    postRuleSyncNotificationWithCustomMessage:message];
+      postRuleSyncNotificationWithCustomMessage:message];
   reply();
 }
 

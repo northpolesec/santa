@@ -31,9 +31,9 @@
   XCTAssertNotNil(goldenFileData, @"unable to open / read golden file");
 
   NSDictionary *expectedJSONDict =
-    [NSJSONSerialization JSONObjectWithData:goldenFileData
-                                    options:NSJSONReadingAllowFragments
-                                      error:&err];
+      [NSJSONSerialization JSONObjectWithData:goldenFileData
+                                      options:NSJSONReadingAllowFragments
+                                        error:&err];
 
   XCTAssertNotNil(expectedJSONDict);
   XCTAssertEqualObjects(expectedJSONDict, jsonDict, @"generated JSON does not match golden file.");

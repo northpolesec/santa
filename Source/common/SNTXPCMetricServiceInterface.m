@@ -21,9 +21,9 @@
 
   [r setClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], [NSNumber class],
                                       [NSString class], [NSDate class], nil]
-      forSelector:@selector(exportForMonitoring:)
-    argumentIndex:0
-          ofReply:NO];
+        forSelector:@selector(exportForMonitoring:)
+      argumentIndex:0
+            ofReply:NO];
 
   return r;
 }

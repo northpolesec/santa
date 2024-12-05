@@ -56,8 +56,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   self = [super init];
   if (self) {
     _pendingNotifications = [[NSMutableArray alloc] init];
-    _hashBundleBinariesQueue =
-      dispatch_queue_create("com.northpolesec.santagui.hashbundlebinaries", DISPATCH_QUEUE_SERIAL);
+    _hashBundleBinariesQueue = dispatch_queue_create("com.northpolesec.santagui.hashbundlebinaries",
+                                                     DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }
@@ -163,7 +163,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   SNTBinaryMessageWindowController *wc = (SNTBinaryMessageWindowController *)pendingMsg;
   NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
   NSMutableArray<NSDictionary *> *signingChain =
-    [NSMutableArray arrayWithCapacity:wc.event.signingChain.count];
+      [NSMutableArray arrayWithCapacity:wc.event.signingChain.count];
   for (MOLCertificate *cert in wc.event.signingChain) {
     [signingChain addObject:@{
       kCertSHA256 : cert.SHA256 ?: @"",
@@ -209,7 +209,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
       if ([self.currentWindowController isKindOfClass:[SNTBinaryMessageWindowController class]]) {
         SNTBinaryMessageWindowController *controller =
-          (SNTBinaryMessageWindowController *)self.currentWindowController;
+            (SNTBinaryMessageWindowController *)self.currentWindowController;
         dispatch_async(self.hashBundleBinariesQueue, ^{
           [self hashBundleBinariesForEvent:controller.event withController:controller];
         });
@@ -245,40 +245,40 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   // Start hashing. Progress is reported to the root NSProgress
   // (currentWindowController.progress).
   [[bc remoteObjectProxy]
-    hashBundleBinariesForEvent:event
-                         reply:^(NSString *bh, NSArray<SNTStoredEvent *> *events, NSNumber *ms) {
-                           // Revert to displaying the blockable event if we fail to calculate the
-                           // bundle hash
-                           if (!bh)
-                             return [withController updateBlockNotification:event
-                                                             withBundleHash:nil];
+      hashBundleBinariesForEvent:event
+                           reply:^(NSString *bh, NSArray<SNTStoredEvent *> *events, NSNumber *ms) {
+                             // Revert to displaying the blockable event if we fail to calculate the
+                             // bundle hash
+                             if (!bh)
+                               return [withController updateBlockNotification:event
+                                                               withBundleHash:nil];
 
-                           event.fileBundleHash = bh;
-                           event.fileBundleBinaryCount = @(events.count);
-                           event.fileBundleHashMilliseconds = ms;
-                           event.fileBundleExecutableRelPath =
-                             [events.firstObject fileBundleExecutableRelPath];
-                           for (SNTStoredEvent *se in events) {
-                             se.fileBundleHash = bh;
-                             se.fileBundleBinaryCount = @(events.count);
-                             se.fileBundleHashMilliseconds = ms;
-                           }
+                             event.fileBundleHash = bh;
+                             event.fileBundleBinaryCount = @(events.count);
+                             event.fileBundleHashMilliseconds = ms;
+                             event.fileBundleExecutableRelPath =
+                                 [events.firstObject fileBundleExecutableRelPath];
+                             for (SNTStoredEvent *se in events) {
+                               se.fileBundleHash = bh;
+                               se.fileBundleBinaryCount = @(events.count);
+                               se.fileBundleHashMilliseconds = ms;
+                             }
 
-                           // Send the results to santad. It will decide if they need to be
-                           // synced.
-                           MOLXPCConnection *daemonConn =
-                             [SNTXPCControlInterface configuredConnection];
-                           [daemonConn resume];
-                           [[daemonConn remoteObjectProxy] syncBundleEvent:event
-                                                             relatedEvents:events];
-                           [daemonConn invalidate];
+                             // Send the results to santad. It will decide if they need to be
+                             // synced.
+                             MOLXPCConnection *daemonConn =
+                                 [SNTXPCControlInterface configuredConnection];
+                             [daemonConn resume];
+                             [[daemonConn remoteObjectProxy] syncBundleEvent:event
+                                                               relatedEvents:events];
+                             [daemonConn invalidate];
 
-                           // Update the UI with the bundle hash. Also make the openEventButton
-                           // available.
-                           [withController updateBlockNotification:event withBundleHash:bh];
+                             // Update the UI with the bundle hash. Also make the openEventButton
+                             // available.
+                             [withController updateBlockNotification:event withBundleHash:bh];
 
-                           [bc invalidate];
-                         }];
+                             [bc invalidate];
+                           }];
 
   [withController.progress resignCurrent];
 }
@@ -328,9 +328,9 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   }
 
   UNNotificationRequest *req =
-    [UNNotificationRequest requestWithIdentifier:@"clientModeNotification"
-                                         content:content
-                                         trigger:nil];
+      [UNNotificationRequest requestWithIdentifier:@"clientModeNotification"
+                                           content:content
+                                           trigger:nil];
 
   [un addNotificationRequest:req withCompletionHandler:nil];
 }
@@ -363,10 +363,10 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   }
 
   SNTBinaryMessageWindowController *pendingMsg =
-    [[SNTBinaryMessageWindowController alloc] initWithEvent:event
-                                                  customMsg:message
-                                                  customURL:url
-                                                      reply:replyBlock];
+      [[SNTBinaryMessageWindowController alloc] initWithEvent:event
+                                                    customMsg:message
+                                                    customURL:url
+                                                        reply:replyBlock];
 
   [self queueMessage:pendingMsg];
 }
@@ -377,7 +377,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     return;
   }
   SNTDeviceMessageWindowController *pendingMsg =
-    [[SNTDeviceMessageWindowController alloc] initWithEvent:event];
+      [[SNTDeviceMessageWindowController alloc] initWithEvent:event];
 
   [self queueMessage:pendingMsg];
 }
@@ -392,10 +392,10 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   }
 
   SNTFileAccessMessageWindowController *pendingMsg =
-    [[SNTFileAccessMessageWindowController alloc] initWithEvent:event
-                                                  customMessage:message
-                                                      customURL:url
-                                                     customText:text];
+      [[SNTFileAccessMessageWindowController alloc] initWithEvent:event
+                                                    customMessage:message
+                                                        customURL:url
+                                                       customText:text];
 
   [self queueMessage:pendingMsg];
 }
@@ -408,14 +408,14 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                  hashedCount:(uint64_t)hashedCount {
   if ([self.currentWindowController isKindOfClass:[SNTBinaryMessageWindowController class]]) {
     SNTBinaryMessageWindowController *controller =
-      (SNTBinaryMessageWindowController *)self.currentWindowController;
+        (SNTBinaryMessageWindowController *)self.currentWindowController;
 
     if ([controller.event.idx isEqual:event.idx]) {
       dispatch_async(dispatch_get_main_queue(), ^{
         NSString *fileLabel =
-          [NSString stringWithFormat:@"%llu binaries / %llu files", binaryCount, fileCount];
+            [NSString stringWithFormat:@"%llu binaries / %llu files", binaryCount, fileCount];
         NSString *hashedLabel =
-          [NSString stringWithFormat:@"%llu hashed / %llu binaries", hashedCount, binaryCount];
+            [NSString stringWithFormat:@"%llu hashed / %llu binaries", hashedCount, binaryCount];
         controller.bundleProgress.label = hashedCount ? hashedLabel : fileLabel;
       });
     }

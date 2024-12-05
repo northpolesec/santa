@@ -139,7 +139,7 @@
 
 - (NSString *)description {
   return
-    [NSString stringWithFormat:@"SNTStoredEvent[%@] with SHA-256: %@", self.idx, self.fileSHA256];
+      [NSString stringWithFormat:@"SNTStoredEvent[%@] with SHA-256: %@", self.idx, self.fileSHA256];
 }
 
 - (NSString *)publisherInfo {

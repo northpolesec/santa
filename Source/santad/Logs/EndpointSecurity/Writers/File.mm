@@ -29,8 +29,8 @@ std::shared_ptr<File> File::Create(NSString *path, uint64_t flush_timeout_ms,
   dispatch_source_set_timer(timer_source, dispatch_time(DISPATCH_TIME_NOW, 0),
                             NSEC_PER_MSEC * flush_timeout_ms, 0);
 
-  auto ret_writer =
-    std::make_shared<File>(path, batch_size_bytes, max_expected_write_size_bytes, q, timer_source);
+  auto ret_writer = std::make_shared<File>(path, batch_size_bytes, max_expected_write_size_bytes, q,
+                                           timer_source);
   ret_writer->WatchLogFile();
 
   std::weak_ptr<File> weak_writer(ret_writer);

@@ -41,19 +41,19 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t *data, std::size_t size
   [daemonConn resume];
 
   [[daemonConn remoteObjectProxy]
-    checkCacheForVnodeID:vnodeID
-               withReply:^(SNTAction action) {
-                 if (action == SNTActionRespondAllow) {
-                   std::cerr << "File exists in [whitelist] kernel cache" << std::endl;
-                   ;
-                 } else if (action == SNTActionRespondDeny) {
-                   std::cerr << "File exists in [blacklist] kernel cache" << std::endl;
-                   ;
-                 } else if (action == SNTActionUnset) {
-                   std::cerr << "File does not exist in cache" << std::endl;
-                   ;
-                 }
-               }];
+      checkCacheForVnodeID:vnodeID
+                 withReply:^(SNTAction action) {
+                   if (action == SNTActionRespondAllow) {
+                     std::cerr << "File exists in [whitelist] kernel cache" << std::endl;
+                     ;
+                   } else if (action == SNTActionRespondDeny) {
+                     std::cerr << "File exists in [blacklist] kernel cache" << std::endl;
+                     ;
+                   } else if (action == SNTActionUnset) {
+                     std::cerr << "File does not exist in cache" << std::endl;
+                     ;
+                   }
+                 }];
 
   return 0;
 }

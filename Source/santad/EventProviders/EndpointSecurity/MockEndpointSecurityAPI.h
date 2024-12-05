@@ -72,7 +72,7 @@ class MockEndpointSecurityAPI : public santa::EndpointSecurityAPI {
 
   void SetExpectationsESNewClient() {
     EXPECT_CALL(*this, NewClient)
-      .WillOnce(testing::Return(santa::Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
+        .WillOnce(testing::Return(santa::Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
     EXPECT_CALL(*this, MuteProcess).WillOnce(testing::Return(true));
     EXPECT_CALL(*this, ClearCache).WillRepeatedly(testing::Return(true));
     EXPECT_CALL(*this, Subscribe).WillRepeatedly(testing::Return(true));

@@ -95,12 +95,12 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
 }
 
 static NSString *const kPrinterProxyPreMonterey =
-  (@"/System/Library/Frameworks/Carbon.framework/Versions/Current/"
-   @"Frameworks/Print.framework/Versions/Current/Plugins/PrinterProxy.app/"
-   @"Contents/MacOS/PrinterProxy");
+    (@"/System/Library/Frameworks/Carbon.framework/Versions/Current/"
+     @"Frameworks/Print.framework/Versions/Current/Plugins/PrinterProxy.app/"
+     @"Contents/MacOS/PrinterProxy");
 static NSString *const kPrinterProxyPostMonterey =
-  (@"/System/Library/PrivateFrameworks/PrintingPrivate.framework/"
-   @"Versions/Current/Plugins/PrinterProxy.app/Contents/MacOS/PrinterProxy");
+    (@"/System/Library/PrivateFrameworks/PrintingPrivate.framework/"
+     @"Versions/Current/Plugins/PrinterProxy.app/Contents/MacOS/PrinterProxy");
 
 #pragma mark Initializers
 
@@ -121,7 +121,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _policyProcessor = [[SNTPolicyProcessor alloc] initWithRuleTable:_ruleTable];
 
     _eventQueue =
-      dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
 
     // This establishes the XPC connection between libsecurity and syspolicyd.
     // Not doing this causes a deadlock as establishing this link goes through xpcproxy.
@@ -185,8 +185,8 @@ static NSString *const kPrinterProxyPostMonterey =
     // Programming error. Bail.
     LOGE(@"Attempt to validate non-EXEC event. Event type: %d", esMsg->event_type);
     [NSException
-       raise:@"Invalid event type"
-      format:@"synchronousShouldProcessExecEvent: Unexpected event type: %d", esMsg->event_type];
+         raise:@"Invalid event type"
+        format:@"synchronousShouldProcessExecEvent: Unexpected event type: %d", esMsg->event_type];
   }
 
   const es_process_t *targetProc = esMsg->event.exec.target;
@@ -195,7 +195,7 @@ static NSString *const kPrinterProxyPostMonterey =
       targetProc->executable->path_truncated) {
     // Store a SNTCachedDecision so that this event gets properly logged
     SNTCachedDecision *cd =
-      [[SNTCachedDecision alloc] initWithEndpointSecurityFile:targetProc->executable];
+        [[SNTCachedDecision alloc] initWithEndpointSecurityFile:targetProc->executable];
     cd.decision = SNTEventStateBlockLongPath;
     cd.customMsg = [NSString stringWithFormat:@"Path exceeded max length for processing (%zu)",
                                               targetProc->executable->path.length];
@@ -221,8 +221,8 @@ static NSString *const kPrinterProxyPostMonterey =
     // Programming error. Bail.
     LOGE(@"Attempt to validate non-EXEC event. Event type: %d", esMsg->event_type);
     [NSException
-       raise:@"Invalid event type"
-      format:@"validateExecEvent:postAction: Unexpected event type: %d", esMsg->event_type];
+         raise:@"Invalid event type"
+        format:@"validateExecEvent:postAction: Unexpected event type: %d", esMsg->event_type];
   }
 
   // Get info about the file. If we can't get this info, respond appropriately and log an error.
@@ -258,48 +258,48 @@ static NSString *const kPrinterProxyPostMonterey =
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
   SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo
-    targetProcess:targetProc
-    preCodesignCheckCallback:^(void) {
-      esMsg.UpdateStatState(StatChangeStep::kCodesignValidation);
-    }
-    entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
-      if (!entitlements) {
-        return nil;
+      targetProcess:targetProc
+      preCodesignCheckCallback:^(void) {
+        esMsg.UpdateStatState(StatChangeStep::kCodesignValidation);
       }
+      entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
+        if (!entitlements) {
+          return nil;
+        }
 
-      absl::ReaderMutexLock lock(&self->_entitlementFilterMutex);
+        absl::ReaderMutexLock lock(&self->_entitlementFilterMutex);
 
-      if (teamID && self->_entitlementsTeamIDFilter.count(std::string(teamID)) > 0) {
-        // Dropping entitlement logging for configured TeamID
-        return nil;
-      }
+        if (teamID && self->_entitlementsTeamIDFilter.count(std::string(teamID)) > 0) {
+          // Dropping entitlement logging for configured TeamID
+          return nil;
+        }
 
-      if (self->_entitlementsPrefixFilter->NodeCount() == 0) {
-        // Copying full entitlements for TeamID
-        return [entitlements sntDeepCopy];
-      } else {
-        // Filtering entitlements for TeamID
-        NSMutableDictionary *filtered = [NSMutableDictionary dictionary];
+        if (self->_entitlementsPrefixFilter->NodeCount() == 0) {
+          // Copying full entitlements for TeamID
+          return [entitlements sntDeepCopy];
+        } else {
+          // Filtering entitlements for TeamID
+          NSMutableDictionary *filtered = [NSMutableDictionary dictionary];
 
-        [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
-          if (!self->_entitlementsPrefixFilter->HasPrefix(key.UTF8String)) {
-            if ([obj isKindOfClass:[NSArray class]] || [obj isKindOfClass:[NSDictionary class]]) {
-              [filtered setObject:[obj sntDeepCopy] forKey:key];
-            } else {
-              [filtered setObject:[obj copy] forKey:key];
+          [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
+            if (!self->_entitlementsPrefixFilter->HasPrefix(key.UTF8String)) {
+              if ([obj isKindOfClass:[NSArray class]] || [obj isKindOfClass:[NSDictionary class]]) {
+                [filtered setObject:[obj sntDeepCopy] forKey:key];
+              } else {
+                [filtered setObject:[obj copy] forKey:key];
+              }
             }
-          }
-        }];
+          }];
 
-        return filtered.count > 0 ? filtered : nil;
-      }
-    }];
+          return filtered.count > 0 ? filtered : nil;
+        }
+      }];
 
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
 
   // Formulate an initial action from the decision.
   SNTAction action =
-    (SNTEventStateAllow & cd.decision) ? SNTActionRespondAllow : SNTActionRespondDeny;
+      (SNTEventStateAllow & cd.decision) ? SNTActionRespondAllow : SNTActionRespondDeny;
 
   // Save decision details for logging the execution later.  For transitive rules, we also use
   // the shasum stored in the decision details to update the rule's timestamp whenever an

@@ -43,9 +43,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     }
 
     NSCharacterSet *nonHex =
-      [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet];
+        [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet];
     NSCharacterSet *nonUppercaseAlphaNumeric = [[NSCharacterSet
-      characterSetWithCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"] invertedSet];
+        characterSetWithCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"] invertedSet];
 
     switch (type) {
       case SNTRuleTypeBinary: OS_FALLTHROUGH;
@@ -64,7 +64,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       case SNTRuleTypeTeamID: {
         // TeamIDs are always [0-9A-Z], so enforce that the identifier is uppercase
         identifier =
-          [[identifier uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
+            [[identifier uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
         if (identifier.length != kExpectedTeamIDLength) {
           return nil;
         }
@@ -88,7 +88,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
         if (![teamID isEqualToString:@"platform"]) {
           teamID =
-            [[teamID uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
+              [[teamID uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
           if (teamID.length != kExpectedTeamIDLength) {
             return nil;
           }
@@ -96,8 +96,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
         // The rest of the components are the Signing ID since ":" a legal character.
         // Join all but the last element of the components to rebuild the SigningID.
-        NSString *signingID = [[sidComponents
-          subarrayWithRange:NSMakeRange(1, sidComponents.count - 1)] componentsJoinedByString:@":"];
+        NSString *signingID =
+            [[sidComponents subarrayWithRange:NSMakeRange(1, sidComponents.count - 1)]
+                componentsJoinedByString:@":"];
         if (signingID.length == 0) {
           return nil;
         }
@@ -313,8 +314,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
 - (NSString *)description {
   return [NSString
-    stringWithFormat:@"SNTRule: Identifier: %@, State: %ld, Type: %ld, Timestamp: %lu",
-                     self.identifier, self.state, self.type, (unsigned long)self.timestamp];
+      stringWithFormat:@"SNTRule: Identifier: %@, State: %ld, Type: %ld, Timestamp: %lu",
+                       self.identifier, self.state, self.type, (unsigned long)self.timestamp];
 }
 
 #pragma mark Last-access Timestamp

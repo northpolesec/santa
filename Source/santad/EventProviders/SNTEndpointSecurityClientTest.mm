@@ -48,7 +48,7 @@ using santa::WatchItemPathType;
 - (bool)muteSelf;
 - (NSString *)errorMessageForNewClientResult:(es_new_client_result_t)result;
 - (void)handleMessage:(Message &&)esMsg
-   recordEventMetrics:(void (^)(santa::EventDisposition disposition))recordEventMetrics;
+    recordEventMetrics:(void (^)(santa::EventDisposition disposition))recordEventMetrics;
 - (BOOL)shouldHandleMessage:(const Message &)esMsg;
 - (int64_t)computeBudgetForDeadline:(uint64_t)deadline currentTime:(uint64_t)currentTime;
 
@@ -68,13 +68,13 @@ using santa::WatchItemPathType;
   EXPECT_CALL(*mockESApi, MuteProcess).WillOnce(testing::Return(true));
 
   EXPECT_CALL(*mockESApi, NewClient)
-    .WillOnce(testing::Return(Client()))
-    .WillOnce(testing::Return(Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
+      .WillOnce(testing::Return(Client()))
+      .WillOnce(testing::Return(Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // First time throws because mock triggers failed connection
   // Second time succeeds
@@ -86,20 +86,20 @@ using santa::WatchItemPathType;
 
 - (void)testErrorMessageForNewClientResult {
   std::map<es_new_client_result_t, std::string> resultMessagePairs{
-    {ES_NEW_CLIENT_RESULT_SUCCESS, ""},
-    {ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED, "Full-disk access not granted"},
-    {ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED, "Not entitled"},
-    {ES_NEW_CLIENT_RESULT_ERR_NOT_PRIVILEGED, "Not running as root"},
-    {ES_NEW_CLIENT_RESULT_ERR_INVALID_ARGUMENT, "Invalid argument"},
-    {ES_NEW_CLIENT_RESULT_ERR_INTERNAL, "Internal error"},
-    {ES_NEW_CLIENT_RESULT_ERR_TOO_MANY_CLIENTS, "Too many simultaneous clients"},
-    {(es_new_client_result_t)123, "Unknown error"},
+      {ES_NEW_CLIENT_RESULT_SUCCESS, ""},
+      {ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED, "Full-disk access not granted"},
+      {ES_NEW_CLIENT_RESULT_ERR_NOT_ENTITLED, "Not entitled"},
+      {ES_NEW_CLIENT_RESULT_ERR_NOT_PRIVILEGED, "Not running as root"},
+      {ES_NEW_CLIENT_RESULT_ERR_INVALID_ARGUMENT, "Invalid argument"},
+      {ES_NEW_CLIENT_RESULT_ERR_INTERNAL, "Internal error"},
+      {ES_NEW_CLIENT_RESULT_ERR_TOO_MANY_CLIENTS, "Too many simultaneous clients"},
+      {(es_new_client_result_t)123, "Unknown error"},
   };
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:nullptr
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:nullptr
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   for (const auto &kv : resultMessagePairs) {
     NSString *message = [client errorMessageForNewClientResult:kv.first];
@@ -114,9 +114,9 @@ using santa::WatchItemPathType;
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   { XCTAssertThrows([client handleMessage:Message(mockESApi, &esMsg) recordEventMetrics:nil]); }
 
@@ -133,15 +133,15 @@ using santa::WatchItemPathType;
 
   // Have subscribe fail the first time, meaning clear cache only called once.
   EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, ES_AUTH_RESULT_ALLOW, true))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
 
   id mockConfigurator = OCMStrictClassMock([SNTConfigurator class]);
   OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   {
     Message msg(mockESApi, &esMsg);
@@ -186,13 +186,13 @@ using santa::WatchItemPathType;
 - (void)testMuteSelf {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   EXPECT_CALL(*mockESApi, MuteProcess)
-    .WillOnce(testing::Return(true))
-    .WillOnce(testing::Return(false));
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
 
   XCTAssertTrue([client muteSelf]);
   XCTAssertFalse([client muteSelf]);
@@ -203,14 +203,14 @@ using santa::WatchItemPathType;
 - (void)testClearCache {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // Test the underlying clear cache impl returning both true and false
   EXPECT_CALL(*mockESApi, ClearCache)
-    .WillOnce(testing::Return(true))
-    .WillOnce(testing::Return(false));
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
 
   XCTAssertTrue([client clearCache]);
   XCTAssertFalse([client clearCache]);
@@ -221,19 +221,19 @@ using santa::WatchItemPathType;
 - (void)testSubscribe {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   std::set<es_event_type_t> events = {
-    ES_EVENT_TYPE_NOTIFY_CLOSE,
-    ES_EVENT_TYPE_NOTIFY_EXIT,
+      ES_EVENT_TYPE_NOTIFY_CLOSE,
+      ES_EVENT_TYPE_NOTIFY_EXIT,
   };
 
   // Test the underlying subscribe impl returning both true and false
   EXPECT_CALL(*mockESApi, Subscribe(testing::_, events))
-    .WillOnce(testing::Return(true))
-    .WillOnce(testing::Return(false));
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
 
   XCTAssertTrue([client subscribe:events]);
   XCTAssertFalse([client subscribe:events]);
@@ -244,16 +244,16 @@ using santa::WatchItemPathType;
 - (void)testSubscribeAndClearCache {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // Have subscribe fail the first time, meaning clear cache only called once.
   EXPECT_CALL(*mockESApi, ClearCache)
-    .After(EXPECT_CALL(*mockESApi, Subscribe)
-             .WillOnce(testing::Return(false))
-             .WillOnce(testing::Return(true)))
-    .WillOnce(testing::Return(true));
+      .After(EXPECT_CALL(*mockESApi, Subscribe)
+                 .WillOnce(testing::Return(false))
+                 .WillOnce(testing::Return(true)))
+      .WillOnce(testing::Return(true));
 
   XCTAssertFalse([client subscribeAndClearCache:{}]);
   XCTAssertTrue([client subscribeAndClearCache:{}]);
@@ -264,14 +264,14 @@ using santa::WatchItemPathType;
 - (void)testUnsubscribeAll {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // Test the underlying unsubscribe all impl returning both true and false
   EXPECT_CALL(*mockESApi, UnsubscribeAll)
-    .WillOnce(testing::Return(true))
-    .WillOnce(testing::Return(false));
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
 
   XCTAssertTrue([client unsubscribeAll]);
   XCTAssertFalse([client unsubscribeAll]);
@@ -282,14 +282,14 @@ using santa::WatchItemPathType;
 - (void)testUnmuteAllTargetPaths {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // Test the underlying unmute impl returning both true and false
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths)
-    .WillOnce(testing::Return(true))
-    .WillOnce(testing::Return(false));
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
 
   XCTAssertTrue([client unmuteAllTargetPaths]);
   XCTAssertFalse([client unmuteAllTargetPaths]);
@@ -300,17 +300,17 @@ using santa::WatchItemPathType;
 - (void)testEnableTargetPathWatching {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // UnmuteAllTargetPaths is always attempted.
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).Times(2).WillRepeatedly(testing::Return(true));
 
   // Test the underlying invert nute impl returning both true and false
   EXPECT_CALL(*mockESApi, InvertTargetPathMuting)
-    .WillOnce(testing::Return(true))
-    .WillOnce(testing::Return(false));
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
 
   XCTAssertTrue([client enableTargetPathWatching]);
   XCTAssertFalse([client enableTargetPathWatching]);
@@ -321,26 +321,26 @@ using santa::WatchItemPathType;
 - (void)testMuteTargetPaths {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // Ensure all paths are attempted to be muted even if some fail.
   // Ensure if any paths fail the overall result is false.
   EXPECT_CALL(*mockESApi,
               MuteTargetPath(testing::_, std::string_view("a"), WatchItemPathType::kLiteral))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockESApi,
               MuteTargetPath(testing::_, std::string_view("b"), WatchItemPathType::kLiteral))
-    .WillOnce(testing::Return(false));
+      .WillOnce(testing::Return(false));
   EXPECT_CALL(*mockESApi,
               MuteTargetPath(testing::_, std::string_view("c"), WatchItemPathType::kPrefix))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
 
   std::vector<std::pair<std::string, WatchItemPathType>> paths = {
-    {"a", WatchItemPathType::kLiteral},
-    {"b", WatchItemPathType::kLiteral},
-    {"c", WatchItemPathType::kPrefix},
+      {"a", WatchItemPathType::kLiteral},
+      {"b", WatchItemPathType::kLiteral},
+      {"c", WatchItemPathType::kPrefix},
   };
 
   XCTAssertFalse([client muteTargetPaths:paths]);
@@ -351,26 +351,26 @@ using santa::WatchItemPathType;
 - (void)testUnmuteTargetPaths {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // Ensure all paths are attempted to be unmuted even if some fail.
   // Ensure if any paths fail the overall result is false.
   EXPECT_CALL(*mockESApi,
               UnmuteTargetPath(testing::_, std::string_view("a"), WatchItemPathType::kLiteral))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockESApi,
               UnmuteTargetPath(testing::_, std::string_view("b"), WatchItemPathType::kLiteral))
-    .WillOnce(testing::Return(false));
+      .WillOnce(testing::Return(false));
   EXPECT_CALL(*mockESApi,
               UnmuteTargetPath(testing::_, std::string_view("c"), WatchItemPathType::kPrefix))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
 
   std::vector<std::pair<std::string, WatchItemPathType>> paths = {
-    {"a", WatchItemPathType::kLiteral},
-    {"b", WatchItemPathType::kLiteral},
-    {"c", WatchItemPathType::kPrefix},
+      {"a", WatchItemPathType::kLiteral},
+      {"b", WatchItemPathType::kLiteral},
+      {"c", WatchItemPathType::kPrefix},
   };
 
   XCTAssertFalse([client unmuteTargetPaths:paths]);
@@ -390,12 +390,12 @@ using santa::WatchItemPathType;
 
   // Have subscribe fail the first time, meaning clear cache only called once.
   EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, result, cacheable))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   {
     Message msg(mockESApi, &esMsg);
@@ -413,15 +413,15 @@ using santa::WatchItemPathType;
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
   {
     auto enrichedMsg = std::make_unique<EnrichedMessage>(EnrichedClose(
-      Message(mockESApi, &esMsg),
-      EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
-                      EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
-      EnrichedFile(std::nullopt, std::nullopt, std::nullopt)));
+        Message(mockESApi, &esMsg),
+        EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+                        EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
+        EnrichedFile(std::nullopt, std::nullopt, std::nullopt)));
 
     [client processEnrichedMessage:std::move(enrichedMsg)
                            handler:^(std::unique_ptr<EnrichedMessage> msg) {
@@ -436,8 +436,8 @@ using santa::WatchItemPathType;
                            }];
 
     XCTAssertEqual(
-      0, dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
-      "Handler block not called within expected time window");
+        0, dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+        "Handler block not called within expected time window");
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -452,9 +452,9 @@ using santa::WatchItemPathType;
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   {
     XCTAssertThrows([client processMessage:Message(mockESApi, &esMsg)
@@ -483,9 +483,9 @@ using santa::WatchItemPathType;
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   {
     XCTAssertNoThrow([client processMessage:Message(mockESApi, &esMsg)
@@ -494,8 +494,8 @@ using santa::WatchItemPathType;
                                     }]);
 
     XCTAssertEqual(
-      0, dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-      "Handler block not called within expected time window");
+        0, dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
+        "Handler block not called within expected time window");
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -505,9 +505,9 @@ using santa::WatchItemPathType;
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // The test uses crafted values to make even numbers. Ensure the client has
   // expected values for these properties so the test can fail early if not.
@@ -516,21 +516,21 @@ using santa::WatchItemPathType;
   XCTAssertEqual(client.maxAllowedHeadroom, 5 * NSEC_PER_SEC);
 
   std::map<uint64_t, int64_t> deadlineMillisToBudgetMillis{
-    // Further out deadlines clamp processing budget to maxAllowedHeadroom
-    {45000, 40000},
+      // Further out deadlines clamp processing budget to maxAllowedHeadroom
+      {45000, 40000},
 
-    // Closer deadlines allow a set percentage processing budget
-    {15000, 12000},
+      // Closer deadlines allow a set percentage processing budget
+      {15000, 12000},
 
-    // Near deadlines clamp processing budget to minAllowedHeadroom
-    {3500, 2500}};
+      // Near deadlines clamp processing budget to minAllowedHeadroom
+      {3500, 2500}};
 
   uint64_t curTime = mach_absolute_time();
 
   for (const auto [deadlineMS, budgetMS] : deadlineMillisToBudgetMillis) {
-    int64_t got =
-      [client computeBudgetForDeadline:AddNanosecondsToMachTime(deadlineMS * NSEC_PER_MSEC, curTime)
-                           currentTime:curTime];
+    int64_t got = [client
+        computeBudgetForDeadline:AddNanosecondsToMachTime(deadlineMS * NSEC_PER_MSEC, curTime)
+                     currentTime:curTime];
 
     // Add 100us, then clip to ms to account for non-exact values due to timebase division
     got = (int64_t)((double)(got + (100 * NSEC_PER_USEC)) / (double)NSEC_PER_MSEC);
@@ -566,11 +566,11 @@ using santa::WatchItemPathType;
 
   es_auth_result_t wantAuthResult = shouldFailClosed ? ES_AUTH_RESULT_DENY : ES_AUTH_RESULT_ALLOW;
   EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, wantAuthResult, false))
-    .WillOnce(testing::InvokeWithoutArgs(^() {
-      // Signal deadlineSema to let the handler block continue execution
-      dispatch_semaphore_signal(deadlineSema);
-      return true;
-    }));
+      .WillOnce(testing::InvokeWithoutArgs(^() {
+        // Signal deadlineSema to let the handler block continue execution
+        dispatch_semaphore_signal(deadlineSema);
+        return true;
+      }));
 
   id mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
@@ -578,9 +578,9 @@ using santa::WatchItemPathType;
   OCMExpect([mockConfigurator failClosed]).andReturn(shouldFailClosed);
 
   SNTEndpointSecurityClient *client =
-    [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
-                                             metrics:nullptr
-                                           processor:Processor::kUnknown];
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
 
   // Set min/max headroom the same to clamp the value for this test
   client.minAllowedHeadroom = 500 * NSEC_PER_MSEC;
@@ -591,8 +591,8 @@ using santa::WatchItemPathType;
     XCTAssertNoThrow([client processMessage:Message(mockESApi, &esMsg)
                                     handler:^(const Message &msg) {
                                       result = dispatch_semaphore_wait(
-                                        deadlineSema,
-                                        dispatch_time(DISPATCH_TIME_NOW, 4 * NSEC_PER_SEC));
+                                          deadlineSema,
+                                          dispatch_time(DISPATCH_TIME_NOW, 4 * NSEC_PER_SEC));
 
                                       // Once done waiting on deadlineSema, trigger controlSema to
                                       // continue test
@@ -600,8 +600,9 @@ using santa::WatchItemPathType;
                                     }]);
 
     XCTAssertEqual(
-      0, dispatch_semaphore_wait(controlSema, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
-      "Control sema not signaled within expected time window");
+        0,
+        dispatch_semaphore_wait(controlSema, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+        "Control sema not signaled within expected time window");
 
     XCTAssertEqual(result, 0);
   }

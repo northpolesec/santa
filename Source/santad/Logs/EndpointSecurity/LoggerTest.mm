@@ -125,8 +125,8 @@ class MockWriter : public Null {
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Null>(logger.Writer()));
 
   logger =
-    LoggerPeer(Logger::Create(mockESApi, TelemetryEvent::kEverything, SNTEventLogTypeProtobuf, nil,
-                              @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
+      LoggerPeer(Logger::Create(mockESApi, TelemetryEvent::kEverything, SNTEventLogTypeProtobuf,
+                                nil, @"/tmp/temppy", @"/tmp/spool", 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.Serializer()));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Spool>(logger.Writer()));
 
@@ -148,10 +148,10 @@ class MockWriter : public Null {
 
   {
     auto enrichedMsg = std::make_unique<EnrichedMessage>(EnrichedClose(
-      Message(mockESApi, &msg),
-      EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
-                      EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
-      EnrichedFile(std::nullopt, std::nullopt, std::nullopt)));
+        Message(mockESApi, &msg),
+        EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+                        EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
+        EnrichedFile(std::nullopt, std::nullopt, std::nullopt)));
 
     EXPECT_CALL(*mockSerializer, SerializeMessage(testing::A<const EnrichedClose &>())).Times(1);
     EXPECT_CALL(*mockWriter, Write).Times(1);
@@ -176,7 +176,7 @@ class MockWriter : public Null {
   EXPECT_CALL(*mockWriter, Write);
 
   Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter)
-    .LogAllowlist(Message(mockESApi, &msg), hash);
+      .LogAllowlist(Message(mockESApi, &msg), hash);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
@@ -238,11 +238,11 @@ class MockWriter : public Null {
   EXPECT_CALL(*mockWriter, Write);
 
   Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter)
-    .LogFileAccess(
-      "v1", "name", Message(mockESApi, &msg),
-      EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
-                      EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
-      "tgt", FileAccessPolicyDecision::kDenied);
+      .LogFileAccess(
+          "v1", "name", Message(mockESApi, &msg),
+          EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+                          EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
+          "tgt", FileAccessPolicyDecision::kDenied);
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());

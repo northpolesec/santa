@@ -59,8 +59,8 @@
 }
 
 - (NSString *)description {
-  return [NSString
-    stringWithFormat:@"SNTFileAccessEvent: Accessed: %@, By: %@", self.accessedPath, self.filePath];
+  return [NSString stringWithFormat:@"SNTFileAccessEvent: Accessed: %@, By: %@", self.accessedPath,
+                                    self.filePath];
 }
 
 @end

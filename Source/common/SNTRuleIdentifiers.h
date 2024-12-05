@@ -44,7 +44,7 @@ struct RuleIdentifiers {
 - (instancetype)init NS_UNAVAILABLE;
 
 - (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)identifiers
-  NS_DESIGNATED_INITIALIZER;
+    NS_DESIGNATED_INITIALIZER;
 
 - (struct RuleIdentifiers)toStruct;
 

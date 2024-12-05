@@ -58,9 +58,9 @@ static void SantaWatchdog(void *context) {
   if (tinfo.has_value()) {
     // CPU
     double total_time =
-      (tinfo->total_user_nanos + tinfo->total_system_nanos) / (double)NSEC_PER_SEC;
+        (tinfo->total_user_nanos + tinfo->total_system_nanos) / (double)NSEC_PER_SEC;
     double percentage =
-      (((total_time - state->prev_total_time) / (double)kWatchdogTimeInterval) * 100.0);
+        (((total_time - state->prev_total_time) / (double)kWatchdogTimeInterval) * 100.0);
     state->prev_total_time = total_time;
 
     if (percentage > cpu_warn_threshold) {
@@ -116,9 +116,9 @@ int main(int argc, char *argv[]) {
     InstallServices();
 
     dispatch_queue_t watchdog_queue = dispatch_queue_create(
-      "com.northpolesec.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
+        "com.northpolesec.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
     dispatch_source_t watchdog_timer =
-      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, watchdog_queue);
+        dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, watchdog_queue);
 
     WatchdogState state = {.prev_total_time = 0.0, .prev_ram_use_mb = 0.0};
 
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::unique_ptr<SantadDeps> deps =
-      SantadDeps::Create([SNTConfigurator configurator], [SNTMetricSet sharedInstance]);
+        SantadDeps::Create([SNTConfigurator configurator], [SNTMetricSet sharedInstance]);
 
     // This doesn't return
     SantadMain(deps->ESAPI(), deps->Logger(), deps->Metrics(), deps->WatchItems(), deps->Enricher(),

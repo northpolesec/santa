@@ -663,7 +663,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (BOOL)failClosed {
   NSNumber *n = self.configState[kFailClosedKey];
   BOOL runningInLockdownClientMode =
-    self.clientMode == SNTClientModeLockdown || self.clientMode == SNTClientModeStandalone;
+      self.clientMode == SNTClientModeLockdown || self.clientMode == SNTClientModeStandalone;
   return [n boolValue] && runningInLockdownClientMode;
 }
 
@@ -989,20 +989,20 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSUInteger)spoolDirectoryFileSizeThresholdKB {
   return self.configState[kSpoolDirectoryFileSizeThresholdKB]
-           ? [self.configState[kSpoolDirectoryFileSizeThresholdKB] unsignedIntegerValue]
-           : 250;
+             ? [self.configState[kSpoolDirectoryFileSizeThresholdKB] unsignedIntegerValue]
+             : 250;
 }
 
 - (NSUInteger)spoolDirectorySizeThresholdMB {
   return self.configState[kSpoolDirectorySizeThresholdMB]
-           ? [self.configState[kSpoolDirectorySizeThresholdMB] unsignedIntegerValue]
-           : 100;
+             ? [self.configState[kSpoolDirectorySizeThresholdMB] unsignedIntegerValue]
+             : 100;
 }
 
 - (float)spoolDirectoryEventMaxFlushTimeSec {
   return self.configState[kSpoolDirectoryEventMaxFlushTimeSec]
-           ? [self.configState[kSpoolDirectoryEventMaxFlushTimeSec] floatValue]
-           : 15.0;
+             ? [self.configState[kSpoolDirectoryEventMaxFlushTimeSec] floatValue]
+             : 15.0;
 }
 
 - (NSDictionary *)fileAccessPolicy {
@@ -1024,8 +1024,8 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (uint32_t)fileAccessPolicyUpdateIntervalSec {
   return self.configState[kFileAccessPolicyUpdateIntervalSec]
-           ? [self.configState[kFileAccessPolicyUpdateIntervalSec] unsignedIntValue]
-           : 60 * 10;
+             ? [self.configState[kFileAccessPolicyUpdateIntervalSec] unsignedIntValue]
+             : 60 * 10;
 }
 
 - (BOOL)enableMachineIDDecoration {
@@ -1236,7 +1236,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 
   NSMutableDictionary *syncState =
-    [NSMutableDictionary dictionaryWithContentsOfFile:self.syncStateFilePath];
+      [NSMutableDictionary dictionaryWithContentsOfFile:self.syncStateFilePath];
   for (NSString *key in syncState.allKeys) {
     if (self.syncServerKeyTypes[key] == [NSRegularExpression class]) {
       NSString *pattern = [syncState[key] isKindOfClass:[NSString class]] ? syncState[key] : nil;
@@ -1267,8 +1267,8 @@ static SNTConfigurator *sharedConfigurator = nil;
   // Otherwise, migrate the old value to be compatible with the new logic.
   if (!self.syncState[kSyncTypeRequired]) {
     syncState[kSyncTypeRequired] = [self.syncState[kSyncCleanRequiredDeprecated] boolValue]
-                                     ? @(SNTSyncTypeClean)
-                                     : @(SNTSyncTypeNormal);
+                                       ? @(SNTSyncTypeClean)
+                                       : @(SNTSyncTypeNormal);
   }
 
   // Delete the deprecated key
@@ -1400,9 +1400,9 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 
   dispatch_source_t source =
-    dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE, descriptor,
-                           DISPATCH_VNODE_WRITE | DISPATCH_VNODE_RENAME | DISPATCH_VNODE_DELETE,
-                           dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE, descriptor,
+                             DISPATCH_VNODE_WRITE | DISPATCH_VNODE_RENAME | DISPATCH_VNODE_DELETE,
+                             dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
   dispatch_source_set_event_handler(source, ^{
     dispatch_async(dispatch_get_main_queue(), ^{
       [self defaultsChanged:nil];
@@ -1442,7 +1442,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (![staticRules isKindOfClass:[NSArray class]]) return;
 
   NSMutableDictionary<NSString *, SNTRule *> *rules =
-    [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
+      [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
   for (id rule in staticRules) {
     if (![rule isKindOfClass:[NSDictionary class]]) return;
     SNTRule *r = [[SNTRule alloc] initWithDictionary:rule];

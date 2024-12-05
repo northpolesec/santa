@@ -94,13 +94,13 @@ REGISTER_COMMAND_NAME(@"status")
 
   // Database counts
   __block struct RuleCounts ruleCounts = {
-    .binary = -1,
-    .certificate = -1,
-    .compiler = -1,
-    .transitive = -1,
-    .teamID = -1,
-    .signingID = -1,
-    .cdhash = -1,
+      .binary = -1,
+      .certificate = -1,
+      .compiler = -1,
+      .transitive = -1,
+      .teamID = -1,
+      .signingID = -1,
+      .cdhash = -1,
   };
   [rop databaseRuleCounts:^(struct RuleCounts counts) {
     ruleCounts = counts;
@@ -183,11 +183,12 @@ REGISTER_COMMAND_NAME(@"status")
   dateFormatter.dateFormat = @"yyyy/MM/dd HH:mm:ss Z";
   NSString *fullSyncLastSuccessStr = [dateFormatter stringFromDate:fullSyncLastSuccess] ?: @"Never";
   NSString *ruleSyncLastSuccessStr =
-    [dateFormatter stringFromDate:ruleSyncLastSuccess] ?: fullSyncLastSuccessStr;
+      [dateFormatter stringFromDate:ruleSyncLastSuccess] ?: fullSyncLastSuccessStr;
 
   NSString *watchItemsLastUpdateStr =
-    [dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSince1970:watchItemsLastUpdateEpoch]]
-      ?: @"Never";
+      [dateFormatter
+          stringFromDate:[NSDate dateWithTimeIntervalSince1970:watchItemsLastUpdateEpoch]]
+          ?: @"Never";
 
   NSString *syncURLStr = configurator.syncBaseURL.absoluteString;
 

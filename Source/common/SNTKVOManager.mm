@@ -60,11 +60,11 @@
                         change:(NSDictionary<NSString *, id> *)change
                        context:(void *)context {
   id oldValue = [change[NSKeyValueChangeOldKey] isKindOfClass:self.expectedType]
-                  ? change[NSKeyValueChangeOldKey]
-                  : nil;
+                    ? change[NSKeyValueChangeOldKey]
+                    : nil;
   id newValue = [change[NSKeyValueChangeNewKey] isKindOfClass:self.expectedType]
-                  ? change[NSKeyValueChangeNewKey]
-                  : nil;
+                    ? change[NSKeyValueChangeNewKey]
+                    : nil;
 
   self.callback(oldValue, newValue);
 }

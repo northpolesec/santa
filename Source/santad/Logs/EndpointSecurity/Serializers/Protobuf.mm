@@ -786,14 +786,14 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
   ::pbv1::LoginWindowSessionLogin *pb_lw_login =
-    santa_msg->mutable_login_window_session()->mutable_login();
+      santa_msg->mutable_login_window_session()->mutable_login();
 
   EncodeProcessInfoLight(pb_lw_login->mutable_instigator(), msg);
   EncodeUserInfo([pb_lw_login] { return pb_lw_login->mutable_user(); }, msg.UID(),
                  msg->event.lw_session_login->username);
 
   pb_lw_login->mutable_graphical_session()->set_id(
-    msg->event.lw_session_login->graphical_session_id);
+      msg->event.lw_session_login->graphical_session_id);
 
   return FinalizeProto(santa_msg);
 }
@@ -802,14 +802,14 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
   ::pbv1::LoginWindowSessionLogout *pb_lw_logout =
-    santa_msg->mutable_login_window_session()->mutable_logout();
+      santa_msg->mutable_login_window_session()->mutable_logout();
 
   EncodeProcessInfoLight(pb_lw_logout->mutable_instigator(), msg);
   EncodeUserInfo([pb_lw_logout] { return pb_lw_logout->mutable_user(); }, msg.UID(),
                  msg->event.lw_session_logout->username);
 
   pb_lw_logout->mutable_graphical_session()->set_id(
-    msg->event.lw_session_logout->graphical_session_id);
+      msg->event.lw_session_logout->graphical_session_id);
 
   return FinalizeProto(santa_msg);
 }
@@ -818,7 +818,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
   ::pbv1::LoginWindowSessionLock *pb_lw_lock =
-    santa_msg->mutable_login_window_session()->mutable_lock();
+      santa_msg->mutable_login_window_session()->mutable_lock();
 
   EncodeProcessInfoLight(pb_lw_lock->mutable_instigator(), msg);
   EncodeUserInfo([pb_lw_lock] { return pb_lw_lock->mutable_user(); }, msg.UID(),
@@ -833,14 +833,14 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
   ::pbv1::LoginWindowSessionUnlock *pb_lw_unlock =
-    santa_msg->mutable_login_window_session()->mutable_unlock();
+      santa_msg->mutable_login_window_session()->mutable_unlock();
 
   EncodeProcessInfoLight(pb_lw_unlock->mutable_instigator(), msg);
   EncodeUserInfo([pb_lw_unlock] { return pb_lw_unlock->mutable_user(); }, msg.UID(),
                  msg->event.lw_session_unlock->username);
 
   pb_lw_unlock->mutable_graphical_session()->set_id(
-    msg->event.lw_session_unlock->graphical_session_id);
+      msg->event.lw_session_unlock->graphical_session_id);
 
   return FinalizeProto(santa_msg);
 }
@@ -868,7 +868,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingAttac
 
   pb_attach->set_existing_session(msg->event.screensharing_attach->existing_session);
   pb_attach->mutable_graphical_session()->set_id(
-    msg->event.screensharing_attach->graphical_session_id);
+      msg->event.screensharing_attach->graphical_session_id);
 
   return FinalizeProto(santa_msg);
 }
@@ -886,7 +886,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingDetac
                StringTokenToStringView(msg->event.screensharing_detach->viewer_appleid));
 
   pb_detach->mutable_graphical_session()->set_id(
-    msg->event.screensharing_detach->graphical_session_id);
+      msg->event.screensharing_detach->graphical_session_id);
 
   return FinalizeProto(santa_msg);
 }
@@ -905,8 +905,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogin &msg)
                       msg->event.openssh_login->source_address_type);
   EncodeUserInfo([pb_ssh_login] { return pb_ssh_login->mutable_user(); },
                  msg->event.openssh_login->has_uid
-                   ? std::make_optional<uid_t>(msg->event.openssh_login->uid.uid)
-                   : std::nullopt,
+                     ? std::make_optional<uid_t>(msg->event.openssh_login->uid.uid)
+                     : std::nullopt,
                  msg->event.openssh_login->username);
 
   return FinalizeProto(santa_msg);
@@ -940,8 +940,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogin &msg) {
                StringTokenToStringView(msg->event.login_login->failure_message));
   EncodeUserInfo([pb_login] { return pb_login->mutable_user(); },
                  msg->event.login_login->has_uid
-                   ? std::make_optional<uid_t>(msg->event.login_login->uid.uid)
-                   : std::nullopt,
+                     ? std::make_optional<uid_t>(msg->event.login_login->uid.uid)
+                     : std::nullopt,
                  msg->event.login_login->username);
 
   return FinalizeProto(santa_msg);
@@ -960,9 +960,9 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogout &msg) 
 }
 
 void EncodeAuthInstigatorOrFallback(
-  const EnrichedAuthenticationWithInstigator &auth_event,
-  std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
-  std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
+    const EnrichedAuthenticationWithInstigator &auth_event,
+    std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
+    std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
   if (auth_event.AuthInstigator() && auth_event.EnrichedAuthInstigator().has_value()) {
     EncodeProcessInfoLight(lazy_auth_instigator_f(), auth_event.AuthInstigator(),
                            auth_event.EnrichedAuthInstigator().value());
@@ -986,8 +986,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD &
 
   EncodeProcessInfoLight(pb_od->mutable_instigator(), msg);
   EncodeAuthInstigatorOrFallback(
-    msg, [pb_od] { return pb_od->mutable_trigger_process(); },
-    [pb_od] { return pb_od->mutable_trigger_id(); });
+      msg, [pb_od] { return pb_od->mutable_trigger_process(); },
+      [pb_od] { return pb_od->mutable_trigger_id(); });
 
   EncodeStringToken([pb_od] { return pb_od->mutable_record_type(); }, es_od_event->record_type);
   EncodeStringToken([pb_od] { return pb_od->mutable_record_name(); }, es_od_event->record_name);
@@ -1017,8 +1017,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouc
 
   EncodeProcessInfoLight(pb_touchid->mutable_instigator(), msg);
   EncodeAuthInstigatorOrFallback(
-    msg, [pb_touchid] { return pb_touchid->mutable_trigger_process(); },
-    [pb_touchid] { return pb_touchid->mutable_trigger_id(); });
+      msg, [pb_touchid] { return pb_touchid->mutable_trigger_process(); },
+      [pb_touchid] { return pb_touchid->mutable_trigger_id(); });
 
   pb_touchid->set_mode(GetAuthenticationTouchIDMode(es_touchid_event->touchid_mode));
   if (es_touchid_event->has_uid) {
@@ -1040,8 +1040,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToke
 
   EncodeProcessInfoLight(pb_token->mutable_instigator(), msg);
   EncodeAuthInstigatorOrFallback(
-    msg, [pb_token] { return pb_token->mutable_trigger_process(); },
-    [pb_token] { return pb_token->mutable_trigger_id(); });
+      msg, [pb_token] { return pb_token->mutable_trigger_process(); },
+      [pb_token] { return pb_token->mutable_trigger_id(); });
 
   EncodeStringToken([pb_token] { return pb_token->mutable_pubkey_hash(); },
                     es_token_event->pubkey_hash);
@@ -1070,7 +1070,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAuto
 
   ::pbv1::AuthenticationAutoUnlock *pb_auto_unlock = pb_auth->mutable_authentication_auto_unlock();
   es_event_authentication_auto_unlock_t *es_auto_unlock_event =
-    msg->event.authentication->data.auto_unlock;
+      msg->event.authentication->data.auto_unlock;
 
   EncodeProcessInfoLight(pb_auto_unlock->mutable_instigator(), msg);
 
@@ -1154,8 +1154,8 @@ static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDict
     serial = santa::SerialForDevice(props[@"DADevicePath"]);
   }
 
-  NSString *model = [NSString
-    stringWithFormat:@"%@ %@", NonNull(props[@"DADeviceVendor"]), NonNull(props[@"DADeviceModel"])];
+  NSString *model = [NSString stringWithFormat:@"%@ %@", NonNull(props[@"DADeviceVendor"]),
+                                               NonNull(props[@"DADeviceModel"])];
   model = [model stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 
   EncodeString([pb_disk] { return pb_disk->mutable_mount(); }, [props[@"DAVolumePath"] path]);
@@ -1174,13 +1174,13 @@ static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDict
     // reference date of `Jan 1 2001 00:00:00 GMT` (not the typical `00:00:00 UTC on 1 January
     // 1970`).
     NSDate *appearance =
-      [NSDate dateWithTimeIntervalSinceReferenceDate:[props[@"DAAppearanceTime"] doubleValue]];
+        [NSDate dateWithTimeIntervalSinceReferenceDate:[props[@"DAAppearanceTime"] doubleValue]];
     NSTimeInterval interval = [appearance timeIntervalSince1970];
     double seconds;
     double fractional = modf(interval, &seconds);
     struct timespec ts = {
-      .tv_sec = (long)seconds,
-      .tv_nsec = (long)(fractional * NSEC_PER_SEC),
+        .tv_sec = (long)seconds,
+        .tv_nsec = (long)(fractional * NSEC_PER_SEC),
     };
     EncodeTimestamp(pb_disk->mutable_appearance(), ts);
     Timestamp timestamp = pb_disk->appearance();

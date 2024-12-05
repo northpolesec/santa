@@ -82,14 +82,14 @@ using santa::WatchItemPathType;
     _maxAllowedHeadroom = 5 * NSEC_PER_SEC;
 
     _authQueue = dispatch_queue_create(
-      "com.northpolesec.santa.daemon.auth_queue",
-      dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL,
-                                              QOS_CLASS_USER_INTERACTIVE, 0));
+        "com.northpolesec.santa.daemon.auth_queue",
+        dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL,
+                                                QOS_CLASS_USER_INTERACTIVE, 0));
 
     _notifyQueue = dispatch_queue_create(
-      "com.northpolesec.santa.daemon.notify_queue",
-      dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL,
-                                              QOS_CLASS_UTILITY, 0));
+        "com.northpolesec.santa.daemon.notify_queue",
+        dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_CONCURRENT_WITH_AUTORELEASE_POOL,
+                                                QOS_CLASS_UTILITY, 0));
   }
   return self;
 }
@@ -108,7 +108,7 @@ using santa::WatchItemPathType;
 }
 
 - (void)handleMessage:(Message &&)esMsg
-   recordEventMetrics:(void (^)(EventDisposition disposition))recordEventMetrics {
+    recordEventMetrics:(void (^)(EventDisposition disposition))recordEventMetrics {
   // This method should only be used by classes derived
   // from SNTEndpointSecurityClient.
   [self doesNotRecognizeSelector:_cmd];
@@ -152,11 +152,11 @@ using santa::WatchItemPathType;
 
     if ([self shouldHandleMessage:esMsg]) {
       [self handleMessage:std::move(esMsg)
-        recordEventMetrics:^(EventDisposition disposition) {
-          int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
-          self->_metrics->SetEventMetrics(self->_processor, disposition,
-                                          processingEnd - processingStart, esMsg);
-        }];
+          recordEventMetrics:^(EventDisposition disposition) {
+            int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+            self->_metrics->SetEventMetrics(self->_processor, disposition,
+                                            processingEnd - processingStart, esMsg);
+          }];
     } else {
       int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
       self->_metrics->SetEventMetrics(self->_processor, EventDisposition::kDropped,
@@ -230,7 +230,7 @@ using santa::WatchItemPathType;
   bool result = true;
   for (const auto &pathAndTypePair : paths) {
     result =
-      _esApi->MuteTargetPath(_esClient, pathAndTypePair.first, pathAndTypePair.second) && result;
+        _esApi->MuteTargetPath(_esClient, pathAndTypePair.first, pathAndTypePair.second) && result;
   }
   return result;
 }
@@ -238,8 +238,8 @@ using santa::WatchItemPathType;
 - (bool)unmuteTargetPaths:(const std::vector<std::pair<std::string, WatchItemPathType>> &)paths {
   bool result = true;
   for (const auto &pathAndTypePair : paths) {
-    result =
-      _esApi->UnmuteTargetPath(_esClient, pathAndTypePair.first, pathAndTypePair.second) && result;
+    result = _esApi->UnmuteTargetPath(_esClient, pathAndTypePair.first, pathAndTypePair.second) &&
+             result;
   }
   return result;
 }
@@ -249,11 +249,11 @@ using santa::WatchItemPathType;
                cacheable:(bool)cacheable {
   if (msg->event_type == ES_EVENT_TYPE_AUTH_OPEN) {
     return _esApi->RespondFlagsResult(
-      // For now, Santa is only concerned about alllowing all access or no
-      // access, hence the flags being translated here to all or nothing based
-      // on the auth result. In the future it might be beneficial to expand the
-      // scope of Santa to enforce things like read-only access.
-      _esClient, msg, (result == ES_AUTH_RESULT_ALLOW) ? 0xffffffff : 0x0, cacheable);
+        // For now, Santa is only concerned about alllowing all access or no
+        // access, hence the flags being translated here to all or nothing based
+        // on the auth result. In the future it might be beneficial to expand the
+        // scope of Santa to enforce things like read-only access.
+        _esClient, msg, (result == ES_AUTH_RESULT_ALLOW) ? 0xffffffff : 0x0, cacheable);
   } else {
     return _esApi->RespondAuthResult(_esClient, msg, result, cacheable);
   }

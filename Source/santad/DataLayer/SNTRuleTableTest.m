@@ -161,9 +161,9 @@
 
   NSError *error;
   [self.sut
-       addRules:@[ [self _exampleBinaryRule], [self _exampleCertRule], [self _exampleBinaryRule] ]
-    ruleCleanup:SNTRuleCleanupNone
-          error:&error];
+         addRules:@[ [self _exampleBinaryRule], [self _exampleCertRule], [self _exampleBinaryRule] ]
+      ruleCleanup:SNTRuleCleanupNone
+            error:&error];
 
   XCTAssertEqual(self.sut.ruleCount, ruleCount + 2);
   XCTAssertNil(error);
@@ -197,20 +197,20 @@
                error:nil];
 
   SNTRule *r = [self.sut
-    ruleForIdentifiers:(struct RuleIdentifiers){
-                         .binarySHA256 =
-                           @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
-                       }];
+      ruleForIdentifiers:
+          (struct RuleIdentifiers){
+              .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+          }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier,
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
   XCTAssertEqual(r.type, SNTRuleTypeBinary);
 
   r = [self.sut
-    ruleForIdentifiers:(struct RuleIdentifiers){
-                         .binarySHA256 =
-                           @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
-                       }];
+      ruleForIdentifiers:
+          (struct RuleIdentifiers){
+              .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
+          }];
   XCTAssertNil(r);
 }
 
@@ -219,21 +219,22 @@
          ruleCleanup:SNTRuleCleanupNone
                error:nil];
 
-  SNTRule *r = [self.sut
-    ruleForIdentifiers:(struct RuleIdentifiers){
-                         .certificateSHA256 =
-                           @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
-                       }];
+  SNTRule *r =
+      [self.sut ruleForIdentifiers:
+                    (struct RuleIdentifiers){
+                        .certificateSHA256 =
+                            @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
+                    }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier,
                         @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258");
   XCTAssertEqual(r.type, SNTRuleTypeCertificate);
 
-  r = [self.sut
-    ruleForIdentifiers:(struct RuleIdentifiers){
-                         .certificateSHA256 =
-                           @"5bdab1288fc16892fef50c658db54f1e2e19cf8f71cc55f77de2b95e051e2562",
-                       }];
+  r = [self.sut ruleForIdentifiers:
+                    (struct RuleIdentifiers){
+                        .certificateSHA256 =
+                            @"5bdab1288fc16892fef50c658db54f1e2e19cf8f71cc55f77de2b95e051e2562",
+                    }];
   XCTAssertNil(r);
 }
 
@@ -243,7 +244,7 @@
                error:nil];
 
   SNTRule *r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                              .teamID = @"ABCDEFGHIJ",
+                                                .teamID = @"ABCDEFGHIJ",
                                             }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ");
@@ -251,7 +252,7 @@
   XCTAssertEqual([self.sut teamIDRuleCount], 1);
 
   r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                     .teamID = @"nonexistentTeamID",
+                                       .teamID = @"nonexistentTeamID",
                                    }];
   XCTAssertNil(r);
 }
@@ -267,7 +268,7 @@
   XCTAssertEqual([self.sut signingIDRuleCount], 2);
 
   SNTRule *r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                              .signingID = @"ABCDEFGHIJ:signingID",
+                                                .signingID = @"ABCDEFGHIJ:signingID",
                                             }];
 
   XCTAssertNotNil(r);
@@ -275,36 +276,38 @@
   XCTAssertEqual(r.type, SNTRuleTypeSigningID);
 
   r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                     .signingID = @"platform:signingID",
+                                       .signingID = @"platform:signingID",
                                    }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"platform:signingID");
   XCTAssertEqual(r.type, SNTRuleTypeSigningID);
 
   r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                     .signingID = @"nonexistent",
+                                       .signingID = @"nonexistent",
                                    }];
   XCTAssertNil(r);
 }
 
 - (void)testFetchCDHashRule {
-  [self.sut
-       addRules:@[ [self _exampleBinaryRule], [self _exampleTeamIDRule], [self _exampleCDHashRule] ]
-    ruleCleanup:SNTRuleCleanupNone
-          error:nil];
+  [self.sut addRules:@[
+    [self _exampleBinaryRule], [self _exampleTeamIDRule], [self _exampleCDHashRule]
+  ]
+         ruleCleanup:SNTRuleCleanupNone
+               error:nil];
 
   XCTAssertEqual([self.sut cdhashRuleCount], 1);
 
-  SNTRule *r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                              .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
-                                            }];
+  SNTRule *r =
+      [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
+                                       .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
+                                   }];
 
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a");
   XCTAssertEqual(r.type, SNTRuleTypeCDHash);
 
   r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                     .cdhash = @"nonexistent",
+                                       .cdhash = @"nonexistent",
                                    }];
   XCTAssertNil(r);
 }
@@ -325,58 +328,58 @@
   // This test verifies that the implicit rule ordering we've been abusing is still working.
   // See the comment in SNTRuleTable#ruleForIdentifiers:
   SNTRule *r = [self.sut
-    ruleForIdentifiers:(struct RuleIdentifiers){
-                         .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
-                         .binarySHA256 =
-                           @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
-                         .signingID = @"ABCDEFGHIJ:signingID",
-                         .certificateSHA256 =
-                           @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
-                         .teamID = @"ABCDEFGHIJ",
-                       }];
+      ruleForIdentifiers:
+          (struct RuleIdentifiers){
+              .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
+              .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+              .signingID = @"ABCDEFGHIJ:signingID",
+              .certificateSHA256 =
+                  @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
+              .teamID = @"ABCDEFGHIJ",
+          }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a");
   XCTAssertEqual(r.type, SNTRuleTypeCDHash, @"Implicit rule ordering failed");
 
   r = [self.sut
-    ruleForIdentifiers:(struct RuleIdentifiers){
-                         .cdhash = @"unknown",
-                         .binarySHA256 =
-                           @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
-                         .signingID = @"ABCDEFGHIJ:signingID",
-                         .certificateSHA256 =
-                           @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
-                         .teamID = @"ABCDEFGHIJ",
-                       }];
+      ruleForIdentifiers:
+          (struct RuleIdentifiers){
+              .cdhash = @"unknown",
+              .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+              .signingID = @"ABCDEFGHIJ:signingID",
+              .certificateSHA256 =
+                  @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
+              .teamID = @"ABCDEFGHIJ",
+          }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier,
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
   XCTAssertEqual(r.type, SNTRuleTypeBinary, @"Implicit rule ordering failed");
 
   r = [self.sut
-    ruleForIdentifiers:(struct RuleIdentifiers){
-                         .cdhash = @"unknown",
-                         .binarySHA256 =
-                           @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
-                         .signingID = @"ABCDEFGHIJ:signingID",
-                         .certificateSHA256 = @"unknown",
-                         .teamID = @"ABCDEFGHIJ",
-                       }];
+      ruleForIdentifiers:
+          (struct RuleIdentifiers){
+              .cdhash = @"unknown",
+              .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+              .signingID = @"ABCDEFGHIJ:signingID",
+              .certificateSHA256 = @"unknown",
+              .teamID = @"ABCDEFGHIJ",
+          }];
 
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier,
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
   XCTAssertEqual(r.type, SNTRuleTypeBinary, @"Implicit rule ordering failed");
 
-  r = [self.sut
-    ruleForIdentifiers:(struct RuleIdentifiers){
-                         .cdhash = @"unknown",
-                         .binarySHA256 = @"unknown",
-                         .signingID = @"unknown",
-                         .certificateSHA256 =
-                           @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
-                         .teamID = @"ABCDEFGHIJ",
-                       }];
+  r = [self.sut ruleForIdentifiers:
+                    (struct RuleIdentifiers){
+                        .cdhash = @"unknown",
+                        .binarySHA256 = @"unknown",
+                        .signingID = @"unknown",
+                        .certificateSHA256 =
+                            @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
+                        .teamID = @"ABCDEFGHIJ",
+                    }];
 
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier,
@@ -384,22 +387,22 @@
   XCTAssertEqual(r.type, SNTRuleTypeCertificate, @"Implicit rule ordering failed");
 
   r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                     .cdhash = @"unknown",
-                                     .binarySHA256 = @"unknown",
-                                     .signingID = @"ABCDEFGHIJ:signingID",
-                                     .certificateSHA256 = @"unknown",
-                                     .teamID = @"ABCDEFGHIJ",
+                                       .cdhash = @"unknown",
+                                       .binarySHA256 = @"unknown",
+                                       .signingID = @"ABCDEFGHIJ:signingID",
+                                       .certificateSHA256 = @"unknown",
+                                       .teamID = @"ABCDEFGHIJ",
                                    }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ:signingID");
   XCTAssertEqual(r.type, SNTRuleTypeSigningID, @"Implicit rule ordering failed (SigningID)");
 
   r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                     .cdhash = @"unknown",
-                                     .binarySHA256 = @"unknown",
-                                     .signingID = @"unknown",
-                                     .certificateSHA256 = @"unknown",
-                                     .teamID = @"ABCDEFGHIJ",
+                                       .cdhash = @"unknown",
+                                       .binarySHA256 = @"unknown",
+                                       .signingID = @"unknown",
+                                       .certificateSHA256 = @"unknown",
+                                       .teamID = @"ABCDEFGHIJ",
                                    }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ");

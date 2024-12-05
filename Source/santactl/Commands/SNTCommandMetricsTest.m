@@ -37,15 +37,15 @@
   }
 
   self.tempDir =
-    [[NSFileManager defaultManager] stringWithFileSystemRepresentation:tempPath
-                                                                length:strlen(tempPath)];
+      [[NSFileManager defaultManager] stringWithFileSystemRepresentation:tempPath
+                                                                  length:strlen(tempPath)];
   // mock the SNTConfigurator
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
   OCMStub([self.mockConfigurator exportMetrics]).andReturn(YES);
   OCMStub([self.mockConfigurator metricFormat]).andReturn(SNTMetricFormatTypeMonarchJSON);
   OCMStub([self.mockConfigurator metricURL])
-    .andReturn([NSURL URLWithString:@"http://localhost:2444/submit"]);
+      .andReturn([NSURL URLWithString:@"http://localhost:2444/submit"]);
   OCMStub([self.mockConfigurator metricExportInterval]).andReturn((NSUInteger)30);
 }
 
@@ -67,8 +67,8 @@
   path = [path stringByAppendingPathComponent:@"Commands/testdata/metrics-prettyprint.json"];
 
   NSString *goldenFileContents = [[NSString alloc]
-    initWithData:[NSData dataWithContentsOfFile:path options:NSDataReadingUncached error:&err]
-        encoding:NSUTF8StringEncoding];
+      initWithData:[NSData dataWithContentsOfFile:path options:NSDataReadingUncached error:&err]
+          encoding:NSUTF8StringEncoding];
 
   XCTAssertNil(err, @"failed to read golden file %@ for testPrettyPrintingJSON", path);
 
@@ -90,8 +90,8 @@
 
   // open test file assert equal with golden file
   NSString *commandOutput =
-    [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:outputPath]
-                          encoding:NSUTF8StringEncoding];
+      [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:outputPath]
+                            encoding:NSUTF8StringEncoding];
   XCTAssertEqualObjects(goldenFileContents, commandOutput,
                         @"Metrics command command did not produce expected output");
 }
@@ -102,8 +102,8 @@
   path = [path stringByAppendingPathComponent:@"Commands/testdata/metrics-prettyprint.txt"];
 
   NSString *goldenFileContents = [[NSString alloc]
-    initWithData:[NSData dataWithContentsOfFile:path options:NSDataReadingUncached error:&err]
-        encoding:NSUTF8StringEncoding];
+      initWithData:[NSData dataWithContentsOfFile:path options:NSDataReadingUncached error:&err]
+          encoding:NSUTF8StringEncoding];
 
   XCTAssertNil(err, @"failed to read golden file %@ for testPrettyPrinting", path);
 
@@ -125,8 +125,8 @@
 
   // open test file assert equal with golden file
   NSString *commandOutput =
-    [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:outputPath]
-                          encoding:NSUTF8StringEncoding];
+      [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:outputPath]
+                            encoding:NSUTF8StringEncoding];
   XCTAssertEqualObjects(goldenFileContents, commandOutput,
                         @"Metrics command command did not produce expected output");
 }

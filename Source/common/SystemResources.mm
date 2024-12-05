@@ -71,9 +71,9 @@ std::optional<SantaTaskInfo> GetTaskInfo() {
   }
 
   return SantaTaskInfo{
-    .virtual_size = pti.pti_virtual_size,
-    .resident_size = pti.pti_resident_size,
-    .total_user_nanos = MachTimeToNanos(pti.pti_total_user),
-    .total_system_nanos = MachTimeToNanos(pti.pti_total_system),
+      .virtual_size = pti.pti_virtual_size,
+      .resident_size = pti.pti_resident_size,
+      .total_user_nanos = MachTimeToNanos(pti.pti_total_user),
+      .total_system_nanos = MachTimeToNanos(pti.pti_total_system),
   };
 }

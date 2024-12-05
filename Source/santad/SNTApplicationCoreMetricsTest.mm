@@ -41,8 +41,8 @@
 }
 
 - (NSDictionary *)fixUpDatesAndDataValuesOf:(NSDictionary *)exportedMetrics {
-  NSMutableDictionary *mutableMetrics =
-    [[SNTMetricFormatTestHelper convertDatesToFixedDateWithExportDict:exportedMetrics] mutableCopy];
+  NSMutableDictionary *mutableMetrics = [[SNTMetricFormatTestHelper
+      convertDatesToFixedDateWithExportDict:exportedMetrics] mutableCopy];
 
   // Ensure that we got data of the correct type but do not check the values as they'll change per
   // call. Instead we stub out the values for testing.
@@ -90,7 +90,7 @@
 
   NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
   formatter.formatOptions =
-    NSISO8601DateFormatWithFractionalSeconds | NSISO8601DateFormatWithInternetDateTime;
+      NSISO8601DateFormatWithFractionalSeconds | NSISO8601DateFormatWithInternetDateTime;
 
   NSDate *fixedDate = [formatter dateFromString:@"2021-09-16T21:07:34.826Z"];
   NSString *hostname = [NSProcessInfo processInfo].hostName;

@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 void logSyncMessage(LogLevel level, NSString *format, ...)
-  __attribute__((format(__NSString__, 2, 3)));
+    __attribute__((format(__NSString__, 2, 3)));
 
 #ifdef __cplusplus
 }

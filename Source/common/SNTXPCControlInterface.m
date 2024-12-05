@@ -44,19 +44,19 @@ NSString *const kBundleID = @"com.northpolesec.santa.daemon";
 
 + (void)initializeControlInterface:(NSXPCInterface *)r {
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil]
-      forSelector:@selector(databaseEventsPending:)
-    argumentIndex:0
-          ofReply:YES];
+        forSelector:@selector(databaseEventsPending:)
+      argumentIndex:0
+            ofReply:YES];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTRule class], nil]
-      forSelector:@selector(databaseRuleAddRules:ruleCleanup:reply:)
-    argumentIndex:0
-          ofReply:NO];
+        forSelector:@selector(databaseRuleAddRules:ruleCleanup:reply:)
+      argumentIndex:0
+            ofReply:NO];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTRule class], nil]
-      forSelector:@selector(retrieveAllRules:)
-    argumentIndex:0
-          ofReply:YES];
+        forSelector:@selector(retrieveAllRules:)
+      argumentIndex:0
+            ofReply:YES];
 }
 
 + (NSXPCInterface *)controlInterface {

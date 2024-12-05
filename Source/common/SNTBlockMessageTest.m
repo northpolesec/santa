@@ -96,10 +96,10 @@
   fae.executingUser = @"my_un";
 
   NSString *url =
-    @"http://"
-    @"localhost?rv=%rule_version%&rn=%rule_name%&fi=%file_identifier%&"
-    @"fbid=%file_bundle_id%&ti=%team_id%&si=%signing_id%&ch=%cdhash%&"
-    @"ap=%accessed_path%&un=%username%&mid=%machine_id%&hn=%hostname%&u=%uuid%&s=%serial%";
+      @"http://"
+      @"localhost?rv=%rule_version%&rn=%rule_name%&fi=%file_identifier%&"
+      @"fbid=%file_bundle_id%&ti=%team_id%&si=%signing_id%&ch=%cdhash%&"
+      @"ap=%accessed_path%&un=%username%&mid=%machine_id%&hn=%hostname%&u=%uuid%&s=%serial%";
   NSString *wantUrl = @"http://"
                       @"localhost?rv=my_rv&rn=my_rn&fi=my_fi&"
                       @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"

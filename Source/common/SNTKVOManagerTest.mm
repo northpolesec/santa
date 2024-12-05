@@ -57,14 +57,14 @@
   __block int newVal;
 
   SNTKVOManager *kvo =
-    [[SNTKVOManager alloc] initWithObject:foo
-                                 selector:@selector(propNumber)
-                                     type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
-                                   oldVal = [oldValue intValue];
-                                   newVal = [newValue intValue];
-                                   dispatch_semaphore_signal(sema);
-                                 }];
+      [[SNTKVOManager alloc] initWithObject:foo
+                                   selector:@selector(propNumber)
+                                       type:[NSNumber class]
+                                   callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                     oldVal = [oldValue intValue];
+                                     newVal = [newValue intValue];
+                                     dispatch_semaphore_signal(sema);
+                                   }];
   XCTAssertNotNil(kvo);
 
   // Ensure an update to the observed property triggers the callback

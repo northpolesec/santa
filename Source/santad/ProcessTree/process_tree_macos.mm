@@ -122,17 +122,17 @@ absl::StatusOr<Process> LoadPID(pid_t pid) {
 
   // Don't fail Process creation if args can't be recovered.
   std::vector<std::string> args =
-    ProcessArgumentsForPID(audit_token_to_pid(token)).value_or(std::vector<std::string>());
+      ProcessArgumentsForPID(audit_token_to_pid(token)).value_or(std::vector<std::string>());
 
   return Process((struct Pid){.pid = audit_token_to_pid(token),
                               .pidversion = (uint64_t)audit_token_to_pidversion(token)},
                  (struct Cred){
-                   .uid = audit_token_to_euid(token),
-                   .gid = audit_token_to_egid(token),
+                     .uid = audit_token_to_euid(token),
+                     .gid = audit_token_to_egid(token),
                  },
                  std::make_shared<struct Program>((struct Program){
-                   .executable = path,
-                   .arguments = args,
+                     .executable = path,
+                     .arguments = args,
                  }),
                  nullptr);
 }

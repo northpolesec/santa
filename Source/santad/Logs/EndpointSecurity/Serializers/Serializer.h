@@ -56,10 +56,10 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
-    const santa::EnrichedLoginWindowSessionLogout &) = 0;
+      const santa::EnrichedLoginWindowSessionLogout &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLock &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
-    const santa::EnrichedLoginWindowSessionUnlock &) = 0;
+      const santa::EnrichedLoginWindowSessionUnlock &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingAttach &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingDetach &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogin &) = 0;
@@ -70,7 +70,7 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
-    const santa::EnrichedAuthenticationAutoUnlock &) = 0;
+      const santa::EnrichedAuthenticationAutoUnlock &) = 0;
 
   virtual std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
                                                    const std::string &policy_name,

@@ -19,8 +19,8 @@
   }
 
   self.tempDir =
-    [[NSFileManager defaultManager] stringWithFileSystemRepresentation:tempPath
-                                                                length:strlen(tempPath)];
+      [[NSFileManager defaultManager] stringWithFileSystemRepresentation:tempPath
+                                                                  length:strlen(tempPath)];
 }
 
 - (void)tearDown {

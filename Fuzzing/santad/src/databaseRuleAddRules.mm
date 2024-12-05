@@ -58,17 +58,18 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t *data, std::size_t size
 
   [daemonConn resume];
   [[daemonConn remoteObjectProxy]
-    databaseRuleAddRules:@[ newRule ]
-             ruleCleanup:SNTRuleCleanupNone
-                   reply:^(NSError *error) {
-                     if (!error) {
-                       if (newRule.state == SNTRuleStateRemove) {
-                         printf("Removed rule for SHA-256: %s.\n", [newRule.identifier UTF8String]);
-                       } else {
-                         printf("Added rule for SHA-256: %s.\n", [newRule.identifier UTF8String]);
+      databaseRuleAddRules:@[ newRule ]
+               ruleCleanup:SNTRuleCleanupNone
+                     reply:^(NSError *error) {
+                       if (!error) {
+                         if (newRule.state == SNTRuleStateRemove) {
+                           printf("Removed rule for SHA-256: %s.\n",
+                                  [newRule.identifier UTF8String]);
+                         } else {
+                           printf("Added rule for SHA-256: %s.\n", [newRule.identifier UTF8String]);
+                         }
                        }
-                     }
-                   }];
+                     }];
 
   return 0;
 }

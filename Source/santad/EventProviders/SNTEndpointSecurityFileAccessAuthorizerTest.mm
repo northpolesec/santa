@@ -71,7 +71,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
 }
 
 void SetExpectationsForFileAccessAuthorizerInit(
-  std::shared_ptr<MockEndpointSecurityAPI> mockESApi) {
+    std::shared_ptr<MockEndpointSecurityAPI> mockESApi) {
   EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
 }
@@ -93,7 +93,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 - (bool)policyProcess:(const WatchItemPolicy::Process &)policyProc
      matchesESProcess:(const es_process_t *)esProc;
 - (FileAccessPolicyDecision)applyPolicy:
-                              (std::optional<std::shared_ptr<WatchItemPolicy>>)optionalPolicy
+                                (std::optional<std::shared_ptr<WatchItemPolicy>>)optionalPolicy
                               forTarget:(const PathTarget &)target
                               toMessage:(const Message &)msg;
 
@@ -142,24 +142,24 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
 
   SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-    [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                           metrics:nullptr
-                                                            logger:nullptr
-                                                        watchItems:nullptr
-                                                          enricher:nullptr
-                                                     decisionCache:self.dcMock
-                                                         ttyWriter:nullptr];
+      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                             metrics:nullptr
+                                                              logger:nullptr
+                                                          watchItems:nullptr
+                                                            enricher:nullptr
+                                                       decisionCache:self.dcMock
+                                                           ttyWriter:nullptr];
 
   //
   // Test 1 - Not in local cache or decision cache, and code sig lookup fails
   //
   OCMExpect([self.dcMock cachedDecisionForFile:esFile1.stat])
-    .ignoringNonObjectArgs()
-    .andReturn(nil);
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
 
   NSError *err = [NSError errorWithDomain:@"" code:errSecCSSignatureFailed userInfo:nil];
   OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
-    .andReturn(self.cscMock);
+      .andReturn(self.cscMock);
 
   got = [accessClient getCertificateHash:&esFile1];
   want = kBadCertHash;
@@ -177,10 +177,10 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   // Test 2 - Not in local cache or decision cache, code sig lookup successful
   //
   OCMExpect([self.dcMock cachedDecisionForFile:esFile2.stat])
-    .ignoringNonObjectArgs()
-    .andReturn(nil);
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
   OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:nil]])
-    .andReturn(self.cscMock);
+      .andReturn(self.cscMock);
 
   OCMExpect([self.cscMock leafCertificate]).andReturn(certMock);
   OCMExpect([certMock SHA256]).andReturn(certHash2);
@@ -219,12 +219,12 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 
 - (void)testFileAccessPolicyDecisionToESAuthResult {
   std::map<FileAccessPolicyDecision, es_auth_result_t> policyDecisionToAuthResult = {
-    {FileAccessPolicyDecision::kNoPolicy, ES_AUTH_RESULT_ALLOW},
-    {FileAccessPolicyDecision::kDenied, ES_AUTH_RESULT_DENY},
-    {FileAccessPolicyDecision::kDeniedInvalidSignature, ES_AUTH_RESULT_DENY},
-    {FileAccessPolicyDecision::kAllowed, ES_AUTH_RESULT_ALLOW},
-    {FileAccessPolicyDecision::kAllowedReadAccess, ES_AUTH_RESULT_ALLOW},
-    {FileAccessPolicyDecision::kAllowedAuditOnly, ES_AUTH_RESULT_ALLOW},
+      {FileAccessPolicyDecision::kNoPolicy, ES_AUTH_RESULT_ALLOW},
+      {FileAccessPolicyDecision::kDenied, ES_AUTH_RESULT_DENY},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, ES_AUTH_RESULT_DENY},
+      {FileAccessPolicyDecision::kAllowed, ES_AUTH_RESULT_ALLOW},
+      {FileAccessPolicyDecision::kAllowedReadAccess, ES_AUTH_RESULT_ALLOW},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, ES_AUTH_RESULT_ALLOW},
   };
 
   for (const auto &kv : policyDecisionToAuthResult) {
@@ -236,13 +236,13 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 
 - (void)testShouldLogDecision {
   std::map<FileAccessPolicyDecision, bool> policyDecisionToShouldLog = {
-    {FileAccessPolicyDecision::kNoPolicy, false},
-    {FileAccessPolicyDecision::kDenied, true},
-    {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
-    {FileAccessPolicyDecision::kAllowed, false},
-    {FileAccessPolicyDecision::kAllowedReadAccess, false},
-    {FileAccessPolicyDecision::kAllowedAuditOnly, true},
-    {(FileAccessPolicyDecision)123, false},
+      {FileAccessPolicyDecision::kNoPolicy, false},
+      {FileAccessPolicyDecision::kDenied, true},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
+      {FileAccessPolicyDecision::kAllowed, false},
+      {FileAccessPolicyDecision::kAllowedReadAccess, false},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, true},
+      {(FileAccessPolicyDecision)123, false},
   };
 
   for (const auto &kv : policyDecisionToShouldLog) {
@@ -252,13 +252,13 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 
 - (void)testShouldNotifyUserDecision {
   std::map<FileAccessPolicyDecision, bool> policyDecisionToShouldLog = {
-    {FileAccessPolicyDecision::kNoPolicy, false},
-    {FileAccessPolicyDecision::kDenied, true},
-    {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
-    {FileAccessPolicyDecision::kAllowed, false},
-    {FileAccessPolicyDecision::kAllowedReadAccess, false},
-    {FileAccessPolicyDecision::kAllowedAuditOnly, false},
-    {(FileAccessPolicyDecision)123, false},
+      {FileAccessPolicyDecision::kNoPolicy, false},
+      {FileAccessPolicyDecision::kDenied, true},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
+      {FileAccessPolicyDecision::kAllowed, false},
+      {FileAccessPolicyDecision::kAllowedReadAccess, false},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, false},
+      {(FileAccessPolicyDecision)123, false},
   };
 
   for (const auto &kv : policyDecisionToShouldLog) {
@@ -268,13 +268,13 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 
 - (void)testIsBlockDecision {
   std::map<FileAccessPolicyDecision, bool> policyDecisionToIsBlockDecision = {
-    {FileAccessPolicyDecision::kNoPolicy, false},
-    {FileAccessPolicyDecision::kDenied, true},
-    {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
-    {FileAccessPolicyDecision::kAllowed, false},
-    {FileAccessPolicyDecision::kAllowedReadAccess, false},
-    {FileAccessPolicyDecision::kAllowedAuditOnly, false},
-    {(FileAccessPolicyDecision)123, false},
+      {FileAccessPolicyDecision::kNoPolicy, false},
+      {FileAccessPolicyDecision::kDenied, true},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
+      {FileAccessPolicyDecision::kAllowed, false},
+      {FileAccessPolicyDecision::kAllowedReadAccess, false},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, false},
+      {(FileAccessPolicyDecision)123, false},
   };
 
   for (const auto &kv : policyDecisionToIsBlockDecision) {
@@ -285,42 +285,43 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 - (void)testApplyOverrideToDecision {
   std::map<std::pair<FileAccessPolicyDecision, SNTOverrideFileAccessAction>,
            FileAccessPolicyDecision>
-    decisionAndOverrideToDecision = {
-      // Override action: None - Policy shouldn't be changed
-      {{FileAccessPolicyDecision::kNoPolicy, SNTOverrideFileAccessActionNone},
-       FileAccessPolicyDecision::kNoPolicy},
-      {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionNone},
-       FileAccessPolicyDecision::kDenied},
+      decisionAndOverrideToDecision = {
+          // Override action: None - Policy shouldn't be changed
+          {{FileAccessPolicyDecision::kNoPolicy, SNTOverrideFileAccessActionNone},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionNone},
+           FileAccessPolicyDecision::kDenied},
 
-      // Override action: AuditOnly - Policy should be changed only on blocked decisions
-      {{FileAccessPolicyDecision::kNoPolicy, SNTOverrideFileAccessActionAuditOnly},
-       FileAccessPolicyDecision::kNoPolicy},
-      {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionAuditOnly},
-       FileAccessPolicyDecision::kAllowedAuditOnly},
-      {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionAuditOnly},
-       FileAccessPolicyDecision::kAllowedReadAccess},
-      {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionAuditOnly},
-       FileAccessPolicyDecision::kAllowedAuditOnly},
-      {{FileAccessPolicyDecision::kDeniedInvalidSignature, SNTOverrideFileAccessActionAuditOnly},
-       FileAccessPolicyDecision::kAllowedAuditOnly},
+          // Override action: AuditOnly - Policy should be changed only on blocked decisions
+          {{FileAccessPolicyDecision::kNoPolicy, SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kAllowedAuditOnly},
+          {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kAllowedReadAccess},
+          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kAllowedAuditOnly},
+          {{FileAccessPolicyDecision::kDeniedInvalidSignature,
+            SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kAllowedAuditOnly},
 
-      // Override action: Disable - Always changes the decision to be no policy applied
-      {{FileAccessPolicyDecision::kAllowed, SNTOverrideFileAccessActionDiable},
-       FileAccessPolicyDecision::kNoPolicy},
-      {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionDiable},
-       FileAccessPolicyDecision::kNoPolicy},
-      {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionDiable},
-       FileAccessPolicyDecision::kNoPolicy},
-      {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionDiable},
-       FileAccessPolicyDecision::kNoPolicy},
+          // Override action: Disable - Always changes the decision to be no policy applied
+          {{FileAccessPolicyDecision::kAllowed, SNTOverrideFileAccessActionDiable},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionDiable},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionDiable},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionDiable},
+           FileAccessPolicyDecision::kNoPolicy},
   };
 
   for (const auto &kv : decisionAndOverrideToDecision) {
     XCTAssertEqual(ApplyOverrideToDecision(kv.first.first, kv.first.second), kv.second);
   }
 
-  XCTAssertThrows(
-    ApplyOverrideToDecision(FileAccessPolicyDecision::kAllowed, (SNTOverrideFileAccessAction)123));
+  XCTAssertThrows(ApplyOverrideToDecision(FileAccessPolicyDecision::kAllowed,
+                                          (SNTOverrideFileAccessAction)123));
 }
 
 - (void)testCombinePolicyResults {
@@ -350,13 +351,13 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
 
   SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-    [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                           metrics:nullptr
-                                                            logger:nullptr
-                                                        watchItems:nullptr
-                                                          enricher:nullptr
-                                                     decisionCache:nil
-                                                         ttyWriter:nullptr];
+      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                             metrics:nullptr
+                                                              logger:nullptr
+                                                          watchItems:nullptr
+                                                            enricher:nullptr
+                                                       decisionCache:nil
+                                                           ttyWriter:nullptr];
 
   auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "ver", "/foo");
 
@@ -440,8 +441,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 
   // Ensure other handled event types do not have a special case
   std::set<es_event_type_t> eventTypes = {
-    ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ES_EVENT_TYPE_AUTH_LINK,
-    ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_TRUNCATE,     ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ES_EVENT_TYPE_AUTH_LINK,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_TRUNCATE,     ES_EVENT_TYPE_AUTH_UNLINK,
   };
 
   for (const auto &event : eventTypes) {
@@ -479,19 +480,19 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
 
   SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-    [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                           metrics:nullptr
-                                                            logger:nullptr
-                                                        watchItems:nullptr
-                                                          enricher:nullptr
-                                                     decisionCache:nil
-                                                         ttyWriter:nullptr];
+      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                             metrics:nullptr
+                                                              logger:nullptr
+                                                          watchItems:nullptr
+                                                            enricher:nullptr
+                                                       decisionCache:nil
+                                                           ttyWriter:nullptr];
 
   id accessClientMock = OCMPartialMock(accessClient);
 
   OCMStub([accessClientMock getCertificateHash:&esFile])
-    .ignoringNonObjectArgs()
-    .andReturn(@(instigatingCertHash));
+      .ignoringNonObjectArgs()
+      .andReturn(@(instigatingCertHash));
 
   WatchItemPolicy::Process policyProc("", "", "", {}, "", std::nullopt);
 
@@ -598,25 +599,25 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
 
   SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-    [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                           metrics:nullptr
-                                                            logger:nullptr
-                                                        watchItems:nullptr
-                                                          enricher:nullptr
-                                                     decisionCache:nil
-                                                         ttyWriter:nullptr];
+      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                             metrics:nullptr
+                                                              logger:nullptr
+                                                          watchItems:nullptr
+                                                            enricher:nullptr
+                                                       decisionCache:nil
+                                                           ttyWriter:nullptr];
 
   id accessClientMock = OCMPartialMock(accessClient);
 
   PathTarget target = {.path = "/some/random/path", .isReadable = true};
   int fake;
   OCMStub([accessClientMock specialCaseForPolicy:nullptr target:target message:*(Message *)&fake])
-    .ignoringNonObjectArgs()
-    .andReturn(FileAccessPolicyDecision::kNoPolicy);
+      .ignoringNonObjectArgs()
+      .andReturn(FileAccessPolicyDecision::kNoPolicy);
 
   OCMStub([accessClientMock getCertificateHash:&esFile])
-    .ignoringNonObjectArgs()
-    .andReturn(@(instigatingCertHash));
+      .ignoringNonObjectArgs()
+      .andReturn(@(instigatingCertHash));
 
   // If no policy exists, the operation is allowed
   {
@@ -648,8 +649,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
     OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
     esMsg.process->codesigning_flags = CS_SIGNED;
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-      .ignoringNonObjectArgs()
-      .andReturn(true);
+        .ignoringNonObjectArgs()
+        .andReturn(true);
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
@@ -662,8 +663,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   // If no exceptions, operations are logged and denied
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-      .ignoringNonObjectArgs()
-      .andReturn(false);
+        .ignoringNonObjectArgs()
+        .andReturn(false);
     policy->audit_only = false;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -674,8 +675,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   // For audit only policies with no exceptions, operations are logged but allowed
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-      .ignoringNonObjectArgs()
-      .andReturn(false);
+        .ignoringNonObjectArgs()
+        .andReturn(false);
     policy->audit_only = true;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -691,8 +692,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   // then the operation should be allowed.
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-      .ignoringNonObjectArgs()
-      .andReturn(false);
+        .ignoringNonObjectArgs()
+        .andReturn(false);
     policy->audit_only = false;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -704,8 +705,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   // denied processes, operations are allowed.
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-      .ignoringNonObjectArgs()
-      .andReturn(false);
+        .ignoringNonObjectArgs()
+        .andReturn(false);
     policy->audit_only = true;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -717,8 +718,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   // denied processes, operations are allowed audit only.
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-      .ignoringNonObjectArgs()
-      .andReturn(true);
+        .ignoringNonObjectArgs()
+        .andReturn(true);
     policy->audit_only = true;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -730,8 +731,8 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   // denied processes, operations are denied.
   {
     OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-      .ignoringNonObjectArgs()
-      .andReturn(true);
+        .ignoringNonObjectArgs()
+        .andReturn(true);
     policy->audit_only = false;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -744,22 +745,22 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 
 - (void)testEnable {
   std::set<es_event_type_t> expectedEventSubs = {
-    ES_EVENT_TYPE_AUTH_CLONE,        ES_EVENT_TYPE_AUTH_COPYFILE, ES_EVENT_TYPE_AUTH_CREATE,
-    ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ES_EVENT_TYPE_AUTH_LINK,     ES_EVENT_TYPE_AUTH_OPEN,
-    ES_EVENT_TYPE_AUTH_RENAME,       ES_EVENT_TYPE_AUTH_TRUNCATE, ES_EVENT_TYPE_AUTH_UNLINK,
-    ES_EVENT_TYPE_NOTIFY_EXIT,
+      ES_EVENT_TYPE_AUTH_CLONE,        ES_EVENT_TYPE_AUTH_COPYFILE, ES_EVENT_TYPE_AUTH_CREATE,
+      ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ES_EVENT_TYPE_AUTH_LINK,     ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_RENAME,       ES_EVENT_TYPE_AUTH_TRUNCATE, ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_NOTIFY_EXIT,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   EXPECT_CALL(*mockESApi, ClearCache)
-    .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
-             .WillOnce(testing::Return(true)))
-    .WillOnce(testing::Return(true));
+      .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
+                 .WillOnce(testing::Return(true)))
+      .WillOnce(testing::Return(true));
 
   id fileAccessClient = [[SNTEndpointSecurityFileAccessAuthorizer alloc]
-    initWithESAPI:mockESApi
-          metrics:nullptr
-        processor:santa::Processor::kFileAccessAuthorizer];
+      initWithESAPI:mockESApi
+            metrics:nullptr
+          processor:santa::Processor::kFileAccessAuthorizer];
 
   [fileAccessClient enable];
 
@@ -776,13 +777,13 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
 
   SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-    [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                           metrics:nullptr
-                                                            logger:nullptr
-                                                        watchItems:nullptr
-                                                          enricher:nullptr
-                                                     decisionCache:nil
-                                                         ttyWriter:nullptr];
+      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                             metrics:nullptr
+                                                              logger:nullptr
+                                                          watchItems:nullptr
+                                                            enricher:nullptr
+                                                       decisionCache:nil
+                                                           ttyWriter:nullptr];
 
   EXPECT_CALL(*mockESApi, UnsubscribeAll);
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));

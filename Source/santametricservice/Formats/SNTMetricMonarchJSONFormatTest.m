@@ -13,7 +13,7 @@
 - (void)testMetricsConversionToJSON {
   id classMock = OCMClassMock([NSDate class]);
   OCMStub([classMock date])
-    .andReturn([NSDate dateWithTimeIntervalSince1970:1631826490]);  // 2021-09-16 21:08:10Z
+      .andReturn([NSDate dateWithTimeIntervalSince1970:1631826490]);  // 2021-09-16 21:08:10Z
 
   NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
   SNTMetricMonarchJSONFormat *formatter = [[SNTMetricMonarchJSONFormat alloc] init];
@@ -37,9 +37,9 @@
   XCTAssertNotNil(goldenFileData, @"unable to open / read golden file");
 
   NSDictionary *expectedJSONDict =
-    [NSJSONSerialization JSONObjectWithData:goldenFileData
-                                    options:NSJSONReadingAllowFragments
-                                      error:&err];
+      [NSJSONSerialization JSONObjectWithData:goldenFileData
+                                      options:NSJSONReadingAllowFragments
+                                        error:&err];
 
   XCTAssertNotNil(expectedJSONDict);
   XCTAssertNil(err);

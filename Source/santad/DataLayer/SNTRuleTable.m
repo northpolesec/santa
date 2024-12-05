@@ -39,7 +39,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   // TODO(mlw): Reorganize this code so that a temporary ES client doesn't need to be created
   es_client_t *client = NULL;
   es_new_client_result_t ret = es_new_client(&client, ^(es_client_t *c, const es_message_t *m){
-                                               // noop
+                                                 // noop
                                              });
 
   if (ret != ES_NEW_CLIENT_RESULT_SUCCESS) {
@@ -294,7 +294,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase *db) {
     count =
-      [db longForQuery:@"SELECT COUNT(*) FROM rules WHERE state=?", @(SNTRuleStateAllowCompiler)];
+        [db longForQuery:@"SELECT COUNT(*) FROM rules WHERE state=?", @(SNTRuleStateAllowCompiler)];
   }];
   return count;
 }
@@ -302,8 +302,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 - (int64_t)transitiveRuleCount {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase *db) {
-    count =
-      [db longForQuery:@"SELECT COUNT(*) FROM rules WHERE state=?", @(SNTRuleStateAllowTransitive)];
+    count = [db
+        longForQuery:@"SELECT COUNT(*) FROM rules WHERE state=?", @(SNTRuleStateAllowTransitive)];
   }];
   return count;
 }
@@ -386,14 +386,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   //
   [self inDatabase:^(FMDatabase *db) {
     FMResultSet *rs =
-      [db executeQuery:@"SELECT * FROM rules WHERE "
-                       @"   (identifier=? AND type=500) "
-                       @"OR (identifier=? AND type=1000) "
-                       @"OR (identifier=? AND type=2000) "
-                       @"OR (identifier=? AND type=3000) "
-                       @"OR (identifier=? AND type=4000) LIMIT 1",
-                       identifiers.cdhash, identifiers.binarySHA256, identifiers.signingID,
-                       identifiers.certificateSHA256, identifiers.teamID];
+        [db executeQuery:@"SELECT * FROM rules WHERE "
+                         @"   (identifier=? AND type=500) "
+                         @"OR (identifier=? AND type=1000) "
+                         @"OR (identifier=? AND type=2000) "
+                         @"OR (identifier=? AND type=3000) "
+                         @"OR (identifier=? AND type=4000) LIMIT 1",
+                         identifiers.cdhash, identifiers.binarySHA256, identifiers.signingID,
+                         identifiers.certificateSHA256, identifiers.teamID];
     if ([rs next]) {
       rule = [self ruleFromResultSet:rs];
     }
@@ -449,12 +449,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
           return;
         }
       } else {
-        if (![db
-              executeUpdate:@"INSERT OR REPLACE INTO rules "
-                            @"(identifier, state, type, custommsg, customurl, timestamp, comment) "
-                            @"VALUES (?, ?, ?, ?, ?, ?, ?);",
-                            rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
-                            rule.customURL, @(rule.timestamp), rule.comment]) {
+        if (![db executeUpdate:
+                     @"INSERT OR REPLACE INTO rules "
+                     @"(identifier, state, type, custommsg, customurl, timestamp, comment) "
+                     @"VALUES (?, ?, ?, ?, ?, ?, ?);",
+                     rule.identifier, @(rule.state), @(rule.type), rule.customMsg, rule.customURL,
+                     @(rule.timestamp), rule.comment]) {
           [self fillError:error
                      code:SNTRuleTableErrorInsertOrReplaceFailed
                   message:[db lastErrorMessage]];
@@ -503,8 +503,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       // If it does not then flush the cache. To ensure that the new rule is honored.
       if ((rule.state != SNTRuleStateAllow)) {
         if ([db longForQuery:
-                  @"SELECT COUNT(*) FROM rules WHERE identifier=? AND type=? AND state=? LIMIT 1",
-                  rule.identifier, @(rule.type), @(rule.state)] == 0) {
+                    @"SELECT COUNT(*) FROM rules WHERE identifier=? AND type=? AND state=? LIMIT 1",
+                    rule.identifier, @(rule.type), @(rule.state)] == 0) {
           flushDecisionCache = YES;
           return;
         }
@@ -552,7 +552,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   if ([self ruleCount] < kTransitiveRuleCullingThreshold) return;
   // Determine what timestamp qualifies as outdated.
   NSUInteger outdatedTimestamp =
-    [[NSDate date] timeIntervalSinceReferenceDate] - kTransitiveRuleExpirationSeconds;
+      [[NSDate date] timeIntervalSinceReferenceDate] - kTransitiveRuleExpirationSeconds;
 
   [self inDatabase:^(FMDatabase *db) {
     if (![db executeUpdate:@"DELETE FROM rules WHERE state=? AND timestamp < ?",
@@ -574,7 +574,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     case SNTRuleTableErrorEmptyRuleArray: d[NSLocalizedDescriptionKey] = @"Empty rule array"; break;
     case SNTRuleTableErrorInvalidRule:
       d[NSLocalizedDescriptionKey] =
-        [NSString stringWithFormat:@"Rule array contained invalid entry: %@", message];
+          [NSString stringWithFormat:@"Rule array contained invalid entry: %@", message];
       break;
     case SNTRuleTableErrorInsertOrReplaceFailed:
       d[NSLocalizedDescriptionKey] = @"A database error occurred while inserting/replacing a rule";

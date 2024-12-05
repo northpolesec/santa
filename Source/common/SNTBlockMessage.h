@@ -44,7 +44,7 @@ NS_ASSUME_NONNULL_BEGIN
                                          customMessage:(nullable NSString *)customMessage;
 
 + (NSAttributedString *)attributedBlockMessageForFileAccessEvent:
-                          (nullable SNTFileAccessEvent *)event
+                            (nullable SNTFileAccessEvent *)event
                                                    customMessage:(nullable NSString *)customMessage;
 
 + (NSAttributedString *)attributedBlockMessageForDeviceEvent:(nullable SNTDeviceEvent *)event;

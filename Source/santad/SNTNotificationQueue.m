@@ -37,9 +37,9 @@ static const int kMaximumNotifications = 10;
 }
 
 - (void)addEvent:(SNTStoredEvent *)event
-  withCustomMessage:(NSString *)message
-          customURL:(NSString *)url
-           andReply:(void (^)(BOOL authenticated))reply {
+    withCustomMessage:(NSString *)message
+            customURL:(NSString *)url
+             andReply:(void (^)(BOOL authenticated))reply {
   if (!event) {
     if (reply) reply(NO);
     return;

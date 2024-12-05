@@ -77,7 +77,7 @@ using santa::SpoolPeer;
 - (void)testTypeUrl {
   // Ensure the manually created type url isn't modified
   auto spool =
-    std::make_shared<SpoolPeer>(self.q, self.timer, [self.baseDir UTF8String], 10240, 1024);
+      std::make_shared<SpoolPeer>(self.q, self.timer, [self.baseDir UTF8String], 10240, 1024);
   std::string wantTypeUrl("type.googleapis.com/santa.pb.v1.SantaMessage");
   XCTAssertCppStringEqual(spool->GetTypeUrl(), wantTypeUrl);
 }
@@ -92,19 +92,19 @@ using santa::SpoolPeer;
   __block int flushCount = 0;
 
   auto spool = std::make_shared<SpoolPeer>(
-    self.q, self.timer, [self.baseDir UTF8String], 10240, 1024,
-    ^{
-      dispatch_semaphore_signal(semaWrite);
-    },
-    ^{
-      flushCount++;
-      if (flushCount <= 2) {
-        // The first flush is the initial fire.
-        // The second flush should flush the new contents to disk
-        // Afterwards, nothing else waits on the semaphore, so stop signaling
-        dispatch_semaphore_signal(semaFlush);
-      }
-    });
+      self.q, self.timer, [self.baseDir UTF8String], 10240, 1024,
+      ^{
+        dispatch_semaphore_signal(semaWrite);
+      },
+      ^{
+        flushCount++;
+        if (flushCount <= 2) {
+          // The first flush is the initial fire.
+          // The second flush should flush the new contents to disk
+          // Afterwards, nothing else waits on the semaphore, so stop signaling
+          dispatch_semaphore_signal(semaFlush);
+        }
+      });
 
   // Set a custom timer interval for this test
   dispatch_source_set_timer(self.timer, dispatch_time(DISPATCH_TIME_NOW, 0),
@@ -113,8 +113,8 @@ using santa::SpoolPeer;
   spool->Write(std::vector<uint8_t>(writeSize, 'A'));
 
   XCTAssertEqual(
-    0, dispatch_semaphore_wait(semaWrite, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-    "Second write didn't compelte within expected window");
+      0, dispatch_semaphore_wait(semaWrite, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
+      "Second write didn't compelte within expected window");
 
   // Sleep for a short time. Nothing should happen, but want to help ensure that if somehow
   // if somehow timers were active that would be caught and fail the test.
@@ -133,8 +133,8 @@ using santa::SpoolPeer;
   spool->BeginFlushTask();
 
   XCTAssertEqual(
-    0, dispatch_semaphore_wait(semaFlush, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-    "Initial flush task firing didn't occur within expected window");
+      0, dispatch_semaphore_wait(semaFlush, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
+      "Initial flush task firing didn't occur within expected window");
 
   // Ensure no growth in the amount of data
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
@@ -143,12 +143,12 @@ using santa::SpoolPeer;
   spool->Write(std::vector<uint8_t>(writeSize, 'B'));
 
   XCTAssertEqual(
-    0, dispatch_semaphore_wait(semaWrite, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-    "Second write didn't compelte within expected window");
+      0, dispatch_semaphore_wait(semaWrite, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
+      "Second write didn't compelte within expected window");
 
   XCTAssertEqual(
-    0, dispatch_semaphore_wait(semaFlush, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-    "Initial flush task firing didn't occur within expected window");
+      0, dispatch_semaphore_wait(semaFlush, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
+      "Initial flush task firing didn't occur within expected window");
 
   // Ensure the new log entry appears
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 2);

@@ -31,7 +31,7 @@ std::shared_ptr<Spool> Spool::Create(std::string_view base_dir, size_t max_spool
                             NSEC_PER_MSEC * flush_timeout_ms, 0);
 
   auto spool_writer =
-    std::make_shared<Spool>(q, timer_source, base_dir, max_spool_disk_size, max_spool_batch_size);
+      std::make_shared<Spool>(q, timer_source, base_dir, max_spool_disk_size, max_spool_batch_size);
 
   spool_writer->BeginFlushTask();
 

@@ -20,13 +20,13 @@
 + (NSString *)serialNumber {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  io_service_t platformExpert =
-    IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
+  io_service_t platformExpert = IOServiceGetMatchingService(
+      kIOMasterPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
 #pragma clang diagnostic pop
   if (!platformExpert) return nil;
 
   NSString *serial = CFBridgingRelease(IORegistryEntryCreateCFProperty(
-    platformExpert, CFSTR(kIOPlatformSerialNumberKey), kCFAllocatorDefault, 0));
+      platformExpert, CFSTR(kIOPlatformSerialNumberKey), kCFAllocatorDefault, 0));
 
   IOObjectRelease(platformExpert);
 
@@ -36,13 +36,13 @@
 + (NSString *)hardwareUUID {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  io_service_t platformExpert =
-    IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
+  io_service_t platformExpert = IOServiceGetMatchingService(
+      kIOMasterPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
 #pragma clang diagnostic pop
   if (!platformExpert) return nil;
 
   NSString *uuid = CFBridgingRelease(IORegistryEntryCreateCFProperty(
-    platformExpert, CFSTR(kIOPlatformUUIDKey), kCFAllocatorDefault, 0));
+      platformExpert, CFSTR(kIOPlatformUUIDKey), kCFAllocatorDefault, 0));
 
   IOObjectRelease(platformExpert);
 
@@ -92,8 +92,8 @@
 #pragma mark - Internal
 
 + (NSDictionary *)_systemVersionDictionary {
-  return
-    [NSDictionary dictionaryWithContentsOfFile:@"/System/Library/CoreServices/SystemVersion.plist"];
+  return [NSDictionary
+      dictionaryWithContentsOfFile:@"/System/Library/CoreServices/SystemVersion.plist"];
 }
 
 @end

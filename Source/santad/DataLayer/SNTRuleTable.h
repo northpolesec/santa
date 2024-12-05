@@ -115,6 +115,6 @@
 ///  certain critical system binaries that are integral to Santa's functionality.
 ///
 @property(readonly, nonatomic)
-  NSDictionary<NSString *, SNTCachedDecision *> *criticalSystemBinaries;
+    NSDictionary<NSString *, SNTCachedDecision *> *criticalSystemBinaries;
 
 @end

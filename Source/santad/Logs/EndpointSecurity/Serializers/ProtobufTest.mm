@@ -74,7 +74,7 @@ extern ::pbv1::SocketAddress::Type GetSocketAddressType(es_address_type_t type);
 extern ::pbv1::OpenSSHLogin::Result GetOpenSSHLoginResultType(es_openssh_login_result_type_t type);
 extern ::pbv1::AuthenticationTouchID::Mode GetAuthenticationTouchIDMode(es_touchid_mode_t mode);
 extern ::pbv1::AuthenticationAutoUnlock::Type GetAuthenticationAutoUnlockType(
-  es_auto_unlock_type_t type);
+    es_auto_unlock_type_t type);
 #endif  // HAVE_MACOS_13
 }  // namespace santa
 
@@ -271,14 +271,14 @@ void SerializeAndCheck(es_event_type_t eventType,
     struct timespec enrichmentTime;
     struct timespec msgTime;
     NSString *wantData = std::visit(
-      [&msgTime, &enrichmentTime, variant](const EnrichedEventType &enrichedEvent) {
-        msgTime = enrichedEvent->time;
-        enrichmentTime = enrichedEvent.enrichment_time();
+        [&msgTime, &enrichmentTime, variant](const EnrichedEventType &enrichedEvent) {
+          msgTime = enrichedEvent->time;
+          enrichmentTime = enrichedEvent.enrichment_time();
 
-        return LoadTestJson(ConstructFilename(enrichedEvent->event_type, variant),
-                            enrichedEvent->version);
-      },
-      enrichedMsg->GetEnrichedMessage());
+          return LoadTestJson(ConstructFilename(enrichedEvent->event_type, variant),
+                              enrichedEvent->version);
+        },
+        enrichedMsg->GetEnrichedMessage());
 
     std::vector<uint8_t> vec = bs->SerializeMessage(std::move(enrichedMsg));
     std::string protoStr(vec.begin(), vec.end());
@@ -305,14 +305,14 @@ void SerializeAndCheck(es_event_type_t eventType,
     NSError *jsonError;
     NSData *objectData = [wantData dataUsingEncoding:NSUTF8StringEncoding];
     NSDictionary *wantJSONDict =
-      [NSJSONSerialization JSONObjectWithData:objectData
-                                      options:NSJSONReadingMutableContainers
-                                        error:&jsonError];
+        [NSJSONSerialization JSONObjectWithData:objectData
+                                        options:NSJSONReadingMutableContainers
+                                          error:&jsonError];
     XCTAssertNil(jsonError, @"failed to parse want data as JSON");
     NSDictionary *gotJSONDict = [NSJSONSerialization
-      JSONObjectWithData:[NSData dataWithBytes:gotData.data() length:gotData.length()]
-                 options:NSJSONReadingMutableContainers
-                   error:&jsonError];
+        JSONObjectWithData:[NSData dataWithBytes:gotData.data() length:gotData.length()]
+                   options:NSJSONReadingMutableContainers
+                     error:&jsonError];
     XCTAssertNil(jsonError, @"failed to parse got data as JSON");
 
     XCTAssertNil(FindDelta(wantJSONDict, gotJSONDict));
@@ -329,19 +329,19 @@ void SerializeAndCheck(es_event_type_t eventType,
                                             es_message_t *),
                        SNTDecisionCache *decisionCache, bool json, NSString *variant) {
   return SerializeAndCheck(
-    eventType,
-    ^bool(std::shared_ptr<MockEndpointSecurityAPI> esapi, es_message_t *msg) {
-      messageSetup(esapi, msg);
-      return true;
-    },
-    decisionCache, json, variant);
+      eventType,
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> esapi, es_message_t *msg) {
+        messageSetup(esapi, msg);
+        return true;
+      },
+      decisionCache, json, variant);
 }
 
 void SerializeAndCheckNonESEvents(
-  uint32_t minAssociatedESVersion, es_event_type_t eventType, NSString *filename,
-  void (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>, es_message_t *),
-  std::vector<uint8_t> (^RunSerializer)(std::shared_ptr<Serializer> serializer,
-                                        const Message &msg)) {
+    uint32_t minAssociatedESVersion, es_event_type_t eventType, NSString *filename,
+    void (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>, es_message_t *),
+    std::vector<uint8_t> (^RunSerializer)(std::shared_ptr<Serializer> serializer,
+                                          const Message &msg)) {
   std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
   std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, nil);
@@ -401,7 +401,7 @@ void SerializeAndCheckNonESEvents(
     @"key_with_arr_val" : @[ @"v1", @"v2", @"v3" ],
     @"key_with_arr_val_nested" : @[ @"v1", @"v2", @"v3", @[ @"nv1", @"nv2" ] ],
     @"key_with_arr_val_multitype" :
-      @[ @"v1", @"v2", @"v3", @(123), [NSDate dateWithTimeIntervalSince1970:1699376402] ],
+        @[ @"v1", @"v2", @"v3", @(123), [NSDate dateWithTimeIntervalSince1970:1699376402] ],
     @"key_with_dict_val" : @{@"k1" : @"v1", @"k2" : @"v2"},
     @"key_with_dict_val_nested" : @{
       @"k1" : @"v1",
@@ -413,8 +413,8 @@ void SerializeAndCheckNonESEvents(
   self.mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
   OCMStub([self.mockDecisionCache resetTimestampForCachedDecision:{}])
-    .ignoringNonObjectArgs()
-    .andReturn(self.testCachedDecision);
+      .ignoringNonObjectArgs()
+      .andReturn(self.testCachedDecision);
 }
 
 - (void)tearDown {
@@ -474,22 +474,22 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetDecisionEnum {
   std::map<SNTEventState, ::pbv1::Execution::Decision> stateToDecision = {
-    {SNTEventStateUnknown, ::pbv1::Execution::DECISION_UNKNOWN},
-    {SNTEventStateBundleBinary, ::pbv1::Execution::DECISION_UNKNOWN},
-    {SNTEventStateBlockUnknown, ::pbv1::Execution::DECISION_DENY},
-    {SNTEventStateBlockBinary, ::pbv1::Execution::DECISION_DENY},
-    {SNTEventStateBlockCertificate, ::pbv1::Execution::DECISION_DENY},
-    {SNTEventStateBlockScope, ::pbv1::Execution::DECISION_DENY},
-    {SNTEventStateBlockTeamID, ::pbv1::Execution::DECISION_DENY},
-    {SNTEventStateBlockLongPath, ::pbv1::Execution::DECISION_DENY},
-    {SNTEventStateAllowUnknown, ::pbv1::Execution::DECISION_ALLOW},
-    {SNTEventStateAllowBinary, ::pbv1::Execution::DECISION_ALLOW},
-    {SNTEventStateAllowCertificate, ::pbv1::Execution::DECISION_ALLOW},
-    {SNTEventStateAllowScope, ::pbv1::Execution::DECISION_ALLOW},
-    {SNTEventStateAllowCompiler, ::pbv1::Execution::DECISION_ALLOW},
-    {SNTEventStateAllowTransitive, ::pbv1::Execution::DECISION_ALLOW},
-    {SNTEventStateAllowPendingTransitive, ::pbv1::Execution::DECISION_ALLOW},
-    {SNTEventStateAllowTeamID, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateUnknown, ::pbv1::Execution::DECISION_UNKNOWN},
+      {SNTEventStateBundleBinary, ::pbv1::Execution::DECISION_UNKNOWN},
+      {SNTEventStateBlockUnknown, ::pbv1::Execution::DECISION_DENY},
+      {SNTEventStateBlockBinary, ::pbv1::Execution::DECISION_DENY},
+      {SNTEventStateBlockCertificate, ::pbv1::Execution::DECISION_DENY},
+      {SNTEventStateBlockScope, ::pbv1::Execution::DECISION_DENY},
+      {SNTEventStateBlockTeamID, ::pbv1::Execution::DECISION_DENY},
+      {SNTEventStateBlockLongPath, ::pbv1::Execution::DECISION_DENY},
+      {SNTEventStateAllowUnknown, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateAllowBinary, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateAllowCertificate, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateAllowScope, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateAllowCompiler, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateAllowTransitive, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateAllowPendingTransitive, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateAllowTeamID, ::pbv1::Execution::DECISION_ALLOW},
   };
 
   for (const auto &kv : stateToDecision) {
@@ -499,26 +499,26 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetReasonEnum {
   std::map<SNTEventState, ::pbv1::Execution::Reason> stateToReason = {
-    {SNTEventStateUnknown, ::pbv1::Execution::REASON_NOT_RUNNING},
-    {SNTEventStateBundleBinary, ::pbv1::Execution::REASON_NOT_RUNNING},
-    {SNTEventStateBlockUnknown, ::pbv1::Execution::REASON_UNKNOWN},
-    {SNTEventStateBlockBinary, ::pbv1::Execution::REASON_BINARY},
-    {SNTEventStateBlockCertificate, ::pbv1::Execution::REASON_CERT},
-    {SNTEventStateBlockScope, ::pbv1::Execution::REASON_SCOPE},
-    {SNTEventStateBlockTeamID, ::pbv1::Execution::REASON_TEAM_ID},
-    {SNTEventStateBlockSigningID, ::pbv1::Execution::REASON_SIGNING_ID},
-    {SNTEventStateBlockCDHash, ::pbv1::Execution::REASON_CDHASH},
-    {SNTEventStateBlockLongPath, ::pbv1::Execution::REASON_LONG_PATH},
-    {SNTEventStateAllowUnknown, ::pbv1::Execution::REASON_UNKNOWN},
-    {SNTEventStateAllowBinary, ::pbv1::Execution::REASON_BINARY},
-    {SNTEventStateAllowCertificate, ::pbv1::Execution::REASON_CERT},
-    {SNTEventStateAllowScope, ::pbv1::Execution::REASON_SCOPE},
-    {SNTEventStateAllowCompiler, ::pbv1::Execution::REASON_COMPILER},
-    {SNTEventStateAllowTransitive, ::pbv1::Execution::REASON_TRANSITIVE},
-    {SNTEventStateAllowPendingTransitive, ::pbv1::Execution::REASON_PENDING_TRANSITIVE},
-    {SNTEventStateAllowTeamID, ::pbv1::Execution::REASON_TEAM_ID},
-    {SNTEventStateAllowSigningID, ::pbv1::Execution::REASON_SIGNING_ID},
-    {SNTEventStateAllowCDHash, ::pbv1::Execution::REASON_CDHASH},
+      {SNTEventStateUnknown, ::pbv1::Execution::REASON_NOT_RUNNING},
+      {SNTEventStateBundleBinary, ::pbv1::Execution::REASON_NOT_RUNNING},
+      {SNTEventStateBlockUnknown, ::pbv1::Execution::REASON_UNKNOWN},
+      {SNTEventStateBlockBinary, ::pbv1::Execution::REASON_BINARY},
+      {SNTEventStateBlockCertificate, ::pbv1::Execution::REASON_CERT},
+      {SNTEventStateBlockScope, ::pbv1::Execution::REASON_SCOPE},
+      {SNTEventStateBlockTeamID, ::pbv1::Execution::REASON_TEAM_ID},
+      {SNTEventStateBlockSigningID, ::pbv1::Execution::REASON_SIGNING_ID},
+      {SNTEventStateBlockCDHash, ::pbv1::Execution::REASON_CDHASH},
+      {SNTEventStateBlockLongPath, ::pbv1::Execution::REASON_LONG_PATH},
+      {SNTEventStateAllowUnknown, ::pbv1::Execution::REASON_UNKNOWN},
+      {SNTEventStateAllowBinary, ::pbv1::Execution::REASON_BINARY},
+      {SNTEventStateAllowCertificate, ::pbv1::Execution::REASON_CERT},
+      {SNTEventStateAllowScope, ::pbv1::Execution::REASON_SCOPE},
+      {SNTEventStateAllowCompiler, ::pbv1::Execution::REASON_COMPILER},
+      {SNTEventStateAllowTransitive, ::pbv1::Execution::REASON_TRANSITIVE},
+      {SNTEventStateAllowPendingTransitive, ::pbv1::Execution::REASON_PENDING_TRANSITIVE},
+      {SNTEventStateAllowTeamID, ::pbv1::Execution::REASON_TEAM_ID},
+      {SNTEventStateAllowSigningID, ::pbv1::Execution::REASON_SIGNING_ID},
+      {SNTEventStateAllowCDHash, ::pbv1::Execution::REASON_CDHASH},
   };
 
   for (const auto &kv : stateToReason) {
@@ -528,11 +528,11 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetModeEnum {
   std::map<SNTClientMode, ::pbv1::Execution::Mode> clientModeToExecMode = {
-    {SNTClientModeUnknown, ::pbv1::Execution::MODE_UNKNOWN},
-    {SNTClientModeMonitor, ::pbv1::Execution::MODE_MONITOR},
-    {SNTClientModeLockdown, ::pbv1::Execution::MODE_LOCKDOWN},
-    {SNTClientModeStandalone, ::pbv1::Execution::MODE_STANDALONE},
-    {(SNTClientMode)123, ::pbv1::Execution::MODE_UNKNOWN},
+      {SNTClientModeUnknown, ::pbv1::Execution::MODE_UNKNOWN},
+      {SNTClientModeMonitor, ::pbv1::Execution::MODE_MONITOR},
+      {SNTClientModeLockdown, ::pbv1::Execution::MODE_LOCKDOWN},
+      {SNTClientModeStandalone, ::pbv1::Execution::MODE_STANDALONE},
+      {(SNTClientMode)123, ::pbv1::Execution::MODE_UNKNOWN},
   };
 
   for (const auto &kv : clientModeToExecMode) {
@@ -542,17 +542,17 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetFileDescriptorType {
   std::map<uint32_t, ::pbv1::FileDescriptor::FDType> fdtypeToEnumType = {
-    {PROX_FDTYPE_ATALK, ::pbv1::FileDescriptor::FD_TYPE_ATALK},
-    {PROX_FDTYPE_VNODE, ::pbv1::FileDescriptor::FD_TYPE_VNODE},
-    {PROX_FDTYPE_SOCKET, ::pbv1::FileDescriptor::FD_TYPE_SOCKET},
-    {PROX_FDTYPE_PSHM, ::pbv1::FileDescriptor::FD_TYPE_PSHM},
-    {PROX_FDTYPE_PSEM, ::pbv1::FileDescriptor::FD_TYPE_PSEM},
-    {PROX_FDTYPE_KQUEUE, ::pbv1::FileDescriptor::FD_TYPE_KQUEUE},
-    {PROX_FDTYPE_PIPE, ::pbv1::FileDescriptor::FD_TYPE_PIPE},
-    {PROX_FDTYPE_FSEVENTS, ::pbv1::FileDescriptor::FD_TYPE_FSEVENTS},
-    {PROX_FDTYPE_NETPOLICY, ::pbv1::FileDescriptor::FD_TYPE_NETPOLICY},
-    {10 /* PROX_FDTYPE_CHANNEL */, ::pbv1::FileDescriptor::FD_TYPE_CHANNEL},
-    {11 /* PROX_FDTYPE_NEXUS */, ::pbv1::FileDescriptor::FD_TYPE_NEXUS},
+      {PROX_FDTYPE_ATALK, ::pbv1::FileDescriptor::FD_TYPE_ATALK},
+      {PROX_FDTYPE_VNODE, ::pbv1::FileDescriptor::FD_TYPE_VNODE},
+      {PROX_FDTYPE_SOCKET, ::pbv1::FileDescriptor::FD_TYPE_SOCKET},
+      {PROX_FDTYPE_PSHM, ::pbv1::FileDescriptor::FD_TYPE_PSHM},
+      {PROX_FDTYPE_PSEM, ::pbv1::FileDescriptor::FD_TYPE_PSEM},
+      {PROX_FDTYPE_KQUEUE, ::pbv1::FileDescriptor::FD_TYPE_KQUEUE},
+      {PROX_FDTYPE_PIPE, ::pbv1::FileDescriptor::FD_TYPE_PIPE},
+      {PROX_FDTYPE_FSEVENTS, ::pbv1::FileDescriptor::FD_TYPE_FSEVENTS},
+      {PROX_FDTYPE_NETPOLICY, ::pbv1::FileDescriptor::FD_TYPE_NETPOLICY},
+      {10 /* PROX_FDTYPE_CHANNEL */, ::pbv1::FileDescriptor::FD_TYPE_CHANNEL},
+      {11 /* PROX_FDTYPE_NEXUS */, ::pbv1::FileDescriptor::FD_TYPE_NEXUS},
   };
 
   for (const auto &kv : fdtypeToEnumType) {
@@ -564,7 +564,7 @@ void SerializeAndCheckNonESEvents(
 - (void)testSerializeMessageExec {
   es_file_t procFileTarget = MakeESFile("fooexec", MakeStat(300));
   __block es_process_t procTarget =
-    MakeESProcess(&procFileTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+      MakeESProcess(&procFileTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
   __block es_file_t fileCwd = MakeESFile("cwd", MakeStat(400));
   __block es_file_t fileScript = MakeESFile("script.sh", MakeStat(500));
   __block es_fd_t fd1 = {.fd = 1, .fdtype = PROX_FDTYPE_VNODE};
@@ -592,22 +592,22 @@ void SerializeAndCheckNonESEvents(
 
                     EXPECT_CALL(*mockESApi, ExecArgCount).WillOnce(testing::Return(3));
                     EXPECT_CALL(*mockESApi, ExecArg)
-                      .WillOnce(testing::Return(MakeESStringToken("exec_path")))
-                      .WillOnce(testing::Return(MakeESStringToken("-l")))
-                      .WillOnce(testing::Return(MakeESStringToken("--foo")));
+                        .WillOnce(testing::Return(MakeESStringToken("exec_path")))
+                        .WillOnce(testing::Return(MakeESStringToken("-l")))
+                        .WillOnce(testing::Return(MakeESStringToken("--foo")));
 
                     EXPECT_CALL(*mockESApi, ExecEnvCount).WillOnce(testing::Return(2));
                     EXPECT_CALL(*mockESApi, ExecEnv)
-                      .WillOnce(
-                        testing::Return(MakeESStringToken("ENV_PATH=/path/to/bin:/and/another")))
-                      .WillOnce(testing::Return(MakeESStringToken("DEBUG=1")));
+                        .WillOnce(testing::Return(
+                            MakeESStringToken("ENV_PATH=/path/to/bin:/and/another")))
+                        .WillOnce(testing::Return(MakeESStringToken("DEBUG=1")));
 
                     if (esMsg->version >= 4) {
                       EXPECT_CALL(*mockESApi, ExecFDCount).WillOnce(testing::Return(3));
                       EXPECT_CALL(*mockESApi, ExecFD)
-                        .WillOnce(testing::Return(&fd1))
-                        .WillOnce(testing::Return(&fd2))
-                        .WillOnce(testing::Return(&fd3));
+                          .WillOnce(testing::Return(&fd1))
+                          .WillOnce(testing::Return(&fd2))
+                          .WillOnce(testing::Return(&fd3));
                     }
                   }];
 }
@@ -615,7 +615,7 @@ void SerializeAndCheckNonESEvents(
 - (void)testSerializeMessageExecJSON {
   es_file_t procFileTarget = MakeESFile("fooexec", MakeStat(300));
   __block es_process_t procTarget =
-    MakeESProcess(&procFileTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+      MakeESProcess(&procFileTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
   __block es_file_t fileCwd = MakeESFile("cwd", MakeStat(400));
   __block es_file_t fileScript = MakeESFile("script.sh", MakeStat(500));
   __block es_fd_t fd1 = {.fd = 1, .fdtype = PROX_FDTYPE_VNODE};
@@ -643,22 +643,22 @@ void SerializeAndCheckNonESEvents(
 
                     EXPECT_CALL(*mockESApi, ExecArgCount).WillOnce(testing::Return(3));
                     EXPECT_CALL(*mockESApi, ExecArg)
-                      .WillOnce(testing::Return(MakeESStringToken("exec_path")))
-                      .WillOnce(testing::Return(MakeESStringToken("-l")))
-                      .WillOnce(testing::Return(MakeESStringToken("--foo")));
+                        .WillOnce(testing::Return(MakeESStringToken("exec_path")))
+                        .WillOnce(testing::Return(MakeESStringToken("-l")))
+                        .WillOnce(testing::Return(MakeESStringToken("--foo")));
 
                     EXPECT_CALL(*mockESApi, ExecEnvCount).WillOnce(testing::Return(2));
                     EXPECT_CALL(*mockESApi, ExecEnv)
-                      .WillOnce(
-                        testing::Return(MakeESStringToken("ENV_PATH=/path/to/bin:/and/another")))
-                      .WillOnce(testing::Return(MakeESStringToken("DEBUG=1")));
+                        .WillOnce(testing::Return(
+                            MakeESStringToken("ENV_PATH=/path/to/bin:/and/another")))
+                        .WillOnce(testing::Return(MakeESStringToken("DEBUG=1")));
 
                     if (esMsg->version >= 4) {
                       EXPECT_CALL(*mockESApi, ExecFDCount).WillOnce(testing::Return(3));
                       EXPECT_CALL(*mockESApi, ExecFD)
-                        .WillOnce(testing::Return(&fd1))
-                        .WillOnce(testing::Return(&fd2))
-                        .WillOnce(testing::Return(&fd3));
+                          .WillOnce(testing::Return(&fd1))
+                          .WillOnce(testing::Return(&fd2))
+                          .WillOnce(testing::Return(&fd3));
                     }
                   }
                           json:YES];
@@ -763,7 +763,7 @@ void SerializeAndCheckNonESEvents(
   __block es_file_t procFileChild = MakeESFile("foo_child", MakeStat(300));
   __block es_file_t ttyFileChild = MakeESFile("footty", MakeStat(400));
   __block es_process_t procChild =
-    MakeESProcess(&procFileChild, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+      MakeESProcess(&procFileChild, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   procChild.tty = &ttyFileChild;
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_FORK
@@ -832,8 +832,8 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeMessageLoginWindowSessionLogin {
   __block es_event_lw_session_login_t lwLogin = {
-    .username = MakeESStringToken("daemon"),
-    .graphical_session_id = 123,
+      .username = MakeESStringToken("daemon"),
+      .graphical_session_id = 123,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN
@@ -845,8 +845,8 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeMessageLoginWindowSessionLogout {
   __block es_event_lw_session_logout_t lwLogout = {
-    .username = MakeESStringToken("daemon"),
-    .graphical_session_id = 123,
+      .username = MakeESStringToken("daemon"),
+      .graphical_session_id = 123,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT
@@ -858,8 +858,8 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeMessageLoginWindowSessionLock {
   __block es_event_lw_session_lock_t lwLock = {
-    .username = MakeESStringToken("daemon"),
-    .graphical_session_id = 123,
+      .username = MakeESStringToken("daemon"),
+      .graphical_session_id = 123,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK
@@ -871,8 +871,8 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeMessageLoginWindowSessionUnlock {
   __block es_event_lw_session_unlock_t lwUnlock = {
-    .username = MakeESStringToken("daemon"),
-    .graphical_session_id = 123,
+      .username = MakeESStringToken("daemon"),
+      .graphical_session_id = 123,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK
@@ -884,15 +884,15 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeMessageScreensharingAttach {
   __block es_event_screensharing_attach_t attach = {
-    .success = true,
-    .source_address_type = ES_ADDRESS_TYPE_IPV6,
-    .source_address = MakeESStringToken("::1"),
-    .viewer_appleid = MakeESStringToken("foo@example.com"),
-    .authentication_type = MakeESStringToken("idk"),
-    .authentication_username = MakeESStringToken("my_auth_user"),
-    .session_username = MakeESStringToken("my_session_user"),
-    .existing_session = true,
-    .graphical_session_id = 123,
+      .success = true,
+      .source_address_type = ES_ADDRESS_TYPE_IPV6,
+      .source_address = MakeESStringToken("::1"),
+      .viewer_appleid = MakeESStringToken("foo@example.com"),
+      .authentication_type = MakeESStringToken("idk"),
+      .authentication_username = MakeESStringToken("my_auth_user"),
+      .session_username = MakeESStringToken("my_session_user"),
+      .existing_session = true,
+      .graphical_session_id = 123,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH
@@ -918,10 +918,10 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeMessageScreensharingDetach {
   __block es_event_screensharing_detach_t detach = {
-    .source_address_type = ES_ADDRESS_TYPE_IPV4,
-    .source_address = MakeESStringToken("1.2.3.4"),
-    .viewer_appleid = MakeESStringToken("foo@example.com"),
-    .graphical_session_id = 123,
+      .source_address_type = ES_ADDRESS_TYPE_IPV4,
+      .source_address = MakeESStringToken("1.2.3.4"),
+      .viewer_appleid = MakeESStringToken("foo@example.com"),
+      .graphical_session_id = 123,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH
@@ -939,7 +939,7 @@ void SerializeAndCheckNonESEvents(
                                                .username = MakeESStringToken("foo_user"),
                                                .has_uid = true,
                                                .uid = {
-                                                 .uid = 12345,
+                                                   .uid = 12345,
                                                }};
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN
@@ -965,10 +965,10 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeMessageOpenSSHLogout {
   __block es_event_openssh_logout_t sshLogout = {
-    .source_address_type = ES_ADDRESS_TYPE_IPV4,
-    .source_address = MakeESStringToken("1.2.3.4"),
-    .username = MakeESStringToken("foo_user"),
-    .uid = 12345,
+      .source_address_type = ES_ADDRESS_TYPE_IPV4,
+      .source_address = MakeESStringToken("1.2.3.4"),
+      .username = MakeESStringToken("foo_user"),
+      .uid = 12345,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT
@@ -984,7 +984,7 @@ void SerializeAndCheckNonESEvents(
                                           .username = MakeESStringToken("asdf"),
                                           .has_uid = true,
                                           .uid = {
-                                            .uid = 321,
+                                              .uid = 321,
                                           }};
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN
@@ -1007,11 +1007,11 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetSocketAddressType {
   std::map<es_address_type_t, ::pbv1::SocketAddress::Type> esToSantaAddrType = {
-    {ES_ADDRESS_TYPE_NONE, ::pbv1::SocketAddress::TYPE_NONE},
-    {ES_ADDRESS_TYPE_IPV4, ::pbv1::SocketAddress::TYPE_IPV4},
-    {ES_ADDRESS_TYPE_IPV6, ::pbv1::SocketAddress::TYPE_IPV6},
-    {ES_ADDRESS_TYPE_NAMED_SOCKET, ::pbv1::SocketAddress::TYPE_NAMED_SOCKET},
-    {(es_address_type_t)1234, ::pbv1::SocketAddress::TYPE_UNKNOWN},
+      {ES_ADDRESS_TYPE_NONE, ::pbv1::SocketAddress::TYPE_NONE},
+      {ES_ADDRESS_TYPE_IPV4, ::pbv1::SocketAddress::TYPE_IPV4},
+      {ES_ADDRESS_TYPE_IPV6, ::pbv1::SocketAddress::TYPE_IPV6},
+      {ES_ADDRESS_TYPE_NAMED_SOCKET, ::pbv1::SocketAddress::TYPE_NAMED_SOCKET},
+      {(es_address_type_t)1234, ::pbv1::SocketAddress::TYPE_UNKNOWN},
   };
 
   for (const auto &kv : esToSantaAddrType) {
@@ -1021,17 +1021,17 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetOpenSSHLoginResultType {
   std::map<es_openssh_login_result_type_t, ::pbv1::OpenSSHLogin::Result> esToSantaOpenSSHResultType{
-    {ES_OPENSSH_LOGIN_EXCEED_MAXTRIES, ::pbv1::OpenSSHLogin::RESULT_LOGIN_EXCEED_MAXTRIES},
-    {ES_OPENSSH_LOGIN_ROOT_DENIED, ::pbv1::OpenSSHLogin::RESULT_LOGIN_ROOT_DENIED},
-    {ES_OPENSSH_AUTH_SUCCESS, ::pbv1::OpenSSHLogin::RESULT_AUTH_SUCCESS},
-    {ES_OPENSSH_AUTH_FAIL_NONE, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_NONE},
-    {ES_OPENSSH_AUTH_FAIL_PASSWD, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_PASSWD},
-    {ES_OPENSSH_AUTH_FAIL_KBDINT, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_KBDINT},
-    {ES_OPENSSH_AUTH_FAIL_PUBKEY, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_PUBKEY},
-    {ES_OPENSSH_AUTH_FAIL_HOSTBASED, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_HOSTBASED},
-    {ES_OPENSSH_AUTH_FAIL_GSSAPI, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_GSSAPI},
-    {ES_OPENSSH_INVALID_USER, ::pbv1::OpenSSHLogin::RESULT_INVALID_USER},
-    {(es_openssh_login_result_type_t)1234, ::pbv1::OpenSSHLogin::RESULT_UNKNOWN},
+      {ES_OPENSSH_LOGIN_EXCEED_MAXTRIES, ::pbv1::OpenSSHLogin::RESULT_LOGIN_EXCEED_MAXTRIES},
+      {ES_OPENSSH_LOGIN_ROOT_DENIED, ::pbv1::OpenSSHLogin::RESULT_LOGIN_ROOT_DENIED},
+      {ES_OPENSSH_AUTH_SUCCESS, ::pbv1::OpenSSHLogin::RESULT_AUTH_SUCCESS},
+      {ES_OPENSSH_AUTH_FAIL_NONE, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_NONE},
+      {ES_OPENSSH_AUTH_FAIL_PASSWD, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_PASSWD},
+      {ES_OPENSSH_AUTH_FAIL_KBDINT, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_KBDINT},
+      {ES_OPENSSH_AUTH_FAIL_PUBKEY, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_PUBKEY},
+      {ES_OPENSSH_AUTH_FAIL_HOSTBASED, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_HOSTBASED},
+      {ES_OPENSSH_AUTH_FAIL_GSSAPI, ::pbv1::OpenSSHLogin::RESULT_AUTH_FAIL_GSSAPI},
+      {ES_OPENSSH_INVALID_USER, ::pbv1::OpenSSHLogin::RESULT_INVALID_USER},
+      {(es_openssh_login_result_type_t)1234, ::pbv1::OpenSSHLogin::RESULT_UNKNOWN},
   };
 
   for (const auto &kv : esToSantaOpenSSHResultType) {
@@ -1042,22 +1042,22 @@ void SerializeAndCheckNonESEvents(
 - (void)testSerializeMessageAuthenticationOD {
   es_file_t instigatorProcTarget = MakeESFile("foo", MakeStat(300));
   __block es_process_t instigatorProc =
-    MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+      MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
   __block es_event_authentication_od_t authenticationOD = {
-    .instigator = &instigatorProc,
-    .record_type = MakeESStringToken("my_rec_type"),
-    .record_name = MakeESStringToken("my_rec_name"),
-    .node_name = MakeESStringToken("my_node_name"),
-    .db_path = MakeESStringToken("my_db_path"),
+      .instigator = &instigatorProc,
+      .record_type = MakeESStringToken("my_rec_type"),
+      .record_name = MakeESStringToken("my_rec_name"),
+      .node_name = MakeESStringToken("my_node_name"),
+      .db_path = MakeESStringToken("my_db_path"),
 #if HAVE_MACOS_15
-    .instigator_token = MakeAuditToken(98, 76),
+      .instigator_token = MakeAuditToken(98, 76),
 #endif
   };
 
   __block es_event_authentication_t authenticationEvent = {
-    .success = true,
-    .type = ES_AUTHENTICATION_TYPE_OD,
-    .data.od = &authenticationOD,
+      .success = true,
+      .type = ES_AUTHENTICATION_TYPE_OD,
+      .data.od = &authenticationOD,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
@@ -1087,9 +1087,9 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetAuthenticationTouchIDMode {
   std::map<es_touchid_mode_t, ::pbv1::AuthenticationTouchID::Mode> esToSantaTouchIDMode{
-    {ES_TOUCHID_MODE_VERIFICATION, ::pbv1::AuthenticationTouchID::MODE_VERIFICATION},
-    {ES_TOUCHID_MODE_IDENTIFICATION, ::pbv1::AuthenticationTouchID::MODE_IDENTIFICATION},
-    {(es_touchid_mode_t)1234, ::pbv1::AuthenticationTouchID::MODE_UNKNOWN},
+      {ES_TOUCHID_MODE_VERIFICATION, ::pbv1::AuthenticationTouchID::MODE_VERIFICATION},
+      {ES_TOUCHID_MODE_IDENTIFICATION, ::pbv1::AuthenticationTouchID::MODE_IDENTIFICATION},
+      {(es_touchid_mode_t)1234, ::pbv1::AuthenticationTouchID::MODE_UNKNOWN},
   };
 
   for (const auto &kv : esToSantaTouchIDMode) {
@@ -1100,24 +1100,24 @@ void SerializeAndCheckNonESEvents(
 - (void)testSerializeMessageAuthenticationTouchID {
   es_file_t instigatorProcTarget = MakeESFile("foo", MakeStat(300));
   __block es_process_t instigatorProc =
-    MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+      MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
   __block es_event_authentication_touchid_t authenticationTouchID = {
-    .instigator = &instigatorProc,
-    .touchid_mode = ES_TOUCHID_MODE_VERIFICATION,
-    .has_uid = true,
-    .uid =
-      {
-        .uid = NOBODY_UID,
-      },
+      .instigator = &instigatorProc,
+      .touchid_mode = ES_TOUCHID_MODE_VERIFICATION,
+      .has_uid = true,
+      .uid =
+          {
+              .uid = NOBODY_UID,
+          },
 #if HAVE_MACOS_15
-    .instigator_token = MakeAuditToken(98, 76),
+      .instigator_token = MakeAuditToken(98, 76),
 #endif
   };
 
   __block es_event_authentication_t authenticationEvent = {
-    .success = true,
-    .type = ES_AUTHENTICATION_TYPE_TOUCHID,
-    .data.touchid = &authenticationTouchID,
+      .success = true,
+      .type = ES_AUTHENTICATION_TYPE_TOUCHID,
+      .data.touchid = &authenticationTouchID,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
@@ -1158,21 +1158,21 @@ void SerializeAndCheckNonESEvents(
 - (void)testSerializeMessageAuthenticationToken {
   es_file_t instigatorProcTarget = MakeESFile("foo", MakeStat(300));
   __block es_process_t instigatorProc =
-    MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+      MakeESProcess(&instigatorProcTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
   __block es_event_authentication_token_t authenticationToken = {
-    .instigator = &instigatorProc,
-    .pubkey_hash = MakeESStringToken("my_pubkey_hash"),
-    .token_id = MakeESStringToken("my_token_id"),
-    .kerberos_principal = MakeESStringToken("my_kerberos_principal"),
+      .instigator = &instigatorProc,
+      .pubkey_hash = MakeESStringToken("my_pubkey_hash"),
+      .token_id = MakeESStringToken("my_token_id"),
+      .kerberos_principal = MakeESStringToken("my_kerberos_principal"),
 #if HAVE_MACOS_15
-    .instigator_token = MakeAuditToken(98, 76),
+      .instigator_token = MakeAuditToken(98, 76),
 #endif
   };
 
   __block es_event_authentication_t authenticationEvent = {
-    .success = true,
-    .type = ES_AUTHENTICATION_TYPE_TOKEN,
-    .data.token = &authenticationToken,
+      .success = true,
+      .type = ES_AUTHENTICATION_TYPE_TOKEN,
+      .data.token = &authenticationToken,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
@@ -1202,9 +1202,9 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetAuthenticationAutoUnlockType {
   std::map<es_auto_unlock_type_t, ::pbv1::AuthenticationAutoUnlock::Type> esToSantaAutoUnlockType{
-    {ES_AUTO_UNLOCK_MACHINE_UNLOCK, ::pbv1::AuthenticationAutoUnlock::TYPE_MACHINE_UNLOCK},
-    {ES_AUTO_UNLOCK_AUTH_PROMPT, ::pbv1::AuthenticationAutoUnlock::TYPE_AUTH_PROMPT},
-    {(es_auto_unlock_type_t)1234, ::pbv1::AuthenticationAutoUnlock::TYPE_UNKNOWN},
+      {ES_AUTO_UNLOCK_MACHINE_UNLOCK, ::pbv1::AuthenticationAutoUnlock::TYPE_MACHINE_UNLOCK},
+      {ES_AUTO_UNLOCK_AUTH_PROMPT, ::pbv1::AuthenticationAutoUnlock::TYPE_AUTH_PROMPT},
+      {(es_auto_unlock_type_t)1234, ::pbv1::AuthenticationAutoUnlock::TYPE_UNKNOWN},
   };
 
   for (const auto &kv : esToSantaAutoUnlockType) {
@@ -1214,14 +1214,14 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeMessageAuthenticationAutoUnlock {
   __block es_event_authentication_auto_unlock_t authenticationAutoUnlock = {
-    .username = MakeESStringToken("nobody"),
-    .type = ES_AUTO_UNLOCK_MACHINE_UNLOCK,
+      .username = MakeESStringToken("nobody"),
+      .type = ES_AUTO_UNLOCK_MACHINE_UNLOCK,
   };
 
   __block es_event_authentication_t authenticationEvent = {
-    .success = true,
-    .type = ES_AUTHENTICATION_TYPE_AUTO_UNLOCK,
-    .data.auto_unlock = &authenticationAutoUnlock,
+      .success = true,
+      .type = ES_AUTHENTICATION_TYPE_AUTO_UNLOCK,
+      .data.auto_unlock = &authenticationAutoUnlock,
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
@@ -1247,16 +1247,16 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetAccessType {
   std::map<es_event_type_t, ::pbv1::FileAccess::AccessType> eventTypeToAccessType = {
-    {ES_EVENT_TYPE_AUTH_CLONE, ::pbv1::FileAccess::ACCESS_TYPE_CLONE},
-    {ES_EVENT_TYPE_AUTH_COPYFILE, ::pbv1::FileAccess::ACCESS_TYPE_COPYFILE},
-    {ES_EVENT_TYPE_AUTH_CREATE, ::pbv1::FileAccess::ACCESS_TYPE_CREATE},
-    {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ::pbv1::FileAccess::ACCESS_TYPE_EXCHANGEDATA},
-    {ES_EVENT_TYPE_AUTH_LINK, ::pbv1::FileAccess::ACCESS_TYPE_LINK},
-    {ES_EVENT_TYPE_AUTH_OPEN, ::pbv1::FileAccess::ACCESS_TYPE_OPEN},
-    {ES_EVENT_TYPE_AUTH_RENAME, ::pbv1::FileAccess::ACCESS_TYPE_RENAME},
-    {ES_EVENT_TYPE_AUTH_TRUNCATE, ::pbv1::FileAccess::ACCESS_TYPE_TRUNCATE},
-    {ES_EVENT_TYPE_AUTH_UNLINK, ::pbv1::FileAccess::ACCESS_TYPE_UNLINK},
-    {(es_event_type_t)1234, ::pbv1::FileAccess::ACCESS_TYPE_UNKNOWN},
+      {ES_EVENT_TYPE_AUTH_CLONE, ::pbv1::FileAccess::ACCESS_TYPE_CLONE},
+      {ES_EVENT_TYPE_AUTH_COPYFILE, ::pbv1::FileAccess::ACCESS_TYPE_COPYFILE},
+      {ES_EVENT_TYPE_AUTH_CREATE, ::pbv1::FileAccess::ACCESS_TYPE_CREATE},
+      {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ::pbv1::FileAccess::ACCESS_TYPE_EXCHANGEDATA},
+      {ES_EVENT_TYPE_AUTH_LINK, ::pbv1::FileAccess::ACCESS_TYPE_LINK},
+      {ES_EVENT_TYPE_AUTH_OPEN, ::pbv1::FileAccess::ACCESS_TYPE_OPEN},
+      {ES_EVENT_TYPE_AUTH_RENAME, ::pbv1::FileAccess::ACCESS_TYPE_RENAME},
+      {ES_EVENT_TYPE_AUTH_TRUNCATE, ::pbv1::FileAccess::ACCESS_TYPE_TRUNCATE},
+      {ES_EVENT_TYPE_AUTH_UNLINK, ::pbv1::FileAccess::ACCESS_TYPE_UNLINK},
+      {(es_event_type_t)1234, ::pbv1::FileAccess::ACCESS_TYPE_UNKNOWN},
   };
 
   for (const auto &kv : eventTypeToAccessType) {
@@ -1266,16 +1266,17 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testGetPolicyDecision {
   std::map<FileAccessPolicyDecision, ::pbv1::FileAccess::PolicyDecision> policyDecisionEnumToProto =
-    {
-      {FileAccessPolicyDecision::kNoPolicy, ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
-      {FileAccessPolicyDecision::kDenied, ::pbv1::FileAccess::POLICY_DECISION_DENIED},
-      {FileAccessPolicyDecision::kDeniedInvalidSignature,
-       ::pbv1::FileAccess::POLICY_DECISION_DENIED_INVALID_SIGNATURE},
-      {FileAccessPolicyDecision::kAllowed, ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
-      {FileAccessPolicyDecision::kAllowedReadAccess, ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
-      {FileAccessPolicyDecision::kAllowedAuditOnly,
-       ::pbv1::FileAccess::POLICY_DECISION_ALLOWED_AUDIT_ONLY},
-      {(FileAccessPolicyDecision)1234, ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
+      {
+          {FileAccessPolicyDecision::kNoPolicy, ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
+          {FileAccessPolicyDecision::kDenied, ::pbv1::FileAccess::POLICY_DECISION_DENIED},
+          {FileAccessPolicyDecision::kDeniedInvalidSignature,
+           ::pbv1::FileAccess::POLICY_DECISION_DENIED_INVALID_SIGNATURE},
+          {FileAccessPolicyDecision::kAllowed, ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
+          {FileAccessPolicyDecision::kAllowedReadAccess,
+           ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
+          {FileAccessPolicyDecision::kAllowedAuditOnly,
+           ::pbv1::FileAccess::POLICY_DECISION_ALLOWED_AUDIT_ONLY},
+          {(FileAccessPolicyDecision)1234, ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
   };
 
   for (const auto &kv : policyDecisionEnumToProto) {
@@ -1286,27 +1287,27 @@ void SerializeAndCheckNonESEvents(
 - (void)testSerializeFileAccess {
   __block es_file_t openFile = MakeESFile("open_file", MakeStat(300));
   SerializeAndCheckNonESEvents(
-    6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access.json",
-    ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
-      esMsg->event.open.file = &openFile;
-    },
-    ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
-      return serializer->SerializeFileAccess("policy_version", "policy_name", msg,
-                                             Enricher().Enrich(*msg->process), "target",
-                                             FileAccessPolicyDecision::kDenied);
-    });
+      6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access.json",
+      ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+        esMsg->event.open.file = &openFile;
+      },
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+        return serializer->SerializeFileAccess("policy_version", "policy_name", msg,
+                                               Enricher().Enrich(*msg->process), "target",
+                                               FileAccessPolicyDecision::kDenied);
+      });
 }
 
 - (void)testSerializeAllowlist {
   __block es_file_t closeFile = MakeESFile("close_file", MakeStat(300));
   SerializeAndCheckNonESEvents(
-    1, ES_EVENT_TYPE_NOTIFY_CLOSE, @"allowlist.json",
-    ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
-      esMsg->event.close.target = &closeFile;
-    },
-    ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
-      return serializer->SerializeAllowlist(msg, "hash_value");
-    });
+      1, ES_EVENT_TYPE_NOTIFY_CLOSE, @"allowlist.json",
+      ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+        esMsg->event.close.target = &closeFile;
+      },
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+        return serializer->SerializeAllowlist(msg, "hash_value");
+      });
 }
 
 - (void)testSerializeBundleHashingEvent {

@@ -53,11 +53,11 @@
   }
 
   self.window =
-    [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
-                                          NSWindowStyleMaskTitled
-                                  backing:NSBackingStoreBuffered
-                                    defer:NO];
+      [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
+                                  styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
+                                            NSWindowStyleMaskTitled
+                                    backing:NSBackingStoreBuffered
+                                      defer:NO];
   self.window.titlebarAppearsTransparent = YES;
   self.window.movableByWindowBackground = YES;
   [self.window standardWindowButton:NSWindowZoomButton].hidden = YES;
@@ -65,14 +65,14 @@
   [self.window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
 
   self.window.contentViewController = [SNTFileAccessMessageWindowViewFactory
-    createWithWindow:self.window
-               event:self.event
-       customMessage:self.customMessage
-           customURL:self.customURL
-          customText:self.customText
-     uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
-       self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
-     }];
+      createWithWindow:self.window
+                 event:self.event
+         customMessage:self.customMessage
+             customURL:self.customURL
+            customText:self.customText
+       uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+         self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
+       }];
 
   self.window.delegate = self;
 
@@ -84,8 +84,8 @@
   // 1. The current file access rule version
   // 2. The name of the rule that was violated
   // 3. The path of the process
-  return [NSString
-    stringWithFormat:@"%@|%@|%@", self.event.ruleVersion, self.event.ruleName, self.event.filePath];
+  return [NSString stringWithFormat:@"%@|%@|%@", self.event.ruleVersion, self.event.ruleName,
+                                    self.event.filePath];
 }
 
 @end

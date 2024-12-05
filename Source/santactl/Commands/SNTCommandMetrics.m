@@ -86,8 +86,8 @@ REGISTER_COMMAND_NAME(@"metrics")
         if (fields.count >= 1 && fields[0].length) {
           for (int i = 0; i < fields.count; i++) {
             fieldDisplayString = [fieldDisplayString
-              stringByAppendingString:[NSString
-                                        stringWithFormat:@"%@=%@", fields[i], fieldValues[i]]];
+                stringByAppendingString:[NSString
+                                            stringWithFormat:@"%@=%@", fields[i], fieldValues[i]]];
             if (i < fields.count - 1) {
               fieldDisplayString = [fieldDisplayString stringByAppendingString:@","];
             }

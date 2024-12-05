@@ -83,26 +83,26 @@
   if (self.window) [self.window orderOut:sender];
 
   self.window =
-    [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
-                                          NSWindowStyleMaskTitled
-                                  backing:NSBackingStoreBuffered
-                                    defer:NO];
+      [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
+                                  styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
+                                            NSWindowStyleMaskTitled
+                                    backing:NSBackingStoreBuffered
+                                      defer:NO];
   self.window.titlebarAppearsTransparent = YES;
   self.window.movableByWindowBackground = YES;
   [self.window standardWindowButton:NSWindowZoomButton].hidden = YES;
   [self.window standardWindowButton:NSWindowCloseButton].hidden = YES;
   [self.window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
   self.window.contentViewController = [SNTBinaryMessageWindowViewFactory
-    createWithWindow:self.window
-               event:self.event
-           customMsg:self.customMessage
-           customURL:self.customURL
-      bundleProgress:self.bundleProgress
-     uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
-       self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
-     }
-       replyCallback:self.replyBlock];
+      createWithWindow:self.window
+                 event:self.event
+             customMsg:self.customMessage
+             customURL:self.customURL
+        bundleProgress:self.bundleProgress
+       uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+         self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
+       }
+         replyCallback:self.replyBlock];
 
   self.window.delegate = self;
 

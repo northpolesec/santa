@@ -162,10 +162,10 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
 - (void)testProcessorToString {
   std::map<Processor, NSString *> processorToString = {
-    {Processor::kAuthorizer, @"Authorizer"},
-    {Processor::kDeviceManager, @"DeviceManager"},
-    {Processor::kRecorder, @"Recorder"},
-    {Processor::kTamperResistance, @"TamperResistance"},
+      {Processor::kAuthorizer, @"Authorizer"},
+      {Processor::kDeviceManager, @"DeviceManager"},
+      {Processor::kRecorder, @"Recorder"},
+      {Processor::kTamperResistance, @"TamperResistance"},
   };
 
   for (const auto &kv : processorToString) {
@@ -177,42 +177,42 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
 - (void)testEventTypeToString {
   std::map<es_event_type_t, NSString *> eventTypeToString = {
-    {ES_EVENT_TYPE_AUTH_CLONE, @"AuthClone"},
-    {ES_EVENT_TYPE_AUTH_COPYFILE, @"AuthCopyfile"},
-    {ES_EVENT_TYPE_AUTH_CREATE, @"AuthCreate"},
-    {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, @"AuthExchangedata"},
-    {ES_EVENT_TYPE_AUTH_EXEC, @"AuthExec"},
-    {ES_EVENT_TYPE_AUTH_KEXTLOAD, @"AuthKextload"},
-    {ES_EVENT_TYPE_AUTH_LINK, @"AuthLink"},
-    {ES_EVENT_TYPE_AUTH_MOUNT, @"AuthMount"},
-    {ES_EVENT_TYPE_AUTH_REMOUNT, @"AuthRemount"},
-    {ES_EVENT_TYPE_AUTH_RENAME, @"AuthRename"},
-    {ES_EVENT_TYPE_AUTH_TRUNCATE, @"AuthTruncate"},
-    {ES_EVENT_TYPE_AUTH_UNLINK, @"AuthUnlink"},
-    {ES_EVENT_TYPE_NOTIFY_CLOSE, @"NotifyClose"},
-    {ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED, @"NotifyCodesigningInvalidated"},
-    {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, @"NotifyExchangedata"},
-    {ES_EVENT_TYPE_NOTIFY_EXEC, @"NotifyExec"},
-    {ES_EVENT_TYPE_NOTIFY_EXIT, @"NotifyExit"},
-    {ES_EVENT_TYPE_NOTIFY_FORK, @"NotifyFork"},
-    {ES_EVENT_TYPE_NOTIFY_LINK, @"NotifyLink"},
-    {ES_EVENT_TYPE_NOTIFY_RENAME, @"NotifyRename"},
-    {ES_EVENT_TYPE_NOTIFY_UNLINK, @"NotifyUnlink"},
-    {ES_EVENT_TYPE_NOTIFY_UNMOUNT, @"NotifyUnmount"},
+      {ES_EVENT_TYPE_AUTH_CLONE, @"AuthClone"},
+      {ES_EVENT_TYPE_AUTH_COPYFILE, @"AuthCopyfile"},
+      {ES_EVENT_TYPE_AUTH_CREATE, @"AuthCreate"},
+      {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, @"AuthExchangedata"},
+      {ES_EVENT_TYPE_AUTH_EXEC, @"AuthExec"},
+      {ES_EVENT_TYPE_AUTH_KEXTLOAD, @"AuthKextload"},
+      {ES_EVENT_TYPE_AUTH_LINK, @"AuthLink"},
+      {ES_EVENT_TYPE_AUTH_MOUNT, @"AuthMount"},
+      {ES_EVENT_TYPE_AUTH_REMOUNT, @"AuthRemount"},
+      {ES_EVENT_TYPE_AUTH_RENAME, @"AuthRename"},
+      {ES_EVENT_TYPE_AUTH_TRUNCATE, @"AuthTruncate"},
+      {ES_EVENT_TYPE_AUTH_UNLINK, @"AuthUnlink"},
+      {ES_EVENT_TYPE_NOTIFY_CLOSE, @"NotifyClose"},
+      {ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED, @"NotifyCodesigningInvalidated"},
+      {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, @"NotifyExchangedata"},
+      {ES_EVENT_TYPE_NOTIFY_EXEC, @"NotifyExec"},
+      {ES_EVENT_TYPE_NOTIFY_EXIT, @"NotifyExit"},
+      {ES_EVENT_TYPE_NOTIFY_FORK, @"NotifyFork"},
+      {ES_EVENT_TYPE_NOTIFY_LINK, @"NotifyLink"},
+      {ES_EVENT_TYPE_NOTIFY_RENAME, @"NotifyRename"},
+      {ES_EVENT_TYPE_NOTIFY_UNLINK, @"NotifyUnlink"},
+      {ES_EVENT_TYPE_NOTIFY_UNMOUNT, @"NotifyUnmount"},
 #if HAVE_MACOS_13
-    {ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, @"NotifyAuthentication"},
-    {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN, @"NotifyLoginLogin"},
-    {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT, @"NotifyLoginLogout"},
-    {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN, @"NotifyLWSessionLogin"},
-    {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT, @"NotifyLWSessionLogout"},
-    {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK, @"NotifyLWSessionLock"},
-    {ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK, @"NotifyLWSessionUnlock"},
-    {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH, @"NotifyScreensharingAttach"},
-    {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, @"NotifyScreensharingDetach"},
-    {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN, @"NotifyOpenSSHLogin"},
-    {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, @"NotifyOpenSSHLogout"},
+      {ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, @"NotifyAuthentication"},
+      {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN, @"NotifyLoginLogin"},
+      {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT, @"NotifyLoginLogout"},
+      {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN, @"NotifyLWSessionLogin"},
+      {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT, @"NotifyLWSessionLogout"},
+      {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK, @"NotifyLWSessionLock"},
+      {ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK, @"NotifyLWSessionUnlock"},
+      {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH, @"NotifyScreensharingAttach"},
+      {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, @"NotifyScreensharingDetach"},
+      {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN, @"NotifyOpenSSHLogin"},
+      {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, @"NotifyOpenSSHLogout"},
 #endif
-    {ES_EVENT_TYPE_LAST, @"Global"},
+      {ES_EVENT_TYPE_LAST, @"Global"},
   };
 
   for (const auto &kv : eventTypeToString) {
@@ -224,8 +224,8 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
 - (void)testEventDispositionToString {
   std::map<EventDisposition, NSString *> dispositionToString = {
-    {EventDisposition::kDropped, @"Dropped"},
-    {EventDisposition::kProcessed, @"Processed"},
+      {EventDisposition::kDropped, @"Dropped"},
+      {EventDisposition::kProcessed, @"Processed"},
   };
 
   for (const auto &kv : dispositionToString) {
@@ -237,8 +237,8 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
 - (void)testFileAccessMetricStatusToString {
   std::map<FileAccessMetricStatus, NSString *> statusToString = {
-    {FileAccessMetricStatus::kOK, @"OK"},
-    {FileAccessMetricStatus::kBlockedUser, @"BLOCKED_USER"},
+      {FileAccessMetricStatus::kOK, @"OK"},
+      {FileAccessMetricStatus::kBlockedUser, @"BLOCKED_USER"},
   };
 
   for (const auto &kv : statusToString) {
@@ -250,9 +250,9 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
 - (void)testFileAccessPolicyDecisionToString {
   std::map<FileAccessPolicyDecision, NSString *> decisionToString = {
-    {FileAccessPolicyDecision::kDenied, @"Denied"},
-    {FileAccessPolicyDecision::kDeniedInvalidSignature, @"Denied"},
-    {FileAccessPolicyDecision::kDeniedInvalidSignature, @"Denied"},
+      {FileAccessPolicyDecision::kDenied, @"Denied"},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, @"Denied"},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, @"Denied"},
   };
 
   for (const auto &kv : decisionToString) {
@@ -260,10 +260,10 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   }
 
   std::set<FileAccessPolicyDecision> decisionToStringThrows = {
-    FileAccessPolicyDecision::kNoPolicy,
-    FileAccessPolicyDecision::kAllowed,
-    FileAccessPolicyDecision::kAllowedReadAccess,
-    (FileAccessPolicyDecision)12345,
+      FileAccessPolicyDecision::kNoPolicy,
+      FileAccessPolicyDecision::kAllowed,
+      FileAccessPolicyDecision::kAllowedReadAccess,
+      (FileAccessPolicyDecision)12345,
   };
   for (const auto &v : decisionToStringThrows) {
     XCTAssertThrows(FileAccessPolicyDecisionToString(v));
@@ -272,9 +272,9 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
 - (void)testStatChangeStepToString {
   std::map<StatChangeStep, NSString *> stepToString = {
-    {StatChangeStep::kNoChange, @"NoChange"},
-    {StatChangeStep::kMessageCreate, @"MessageCreate"},
-    {StatChangeStep::kCodesignValidation, @"CodesignValidation"},
+      {StatChangeStep::kNoChange, @"NoChange"},
+      {StatChangeStep::kMessageCreate, @"MessageCreate"},
+      {StatChangeStep::kCodesignValidation, @"CodesignValidation"},
   };
 
   for (const auto &kv : stepToString) {
@@ -286,9 +286,9 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
 - (void)testStatResultToString {
   std::map<StatResult, NSString *> resultToString = {
-    {StatResult::kOK, @"OK"},
-    {StatResult::kStatError, @"StatError"},
-    {StatResult::kDevnoInodeMismatch, @"DevnoInodeMismatch"},
+      {StatResult::kOK, @"OK"},
+      {StatResult::kStatError, @"StatError"},
+      {StatResult::kDevnoInodeMismatch, @"DevnoInodeMismatch"},
   };
 
   for (const auto &kv : resultToString) {
@@ -479,23 +479,23 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   esMsgWithDrops.global_seq_num = 123;
 
   OCMStub([mockEventCounts incrementBy:0 forFieldValues:[OCMArg any]])
-    .ignoringNonObjectArgs()
-    .andDo(^(NSInvocation *inv) {
-      dispatch_semaphore_signal(self.sema);
-    });
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation *inv) {
+        dispatch_semaphore_signal(self.sema);
+      });
 
   OCMStub([(SNTMetricInt64Gauge *)mockEventProcessingTimes set:nanos forFieldValues:[OCMArg any]])
-    .ignoringNonObjectArgs()
-    .andDo(^(NSInvocation *inv) {
-      dispatch_semaphore_signal(self.sema);
-    });
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation *inv) {
+        dispatch_semaphore_signal(self.sema);
+      });
 
   dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.q);
   auto metrics = std::make_shared<MetricsPeer>(self.q, timer, 100, mockEventProcessingTimes,
                                                mockEventCounts, mockEventCounts, mockEventCounts,
                                                mockEventCounts, mockEventCounts, nil,
                                                ^(santa::Metrics *m){
-                                                 // This block intentionally left blank
+                                                   // This block intentionally left blank
                                                });
 
   metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos, execMsg);

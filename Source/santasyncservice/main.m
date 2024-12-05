@@ -27,9 +27,9 @@ int main(int argc, const char *argv[]) {
     // are dropped.
 
     MOLXPCConnection *c =
-      [[MOLXPCConnection alloc] initServerWithName:[SNTXPCSyncServiceInterface serviceID]];
+        [[MOLXPCConnection alloc] initServerWithName:[SNTXPCSyncServiceInterface serviceID]];
     c.privilegedInterface = c.unprivilegedInterface =
-      [SNTXPCSyncServiceInterface syncServiceInterface];
+        [SNTXPCSyncServiceInterface syncServiceInterface];
     c.exportedObject = [[SNTSyncService alloc] init];
     [c resume];
     [[NSRunLoop mainRunLoop] run];

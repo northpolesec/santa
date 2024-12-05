@@ -32,33 +32,33 @@ using santa::TelemetryEvent;
   // Ensure that each named event returns an expected flags value.
   // Some items have mixed case to ensure case insensitive matching.
   std::map<std::string_view, TelemetryEvent> eventNameToMask = {
-    {"ExeCUTion", TelemetryEvent::kExecution},
-    {"FoRk", TelemetryEvent::kFork},
-    {"eXIt", TelemetryEvent::kExit},
-    {"close", TelemetryEvent::kClose},
-    {"rename", TelemetryEvent::kRename},
-    {"unlink", TelemetryEvent::kUnlink},
-    {"link", TelemetryEvent::kLink},
-    {"ExchangeData", TelemetryEvent::kExchangeData},
-    {"disk", TelemetryEvent::kDisk},
-    {"bundle", TelemetryEvent::kBundle},
-    {"allowList", TelemetryEvent::kAllowlist},
-    {"fileAccess", TelemetryEvent::kFileAccess},
-    {"codesigninginvalidated", TelemetryEvent::kCodesigningInvalidated},
-    {"loginwindowsession", TelemetryEvent::kLoginWindowSession},
-    {"loginlogout", TelemetryEvent::kLoginLogout},
-    {"screensharing", TelemetryEvent::kScreenSharing},
-    {"openssh", TelemetryEvent::kOpenSSH},
-    {"authentication", TelemetryEvent::kAuthentication},
+      {"ExeCUTion", TelemetryEvent::kExecution},
+      {"FoRk", TelemetryEvent::kFork},
+      {"eXIt", TelemetryEvent::kExit},
+      {"close", TelemetryEvent::kClose},
+      {"rename", TelemetryEvent::kRename},
+      {"unlink", TelemetryEvent::kUnlink},
+      {"link", TelemetryEvent::kLink},
+      {"ExchangeData", TelemetryEvent::kExchangeData},
+      {"disk", TelemetryEvent::kDisk},
+      {"bundle", TelemetryEvent::kBundle},
+      {"allowList", TelemetryEvent::kAllowlist},
+      {"fileAccess", TelemetryEvent::kFileAccess},
+      {"codesigninginvalidated", TelemetryEvent::kCodesigningInvalidated},
+      {"loginwindowsession", TelemetryEvent::kLoginWindowSession},
+      {"loginlogout", TelemetryEvent::kLoginLogout},
+      {"screensharing", TelemetryEvent::kScreenSharing},
+      {"openssh", TelemetryEvent::kOpenSSH},
+      {"authentication", TelemetryEvent::kAuthentication},
 
-    // special cases
-    {"none", TelemetryEvent::kNone},
-    {"everything", TelemetryEvent::kEverything},
+      // special cases
+      {"none", TelemetryEvent::kNone},
+      {"everything", TelemetryEvent::kEverything},
   };
 
   for (const auto &[event_name, want] : eventNameToMask) {
     TelemetryEvent got =
-      TelemetryConfigToBitmask(@[ [NSString stringWithUTF8String:event_name.data()] ], false);
+        TelemetryConfigToBitmask(@[ [NSString stringWithUTF8String:event_name.data()] ], false);
     XCTAssertEqual(got, want);
   }
 
@@ -79,26 +79,26 @@ using santa::TelemetryEvent;
 
 - (void)testESEventToTelemetryEvent {
   std::map<es_event_type_t, TelemetryEvent> esEventToTelemetryEvent = {
-    {ES_EVENT_TYPE_NOTIFY_CLOSE, TelemetryEvent::kClose},
-    {ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED, TelemetryEvent::kCodesigningInvalidated},
-    {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, TelemetryEvent::kExchangeData},
-    {ES_EVENT_TYPE_NOTIFY_EXEC, TelemetryEvent::kExecution},
-    {ES_EVENT_TYPE_NOTIFY_EXIT, TelemetryEvent::kExit},
-    {ES_EVENT_TYPE_NOTIFY_FORK, TelemetryEvent::kFork},
-    {ES_EVENT_TYPE_NOTIFY_LINK, TelemetryEvent::kLink},
-    {ES_EVENT_TYPE_NOTIFY_RENAME, TelemetryEvent::kRename},
-    {ES_EVENT_TYPE_NOTIFY_UNLINK, TelemetryEvent::kUnlink},
-    {ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, TelemetryEvent::kAuthentication},
-    {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN, TelemetryEvent::kLoginLogout},
-    {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT, TelemetryEvent::kLoginLogout},
-    {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN, TelemetryEvent::kLoginWindowSession},
-    {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT, TelemetryEvent::kLoginWindowSession},
-    {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK, TelemetryEvent::kLoginWindowSession},
-    {ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK, TelemetryEvent::kLoginWindowSession},
-    {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH, TelemetryEvent::kScreenSharing},
-    {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, TelemetryEvent::kScreenSharing},
-    {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN, TelemetryEvent::kOpenSSH},
-    {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, TelemetryEvent::kOpenSSH},
+      {ES_EVENT_TYPE_NOTIFY_CLOSE, TelemetryEvent::kClose},
+      {ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED, TelemetryEvent::kCodesigningInvalidated},
+      {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, TelemetryEvent::kExchangeData},
+      {ES_EVENT_TYPE_NOTIFY_EXEC, TelemetryEvent::kExecution},
+      {ES_EVENT_TYPE_NOTIFY_EXIT, TelemetryEvent::kExit},
+      {ES_EVENT_TYPE_NOTIFY_FORK, TelemetryEvent::kFork},
+      {ES_EVENT_TYPE_NOTIFY_LINK, TelemetryEvent::kLink},
+      {ES_EVENT_TYPE_NOTIFY_RENAME, TelemetryEvent::kRename},
+      {ES_EVENT_TYPE_NOTIFY_UNLINK, TelemetryEvent::kUnlink},
+      {ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, TelemetryEvent::kAuthentication},
+      {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN, TelemetryEvent::kLoginLogout},
+      {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT, TelemetryEvent::kLoginLogout},
+      {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN, TelemetryEvent::kLoginWindowSession},
+      {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT, TelemetryEvent::kLoginWindowSession},
+      {ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK, TelemetryEvent::kLoginWindowSession},
+      {ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK, TelemetryEvent::kLoginWindowSession},
+      {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH, TelemetryEvent::kScreenSharing},
+      {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, TelemetryEvent::kScreenSharing},
+      {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN, TelemetryEvent::kOpenSSH},
+      {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, TelemetryEvent::kOpenSSH},
   };
 
   // Ensure ESEventToTelemetryEvent returns TelemetryEvent::kNone for

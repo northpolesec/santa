@@ -194,24 +194,24 @@ NS_ASSUME_NONNULL_BEGIN
     _remountArgs = remountUSBMode;
 
     _diskQueue =
-      dispatch_queue_create("com.northpolesec.santa.daemon.disk_queue", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_create("com.northpolesec.santa.daemon.disk_queue", DISPATCH_QUEUE_SERIAL);
 
     _diskArbSession = DASessionCreate(NULL);
     DASessionSetDispatchQueue(_diskArbSession, _diskQueue);
 
-    SNTMetricInt64Gauge *startupPrefsMetric =
-      [[SNTMetricSet sharedInstance] int64GaugeWithName:@"/santa/device_manager/startup_preference"
-                                             fieldNames:@[]
-                                               helpText:@"The current startup preference value"];
+    SNTMetricInt64Gauge *startupPrefsMetric = [[SNTMetricSet sharedInstance]
+        int64GaugeWithName:@"/santa/device_manager/startup_preference"
+                fieldNames:@[]
+                  helpText:@"The current startup preference value"];
 
     [[SNTMetricSet sharedInstance] registerCallback:^{
       [startupPrefsMetric set:startupPrefs forFieldValues:@[]];
     }];
 
     _startupDiskMetrics = [[SNTMetricSet sharedInstance]
-      counterWithName:@"/santa/device_manager/startup_disk_operation"
-           fieldNames:@[ @"operation" ]
-             helpText:@"Count of the number of USB devices encountered per operation"];
+        counterWithName:@"/santa/device_manager/startup_disk_operation"
+             fieldNames:@[ @"operation" ]
+               helpText:@"Count of the number of USB devices encountered per operation"];
 
     [self performStartupTasks:startupPrefs];
 
@@ -347,9 +347,9 @@ NS_ASSUME_NONNULL_BEGIN
 
     if (dispatch_semaphore_wait(self.diskSema,
                                 dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
-      LOGW(
-        @"Unmounting '%s' mounted on '%s' took longer than expected. Device may still be mounted.",
-        sfs->f_mntfromname, sfs->f_mntonname);
+      LOGW(@"Unmounting '%s' mounted on '%s' took longer than expected. Device may still be "
+           @"mounted.",
+           sfs->f_mntfromname, sfs->f_mntonname);
       [self incrementStartupMetricsOperation:kMetricStartupDiskOperationUnmountFailed];
       continue;
     }
@@ -393,7 +393,7 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (void)handleMessage:(Message &&)esMsg
-   recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
+    recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   // Process the unmount event first so that caches are flushed before any
   // other potential early returns.
   if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_UNMOUNT) {
@@ -428,9 +428,9 @@ NS_ASSUME_NONNULL_BEGIN
                                     (__bridge void *)self);
 
   [super subscribeAndClearCache:{
-                                  ES_EVENT_TYPE_AUTH_MOUNT,
-                                  ES_EVENT_TYPE_AUTH_REMOUNT,
-                                  ES_EVENT_TYPE_NOTIFY_UNMOUNT,
+                                    ES_EVENT_TYPE_AUTH_MOUNT,
+                                    ES_EVENT_TYPE_AUTH_REMOUNT,
+                                    ES_EVENT_TYPE_NOTIFY_UNMOUNT,
                                 }];
 }
 
@@ -447,9 +447,9 @@ NS_ASSUME_NONNULL_BEGIN
   }
 
   pid_t pid = audit_token_to_pid(m->process->audit_token);
-  LOGD(
-    @"SNTEndpointSecurityDeviceManager: mount syscall arriving from path: %s, pid: %d, fflags: %u",
-    m->process->executable->path.data, pid, eventStatFS->f_flags);
+  LOGD(@"SNTEndpointSecurityDeviceManager: mount syscall arriving from path: %s, pid: %d, fflags: "
+       @"%u",
+       m->process->executable->path.data, pid, eventStatFS->f_flags);
 
   DADiskRef disk = DADiskCreateFromBSDName(NULL, self.diskArbSession, eventStatFS->f_mntfromname);
   CFAutorelease(disk);
@@ -459,8 +459,8 @@ NS_ASSUME_NONNULL_BEGIN
   }
 
   SNTDeviceEvent *event = [[SNTDeviceEvent alloc]
-    initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
-          fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
+      initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
+            fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
 
   if ([self haveRemountArgs]) {
     event.remountArgs = self.remountArgs;

@@ -76,18 +76,18 @@ static void RegisterEventLogType(SNTMetricSet *metricSet) {
  */
 static void RegisterMemoryAndCPUMetrics(SNTMetricSet *metricSet) {
   SNTMetricInt64Gauge *vsize =
-    [metricSet int64GaugeWithName:@"/proc/memory/virtual_size"
-                       fieldNames:@[]
-                         helpText:@"The virtual memory size of this process"];
+      [metricSet int64GaugeWithName:@"/proc/memory/virtual_size"
+                         fieldNames:@[]
+                           helpText:@"The virtual memory size of this process"];
   SNTMetricInt64Gauge *rsize =
-    [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
-                       fieldNames:@[]
-                         helpText:@"The resident set size of this process"];
+      [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
+                         fieldNames:@[]
+                           helpText:@"The resident set size of this process"];
 
   SNTMetricDoubleGauge *cpuUsage =
-    [metricSet doubleGaugeWithName:@"/proc/cpu_usage"
-                        fieldNames:@[ @"mode" ]  // "user" or "system"
-                          helpText:@"CPU time consumed by this process, in seconds"];
+      [metricSet doubleGaugeWithName:@"/proc/cpu_usage"
+                          fieldNames:@[ @"mode" ]  // "user" or "system"
+                            helpText:@"CPU time consumed by this process, in seconds"];
 
   [metricSet registerCallback:^(void) {
     std::optional<SantaTaskInfo> tinfo = GetTaskInfo();
@@ -143,9 +143,9 @@ static void RegisterCommonSantaMetrics(SNTMetricSet *metricSet) {
 
   // register start time
   [metricSet
-    addConstantIntegerWithName:@"/proc/birth_timestamp"
-                      helpText:@"Start time of Santad, in microseconds since epoch"
-                         value:(long long)([[NSDate date] timeIntervalSince1970] * 1000000)];
+      addConstantIntegerWithName:@"/proc/birth_timestamp"
+                        helpText:@"Start time of Santad, in microseconds since epoch"
+                           value:(long long)([[NSDate date] timeIntervalSince1970] * 1000000)];
 
   // Register OS version
   [metricSet addConstantStringWithName:@"/proc/os/version"

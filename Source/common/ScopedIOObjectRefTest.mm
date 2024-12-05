@@ -50,7 +50,7 @@ using santa::ScopedIOObjectRef;
     io_service_t service = IOServiceGetMatchingService(GetDefaultIOKitCommsPort(), matchingDict);
 
     ScopedIOObjectRef<io_service_t> scopedServiceRef =
-      ScopedIOObjectRef<io_service_t>::Assume(service);
+        ScopedIOObjectRef<io_service_t>::Assume(service);
 
     XCTAssertTrue(scopedServiceRef.Unsafe());
     XCTAssertTrue(scopedServiceRef);

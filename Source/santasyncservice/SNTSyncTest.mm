@@ -103,8 +103,8 @@
   };
 
   OCMStub([self.syncState.session
-    dataTaskWithRequest:[OCMArg checkWithBlock:validateBlockWrapper]
-      completionHandler:([OCMArg invokeBlockWithArgs:respData, resp, err, nil])]);
+      dataTaskWithRequest:[OCMArg checkWithBlock:validateBlockWrapper]
+        completionHandler:([OCMArg invokeBlockWithArgs:respData, resp, err, nil])]);
 }
 
 /**
@@ -158,11 +158,11 @@
 - (void)setupDefaultDaemonConnResponses {
   struct RuleCounts ruleCounts = {0};
   OCMStub([self.daemonConnRop
-    databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
+      databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
   OCMStub([self.daemonConnRop
-    syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTSyncTypeNormal), nil])]);
+      syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTSyncTypeNormal), nil])]);
   OCMStub([self.daemonConnRop
-    clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
+      clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
 }
 
 #pragma mark - SNTSyncStage Tests
@@ -213,13 +213,13 @@
 
   // Stub succeeding request
   [self
-    stubRequestBody:nil
-           response:nil
-              error:nil
-      validateBlock:^BOOL(NSURLRequest *req) {
-        return ([req.URL.absoluteString containsString:@"/a/"] &&
-                [[req valueForHTTPHeaderField:@"X-XSRF-TOKEN"] isEqualToString:@"my-xsrf-token"]);
-      }];
+      stubRequestBody:nil
+             response:nil
+                error:nil
+        validateBlock:^BOOL(NSURLRequest *req) {
+          return ([req.URL.absoluteString containsString:@"/a/"] &&
+                  [[req valueForHTTPHeaderField:@"X-XSRF-TOKEN"] isEqualToString:@"my-xsrf-token"]);
+        }];
 
   NSString *stageName = [@"a" stringByAppendingFormat:@"/%@", self.syncState.machineID];
   NSURL *u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
@@ -261,7 +261,7 @@
           validateBlock:^BOOL(NSURLRequest *req) {
             return ([req.URL.absoluteString containsString:@"/a/"] &&
                     [[req valueForHTTPHeaderField:@"X-CLIENT-XSRF-TOKEN"]
-                      isEqualToString:@"my-xsrf-token"]);
+                        isEqualToString:@"my-xsrf-token"]);
           }];
 
   NSString *stageName = [@"a" stringByAppendingFormat:@"/%@", self.syncState.machineID];
@@ -281,16 +281,16 @@
 
   NSData *respData = [self dataFromFixture:@"sync_preflight_basic.json"];
   [self
-    stubRequestBody:respData
-           response:nil
-              error:nil
-      validateBlock:^BOOL(NSURLRequest *req) {
-        NSData *gotReqData = [req HTTPBody];
-        NSData *expectedReqData = [self dataFromFixture:@"sync_preflight_request.json"];
-        XCTAssertEqualObjects(gotReqData, expectedReqData);
-        XCTAssertEqualObjects([req valueForHTTPHeaderField:@"Content-Type"], @"application/json");
-        return YES;
-      }];
+      stubRequestBody:respData
+             response:nil
+                error:nil
+        validateBlock:^BOOL(NSURLRequest *req) {
+          NSData *gotReqData = [req HTTPBody];
+          NSData *expectedReqData = [self dataFromFixture:@"sync_preflight_request.json"];
+          XCTAssertEqualObjects(gotReqData, expectedReqData);
+          XCTAssertEqualObjects([req valueForHTTPHeaderField:@"Content-Type"], @"application/json");
+          return YES;
+        }];
 
   XCTAssertTrue([sut sync]);
   XCTAssertEqual(self.syncState.clientMode, SNTClientModeMonitor);
@@ -353,7 +353,7 @@
   SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
   NSData *respData = [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100}"
-    dataUsingEncoding:NSUTF8StringEncoding];
+      dataUsingEncoding:NSUTF8StringEncoding];
 
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
@@ -365,17 +365,17 @@
   SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
   struct RuleCounts ruleCounts = {
-    .binary = 5,
-    .certificate = 8,
-    .compiler = 2,
-    .transitive = 19,
-    .teamID = 3,
-    .signingID = 123,
-    .cdhash = 11,
+      .binary = 5,
+      .certificate = 8,
+      .compiler = 2,
+      .transitive = 19,
+      .teamID = 3,
+      .signingID = 123,
+      .cdhash = 11,
   };
 
   OCMStub([self.daemonConnRop
-    databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
+      databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
 
   [self stubRequestBody:nil
                response:nil
@@ -405,11 +405,11 @@
 
   struct RuleCounts ruleCounts = {0};
   OCMStub([self.daemonConnRop
-    databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
+      databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
   OCMStub([self.daemonConnRop
-    clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
+      clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
   OCMStub([self.daemonConnRop
-    syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(requestedSyncType), nil])]);
+      syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(requestedSyncType), nil])]);
 
   NSData *respData = [self dataFromDict:resp];
   [self stubRequestBody:respData
@@ -662,55 +662,56 @@
 
   OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
 
-  [self
-    stubRequestBody:nil
-           response:nil
-              error:nil
-      validateBlock:^BOOL(NSURLRequest *req) {
-        NSDictionary *requestDict = [self dictFromRequest:req];
-        NSArray *events = requestDict[kEvents];
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest *req) {
+            NSDictionary *requestDict = [self dictFromRequest:req];
+            NSArray *events = requestDict[kEvents];
 
-        XCTAssertEqual(events.count, 2);
+            XCTAssertEqual(events.count, 2);
 
-        NSDictionary *event = events[0];
-        XCTAssertEqualObjects(event[kFileSHA256],
-                              @"ff98fa0c0a1095fedcbe4d388a9760e71399a5c3c017a847ffa545663b57929a");
-        XCTAssertEqualObjects(event[kFileName], @"yes");
-        XCTAssertEqualObjects(event[kFilePath], @"/usr/bin");
-        XCTAssertEqualObjects(event[kDecision], @"BLOCK_BINARY");
-        NSArray *sessions = @[ @"foouser@console", @"foouser@ttys000" ];
-        XCTAssertEqualObjects(event[kCurrentSessions], sessions);
-        NSArray *users = @[ @"foouser" ];
-        XCTAssertEqualObjects(event[kLoggedInUsers], users);
-        XCTAssertEqualObjects(event[kExecutingUser], @"root");
-        XCTAssertEqualObjects(event[kPID], @(11196));
-        XCTAssertEqualObjects(event[kPPID], @(10760));
-        XCTAssertEqualObjects(event[kExecutionTime], @(1464201698.537635));
+            NSDictionary *event = events[0];
+            XCTAssertEqualObjects(
+                event[kFileSHA256],
+                @"ff98fa0c0a1095fedcbe4d388a9760e71399a5c3c017a847ffa545663b57929a");
+            XCTAssertEqualObjects(event[kFileName], @"yes");
+            XCTAssertEqualObjects(event[kFilePath], @"/usr/bin");
+            XCTAssertEqualObjects(event[kDecision], @"BLOCK_BINARY");
+            NSArray *sessions = @[ @"foouser@console", @"foouser@ttys000" ];
+            XCTAssertEqualObjects(event[kCurrentSessions], sessions);
+            NSArray *users = @[ @"foouser" ];
+            XCTAssertEqualObjects(event[kLoggedInUsers], users);
+            XCTAssertEqualObjects(event[kExecutingUser], @"root");
+            XCTAssertEqualObjects(event[kPID], @(11196));
+            XCTAssertEqualObjects(event[kPPID], @(10760));
+            XCTAssertEqualObjects(event[kExecutionTime], @(1464201698.537635));
 
-        NSArray *certs = event[kSigningChain];
-        XCTAssertEqual(certs.count, 3);
+            NSArray *certs = event[kSigningChain];
+            XCTAssertEqual(certs.count, 3);
 
-        NSDictionary *cert = [certs firstObject];
-        XCTAssertEqualObjects(cert[kCertSHA256],
-                              @"2aa4b9973b7ba07add447ee4da8b5337c3ee2c3a991911e80e7282e8a751fc32");
-        XCTAssertEqualObjects(cert[kCertCN], @"Software Signing");
-        XCTAssertEqualObjects(cert[kCertOrg], @"Apple Inc.");
-        XCTAssertEqualObjects(cert[kCertOU], @"Apple Software");
-        XCTAssertEqualObjects(cert[kCertValidFrom], @(1365806075));
-        XCTAssertEqualObjects(cert[kCertValidUntil], @(1618266875));
+            NSDictionary *cert = [certs firstObject];
+            XCTAssertEqualObjects(
+                cert[kCertSHA256],
+                @"2aa4b9973b7ba07add447ee4da8b5337c3ee2c3a991911e80e7282e8a751fc32");
+            XCTAssertEqualObjects(cert[kCertCN], @"Software Signing");
+            XCTAssertEqualObjects(cert[kCertOrg], @"Apple Inc.");
+            XCTAssertEqualObjects(cert[kCertOU], @"Apple Software");
+            XCTAssertEqualObjects(cert[kCertValidFrom], @(1365806075));
+            XCTAssertEqualObjects(cert[kCertValidUntil], @(1618266875));
 
-        XCTAssertEqualObjects(event[kTeamID], @"012345678910");
-        XCTAssertEqualObjects(event[kSigningID], @"signing.id");
-        XCTAssertEqualObjects(event[kCDHash], @"abc123");
+            XCTAssertEqualObjects(event[kTeamID], @"012345678910");
+            XCTAssertEqualObjects(event[kSigningID], @"signing.id");
+            XCTAssertEqualObjects(event[kCDHash], @"abc123");
 
-        event = events[1];
-        XCTAssertEqualObjects(event[kFileName], @"hub");
-        XCTAssertEqualObjects(event[kExecutingUser], @"foouser");
-        certs = event[kSigningChain];
-        XCTAssertEqual(certs.count, 0);
+            event = events[1];
+            XCTAssertEqualObjects(event[kFileName], @"hub");
+            XCTAssertEqualObjects(event[kExecutingUser], @"foouser");
+            certs = event[kSigningChain];
+            XCTAssertEqual(certs.count, 0);
 
-        return YES;
-      }];
+            return YES;
+          }];
 
   [sut sync];
 }
@@ -748,8 +749,8 @@
             XCTAssertEqualObjects(event[kQuarantineTimestamp], @(1464204868));
             XCTAssertEqualObjects(event[kQuarantineAgentBundleID], @"com.google.Chrome");
             XCTAssertEqualObjects(
-              event[kQuarantineDataURL],
-              @"https://d3hevc2w7wq7nj.cloudfront.net/paw/Paw-2.3.4-2003004001.zip");
+                event[kQuarantineDataURL],
+                @"https://d3hevc2w7wq7nj.cloudfront.net/paw/Paw-2.3.4-2003004001.zip");
             XCTAssertEqualObjects(event[kQuarantineRefererURL], @"https://luckymarmot.com/paw");
 
             return YES;
@@ -815,27 +816,27 @@
 
   // Stub out the call to invoke the block, verification of the input is later
   OCMStub([self.daemonConnRop
-    databaseRuleAddRules:OCMOCK_ANY
-             ruleCleanup:SNTRuleCleanupNone
-                   reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
+      databaseRuleAddRules:OCMOCK_ANY
+               ruleCleanup:SNTRuleCleanupNone
+                     reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
   [sut sync];
 
   NSArray *rules = @[
     [[SNTRule alloc]
-      initWithIdentifier:@"ee382e199f7eda58863a93a7854b930ade35798bc6856ee8e6ab6ce9277f0eab"
-                   state:SNTRuleStateBlock
-                    type:SNTRuleTypeBinary
-               customMsg:@""],
+        initWithIdentifier:@"ee382e199f7eda58863a93a7854b930ade35798bc6856ee8e6ab6ce9277f0eab"
+                     state:SNTRuleStateBlock
+                      type:SNTRuleTypeBinary
+                 customMsg:@""],
     [[SNTRule alloc]
-      initWithIdentifier:@"46f8c706d0533a54554af5fc163eea704f10c08b30f8a5db12bfdc04fb382fc3"
-                   state:SNTRuleStateAllow
-                    type:SNTRuleTypeCertificate
-               customMsg:@""],
+        initWithIdentifier:@"46f8c706d0533a54554af5fc163eea704f10c08b30f8a5db12bfdc04fb382fc3"
+                     state:SNTRuleStateAllow
+                      type:SNTRuleTypeCertificate
+                 customMsg:@""],
     [[SNTRule alloc]
-      initWithIdentifier:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"
-                   state:SNTRuleStateBlock
-                    type:SNTRuleTypeCertificate
-               customMsg:@"Hi There"],
+        initWithIdentifier:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"
+                     state:SNTRuleStateBlock
+                      type:SNTRuleTypeCertificate
+                 customMsg:@"Hi There"],
     [[SNTRule alloc] initWithIdentifier:@"AAAAAAAAAA"
                                   state:SNTRuleStateBlock
                                    type:SNTRuleTypeTeamID

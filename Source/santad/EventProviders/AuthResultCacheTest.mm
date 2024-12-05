@@ -51,7 +51,7 @@ static uint64_t RootDevno() {
 
 static inline es_file_t MakeCacheableFile(uint64_t devno, uint64_t ino) {
   return es_file_t{
-    .path = {}, .path_truncated = false, .stat = {.st_dev = (dev_t)devno, .st_ino = ino}};
+      .path = {}, .path_truncated = false, .stat = {.st_dev = (dev_t)devno, .st_ino = ino}};
 }
 
 static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uint64_t root_count,
@@ -176,9 +176,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
 
   SNTAction allowed_transitions[] = {
-    SNTActionRespondAllow,
-    SNTActionRespondAllowCompiler,
-    SNTActionRespondDeny,
+      SNTActionRespondAllow,
+      SNTActionRespondAllowCompiler,
+      SNTActionRespondDeny,
   };
 
   for (size_t i = 0; i < sizeof(allowed_transitions) / sizeof(allowed_transitions[0]); i++) {
@@ -224,22 +224,22 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
 - (void)testFlushCacheReasonToString {
   std::map<FlushCacheReason, NSString *> reasonToString = {
-    {FlushCacheReason::kClientModeChanged, @"ClientModeChanged"},
-    {FlushCacheReason::kPathRegexChanged, @"PathRegexChanged"},
-    {FlushCacheReason::kRulesChanged, @"RulesChanged"},
-    {FlushCacheReason::kStaticRulesChanged, @"StaticRulesChanged"},
-    {FlushCacheReason::kExplicitCommand, @"ExplicitCommand"},
-    {FlushCacheReason::kFilesystemUnmounted, @"FilesystemUnmounted"},
-    {FlushCacheReason::kEntitlementsPrefixFilterChanged, @"EntitlementsPrefixFilterChanged"},
-    {FlushCacheReason::kEntitlementsTeamIDFilterChanged, @"EntitlementsTeamIDFilterChanged"},
+      {FlushCacheReason::kClientModeChanged, @"ClientModeChanged"},
+      {FlushCacheReason::kPathRegexChanged, @"PathRegexChanged"},
+      {FlushCacheReason::kRulesChanged, @"RulesChanged"},
+      {FlushCacheReason::kStaticRulesChanged, @"StaticRulesChanged"},
+      {FlushCacheReason::kExplicitCommand, @"ExplicitCommand"},
+      {FlushCacheReason::kFilesystemUnmounted, @"FilesystemUnmounted"},
+      {FlushCacheReason::kEntitlementsPrefixFilterChanged, @"EntitlementsPrefixFilterChanged"},
+      {FlushCacheReason::kEntitlementsTeamIDFilterChanged, @"EntitlementsTeamIDFilterChanged"},
   };
 
   for (const auto &kv : reasonToString) {
     XCTAssertEqualObjects(FlushCacheReasonToString(kv.first), kv.second);
   }
 
-  XCTAssertThrows(FlushCacheReasonToString(
-    (FlushCacheReason)(static_cast<int>(FlushCacheReason::kEntitlementsTeamIDFilterChanged) + 1)));
+  XCTAssertThrows(FlushCacheReasonToString((
+      FlushCacheReason)(static_cast<int>(FlushCacheReason::kEntitlementsTeamIDFilterChanged) + 1)));
 }
 
 @end

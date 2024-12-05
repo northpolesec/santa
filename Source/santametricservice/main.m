@@ -31,9 +31,9 @@ int main(int argc, const char *argv[]) {
     NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
     LOGI(@"Started, version %@", infoDict[@"CFBundleVersion"]);
     MOLXPCConnection *c =
-      [[MOLXPCConnection alloc] initServerWithName:[SNTXPCMetricServiceInterface serviceID]];
+        [[MOLXPCConnection alloc] initServerWithName:[SNTXPCMetricServiceInterface serviceID]];
     c.privilegedInterface = c.unprivilegedInterface =
-      [SNTXPCMetricServiceInterface metricServiceInterface];
+        [SNTXPCMetricServiceInterface metricServiceInterface];
     c.exportedObject = [[SNTMetricService alloc] init];
     [c resume];
     [[NSRunLoop mainRunLoop] run];

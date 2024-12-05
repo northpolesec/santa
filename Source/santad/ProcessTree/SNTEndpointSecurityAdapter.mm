@@ -50,13 +50,13 @@ void InformFromESEvent(ProcessTree &tree, const Message &msg) {
 
       es_string_token_t executable = msg->event.exec.target->executable->path;
       tree.HandleExec(
-        msg->mach_time, **proc, PidFromAuditToken(msg->event.exec.target->audit_token),
-        (struct Program){.executable = std::string(executable.data, executable.length),
-                         .arguments = args},
-        (struct Cred){
-          .uid = audit_token_to_euid(msg->event.exec.target->audit_token),
-          .gid = audit_token_to_egid(msg->event.exec.target->audit_token),
-        });
+          msg->mach_time, **proc, PidFromAuditToken(msg->event.exec.target->audit_token),
+          (struct Program){.executable = std::string(executable.data, executable.length),
+                           .arguments = args},
+          (struct Cred){
+              .uid = audit_token_to_euid(msg->event.exec.target->audit_token),
+              .gid = audit_token_to_egid(msg->event.exec.target->audit_token),
+          });
 
       break;
     }

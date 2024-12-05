@@ -29,8 +29,8 @@
   self = [super init];
   if (self) {
     _logListeners = [NSMutableArray array];
-    _broadcastQueue =
-      dispatch_queue_create("com.northpolesec.santa.syncservice.broadcast", DISPATCH_QUEUE_SERIAL);
+    _broadcastQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.broadcast",
+                                            DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }

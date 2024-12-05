@@ -25,8 +25,8 @@ namespace santa {
 
 std::unique_ptr<TTYWriter> TTYWriter::Create() {
   dispatch_queue_t q = dispatch_queue_create_with_target(
-    "com.northpolesec.santa.ttywriter", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
-    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0));
+      "com.northpolesec.santa.ttywriter", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+      dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0));
 
   if (!q) {
     return nullptr;

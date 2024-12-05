@@ -49,9 +49,9 @@
                                      targetProcess:(nonnull const es_process_t *)targetProc
                           preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback
                         entitlementsFilterCallback:
-                          (NSDictionary *_Nullable (^_Nonnull)(
-                            const char *_Nullable teamID,
-                            NSDictionary *_Nullable entitlements))entitlementsFilterCallback;
+                            (NSDictionary *_Nullable (^_Nonnull)(
+                                const char *_Nullable teamID,
+                                NSDictionary *_Nullable entitlements))entitlementsFilterCallback;
 
 ///
 ///  A wrapper for decisionForFileInfo:fileSHA256:certificateSHA256:. This method is slower as it
@@ -67,7 +67,7 @@
 ///
 /// Returns YES if the decision requires no futher processing NO otherwise.
 - (BOOL)decision:(nonnull SNTCachedDecision *)cd
-              forRule:(nonnull SNTRule *)rule
-  withTransitiveRules:(BOOL)transitive;
+                forRule:(nonnull SNTRule *)rule
+    withTransitiveRules:(BOOL)transitive;
 
 @end

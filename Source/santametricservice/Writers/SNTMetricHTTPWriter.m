@@ -40,7 +40,7 @@
   config.timeoutIntervalForResource = timeout;
 
   MOLAuthenticatingURLSession *session =
-    [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:config];
+      [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:config];
   session.serverHostname = url.host;
 
   return session;
@@ -54,7 +54,7 @@
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   MOLAuthenticatingURLSession *authSession =
-    [self createSessionWithHostname:url Timeout:self.configurator.metricExportTimeout];
+      [self createSessionWithHostname:url Timeout:self.configurator.metricExportTimeout];
 
   NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
   request.HTTPMethod = @"POST";
@@ -71,11 +71,11 @@
     // tests are written.
     {
       NSURLSessionDataTask *task = [authSession.session
-        dataTaskWithRequest:request
-          completionHandler:^(NSData *_Nullable data, NSURLResponse *_Nullable response,
-                              NSError *_Nullable err) {
-            dispatch_semaphore_signal(sema);
-          }];
+          dataTaskWithRequest:request
+            completionHandler:^(NSData *_Nullable data, NSURLResponse *_Nullable response,
+                                NSError *_Nullable err) {
+              dispatch_semaphore_signal(sema);
+            }];
 
       [task resume];
 
@@ -94,12 +94,12 @@
       NSInteger statusCode = ((NSHTTPURLResponse *)taskResponse).statusCode;
       if (statusCode != 200) {
         localError = [[NSError alloc]
-          initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
-                    code:statusCode
-                userInfo:@{
-                  NSLocalizedDescriptionKey : [NSString
-                    stringWithFormat:@"received http status code %ld from %@", statusCode, url]
-                }];
+            initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
+                      code:statusCode
+                  userInfo:@{
+                    NSLocalizedDescriptionKey : [NSString
+                        stringWithFormat:@"received http status code %ld from %@", statusCode, url]
+                  }];
       }
     }
   }

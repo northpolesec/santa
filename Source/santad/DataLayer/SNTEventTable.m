@@ -118,12 +118,12 @@ static const uint32_t kEventTableCurrentVersion = 3;
   __block BOOL success = NO;
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
     [eventsData
-      enumerateKeysAndObjectsUsingBlock:^(NSData *eventData, SNTStoredEvent *event, BOOL *stop) {
-        success = [db executeUpdate:@"INSERT INTO 'events' (idx, filesha256, eventdata)"
-                                    @"VALUES (?, ?, ?)",
-                                    event.idx, event.fileSHA256, eventData];
-        if (!success) *stop = YES;
-      }];
+        enumerateKeysAndObjectsUsingBlock:^(NSData *eventData, SNTStoredEvent *event, BOOL *stop) {
+          success = [db executeUpdate:@"INSERT INTO 'events' (idx, filesha256, eventdata)"
+                                      @"VALUES (?, ?, ?)",
+                                      event.idx, event.fileSHA256, eventData];
+          if (!success) *stop = YES;
+        }];
   }];
 
   return success;
