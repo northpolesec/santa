@@ -53,6 +53,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
+using santa::DataWatchItemPolicy;
 using santa::EndpointSecurityAPI;
 using santa::Enricher;
 using santa::EnrichOptions;
@@ -66,7 +67,7 @@ using santa::RateLimiter;
 using santa::StringToNSString;
 using santa::TTYWriter;
 using santa::WatchItemPathType;
-using santa::WatchItemPolicy;
+using santa::WatchItemProcess;
 using santa::WatchItems;
 
 NSString *kBadCertHash = @"BAD_CERT_HASH";
@@ -365,7 +366,7 @@ void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
   }
 }
 
-bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Message &msg,
+bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const Message &msg,
                       ProcessSet<std::pair<std::string, std::string>> &ttyMessageCache) {
   if (policy->silent_tty || !TTYWriter::CanWrite(msg->process)) {
     return false;
@@ -477,7 +478,7 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
   return result;
 }
 
-- (FileAccessPolicyDecision)specialCaseForPolicy:(std::shared_ptr<WatchItemPolicy>)policy
+- (FileAccessPolicyDecision)specialCaseForPolicy:(std::shared_ptr<DataWatchItemPolicy>)policy
                                           target:(const PathTarget &)target
                                          message:(const Message &)msg {
   switch (msg->event_type) {
@@ -524,8 +525,8 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
 }
 
 /// An An `es_process_t` must match all criteria within the given
-/// WatchItemPolicy::Process to be considered a match.
-- (bool)policyProcess:(const WatchItemPolicy::Process &)policyProc
+/// WatchItemProcess to be considered a match.
+- (bool)policyProcess:(const WatchItemProcess &)policyProc
      matchesESProcess:(const es_process_t *)esProc {
   // Note: Intentionally not checking `CS_VALID` here - this check must happen
   // outside of this method. This method is used to individually check each
@@ -591,7 +592,7 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
 //   - If the instigating process is signed, the codesignature is valid
 // Otherwise the operation is denied.
 - (FileAccessPolicyDecision)applyPolicy:
-                                (std::optional<std::shared_ptr<WatchItemPolicy>>)optionalPolicy
+                                (std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
                               forTarget:(const PathTarget &)target
                               toMessage:(const Message &)msg {
   // If no policy exists, everything is allowed
@@ -608,7 +609,7 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
     return FileAccessPolicyDecision::kDeniedInvalidSignature;
   }
 
-  std::shared_ptr<WatchItemPolicy> policy = optionalPolicy.value();
+  std::shared_ptr<DataWatchItemPolicy> policy = optionalPolicy.value();
 
   // If policy allows reading, add target to the cache
   if (policy->allow_read_access && target.devnoIno.has_value()) {
@@ -628,7 +629,7 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
 
   FileAccessPolicyDecision decision = FileAccessPolicyDecision::kDenied;
 
-  for (const WatchItemPolicy::Process &process : policy->processes) {
+  for (const WatchItemProcess &process : policy->processes) {
     if ([self policyProcess:process matchesESProcess:msg->process]) {
       decision = FileAccessPolicyDecision::kAllowed;
       break;
@@ -657,7 +658,7 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
 - (FileAccessPolicyDecision)
      handleMessage:(const Message &)msg
             target:(const PathTarget &)target
-            policy:(std::optional<std::shared_ptr<WatchItemPolicy>>)optionalPolicy
+            policy:(std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
      policyVersion:(const std::string &)policyVersion
     overrideAction:(SNTOverrideFileAccessAction)overrideAction {
   FileAccessPolicyDecision policyDecision = ApplyOverrideToDecision(
@@ -666,7 +667,7 @@ bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicy> &policy, const Mess
   // Note: If ShouldLogDecision, it shouldn't be possible for optionalPolicy
   // to not have a value. Performing the check just in case to prevent a crash.
   if (ShouldLogDecision(policyDecision) && optionalPolicy.has_value()) {
-    std::shared_ptr<WatchItemPolicy> policy = optionalPolicy.value();
+    std::shared_ptr<DataWatchItemPolicy> policy = optionalPolicy.value();
     RateLimiter::Decision decision = _rateLimiter->Decide(msg->mach_time);
 
     self->_metrics->SetFileAccessEventMetrics(policyVersion, policy->name,

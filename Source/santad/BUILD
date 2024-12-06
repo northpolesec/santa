@@ -43,6 +43,10 @@ objc_library(
 objc_library(
     name = "WatchItemPolicy",
     hdrs = ["DataLayer/WatchItemPolicy.h"],
+    deps = [
+        "//Source/common:PrefixTree",
+        "//Source/common:Unit",
+    ],
 )
 
 objc_library(
