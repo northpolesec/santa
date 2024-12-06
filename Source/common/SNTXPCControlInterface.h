@@ -59,6 +59,7 @@
 ///  Syncd Ops
 ///
 - (void)postRuleSyncNotificationWithCustomMessage:(NSString *)message reply:(void (^)(void))reply;
+- (void)requestAPNSToken:(void (^)(NSString *))reply;
 
 ///
 /// Control Ops

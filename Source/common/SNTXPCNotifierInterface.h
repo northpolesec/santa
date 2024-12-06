@@ -39,6 +39,7 @@
                  binaryCount:(uint64_t)binaryCount
                    fileCount:(uint64_t)fileCount
                  hashedCount:(uint64_t)hashedCount;
+- (void)requestAPNSToken:(void (^)(NSString *))reply;
 @end
 
 @interface SNTXPCNotifierInterface : NSObject

@@ -93,6 +93,9 @@ The following table expands upon the above logic to list most of the permutation
   if (self.syncState.pushNotificationsToken) {
     req->set_push_notification_token(NSStringToUTF8String(self.syncState.pushNotificationsToken));
   }
+  if (self.syncState.pushNotificationSync) {
+    req->set_push_notification_sync(true);
+  }
 
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
 

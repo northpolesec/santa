@@ -657,6 +657,12 @@
 @property(readonly, nonatomic) BOOL fcmEnabled;
 
 ///
+///  Set to true to use APNS. Defaults to false.
+///  If fcmEnabled and enableAPNS are both enabled, only enableAPNS will be used.
+///
+@property(readonly, nonatomic) BOOL enableAPNS;
+
+///
 /// True if metricsFormat and metricsURL are set. False otherwise.
 ///
 @property(readonly, nonatomic) BOOL exportMetrics;
