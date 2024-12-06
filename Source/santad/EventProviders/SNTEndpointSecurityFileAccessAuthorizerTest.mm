@@ -44,8 +44,9 @@
 #include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
 #include "Source/santad/SNTDecisionCache.h"
 
+using santa::DataWatchItemPolicy;
 using santa::Message;
-using santa::WatchItemPolicy;
+using santa::WatchItemProcess;
 
 extern NSString *kBadCertHash;
 
@@ -77,7 +78,7 @@ void SetExpectationsForFileAccessAuthorizerInit(
 }
 
 // Helper to reset a policy to an empty state
-void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
+void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   proc.binary_path = "";
   proc.signing_id = "";
   proc.team_id = "";
@@ -87,13 +88,13 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
 
 @interface SNTEndpointSecurityFileAccessAuthorizer (Testing)
 - (NSString *)getCertificateHash:(es_file_t *)esFile;
-- (FileAccessPolicyDecision)specialCaseForPolicy:(std::shared_ptr<WatchItemPolicy>)policy
+- (FileAccessPolicyDecision)specialCaseForPolicy:(std::shared_ptr<DataWatchItemPolicy>)policy
                                           target:(const PathTarget &)target
                                          message:(const Message &)msg;
-- (bool)policyProcess:(const WatchItemPolicy::Process &)policyProc
+- (bool)policyProcess:(const WatchItemProcess &)policyProc
      matchesESProcess:(const es_process_t *)esProc;
 - (FileAccessPolicyDecision)applyPolicy:
-                                (std::optional<std::shared_ptr<WatchItemPolicy>>)optionalPolicy
+                                (std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
                               forTarget:(const PathTarget &)target
                               toMessage:(const Message &)msg;
 
@@ -359,7 +360,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                                                        decisionCache:nil
                                                            ttyWriter:nullptr];
 
-  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "ver", "/foo");
+  auto policy = std::make_shared<DataWatchItemPolicy>("foo_policy", "ver", "/foo");
 
   FileAccessPolicyDecision result;
   PathTarget target = {.path = "/some/random/path", .isReadable = true};
@@ -494,7 +495,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
       .ignoringNonObjectArgs()
       .andReturn(@(instigatingCertHash));
 
-  WatchItemPolicy::Process policyProc("", "", "", {}, "", std::nullopt);
+  WatchItemProcess policyProc("", "", "", {}, "", std::nullopt);
 
   {
     // Process policy matching single attribute - path
@@ -584,7 +585,7 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
   const char *instigatingPath = "/path/to/proc";
   const char *instigatingTeamID = "my_teamid";
   const char *instigatingCertHash = "abc123";
-  WatchItemPolicy::Process policyProc(instigatingPath, "", "", {}, "", std::nullopt);
+  WatchItemProcess policyProc(instigatingPath, "", "", {}, "", std::nullopt);
   std::array<uint8_t, 20> instigatingCDHash;
   instigatingCDHash.fill(0x41);
   es_file_t esFile = MakeESFile(instigatingPath);
@@ -627,9 +628,9 @@ void ClearWatchItemPolicyProcess(WatchItemPolicy::Process &proc) {
                    FileAccessPolicyDecision::kNoPolicy);
   }
 
-  auto policy = std::make_shared<WatchItemPolicy>("foo_policy", "ver", "/foo");
+  auto policy = std::make_shared<DataWatchItemPolicy>("foo_policy", "ver", "/foo");
   policy->processes.push_back(policyProc);
-  auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicy>>(policy);
+  auto optionalPolicy = std::make_optional<std::shared_ptr<DataWatchItemPolicy>>(policy);
 
   // Signed but invalid instigating processes are automatically
   // denied when `EnableBadSignatureProtection` is true

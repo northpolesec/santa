@@ -67,16 +67,47 @@ struct WatchItemsState {
   NSTimeInterval last_config_load_epoch;
 };
 
+class DataWatchItems {
+ public:
+  DataWatchItems()
+      : tree_(std::make_unique<santa::PrefixTree<std::shared_ptr<DataWatchItemPolicy>>>()) {}
+
+  DataWatchItems(DataWatchItems &&other) = default;
+  DataWatchItems &operator=(DataWatchItems &&rhs) = default;
+
+  // Copying not supported
+  DataWatchItems(const DataWatchItems &other) = delete;
+  DataWatchItems &operator=(const DataWatchItems &other) = delete;
+
+  bool operator==(const DataWatchItems &other) const { return paths_ == other.paths_; }
+  bool operator!=(const DataWatchItems &other) const { return !(*this == other); }
+  std::vector<std::pair<std::string, WatchItemPathType>> operator-(
+      const DataWatchItems &other) const;
+
+  friend void swap(DataWatchItems &first, DataWatchItems &second) {
+    std::swap(first.tree_, second.tree_);
+    std::swap(first.paths_, second.paths_);
+  }
+
+  bool Build(std::vector<std::shared_ptr<DataWatchItemPolicy>> data_policies);
+  size_t Count() const { return paths_.size(); }
+
+  std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> FindPolcies(
+      const std::vector<std::string_view> &paths) const;
+
+ private:
+  std::unique_ptr<santa::PrefixTree<std::shared_ptr<DataWatchItemPolicy>>> tree_;
+  std::set<std::pair<std::string, WatchItemPathType>> paths_;
+};
+
 class WatchItems : public std::enable_shared_from_this<WatchItems> {
  public:
   using VersionAndPolicies =
-      std::pair<std::string, std::vector<std::optional<std::shared_ptr<WatchItemPolicy>>>>;
-  using WatchItemsTree = santa::PrefixTree<std::shared_ptr<WatchItemPolicy>>;
+      std::pair<std::string, std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>>>;
 
-  // Factory
+  // Factory methods
   static std::shared_ptr<WatchItems> Create(NSString *config_path,
                                             uint64_t reapply_config_frequency_secs);
-  // Factory
   static std::shared_ptr<WatchItems> Create(NSDictionary *config,
                                             uint64_t reapply_config_frequency_secs);
 
@@ -99,7 +130,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   std::optional<WatchItemsState> State();
 
   std::pair<NSString *, NSString *> EventDetailLinkInfo(
-      const std::shared_ptr<WatchItemPolicy> &watch_item);
+      const std::shared_ptr<DataWatchItemPolicy> &watch_item);
 
   friend class santa::WatchItemsPeer;
 
@@ -110,12 +141,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   NSDictionary *ReadConfig();
   NSDictionary *ReadConfigLocked() ABSL_SHARED_LOCKS_REQUIRED(lock_);
   void ReloadConfig(NSDictionary *new_config);
-  void UpdateCurrentState(std::unique_ptr<WatchItemsTree> new_tree,
-                          std::set<std::pair<std::string, WatchItemPathType>> &&new_monitored_paths,
-                          NSDictionary *new_config);
-  bool BuildPolicyTree(const std::vector<std::shared_ptr<WatchItemPolicy>> &watch_items,
-                       WatchItemsTree &tree,
-                       std::set<std::pair<std::string, WatchItemPathType>> &paths);
+  void UpdateCurrentState(DataWatchItems new_data_watch_items, NSDictionary *new_config);
 
   NSString *config_path_;
   NSDictionary *embedded_config_;
@@ -125,11 +151,9 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
 
   absl::Mutex lock_;
 
-  std::unique_ptr<WatchItemsTree> watch_items_ ABSL_GUARDED_BY(lock_);
+  DataWatchItems data_watch_items_ ABSL_GUARDED_BY(lock_);
   NSDictionary *current_config_ ABSL_GUARDED_BY(lock_);
   NSTimeInterval last_update_time_ ABSL_GUARDED_BY(lock_);
-  std::set<std::pair<std::string, WatchItemPathType>> currently_monitored_paths_
-      ABSL_GUARDED_BY(lock_);
   std::string policy_version_ ABSL_GUARDED_BY(lock_);
   std::set<id<SNTEndpointSecurityDynamicEventHandler>> registerd_clients_ ABSL_GUARDED_BY(lock_);
   bool periodic_task_started_ = false;
