@@ -23,5 +23,6 @@
 @interface SNTNotificationManager : NSObject <SNTMessageWindowControllerDelegate, SNTNotifierXPC>
 
 @property NSXPCListenerEndpoint *notificationListener;
-
+- (void)didRegisterForAPNS:(NSString *)deviceToken;
+- (void)APNSTokenChanged;
 @end
