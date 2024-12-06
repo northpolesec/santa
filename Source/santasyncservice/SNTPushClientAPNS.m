@@ -61,8 +61,15 @@
 }
 
 - (void)handleAPNSMessage:(NSDictionary *)message {
-  // TODO: Parse and handle the message.
-  LOGI(@"handleAPNSMessage: %@", message);
+  // Embrace APNS; do not rely on any payload information. Message delivery is best effort. Only a
+  // single message will be queued per-{bundle ID and device}, in a non-deterministic way.
+  // To avoid sync actions from being dropped or delivered out of order, do not store or interpret
+  // any payload data. Instead, use the retrieval as signal that there is new data on the sync
+  // server for the client. Simply, kick off a sync - but let the sync server know this sync was
+  // triggered by a push notification. This allows the sync server to respond with any time
+  // sensitive actions, like displaying a UI notification.
+  // https://developer.apple.com/documentation/usernotifications/sending-notification-requests-to-apns?language=objc
+  [self.delegate pushNotificationSync];
 }
 
 @end
