@@ -81,7 +81,7 @@ using santa::NSStringToUTF8String;
 
   if (!status.ok()) {
     NSString *errStr = [NSString
-      stringWithFormat:@"Failed to convert protobuf to JSON: %s", status.ToString().c_str()];
+        stringWithFormat:@"Failed to convert protobuf to JSON: %s", status.ToString().c_str()];
     SLOGE(@"%@", errStr);
     return nil;
   }
@@ -239,12 +239,12 @@ using santa::NSStringToUTF8String;
   }
 
   google::protobuf::json::ParseOptions options{
-    .ignore_unknown_fields = true,
+      .ignore_unknown_fields = true,
   };
   NSString *jsonData = [[NSString alloc] initWithData:[self stripXssi:data]
                                              encoding:NSUTF8StringEncoding];
   absl::Status status =
-    google::protobuf::json::JsonStringToMessage(NSStringToUTF8String(jsonData), message, options);
+      google::protobuf::json::JsonStringToMessage(NSStringToUTF8String(jsonData), message, options);
   if (!status.ok()) {
     NSString *errStr = [NSString stringWithFormat:@"Failed to parse response JSON into message: %s",
                                                   status.ToString().c_str()];
@@ -277,16 +277,16 @@ using santa::NSStringToUTF8String;
   __block NSError *_error;
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  NSURLSessionDataTask *task =
-    [self.urlSession dataTaskWithRequest:request
-                       completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-                         if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-                           _response = (NSHTTPURLResponse *)response;
-                         }
-                         _data = data;
-                         _error = error;
-                         dispatch_semaphore_signal(sema);
-                       }];
+  NSURLSessionDataTask *task = [self.urlSession
+      dataTaskWithRequest:request
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+          if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+            _response = (NSHTTPURLResponse *)response;
+          }
+          _data = data;
+          _error = error;
+          dispatch_semaphore_signal(sema);
+        }];
   [task resume];
 
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * timeout))) {

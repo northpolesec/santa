@@ -118,12 +118,12 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
         if (esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
           targetPath = @(esMsg->event.rename.destination.existing_file->path.data);
           targetFile = [[SNTFileInfo alloc]
-            initWithEndpointSecurityFile:esMsg->event.rename.destination.existing_file
-                                   error:&error];
+              initWithEndpointSecurityFile:esMsg->event.rename.destination.existing_file
+                                     error:&error];
         } else {
           targetPath = [NSString
-            stringWithFormat:@"%s/%s", esMsg->event.rename.destination.new_path.dir->path.data,
-                             esMsg->event.rename.destination.new_path.filename.data];
+              stringWithFormat:@"%s/%s", esMsg->event.rename.destination.new_path.dir->path.data,
+                               esMsg->event.rename.destination.new_path.filename.data];
           targetFile = [[SNTFileInfo alloc] initWithPath:targetPath error:&error];
         }
       }
@@ -161,7 +161,7 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
     // alone, so that a allowlist or blocklist rule can't be overwritten by a transitive one.
     SNTRuleTable *ruleTable = [SNTDatabaseController ruleTable];
     SNTRule *prevRule = [ruleTable ruleForIdentifiers:(struct RuleIdentifiers){
-                                                        .binarySHA256 = targetFile.SHA256,
+                                                          .binarySHA256 = targetFile.SHA256,
                                                       }];
     if (!prevRule || prevRule.state == SNTRuleStateAllowTransitive) {
       // Construct a new transitive allowlist rule for the executable.

@@ -56,32 +56,33 @@ enum class PlatformBinaryState {
 //
 // It returns YES if the decision was made, NO if the decision was not made.
 - (BOOL)decision:(SNTCachedDecision *)cd
-              forRule:(SNTRule *)rule
-  withTransitiveRules:(BOOL)enableTransitiveRules {
+                forRule:(SNTRule *)rule
+    withTransitiveRules:(BOOL)enableTransitiveRules {
   static const auto decisions =
-    absl::flat_hash_map<std::pair<SNTRuleType, SNTRuleState>, SNTEventState>{
-      {{SNTRuleTypeCDHash, SNTRuleStateAllow}, SNTEventStateAllowCDHash},
-      {{SNTRuleTypeCDHash, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompiler},
-      {{SNTRuleTypeCDHash, SNTRuleStateBlock}, SNTEventStateBlockCDHash},
-      {{SNTRuleTypeCDHash, SNTRuleStateSilentBlock}, SNTEventStateBlockCDHash},
-      {{SNTRuleTypeBinary, SNTRuleStateAllow}, SNTEventStateAllowBinary},
-      {{SNTRuleTypeBinary, SNTRuleStateAllowLocalBinary}, SNTEventStateAllowLocalBinary},
-      {{SNTRuleTypeBinary, SNTRuleStateAllowTransitive}, SNTEventStateAllowTransitive},
-      {{SNTRuleTypeBinary, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompiler},
-      {{SNTRuleTypeBinary, SNTRuleStateSilentBlock}, SNTEventStateBlockBinary},
-      {{SNTRuleTypeBinary, SNTRuleStateBlock}, SNTEventStateBlockBinary},
-      {{SNTRuleTypeSigningID, SNTRuleStateAllow}, SNTEventStateAllowSigningID},
-      {{SNTRuleTypeSigningID, SNTRuleStateAllowLocalSigningID}, SNTEventStateAllowLocalSigningID},
-      {{SNTRuleTypeSigningID, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompiler},
-      {{SNTRuleTypeSigningID, SNTRuleStateSilentBlock}, SNTEventStateBlockSigningID},
-      {{SNTRuleTypeSigningID, SNTRuleStateBlock}, SNTEventStateBlockSigningID},
-      {{SNTRuleTypeCertificate, SNTRuleStateAllow}, SNTEventStateAllowCertificate},
-      {{SNTRuleTypeCertificate, SNTRuleStateSilentBlock}, SNTEventStateBlockCertificate},
-      {{SNTRuleTypeCertificate, SNTRuleStateBlock}, SNTEventStateBlockCertificate},
-      {{SNTRuleTypeTeamID, SNTRuleStateAllow}, SNTEventStateAllowTeamID},
-      {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, SNTEventStateBlockTeamID},
-      {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
-    };
+      absl::flat_hash_map<std::pair<SNTRuleType, SNTRuleState>, SNTEventState>{
+          {{SNTRuleTypeCDHash, SNTRuleStateAllow}, SNTEventStateAllowCDHash},
+          {{SNTRuleTypeCDHash, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompiler},
+          {{SNTRuleTypeCDHash, SNTRuleStateBlock}, SNTEventStateBlockCDHash},
+          {{SNTRuleTypeCDHash, SNTRuleStateSilentBlock}, SNTEventStateBlockCDHash},
+          {{SNTRuleTypeBinary, SNTRuleStateAllow}, SNTEventStateAllowBinary},
+          {{SNTRuleTypeBinary, SNTRuleStateAllowLocalBinary}, SNTEventStateAllowLocalBinary},
+          {{SNTRuleTypeBinary, SNTRuleStateAllowTransitive}, SNTEventStateAllowTransitive},
+          {{SNTRuleTypeBinary, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompiler},
+          {{SNTRuleTypeBinary, SNTRuleStateSilentBlock}, SNTEventStateBlockBinary},
+          {{SNTRuleTypeBinary, SNTRuleStateBlock}, SNTEventStateBlockBinary},
+          {{SNTRuleTypeSigningID, SNTRuleStateAllow}, SNTEventStateAllowSigningID},
+          {{SNTRuleTypeSigningID, SNTRuleStateAllowLocalSigningID},
+           SNTEventStateAllowLocalSigningID},
+          {{SNTRuleTypeSigningID, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompiler},
+          {{SNTRuleTypeSigningID, SNTRuleStateSilentBlock}, SNTEventStateBlockSigningID},
+          {{SNTRuleTypeSigningID, SNTRuleStateBlock}, SNTEventStateBlockSigningID},
+          {{SNTRuleTypeCertificate, SNTRuleStateAllow}, SNTEventStateAllowCertificate},
+          {{SNTRuleTypeCertificate, SNTRuleStateSilentBlock}, SNTEventStateBlockCertificate},
+          {{SNTRuleTypeCertificate, SNTRuleStateBlock}, SNTEventStateBlockCertificate},
+          {{SNTRuleTypeTeamID, SNTRuleStateAllow}, SNTEventStateAllowTeamID},
+          {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, SNTEventStateBlockTeamID},
+          {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
+      };
 
   auto iterator = decisions.find(std::pair<SNTRuleType, SNTRuleState>{rule.type, rule.state});
   if (iterator != decisions.end()) {
@@ -107,9 +108,9 @@ enum class PlatformBinaryState {
             // be.
             LOGE(@"Invalid compiler rule type %ld", rule.type);
             [NSException
-               raise:@"Invalid compiler rule type"
-              format:@"decision:forRule:withTransitiveRules: Unexpected compiler rule type: %ld",
-                     rule.type];
+                 raise:@"Invalid compiler rule type"
+                format:@"decision:forRule:withTransitiveRules: Unexpected compiler rule type: %ld",
+                       rule.type];
             break;
         }
       }
@@ -137,8 +138,8 @@ enum class PlatformBinaryState {
 }
 
 static void UpdateCachedDecisionSigningInfo(
-  SNTCachedDecision *cd, MOLCodesignChecker *csInfo, PlatformBinaryState platformBinaryState,
-  NSDictionary *_Nullable (^entitlementsFilterCallback)(NSDictionary *_Nullable entitlements)) {
+    SNTCachedDecision *cd, MOLCodesignChecker *csInfo, PlatformBinaryState platformBinaryState,
+    NSDictionary *_Nullable (^entitlementsFilterCallback)(NSDictionary *_Nullable entitlements)) {
   cd.certSHA256 = csInfo.leafCertificate.SHA256;
   cd.certCommonName = csInfo.leafCertificate.commonName;
   cd.certChain = csInfo.certificates;
@@ -179,17 +180,17 @@ static void UpdateCachedDecisionSigningInfo(
 }
 
 - (nonnull SNTCachedDecision *)
-         decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                      cdhash:(nullable NSString *)cdhash
-                  fileSHA256:(nullable NSString *)fileSHA256
-           certificateSHA256:(nullable NSString *)certificateSHA256
-                      teamID:(nullable NSString *)teamID
-                   signingID:(nullable NSString *)signingID
-         platformBinaryState:(PlatformBinaryState)platformBinaryState
-        isProdSignedCallback:(BOOL (^_Nonnull)())isProdSignedCallback
-  entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nullable)(
-                               NSDictionary *_Nullable entitlements))entitlementsFilterCallback
-    preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback {
+           decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                        cdhash:(nullable NSString *)cdhash
+                    fileSHA256:(nullable NSString *)fileSHA256
+             certificateSHA256:(nullable NSString *)certificateSHA256
+                        teamID:(nullable NSString *)teamID
+                     signingID:(nullable NSString *)signingID
+           platformBinaryState:(PlatformBinaryState)platformBinaryState
+          isProdSignedCallback:(BOOL (^_Nonnull)())isProdSignedCallback
+    entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nullable)(
+                                   NSDictionary *_Nullable entitlements))entitlementsFilterCallback
+      preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback {
   // Check the hash before allocating a SNTCachedDecision.
   NSString *fileHash = fileSHA256 ?: fileInfo.SHA256;
   SNTClientMode mode = [self.configurator clientMode];
@@ -225,8 +226,8 @@ static void UpdateCachedDecisionSigningInfo(
     MOLCodesignChecker *csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
     if (csInfoError) {
       csInfo = nil;
-      cd.decisionExtra =
-        [NSString stringWithFormat:@"Signature ignored due to error: %ld", (long)csInfoError.code];
+      cd.decisionExtra = [NSString
+          stringWithFormat:@"Signature ignored due to error: %ld", (long)csInfoError.code];
       cd.teamID = nil;
       cd.signingID = nil;
       cd.cdhash = nil;
@@ -248,17 +249,17 @@ static void UpdateCachedDecisionSigningInfo(
     cd.signingID = nil;
   }
 
-  SNTRule *rule =
-    [self.ruleTable ruleForIdentifiers:(struct RuleIdentifiers){.cdhash = cd.cdhash,
-                                                                .binarySHA256 = cd.sha256,
-                                                                .signingID = cd.signingID,
-                                                                .certificateSHA256 = cd.certSHA256,
-                                                                .teamID = cd.teamID}];
+  SNTRule *rule = [self.ruleTable
+      ruleForIdentifiers:(struct RuleIdentifiers){.cdhash = cd.cdhash,
+                                                  .binarySHA256 = cd.sha256,
+                                                  .signingID = cd.signingID,
+                                                  .certificateSHA256 = cd.certSHA256,
+                                                  .teamID = cd.teamID}];
   if (rule) {
     // If we have a rule match we don't need to process any further.
     if ([self decision:cd
-                      forRule:rule
-          withTransitiveRules:self.configurator.enableTransitiveRules]) {
+                        forRule:rule
+            withTransitiveRules:self.configurator.enableTransitiveRules]) {
       return cd;
     }
   }
@@ -266,7 +267,7 @@ static void UpdateCachedDecisionSigningInfo(
   if ([[SNTConfigurator configurator] enableBadSignatureProtection] && csInfoError &&
       csInfoError.code != errSecCSUnsigned) {
     cd.decisionExtra =
-      [NSString stringWithFormat:@"Blocked due to signature error: %ld", (long)csInfoError.code];
+        [NSString stringWithFormat:@"Blocked due to signature error: %ld", (long)csInfoError.code];
     cd.decision = SNTEventStateBlockCertificate;
     return cd;
   }
@@ -297,9 +298,9 @@ static void UpdateCachedDecisionSigningInfo(
                                      targetProcess:(nonnull const es_process_t *)targetProc
                           preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback
                         entitlementsFilterCallback:
-                          (NSDictionary *_Nullable (^_Nonnull)(
-                            const char *_Nullable teamID,
-                            NSDictionary *_Nullable entitlements))entitlementsFilterCallback {
+                            (NSDictionary *_Nullable (^_Nonnull)(
+                                const char *_Nullable teamID,
+                                NSDictionary *_Nullable entitlements))entitlementsFilterCallback {
   NSString *signingID;
   NSString *teamID;
   NSString *cdhash;
@@ -312,13 +313,13 @@ static void UpdateCachedDecisionSigningInfo(
         entitlementsFilterTeamID = targetProc->team_id.data;
         teamID = [NSString stringWithUTF8String:targetProc->team_id.data];
         signingID =
-          [NSString stringWithFormat:@"%@:%@", teamID,
-                                     [NSString stringWithUTF8String:targetProc->signing_id.data]];
+            [NSString stringWithFormat:@"%@:%@", teamID,
+                                       [NSString stringWithUTF8String:targetProc->signing_id.data]];
       } else if (targetProc->is_platform_binary) {
         entitlementsFilterTeamID = "platform";
         signingID =
-          [NSString stringWithFormat:@"platform:%@",
-                                     [NSString stringWithUTF8String:targetProc->signing_id.data]];
+            [NSString stringWithFormat:@"platform:%@",
+                                       [NSString stringWithUTF8String:targetProc->signing_id.data]];
       }
     }
 
@@ -338,20 +339,20 @@ static void UpdateCachedDecisionSigningInfo(
   }
 
   return [self decisionForFileInfo:fileInfo
-    cdhash:cdhash
-    fileSHA256:nil
-    certificateSHA256:nil
-    teamID:teamID
-    signingID:signingID
-    platformBinaryState:targetProc->is_platform_binary ? PlatformBinaryState::kRuntimeTrue
-                                                       : PlatformBinaryState::kRuntimeFalse
-    isProdSignedCallback:^BOOL {
-      return ((targetProc->codesigning_flags & CS_DEV_CODE) == 0);
-    }
-    entitlementsFilterCallback:^NSDictionary *(NSDictionary *entitlements) {
-      return entitlementsFilterCallback(entitlementsFilterTeamID, entitlements);
-    }
-    preCodesignCheckCallback:preCodesignCheckCallback];
+      cdhash:cdhash
+      fileSHA256:nil
+      certificateSHA256:nil
+      teamID:teamID
+      signingID:signingID
+      platformBinaryState:targetProc->is_platform_binary ? PlatformBinaryState::kRuntimeTrue
+                                                         : PlatformBinaryState::kRuntimeFalse
+      isProdSignedCallback:^BOOL {
+        return ((targetProc->codesigning_flags & CS_DEV_CODE) == 0);
+      }
+      entitlementsFilterCallback:^NSDictionary *(NSDictionary *entitlements) {
+        return entitlementsFilterCallback(entitlementsFilterTeamID, entitlements);
+      }
+      preCodesignCheckCallback:preCodesignCheckCallback];
 }
 
 // Used by `$ santactl fileinfo`.
@@ -383,7 +384,7 @@ static void UpdateCachedDecisionSigningInfo(
                   // https://images.apple.com/certificateauthority/pdf/Apple_WWDR_CPS_v1.31.pdf
                   NSArray *keys = @[ @"1.2.840.113635.100.6.1.2", @"1.2.840.113635.100.6.1.12" ];
                   NSDictionary *vals = CFBridgingRelease(SecCertificateCopyValues(
-                    csInfo.leafCertificate.certRef, (__bridge CFArrayRef)keys, NULL));
+                      csInfo.leafCertificate.certRef, (__bridge CFArrayRef)keys, NULL));
                   return vals.count == 0;
                 } else {
                   return NO;

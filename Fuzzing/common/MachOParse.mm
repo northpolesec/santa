@@ -11,7 +11,7 @@ int get_num_fds() {
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static NSString *tmpPath =
-    [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+      [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
 
   int num_fds_pre = get_num_fds();
 

@@ -48,9 +48,9 @@ std::unique_ptr<Logger> Logger::Create(std::shared_ptr<EndpointSecurityAPI> esap
   switch (log_type) {
     case SNTEventLogTypeFilelog:
       return std::make_unique<Logger>(
-        telemetry_mask, BasicString::Create(esapi, std::move(decision_cache)),
-        File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
-                     kMaxExpectedWriteSizeBytes));
+          telemetry_mask, BasicString::Create(esapi, std::move(decision_cache)),
+          File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
+                       kMaxExpectedWriteSizeBytes));
     case SNTEventLogTypeSyslog:
       return std::make_unique<Logger>(telemetry_mask,
                                       BasicString::Create(esapi, std::move(decision_cache), false),
@@ -61,14 +61,14 @@ std::unique_ptr<Logger> Logger::Create(std::shared_ptr<EndpointSecurityAPI> esap
       LOGW(@"The EventLogType value protobuf is currently in beta. The protobuf schema is subject "
            @"to change.");
       return std::make_unique<Logger>(
-        telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache)),
-        Spool::Create([spool_log_path UTF8String], spool_dir_size_threshold,
-                      spool_file_size_threshold, spool_flush_timeout_ms));
+          telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache)),
+          Spool::Create([spool_log_path UTF8String], spool_dir_size_threshold,
+                        spool_file_size_threshold, spool_flush_timeout_ms));
     case SNTEventLogTypeJSON:
       return std::make_unique<Logger>(
-        telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache), true),
-        File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
-                     kMaxExpectedWriteSizeBytes));
+          telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache), true),
+          File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
+                       kMaxExpectedWriteSizeBytes));
     default: LOGE(@"Invalid log type: %ld", log_type); return nullptr;
   }
 }

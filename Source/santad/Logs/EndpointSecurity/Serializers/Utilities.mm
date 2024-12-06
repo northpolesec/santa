@@ -46,8 +46,8 @@ NSString *OriginalPathForTranslocation(const es_process_t *es_proc) {
 
   // Note: Benchmarks showed better performance using `URLWithString` with a `file://` prefix
   // compared to using `fileURLWithPath`.
-  CFURLRef cfExecURL = (__bridge CFURLRef)
-    [NSURL URLWithString:[NSString stringWithFormat:@"file://%s", es_proc->executable->path.data]];
+  CFURLRef cfExecURL = (__bridge CFURLRef)[NSURL
+      URLWithString:[NSString stringWithFormat:@"file://%s", es_proc->executable->path.data]];
   NSURL *origURL = nil;
   bool isTranslocated = false;
 
@@ -73,7 +73,7 @@ NSString *SerialForDevice(NSString *devPath) {
   }
   NSString *serial;
   io_registry_entry_t device =
-    IORegistryEntryFromPath(GetDefaultIOKitCommsPort(), devPath.UTF8String);
+      IORegistryEntryFromPath(GetDefaultIOKitCommsPort(), devPath.UTF8String);
   while (!serial && device) {
     CFMutableDictionaryRef device_properties = NULL;
     IORegistryEntryCreateCFProperties(device, &device_properties, kCFAllocatorDefault, kNilOptions);
@@ -121,7 +121,7 @@ NSString *DiskImageForDevice(NSString *devPath) {
   }
 
   io_registry_entry_t device =
-    IORegistryEntryFromPath(GetDefaultIOKitCommsPort(), devPath.UTF8String);
+      IORegistryEntryFromPath(GetDefaultIOKitCommsPort(), devPath.UTF8String);
   CFMutableDictionaryRef device_properties = NULL;
   IORegistryEntryCreateCFProperties(device, &device_properties, kCFAllocatorDefault, kNilOptions);
   NSDictionary *properties = CFBridgingRelease(device_properties);

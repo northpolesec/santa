@@ -37,7 +37,7 @@ static NSString *const kEventsDatabaseName = @"events.db";
   dispatch_once(&eventDatabaseToken, ^{
     [self createDatabasePath];
     NSString *fullPath =
-      [[SNTDatabaseController databasePath] stringByAppendingPathComponent:kEventsDatabaseName];
+        [[SNTDatabaseController databasePath] stringByAppendingPathComponent:kEventsDatabaseName];
     FMDatabaseQueue *dbq = [[FMDatabaseQueue alloc] initWithPath:fullPath];
 
 #ifndef DEBUG
@@ -61,7 +61,7 @@ static NSString *const kEventsDatabaseName = @"events.db";
   dispatch_once(&ruleDatabaseToken, ^{
     [self createDatabasePath];
     NSString *fullPath =
-      [[SNTDatabaseController databasePath] stringByAppendingPathComponent:kRulesDatabaseName];
+        [[SNTDatabaseController databasePath] stringByAppendingPathComponent:kRulesDatabaseName];
     FMDatabaseQueue *dbq = [[FMDatabaseQueue alloc] initWithPath:fullPath];
 
 #ifndef DEBUG
@@ -92,9 +92,9 @@ static NSString *const kEventsDatabaseName = @"events.db";
 
   if (![fm fileExistsAtPath:[SNTDatabaseController databasePath]]) {
     [fm createDirectoryAtPath:[SNTDatabaseController databasePath]
-      withIntermediateDirectories:YES
-                       attributes:attrs
-                            error:nil];
+        withIntermediateDirectories:YES
+                         attributes:attrs
+                              error:nil];
   } else {
     [fm setAttributes:attrs ofItemAtPath:[SNTDatabaseController databasePath] error:nil];
   }

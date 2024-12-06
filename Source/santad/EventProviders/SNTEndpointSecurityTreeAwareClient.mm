@@ -38,7 +38,7 @@ using santa::Processor;
                       metrics:(std::shared_ptr<Metrics>)metrics
                     processor:(Processor)processor
                   processTree:
-                    (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
+                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
   self = [super initWithESAPI:std::move(esApi) metrics:std::move(metrics) processor:processor];
   if (self) {
     _processTree = std::move(processTree);
@@ -101,11 +101,11 @@ using santa::Processor;
     case ES_EVENT_TYPE_AUTH_EXEC:
     case ES_EVENT_TYPE_NOTIFY_EXEC:
       pids.emplace_back(
-        santa::santad::process_tree::PidFromAuditToken(esMsg->event.exec.target->audit_token));
+          santa::santad::process_tree::PidFromAuditToken(esMsg->event.exec.target->audit_token));
       break;
     case ES_EVENT_TYPE_NOTIFY_FORK:
       pids.emplace_back(
-        santa::santad::process_tree::PidFromAuditToken(esMsg->event.fork.child->audit_token));
+          santa::santad::process_tree::PidFromAuditToken(esMsg->event.fork.child->audit_token));
       break;
     default: break;
   }

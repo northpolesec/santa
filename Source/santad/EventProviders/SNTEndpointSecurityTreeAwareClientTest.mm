@@ -42,10 +42,10 @@ using santa::Processor;
   EXPECT_CALL(*mockESApi, Subscribe).WillRepeatedly(testing::Return(true));
 
   SNTEndpointSecurityTreeAwareClient *treeClient =
-    [[SNTEndpointSecurityTreeAwareClient alloc] initWithESAPI:mockESApi
-                                                      metrics:nullptr
-                                                    processor:Processor::kUnknown
-                                                  processTree:nullptr];
+      [[SNTEndpointSecurityTreeAwareClient alloc] initWithESAPI:mockESApi
+                                                        metrics:nullptr
+                                                      processor:Processor::kUnknown
+                                                    processTree:nullptr];
 
   // Ensure no forced events initially set
   XCTAssertFalse([treeClient eventWasAdded:ES_EVENT_TYPE_NOTIFY_FORK]);
@@ -92,10 +92,10 @@ using santa::Processor;
   // Check that tree aware clients that only subscribe to a subset of forced events
   // return appropriately from handleContextMessage based on which events for force-added.
   SNTEndpointSecurityTreeAwareClient *treeClient =
-    [[SNTEndpointSecurityTreeAwareClient alloc] initWithESAPI:mockESApi
-                                                      metrics:nullptr
-                                                    processor:Processor::kUnknown
-                                                  processTree:nullptr];
+      [[SNTEndpointSecurityTreeAwareClient alloc] initWithESAPI:mockESApi
+                                                        metrics:nullptr
+                                                      processor:Processor::kUnknown
+                                                    processTree:nullptr];
 
   [treeClient subscribe:{ES_EVENT_TYPE_NOTIFY_FORK}];
 

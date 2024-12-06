@@ -24,9 +24,9 @@
   self.mockMOLAuthenticatingURLSession = OCMClassMock([MOLAuthenticatingURLSession class]);
 
   OCMStub([self.mockMOLAuthenticatingURLSession alloc])
-    .andReturn(self.mockMOLAuthenticatingURLSession);
+      .andReturn(self.mockMOLAuthenticatingURLSession);
   OCMStub([self.mockMOLAuthenticatingURLSession initWithSessionConfiguration:[OCMArg any]])
-    .andReturn(self.mockMOLAuthenticatingURLSession);
+      .andReturn(self.mockMOLAuthenticatingURLSession);
   OCMStub([self.mockMOLAuthenticatingURLSession session]).andReturn(self.mockSession);
 
   self.httpWriter = [[SNTMetricHTTPWriter alloc] init];
@@ -51,10 +51,10 @@
 
     if (responseValue[@"error"] != nil) {
       OCMExpect([(NSURLSessionDataTask *)self.mockSessionDataTask error])
-        .andReturn(responseValue[@"error"]);
+          .andReturn(responseValue[@"error"]);
     } else if (((NSHTTPURLResponse *)responseValue[@"response"]).statusCode != 200) {
       OCMExpect([(NSURLSessionDataTask *)self.mockSessionDataTask response])
-        .andReturn(responseValue[@"response"]);
+          .andReturn(responseValue[@"response"]);
     }
 
     if (responseValue != nil && completionHandler != nil) {
@@ -69,8 +69,8 @@
   OCMStub([(NSURLSessionDataTask *)self.mockSessionDataTask resume]).andDo(callCompletionHandler);
 
   OCMStub([self.mockSession dataTaskWithRequest:[OCMArg any] completionHandler:[OCMArg any]])
-    .andDo(getCompletionHandler)
-    .andReturn(self.mockSessionDataTask);
+      .andDo(getCompletionHandler)
+      .andReturn(self.mockSessionDataTask);
 }
 
 /// enqueues a mock HTTP response for testing.
@@ -79,10 +79,10 @@
                          withData:(NSData *)data
                         withError:(NSError *)err {
   NSHTTPURLResponse *response =
-    [[NSHTTPURLResponse alloc] initWithURL:url
-                                statusCode:code
-                               HTTPVersion:@"HTTP/1.1"
-                              headerFields:@{@"content-type" : @"application/json"}];
+      [[NSHTTPURLResponse alloc] initWithURL:url
+                                  statusCode:code
+                                 HTTPVersion:@"HTTP/1.1"
+                                headerFields:@{@"content-type" : @"application/json"}];
 
   NSMutableDictionary *responseValue = [[NSMutableDictionary alloc] init];
 
@@ -125,7 +125,7 @@
     XCTAssertEqualObjects(@"com.northpolesec.santa.metricservice.writers.http", err.domain);
 
     NSString *expectedErrMsg = [NSString
-      stringWithFormat:@"received http status code %ld from %@", code, url.absoluteString];
+        stringWithFormat:@"received http status code %ld from %@", code, url.absoluteString];
     XCTAssertEqualObjects(expectedErrMsg, err.localizedDescription);
     err = nil;
   }
@@ -134,9 +134,9 @@
 - (void)testEnsureErrorsFromTransportAreHandled {
   NSURL *url = [NSURL URLWithString:@"http://localhost:9444"];
   NSError *mockErr =
-    [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
-                               code:505
-                           userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
+      [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
+                                 code:505
+                             userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
   NSError *err;
 
   [self createMockResponseWithURL:url withCode:505 withData:nil withError:mockErr];
@@ -183,9 +183,9 @@
   XCTAssertEqual(NO, result);
 
   NSError *mockErr =
-    [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http.test"
-                               code:505
-                           userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
+      [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http.test"
+                                 code:505
+                             userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
 
   // Queue up two responses for nil and NULL.
   [self createMockResponseWithURL:url withCode:500 withData:nil withError:mockErr];

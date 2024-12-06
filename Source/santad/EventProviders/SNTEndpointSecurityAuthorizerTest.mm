@@ -70,14 +70,14 @@ class MockAuthResultCache : public AuthResultCache {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
   id authClient =
-    [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                 metrics:nullptr
-                                               processor:santa::Processor::kAuthorizer];
+      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                   metrics:nullptr
+                                                 processor:santa::Processor::kAuthorizer];
 
   EXPECT_CALL(*mockESApi, ClearCache)
-    .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
-             .WillOnce(testing::Return(true)))
-    .WillOnce(testing::Return(true));
+      .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
+                 .WillOnce(testing::Return(true)))
+      .WillOnce(testing::Return(true));
 
   [authClient enable];
 
@@ -118,11 +118,11 @@ class MockAuthResultCache : public AuthResultCache {
     ::testing::Mock::AllowLeak(mockESApi.get());
 
     SNTEndpointSecurityAuthorizer *authClient =
-      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                   metrics:nullptr
-                                            execController:self.mockExecController
-                                        compilerController:nil
-                                           authResultCache:nullptr];
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:self.mockExecController
+                                          compilerController:nil
+                                             authResultCache:nullptr];
 
     // Temporarily change the event type
     esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXEC;
@@ -142,11 +142,11 @@ class MockAuthResultCache : public AuthResultCache {
     ::testing::Mock::AllowLeak(mockESApi.get());
 
     SNTEndpointSecurityAuthorizer *authClient =
-      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                   metrics:nullptr
-                                            execController:self.mockExecController
-                                        compilerController:nil
-                                           authResultCache:nullptr];
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:self.mockExecController
+                                          compilerController:nil
+                                             authResultCache:nullptr];
 
     id mockAuthClient = OCMPartialMock(authClient);
 
@@ -155,16 +155,16 @@ class MockAuthResultCache : public AuthResultCache {
       Message msg(mockESApi, &esMsg);
 
       OCMExpect([self.mockExecController synchronousShouldProcessExecEvent:msg])
-        .ignoringNonObjectArgs()
-        .andReturn(NO);
+          .ignoringNonObjectArgs()
+          .andReturn(NO);
 
       OCMExpect([mockAuthClient postAction:SNTActionRespondDeny
                                 forMessage:Message(mockESApi, &esMsg)])
-        .ignoringNonObjectArgs();
+          .ignoringNonObjectArgs();
       OCMStub([mockAuthClient postAction:SNTActionRespondDeny
                               forMessage:Message(mockESApi, &esMsg)])
-        .ignoringNonObjectArgs()
-        .andDo(nil);
+          .ignoringNonObjectArgs()
+          .andDo(nil);
 
       [mockAuthClient handleMessage:std::move(msg)
                  recordEventMetrics:^(EventDisposition d) {
@@ -189,11 +189,11 @@ class MockAuthResultCache : public AuthResultCache {
     ::testing::Mock::AllowLeak(mockESApi.get());
 
     SNTEndpointSecurityAuthorizer *authClient =
-      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                   metrics:nullptr
-                                            execController:self.mockExecController
-                                        compilerController:nil
-                                           authResultCache:nullptr];
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:self.mockExecController
+                                          compilerController:nil
+                                             authResultCache:nullptr];
 
     id mockAuthClient = OCMPartialMock(authClient);
 
@@ -201,13 +201,13 @@ class MockAuthResultCache : public AuthResultCache {
       Message msg(mockESApi, &esMsg);
 
       OCMExpect([self.mockExecController synchronousShouldProcessExecEvent:msg])
-        .ignoringNonObjectArgs()
-        .andReturn(YES);
+          .ignoringNonObjectArgs()
+          .andReturn(YES);
 
       OCMExpect([mockAuthClient processMessage:Message(mockESApi, &esMsg)]).ignoringNonObjectArgs();
       OCMStub([mockAuthClient processMessage:Message(mockESApi, &esMsg)])
-        .ignoringNonObjectArgs()
-        .andDo(nil);
+          .ignoringNonObjectArgs()
+          .andDo(nil);
 
       [mockAuthClient handleMessage:std::move(msg)
                  recordEventMetrics:^(EventDisposition d) {
@@ -240,22 +240,22 @@ class MockAuthResultCache : public AuthResultCache {
 
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   EXPECT_CALL(*mockAuthCache, CheckCache)
-    .WillOnce(testing::Return(SNTActionRequestBinary))
-    .WillOnce(testing::Return(SNTActionRequestBinary))
-    .WillOnce(testing::Return(SNTActionRespondAllowCompiler))
-    .WillOnce(testing::Return(SNTActionUnset));
+      .WillOnce(testing::Return(SNTActionRequestBinary))
+      .WillOnce(testing::Return(SNTActionRequestBinary))
+      .WillOnce(testing::Return(SNTActionRespondAllowCompiler))
+      .WillOnce(testing::Return(SNTActionUnset));
   EXPECT_CALL(*mockAuthCache, AddToCache(testing::_, SNTActionRequestBinary))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
 
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
 
   SNTEndpointSecurityAuthorizer *authClient =
-    [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                 metrics:nullptr
-                                          execController:self.mockExecController
-                                      compilerController:mockCompilerController
-                                         authResultCache:mockAuthCache];
+      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                   metrics:nullptr
+                                            execController:self.mockExecController
+                                        compilerController:mockCompilerController
+                                           authResultCache:mockAuthCache];
   id mockAuthClient = OCMPartialMock(authClient);
 
   // This block tests that processing is held up until an outstanding thread
@@ -278,7 +278,7 @@ class MockAuthResultCache : public AuthResultCache {
   {
     Message msg(mockESApi, &esMsg);
     OCMExpect([self.mockExecController validateExecEvent:msg postAction:OCMOCK_ANY])
-      .ignoringNonObjectArgs();
+        .ignoringNonObjectArgs();
 
     [mockAuthClient processMessage:msg];
 
@@ -307,21 +307,21 @@ class MockAuthResultCache : public AuthResultCache {
 
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondAllowCompiler))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondAllow))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondDeny))
-    .WillOnce(testing::Return(true));
+      .WillOnce(testing::Return(true));
 
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
 
   SNTEndpointSecurityAuthorizer *authClient =
-    [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                 metrics:nullptr
-                                          execController:self.mockExecController
-                                      compilerController:mockCompilerController
-                                         authResultCache:mockAuthCache];
+      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                   metrics:nullptr
+                                            execController:self.mockExecController
+                                        compilerController:mockCompilerController
+                                           authResultCache:mockAuthCache];
   id mockAuthClient = OCMPartialMock(authClient);
 
   {
@@ -330,9 +330,9 @@ class MockAuthResultCache : public AuthResultCache {
     XCTAssertThrows([mockAuthClient postAction:(SNTAction)123 forMessage:msg]);
 
     std::map<SNTAction, es_auth_result_t> actions = {
-      {SNTActionRespondAllowCompiler, ES_AUTH_RESULT_ALLOW},
-      {SNTActionRespondAllow, ES_AUTH_RESULT_ALLOW},
-      {SNTActionRespondDeny, ES_AUTH_RESULT_DENY},
+        {SNTActionRespondAllowCompiler, ES_AUTH_RESULT_ALLOW},
+        {SNTActionRespondAllow, ES_AUTH_RESULT_ALLOW},
+        {SNTActionRespondDeny, ES_AUTH_RESULT_DENY},
     };
 
     for (const auto &kv : actions) {

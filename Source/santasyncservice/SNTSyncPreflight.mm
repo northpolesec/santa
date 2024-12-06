@@ -164,16 +164,16 @@ The following table expands upon the above logic to list most of the permutation
 
   // Don't let these go too low
   uint64_t value = resp.push_notification_full_sync_interval_seconds()
-                     ?: resp.deprecated_fcm_full_sync_interval_seconds();
+                       ?: resp.deprecated_fcm_full_sync_interval_seconds();
   self.syncState.pushNotificationsFullSyncInterval =
-    (value < kDefaultFullSyncInterval) ? kDefaultPushNotificationsFullSyncInterval : value;
+      (value < kDefaultFullSyncInterval) ? kDefaultPushNotificationsFullSyncInterval : value;
 
   value = resp.push_notification_global_rule_sync_deadline_seconds()
-            ?: resp.deprecated_fcm_global_rule_sync_deadline_seconds();
+              ?: resp.deprecated_fcm_global_rule_sync_deadline_seconds();
   self.syncState.pushNotificationsGlobalRuleSyncDeadline =
-    (value < kDefaultPushNotificationsGlobalRuleSyncDeadline)
-      ? kDefaultPushNotificationsGlobalRuleSyncDeadline
-      : value;
+      (value < kDefaultPushNotificationsGlobalRuleSyncDeadline)
+          ? kDefaultPushNotificationsGlobalRuleSyncDeadline
+          : value;
 
   // Check if our sync interval has changed
   value = resp.full_sync_interval_seconds();

@@ -25,5 +25,5 @@
                       metrics:(std::shared_ptr<santa::Metrics>)metrics
                     processor:(santa::Processor)processor
                   processTree:
-                    (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
+                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
 @end

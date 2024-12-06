@@ -38,9 +38,9 @@ typedef void (^MockDADiskAppearedCallback)(DADiskRef ref);
 // Singleton mock fixture around all of the DiskArbitration framework functions
 @interface MockDiskArbitration : NSObject
 @property(nonatomic, readwrite, nonnull)
-  NSMutableDictionary<NSString *, MockDADisk *> *insertedDevices;
+    NSMutableDictionary<NSString *, MockDADisk *> *insertedDevices;
 @property(nonatomic, readwrite, nonnull)
-  NSMutableArray<MockDADiskAppearedCallback> *diskAppearedCallbacks;
+    NSMutableArray<MockDADiskAppearedCallback> *diskAppearedCallbacks;
 @property(nonatomic, nullable) dispatch_queue_t sessionQueue;
 
 - (instancetype _Nonnull)init;

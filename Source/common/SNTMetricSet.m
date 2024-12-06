@@ -646,7 +646,7 @@ NSDictionary *SNTMetricConvertDatesToISO8601Strings(NSDictionary *metrics) {
 
   NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
   formatter.formatOptions =
-    NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+      NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
 
   for (NSString *metricName in mutableMetrics[@"metrics"]) {
     NSMutableDictionary *metric = mutableMetrics[@"metrics"][metricName];

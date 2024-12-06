@@ -41,7 +41,7 @@ using santa::WatchItemPathType;
 static constexpr std::string_view kEventsDBPath = "/private/var/db/santa/events.db";
 static constexpr std::string_view kRulesDBPath = "/private/var/db/santa/rules.db";
 static constexpr std::string_view kSantaAppPrefixPath =
-  "/Applications/Santa.app/Contents/Info.plist";
+    "/Applications/Santa.app/Contents/Info.plist";
 static constexpr std::string_view kBenignPath = "/some/other/path";
 
 @interface SNTEndpointSecurityTamperResistance (Testing)
@@ -56,18 +56,18 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
   std::set<es_event_type_t> expectedEventSubs{
-    ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
-    ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   EXPECT_CALL(*mockESApi, NewClient(testing::_))
-    .WillOnce(testing::Return(Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
+      .WillOnce(testing::Return(Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
   EXPECT_CALL(*mockESApi, MuteProcess(testing::_, testing::_)).WillOnce(testing::Return(true));
   EXPECT_CALL(*mockESApi, ClearCache(testing::_))
-    .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
-             .WillOnce(testing::Return(true)))
-    .WillOnce(testing::Return(true));
+      .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
+                 .WillOnce(testing::Return(true)))
+      .WillOnce(testing::Return(true));
 
   // Setup mocks to handle inverting target path muting
   EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
@@ -75,14 +75,14 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
   // Setup mocks to handle muting the rules db and events db
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kLiteral))
-    .WillRepeatedly(testing::Return(true));
+      .WillRepeatedly(testing::Return(true));
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kPrefix))
-    .WillRepeatedly(testing::Return(true));
+      .WillRepeatedly(testing::Return(true));
 
   SNTEndpointSecurityTamperResistance *tamperClient =
-    [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
-                                                       metrics:nullptr
-                                                        logger:nullptr];
+      [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
+                                                         metrics:nullptr
+                                                          logger:nullptr];
   id mockTamperClient = OCMPartialMock(tamperClient);
 
   [mockTamperClient enable];
@@ -106,16 +106,16 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   es_file_t fileBenign = MakeESFile(kBenignPath.data());
 
   std::map<es_file_t *, es_auth_result_t> pathToResult{
-    {&fileEventsDB, ES_AUTH_RESULT_DENY},
-    {&fileRulesDB, ES_AUTH_RESULT_DENY},
-    {&fileSantaAppPrefix, ES_AUTH_RESULT_DENY},
-    {&fileBenign, ES_AUTH_RESULT_ALLOW},
+      {&fileEventsDB, ES_AUTH_RESULT_DENY},
+      {&fileRulesDB, ES_AUTH_RESULT_DENY},
+      {&fileSantaAppPrefix, ES_AUTH_RESULT_DENY},
+      {&fileBenign, ES_AUTH_RESULT_ALLOW},
   };
 
   std::map<std::pair<pid_t, pid_t>, es_auth_result_t> pidsToResult{
-    {{getpid(), 31838}, ES_AUTH_RESULT_DENY},
-    {{getpid(), 1}, ES_AUTH_RESULT_ALLOW},
-    {{435, 98381}, ES_AUTH_RESULT_ALLOW},
+      {{getpid(), 31838}, ES_AUTH_RESULT_DENY},
+      {{getpid(), 1}, ES_AUTH_RESULT_ALLOW},
+      {{435, 98381}, ES_AUTH_RESULT_ALLOW},
   };
 
   dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
@@ -125,9 +125,9 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   SNTEndpointSecurityTamperResistance *tamperClient =
-    [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
-                                                       metrics:nullptr
-                                                        logger:nullptr];
+      [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
+                                                         metrics:nullptr
+                                                          logger:nullptr];
 
   id mockTamperClient = OCMPartialMock(tamperClient);
 
@@ -140,11 +140,11 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   OCMStub([mockTamperClient respondToMessage:Message(mockESApi, &esMsg)
                               withAuthResult:(es_auth_result_t)0
                                    cacheable:false])
-    .ignoringNonObjectArgs()
-    .andDo(^(NSInvocation *inv) {
-      [inv getArgument:&gotAuthResult atIndex:3];
-      [inv getArgument:&gotCachable atIndex:4];
-    });
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation *inv) {
+        [inv getArgument:&gotAuthResult atIndex:3];
+        [inv getArgument:&gotCachable atIndex:4];
+      });
 
   // First check unhandled event types will crash
   {
@@ -163,12 +163,12 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       esMsg.event.unlink.target = kv.first;
 
       [mockTamperClient
-             handleMessage:std::move(msg)
-        recordEventMetrics:^(EventDisposition d) {
-          XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                             : EventDisposition::kDropped);
-          dispatch_semaphore_signal(semaMetrics);
-        }];
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
 
@@ -186,12 +186,12 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
 
       [mockTamperClient
-             handleMessage:std::move(msg)
-        recordEventMetrics:^(EventDisposition d) {
-          XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                             : EventDisposition::kDropped);
-          dispatch_semaphore_signal(semaMetrics);
-        }];
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
@@ -209,12 +209,12 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       esMsg.event.rename.destination.existing_file = kv.first;
 
       [mockTamperClient
-             handleMessage:std::move(msg)
-        recordEventMetrics:^(EventDisposition d) {
-          XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                             : EventDisposition::kDropped);
-          dispatch_semaphore_signal(semaMetrics);
-        }];
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
@@ -234,12 +234,12 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       esMsg.process->audit_token = MakeAuditToken(kv.first.second, 42);
 
       [mockTamperClient
-             handleMessage:std::move(msg)
-        recordEventMetrics:^(EventDisposition d) {
-          XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                             : EventDisposition::kDropped);
-          dispatch_semaphore_signal(semaMetrics);
-        }];
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
@@ -256,12 +256,12 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       esMsg.event.open.fflag = FWRITE;
 
       [mockTamperClient
-             handleMessage:std::move(msg)
-        recordEventMetrics:^(EventDisposition d) {
-          XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                             : EventDisposition::kDropped);
-          dispatch_semaphore_signal(semaMetrics);
-        }];
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
 
@@ -279,14 +279,14 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
 - (void)testIsProtectedPath {
   XCTAssertTrue(
-    [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/rules.db"]);
+      [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/rules.db"]);
   XCTAssertTrue(
-    [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/events.db"]);
+      [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/events.db"]);
   XCTAssertTrue([SNTEndpointSecurityTamperResistance isProtectedPath:"/Applications/Santa.app"]);
   XCTAssertTrue([SNTEndpointSecurityTamperResistance
-    isProtectedPath:"/Library/LaunchAgents/com.northpolesec.santa.plist"]);
+      isProtectedPath:"/Library/LaunchAgents/com.northpolesec.santa.plist"]);
   XCTAssertTrue([SNTEndpointSecurityTamperResistance
-    isProtectedPath:"/Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist"]);
+      isProtectedPath:"/Library/LaunchDaemons/com.northpolesec.santa.syncservice.plist"]);
   XCTAssertFalse([SNTEndpointSecurityTamperResistance isProtectedPath:"/not/a/db/path"]);
 }
 

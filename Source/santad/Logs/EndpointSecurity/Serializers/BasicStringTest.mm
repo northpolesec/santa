@@ -97,8 +97,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   self.mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
   OCMStub([self.mockDecisionCache resetTimestampForCachedDecision:{}])
-    .ignoringNonObjectArgs()
-    .andReturn(self.testCachedDecision);
+      .ignoringNonObjectArgs()
+      .andReturn(self.testCachedDecision);
 }
 
 - (void)tearDown {
@@ -158,16 +158,16 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   EXPECT_CALL(*mockESApi, ExecArgCount).WillOnce(testing::Return(3));
 
   EXPECT_CALL(*mockESApi, ExecArg)
-    .WillOnce(testing::Return(es_string_token_t{9, "exec|path"}))
-    .WillOnce(testing::Return(es_string_token_t{5, "-l\n-t"}))
-    .WillOnce(testing::Return(es_string_token_t{8, "-v\r--foo"}));
+      .WillOnce(testing::Return(es_string_token_t{9, "exec|path"}))
+      .WillOnce(testing::Return(es_string_token_t{5, "-l\n-t"}))
+      .WillOnce(testing::Return(es_string_token_t{8, "-v\r--foo"}));
 
   std::string got = BasicStringSerializeMessage(mockESApi, &esMsg, self.mockDecisionCache);
   std::string want =
-    "action=EXEC|decision=ALLOW|reason=BINARY|explain=extra!|sha256=1234_hash|"
-    "cert_sha256=5678_hash|cert_cn=|quarantine_url=google.com|pid=12|pidversion="
-    "89|ppid=56|uid=-2|user=nobody|gid=-1|group=nogroup|mode=L|path=execpath<pipe>|"
-    "args=exec<pipe>path -l\\n-t -v\\r--foo|machineid=my_id\n";
+      "action=EXEC|decision=ALLOW|reason=BINARY|explain=extra!|sha256=1234_hash|"
+      "cert_sha256=5678_hash|cert_cn=|quarantine_url=google.com|pid=12|pidversion="
+      "89|ppid=56|uid=-2|user=nobody|gid=-1|group=nogroup|mode=L|path=execpath<pipe>|"
+      "args=exec<pipe>path -l\\n-t -v\\r--foo|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 }
@@ -188,7 +188,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_file_t procChildFile = MakeESFile("foo_child");
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_process_t procChild =
-    MakeESProcess(&procChildFile, MakeAuditToken(67, 89), MakeAuditToken(12, 34));
+      MakeESProcess(&procChildFile, MakeAuditToken(67, 89), MakeAuditToken(12, 34));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_FORK, &proc);
   esMsg.event.fork.child = &procChild;
 
@@ -256,9 +256,9 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   std::string got = BasicStringSerializeMessage(&esMsg);
   std::string want =
-    "action=CODESIGNING_INVALIDATED"
-    "|pid=12|ppid=56|process=foo|processpath=foo"
-    "|uid=-2|user=nobody|gid=-1|group=nogroup|codesigning_flags=0x00000000|machineid=my_id\n";
+      "action=CODESIGNING_INVALIDATED"
+      "|pid=12|ppid=56|process=foo|processpath=foo"
+      "|uid=-2|user=nobody|gid=-1|group=nogroup|codesigning_flags=0x00000000|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 }
@@ -270,8 +270,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN, &proc);
   es_event_lw_session_login_t lwLogin = {
-    .username = MakeESStringToken("daemon"),
-    .graphical_session_id = 123,
+      .username = MakeESStringToken("daemon"),
+      .graphical_session_id = 123,
   };
 
   esMsg.event.lw_session_login = &lwLogin;
@@ -289,8 +289,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT, &proc);
   es_event_lw_session_logout_t lwLogout = {
-    .username = MakeESStringToken("daemon"),
-    .graphical_session_id = 123,
+      .username = MakeESStringToken("daemon"),
+      .graphical_session_id = 123,
   };
 
   esMsg.event.lw_session_logout = &lwLogout;
@@ -308,8 +308,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK, &proc);
   es_event_lw_session_lock_t lwLock = {
-    .username = MakeESStringToken("daemon"),
-    .graphical_session_id = 123,
+      .username = MakeESStringToken("daemon"),
+      .graphical_session_id = 123,
   };
 
   esMsg.event.lw_session_lock = &lwLock;
@@ -327,8 +327,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK, &proc);
   es_event_lw_session_unlock_t lwUnlock = {
-    .username = MakeESStringToken("daemon"),
-    .graphical_session_id = 123,
+      .username = MakeESStringToken("daemon"),
+      .graphical_session_id = 123,
   };
 
   esMsg.event.lw_session_unlock = &lwUnlock;
@@ -346,17 +346,17 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN, &proc);
   es_event_login_login_t login = {
-    .success = false,
-    .failure_message = MakeESStringToken("my|failure"),
-    .username = MakeESStringToken("asdf"),
-    .has_uid = false,
+      .success = false,
+      .failure_message = MakeESStringToken("my|failure"),
+      .username = MakeESStringToken("asdf"),
+      .has_uid = false,
   };
   esMsg.event.login_login = &login;
 
   std::string got = BasicStringSerializeMessage(&esMsg);
-  std::string want =
-    "action=LOGIN|success=false|failure=my<pipe>failure|pid=12|ppid=56|process=foo|processpath=foo|"
-    "uid=-2|user=nobody|gid=-1|group=nogroup|event_user=asdf|machineid=my_id\n";
+  std::string want = "action=LOGIN|success=false|failure=my<pipe>failure|pid=12|ppid=56|process="
+                     "foo|processpath=foo|"
+                     "uid=-2|user=nobody|gid=-1|group=nogroup|event_user=asdf|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -376,8 +376,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT, &proc);
   es_event_login_logout_t logout{
-    .username = MakeESStringToken("asdf"),
-    .uid = 123,
+      .username = MakeESStringToken("asdf"),
+      .uid = 123,
   };
   esMsg.event.login_logout = &logout;
 
@@ -393,24 +393,25 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH, &proc);
   es_event_screensharing_attach_t attach{
-    .success = true,
-    .source_address_type = ES_ADDRESS_TYPE_IPV6,
-    .source_address = MakeESStringToken("::1"),
-    .viewer_appleid = MakeESStringToken("foo@example.com"),
-    .authentication_type = MakeESStringToken("idk"),
-    .authentication_username = MakeESStringToken("my_auth_user"),
-    .session_username = MakeESStringToken("my_session_user"),
-    .existing_session = true,
-    .graphical_session_id = 123,
+      .success = true,
+      .source_address_type = ES_ADDRESS_TYPE_IPV6,
+      .source_address = MakeESStringToken("::1"),
+      .viewer_appleid = MakeESStringToken("foo@example.com"),
+      .authentication_type = MakeESStringToken("idk"),
+      .authentication_username = MakeESStringToken("my_auth_user"),
+      .session_username = MakeESStringToken("my_session_user"),
+      .existing_session = true,
+      .graphical_session_id = 123,
   };
   esMsg.event.screensharing_attach = &attach;
 
   std::string got = BasicStringSerializeMessage(&esMsg);
   std::string want =
-    "action=SCREEN_SHARING_ATTACH|success=true|address_type=ipv6|address=::1|viewer=foo@example."
-    "com|auth_type=idk|auth_user=my_auth_user|session_user=my_session_user|existing_session=true|"
-    "pid=12|ppid=56|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|graphical_"
-    "session_id=123|machineid=my_id\n";
+      "action=SCREEN_SHARING_ATTACH|success=true|address_type=ipv6|address=::1|viewer=foo@example."
+      "com|auth_type=idk|auth_user=my_auth_user|session_user=my_session_user|existing_session=true|"
+      "pid=12|ppid=56|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|"
+      "graphical_"
+      "session_id=123|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -434,10 +435,10 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, &proc);
   es_event_screensharing_detach_t detach{
-    .source_address_type = ES_ADDRESS_TYPE_IPV4,
-    .source_address = MakeESStringToken("1.2.3.4"),
-    .viewer_appleid = MakeESStringToken("foo@example.com"),
-    .graphical_session_id = 123,
+      .source_address_type = ES_ADDRESS_TYPE_IPV4,
+      .source_address = MakeESStringToken("1.2.3.4"),
+      .viewer_appleid = MakeESStringToken("foo@example.com"),
+      .graphical_session_id = 123,
   };
   esMsg.event.screensharing_detach = &detach;
 
@@ -454,12 +455,12 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN, &proc);
   es_event_openssh_login_t login{
-    .success = false,
-    .result_type = ES_OPENSSH_AUTH_FAIL_PASSWD,
-    .source_address_type = ES_ADDRESS_TYPE_NAMED_SOCKET,
-    .source_address = MakeESStringToken("foo"),
-    .username = MakeESStringToken("my_user"),
-    .has_uid = false,
+      .success = false,
+      .result_type = ES_OPENSSH_AUTH_FAIL_PASSWD,
+      .source_address_type = ES_ADDRESS_TYPE_NAMED_SOCKET,
+      .source_address = MakeESStringToken("foo"),
+      .username = MakeESStringToken("my_user"),
+      .has_uid = false,
   };
   esMsg.event.openssh_login = &login;
 
@@ -488,10 +489,10 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, &proc);
   es_event_openssh_logout_t logout{
-    .source_address_type = ES_ADDRESS_TYPE_IPV4,
-    .source_address = MakeESStringToken("5.6.7.8"),
-    .username = MakeESStringToken("my_user"),
-    .uid = 321,
+      .source_address_type = ES_ADDRESS_TYPE_IPV4,
+      .source_address = MakeESStringToken("5.6.7.8"),
+      .username = MakeESStringToken("my_user"),
+      .uid = 321,
   };
   esMsg.event.openssh_logout = &logout;
 
@@ -505,9 +506,9 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 - (void)testGetAuthenticationTouchIDModeString {
   std::map<es_touchid_mode_t, std::string> touchIDModeToString{
-    {ES_TOUCHID_MODE_VERIFICATION, "VERIFICATION"},
-    {ES_TOUCHID_MODE_IDENTIFICATION, "IDENTIFICATION"},
-    {(es_touchid_mode_t)1234, "UNKNOWN"},
+      {ES_TOUCHID_MODE_VERIFICATION, "VERIFICATION"},
+      {ES_TOUCHID_MODE_IDENTIFICATION, "IDENTIFICATION"},
+      {(es_touchid_mode_t)1234, "UNKNOWN"},
   };
 
   for (const auto &kv : touchIDModeToString) {
@@ -522,23 +523,23 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   es_file_t instigatorProcFile = MakeESFile("foo");
   es_process_t instigatorProc =
-    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
 
   es_event_authentication_od_t od = {
-    .instigator = &instigatorProc,
-    .record_type = MakeESStringToken("my_rec_type"),
-    .record_name = MakeESStringToken("my_rec_name"),
-    .node_name = MakeESStringToken("my_node_name"),
-    .db_path = MakeESStringToken("my_db_path"),
+      .instigator = &instigatorProc,
+      .record_type = MakeESStringToken("my_rec_type"),
+      .record_name = MakeESStringToken("my_rec_name"),
+      .node_name = MakeESStringToken("my_node_name"),
+      .db_path = MakeESStringToken("my_db_path"),
 #if HAVE_MACOS_15
-    .instigator_token = MakeAuditToken(654, 321),
+      .instigator_token = MakeAuditToken(654, 321),
 #endif
   };
 
   es_event_authentication_t auth = {
-    .success = true,
-    .type = ES_AUTHENTICATION_TYPE_OD,
-    .data.od = &od,
+      .success = true,
+      .type = ES_AUTHENTICATION_TYPE_OD,
+      .data.od = &od,
   };
 
   esMsg.event.authentication = &auth;
@@ -546,11 +547,11 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   std::string got = BasicStringSerializeMessage(&esMsg);
   std::string want =
-    "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
-    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
-    "|record_type=my_rec_type|record_name=my_rec_name|node_name=my_node_name"
-    "|db_path=my_db_path|machineid=my_id\n";
+      "action=AUTHENTICATION_OD|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+      "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+      "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+      "|record_type=my_rec_type|record_name=my_rec_name|node_name=my_node_name"
+      "|db_path=my_db_path|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -592,22 +593,22 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   es_file_t instigatorProcFile = MakeESFile("foo");
   es_process_t instigatorProc =
-    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
 
   es_event_authentication_touchid_t touchid = {
-    .instigator = &instigatorProc,
-    .touchid_mode = ES_TOUCHID_MODE_VERIFICATION,
-    .has_uid = true,
-    .uid.uid = NOBODY_UID,
+      .instigator = &instigatorProc,
+      .touchid_mode = ES_TOUCHID_MODE_VERIFICATION,
+      .has_uid = true,
+      .uid.uid = NOBODY_UID,
 #if HAVE_MACOS_15
-    .instigator_token = MakeAuditToken(654, 321),
+      .instigator_token = MakeAuditToken(654, 321),
 #endif
   };
 
   es_event_authentication_t auth = {
-    .success = true,
-    .type = ES_AUTHENTICATION_TYPE_TOUCHID,
-    .data.touchid = &touchid,
+      .success = true,
+      .type = ES_AUTHENTICATION_TYPE_TOUCHID,
+      .data.touchid = &touchid,
   };
 
   esMsg.event.authentication = &auth;
@@ -615,10 +616,10 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   std::string got = BasicStringSerializeMessage(&esMsg);
   std::string want =
-    "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
-    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
-    "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+      "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+      "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+      "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+      "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -658,22 +659,22 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   es_file_t instigatorProcFile = MakeESFile("foo");
   es_process_t instigatorProc =
-    MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
 
   es_event_authentication_token_t token = {
-    .instigator = &instigatorProc,
-    .pubkey_hash = MakeESStringToken("abc123"),
-    .token_id = MakeESStringToken("my_tok_id"),
-    .kerberos_principal = MakeESStringToken("my_kerberos_principal"),
+      .instigator = &instigatorProc,
+      .pubkey_hash = MakeESStringToken("abc123"),
+      .token_id = MakeESStringToken("my_tok_id"),
+      .kerberos_principal = MakeESStringToken("my_kerberos_principal"),
 #if HAVE_MACOS_15
-    .instigator_token = MakeAuditToken(654, 321),
+      .instigator_token = MakeAuditToken(654, 321),
 #endif
   };
 
   es_event_authentication_t auth = {
-    .success = true,
-    .type = ES_AUTHENTICATION_TYPE_TOKEN,
-    .data.token = &token,
+      .success = true,
+      .type = ES_AUTHENTICATION_TYPE_TOKEN,
+      .data.token = &token,
   };
 
   esMsg.event.authentication = &auth;
@@ -681,11 +682,11 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   std::string got = BasicStringSerializeMessage(&esMsg);
   std::string want =
-    "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
-    "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
-    "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
-    "|pubkey_hash=abc123|token_id=my_tok_id|kerberos_principal=my_kerberos_principal"
-    "|machineid=my_id\n";
+      "action=AUTHENTICATION_TOKEN|success=true|pid=12|ppid=56|process=foo|processpath=foo"
+      "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
+      "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
+      "|pubkey_hash=abc123|token_id=my_tok_id|kerberos_principal=my_kerberos_principal"
+      "|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -721,9 +722,9 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 - (void)testGetAuthenticationAutoUnlockTypeString {
   std::map<es_auto_unlock_type_t, std::string> autoUnlockTypeToString{
-    {ES_AUTO_UNLOCK_MACHINE_UNLOCK, "MACHINE_UNLOCK"},
-    {ES_AUTO_UNLOCK_AUTH_PROMPT, "AUTH_PROMPT"},
-    {(es_auto_unlock_type_t)1234, "UNKNOWN"},
+      {ES_AUTO_UNLOCK_MACHINE_UNLOCK, "MACHINE_UNLOCK"},
+      {ES_AUTO_UNLOCK_AUTH_PROMPT, "AUTH_PROMPT"},
+      {(es_auto_unlock_type_t)1234, "UNKNOWN"},
   };
 
   for (const auto &kv : autoUnlockTypeToString) {
@@ -737,14 +738,14 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, &proc);
 
   es_event_authentication_auto_unlock_t auto_unlock = {
-    .username = MakeESStringToken("daemon"),
-    .type = ES_AUTO_UNLOCK_MACHINE_UNLOCK,
+      .username = MakeESStringToken("daemon"),
+      .type = ES_AUTO_UNLOCK_MACHINE_UNLOCK,
   };
 
   es_event_authentication_t auth = {
-    .success = true,
-    .type = ES_AUTHENTICATION_TYPE_AUTO_UNLOCK,
-    .data.auto_unlock = &auto_unlock,
+      .success = true,
+      .type = ES_AUTHENTICATION_TYPE_AUTO_UNLOCK,
+      .data.auto_unlock = &auto_unlock,
   };
 
   esMsg.event.authentication = &auth;
@@ -762,11 +763,11 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 - (void)testGetAccessTypeString {
   std::map<es_event_type_t, std::string> accessTypeToString = {
-    {ES_EVENT_TYPE_AUTH_OPEN, "OPEN"},         {ES_EVENT_TYPE_AUTH_LINK, "LINK"},
-    {ES_EVENT_TYPE_AUTH_RENAME, "RENAME"},     {ES_EVENT_TYPE_AUTH_UNLINK, "UNLINK"},
-    {ES_EVENT_TYPE_AUTH_CLONE, "CLONE"},       {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, "EXCHANGEDATA"},
-    {ES_EVENT_TYPE_AUTH_CREATE, "CREATE"},     {ES_EVENT_TYPE_AUTH_TRUNCATE, "TRUNCATE"},
-    {ES_EVENT_TYPE_AUTH_COPYFILE, "COPYFILE"}, {(es_event_type_t)1234, "UNKNOWN_TYPE_1234"},
+      {ES_EVENT_TYPE_AUTH_OPEN, "OPEN"},         {ES_EVENT_TYPE_AUTH_LINK, "LINK"},
+      {ES_EVENT_TYPE_AUTH_RENAME, "RENAME"},     {ES_EVENT_TYPE_AUTH_UNLINK, "UNLINK"},
+      {ES_EVENT_TYPE_AUTH_CLONE, "CLONE"},       {ES_EVENT_TYPE_AUTH_EXCHANGEDATA, "EXCHANGEDATA"},
+      {ES_EVENT_TYPE_AUTH_CREATE, "CREATE"},     {ES_EVENT_TYPE_AUTH_TRUNCATE, "TRUNCATE"},
+      {ES_EVENT_TYPE_AUTH_COPYFILE, "COPYFILE"}, {(es_event_type_t)1234, "UNKNOWN_TYPE_1234"},
   };
 
   for (const auto &kv : accessTypeToString) {
@@ -776,13 +777,13 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 - (void)testGetFileAccessPolicyDecisionString {
   std::map<FileAccessPolicyDecision, std::string> policyDecisionToString = {
-    {FileAccessPolicyDecision::kNoPolicy, "NO_POLICY"},
-    {FileAccessPolicyDecision::kDenied, "DENIED"},
-    {FileAccessPolicyDecision::kDeniedInvalidSignature, "DENIED_INVALID_SIGNATURE"},
-    {FileAccessPolicyDecision::kAllowed, "ALLOWED"},
-    {FileAccessPolicyDecision::kAllowedReadAccess, "ALLOWED_READ_ACCESS"},
-    {FileAccessPolicyDecision::kAllowedAuditOnly, "AUDIT_ONLY"},
-    {(FileAccessPolicyDecision)1234, "UNKNOWN_DECISION_1234"},
+      {FileAccessPolicyDecision::kNoPolicy, "NO_POLICY"},
+      {FileAccessPolicyDecision::kDenied, "DENIED"},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, "DENIED_INVALID_SIGNATURE"},
+      {FileAccessPolicyDecision::kAllowed, "ALLOWED"},
+      {FileAccessPolicyDecision::kAllowedReadAccess, "ALLOWED_READ_ACCESS"},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, "AUDIT_ONLY"},
+      {(FileAccessPolicyDecision)1234, "UNKNOWN_DECISION_1234"},
   };
 
   for (const auto &kv : policyDecisionToString) {
@@ -799,15 +800,16 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   std::vector<uint8_t> ret =
-    BasicString::Create(nullptr, nil, false)
-      ->SerializeFileAccess("v1.0", "pol_name", Message(mockESApi, &esMsg),
-                            Enricher().Enrich(*esMsg.process), "file_target",
-                            FileAccessPolicyDecision::kAllowedAuditOnly);
+      BasicString::Create(nullptr, nil, false)
+          ->SerializeFileAccess("v1.0", "pol_name", Message(mockESApi, &esMsg),
+                                Enricher().Enrich(*esMsg.process), "file_target",
+                                FileAccessPolicyDecision::kAllowedAuditOnly);
   std::string got(ret.begin(), ret.end());
   std::string want =
-    "action=FILE_ACCESS|policy_version=v1.0|policy_name=pol_name|path=file_target|access_type=OPEN|"
-    "decision=AUDIT_ONLY|pid=12|ppid=56|"
-    "process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+      "action=FILE_ACCESS|policy_version=v1.0|policy_name=pol_name|path=file_target|access_type="
+      "OPEN|"
+      "decision=AUDIT_ONLY|pid=12|ppid=56|"
+      "process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
   XCTAssertCppStringEqual(got, want);
 }
 
@@ -821,7 +823,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   std::vector<uint8_t> ret = BasicString::Create(mockESApi, nil, false)
-                               ->SerializeAllowlist(Message(mockESApi, &esMsg), "test_hash");
+                                 ->SerializeAllowlist(Message(mockESApi, &esMsg), "test_hash");
 
   XCTAssertTrue(testing::Mock::VerifyAndClearExpectations(mockESApi.get()),
                 "Expected calls were not properly mocked");
@@ -844,7 +846,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   se.filePath = @"file_path";
 
   std::vector<uint8_t> ret =
-    BasicString::Create(nullptr, nil, false)->SerializeBundleHashingEvent(se);
+      BasicString::Create(nullptr, nil, false)->SerializeBundleHashingEvent(se);
   std::string got(ret.begin(), ret.end());
 
   std::string want = "action=BUNDLE|sha256=file_hash"
@@ -888,7 +890,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   };
 
   std::vector<uint8_t> ret =
-    BasicString::Create(nullptr, nil, false)->SerializeDiskDisappeared(props);
+      BasicString::Create(nullptr, nil, false)->SerializeDiskDisappeared(props);
   std::string got(ret.begin(), ret.end());
 
   std::string want = "action=DISKDISAPPEAR|mount=path|volume=|bsdname=bsd|machineid=my_id\n";
@@ -898,22 +900,22 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 - (void)testGetDecisionString {
   std::map<SNTEventState, std::string> stateToDecision = {
-    {SNTEventStateUnknown, "UNKNOWN"},
-    {SNTEventStateBundleBinary, "UNKNOWN"},
-    {SNTEventStateBlockUnknown, "DENY"},
-    {SNTEventStateBlockBinary, "DENY"},
-    {SNTEventStateBlockCertificate, "DENY"},
-    {SNTEventStateBlockScope, "DENY"},
-    {SNTEventStateBlockTeamID, "DENY"},
-    {SNTEventStateBlockLongPath, "DENY"},
-    {SNTEventStateAllowUnknown, "ALLOW"},
-    {SNTEventStateAllowBinary, "ALLOW"},
-    {SNTEventStateAllowCertificate, "ALLOW"},
-    {SNTEventStateAllowScope, "ALLOW"},
-    {SNTEventStateAllowCompiler, "ALLOW"},
-    {SNTEventStateAllowTransitive, "ALLOW"},
-    {SNTEventStateAllowPendingTransitive, "ALLOW"},
-    {SNTEventStateAllowTeamID, "ALLOW"},
+      {SNTEventStateUnknown, "UNKNOWN"},
+      {SNTEventStateBundleBinary, "UNKNOWN"},
+      {SNTEventStateBlockUnknown, "DENY"},
+      {SNTEventStateBlockBinary, "DENY"},
+      {SNTEventStateBlockCertificate, "DENY"},
+      {SNTEventStateBlockScope, "DENY"},
+      {SNTEventStateBlockTeamID, "DENY"},
+      {SNTEventStateBlockLongPath, "DENY"},
+      {SNTEventStateAllowUnknown, "ALLOW"},
+      {SNTEventStateAllowBinary, "ALLOW"},
+      {SNTEventStateAllowCertificate, "ALLOW"},
+      {SNTEventStateAllowScope, "ALLOW"},
+      {SNTEventStateAllowCompiler, "ALLOW"},
+      {SNTEventStateAllowTransitive, "ALLOW"},
+      {SNTEventStateAllowPendingTransitive, "ALLOW"},
+      {SNTEventStateAllowTeamID, "ALLOW"},
   };
 
   for (const auto &kv : stateToDecision) {
@@ -923,26 +925,26 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 - (void)testGetReasonString {
   std::map<SNTEventState, std::string> stateToReason = {
-    {SNTEventStateUnknown, "NOTRUNNING"},
-    {SNTEventStateBundleBinary, "NOTRUNNING"},
-    {SNTEventStateBlockUnknown, "UNKNOWN"},
-    {SNTEventStateBlockBinary, "BINARY"},
-    {SNTEventStateBlockCertificate, "CERT"},
-    {SNTEventStateBlockScope, "SCOPE"},
-    {SNTEventStateBlockTeamID, "TEAMID"},
-    {SNTEventStateBlockSigningID, "SIGNINGID"},
-    {SNTEventStateBlockCDHash, "CDHASH"},
-    {SNTEventStateBlockLongPath, "LONG_PATH"},
-    {SNTEventStateAllowUnknown, "UNKNOWN"},
-    {SNTEventStateAllowBinary, "BINARY"},
-    {SNTEventStateAllowCertificate, "CERT"},
-    {SNTEventStateAllowScope, "SCOPE"},
-    {SNTEventStateAllowCompiler, "COMPILER"},
-    {SNTEventStateAllowTransitive, "TRANSITIVE"},
-    {SNTEventStateAllowPendingTransitive, "PENDING_TRANSITIVE"},
-    {SNTEventStateAllowTeamID, "TEAMID"},
-    {SNTEventStateAllowSigningID, "SIGNINGID"},
-    {SNTEventStateAllowCDHash, "CDHASH"},
+      {SNTEventStateUnknown, "NOTRUNNING"},
+      {SNTEventStateBundleBinary, "NOTRUNNING"},
+      {SNTEventStateBlockUnknown, "UNKNOWN"},
+      {SNTEventStateBlockBinary, "BINARY"},
+      {SNTEventStateBlockCertificate, "CERT"},
+      {SNTEventStateBlockScope, "SCOPE"},
+      {SNTEventStateBlockTeamID, "TEAMID"},
+      {SNTEventStateBlockSigningID, "SIGNINGID"},
+      {SNTEventStateBlockCDHash, "CDHASH"},
+      {SNTEventStateBlockLongPath, "LONG_PATH"},
+      {SNTEventStateAllowUnknown, "UNKNOWN"},
+      {SNTEventStateAllowBinary, "BINARY"},
+      {SNTEventStateAllowCertificate, "CERT"},
+      {SNTEventStateAllowScope, "SCOPE"},
+      {SNTEventStateAllowCompiler, "COMPILER"},
+      {SNTEventStateAllowTransitive, "TRANSITIVE"},
+      {SNTEventStateAllowPendingTransitive, "PENDING_TRANSITIVE"},
+      {SNTEventStateAllowTeamID, "TEAMID"},
+      {SNTEventStateAllowSigningID, "SIGNINGID"},
+      {SNTEventStateAllowCDHash, "CDHASH"},
   };
 
   for (const auto &kv : stateToReason) {
@@ -952,10 +954,10 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 - (void)testGetModeString {
   std::map<SNTClientMode, std::string> modeToString = {
-    {SNTClientModeMonitor, "M"},
-    {SNTClientModeLockdown, "L"},
-    {SNTClientModeStandalone, "S"},
-    {(SNTClientMode)123, "U"},
+      {SNTClientModeMonitor, "M"},
+      {SNTClientModeLockdown, "L"},
+      {SNTClientModeStandalone, "S"},
+      {(SNTClientMode)123, "U"},
   };
 
   for (const auto &kv : modeToString) {

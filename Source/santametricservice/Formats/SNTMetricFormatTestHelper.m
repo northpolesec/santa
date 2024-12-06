@@ -21,7 +21,7 @@
 + (NSDictionary *)convertDatesToFixedDateWithExportDict:(NSMutableDictionary *)exportDict {
   NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
   formatter.formatOptions =
-    NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+      NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
 
   NSDate *fixedDate = [formatter dateFromString:@"2021-09-16T21:07:34.826Z"];
 
@@ -53,9 +53,9 @@
                                helpText:@"Is santad using the endpoint security framework"
                                   value:YES];
   [metricSet
-    addConstantIntegerWithName:@"/proc/birth_timestamp"
-                      helpText:@"Start time of this santad instance, in microseconds since epoch"
-                         value:(long long)(0x12345668910)];
+      addConstantIntegerWithName:@"/proc/birth_timestamp"
+                        helpText:@"Start time of this santad instance, in microseconds since epoch"
+                           value:(long long)(0x12345668910)];
   // Add Metrics
   SNTMetricCounter *c = [metricSet counterWithName:@"/santa/events"
                                         fieldNames:@[ @"rule_type", @"client" ]
@@ -73,14 +73,14 @@
 
   // Add Metrics with callback
   SNTMetricInt64Gauge *virtualMemoryGauge =
-    [metricSet int64GaugeWithName:@"/proc/memory/virtual_size"
-                       fieldNames:@[]
-                         helpText:@"The virtual memory size of this process"];
+      [metricSet int64GaugeWithName:@"/proc/memory/virtual_size"
+                         fieldNames:@[]
+                           helpText:@"The virtual memory size of this process"];
 
   SNTMetricInt64Gauge *residentMemoryGauge =
-    [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
-                       fieldNames:@[]
-                         helpText:@"The resident set size of this process"];
+      [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
+                         fieldNames:@[]
+                           helpText:@"The resident set size of this process"];
 
   [metricSet registerCallback:^(void) {
     [virtualMemoryGauge set:987654321 forFieldValues:@[]];

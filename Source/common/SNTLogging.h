@@ -41,7 +41,7 @@ typedef enum : NSUInteger {
 ///  @param ... the arguments to format.
 ///
 void logMessage(LogLevel level, FILE *destination, NSString *format, ...)
-  __attribute__((format(__NSString__, 3, 4)));
+    __attribute__((format(__NSString__, 3, 4)));
 
 /// Simple logging macros
 #define LOGD(logFormat, ...) logMessage(LOG_LEVEL_DEBUG, stdout, logFormat, ##__VA_ARGS__)

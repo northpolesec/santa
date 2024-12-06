@@ -91,7 +91,7 @@
                       reply:(void (^)(SNTSyncStatusType))reply {
   MOLXPCConnection *ll = [[MOLXPCConnection alloc] initClientWithListener:logListener];
   ll.remoteInterface =
-    [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
+      [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
   [ll resume];
   [self.syncManager syncType:syncType
                    withReply:^(SNTSyncStatusType status) {

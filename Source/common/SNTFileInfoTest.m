@@ -101,7 +101,7 @@
   }
 
   SNTFileInfo *sut = [[SNTFileInfo alloc]
-    initWithPath:@"/System/Library/Extensions/AppleAPIC.kext/Contents/MacOS/AppleAPIC"];
+      initWithPath:@"/System/Library/Extensions/AppleAPIC.kext/Contents/MacOS/AppleAPIC"];
 
   XCTAssertTrue(sut.isMachO);
   XCTAssertTrue(sut.isKext);

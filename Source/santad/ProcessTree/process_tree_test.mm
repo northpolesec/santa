@@ -125,12 +125,12 @@ using namespace santa::santad::process_tree;
   XCTAssertEqual(proc.effective_cred_.gid, getegid());
 
   [[[NSProcessInfo processInfo] arguments]
-    enumerateObjectsUsingBlock:^(NSString *_Nonnull obj, NSUInteger idx, BOOL *_Nonnull stop) {
-      XCTAssertEqualObjects(@(proc.program_->arguments[idx].c_str()), obj);
-      if (idx == 0) {
-        XCTAssertEqualObjects(@(proc.program_->executable.c_str()), obj);
-      }
-    }];
+      enumerateObjectsUsingBlock:^(NSString *_Nonnull obj, NSUInteger idx, BOOL *_Nonnull stop) {
+        XCTAssertEqualObjects(@(proc.program_->arguments[idx].c_str()), obj);
+        if (idx == 0) {
+          XCTAssertEqualObjects(@(proc.program_->executable.c_str()), obj);
+        }
+      }];
 }
 
 - (void)testAnnotation {

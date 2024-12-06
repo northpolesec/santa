@@ -47,68 +47,68 @@ REGISTER_COMMAND_NAME(@"rule")
 }
 
 + (NSString *)longHelpText {
-  return (
-    @"Usage: santactl rule [options]\n"
-    @"  One of:\n"
-    @"    --allow: add to allow\n"
-    @"    --block: add to block\n"
-    @"    --silent-block: add to silent block\n"
-    @"    --compiler: allow and mark as a compiler\n"
-    @"    --remove: remove existing rule\n"
-    @"    --check: check for an existing rule\n"
-    @"    --import {path}: import rules from a JSON file\n"
-    @"    --export {path}: export rules to a JSON file\n"
-    @"\n"
-    @"  One of:\n"
-    @"    --path {path}: path of binary/bundle to add/remove.\n"
-    @"                   Will add an appropriate rule for the file currently at that path.\n"
-    @"                   Defaults to a SHA-256 rule unless overridden with another flag.\n"
-    @"                   Does not work with --check. Use the fileinfo verb to check.\n"
-    @"                   the rule state of a file.\n"
-    @"    --identifier {sha256|teamID|signingID|cdhash}: identifier to add/remove/check\n"
-    @"    --sha256 {sha256}: hash to add/remove/check [deprecated]\n"
-    @"\n"
-    @"  Optionally:\n"
-    @"    --teamid: add or check a team ID rule instead of binary\n"
-    @"    --signingid: add or check a signing ID rule instead of binary (see notes)\n"
-    @"    --certificate: add or check a certificate sha256 rule instead of binary\n"
-    @"    --cdhash: add or check a cdhash rule instead of binary\n"
+  return (@"Usage: santactl rule [options]\n"
+          @"  One of:\n"
+          @"    --allow: add to allow\n"
+          @"    --block: add to block\n"
+          @"    --silent-block: add to silent block\n"
+          @"    --compiler: allow and mark as a compiler\n"
+          @"    --remove: remove existing rule\n"
+          @"    --check: check for an existing rule\n"
+          @"    --import {path}: import rules from a JSON file\n"
+          @"    --export {path}: export rules to a JSON file\n"
+          @"\n"
+          @"  One of:\n"
+          @"    --path {path}: path of binary/bundle to add/remove.\n"
+          @"                   Will add an appropriate rule for the file currently at that path.\n"
+          @"                   Defaults to a SHA-256 rule unless overridden with another flag.\n"
+          @"                   Does not work with --check. Use the fileinfo verb to check.\n"
+          @"                   the rule state of a file.\n"
+          @"    --identifier {sha256|teamID|signingID|cdhash}: identifier to add/remove/check\n"
+          @"    --sha256 {sha256}: hash to add/remove/check [deprecated]\n"
+          @"\n"
+          @"  Optionally:\n"
+          @"    --teamid: add or check a team ID rule instead of binary\n"
+          @"    --signingid: add or check a signing ID rule instead of binary (see notes)\n"
+          @"    --certificate: add or check a certificate sha256 rule instead of binary\n"
+          @"    --cdhash: add or check a cdhash rule instead of binary\n"
 #ifdef DEBUG
-    @"    --force: allow manual changes even when SyncBaseUrl is set\n"
+          @"    --force: allow manual changes even when SyncBaseUrl is set\n"
 #endif
-    @"    --message {message}: custom message to show when binary is blocked\n"
-    @"    --comment {comment}: comment to attach to a new rule\n"
-    @"    --clean: when importing rules via JSON clear all non-transitive rules before importing\n"
-    @"    --clean-all: when importing rules via JSON clear all rules before importing\n"
-    @"\n"
-    @"  Notes:\n"
-    @"    The format of `identifier` when adding/checking a `signingid` rule is:\n"
-    @"\n"
-    @"      `TeamID:SigningID`\n"
-    @"\n"
-    @"    Because signing IDs are controlled by the binary author, this ensures\n"
-    @"    that the signing ID is properly scoped to a developer. For the special\n"
-    @"    case of platform binaries, `TeamID` should be replaced with the string\n"
-    @"    \"platform\" (e.g. `platform:SigningID`). This allows for rules\n"
-    @"    targeting Apple-signed binaries that do not have a team ID.\n"
-    @"\n"
-    @"  Importing / Exporting Rules:\n"
-    @"    If santa is not configured to use a sync server one can export\n"
-    @"    & import its non-static rules to and from JSON files using the \n"
-    @"    --export/--import flags. These files have the following form:\n"
-    @"\n"
-    @"    {\"rules\": [{rule-dictionaries}]}\n"
-    @"    e.g. {\"rules\": [\n"
-    @"                      {\"policy\": \"BLOCKLIST\",\n"
-    @"                       \"identifier\": "
-    @"\"84de9c61777ca36b13228e2446d53e966096e78db7a72c632b5c185b2ffe68a6\"\n"
-    @"                       \"custom_url\" : \"\",\n"
-    @"                       \"custom_msg\": \"/bin/ls block for demo\"}\n"
-    @"                      ]}\n"
-    @"\n"
-    @"    By default rules are not cleared when importing. To clear the\n"
-    @"    database you must use either --clean or --clean-all\n"
-    @"\n");
+          @"    --message {message}: custom message to show when binary is blocked\n"
+          @"    --comment {comment}: comment to attach to a new rule\n"
+          @"    --clean: when importing rules via JSON clear all non-transitive rules before "
+          @"importing\n"
+          @"    --clean-all: when importing rules via JSON clear all rules before importing\n"
+          @"\n"
+          @"  Notes:\n"
+          @"    The format of `identifier` when adding/checking a `signingid` rule is:\n"
+          @"\n"
+          @"      `TeamID:SigningID`\n"
+          @"\n"
+          @"    Because signing IDs are controlled by the binary author, this ensures\n"
+          @"    that the signing ID is properly scoped to a developer. For the special\n"
+          @"    case of platform binaries, `TeamID` should be replaced with the string\n"
+          @"    \"platform\" (e.g. `platform:SigningID`). This allows for rules\n"
+          @"    targeting Apple-signed binaries that do not have a team ID.\n"
+          @"\n"
+          @"  Importing / Exporting Rules:\n"
+          @"    If santa is not configured to use a sync server one can export\n"
+          @"    & import its non-static rules to and from JSON files using the \n"
+          @"    --export/--import flags. These files have the following form:\n"
+          @"\n"
+          @"    {\"rules\": [{rule-dictionaries}]}\n"
+          @"    e.g. {\"rules\": [\n"
+          @"                      {\"policy\": \"BLOCKLIST\",\n"
+          @"                       \"identifier\": "
+          @"\"84de9c61777ca36b13228e2446d53e966096e78db7a72c632b5c185b2ffe68a6\"\n"
+          @"                       \"custom_url\" : \"\",\n"
+          @"                       \"custom_msg\": \"/bin/ls block for demo\"}\n"
+          @"                      ]}\n"
+          @"\n"
+          @"    By default rules are not cleared when importing. To clear the\n"
+          @"    database you must use either --clean or --clean-all\n"
+          @"\n");
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
@@ -287,17 +287,17 @@ REGISTER_COMMAND_NAME(@"rule")
   if (newRule.type == SNTRuleTypeBinary || newRule.type == SNTRuleTypeCertificate ||
       newRule.type == SNTRuleTypeCDHash) {
     NSCharacterSet *nonHex =
-      [[NSCharacterSet characterSetWithCharactersInString:@"0123456789ABCDEF"] invertedSet];
+        [[NSCharacterSet characterSetWithCharactersInString:@"0123456789ABCDEF"] invertedSet];
     NSUInteger length =
-      [[newRule.identifier uppercaseString] stringByTrimmingCharactersInSet:nonHex].length;
+        [[newRule.identifier uppercaseString] stringByTrimmingCharactersInSet:nonHex].length;
 
     if ((newRule.type == SNTRuleTypeBinary || newRule.type == SNTRuleTypeCertificate) &&
         length != CC_SHA256_DIGEST_LENGTH * 2) {
       [self printErrorUsageAndExit:@"BINARY or CERTIFICATE rules require a valid SHA-256"];
     } else if (newRule.type == SNTRuleTypeCDHash && length != CS_CDHASH_LEN * 2) {
       [self printErrorUsageAndExit:
-              [NSString stringWithFormat:@"CDHASH rules require a valid hex string of length %d",
-                                         CS_CDHASH_LEN * 2]];
+                [NSString stringWithFormat:@"CDHASH rules require a valid hex string of length %d",
+                                           CS_CDHASH_LEN * 2]];
     }
   }
 
@@ -310,50 +310,50 @@ REGISTER_COMMAND_NAME(@"rule")
     [self printErrorUsageAndExit:@"No state specified"];
   } else if (!newRule.identifier) {
     [self printErrorUsageAndExit:
-            @"A valid SHA-256, CDHash, Signing ID, team ID, or path to file must be specified"];
+              @"A valid SHA-256, CDHash, Signing ID, team ID, or path to file must be specified"];
   }
 
   [[self.daemonConn remoteObjectProxy]
-    databaseRuleAddRules:@[ newRule ]
-             ruleCleanup:SNTRuleCleanupNone
-                   reply:^(NSError *error) {
-                     if (error) {
-                       printf("Failed to modify rules: %s",
-                              [error.localizedDescription UTF8String]);
-                       LOGD(@"Failure reason: %@", error.localizedFailureReason);
-                       exit(1);
-                     } else {
-                       NSString *ruleType;
-                       switch (newRule.type) {
-                         case SNTRuleTypeCertificate: ruleType = @"Certificate SHA-256"; break;
-                         case SNTRuleTypeBinary: {
-                           ruleType = @"SHA-256";
-                           break;
-                         }
-                         case SNTRuleTypeTeamID: {
-                           ruleType = @"Team ID";
-                           break;
-                         }
-                         case SNTRuleTypeSigningID: {
-                           ruleType = @"Signing ID";
-                           break;
-                         }
-                         case SNTRuleTypeCDHash: {
-                           ruleType = @"CDHash";
-                           break;
-                         }
-                         default: ruleType = @"(Unknown type)";
-                       }
-                       if (newRule.state == SNTRuleStateRemove) {
-                         printf("Removed rule for %s: %s.\n", [ruleType UTF8String],
-                                [newRule.identifier UTF8String]);
+      databaseRuleAddRules:@[ newRule ]
+               ruleCleanup:SNTRuleCleanupNone
+                     reply:^(NSError *error) {
+                       if (error) {
+                         printf("Failed to modify rules: %s",
+                                [error.localizedDescription UTF8String]);
+                         LOGD(@"Failure reason: %@", error.localizedFailureReason);
+                         exit(1);
                        } else {
-                         printf("Added rule for %s: %s.\n", [ruleType UTF8String],
-                                [newRule.identifier UTF8String]);
+                         NSString *ruleType;
+                         switch (newRule.type) {
+                           case SNTRuleTypeCertificate: ruleType = @"Certificate SHA-256"; break;
+                           case SNTRuleTypeBinary: {
+                             ruleType = @"SHA-256";
+                             break;
+                           }
+                           case SNTRuleTypeTeamID: {
+                             ruleType = @"Team ID";
+                             break;
+                           }
+                           case SNTRuleTypeSigningID: {
+                             ruleType = @"Signing ID";
+                             break;
+                           }
+                           case SNTRuleTypeCDHash: {
+                             ruleType = @"CDHash";
+                             break;
+                           }
+                           default: ruleType = @"(Unknown type)";
+                         }
+                         if (newRule.state == SNTRuleStateRemove) {
+                           printf("Removed rule for %s: %s.\n", [ruleType UTF8String],
+                                  [newRule.identifier UTF8String]);
+                         } else {
+                           printf("Added rule for %s: %s.\n", [ruleType UTF8String],
+                                  [newRule.identifier UTF8String]);
+                         }
+                         exit(0);
                        }
-                       exit(0);
-                     }
-                   }];
+                     }];
 }
 
 // IMPORTANT: This method makes no attempt to validate whether or not the data
@@ -441,11 +441,11 @@ REGISTER_COMMAND_NAME(@"rule")
   __block NSString *output;
 
   struct RuleIdentifiers identifiers = {
-    .cdhash = (rule.type == SNTRuleTypeCDHash) ? rule.identifier : nil,
-    .binarySHA256 = (rule.type == SNTRuleTypeBinary) ? rule.identifier : nil,
-    .certificateSHA256 = (rule.type == SNTRuleTypeCertificate) ? rule.identifier : nil,
-    .teamID = (rule.type == SNTRuleTypeTeamID) ? rule.identifier : nil,
-    .signingID = (rule.type == SNTRuleTypeSigningID) ? rule.identifier : nil,
+      .cdhash = (rule.type == SNTRuleTypeCDHash) ? rule.identifier : nil,
+      .binarySHA256 = (rule.type == SNTRuleTypeBinary) ? rule.identifier : nil,
+      .certificateSHA256 = (rule.type == SNTRuleTypeCertificate) ? rule.identifier : nil,
+      .teamID = (rule.type == SNTRuleTypeTeamID) ? rule.identifier : nil,
+      .signingID = (rule.type == SNTRuleTypeSigningID) ? rule.identifier : nil,
   };
 
   [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
@@ -494,17 +494,17 @@ REGISTER_COMMAND_NAME(@"rule")
   }
 
   [[self.daemonConn remoteObjectProxy]
-    databaseRuleAddRules:parsedRules
-             ruleCleanup:cleanupType
-                   reply:^(NSError *error) {
-                     if (error) {
-                       printf("Failed to modify rules: %s",
-                              [error.localizedDescription UTF8String]);
-                       LOGD(@"Failure reason: %@", error.localizedFailureReason);
-                       exit(1);
-                     }
-                     exit(0);
-                   }];
+      databaseRuleAddRules:parsedRules
+               ruleCleanup:cleanupType
+                     reply:^(NSError *error) {
+                       if (error) {
+                         printf("Failed to modify rules: %s",
+                                [error.localizedDescription UTF8String]);
+                         LOGD(@"Failure reason: %@", error.localizedFailureReason);
+                         exit(1);
+                       }
+                       exit(0);
+                     }];
 }
 
 - (void)exportJSONFile:(NSString *)jsonFilePath {

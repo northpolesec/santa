@@ -38,9 +38,9 @@
 - (void)testSimpleCounter {
   SNTMetricSet *metricSet = [[SNTMetricSet alloc] init];
   SNTMetricCounter *c =
-    [metricSet counterWithName:@"/santa/events"
-                    fieldNames:@[ @"rule_type" ]
-                      helpText:@"Count of exec events broken out by rule type."];
+      [metricSet counterWithName:@"/santa/events"
+                      fieldNames:@[ @"rule_type" ]
+                        helpText:@"Count of exec events broken out by rule type."];
 
   XCTAssertNotNil(c, @"Expected returned SNTMetricCounter to not be nil");
   [c incrementForFieldValues:@[ @"certificate" ]];
@@ -54,9 +54,9 @@
 - (void)testExportNSDictionary {
   SNTMetricSet *metricSet = [[SNTMetricSet alloc] init];
   SNTMetricCounter *c =
-    [metricSet counterWithName:@"/santa/events"
-                    fieldNames:@[ @"rule_type" ]
-                      helpText:@"Count of exec events broken out by rule type."];
+      [metricSet counterWithName:@"/santa/events"
+                      fieldNames:@[ @"rule_type" ]
+                        helpText:@"Count of exec events broken out by rule type."];
 
   XCTAssertNotNil(c);
   [c incrementForFieldValues:@[ @"certificate" ]];
@@ -147,9 +147,9 @@
 - (void)testSimpleGauge {
   SNTMetricSet *metricSet = [[SNTMetricSet alloc] init];
   SNTMetricInt64Gauge *g =
-    [metricSet int64GaugeWithName:@"/santa/rules"
-                       fieldNames:@[ @"rule_type" ]
-                         helpText:@"Count of rules broken out by rule type."];
+      [metricSet int64GaugeWithName:@"/santa/rules"
+                         fieldNames:@[ @"rule_type" ]
+                           helpText:@"Count of rules broken out by rule type."];
 
   XCTAssertNotNil(g, @"Expected returned SNTMetricGaugeInt64 to not be nil");
   // set from zero
@@ -171,9 +171,9 @@
 - (void)testExportNSDictionary {
   SNTMetricSet *metricSet = [[SNTMetricSet alloc] init];
   SNTMetricInt64Gauge *g =
-    [metricSet int64GaugeWithName:@"/santa/rules"
-                       fieldNames:@[ @"rule_type" ]
-                         helpText:@"Count of rules broken out by rule type."];
+      [metricSet int64GaugeWithName:@"/santa/rules"
+                         fieldNames:@[ @"rule_type" ]
+                           helpText:@"Count of rules broken out by rule type."];
 
   XCTAssertNotNil(g, @"Expected returned SNTMetricGaugeInt64 to not be nil");
   // set from zero
@@ -477,9 +477,9 @@
                                helpText:@"Is santad using the endpoint security framework."
                                   value:TRUE];
   [metricSet
-    addConstantIntegerWithName:@"/proc/birth_timestamp"
-                      helpText:@"Start time of this santad instance, in microseconds since epoch"
-                         value:(long long)(0x12345668910)];
+      addConstantIntegerWithName:@"/proc/birth_timestamp"
+                        helpText:@"Start time of this santad instance, in microseconds since epoch"
+                           value:(long long)(0x12345668910)];
   // Add Metrics
   SNTMetricCounter *c = [metricSet counterWithName:@"/santa/events"
                                         fieldNames:@[ @"rule_type" ]
@@ -497,14 +497,14 @@
 
   // Add Metrics with callback
   SNTMetricInt64Gauge *virtualMemoryGauge =
-    [metricSet int64GaugeWithName:@"/proc/memory/virtual_size"
-                       fieldNames:@[]
-                         helpText:@"The virtual memory size of this process."];
+      [metricSet int64GaugeWithName:@"/proc/memory/virtual_size"
+                         fieldNames:@[]
+                           helpText:@"The virtual memory size of this process."];
 
   SNTMetricInt64Gauge *residentMemoryGauge =
-    [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
-                       fieldNames:@[]
-                         helpText:@"The resident set size of this process."];
+      [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
+                         fieldNames:@[]
+                           helpText:@"The resident set size of this process."];
 
   [metricSet registerCallback:^(void) {
     [virtualMemoryGauge set:987654321 forFieldValues:@[]];
@@ -678,9 +678,9 @@
                                                           username:@"testUser"];
 
   SNTMetricCounter *c =
-    [metricSet counterWithName:@"/santa/events"
-                    fieldNames:@[ @"client", @"event_type" ]
-                      helpText:@"Count of events on the host for a given ES client"];
+      [metricSet counterWithName:@"/santa/events"
+                      fieldNames:@[ @"client", @"event_type" ]
+                        helpText:@"Count of events on the host for a given ES client"];
   [c incrementBy:1 forFieldValues:@[ @"device_manager", @"auth_mount" ]];
 
   NSDictionary *expected = @{

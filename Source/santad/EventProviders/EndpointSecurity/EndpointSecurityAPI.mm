@@ -99,8 +99,8 @@ bool EndpointSecurityAPI::MuteTargetPath(const Client &client, std::string_view 
   if (@available(macOS 13.0, *)) {
     return es_mute_path(client.Get(), path.data(),
                         path_type == WatchItemPathType::kPrefix
-                          ? ES_MUTE_PATH_TYPE_TARGET_PREFIX
-                          : ES_MUTE_PATH_TYPE_TARGET_LITERAL) == ES_RETURN_SUCCESS;
+                            ? ES_MUTE_PATH_TYPE_TARGET_PREFIX
+                            : ES_MUTE_PATH_TYPE_TARGET_LITERAL) == ES_RETURN_SUCCESS;
   }
 #endif
 
@@ -113,8 +113,8 @@ bool EndpointSecurityAPI::UnmuteTargetPath(const Client &client, std::string_vie
   if (@available(macOS 13.0, *)) {
     return es_unmute_path(client.Get(), path.data(),
                           path_type == WatchItemPathType::kPrefix
-                            ? ES_MUTE_PATH_TYPE_TARGET_PREFIX
-                            : ES_MUTE_PATH_TYPE_TARGET_LITERAL) == ES_RETURN_SUCCESS;
+                              ? ES_MUTE_PATH_TYPE_TARGET_PREFIX
+                              : ES_MUTE_PATH_TYPE_TARGET_LITERAL) == ES_RETURN_SUCCESS;
   }
 #endif
 

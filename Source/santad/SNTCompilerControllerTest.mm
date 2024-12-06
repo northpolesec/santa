@@ -118,15 +118,15 @@ static const pid_t PID_MAX = 99999;
 
 - (void)testSaveFakeDecision {
   SantaVnode vnode{
-    .fsid = 12,
-    .fileid = 34,
+      .fsid = 12,
+      .fileid = 34,
   };
 
   OCMExpect([self.mockDecisionCache
-    cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
-      return cd.vnodeId == vnode && cd.decision == SNTEventStateAllowPendingTransitive &&
-             [cd.sha256 isEqualToString:@"pending"];
-    }]]);
+      cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
+        return cd.vnodeId == vnode && cd.decision == SNTEventStateAllowPendingTransitive &&
+               [cd.sha256 isEqualToString:@"pending"];
+      }]]);
 
   id mockFileInfo = OCMClassMock([SNTFileInfo class]);
   OCMExpect([mockFileInfo vnode]).andReturn(vnode);
@@ -139,8 +139,8 @@ static const pid_t PID_MAX = 99999;
 
 - (void)testRemoveFakeDecision {
   SantaVnode vnode{
-    .fsid = 12,
-    .fileid = 34,
+      .fsid = 12,
+      .fileid = 34,
   };
 
   id mockFileInfo = OCMClassMock([SNTFileInfo class]);
@@ -230,18 +230,18 @@ static const pid_t PID_MAX = 99999;
     id mockFileInfo = OCMClassMock([SNTFileInfo class]);
     OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
     OCMStub([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-      .ignoringNonObjectArgs()
-      .andReturn(mockFileInfo);
+        .ignoringNonObjectArgs()
+        .andReturn(mockFileInfo);
     OCMStub([mockFileInfo vnode]).andReturn(vnodeNormal);
 
     OCMExpect([mockCompilerController
-                createTransitiveRule:msg
-                              target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
-                                return fi.vnode.fsid == normalFile.stat.st_dev &&
-                                       fi.vnode.fileid == normalFile.stat.st_ino;
-                              }]
-                              logger:nullptr])
-      .ignoringNonObjectArgs();
+                  createTransitiveRule:msg
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                  return fi.vnode.fsid == normalFile.stat.st_dev &&
+                                         fi.vnode.fileid == normalFile.stat.st_ino;
+                                }]
+                                logger:nullptr])
+        .ignoringNonObjectArgs();
 
     XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
 
@@ -259,18 +259,18 @@ static const pid_t PID_MAX = 99999;
     id mockFileInfo = OCMClassMock([SNTFileInfo class]);
     OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
     OCMStub([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-      .ignoringNonObjectArgs()
-      .andReturn(mockFileInfo);
+        .ignoringNonObjectArgs()
+        .andReturn(mockFileInfo);
     OCMStub([mockFileInfo vnode]).andReturn(vnodeNormal);
 
     OCMExpect([mockCompilerController
-                createTransitiveRule:msg
-                              target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
-                                return fi.vnode.fsid == normalFile.stat.st_dev &&
-                                       fi.vnode.fileid == normalFile.stat.st_ino;
-                              }]
-                              logger:nullptr])
-      .ignoringNonObjectArgs();
+                  createTransitiveRule:msg
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                  return fi.vnode.fsid == normalFile.stat.st_dev &&
+                                         fi.vnode.fileid == normalFile.stat.st_ino;
+                                }]
+                                logger:nullptr])
+        .ignoringNonObjectArgs();
 
     XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
 
@@ -294,21 +294,21 @@ static const pid_t PID_MAX = 99999;
     OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
     // Return nil the first time when the source path is looked up
     OCMExpect([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-      .ignoringNonObjectArgs()
-      .andReturn(nil);
+        .ignoringNonObjectArgs()
+        .andReturn(nil);
     OCMExpect([mockFileInfo initWithEndpointSecurityFile:&destFile error:[OCMArg anyObjectRef]])
-      .ignoringNonObjectArgs()
-      .andReturn(mockFileInfo);
+        .ignoringNonObjectArgs()
+        .andReturn(mockFileInfo);
     OCMStub([mockFileInfo vnode]).andReturn(vnodeDest);
 
     OCMExpect([mockCompilerController
-                createTransitiveRule:msg
-                              target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
-                                return fi.vnode.fsid == destFile.stat.st_dev &&
-                                       fi.vnode.fileid == destFile.stat.st_ino;
-                              }]
-                              logger:nullptr])
-      .ignoringNonObjectArgs();
+                  createTransitiveRule:msg
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                  return fi.vnode.fsid == destFile.stat.st_dev &&
+                                         fi.vnode.fileid == destFile.stat.st_ino;
+                                }]
+                                logger:nullptr])
+        .ignoringNonObjectArgs();
 
     XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
 
@@ -328,7 +328,7 @@ static const pid_t PID_MAX = 99999;
     esMsg.event.rename.destination.new_path.filename = destFilename;
     Message msg(mockESApi, &esMsg);
     NSString *expectedTarget =
-      [NSString stringWithFormat:@"%s/%s", destDir.path.data, destFilename.data];
+        [NSString stringWithFormat:@"%s/%s", destDir.path.data, destFilename.data];
 
     struct stat sbNewFile;
     XCTAssertEqual(stat("/usr/bin/true", &sbNewFile), 0);
@@ -341,20 +341,20 @@ static const pid_t PID_MAX = 99999;
 
     // Return nil the first time when the source path is looked up
     OCMExpect([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-      .ignoringNonObjectArgs()
-      .andReturn(nil);
+        .ignoringNonObjectArgs()
+        .andReturn(nil);
     OCMExpect([mockFileInfo initWithPath:expectedTarget error:[OCMArg anyObjectRef]])
-      .ignoringNonObjectArgs()
-      .andReturn(mockFileInfo);
+        .ignoringNonObjectArgs()
+        .andReturn(mockFileInfo);
 
     OCMExpect([mockCompilerController
-                createTransitiveRule:msg
-                              target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
-                                return fi.vnode.fsid == sbNewFile.st_dev &&
-                                       fi.vnode.fileid == sbNewFile.st_ino;
-                              }]
-                              logger:nullptr])
-      .ignoringNonObjectArgs();
+                  createTransitiveRule:msg
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                  return fi.vnode.fsid == sbNewFile.st_dev &&
+                                         fi.vnode.fileid == sbNewFile.st_ino;
+                                }]
+                                logger:nullptr])
+        .ignoringNonObjectArgs();
 
     XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
 

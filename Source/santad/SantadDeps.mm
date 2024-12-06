@@ -49,7 +49,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   // TODO(mlw): The XPC interfaces should be injectable. Could either make a new
   // protocol defining appropriate methods or accept values as params.
   MOLXPCConnection *control_connection =
-    [[MOLXPCConnection alloc] initServerWithName:[SNTXPCControlInterface serviceID]];
+      [[MOLXPCConnection alloc] initServerWithName:[SNTXPCControlInterface serviceID]];
   if (!control_connection) {
     LOGE(@"Failed to initialize control connection.");
     exit(EXIT_FAILURE);
@@ -94,13 +94,13 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   }
 
   SNTExecutionController *exec_controller =
-    [[SNTExecutionController alloc] initWithRuleTable:rule_table
-                                           eventTable:event_table
-                                        notifierQueue:notifier_queue
-                                           syncdQueue:syncd_queue
-                                            ttyWriter:tty_writer
-                             entitlementsPrefixFilter:[configurator entitlementsPrefixFilter]
-                             entitlementsTeamIDFilter:[configurator entitlementsTeamIDFilter]];
+      [[SNTExecutionController alloc] initWithRuleTable:rule_table
+                                             eventTable:event_table
+                                          notifierQueue:notifier_queue
+                                             syncdQueue:syncd_queue
+                                              ttyWriter:tty_writer
+                               entitlementsPrefixFilter:[configurator entitlementsPrefixFilter]
+                               entitlementsTeamIDFilter:[configurator entitlementsTeamIDFilter]];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);
@@ -110,7 +110,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
 
   // TODO(bur): Add KVO handling for fileChangesPrefixFilters.
   NSArray<NSString *> *prefix_filters =
-    [@[ @"/.", @"/dev/" ] arrayByAddingObjectsFromArray:[configurator fileChangesPrefixFilters]];
+      [@[ @"/.", @"/dev/" ] arrayByAddingObjectsFromArray:[configurator fileChangesPrefixFilters]];
   for (NSString *filter in prefix_filters) {
     prefix_tree->InsertPrefix([filter fileSystemRepresentation], Unit {});
   }
@@ -126,28 +126,29 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
 
   std::unique_ptr<::Logger> logger = Logger::Create(
-    esapi, TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
-    [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
-    [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,
-    spool_flush_timeout_ms);
+      esapi,
+      TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
+      [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
+      [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,
+      spool_flush_timeout_ms);
   if (!logger) {
     LOGE(@"Failed to create logger.");
     exit(EXIT_FAILURE);
   }
 
   std::shared_ptr<::WatchItems> watch_items =
-    [configurator fileAccessPolicy]
-      ? WatchItems::Create([configurator fileAccessPolicy],
-                           [configurator fileAccessPolicyUpdateIntervalSec])
-      : WatchItems::Create([configurator fileAccessPolicyPlist],
-                           [configurator fileAccessPolicyUpdateIntervalSec]);
+      [configurator fileAccessPolicy]
+          ? WatchItems::Create([configurator fileAccessPolicy],
+                               [configurator fileAccessPolicyUpdateIntervalSec])
+          : WatchItems::Create([configurator fileAccessPolicyPlist],
+                               [configurator fileAccessPolicyUpdateIntervalSec]);
   if (!watch_items) {
     LOGE(@"Failed to create watch items");
     exit(EXIT_FAILURE);
   }
 
   std::shared_ptr<::Metrics> metrics =
-    Metrics::Create(metric_set, [configurator metricExportInterval]);
+      Metrics::Create(metric_set, [configurator metricExportInterval]);
   if (!metrics) {
     LOGE(@"Failed to create metrics");
     exit(EXIT_FAILURE);
@@ -178,19 +179,19 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   process_tree = *tree_status;
 
   return std::make_unique<SantadDeps>(
-    esapi, std::move(logger), std::move(metrics), std::move(watch_items),
-    std::move(auth_result_cache), control_connection, compiler_controller, notifier_queue,
-    syncd_queue, exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree));
+      esapi, std::move(logger), std::move(metrics), std::move(watch_items),
+      std::move(auth_result_cache), control_connection, compiler_controller, notifier_queue,
+      syncd_queue, exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree));
 }
 
 SantadDeps::SantadDeps(
-  std::shared_ptr<EndpointSecurityAPI> esapi, std::unique_ptr<::Logger> logger,
-  std::shared_ptr<::Metrics> metrics, std::shared_ptr<::WatchItems> watch_items,
-  std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection *control_connection,
-  SNTCompilerController *compiler_controller, SNTNotificationQueue *notifier_queue,
-  SNTSyncdQueue *syncd_queue, SNTExecutionController *exec_controller,
-  std::shared_ptr<::PrefixTree<Unit>> prefix_tree, std::shared_ptr<::TTYWriter> tty_writer,
-  std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree)
+    std::shared_ptr<EndpointSecurityAPI> esapi, std::unique_ptr<::Logger> logger,
+    std::shared_ptr<::Metrics> metrics, std::shared_ptr<::WatchItems> watch_items,
+    std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection *control_connection,
+    SNTCompilerController *compiler_controller, SNTNotificationQueue *notifier_queue,
+    SNTSyncdQueue *syncd_queue, SNTExecutionController *exec_controller,
+    std::shared_ptr<::PrefixTree<Unit>> prefix_tree, std::shared_ptr<::TTYWriter> tty_writer,
+    std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree)
     : esapi_(std::move(esapi)),
       logger_(std::move(logger)),
       metrics_(std::move(metrics)),

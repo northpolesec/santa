@@ -124,14 +124,14 @@ class MockAuthResultCache : public AuthResultCache {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
 
-  SNTEndpointSecurityDeviceManager *deviceManager =
-    [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:mockESApi
-                                                    metrics:nullptr
-                                                     logger:nullptr
-                                            authResultCache:nullptr
-                                              blockUSBMount:false
-                                             remountUSBMode:nil
-                                         startupPreferences:SNTDeviceManagerStartupPreferencesNone];
+  SNTEndpointSecurityDeviceManager *deviceManager = [[SNTEndpointSecurityDeviceManager alloc]
+           initWithESAPI:mockESApi
+                 metrics:nullptr
+                  logger:nullptr
+         authResultCache:nullptr
+           blockUSBMount:false
+          remountUSBMode:nil
+      startupPreferences:SNTDeviceManagerStartupPreferencesNone];
 
   setupDMCallback(deviceManager);
 
@@ -177,13 +177,13 @@ class MockAuthResultCache : public AuthResultCache {
   }
 
   XCTestExpectation *mountExpectation =
-    [self expectationWithDescription:@"Wait for response from ES"];
+      [self expectationWithDescription:@"Wait for response from ES"];
 
   EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, expectedAuthResult, false))
-    .WillOnce(testing::InvokeWithoutArgs(^bool {
-      [mountExpectation fulfill];
-      return true;
-    }));
+      .WillOnce(testing::InvokeWithoutArgs(^bool {
+        [mountExpectation fulfill];
+        return true;
+      }));
 
   [deviceManager handleMessage:Message(mockESApi, &esMsg)
             recordEventMetrics:^(EventDisposition d) {
@@ -214,8 +214,8 @@ class MockAuthResultCache : public AuthResultCache {
   NSArray *wantRemountArgs = @[ @"noexec", @"rdonly" ];
 
   XCTestExpectation *expectation =
-    [self expectationWithDescription:
-            @"Wait for SNTEndpointSecurityDeviceManager's blockCallback to trigger"];
+      [self expectationWithDescription:
+                @"Wait for SNTEndpointSecurityDeviceManager's blockCallback to trigger"];
 
   __block NSString *gotmntonname, *gotmntfromname;
   __block NSArray<NSString *> *gotRemountedArgs;
@@ -247,8 +247,8 @@ class MockAuthResultCache : public AuthResultCache {
 
 - (void)testBlockNoRemount {
   XCTestExpectation *expectation =
-    [self expectationWithDescription:
-            @"Wait for SNTEndpointSecurityDeviceManager's blockCallback to trigger"];
+      [self expectationWithDescription:
+                @"Wait for SNTEndpointSecurityDeviceManager's blockCallback to trigger"];
 
   __block NSString *gotmntonname, *gotmntfromname;
   __block NSArray<NSString *> *gotRemountedArgs;
@@ -278,8 +278,8 @@ class MockAuthResultCache : public AuthResultCache {
   NSArray *wantRemountArgs = @[ @"noexec", @"rdonly" ];
 
   XCTestExpectation *expectation =
-    [self expectationWithDescription:
-            @"Wait for SNTEndpointSecurityDeviceManager's blockCallback to trigger"];
+      [self expectationWithDescription:
+                @"Wait for SNTEndpointSecurityDeviceManager's blockCallback to trigger"];
 
   __block NSString *gotmntonname, *gotmntfromname;
   __block NSArray<NSString *> *gotRemountedArgs;
@@ -347,14 +347,14 @@ class MockAuthResultCache : public AuthResultCache {
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   EXPECT_CALL(*mockAuthCache, FlushCache);
 
-  SNTEndpointSecurityDeviceManager *deviceManager =
-    [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:mockESApi
-                                                    metrics:nullptr
-                                                     logger:nullptr
-                                            authResultCache:mockAuthCache
-                                              blockUSBMount:YES
-                                             remountUSBMode:nil
-                                         startupPreferences:SNTDeviceManagerStartupPreferencesNone];
+  SNTEndpointSecurityDeviceManager *deviceManager = [[SNTEndpointSecurityDeviceManager alloc]
+           initWithESAPI:mockESApi
+                 metrics:nullptr
+                  logger:nullptr
+         authResultCache:mockAuthCache
+           blockUSBMount:YES
+          remountUSBMode:nil
+      startupPreferences:SNTDeviceManagerStartupPreferencesNone];
 
   deviceManager.blockUSBMount = YES;
 
@@ -403,18 +403,18 @@ class MockAuthResultCache : public AuthResultCache {
   // Reset the Mock DA property, setup disks and remount args, then trigger the test
   void (^PerformStartupTest)(NSArray<MockDADisk *> *, NSArray<NSString *> *,
                              SNTDeviceManagerStartupPreferences) =
-    ^void(NSArray<MockDADisk *> *disks, NSArray<NSString *> *remountArgs,
-          SNTDeviceManagerStartupPreferences startupPref) {
-      [self.mockDA reset];
+      ^void(NSArray<MockDADisk *> *disks, NSArray<NSString *> *remountArgs,
+            SNTDeviceManagerStartupPreferences startupPref) {
+        [self.mockDA reset];
 
-      for (MockDADisk *d in disks) {
-        [self.mockDA insert:d];
-      }
+        for (MockDADisk *d in disks) {
+          [self.mockDA insert:d];
+        }
 
-      deviceManager.remountArgs = remountArgs;
+        deviceManager.remountArgs = remountArgs;
 
-      [deviceManager performStartupTasks:startupPref];
-    };
+        [deviceManager performStartupTasks:startupPref];
+      };
 
   // Unmount with RemountUSBMode set
   {
@@ -492,21 +492,21 @@ class MockAuthResultCache : public AuthResultCache {
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
   std::set<es_event_type_t> expectedEventSubs{
-    ES_EVENT_TYPE_AUTH_MOUNT,
-    ES_EVENT_TYPE_AUTH_REMOUNT,
-    ES_EVENT_TYPE_NOTIFY_UNMOUNT,
+      ES_EVENT_TYPE_AUTH_MOUNT,
+      ES_EVENT_TYPE_AUTH_REMOUNT,
+      ES_EVENT_TYPE_NOTIFY_UNMOUNT,
   };
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
   id deviceClient =
-    [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:mockESApi
-                                                    metrics:nullptr
-                                                  processor:santa::Processor::kDeviceManager];
+      [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:mockESApi
+                                                      metrics:nullptr
+                                                    processor:santa::Processor::kDeviceManager];
 
   EXPECT_CALL(*mockESApi, ClearCache(testing::_))
-    .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
-             .WillOnce(testing::Return(true)))
-    .WillOnce(testing::Return(true));
+      .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
+                 .WillOnce(testing::Return(true)))
+      .WillOnce(testing::Return(true));
 
   [deviceClient enable];
 

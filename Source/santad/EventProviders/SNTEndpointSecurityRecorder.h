@@ -37,6 +37,6 @@
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                    prefixTree:(std::shared_ptr<santa::PrefixTree<santa::Unit>>)prefixTree
                   processTree:
-                    (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
+                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
 
 @end

@@ -102,7 +102,7 @@ using santa::Message;
 }
 
 - (void)handleMessage:(Message &&)esMsg
-   recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
+    recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
     // This is a programming error
     LOGE(@"Atteempting to authorize a non-exec event");
@@ -152,7 +152,7 @@ using santa::Message;
 
 - (void)enable {
   [super subscribeAndClearCache:{
-                                  ES_EVENT_TYPE_AUTH_EXEC,
+                                    ES_EVENT_TYPE_AUTH_EXEC,
                                 }];
 }
 

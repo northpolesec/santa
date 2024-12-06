@@ -32,11 +32,11 @@
 }
 
 - (void)testRule:(SNTRule *)rule
-   transitiveRules:(BOOL)transitiveRules
-             final:(BOOL)final
-           matches:(BOOL)matches
-            silent:(BOOL)silent
-  expectedDecision:(SNTEventState)decision {
+     transitiveRules:(BOOL)transitiveRules
+               final:(BOOL)final
+             matches:(BOOL)matches
+              silent:(BOOL)silent
+    expectedDecision:(SNTEventState)decision {
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   if (matches) {
     switch (rule.type) {
@@ -74,17 +74,17 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockCDHash];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockCDHash];
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockCDHash];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockCDHash];
 }
 
 - (void)testDecisionForSilentBlockByCDHashRuleMatches {
@@ -96,18 +96,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockCDHash];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockCDHash];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockCDHash];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockCDHash];
 }
 
 - (void)testDecisionForAllowbyCDHashRuleMatches {
@@ -119,18 +119,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowCDHash];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowCDHash];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowCDHash];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowCDHash];
 }
 
 - (void)testDecisionForBlockBySHA256RuleMatches {
@@ -143,18 +143,18 @@
   XCTAssertNotNil(rule, "invalid test rule dictionary");
 
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockBinary];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockBinary];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockBinary];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockBinary];
 }
 
 - (void)testDecisionForSilenBlockBySHA256RuleMatches {
@@ -167,18 +167,18 @@
   XCTAssertNotNil(rule, "invalid test rule dictionary");
 
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockBinary];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockBinary];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockBinary];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockBinary];
 }
 
 - (void)testDecisionForAllowBySHA256RuleMatches {
@@ -190,18 +190,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowBinary];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowBinary];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowBinary];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowBinary];
 }
 
 - (void)testDecisionForSigningIDBlockRuleMatches {
@@ -213,18 +213,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockSigningID];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockSigningID];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockSigningID];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockSigningID];
 }
 
 // Signing ID rules
@@ -237,18 +237,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockSigningID];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockSigningID];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockSigningID];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockSigningID];
 }
 
 - (void)testDecisionForSigningIDAllowRuleMatches {
@@ -260,18 +260,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowSigningID];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowSigningID];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowSigningID];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowSigningID];
 }
 
 //  Certificate rules
@@ -284,18 +284,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockCertificate];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockCertificate];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockCertificate];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockCertificate];
 }
 
 - (void)testDecisionForCertificateSilentBlockRuleMatches {
@@ -307,18 +307,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockCertificate];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockCertificate];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockCertificate];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockCertificate];
 }
 
 - (void)testDecisionForCertificateAllowRuleMatches {
@@ -330,18 +330,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowCertificate];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowCertificate];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowCertificate];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowCertificate];
 }
 
 // Team ID rules
@@ -354,18 +354,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockTeamID];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockTeamID];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateBlockTeamID];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateBlockTeamID];
 }
 
 - (void)testDecisionForTeamIDSilentBlockRuleMatches {
@@ -377,18 +377,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockTeamID];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockTeamID];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:YES
-    expectedDecision:SNTEventStateBlockTeamID];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:YES
+      expectedDecision:SNTEventStateBlockTeamID];
 }
 
 - (void)testDecisionForTeamIDAllowRuleMatches {
@@ -400,18 +400,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowTeamID];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowTeamID];
   // Ensure that nothing changes when disabling transitive rules.
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowTeamID];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowTeamID];
 }
 
 // Compiler rules
@@ -425,18 +425,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowCompiler];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowCompiler];
   // Ensure disabling transitive rules results in a binary allow
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowCDHash];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowCDHash];
 }
 
 // SHA256
@@ -449,18 +449,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowCompiler];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowCompiler];
   // Ensure disabling transitive rules results in a binary allow
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowBinary];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowBinary];
 }
 
 // SigningID
@@ -473,18 +473,18 @@
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowCompiler];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowCompiler];
   // Ensure disabling transitive rules results in a Signing ID allow
   [self testRule:rule
-     transitiveRules:NO
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowSigningID];
+       transitiveRules:NO
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowSigningID];
 }
 
 // Transitive allowlist rules
@@ -500,19 +500,19 @@
   rule.state = SNTRuleStateAllowTransitive;
 
   [self testRule:rule
-     transitiveRules:YES
-               final:YES
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateAllowTransitive];
+       transitiveRules:YES
+                 final:YES
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateAllowTransitive];
   // Ensure that a transitive allowlist rule results in an
   // SNTEventStateUnknown if transitive rules are disabled.
   [self testRule:rule
-     transitiveRules:NO
-               final:NO
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateUnknown];
+       transitiveRules:NO
+                 final:NO
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateUnknown];
 }
 
 - (void)testEnsureANonMatchingRuleResultsInUnknown {
@@ -527,18 +527,18 @@
   rule.state = static_cast<SNTRuleState>(88888);  // Set to an invalid state
 
   [self testRule:rule
-     transitiveRules:YES
-               final:NO
-             matches:NO
-              silent:NO
-    expectedDecision:SNTEventStateUnknown];
+       transitiveRules:YES
+                 final:NO
+               matches:NO
+                silent:NO
+      expectedDecision:SNTEventStateUnknown];
 
   [self testRule:rule
-     transitiveRules:NO
-               final:NO
-             matches:YES
-              silent:NO
-    expectedDecision:SNTEventStateUnknown];
+       transitiveRules:NO
+                 final:NO
+               matches:YES
+                silent:NO
+      expectedDecision:SNTEventStateUnknown];
 }
 
 - (void)testEnsureCustomURLAndMessageAreSet {

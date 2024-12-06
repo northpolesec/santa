@@ -70,7 +70,7 @@ using santa::ScopedCFTypeRef;
 
   {
     ScopedCFTypeRef<CFMutableArrayRef> scopedArray =
-      ScopedCFTypeRef<CFMutableArrayRef>::Assume(array);
+        ScopedCFTypeRef<CFMutableArrayRef>::Assume(array);
 
     // Ensure ownership was taken, and retain count remains unchanged
     XCTAssertTrue(scopedArray.Unsafe());
@@ -80,7 +80,7 @@ using santa::ScopedCFTypeRef;
     CFMutableArrayRef ref = scopedArray.Unsafe();
     XCTAssertEqual(1, CFArrayGetCount(ref));
     XCTAssertTrue(
-      CFNumberGetValue((CFNumberRef)CFArrayGetValueAtIndex(ref, 0), kCFNumberIntType, &got));
+        CFNumberGetValue((CFNumberRef)CFArrayGetValueAtIndex(ref, 0), kCFNumberIntType, &got));
     XCTAssertEqual(want, got);
   }
 }
@@ -104,7 +104,7 @@ using santa::ScopedCFTypeRef;
 
   {
     ScopedCFTypeRef<CFMutableArrayRef> scopedArray =
-      ScopedCFTypeRef<CFMutableArrayRef>::Retain(array);
+        ScopedCFTypeRef<CFMutableArrayRef>::Retain(array);
 
     // Ensure ownership was taken, and retain count was incremented
     XCTAssertTrue(scopedArray.Unsafe());
@@ -114,7 +114,7 @@ using santa::ScopedCFTypeRef;
     CFMutableArrayRef ref = scopedArray.Unsafe();
     XCTAssertEqual(1, CFArrayGetCount(ref));
     XCTAssertTrue(
-      CFNumberGetValue((CFNumberRef)CFArrayGetValueAtIndex(ref, 0), kCFNumberIntType, &got));
+        CFNumberGetValue((CFNumberRef)CFArrayGetValueAtIndex(ref, 0), kCFNumberIntType, &got));
     XCTAssertEqual(want, got);
   }
 
@@ -125,8 +125,8 @@ using santa::ScopedCFTypeRef;
 
 - (void)testInto {
   ScopedCFTypeRef<CFURLRef> scopedURLRef =
-    ScopedCFTypeRef<CFURLRef>::Assume(CFURLCreateWithFileSystemPath(
-      kCFAllocatorDefault, CFSTR("/usr/bin/true"), kCFURLPOSIXPathStyle, YES));
+      ScopedCFTypeRef<CFURLRef>::Assume(CFURLCreateWithFileSystemPath(
+          kCFAllocatorDefault, CFSTR("/usr/bin/true"), kCFURLPOSIXPathStyle, YES));
 
   ScopedCFTypeRef<SecStaticCodeRef> scopedCodeRef;
   XCTAssertFalse(scopedCodeRef);

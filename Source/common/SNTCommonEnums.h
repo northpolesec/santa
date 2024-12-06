@@ -211,6 +211,6 @@ enum class StatResult {
 #endif
 
 static const char *kSantaDPath =
-  "/Applications/Santa.app/Contents/Library/SystemExtensions/"
-  "com.northpolesec.santa.daemon.systemextension/Contents/MacOS/com.northpolesec.santa.daemon";
+    "/Applications/Santa.app/Contents/Library/SystemExtensions/"
+    "com.northpolesec.santa.daemon.systemextension/Contents/MacOS/com.northpolesec.santa.daemon";
 static const char *kSantaAppPath = "/Applications/Santa.app";

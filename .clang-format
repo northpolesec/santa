@@ -3,7 +3,6 @@ BasedOnStyle: Google
 
 IndentWidth: 2
 ObjCBlockIndentWidth: 2
-ContinuationIndentWidth: 2
 
 # For ObjC, the line limit is 100
 ColumnLimit: 100

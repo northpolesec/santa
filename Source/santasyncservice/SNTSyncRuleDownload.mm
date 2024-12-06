@@ -59,12 +59,12 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   __block NSError *error;
   [[self.daemonConn remoteObjectProxy]
-    databaseRuleAddRules:newRules
-             ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
-                   reply:^(NSError *e) {
-                     error = e;
-                     dispatch_semaphore_signal(sema);
-                   }];
+      databaseRuleAddRules:newRules
+               ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
+                     reply:^(NSError *e) {
+                       error = e;
+                       dispatch_semaphore_signal(sema);
+                     }];
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_SEC))) {
     SLOGE(@"Failed to add rule(s) to database: timeout sending rules to daemon");
     return NO;
@@ -184,20 +184,20 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   NSMutableArray *processed = [NSMutableArray array];
   SNTPushNotificationsTracker *tracker = [SNTPushNotificationsTracker tracker];
   [[tracker all]
-    enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSDictionary *notifier, BOOL *stop) {
-      // Each notifier object is a dictionary with name and count keys. If the count has been
-      // decremented to zero, then this means that we have downloaded all of the rules associated
-      // with this SHA256 hash (which might be a bundle hash or a binary hash), in which case we are
-      // OK to show a notification that the named bundle/binary can be run.
-      NSNumber *remaining = notifier[kFileBundleBinaryCount];
-      if (remaining && [remaining intValue] == 0) {
-        [processed addObject:key];
-        NSString *message = [NSString stringWithFormat:@"%@ can now be run", notifier[kFileName]];
-        [[self.daemonConn remoteObjectProxy] postRuleSyncNotificationWithCustomMessage:message
-                                                                                 reply:^{
-                                                                                 }];
-      }
-    }];
+      enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSDictionary *notifier, BOOL *stop) {
+        // Each notifier object is a dictionary with name and count keys. If the count has been
+        // decremented to zero, then this means that we have downloaded all of the rules associated
+        // with this SHA256 hash (which might be a bundle hash or a binary hash), in which case we
+        // are OK to show a notification that the named bundle/binary can be run.
+        NSNumber *remaining = notifier[kFileBundleBinaryCount];
+        if (remaining && [remaining intValue] == 0) {
+          [processed addObject:key];
+          NSString *message = [NSString stringWithFormat:@"%@ can now be run", notifier[kFileName]];
+          [[self.daemonConn remoteObjectProxy] postRuleSyncNotificationWithCustomMessage:message
+                                                                                   reply:^{
+                                                                                   }];
+        }
+      }];
 
   [tracker removeNotificationsForHashes:processed];
 }
@@ -216,8 +216,8 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
     // As we read in rules, we update the "remaining count" information. This count represents the
     // number of rules associated with the primary hash that still need to be downloaded and added.
     [[SNTPushNotificationsTracker tracker]
-      decrementPendingRulesForHash:primaryHash
-                    totalRuleCount:@(protoRule->file_bundle_binary_count())];
+        decrementPendingRulesForHash:primaryHash
+                      totalRuleCount:@(protoRule->file_bundle_binary_count())];
   }
 }
 

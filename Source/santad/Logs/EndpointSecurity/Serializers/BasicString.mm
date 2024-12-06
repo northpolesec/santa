@@ -540,7 +540,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingAt
   if (msg->event.screensharing_attach->authentication_username.length > 0) {
     str.append("|auth_user=");
     str.append(
-      SanitizableString(msg->event.screensharing_attach->authentication_username).Sanitized());
+        SanitizableString(msg->event.screensharing_attach->authentication_username).Sanitized());
   }
 
   if (msg->event.screensharing_attach->session_username.length > 0) {
@@ -589,8 +589,8 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedOpenSSHLogin &m
   AppendInstigator(str, msg);
   AppendEventUser(str, msg->event.openssh_login->username,
                   msg->event.openssh_login->has_uid
-                    ? std::make_optional<uid_t>(msg->event.openssh_login->uid.uid)
-                    : std::nullopt);
+                      ? std::make_optional<uid_t>(msg->event.openssh_login->uid.uid)
+                      : std::nullopt);
 
   return FinalizeString(str);
 }
@@ -622,8 +622,8 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogin &msg
   AppendInstigator(str, msg);
   AppendEventUser(str, msg->event.login_login->username,
                   msg->event.login_login->has_uid
-                    ? std::make_optional<uid_t>(msg->event.login_login->uid.uid)
-                    : std::nullopt);
+                      ? std::make_optional<uid_t>(msg->event.login_login->uid.uid)
+                      : std::nullopt);
 
   return FinalizeString(str);
 }
@@ -703,7 +703,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
 
   str.append("|touchid_mode=");
   str.append(
-    GetAuthenticationTouchIDModeString(msg->event.authentication->data.touchid->touchid_mode));
+      GetAuthenticationTouchIDModeString(msg->event.authentication->data.touchid->touchid_mode));
 
   if (msg->event.authentication->data.touchid->has_uid) {
     AppendEventUser(str, msg.Username(), msg->event.authentication->data.touchid->uid.uid);
@@ -756,7 +756,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationA
 
   str.append("|type=");
   str.append(
-    GetAuthenticationAutoUnlockTypeString(msg->event.authentication->data.auto_unlock->type));
+      GetAuthenticationAutoUnlockTypeString(msg->event.authentication->data.auto_unlock->type));
 
   return FinalizeString(str);
 }
@@ -833,13 +833,13 @@ std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props) {
     serial = santa::SerialForDevice(props[@"DADevicePath"]);
   }
 
-  NSString *model = [NSString
-    stringWithFormat:@"%@ %@", NonNull(props[@"DADeviceVendor"]), NonNull(props[@"DADeviceModel"])];
+  NSString *model = [NSString stringWithFormat:@"%@ %@", NonNull(props[@"DADeviceVendor"]),
+                                               NonNull(props[@"DADeviceModel"])];
   model = [model stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 
   NSString *appearanceDateString = [GetDateFormatter()
-    stringFromDate:[NSDate dateWithTimeIntervalSinceReferenceDate:[props[@"DAAppearanceTime"]
-                                                                    doubleValue]]];
+      stringFromDate:[NSDate dateWithTimeIntervalSinceReferenceDate:[props[@"DAAppearanceTime"]
+                                                                        doubleValue]]];
 
   std::string str = CreateDefaultString();
   str.append("action=DISKAPPEAR");

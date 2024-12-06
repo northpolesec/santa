@@ -75,7 +75,7 @@ REGISTER_COMMAND_NAME(@"sync")
   MOLXPCConnection *lr = [[MOLXPCConnection alloc] initServerWithListener:logListener];
   lr.exportedObject = self;
   lr.unprivilegedInterface =
-    [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
+      [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
   [lr resume];
 
   SNTSyncType syncType = SNTSyncTypeNormal;
@@ -86,14 +86,14 @@ REGISTER_COMMAND_NAME(@"sync")
   }
 
   [[ss remoteObjectProxy]
-    syncWithLogListener:logListener.endpoint
-               syncType:syncType
-                  reply:^(SNTSyncStatusType status) {
-                    if (status == SNTSyncStatusTypeTooManySyncsInProgress) {
-                      [self didReceiveLog:@"Too many syncs in progress, try again later."];
-                    }
-                    exit((int)status);
-                  }];
+      syncWithLogListener:logListener.endpoint
+                 syncType:syncType
+                    reply:^(SNTSyncStatusType status) {
+                      if (status == SNTSyncStatusTypeTooManySyncsInProgress) {
+                        [self didReceiveLog:@"Too many syncs in progress, try again later."];
+                      }
+                      exit((int)status);
+                    }];
 
   // Do not return from this scope.
   [[NSRunLoop mainRunLoop] run];

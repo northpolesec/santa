@@ -57,22 +57,22 @@ REGISTER_COMMAND_NAME(@"checkcache")
 - (void)runWithArguments:(NSArray *)arguments {
   SantaVnode vnodeID = [self vnodeIDForFile:arguments.firstObject];
   [[self.daemonConn synchronousRemoteObjectProxy]
-    checkCacheForVnodeID:vnodeID
-               withReply:^(SNTAction action) {
-                 if (action == SNTActionRespondAllow) {
-                   LOGI(@"File exists in [allowlist] cache");
-                   exit(0);
-                 } else if (action == SNTActionRespondDeny) {
-                   LOGI(@"File exists in [blocklist] cache");
-                   exit(0);
-                 } else if (action == SNTActionRespondAllowCompiler) {
-                   LOGI(@"File exists in [allowlist compiler] cache");
-                   exit(0);
-                 } else if (action == SNTActionUnset) {
-                   LOGE(@"File does not exist in cache");
-                   exit(1);
-                 }
-               }];
+      checkCacheForVnodeID:vnodeID
+                 withReply:^(SNTAction action) {
+                   if (action == SNTActionRespondAllow) {
+                     LOGI(@"File exists in [allowlist] cache");
+                     exit(0);
+                   } else if (action == SNTActionRespondDeny) {
+                     LOGI(@"File exists in [blocklist] cache");
+                     exit(0);
+                   } else if (action == SNTActionRespondAllowCompiler) {
+                     LOGI(@"File exists in [allowlist compiler] cache");
+                     exit(0);
+                   } else if (action == SNTActionUnset) {
+                     LOGE(@"File does not exist in cache");
+                     exit(1);
+                   }
+                 }];
 }
 
 - (SantaVnode)vnodeIDForFile:(NSString *)path {

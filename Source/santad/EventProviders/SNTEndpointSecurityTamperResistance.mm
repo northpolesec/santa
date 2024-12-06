@@ -41,24 +41,24 @@ using santa::WatchItemPathType;
 // The ES client process (com.northpolesec.santa.daemon) will be the only process allowed to
 // modify these file paths.
 constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
-  {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral},
-  {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral},
-  {"/Applications/Santa.app", WatchItemPathType::kPrefix},
-  {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix},
-  {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix},
+    {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral},
+    {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral},
+    {"/Applications/Santa.app", WatchItemPathType::kPrefix},
+    {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix},
+    {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix},
 };
 
 void RemoveLegacyLaunchdPlists() {
   constexpr std::string_view legacyPlists[] = {
-    "/Library/LaunchDaemons/com.google.santad.plist",
-    "/Library/LaunchDaemons/com.google.santa.bundleservice.plist",
-    "/Library/LaunchDaemons/com.google.santa.metricservice.plist",
-    "/Library/LaunchDaemons/com.google.santa.syncservice.plist",
-    "/Library/LaunchAgents/com.google.santa.plist",
-    // Assume that NPS Santa has already migrated any existing Google newsyslog
-    // config and we can simply remove a new config file that was just laid
-    // down as part of a Google Santa install that is being prevented from running.
-    "/private/etc/newsyslog.d/com.google.santa.newsyslog.conf",
+      "/Library/LaunchDaemons/com.google.santad.plist",
+      "/Library/LaunchDaemons/com.google.santa.bundleservice.plist",
+      "/Library/LaunchDaemons/com.google.santa.metricservice.plist",
+      "/Library/LaunchDaemons/com.google.santa.syncservice.plist",
+      "/Library/LaunchAgents/com.google.santa.plist",
+      // Assume that NPS Santa has already migrated any existing Google newsyslog
+      // config and we can simply remove a new config file that was just laid
+      // down as part of a Google Santa install that is being prevented from running.
+      "/private/etc/newsyslog.d/com.google.santa.newsyslog.conf",
   };
 
   for (const auto &plist : legacyPlists) {
@@ -96,7 +96,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
   // Check for some allowed subcommands
   es_string_token_t arg = esApi->ExecArg(&esMsg->event.exec, 1);
   static const std::unordered_set<std::string> safe_commands{
-    "blame", "help", "hostinfo", "list", "plist", "print", "procinfo",
+      "blame", "help", "hostinfo", "list", "plist", "print", "procinfo",
   };
   if (safe_commands.find(std::string(arg.data, arg.length)) != safe_commands.end()) {
     return {ES_AUTH_RESULT_ALLOW, false};
@@ -148,13 +148,13 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 }
 
 - (void)handleMessage:(Message &&)esMsg
-   recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
+    recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   es_auth_result_t result = ES_AUTH_RESULT_ALLOW;
   bool cacheable = true;
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_UNLINK: {
       if ([SNTEndpointSecurityTamperResistance
-            isProtectedPath:esMsg->event.unlink.target->path.data]) {
+              isProtectedPath:esMsg->event.unlink.target->path.data]) {
         result = ES_AUTH_RESULT_DENY;
         LOGW(@"Preventing attempt to delete important Santa files!");
       }
@@ -163,7 +163,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 
     case ES_EVENT_TYPE_AUTH_RENAME: {
       if ([SNTEndpointSecurityTamperResistance
-            isProtectedPath:esMsg->event.rename.source->path.data]) {
+              isProtectedPath:esMsg->event.rename.source->path.data]) {
         result = ES_AUTH_RESULT_DENY;
         LOGW(@"Preventing attempt to rename important Santa files!");
         break;
@@ -171,7 +171,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 
       if (esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
         if ([SNTEndpointSecurityTamperResistance
-              isProtectedPath:esMsg->event.rename.destination.existing_file->path.data]) {
+                isProtectedPath:esMsg->event.rename.destination.existing_file->path.data]) {
           result = ES_AUTH_RESULT_DENY;
           LOGW(@"Preventing attempt to overwrite important Santa files!");
           break;
@@ -232,7 +232,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 
   // Get the set of protected paths
   std::vector<std::pair<std::string, WatchItemPathType>> protectedPaths =
-    [SNTEndpointSecurityTamperResistance getProtectedPaths];
+      [SNTEndpointSecurityTamperResistance getProtectedPaths];
   protectedPaths.push_back({"/Library/SystemExtensions", WatchItemPathType::kPrefix});
   protectedPaths.push_back({"/bin/launchctl", WatchItemPathType::kLiteral});
 
@@ -240,17 +240,17 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
   [super muteTargetPaths:protectedPaths];
 
   [super subscribeAndClearCache:{
-                                  ES_EVENT_TYPE_AUTH_SIGNAL,
-                                  ES_EVENT_TYPE_AUTH_EXEC,
-                                  ES_EVENT_TYPE_AUTH_UNLINK,
-                                  ES_EVENT_TYPE_AUTH_RENAME,
-                                  ES_EVENT_TYPE_AUTH_OPEN,
+                                    ES_EVENT_TYPE_AUTH_SIGNAL,
+                                    ES_EVENT_TYPE_AUTH_EXEC,
+                                    ES_EVENT_TYPE_AUTH_UNLINK,
+                                    ES_EVENT_TYPE_AUTH_RENAME,
+                                    ES_EVENT_TYPE_AUTH_OPEN,
                                 }];
 }
 
 + (std::vector<std::pair<std::string, WatchItemPathType>>)getProtectedPaths {
   std::vector<std::pair<std::string, WatchItemPathType>> protectedPathsCopy(
-    sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]));
+      sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]));
 
   for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); ++i) {
     protectedPathsCopy.emplace_back(std::string(kProtectedFiles[i].first),

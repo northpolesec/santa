@@ -188,12 +188,12 @@ int getmntinfo_r_np(struct statfs *__nullable *__nullable mntbufp, int flags) {
 
   __block NSUInteger i = 0;
   [mockMounts.mounts
-    enumerateKeysAndObjectsUsingBlock:^(NSString *key, MockStatfs *mockSfs, BOOL *stop) {
-      strlcpy(sfs[i].f_mntfromname, mockSfs.fromName.UTF8String, sizeof(sfs[i].f_mntfromname));
-      strlcpy(sfs[i].f_mntonname, mockSfs.onName.UTF8String, sizeof(sfs[i].f_mntonname));
-      sfs[i].f_flags = [mockSfs.flags unsignedIntValue];
-      i++;
-    }];
+      enumerateKeysAndObjectsUsingBlock:^(NSString *key, MockStatfs *mockSfs, BOOL *stop) {
+        strlcpy(sfs[i].f_mntfromname, mockSfs.fromName.UTF8String, sizeof(sfs[i].f_mntfromname));
+        strlcpy(sfs[i].f_mntonname, mockSfs.onName.UTF8String, sizeof(sfs[i].f_mntonname));
+        sfs[i].f_flags = [mockSfs.flags unsignedIntValue];
+        i++;
+      }];
 
   *mntbufp = sfs;
 

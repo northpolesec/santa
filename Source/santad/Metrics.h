@@ -59,8 +59,8 @@ using EventStatChangeTuple = std::tuple<StatChangeStep, StatResult>;
 using FileAccessMetricsPolicyVersion = std::string;
 using FileAccessMetricsPolicyName = std::string;
 using FileAccessEventCountTuple =
-  std::tuple<FileAccessMetricsPolicyVersion, FileAccessMetricsPolicyName, FileAccessMetricStatus,
-             es_event_type_t, FileAccessPolicyDecision>;
+    std::tuple<FileAccessMetricsPolicyVersion, FileAccessMetricsPolicyName, FileAccessMetricStatus,
+               es_event_type_t, FileAccessPolicyDecision>;
 
 NSString *const EventTypeToString(es_event_type_t eventType);
 

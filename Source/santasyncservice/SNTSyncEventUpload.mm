@@ -81,10 +81,10 @@ using santa::NSStringToUTF8String;
     // A list of bundle hashes that require their related binary events to be uploaded.
     if (response.event_upload_bundle_binaries_size()) {
       self.syncState.bundleBinaryRequests =
-        [NSMutableArray arrayWithCapacity:response.event_upload_bundle_binaries_size()];
+          [NSMutableArray arrayWithCapacity:response.event_upload_bundle_binaries_size()];
       for (const std::string &bundle_binary : response.event_upload_bundle_binaries()) {
         [(NSMutableArray *)self.syncState.bundleBinaryRequests
-          addObject:santa::StringToNSString(bundle_binary)];
+            addObject:santa::StringToNSString(bundle_binary)];
       }
     }
     SLOGI(@"Uploaded %d events", uploadEvents->size());
@@ -96,7 +96,7 @@ using santa::NSStringToUTF8String;
   // See if there are any events remaining to upload
   if (uploadEvents->size() < events.count) {
     NSRange nextEventsRange =
-      NSMakeRange(uploadEvents->size(), events.count - uploadEvents->size());
+        NSMakeRange(uploadEvents->size(), events.count - uploadEvents->size());
     NSArray *nextEvents = [events subarrayWithRange:nextEventsRange];
     return [self uploadEvents:nextEvents];
   }

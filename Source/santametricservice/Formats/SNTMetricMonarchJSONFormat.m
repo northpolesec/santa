@@ -47,7 +47,7 @@ const NSString *kKey = @"key";
   if (self) {
     _dateFormatter = [[NSISO8601DateFormatter alloc] init];
     _dateFormatter.formatOptions =
-      NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+        NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
   }
   return self;
 }
@@ -119,7 +119,7 @@ const NSString *kKey = @"key";
 
         for (int i = 0; i < fieldNames.count; i++) {
           [monarchDataEntry[kField]
-            addObject:@{kName : fieldNames[i], kStringValue : fieldValues[i]}];
+              addObject:@{kName : fieldNames[i], kStringValue : fieldValues[i]}];
         }
       }
 
@@ -208,8 +208,8 @@ const NSString *kKey = @"key";
 
   for (NSString *metricName in metrics[@"metrics"]) {
     [monarchMetrics addObject:[self formatMetric:metricName
-                                       withValue:metrics[@"metrics"][metricName]
-                                 andEndtimestamp:endTimestamp]];
+                                        withValue:metrics[@"metrics"][metricName]
+                                  andEndtimestamp:endTimestamp]];
   }
 
   NSMutableArray<NSDictionary *> *rootLabels = [[NSMutableArray alloc] init];

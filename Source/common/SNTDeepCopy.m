@@ -36,7 +36,7 @@
 
 - (instancetype)sntDeepCopy {
   NSMutableDictionary<__kindof NSObject *, __kindof NSObject *> *deepCopy =
-    [NSMutableDictionary dictionary];
+      [NSMutableDictionary dictionary];
   for (id key in self) {
     id value = self[key];
     if ([value respondsToSelector:@selector(sntDeepCopy)]) {

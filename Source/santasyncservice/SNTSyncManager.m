@@ -303,8 +303,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 - (dispatch_source_t)createSyncTimerWithBlock:(void (^)(void))block {
   dispatch_source_t timerQueue =
-    dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
-                           dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0));
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
+                             dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0));
   dispatch_source_set_event_handler(timerQueue, block);
   dispatch_resume(timerQueue);
   return timerQueue;
@@ -344,7 +344,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   sessConfig.connectionProxyDictionary = [[SNTConfigurator configurator] syncProxyConfig];
 
   MOLAuthenticatingURLSession *authURLSession =
-    [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:sessConfig];
+      [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:sessConfig];
   authURLSession.userAgent = @"santactl-sync/";
   NSString *santactlVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
   if (santactlVersion) {

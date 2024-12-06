@@ -40,7 +40,7 @@ static constexpr WatchItemPathType kWatchItemPolicyDefaultPathType = WatchItemPa
 static constexpr bool kWatchItemPolicyDefaultAllowReadAccess = false;
 static constexpr bool kWatchItemPolicyDefaultAuditOnly = true;
 static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType =
-  WatchItemRuleType::kPathsWithAllowedProcesses;
+    WatchItemRuleType::kPathsWithAllowedProcesses;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
 

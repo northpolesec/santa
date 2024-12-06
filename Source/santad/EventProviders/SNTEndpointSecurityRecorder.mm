@@ -93,7 +93,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
 }
 
 - (void)handleMessage:(Message &&)esMsg
-   recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
+    recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   // Pre-enrichment processing
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_CLOSE: {
@@ -153,9 +153,9 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
       // Only log file changes that match the given regex
       NSString *targetPath = santa::StringToNSString(targetFile->path.data);
       if (![[self.configurator fileChangesRegex]
-            numberOfMatchesInString:targetPath
-                            options:0
-                              range:NSMakeRange(0, targetPath.length)]) {
+              numberOfMatchesInString:targetPath
+                              options:0
+                                range:NSMakeRange(0, targetPath.length)]) {
         // Note: Do not record metrics in this case. These are not considered "drops"
         // because this is not a failure case.
         // TODO(mlw): Consider changes to configuration that would allow muting paths

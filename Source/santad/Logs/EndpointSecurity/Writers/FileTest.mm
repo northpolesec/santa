@@ -176,7 +176,7 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
   size_t bufferSize = 100;
   size_t writeSize = 50;
   auto file =
-    std::make_shared<FilePeer>(self.logPath, bufferSize, bufferSize * 2, self.q, self.timer);
+      std::make_shared<FilePeer>(self.logPath, bufferSize, bufferSize * 2, self.q, self.timer);
 
   // Starting out, file size and internal buffer are 0
   struct stat gotSB;
@@ -202,7 +202,7 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
 - (void)testEnsureCapacity {
   const size_t batchSize = 100;
   auto file =
-    std::make_shared<FilePeer>(self.logPath, batchSize, batchSize * 2, self.q, self.timer);
+      std::make_shared<FilePeer>(self.logPath, batchSize, batchSize * 2, self.q, self.timer);
 
   // Initial capacity == (batch_size + max_expected_write_size)
   const size_t initialCapacity = batchSize + (batchSize * 2);
@@ -235,7 +235,7 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
   // Use a buffer to copy that's slightly larger than the batch size
   std::vector<uint8_t> bytes(batchSize + 2, 'A');
   auto file =
-    std::make_shared<FilePeer>(self.logPath, batchSize, batchSize * 2, self.q, self.timer);
+      std::make_shared<FilePeer>(self.logPath, batchSize, batchSize * 2, self.q, self.timer);
 
   // Initial capacity == (batch_size + max_expected_write_size)
   const size_t initialCapacity = batchSize + (batchSize * 2);
@@ -262,7 +262,7 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
   const size_t halfBatch = batchSize / 2;
   std::vector<uint8_t> bytes(halfBatch);
   auto file =
-    std::make_shared<FilePeer>(self.logPath, batchSize, batchSize * 2, self.q, self.timer);
+      std::make_shared<FilePeer>(self.logPath, batchSize, batchSize * 2, self.q, self.timer);
 
   // Should never want to flush with no data in the buffer
   XCTAssertFalse(file->ShouldFlush());

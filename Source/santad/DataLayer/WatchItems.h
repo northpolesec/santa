@@ -70,7 +70,7 @@ struct WatchItemsState {
 class WatchItems : public std::enable_shared_from_this<WatchItems> {
  public:
   using VersionAndPolicies =
-    std::pair<std::string, std::vector<std::optional<std::shared_ptr<WatchItemPolicy>>>>;
+      std::pair<std::string, std::vector<std::optional<std::shared_ptr<WatchItemPolicy>>>>;
   using WatchItemsTree = santa::PrefixTree<std::shared_ptr<WatchItemPolicy>>;
 
   // Factory
@@ -99,7 +99,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   std::optional<WatchItemsState> State();
 
   std::pair<NSString *, NSString *> EventDetailLinkInfo(
-    const std::shared_ptr<WatchItemPolicy> &watch_item);
+      const std::shared_ptr<WatchItemPolicy> &watch_item);
 
   friend class santa::WatchItemsPeer;
 
@@ -129,7 +129,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   NSDictionary *current_config_ ABSL_GUARDED_BY(lock_);
   NSTimeInterval last_update_time_ ABSL_GUARDED_BY(lock_);
   std::set<std::pair<std::string, WatchItemPathType>> currently_monitored_paths_
-    ABSL_GUARDED_BY(lock_);
+      ABSL_GUARDED_BY(lock_);
   std::string policy_version_ ABSL_GUARDED_BY(lock_);
   std::set<id<SNTEndpointSecurityDynamicEventHandler>> registerd_clients_ ABSL_GUARDED_BY(lock_);
   bool periodic_task_started_ = false;

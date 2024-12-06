@@ -35,7 +35,7 @@
 - (void)setUp {
   self.fileMgr = [NSFileManager defaultManager];
   self.testDir =
-    [NSString stringWithFormat:@"%@santa-configurator-%d", NSTemporaryDirectory(), getpid()];
+      [NSString stringWithFormat:@"%@santa-configurator-%d", NSTemporaryDirectory(), getpid()];
 
   XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.testDir
                         withIntermediateDirectories:YES
@@ -50,7 +50,7 @@
 - (void)runMigrationTestsWithSyncState:(NSDictionary *)syncStatePlist
                               verifier:(void (^)(SNTConfigurator *))verifierBlock {
   NSString *syncStatePlistPath =
-    [NSString stringWithFormat:@"%@/test-sync-state.plist", self.testDir];
+      [NSString stringWithFormat:@"%@/test-sync-state.plist", self.testDir];
 
   XCTAssertTrue([syncStatePlist writeToFile:syncStatePlistPath atomically:YES]);
 

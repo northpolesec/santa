@@ -46,7 +46,7 @@
 }
 
 - (void)request:(OSSystemExtensionRequest *)request
-  didFinishWithResult:(OSSystemExtensionRequestResult)result {
+    didFinishWithResult:(OSSystemExtensionRequestResult)result {
   NSLog(@"SystemExtension \"%@\" request did finish: %ld", request.identifier, (long)result);
   exit(0);
 }

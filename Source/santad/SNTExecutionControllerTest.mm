@@ -74,7 +74,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   self.mockCodesignChecker = OCMClassMock([MOLCodesignChecker class]);
   OCMStub([self.mockCodesignChecker alloc]).andReturn(self.mockCodesignChecker);
   OCMStub([self.mockCodesignChecker initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:NULL]])
-    .andReturn(self.mockCodesignChecker);
+      .andReturn(self.mockCodesignChecker);
 
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
@@ -84,10 +84,10 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
   OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
   OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:nil]])
-    .ignoringNonObjectArgs()
-    .andReturn(self.mockFileInfo);
+      .ignoringNonObjectArgs()
+      .andReturn(self.mockFileInfo);
   OCMStub([self.mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]])
-    .andReturn(self.mockCodesignChecker);
+      .andReturn(self.mockCodesignChecker);
 
   self.mockRuleDatabase = OCMClassMock([SNTRuleTable class]);
   self.mockEventDatabase = OCMClassMock([SNTEventTable class]);
@@ -129,8 +129,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
   es_file_t fileExec = MakeESFile("bar", {
-                                           .st_dev = 12,
-                                           .st_ino = 34,
+                                             .st_dev = 12,
+                                             .st_ino = 34,
                                          });
   es_process_t procExec = MakeESProcess(&fileExec);
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
@@ -166,11 +166,11 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
     Message msg(mockESApi, &esMsg);
 
     OCMExpect(
-      [self.mockDecisionCache cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
-                                return cd.decision == SNTEventStateBlockLongPath &&
-                                       cd.vnodeId.fsid == targetExecutable->stat.st_dev &&
-                                       cd.vnodeId.fileid == targetExecutable->stat.st_ino;
-                              }]]);
+        [self.mockDecisionCache cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
+                                  return cd.decision == SNTEventStateBlockLongPath &&
+                                         cd.vnodeId.fsid == targetExecutable->stat.st_dev &&
+                                         cd.vnodeId.fileid == targetExecutable->stat.st_ino;
+                                }]]);
 
     XCTAssertFalse([self.sut synchronousShouldProcessExecEvent:msg]);
 
@@ -178,11 +178,11 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
     esMsg.event.exec.target->executable->path_truncated = true;
 
     OCMExpect(
-      [self.mockDecisionCache cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
-                                return cd.decision == SNTEventStateBlockLongPath &&
-                                       cd.vnodeId.fsid == targetExecutable->stat.st_dev &&
-                                       cd.vnodeId.fileid == targetExecutable->stat.st_ino;
-                              }]]);
+        [self.mockDecisionCache cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
+                                  return cd.decision == SNTEventStateBlockLongPath &&
+                                         cd.vnodeId.fsid == targetExecutable->stat.st_dev &&
+                                         cd.vnodeId.fileid == targetExecutable->stat.st_ino;
+                                }]]);
 
     XCTAssertFalse([self.sut synchronousShouldProcessExecEvent:msg]);
 
@@ -197,8 +197,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
   es_file_t fileExec = MakeESFile("bar", {
-                                           .st_dev = 12,
-                                           .st_ino = 34,
+                                             .st_dev = 12,
+                                             .st_ino = 34,
                                          });
   es_process_t procExec = MakeESProcess(&fileExec);
   procExec.is_platform_binary = false;
@@ -227,18 +227,18 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
 - (void)stubRule:(SNTRule *)rule forIdentifiers:(struct RuleIdentifiers)wantIdentifiers {
   OCMStub([self.mockRuleDatabase ruleForIdentifiers:wantIdentifiers])
-    .ignoringNonObjectArgs()
-    .andDo(^(NSInvocation *inv) {
-      struct RuleIdentifiers gotIdentifiers = {};
-      [inv getArgument:&gotIdentifiers atIndex:2];
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation *inv) {
+        struct RuleIdentifiers gotIdentifiers = {};
+        [inv getArgument:&gotIdentifiers atIndex:2];
 
-      XCTAssertEqualObjects(gotIdentifiers.cdhash, wantIdentifiers.cdhash);
-      XCTAssertEqualObjects(gotIdentifiers.binarySHA256, wantIdentifiers.binarySHA256);
-      XCTAssertEqualObjects(gotIdentifiers.signingID, wantIdentifiers.signingID);
-      XCTAssertEqualObjects(gotIdentifiers.certificateSHA256, wantIdentifiers.certificateSHA256);
-      XCTAssertEqualObjects(gotIdentifiers.teamID, wantIdentifiers.teamID);
-    })
-    .andReturn(rule);
+        XCTAssertEqualObjects(gotIdentifiers.cdhash, wantIdentifiers.cdhash);
+        XCTAssertEqualObjects(gotIdentifiers.binarySHA256, wantIdentifiers.binarySHA256);
+        XCTAssertEqualObjects(gotIdentifiers.signingID, wantIdentifiers.signingID);
+        XCTAssertEqualObjects(gotIdentifiers.certificateSHA256, wantIdentifiers.certificateSHA256);
+        XCTAssertEqualObjects(gotIdentifiers.teamID, wantIdentifiers.teamID);
+      })
+      .andReturn(rule);
 }
 
 - (void)testBinaryAllowRule {
@@ -535,7 +535,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   rule.type = SNTRuleTypeSigningID;
 
   [self stubRule:rule
-    forIdentifiers:{ .binarySHA256 = @"a", .signingID = signingID, .teamID = @(kExampleTeamID) }];
+      forIdentifiers:{ .binarySHA256 = @"a", .signingID = signingID, .teamID = @(kExampleTeamID) }];
 
   [self validateExecEvent:SNTActionRespondAllowCompiler
              messageSetup:^(es_message_t *msg) {

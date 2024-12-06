@@ -29,12 +29,12 @@ class ProcessTreeTestPeer : public ProcessTree {
 std::shared_ptr<const Process> ProcessTreeTestPeer::InsertInit() {
   absl::MutexLock lock(&mtx_);
   struct Pid initpid = {
-    .pid = 1,
-    .pidversion = 1,
+      .pid = 1,
+      .pidversion = 1,
   };
   auto proc = std::make_shared<Process>(
-    initpid, (Cred){.uid = 0, .gid = 0},
-    std::make_shared<Program>((Program){.executable = "/init", .arguments = {"/init"}}), nullptr);
+      initpid, (Cred){.uid = 0, .gid = 0},
+      std::make_shared<Program>((Program){.executable = "/init", .arguments = {"/init"}}), nullptr);
   map_.emplace(initpid, proc);
   return proc;
 }

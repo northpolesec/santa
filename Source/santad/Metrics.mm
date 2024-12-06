@@ -183,8 +183,8 @@ NSString *const FileAccessPolicyDecisionToString(FileAccessPolicyDecision decisi
       return kFileAccessPolicyDecisionAllowedAuditOnly;
     default:
       [NSException
-         raise:@"Invalid file access policy decision"
-        format:@"Unknown file access policy decision value: %d", static_cast<int>(decision)];
+           raise:@"Invalid file access policy decision"
+          format:@"Unknown file access policy decision value: %d", static_cast<int>(decision)];
       return nil;
   }
 }
@@ -220,43 +220,43 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
   dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
 
   SNTMetricInt64Gauge *event_processing_times =
-    [metric_set int64GaugeWithName:@"/santa/event_processing_time"
-                        fieldNames:@[ @"Processor", @"Event" ]
-                          helpText:@"Time to process various event types by each processor"];
+      [metric_set int64GaugeWithName:@"/santa/event_processing_time"
+                          fieldNames:@[ @"Processor", @"Event" ]
+                            helpText:@"Time to process various event types by each processor"];
 
   SNTMetricCounter *event_counts =
-    [metric_set counterWithName:@"/santa/event_count"
-                     fieldNames:@[ @"Processor", @"Event", @"Disposition" ]
-                       helpText:@"Events received and processed by each processor"];
+      [metric_set counterWithName:@"/santa/event_count"
+                       fieldNames:@[ @"Processor", @"Event", @"Disposition" ]
+                         helpText:@"Events received and processed by each processor"];
 
   SNTMetricCounter *rate_limit_counts =
-    [metric_set counterWithName:@"/santa/rate_limit_count"
-                     fieldNames:@[ @"Processor" ]
-                       helpText:@"Events rate limited by each processor"];
+      [metric_set counterWithName:@"/santa/rate_limit_count"
+                       fieldNames:@[ @"Processor" ]
+                         helpText:@"Events rate limited by each processor"];
 
   SNTMetricCounter *faa_event_counts = [metric_set
-    counterWithName:@"/santa/file_access_authorizer/log/count"
-         fieldNames:@[
-           @"config_version", @"access_type", @"rule_id", @"status", @"operation", @"decision"
-         ]
-           helpText:@"Count of times a log is emitted from the File Access Authorizer client"];
+      counterWithName:@"/santa/file_access_authorizer/log/count"
+           fieldNames:@[
+             @"config_version", @"access_type", @"rule_id", @"status", @"operation", @"decision"
+           ]
+             helpText:@"Count of times a log is emitted from the File Access Authorizer client"];
 
   SNTMetricCounter *drop_counts =
-    [metric_set counterWithName:@"/santa/event_drop_count"
-                     fieldNames:@[ @"Processor", @"Event" ]
-                       helpText:@"Count of the number of drops for each event"];
+      [metric_set counterWithName:@"/santa/event_drop_count"
+                       fieldNames:@[ @"Processor", @"Event" ]
+                         helpText:@"Count of the number of drops for each event"];
 
-  SNTMetricCounter *stat_change_counts =
-    [metric_set counterWithName:@"/santa/event_stat_change_count"
-                     fieldNames:@[ @"step", @"error" ]
-                       helpText:@"Count of times a stat info changed for a binary being evalauted"];
+  SNTMetricCounter *stat_change_counts = [metric_set
+      counterWithName:@"/santa/event_stat_change_count"
+           fieldNames:@[ @"step", @"error" ]
+             helpText:@"Count of times a stat info changed for a binary being evalauted"];
 
   std::shared_ptr<Metrics> metrics = std::make_shared<Metrics>(
-    q, timer_source, interval, event_processing_times, event_counts, rate_limit_counts,
-    faa_event_counts, drop_counts, stat_change_counts, metric_set, ^(Metrics *metrics) {
-      SNTRegisterCoreMetrics();
-      metrics->EstablishConnection();
-    });
+      q, timer_source, interval, event_processing_times, event_counts, rate_limit_counts,
+      faa_event_counts, drop_counts, stat_change_counts, metric_set, ^(Metrics *metrics) {
+        SNTRegisterCoreMetrics();
+        metrics->EstablishConnection();
+      });
 
   std::weak_ptr<Metrics> weak_metrics(metrics);
   dispatch_source_set_event_handler(metrics->timer_source_, ^{
@@ -356,13 +356,13 @@ void Metrics::FlushMetrics() {
       NSString *eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
       NSString *status = FileAccessMetricStatusToString(std::get<FileAccessMetricStatus>(kv.first));
       NSString *decision =
-        FileAccessPolicyDecisionToString(std::get<FileAccessPolicyDecision>(kv.first));
+          FileAccessPolicyDecisionToString(std::get<FileAccessPolicyDecision>(kv.first));
 
       [faa_event_counts_
-           incrementBy:kv.second
-        forFieldValues:@[
-          policyVersion, kFileAccessMetricsAccessType, policyName, status, eventName, decision
-        ]];
+             incrementBy:kv.second
+          forFieldValues:@[
+            policyVersion, kFileAccessMetricsAccessType, policyName, status, eventName, decision
+          ]];
     }
 
     for (auto &[key, stats] : drop_cache_) {
@@ -479,8 +479,9 @@ void Metrics::UpdateEventStats(Processor processor, const es_message_t *msg) {
     drop_cache_[event_stats_key] = SequenceStats{.next_seq_num = msg->seq_num + 1,
                                                  .drops = old_event_stats.drops + new_event_drops};
 
-    drop_cache_[global_stats_key] = SequenceStats{
-      .next_seq_num = msg->global_seq_num + 1, .drops = old_global_stats.drops + new_global_drops};
+    drop_cache_[global_stats_key] =
+        SequenceStats{.next_seq_num = msg->global_seq_num + 1,
+                      .drops = old_global_stats.drops + new_global_drops};
   });
 }
 
@@ -495,7 +496,7 @@ void Metrics::SetFileAccessEventMetrics(std::string policy_version, std::string 
                                         FileAccessPolicyDecision decision) {
   dispatch_sync(events_q_, ^{
     faa_event_counts_cache_[FileAccessEventCountTuple{
-      std::move(policy_version), std::move(rule_name), status, event_type, decision}]++;
+        std::move(policy_version), std::move(rule_name), status, event_type, decision}]++;
   });
 }
 

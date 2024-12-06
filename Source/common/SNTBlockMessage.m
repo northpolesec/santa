@@ -62,13 +62,13 @@ static id ValueOrNull(id value) {
 + (NSAttributedString *)attributedBlockMessageForEvent:(SNTStoredEvent *)event
                                          customMessage:(NSString *)customMessage {
   NSString *defaultBlockedMessage = NSLocalizedString(
-    @"The following application has been blocked from executing<br />because its trustworthiness "
-    @"cannot be determined",
-    @"The default message to show the user when an unknown application is blocked");
+      @"The following application has been blocked from executing<br />because its trustworthiness "
+      @"cannot be determined",
+      @"The default message to show the user when an unknown application is blocked");
   NSString *defaultBannedMessage = NSLocalizedString(
-    @"The following application has been blocked from<br />executing because it has "
-    @"been deemed malicious",
-    @"The default message to show the user when a banned application is blocked");
+      @"The following application has been blocked from<br />executing because it has "
+      @"been deemed malicious",
+      @"The default message to show the user when a banned application is blocked");
 
   if (customMessage.length) {
     return [self formatMessage:customMessage
@@ -85,22 +85,22 @@ static id ValueOrNull(id value) {
 + (NSAttributedString *)attributedBlockMessageForFileAccessEvent:(SNTFileAccessEvent *)event
                                                    customMessage:(NSString *)customMessage {
   NSString *defaultBlockedMesage =
-    NSLocalizedString(@"Access to a file has been denied",
-                      @"The default message to show the user when access to a file is blocked");
+      NSLocalizedString(@"Access to a file has been denied",
+                        @"The default message to show the user when access to a file is blocked");
 
   return [SNTBlockMessage
-    formatMessage:customMessage ?: [[SNTConfigurator configurator] fileAccessBlockMessage]
-     withFallback:defaultBlockedMesage];
+      formatMessage:customMessage ?: [[SNTConfigurator configurator] fileAccessBlockMessage]
+       withFallback:defaultBlockedMesage];
 }
 
 + (NSAttributedString *)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent *)event {
   NSString *defaultRemountMessage =
-    NSLocalizedString(@"The following device has been remounted with reduced permissions",
-                      @"The default message to show the user when a USB device is remounted with "
-                      @"reduced permissions");
+      NSLocalizedString(@"The following device has been remounted with reduced permissions",
+                        @"The default message to show the user when a USB device is remounted with "
+                        @"reduced permissions");
   NSString *defaultBannedMessage = NSLocalizedString(
-    @"The following device has been blocked from mounting",
-    @"The default message to show the user when a USB device is blocked from mounting");
+      @"The following device has been blocked from mounting",
+      @"The default message to show the user when a USB device is blocked from mounting");
 
   if ([[SNTConfigurator configurator] remountUSBMode]) {
     return [SNTBlockMessage formatMessage:[[SNTConfigurator configurator] remountUSBBlockMessage]
@@ -113,10 +113,10 @@ static id ValueOrNull(id value) {
 + (NSString *)stringFromHTML:(NSString *)html {
   NSError *error;
   NSXMLDocument *xml = [[NSXMLDocument alloc]
-    initWithXMLString:html
-              options:NSXMLDocumentIncludeContentTypeDeclaration | NSXMLNodeCompactEmptyElement |
-                      NSXMLNodeLoadExternalEntitiesNever | NSXMLNodeNeverEscapeContents
-                error:&error];
+      initWithXMLString:html
+                options:NSXMLDocumentIncludeContentTypeDeclaration | NSXMLNodeCompactEmptyElement |
+                        NSXMLNodeLoadExternalEntitiesNever | NSXMLNodeNeverEscapeContents
+                  error:&error];
 
   if (error) {
     LOGW(@"Failed to parse HTML message: %@", error);
@@ -126,13 +126,13 @@ static id ValueOrNull(id value) {
   // Strip any HTML tags out of the message. Also remove any content inside <style> tags and
   // replace <br> elements with a newline.
   NSString *stripXslt =
-    @"<?xml version='1.0' encoding='utf-8'?>"
-    @"<xsl:stylesheet version='1.0' xmlns:xsl='http://www.w3.org/1999/XSL/Transform'"
-    @"                              xmlns:xhtml='http://www.w3.org/1999/xhtml'>"
-    @"<xsl:output method='text'/>"
-    @"<xsl:template match='br'><xsl:text>\n</xsl:text></xsl:template>"
-    @"<xsl:template match='style'/>"
-    @"</xsl:stylesheet>";
+      @"<?xml version='1.0' encoding='utf-8'?>"
+      @"<xsl:stylesheet version='1.0' xmlns:xsl='http://www.w3.org/1999/XSL/Transform'"
+      @"                              xmlns:xhtml='http://www.w3.org/1999/xhtml'>"
+      @"<xsl:output method='text'/>"
+      @"<xsl:template match='br'><xsl:text>\n</xsl:text></xsl:template>"
+      @"<xsl:template match='style'/>"
+      @"</xsl:stylesheet>";
   NSData *data = [xml objectByApplyingXSLTString:stripXslt arguments:NULL error:&error];
   if (error || ![data isKindOfClass:[NSData class]]) {
     LOGW(@"Failed to strip HTML message: %@", error);
@@ -177,7 +177,7 @@ static id ValueOrNull(id value) {
     @"%file_sha%" : ValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
     @"%file_identifier%" : ValueOrNull(event.fileSHA256),
     @"%bundle_or_file_identifier%" :
-      ValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
+        ValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
     @"%username%" : ValueOrNull(event.executingUser),
     @"%file_bundle_id%" : ValueOrNull(event.fileBundleID),
     @"%team_id%" : ValueOrNull(event.teamID),

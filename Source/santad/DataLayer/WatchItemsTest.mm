@@ -113,7 +113,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   self.dirStack = [[NSMutableArray alloc] init];
   self.fileMgr = [NSFileManager defaultManager];
   self.testDir =
-    [NSString stringWithFormat:@"%@santa-watchitems-%d", NSTemporaryDirectory(), getpid()];
+      [NSString stringWithFormat:@"%@santa-watchitems-%d", NSTemporaryDirectory(), getpid()];
 
   XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.testDir
                         withIntermediateDirectories:YES
@@ -212,9 +212,9 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   NSDictionary *allFilesPolicy = @{kWatchItemConfigKeyPaths : @[ @"*" ]};
   NSDictionary *configAllFilesOriginal =
-    WrapWatchItemsConfig(@{@"all_files_orig" : allFilesPolicy});
+      WrapWatchItemsConfig(@{@"all_files_orig" : allFilesPolicy});
   NSDictionary *configAllFilesRename =
-    WrapWatchItemsConfig(@{@"all_files_rename" : allFilesPolicy});
+      WrapWatchItemsConfig(@{@"all_files_rename" : allFilesPolicy});
 
   WatchItems::VersionAndPolicies policies;
 
@@ -283,7 +283,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   NSString *configFile = @"config.plist";
   NSDictionary *firstConfig = WrapWatchItemsConfig(@{@"f_files" : fFiles});
   NSDictionary *secondConfig =
-    WrapWatchItemsConfig(@{@"f_files" : fFiles, @"weird_files" : weirdFiles});
+      WrapWatchItemsConfig(@{@"f_files" : fFiles, @"weird_files" : weirdFiles});
 
   dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.q);
 
@@ -367,10 +367,10 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   {
     // Test expected values with the inital policy
     const std::map<std::vector<std::string_view>, std::string_view> pathToPolicyName = {
-      {{"./foo"}, "foo_subdir"},
-      {{"./foo/bar.txt.tmp"}, "foo_subdir"},
-      {{"./foo/bar.txt"}, "foo_subdir"},
-      {{"./does/not/exist"}, kBadPolicyName},
+        {{"./foo"}, "foo_subdir"},
+        {{"./foo/bar.txt.tmp"}, "foo_subdir"},
+        {{"./foo/bar.txt"}, "foo_subdir"},
+        {{"./does/not/exist"}, kBadPolicyName},
     };
 
     for (const auto &kv : pathToPolicyName) {
@@ -403,10 +403,10 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   {
     // Test expected values with the updated policy
     const std::map<std::vector<std::string_view>, std::string_view> pathToPolicyName = {
-      {{"./foo"}, "foo_subdir"},
-      {{"./foo/bar.txt.tmp"}, "foo_subdir"},
-      {{"./foo/bar.txt"}, "bar_txt"},
-      {{"./does/not/exist"}, kBadPolicyName},
+        {{"./foo"}, "foo_subdir"},
+        {{"./foo/bar.txt.tmp"}, "foo_subdir"},
+        {{"./foo/bar.txt"}, "bar_txt"},
+        {{"./does/not/exist"}, kBadPolicyName},
     };
 
     for (const auto &kv : pathToPolicyName) {
@@ -433,10 +433,10 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   {
     // Test expected values with the catch-all policy
     const std::map<std::vector<std::string_view>, std::string_view> pathToPolicyName = {
-      {{"./foo"}, "foo_subdir"},
-      {{"./foo/bar.txt.tmp"}, "foo_subdir"},
-      {{"./foo/bar.txt"}, "bar_txt"},
-      {{"./does/not/exist"}, "dot_everything"},
+        {{"./foo"}, "foo_subdir"},
+        {{"./foo/bar.txt.tmp"}, "foo_subdir"},
+        {{"./foo/bar.txt"}, "bar_txt"},
+        {{"./does/not/exist"}, "dot_everything"},
     };
 
     for (const auto &kv : pathToPolicyName) {
@@ -455,10 +455,10 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   {
     // Test expected values with the foo_subdir policy removed
     const std::map<std::vector<std::string_view>, std::string_view> pathToPolicyName = {
-      {{"./foo"}, "dot_everything"},
-      {{"./foo/bar.txt.tmp"}, "dot_everything"},
-      {{"./foo/bar.txt"}, "bar_txt"},
-      {{"./does/not/exist"}, "dot_everything"},
+        {{"./foo"}, "dot_everything"},
+        {{"./foo/bar.txt.tmp"}, "dot_everything"},
+        {{"./foo/bar.txt"}, "bar_txt"},
+        {{"./does/not/exist"}, "dot_everything"},
     };
 
     for (const auto &kv : pathToPolicyName) {
@@ -491,7 +491,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   // Test path array dictionary with long string
   path_list = VerifyConfigWatchItemPaths(
-    @[ @{kWatchItemConfigKeyPathsPath : RepeatedString(@"A", PATH_MAX + 1)} ], &err);
+      @[ @{kWatchItemConfigKeyPathsPath : RepeatedString(@"A", PATH_MAX + 1)} ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array dictionary with default path type
@@ -503,7 +503,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   // Test path array dictionary with custom path type
   path_list = VerifyConfigWatchItemPaths(
-    @[ @{kWatchItemConfigKeyPathsPath : @"A", kWatchItemConfigKeyPathsIsPrefix : @(YES)} ], &err);
+      @[ @{kWatchItemConfigKeyPathsPath : @"A", kWatchItemConfigKeyPathsIsPrefix : @(YES)} ], &err);
   XCTAssertTrue(std::holds_alternative<PathAndTypeVec>(path_list));
   XCTAssertEqual(std::get<PathAndTypeVec>(path_list).size(), 1);
   XCTAssertCStringEqual(std::get<PathAndTypeVec>(path_list)[0].first.c_str(), "A");
@@ -536,15 +536,15 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Test BinaryPath length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
-      @[ @{kWatchItemConfigKeyProcessesBinaryPath : RepeatedString(@"A", PATH_MAX + 1)} ]
+        @[ @{kWatchItemConfigKeyProcessesBinaryPath : RepeatedString(@"A", PATH_MAX + 1)} ]
   },
                                              &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
 
   // Test valid BinaryPath
   proc_list = VerifyConfigWatchItemProcesses(
-    @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesBinaryPath : @"mypath"} ]},
-    &err);
+      @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesBinaryPath : @"mypath"} ]},
+      &err);
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list).size(), 1);
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[0],
@@ -553,7 +553,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Test SigningID length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
-      @[ @{kWatchItemConfigKeyProcessesSigningID : RepeatedString(@"A", 513)} ]
+        @[ @{kWatchItemConfigKeyProcessesSigningID : RepeatedString(@"A", 513)} ]
   },
                                              &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
@@ -561,7 +561,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Test valid SigningID
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
-      @[ @{kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.test"} ]
+        @[ @{kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.test"} ]
   },
                                              &err);
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
@@ -572,15 +572,15 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Test TeamID length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
-      @[ @{kWatchItemConfigKeyProcessesTeamID : @"LongerThanExpectedTeamID"} ]
+        @[ @{kWatchItemConfigKeyProcessesTeamID : @"LongerThanExpectedTeamID"} ]
   },
                                              &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
 
   // Test valid TeamID
   proc_list = VerifyConfigWatchItemProcesses(
-    @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"myvalidtid"} ]},
-    &err);
+      @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"myvalidtid"} ]},
+      &err);
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list).size(), 1);
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[0],
@@ -589,7 +589,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Test CDHash length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
-      @[ @{kWatchItemConfigKeyProcessesCDHash : RepeatedString(@"A", CS_CDHASH_LEN * 2 + 1)} ]
+        @[ @{kWatchItemConfigKeyProcessesCDHash : RepeatedString(@"A", CS_CDHASH_LEN * 2 + 1)} ]
   },
                                              &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
@@ -597,7 +597,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Test CDHash hex-only
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
-      @[ @{kWatchItemConfigKeyProcessesCDHash : RepeatedString(@"Z", CS_CDHASH_LEN * 2)} ]
+        @[ @{kWatchItemConfigKeyProcessesCDHash : RepeatedString(@"Z", CS_CDHASH_LEN * 2)} ]
   },
                                              &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
@@ -607,7 +607,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   std::vector<uint8_t> cdhashBytes(cdhash.length / 2);
   std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
   proc_list = VerifyConfigWatchItemProcesses(
-    @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesCDHash : cdhash} ]}, &err);
+      @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesCDHash : cdhash} ]}, &err);
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list).size(), 1);
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[0],
@@ -617,7 +617,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses : @[ @{
       kWatchItemConfigKeyProcessesCertificateSha256 :
-        RepeatedString(@"A", CC_SHA256_DIGEST_LENGTH * 2 + 1)
+          RepeatedString(@"A", CC_SHA256_DIGEST_LENGTH * 2 + 1)
     } ]
   },
                                              &err);
@@ -627,7 +627,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses : @[ @{
       kWatchItemConfigKeyProcessesCertificateSha256 :
-        RepeatedString(@"Z", CC_SHA256_DIGEST_LENGTH * 2)
+          RepeatedString(@"Z", CC_SHA256_DIGEST_LENGTH * 2)
     } ]
   },
                                              &err);
@@ -646,14 +646,14 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   // Test valid invalid PlatformBinary type
   proc_list = VerifyConfigWatchItemProcesses(
-    @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesPlatformBinary : @"YES"} ]},
-    &err);
+      @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesPlatformBinary : @"YES"} ]},
+      &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
 
   // Test valid valid PlatformBinary
   proc_list = VerifyConfigWatchItemProcesses(
-    @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesPlatformBinary : @(YES)} ]},
-    &err);
+      @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesPlatformBinary : @(YES)} ]},
+      &err);
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list).size(), 1);
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list)[0],
@@ -684,13 +684,13 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertTrue(std::holds_alternative<PolicyProcessVec>(proc_list));
   XCTAssertEqual(std::get<PolicyProcessVec>(proc_list).size(), 2);
   XCTAssertEqual(
-    std::get<PolicyProcessVec>(proc_list)[0],
-    WatchItemPolicy::Process("mypath1", "com.northpolesec.test1", "validtid_1", cdhashBytes,
-                             [certHash UTF8String], std::make_optional(true)));
+      std::get<PolicyProcessVec>(proc_list)[0],
+      WatchItemPolicy::Process("mypath1", "com.northpolesec.test1", "validtid_1", cdhashBytes,
+                               [certHash UTF8String], std::make_optional(true)));
   XCTAssertEqual(
-    std::get<PolicyProcessVec>(proc_list)[1],
-    WatchItemPolicy::Process("mypath2", "com.northpolesec.test2", "validtid_2", cdhashBytes,
-                             [certHash UTF8String], std::make_optional(false)));
+      std::get<PolicyProcessVec>(proc_list)[1],
+      WatchItemPolicy::Process("mypath2", "com.northpolesec.test2", "validtid_2", cdhashBytes,
+                               [certHash UTF8String], std::make_optional(false)));
 }
 
 - (void)testIsWatchItemNameValid {
@@ -723,30 +723,30 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertFalse(ParseConfig(@{kWatchItemConfigKeyVersion : @[]}, policies, &err));
   XCTAssertFalse(ParseConfig(@{kWatchItemConfigKeyVersion : @""}, policies, &err));
   XCTAssertFalse(ParseConfig(
-    @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @""}, policies, &err));
+      @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @""}, policies, &err));
   XCTAssertFalse(ParseConfig(
-    @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @[]}, policies, &err));
+      @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @[]}, policies, &err));
   XCTAssertFalse(ParseConfig(
-    @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @(0)}, policies, &err));
+      @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @(0)}, policies, &err));
 
   // Minimally successful configs without watch items
   XCTAssertTrue(ParseConfig(@{kWatchItemConfigKeyVersion : @"1"}, policies, &err));
   XCTAssertTrue(ParseConfig(
-    @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{}}, policies, &err));
+      @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{}}, policies, &err));
 
   // Ensure constraints on watch items entries match expectations
   XCTAssertFalse(ParseConfig(
-    @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@(0) : @(0)}}, policies,
-    &err));
-  XCTAssertFalse(
-    ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"" : @{}}},
-                policies, &err));
-  XCTAssertFalse(
-    ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @[]}},
-                policies, &err));
-  XCTAssertFalse(
-    ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @{}}},
-                policies, &err));
+      @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@(0) : @(0)}},
+      policies, &err));
+  XCTAssertFalse(ParseConfig(
+      @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"" : @{}}}, policies,
+      &err));
+  XCTAssertFalse(ParseConfig(
+      @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @[]}}, policies,
+      &err));
+  XCTAssertFalse(ParseConfig(
+      @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @{}}}, policies,
+      &err));
 
   // Minimally successful config with watch item
   XCTAssertTrue(ParseConfig(@{
@@ -763,25 +763,25 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // There must be valid Paths in a watch item
   XCTAssertFalse(ParseConfigSingleWatchItem(@"", "", @{}, policies, &err));
   XCTAssertFalse(
-    ParseConfigSingleWatchItem(@"", "", @{kWatchItemConfigKeyPaths : @[ @"" ]}, policies, &err));
+      ParseConfigSingleWatchItem(@"", "", @{kWatchItemConfigKeyPaths : @[ @"" ]}, policies, &err));
   XCTAssertTrue(
-    ParseConfigSingleWatchItem(@"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ]}, policies, &err));
+      ParseConfigSingleWatchItem(@"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ]}, policies, &err));
 
   // Empty options are fine
   XCTAssertTrue(ParseConfigSingleWatchItem(
-    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @{}}, policies,
-    &err));
+      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @{}}, policies,
+      &err));
 
   // If an Options key exist, it must be a dictionary type
   XCTAssertFalse(ParseConfigSingleWatchItem(
-    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @[]}, policies,
-    &err));
+      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @[]}, policies,
+      &err));
   XCTAssertFalse(ParseConfigSingleWatchItem(
-    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @""}, policies,
-    &err));
+      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @""}, policies,
+      &err));
   XCTAssertFalse(ParseConfigSingleWatchItem(
-    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @(0)}, policies,
-    &err));
+      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @(0)}, policies,
+      &err));
 
   // Options keys must be valid types
   {
@@ -795,49 +795,49 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
          ]) {
       // Parse bool option with invliad type
       XCTAssertFalse(ParseConfigSingleWatchItem(
-        @"", "",
-        @{kWatchItemConfigKeyPaths : @[ @"a" ],
-          kWatchItemConfigKeyOptions : @{key : @""}},
-        policies, &err));
+          @"", "",
+          @{kWatchItemConfigKeyPaths : @[ @"a" ],
+            kWatchItemConfigKeyOptions : @{key : @""}},
+          policies, &err));
 
       // Parse bool option with valid type
       XCTAssertTrue(ParseConfigSingleWatchItem(
-        @"", "",
-        @{kWatchItemConfigKeyPaths : @[ @"a" ],
-          kWatchItemConfigKeyOptions : @{key : @(0)}},
-        policies, &err));
+          @"", "",
+          @{kWatchItemConfigKeyPaths : @[ @"a" ],
+            kWatchItemConfigKeyOptions : @{key : @(0)}},
+          policies, &err));
     }
 
     // Check other option keys
 
     // kWatchItemConfigKeyOptionsRuleType - Invalid type
     XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", "", @{
-        kWatchItemConfigKeyPaths : @[ @"a" ],
-        kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @[]}
-      },
-      policies, &err));
+        @"", "", @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @[]}
+        },
+        policies, &err));
 
     // kWatchItemConfigKeyOptionsRuleType - Invalid RuleType value
     XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", "", @{
-        kWatchItemConfigKeyPaths : @[ @"a" ],
-        kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @"InvalidValue"}
-      },
-      policies, &err));
+        @"", "", @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @"InvalidValue"}
+        },
+        policies, &err));
 
     // kWatchItemConfigKeyOptionsRuleType - Override
     // kWatchItemConfigKeyOptionsInvertProcessExceptions
     policies.clear();
     XCTAssertTrue(ParseConfigSingleWatchItem(
-      @"", "", @{
-        kWatchItemConfigKeyPaths : @[ @"a" ],
-        kWatchItemConfigKeyOptions : @{
-          kWatchItemConfigKeyOptionsRuleType : @"PathsWithAllowedProcesses",
-          kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)
-        }
-      },
-      policies, &err));
+        @"", "", @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{
+            kWatchItemConfigKeyOptionsRuleType : @"PathsWithAllowedProcesses",
+            kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)
+          }
+        },
+        policies, &err));
     XCTAssertEqual(policies.size(), 1);
     XCTAssertEqual(policies[0].get()->rule_type,
                    santa::WatchItemRuleType::kPathsWithAllowedProcesses);
@@ -846,79 +846,80 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
     // as fallback
     policies.clear();
     XCTAssertTrue(ParseConfigSingleWatchItem(
-      @"", "", @{
-        kWatchItemConfigKeyPaths : @[ @"a" ],
-        kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)}
-      },
-      policies, &err));
+        @"", "", @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)}
+        },
+        policies, &err));
     XCTAssertEqual(policies.size(), 1);
     XCTAssertEqual(policies[0].get()->rule_type,
                    santa::WatchItemRuleType::kPathsWithDeniedProcesses);
 
     // kWatchItemConfigKeyOptionsCustomMessage - Invalid type
     XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", "", @{
-        kWatchItemConfigKeyPaths : @[ @"a" ],
-        kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsCustomMessage : @[]}
-      },
-      policies, &err));
+        @"", "", @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsCustomMessage : @[]}
+        },
+        policies, &err));
 
     // kWatchItemConfigKeyOptionsCustomMessage zero length
     XCTAssertTrue(ParseConfigSingleWatchItem(
-      @"", "", @{
-        kWatchItemConfigKeyPaths : @[ @"a" ],
-        kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsCustomMessage : @""}
-      },
-      policies, &err));
+        @"", "", @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsCustomMessage : @""}
+        },
+        policies, &err));
 
     // kWatchItemConfigKeyOptionsCustomMessage valid "normal" length
     XCTAssertTrue(ParseConfigSingleWatchItem(
-      @"", "", @{
-        kWatchItemConfigKeyPaths : @[ @"a" ],
-        kWatchItemConfigKeyOptions :
-          @{kWatchItemConfigKeyOptionsCustomMessage : @"This is a custom message"}
-      },
-      policies, &err));
+        @"", "", @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions :
+              @{kWatchItemConfigKeyOptionsCustomMessage : @"This is a custom message"}
+        },
+        policies, &err));
 
     // kWatchItemConfigKeyOptionsCustomMessage Invalid "long" length
     XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", "", @{
-        kWatchItemConfigKeyPaths : @[ @"a" ],
-        kWatchItemConfigKeyOptions :
-          @{kWatchItemConfigKeyOptionsCustomMessage : RepeatedString(@"A", 4096)}
-      },
-      policies, &err));
+        @"", "", @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions :
+              @{kWatchItemConfigKeyOptionsCustomMessage : RepeatedString(@"A", 4096)}
+        },
+        policies, &err));
   }
 
   // If processes are specified, they must be valid format
   // Note: Full tests in `testVerifyConfigWatchItemProcesses`
   XCTAssertFalse(ParseConfigSingleWatchItem(
-    @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyProcesses : @""}, policies,
-    &err));
+      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyProcesses : @""},
+      policies, &err));
 
   // Test the policy vector is populated as expected
 
   // Test default options with no processes
   policies.clear();
   XCTAssertTrue(ParseConfigSingleWatchItem(
-    @"rule", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ]}, policies, &err));
+      @"rule", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ]}, policies, &err));
   XCTAssertEqual(policies.size(), 1);
   XCTAssertEqual(
-    *policies[0].get(),
-    WatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType,
-                    kWatchItemPolicyDefaultAllowReadAccess, kWatchItemPolicyDefaultAuditOnly,
-                    kWatchItemPolicyDefaultRuleType));
+      *policies[0].get(),
+      WatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType,
+                      kWatchItemPolicyDefaultAllowReadAccess, kWatchItemPolicyDefaultAuditOnly,
+                      kWatchItemPolicyDefaultRuleType));
 
   // Test multiple paths, options, and processes
   policies.clear();
   std::vector<WatchItemPolicy::Process> procs = {
-    WatchItemPolicy::Process("pa", "", "", {}, "", std::nullopt),
-    WatchItemPolicy::Process("pb", "", "", {}, "", std::nullopt),
+      WatchItemPolicy::Process("pa", "", "", {}, "", std::nullopt),
+      WatchItemPolicy::Process("pb", "", "", {}, "", std::nullopt),
   };
 
   XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, @{
-    kWatchItemConfigKeyPaths :
-      @[ @"a", @{kWatchItemConfigKeyPathsPath : @"b", kWatchItemConfigKeyPathsIsPrefix : @(YES)} ],
+    kWatchItemConfigKeyPaths : @[
+      @"a", @{kWatchItemConfigKeyPathsPath : @"b", kWatchItemConfigKeyPathsIsPrefix : @(YES)}
+    ],
     kWatchItemConfigKeyOptions : @{
       kWatchItemConfigKeyOptionsAllowReadAccess : @(YES),
       kWatchItemConfigKeyOptionsAuditOnly : @(NO),

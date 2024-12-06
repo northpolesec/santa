@@ -23,28 +23,28 @@ namespace santa {
 
 static inline TelemetryEvent EventNameToMask(std::string_view event) {
   static absl::flat_hash_map<std::string_view, TelemetryEvent> event_name_to_mask = {
-    {"execution", TelemetryEvent::kExecution},
-    {"fork", TelemetryEvent::kFork},
-    {"exit", TelemetryEvent::kExit},
-    {"close", TelemetryEvent::kClose},
-    {"rename", TelemetryEvent::kRename},
-    {"unlink", TelemetryEvent::kUnlink},
-    {"link", TelemetryEvent::kLink},
-    {"exchangedata", TelemetryEvent::kExchangeData},
-    {"disk", TelemetryEvent::kDisk},
-    {"bundle", TelemetryEvent::kBundle},
-    {"allowlist", TelemetryEvent::kAllowlist},
-    {"fileaccess", TelemetryEvent::kFileAccess},
-    {"codesigninginvalidated", TelemetryEvent::kCodesigningInvalidated},
-    {"loginwindowsession", TelemetryEvent::kLoginWindowSession},
-    {"loginlogout", TelemetryEvent::kLoginLogout},
-    {"screensharing", TelemetryEvent::kScreenSharing},
-    {"openssh", TelemetryEvent::kOpenSSH},
-    {"authentication", TelemetryEvent::kAuthentication},
+      {"execution", TelemetryEvent::kExecution},
+      {"fork", TelemetryEvent::kFork},
+      {"exit", TelemetryEvent::kExit},
+      {"close", TelemetryEvent::kClose},
+      {"rename", TelemetryEvent::kRename},
+      {"unlink", TelemetryEvent::kUnlink},
+      {"link", TelemetryEvent::kLink},
+      {"exchangedata", TelemetryEvent::kExchangeData},
+      {"disk", TelemetryEvent::kDisk},
+      {"bundle", TelemetryEvent::kBundle},
+      {"allowlist", TelemetryEvent::kAllowlist},
+      {"fileaccess", TelemetryEvent::kFileAccess},
+      {"codesigninginvalidated", TelemetryEvent::kCodesigningInvalidated},
+      {"loginwindowsession", TelemetryEvent::kLoginWindowSession},
+      {"loginlogout", TelemetryEvent::kLoginLogout},
+      {"screensharing", TelemetryEvent::kScreenSharing},
+      {"openssh", TelemetryEvent::kOpenSSH},
+      {"authentication", TelemetryEvent::kAuthentication},
 
-    // special cases
-    {"none", TelemetryEvent::kNone},
-    {"everything", TelemetryEvent::kEverything},
+      // special cases
+      {"none", TelemetryEvent::kNone},
+      {"everything", TelemetryEvent::kEverything},
   };
 
   auto search = event_name_to_mask.find(event);

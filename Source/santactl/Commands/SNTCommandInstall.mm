@@ -56,16 +56,16 @@ REGISTER_COMMAND_NAME(@"install")
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   [[self.daemonConn remoteObjectProxy]
-    installSantaApp:installFromPath
-              reply:^(BOOL success) {
-                if (success) {
-                  LOGI(@"Installation was successful");
-                } else {
-                  LOGI(@"Installation unsuccessful. Please consult logs for more information.");
-                }
+      installSantaApp:installFromPath
+                reply:^(BOOL success) {
+                  if (success) {
+                    LOGI(@"Installation was successful");
+                  } else {
+                    LOGI(@"Installation unsuccessful. Please consult logs for more information.");
+                  }
 
-                dispatch_semaphore_signal(sema);
-              }];
+                  dispatch_semaphore_signal(sema);
+                }];
 
   if (dispatch_semaphore_wait(sema,
                               dispatch_time(DISPATCH_TIME_NOW, secondsToWait * NSEC_PER_SEC)) > 0) {

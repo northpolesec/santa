@@ -25,10 +25,10 @@
   if (self.window) [self.window orderOut:sender];
 
   self.window =
-    [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskTitled
-                                  backing:NSBackingStoreBuffered
-                                    defer:NO];
+      [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
+                                  styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskTitled
+                                    backing:NSBackingStoreBuffered
+                                      defer:NO];
   self.window.contentViewController = [SNTAboutWindowViewFactory createWithWindow:self.window];
   self.window.title = @"Santa";
   self.window.delegate = self;
