@@ -1,22 +1,24 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
 
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
 
+#include "Source/common/EncodeEntitlements.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
@@ -34,6 +36,7 @@
 namespace pbv1 = ::santa::sync::v1;
 
 using santa::NSStringToUTF8String;
+using santa::NSStringToUTF8StringView;
 
 @implementation SNTSyncEventUpload
 
@@ -53,7 +56,7 @@ using santa::NSStringToUTF8String;
   return (dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER) == 0);
 }
 
-- (BOOL)uploadEvents:(NSArray *)events {
+- (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events {
   google::protobuf::Arena arena;
   auto req = google::protobuf::Arena::Create<::pbv1::EventUploadRequest>(&arena);
   req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
@@ -175,6 +178,20 @@ using santa::NSStringToUTF8String;
     c->set_valid_from([cert.validFrom timeIntervalSince1970]);
     c->set_valid_until([cert.validUntil timeIntervalSince1970]);
   }
+
+  ::pbv1::EntitlementInfo *pb_entitlement_info = e->mutable_entitlement_info();
+
+  santa::EncodeEntitlementsCommon(
+      event.entitlements, event.entitlementsFiltered,
+      ^(NSUInteger count, bool is_filtered) {
+        pb_entitlement_info->set_entitlements_filtered(is_filtered);
+        pb_entitlement_info->mutable_entitlements()->Reserve((int)count);
+      },
+      ^(NSString *entitlement, NSString *value) {
+        ::pbv1::Entitlement *pb_entitlement = pb_entitlement_info->add_entitlements();
+        pb_entitlement->set_key(NSStringToUTF8StringView(entitlement));
+        pb_entitlement->set_value(NSStringToUTF8StringView(value));
+      });
 
   // TODO: Add support the for Standalone Approval field so that a sync service
   // can be notified that a user self approved a binary.

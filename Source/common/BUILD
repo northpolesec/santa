@@ -153,6 +153,24 @@ objc_library(
 )
 
 objc_library(
+    name = "EncodeEntitlements",
+    srcs = ["EncodeEntitlements.mm"],
+    hdrs = ["EncodeEntitlements.h"],
+    deps = [
+        ":SNTLogging",
+    ],
+)
+
+santa_unit_test(
+    name = "EncodeEntitlementsTest",
+    srcs = ["EncodeEntitlementsTest.mm"],
+    deps = [
+        ":EncodeEntitlements",
+    ],
+)
+
+
+objc_library(
     name = "SigningIDHelpers",
     srcs = ["SigningIDHelpers.m"],
     hdrs = ["SigningIDHelpers.h"],
@@ -536,6 +554,7 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":EncodeEntitlementsTest",
         ":PrefixTreeTest",
         ":SNTBlockMessageTest",
         ":SNTCachedDecisionTest",

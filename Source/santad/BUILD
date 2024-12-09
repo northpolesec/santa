@@ -594,6 +594,7 @@ objc_library(
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
+        "//Source/common:EncodeEntitlements",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:String",

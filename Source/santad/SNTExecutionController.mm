@@ -335,6 +335,8 @@ static NSString *const kPrinterProxyPostMonterey =
     se.pid = @(audit_token_to_pid(targetProc->audit_token));
     se.ppid = @(audit_token_to_pid(targetProc->parent_audit_token));
     se.parentName = @(esMsg.ParentProcessName().c_str());
+    se.entitlements = cd.entitlements;
+    se.entitlementsFiltered = cd.entitlementsFiltered;
 
     // Bundle data
     se.fileBundleID = [binInfo bundleIdentifier];

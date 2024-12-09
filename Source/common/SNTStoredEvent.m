@@ -30,7 +30,11 @@
 #define DECODEARRAY(cls, key)                                                             \
   [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [cls class], nil] \
                           forKey:key]
-
+#define DECODEDICT(key)                                                                       \
+  [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], \
+                                                       [NSString class], [NSNumber class],    \
+                                                       [NSData class], nil]                   \
+                          forKey:key]
 + (BOOL)supportsSecureCoding {
   return YES;
 }
@@ -55,6 +59,8 @@
   ENCODE(self.teamID, @"teamID");
   ENCODE(self.signingID, @"signingID");
   ENCODE(self.cdhash, @"cdhash");
+  ENCODE(self.entitlements, @"entitlements");
+  ENCODE(@(self.entitlementsFiltered), @"entitlementsFiltered");
 
   ENCODE(self.executingUser, @"executingUser");
   ENCODE(self.occurrenceDate, @"occurrenceDate");
@@ -102,6 +108,8 @@
     _teamID = DECODE(NSString, @"teamID");
     _signingID = DECODE(NSString, @"signingID");
     _cdhash = DECODE(NSString, @"cdhash");
+    _entitlements = DECODEDICT(@"entitlements");
+    _entitlementsFiltered = [DECODE(NSNumber, @"entitlementsFiltered") boolValue];
 
     _executingUser = DECODE(NSString, @"executingUser");
     _occurrenceDate = DECODE(NSDate, @"occurrenceDate");
