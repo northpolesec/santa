@@ -174,4 +174,14 @@
 ///
 @property(readonly) NSArray *signingChainCertRefs;
 
+///
+/// If the executed file was entitled, this is the set of key/value pairs of entitlements
+///
+@property NSDictionary *entitlements;
+
+///
+/// Whether or not the set of entitlements were filtered (e.g. due to configuration)
+///
+@property BOOL entitlementsFiltered;
+
 @end
