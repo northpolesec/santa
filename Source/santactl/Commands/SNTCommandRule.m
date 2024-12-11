@@ -121,7 +121,7 @@ REGISTER_COMMAND_NAME(@"rule")
 #else
   ) {
 #endif
-    printf("(SyncBaseURL/StaticRules is set, rules are managed centrally.)");
+    printf("(SyncBaseURL/StaticRules is set, rules are managed centrally.)\n");
     exit(1);
   }
 
@@ -316,9 +316,10 @@ REGISTER_COMMAND_NAME(@"rule")
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddRules:@[ newRule ]
                ruleCleanup:SNTRuleCleanupNone
+                    source:SNTRuleAddSourceSantactl
                      reply:^(NSError *error) {
                        if (error) {
-                         printf("Failed to modify rules: %s",
+                         printf("Failed to modify rules: %s\n",
                                 [error.localizedDescription UTF8String]);
                          LOGD(@"Failure reason: %@", error.localizedFailureReason);
                          exit(1);
@@ -496,6 +497,7 @@ REGISTER_COMMAND_NAME(@"rule")
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddRules:parsedRules
                ruleCleanup:cleanupType
+                    source:SNTRuleAddSourceSantactl
                      reply:^(NSError *error) {
                        if (error) {
                          printf("Failed to modify rules: %s",

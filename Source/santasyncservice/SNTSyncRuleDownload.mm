@@ -61,6 +61,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddRules:newRules
                ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
+                    source:SNTRuleAddSourceSyncService
                      reply:^(NSError *e) {
                        error = e;
                        dispatch_semaphore_signal(sema);

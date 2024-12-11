@@ -118,7 +118,22 @@ double watchdogRAMPeak = 0;
 
 - (void)databaseRuleAddRules:(NSArray *)rules
                  ruleCleanup:(SNTRuleCleanup)cleanupType
+                      source:(SNTRuleAddSource)source
                        reply:(void (^)(NSError *error))reply {
+#ifndef DEBUG
+  SNTConfigurator *config = [SNTConfigurator configurator];
+  if (source == SNTRuleAddSourceSantactl && (config.syncBaseURL || config.staticRules.count > 0)) {
+    NSError *error =
+        [NSError errorWithDomain:@"com.northpolesec.santad.ruletable"
+                            code:42
+                        userInfo:@{
+                          NSLocalizedDescriptionKey : @"Rejected by the Santa daemon",
+                          NSLocalizedFailureReasonErrorKey : @"SyncBaseURL or StaticRules are set",
+                        }];
+    reply(error);
+  }
+#endif
+
   SNTRuleTable *ruleTable = [SNTDatabaseController ruleTable];
 
   // If any rules are added that are not plain allowlist rules, then flush decision cache.
