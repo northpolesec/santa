@@ -525,43 +525,35 @@
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/usr/libexec/trustd"];
   MOLCodesignChecker *csInfo = [fi codesignCheckerWithError:nil];
 
-  SNTCachedDecision *cd = self.sut.criticalSystemBinaries[fi.SHA256];
+  NSString *signingID = FormatSigningID(csInfo);
+  NSString *teamID = [signingID componentsSeparatedByString:@":"][0];
+
+  SNTCachedDecision *cd = self.sut.criticalSystemBinaries[signingID];
 
   XCTAssertEqualObjects(fi.SHA256, cd.sha256, @"hashes should match");
   XCTAssertEqualObjects(csInfo.leafCertificate.SHA256, cd.certSHA256, @"cert hashes should match");
   XCTAssertEqualObjects(csInfo.cdhash, cd.cdhash, @"cdhashes should match");
   XCTAssertEqualObjects(csInfo.certificates, cd.certChain, @"cert chains should match");
-  NSString *signingID = FormatSigningID(csInfo);
-  NSString *teamID = [signingID componentsSeparatedByString:@":"][0];
   XCTAssertEqualObjects(signingID, cd.signingID, @"signing IDs should match");
   XCTAssertEqualObjects(teamID, cd.teamID, @"team IDs should match");
 }
 
-- (void)testCriticalBinariesHaveBothSHAandSigningIDRules {
+- (void)testCriticalBinariesHaveCachedDecisionsKeyedOffSigningIDs {
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/usr/libexec/trustd"];
   MOLCodesignChecker *csInfo = [fi codesignCheckerWithError:nil];
+  NSString *signingID = FormatSigningID(csInfo);
+  NSString *teamID = [signingID componentsSeparatedByString:@":"][0];
 
-  SNTCachedDecision *cd = self.sut.criticalSystemBinaries[fi.SHA256];
+  SNTCachedDecision *cd = self.sut.criticalSystemBinaries[signingID];
+  XCTAssertNotNil(cd, @"critical binary should have a decision");
 
   XCTAssertEqualObjects(fi.SHA256, cd.sha256, @"hashes should match");
-  XCTAssertEqual(SNTEventStateAllowBinary, cd.decision, @"decision should be allow by binary");
+  XCTAssertEqual(SNTEventStateAllowSigningID, cd.decision, @"decision should be allow by binary");
   XCTAssertEqualObjects(csInfo.leafCertificate.SHA256, cd.certSHA256, @"cert hashes should match");
   XCTAssertEqualObjects(csInfo.cdhash, cd.cdhash, @"cdhashes should match");
   XCTAssertEqualObjects(csInfo.certificates, cd.certChain, @"cert chains should match");
-  NSString *signingID = FormatSigningID(csInfo);
-  NSString *teamID = [signingID componentsSeparatedByString:@":"][0];
   XCTAssertEqualObjects(signingID, cd.signingID, @"signing IDs should match");
   XCTAssertEqualObjects(teamID, cd.teamID, @"team IDs should match");
-
-  SNTCachedDecision *cd2 = self.sut.criticalSystemBinaries[signingID];
-  XCTAssertEqual(SNTEventStateAllowSigningID, cd2.decision,
-                 @"decision should be allow by signing ID");
-  XCTAssertEqualObjects(cd.sha256, cd2.sha256, @"hashes should match");
-  XCTAssertEqualObjects(cd.certSHA256, cd2.certSHA256, @"cert hashes should match");
-  XCTAssertEqualObjects(cd.cdhash, cd2.cdhash, @"cdhashes should match");
-  XCTAssertEqualObjects(cd.certChain, cd2.certChain, @"cert chains should match");
-  XCTAssertEqualObjects(cd.signingID, cd2.signingID, @"signing IDs should match");
-  XCTAssertEqualObjects(cd.teamID, cd2.teamID, @"team IDs should match");
 }
 
 // This test ensures that we bump the constant on updates to the rule table

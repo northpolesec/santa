@@ -145,21 +145,35 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     BOOL systemBin = NO;
     if ([csInfo signingInformationMatches:self.launchdCSInfo]) {
       systemBin = YES;
-    } else if (![csInfo signingInformationMatches:self.santadCSInfo]) {
+    } else if (![csInfo.teamID isEqualToString:self.santadCSInfo.teamID]) {
       LOGW(@"Unable to validate critical system binary %@. "
-           @"pid 1: %@, santad: %@ and %@: %@ do not match.",
-           path, self.launchdCSInfo.leafCertificate, self.santadCSInfo.leafCertificate, path,
-           csInfo.leafCertificate);
+           @"pid 1: %@, santad: teamID %@ and %@: %@ do not match.",
+           path, self.launchdCSInfo.leafCertificate, self.santadCSInfo.teamID, path, csInfo.teamID);
       continue;
+    } else {
+      NSSet *santaSigningIDs = [[NSSet alloc] initWithArray:@[
+        @"com.northpolesec.santa",
+        @"com.northpolesec.santa.ctl",
+        @"com.northpolesec.santa.bundleservice",
+        @"com.northpolesec.santa.daemon",
+        @"com.northpolesec.santa.metricservice",
+        @"com.northpolesec.santa.syncservice",
+      ]];
+
+      if (![santaSigningIDs containsObject:csInfo.signingID]) {
+        LOGW(@"Unknown Santa binary signing ID %@ ", csInfo.signingID);
+        continue;
+      }
     }
 
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
 
-    cd.decision = SNTEventStateAllowBinary;
+    cd.decision = SNTEventStateAllowSigningID;
     cd.decisionExtra = systemBin ? @"critical system binary" : @"santa binary";
     cd.sha256 = binInfo.SHA256;
     cd.signingID = FormatSigningID(csInfo);
     cd.cdhash = csInfo.cdhash;
+
     // Normalized by the FormatSigningID function so this will always have a
     // prefix.
     cd.teamID = [cd.signingID componentsSeparatedByString:@":"].firstObject;
@@ -169,20 +183,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     cd.certSHA256 = csInfo.leafCertificate.SHA256;
     cd.certCommonName = csInfo.leafCertificate.commonName;
 
-    bins[binInfo.SHA256] = cd;
-    // Also add the signing ID to the dictionary.
-    SNTCachedDecision *cd2 = [[SNTCachedDecision alloc] init];
-    cd2.decision = SNTEventStateAllowSigningID;
-    cd2.decisionExtra = systemBin ? @"critical system binary" : @"santa binary";
-    cd2.sha256 = cd.sha256;
-    cd2.teamID = cd.teamID;
-    cd2.signingID = cd.signingID;
-    cd2.cdhash = cd.cdhash;
-    cd2.certChain = cd.certChain;
-    cd2.certSHA256 = cd.certSHA256;
-    cd2.certCommonName = cd.certCommonName;
-    cd2.decision = SNTEventStateAllowSigningID;
-    bins[cd.signingID] = cd2;
+    bins[cd.signingID] = cd;
   }
 
   self.criticalSystemBinaries = bins;
