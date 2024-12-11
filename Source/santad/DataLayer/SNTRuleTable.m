@@ -146,24 +146,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     if ([csInfo signingInformationMatches:self.launchdCSInfo]) {
       systemBin = YES;
     } else if (![csInfo.teamID isEqualToString:self.santadCSInfo.teamID]) {
-      LOGW(@"Unable to validate critical system binary %@. "
-           @"pid 1: %@, santad: teamID %@ and %@: %@ do not match.",
-           path, self.launchdCSInfo.leafCertificate, self.santadCSInfo.teamID, path, csInfo.teamID);
+      LOGW(
+          @"Unable to validate critical system binary %@. "
+          @"Not signed by same cert as pid 1: %@, and does not match santad TeamID: %@ and %@: %@.",
+          path, self.launchdCSInfo.leafCertificate, self.santadCSInfo.teamID, path, csInfo.teamID);
       continue;
-    } else {
-      NSSet *santaSigningIDs = [[NSSet alloc] initWithArray:@[
-        @"com.northpolesec.santa",
-        @"com.northpolesec.santa.ctl",
-        @"com.northpolesec.santa.bundleservice",
-        @"com.northpolesec.santa.daemon",
-        @"com.northpolesec.santa.metricservice",
-        @"com.northpolesec.santa.syncservice",
-      ]];
-
-      if (![santaSigningIDs containsObject:csInfo.signingID]) {
-        LOGW(@"Unknown Santa binary signing ID %@ ", csInfo.signingID);
-        continue;
-      }
     }
 
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
