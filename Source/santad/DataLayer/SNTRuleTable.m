@@ -146,10 +146,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     if ([csInfo signingInformationMatches:self.launchdCSInfo]) {
       systemBin = YES;
     } else if (![csInfo.teamID isEqualToString:self.santadCSInfo.teamID]) {
-      LOGW(
-          @"Unable to validate critical system binary %@. "
-          @"Not signed by same cert as pid 1: %@ vs %@, and does not match santad TeamID: %@ vs %@.",
-          path, self.launchdCSInfo.leafCertificate, csInfo.leafCertificate, self.santadCSInfo.teamID, csInfo.teamID);
+      LOGW(@"Unable to validate critical system binary %@. "
+           @"Not signed by same cert as pid 1: %@ vs %@, and does not match santad TeamID: %@ vs "
+           @"%@.",
+           path, self.launchdCSInfo.leafCertificate, csInfo.leafCertificate,
+           self.santadCSInfo.teamID, csInfo.teamID);
       continue;
     }
 
