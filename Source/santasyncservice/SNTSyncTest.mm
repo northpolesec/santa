@@ -818,6 +818,7 @@
   OCMStub([self.daemonConnRop
       databaseRuleAddRules:OCMOCK_ANY
                ruleCleanup:SNTRuleCleanupNone
+                    source:SNTRuleAddSourceSyncService
                      reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
   [sut sync];
 
@@ -845,6 +846,7 @@
 
   OCMVerify([self.daemonConnRop databaseRuleAddRules:rules
                                          ruleCleanup:SNTRuleCleanupNone
+                                              source:SNTRuleAddSourceSyncService
                                                reply:OCMOCK_ANY]);
 }
 
