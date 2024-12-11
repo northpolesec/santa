@@ -198,6 +198,12 @@ static void UpdateCachedDecisionSigningInfo(
   // If the binary is a critical system binary, don't check its signature.
   // The binary was validated at startup when the rule table was initialized.
   SNTCachedDecision *systemCd = self.ruleTable.criticalSystemBinaries[fileHash];
+
+  // If we didn't find the binary by SHA256, try by signingID
+  if (!systemCd) {
+    systemCd = self.ruleTable.criticalSystemBinaries[signingID];
+  }
+
   if (systemCd) {
     systemCd.decisionClientMode = mode;
     return systemCd;

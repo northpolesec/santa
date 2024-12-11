@@ -13,6 +13,7 @@
 ///    limitations under the License.
 
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/common/SNTCommonEnums.h"
 
 #import <EndpointSecurity/EndpointSecurity.h>
 #import <MOLCertificate/MOLCertificate.h>
@@ -169,7 +170,21 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     cd.certCommonName = csInfo.leafCertificate.commonName;
 
     bins[binInfo.SHA256] = cd;
+    // Also add the signing ID to the dictionary.
+    SNTCachedDecision *cd2 = [[SNTCachedDecision alloc] init];
+    cd2.decision = SNTEventStateAllowSigningID;
+    cd2.decisionExtra = systemBin ? @"critical system binary" : @"santa binary";
+    cd2.sha256 = cd.sha256;
+    cd2.teamID = cd.teamID;
+    cd2.signingID = cd.signingID;
+    cd2.cdhash = cd.cdhash;
+    cd2.certChain = cd.certChain;
+    cd2.certSHA256 = cd.certSHA256;
+    cd2.certCommonName = cd.certCommonName;
+    cd2.decision = SNTEventStateAllowSigningID;
+    bins[cd.signingID] = cd2;
   }
+
   self.criticalSystemBinaries = bins;
 }
 

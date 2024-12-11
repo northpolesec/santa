@@ -241,6 +241,28 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
       .andReturn(rule);
 }
 
+- (void)testCriticalSystemBinaryCheckSigningID {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.decision = SNTEventStateAllowBinary;
+  SNTCachedDecision *cd2 = [[SNTCachedDecision alloc] init];
+  cd2.decision = SNTEventStateAllowSigningID;
+
+  NSString *signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+  NSDictionary *critBins = @{@"abcdefg" : cd, signingID : cd2};
+
+  OCMStub([self.mockRuleDatabase criticalSystemBinaries]).andReturn(critBins);
+
+  [self validateExecEvent:SNTActionRespondAllow
+             messageSetup:^(es_message_t *msg) {
+               msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+               msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
+             }];
+}
+
 - (void)testBinaryAllowRule {
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
