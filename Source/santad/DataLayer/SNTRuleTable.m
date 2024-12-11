@@ -13,6 +13,7 @@
 ///    limitations under the License.
 
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/common/SNTCommonEnums.h"
 
 #import <EndpointSecurity/EndpointSecurity.h>
 #import <MOLCertificate/MOLCertificate.h>
@@ -144,21 +145,23 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     BOOL systemBin = NO;
     if ([csInfo signingInformationMatches:self.launchdCSInfo]) {
       systemBin = YES;
-    } else if (![csInfo signingInformationMatches:self.santadCSInfo]) {
+    } else if (![csInfo.teamID isEqualToString:self.santadCSInfo.teamID]) {
       LOGW(@"Unable to validate critical system binary %@. "
-           @"pid 1: %@, santad: %@ and %@: %@ do not match.",
-           path, self.launchdCSInfo.leafCertificate, self.santadCSInfo.leafCertificate, path,
-           csInfo.leafCertificate);
+           @"Not signed by same cert as pid 1: %@ vs %@, and does not match santad TeamID: %@ vs "
+           @"%@.",
+           path, self.launchdCSInfo.leafCertificate, csInfo.leafCertificate,
+           self.santadCSInfo.teamID, csInfo.teamID);
       continue;
     }
 
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
 
-    cd.decision = SNTEventStateAllowBinary;
+    cd.decision = SNTEventStateAllowSigningID;
     cd.decisionExtra = systemBin ? @"critical system binary" : @"santa binary";
     cd.sha256 = binInfo.SHA256;
     cd.signingID = FormatSigningID(csInfo);
     cd.cdhash = csInfo.cdhash;
+
     // Normalized by the FormatSigningID function so this will always have a
     // prefix.
     cd.teamID = [cd.signingID componentsSeparatedByString:@":"].firstObject;
@@ -168,8 +171,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     cd.certSHA256 = csInfo.leafCertificate.SHA256;
     cd.certCommonName = csInfo.leafCertificate.commonName;
 
-    bins[binInfo.SHA256] = cd;
+    bins[cd.signingID] = cd;
   }
+
   self.criticalSystemBinaries = bins;
 }
 
