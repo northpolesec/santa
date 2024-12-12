@@ -42,6 +42,7 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 # the deletion. While this is benign, we can take the opportunity to remove the
 # artifact here.
 /bin/rm -f /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
+/bin/rm -f /Library/LaunchDaemons/com.northpolesec.santa-migration.plist
 
 # Unload NPS Santa services in preparation for installation / update.
 /bin/launchctl remove com.northpolesec.santa.bundleservice || true
