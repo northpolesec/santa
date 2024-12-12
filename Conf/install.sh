@@ -35,7 +35,31 @@ else
   # install.
   /bin/mkdir -p /var/db/santa/migration
   /bin/cp -r ${BINARIES}/Santa.app /var/db/santa/migration/
+
+  SANTA_VERSION=$(/Applications/Santa.app/Contents/MacOS/santactl version | /usr/bin/awk '/^santad/ { print $3 }')
+  SANTA_MODE=$(/Applications/Santa.app/Contents/MacOS/santactl status | /usr/bin/awk '/ *Mode/ { print $3 }')
+
+  # For Santa v2024.10 and v2024.11, create allow rules to unblock upgrades in Lockdown mode
+  if [[ ("${SANTA_VERSION}" == "2024.10" || "${SANTA_VERSION}" == "2024.11") && "${SANTA_MODE}" != "Monitor" ]]; then
+    sb='(version 1)(allow default)(deny mach-lookup (with no-report) (global-name "com.apple.cfprefsd.daemon"))(deny file-read-data (with no-report) (subpath "/Library/Managed Preferences/com.northpolesec.santa.plist"))'
+
+    signing_ids=(
+      "ZMCG7MLDV94:com.northpolesec.santa"
+      "ZMCG7MLDV94:com.northpolesec.santa.bundleservice"
+      "ZMCG7MLDV94:com.northpolesec.santa.ctl"
+      "ZMCG7MLDV94:com.northpolesec.santa.daemon"
+      "ZMCG7MLDV94:com.northpolesec.santa.metricservice"
+      "ZMCG7MLDV94:com.northpolesec.santa.syncservice"
+    )
+
+    # Add rules to allow NPS Santa components
+    for signing_id in "${signing_ids[@]}"; do
+      /usr/bin/sandbox-exec -p "${sb}" /Applications/Santa.app/Contents/MacOS/santactl rule --allow --signingid --identifier "${signing_id}" >/dev/null 2>&1
+    done
+  fi
+
   /Applications/Santa.app/Contents/MacOS/santactl install
+
   # Cleanup cache dir.
   /bin/rm -rf /var/db/santa/migration
 fi
