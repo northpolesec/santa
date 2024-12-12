@@ -36,10 +36,11 @@ else
   /bin/mkdir -p /var/db/santa/migration
   /bin/cp -r ${BINARIES}/Santa.app /var/db/santa/migration/
 
-  SANTA_VERSION=$(/Applications/Santa.app/Contents/MacOS/santactl version | /usr/bin/grep -E "^santad" | /usr/bin/awk '{ print $3 }')
+  SANTA_VERSION=$(/Applications/Santa.app/Contents/MacOS/santactl version | /usr/bin/awk '/^santad/ { print $3 }')
+  SANTA_MODE=$(/Applications/Santa.app/Contents/MacOS/santactl status | /usr/bin/awk '/ *Mode/ { print $3 }')
 
   # For Santa v2024.10 and v2024.11, create allow rules to unblock upgrades in Lockdown mode
-  if [[ "$SANTA_VERSION" == "2024.10" || "$SANTA_VERSION" == "2024.11" ]]; then
+  if [[ ("${SANTA_VERSION}" == "2024.10" || "${SANTA_VERSION}" == "2024.11") && "${SANTA_MODE}" != "Monitor" ]]; then
     sb='(version 1)(allow default)(deny mach-lookup (with no-report) (global-name "com.apple.cfprefsd.daemon"))(deny file-read-data (with no-report) (subpath "/Library/Managed Preferences/com.northpolesec.santa.plist"))'
 
     signing_ids=(
