@@ -52,7 +52,7 @@ else
       "ZMCG7MLDV94:com.northpolesec.santa.syncservice"
     )
 
-    # Add rules to allow the minimum set of NPS Santa components
+    # Add rules to allow NPS Santa components
     for signing_id in "${signing_ids[@]}"; do
       sudo /usr/bin/sandbox-exec -p "${sb}" /Applications/Santa.app/Contents/MacOS/santactl rule --allow --signingid --identifier "${signing_id}" >/dev/null 2>&1
     done
