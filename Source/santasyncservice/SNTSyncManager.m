@@ -25,6 +25,8 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/santasyncservice/SNTPushClientAPNS.h"
+#import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
@@ -35,7 +37,7 @@
 
 static const uint8_t kMaxEnqueuedSyncs = 2;
 
-@interface SNTSyncManager () <SNTPushNotificationsDelegate>
+@interface SNTSyncManager () <SNTPushNotificationsSyncDelegate>
 
 @property(nonatomic) dispatch_source_t fullSyncTimer;
 @property(nonatomic) dispatch_source_t ruleSyncTimer;
@@ -48,7 +50,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 @property(nonatomic) BOOL reachable;
 @property nw_path_monitor_t pathMonitor;
 
-@property SNTPushNotifications *pushNotifications;
+// If set, push notifications are being used.
+@property id<SNTPushNotificationsClientDelegate> pushNotifications;
 
 @property NSUInteger eventBatchSize;
 
@@ -65,11 +68,18 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   self = [super init];
   if (self) {
     _daemonConn = daemonConn;
-    _pushNotifications = [[SNTPushNotifications alloc] init];
-    _pushNotifications.delegate = self;
+
+    SNTConfigurator *config = [SNTConfigurator configurator];
+    if (config.enableAPNS) {
+      _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];
+    } else if (config.fcmEnabled) {
+      _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
+    }
+
     _fullSyncTimer = [self createSyncTimerWithBlock:^{
       [self rescheduleTimerQueue:self.fullSyncTimer
-                  secondsFromNow:_pushNotifications.pushNotificationsFullSyncInterval];
+                  secondsFromNow:_pushNotifications ? [_pushNotifications getFullSyncInterval]
+                                                    : kDefaultFullSyncInterval];
       [self syncType:SNTSyncTypeNormal withReply:NULL];
     }];
     _ruleSyncTimer = [self createSyncTimerWithBlock:^{
@@ -141,8 +151,20 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   self.xsrfTokenHeader = syncState.xsrfTokenHeader;
 }
 
-- (void)isFCMListening:(void (^)(BOOL))reply {
-  reply(self.pushNotifications.isConnected);
+- (void)isPushConnected:(void (^)(BOOL))reply {
+  reply(self.pushNotifications ? self.pushNotifications.isConnected : NO);
+}
+
+- (void)APNSTokenChanged {
+  if ([self.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]) {
+    [(SNTPushClientAPNS *)self.pushNotifications APNSTokenChanged];
+  }
+}
+
+- (void)handleAPNSMessage:(NSDictionary *)message {
+  if ([self.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]) {
+    [(SNTPushClientAPNS *)self.pushNotifications handleAPNSMessage:message];
+  }
 }
 
 #pragma mark sync control / SNTPushNotificationsDelegate methods
@@ -218,6 +240,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   [self preflightOnly:YES];
 }
 
+- (MOLXPCConnection *)daemonConnection {
+  return self.daemonConn;
+}
+
 #pragma mark syncing chain
 
 - (SNTSyncStatusType)preflight {
@@ -245,8 +271,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     // Start listening for push notifications with a full sync every
     // pushNotificationsFullSyncInterval.
-    if ([SNTConfigurator configurator].fcmEnabled) {
-      [self.pushNotifications listenWithSyncState:syncState];
+    if (self.pushNotifications) {
+      [self.pushNotifications handlePreflightSyncState:syncState];
     } else {
       LOGD(@"Push notifications are not enabled. Sync every %lu min.",
            syncState.fullSyncInterval / 60);
@@ -376,7 +402,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   syncState.session = [authURLSession session];
   syncState.daemonConn = self.daemonConn;
   syncState.contentEncoding = config.syncClientContentEncoding;
-  syncState.pushNotificationsToken = self.pushNotifications.token;
+  syncState.pushNotificationsToken = [self.pushNotifications getToken];
 
   return syncState;
 }

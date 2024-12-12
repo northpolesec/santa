@@ -1,4 +1,4 @@
-/// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc. All rights reserved.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,25 +12,10 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License
 
-#import <Foundation/Foundation.h>
+#import "Source/santasyncservice/SNTPushNotifications.h"
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
-@protocol SNTPushNotificationsSyncDelegate <NSObject>
-- (void)sync;
-- (void)syncSecondsFromNow:(uint64_t)seconds;
-- (void)ruleSync;
-- (void)ruleSyncSecondsFromNow:(uint64_t)seconds;
-- (void)preflightSync;
-- (MOLXPCConnection *)daemonConnection;
-@end
-
-@class SNTSyncState;
-
-@protocol SNTPushNotificationsClientDelegate <NSObject>
+@interface SNTPushClientAPNS : NSObject <SNTPushNotificationsClientDelegate>
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
-- (BOOL)isConnected;
-- (NSString *)getToken;
-- (NSUInteger)getFullSyncInterval;
-- (void)handlePreflightSyncState:(SNTSyncState *)syncState;
+- (void)APNSTokenChanged;
+- (void)handleAPNSMessage:(NSDictionary *)message;
 @end
