@@ -33,16 +33,26 @@ if [ -z "${GOOGLE_SANTA_ACTIVATED}" ]; then
     # update is valid, the system extension will take care of finishing the
     # install.
 
-    # Check if any NPS SigningID rules exist:
-    cnt=$(/usr/bin/sqlite3 'file:///var/db/santa/rules.db?immutable=1' 'SELECT COUNT(*) FROM rules WHERE identifier LIKE "ZMCG7MLDV94:%"')
-    sb='(version 1)(allow default)(deny mach-lookup (with no-report) (global-name "com.apple.cfprefsd.daemon"))(deny file-read-data (with no-report) (subpath "/Library/Managed Preferences/com.northpolesec.santa.plist"))'
+    SANTA_VERSION=$(/Applications/Santa.app/Contents/MacOS/santactl version | /usr/bin/grep -E "^santad" | /usr/bin/awk '{ print $3 }')
 
-    signing_ids=("ZMCG7MLDV94:com.northpolesec.santa" "ZMCG7MLDV94:com.northpolesec.santa.ctl" "ZMCG7MLDV94:com.northpolesec.santa.syncservice")
+    # For Santa v2024.10 and v2024.11, create allow rules to unblock upgrades in Lockdown mode
+    if [[ "$SANTA_VERSION" == "2024.10" || "$SANTA_VERSION" == "2024.11" ]]; then
+      sb='(version 1)(allow default)(deny mach-lookup (with no-report) (global-name "com.apple.cfprefsd.daemon"))(deny file-read-data (with no-report) (subpath "/Library/Managed Preferences/com.northpolesec.santa.plist"))'
 
-    # Add rules to allow the minimum set of NPS Santa components
-    for signing_id in "${signing_ids[@]}"; do
-      sudo /usr/bin/sandbox-exec -p "${sb}" /Applications/Santa.app/Contents/MacOS/santactl rule --allow --signingid --identifier "${signing_id}" >/dev/null 2>&1
-    done
+      signing_ids=(
+        "ZMCG7MLDV94:com.northpolesec.santa"
+        "ZMCG7MLDV94:com.northpolesec.santa.bundleservice"
+        "ZMCG7MLDV94:com.northpolesec.santa.ctl"
+        "ZMCG7MLDV94:com.northpolesec.santa.daemon"
+        "ZMCG7MLDV94:com.northpolesec.santa.metricservice"
+        "ZMCG7MLDV94:com.northpolesec.santa.syncservice"
+      )
+
+      # Add rules to allow the minimum set of NPS Santa components
+      for signing_id in "${signing_ids[@]}"; do
+        sudo /usr/bin/sandbox-exec -p "${sb}" /Applications/Santa.app/Contents/MacOS/santactl rule --allow --signingid --identifier "${signing_id}" >/dev/null 2>&1
+      done
+    fi
 
     /Applications/Santa.app/Contents/MacOS/santactl install
   fi
