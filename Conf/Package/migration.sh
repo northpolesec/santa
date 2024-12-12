@@ -34,6 +34,7 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 # Cleanup migration service and on-disk artifacts.
 /bin/rm -rf /var/db/santa/migration/
 /bin/rm /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
+/bin/rm /Library/LaunchDaemons/com.northpolesec.santa-migration.plist
 /bin/launchctl remove com.northpolesec.santa.migration
 
 exit 0
