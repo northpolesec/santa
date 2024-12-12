@@ -16,6 +16,7 @@ if [ -z "${GOOGLE_SANTA_ACTIVATED}" ]; then
   # Remove the com.northpolesec.santa.migration launch job, as it is not
   # needed.
   /bin/rm /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
+  /bin/rm /Library/LaunchDaemons/com.northpolesec.santa-migration.plist
 
   # Attempt to remove the current install of Santa, if any. If this command
   # succeeds, Santa is not currently running and this script should finish the
@@ -75,7 +76,7 @@ else
   # Load the com.northpolesec.santa.migration launch job. It will wait for the
   # unsupported version of Santa to be removed, then trigger an install of the
   # new version.
-  /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.migration.plist
+  /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa-migration.plist
 fi
 
 exit 0
