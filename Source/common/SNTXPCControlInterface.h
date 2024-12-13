@@ -29,8 +29,13 @@
 ///
 ///  Database ops
 ///
+typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
+  SNTRuleAddSourceSyncService,
+  SNTRuleAddSourceSantactl,
+};
 - (void)databaseRuleAddRules:(NSArray *)rules
                  ruleCleanup:(SNTRuleCleanup)cleanupType
+                      source:(SNTRuleAddSource)source
                        reply:(void (^)(NSError *error))reply;
 - (void)databaseEventsPending:(void (^)(NSArray *events))reply;
 - (void)databaseRemoveEventsWithIDs:(NSArray *)ids;
