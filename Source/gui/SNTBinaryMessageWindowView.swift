@@ -161,8 +161,8 @@ struct MoreDetailsView: View {
             }
           }
           .buttonStyle(ScalingButtonStyle())
-          .keyboardShortcut("d", modifiers: .command)
-          .help("⌘ d")
+          .keyboardShortcut("c", modifiers: [.command, .shift])
+          .help("⇧ ⌘  c")
 
           Button(action: { presentationMode.wrappedValue.dismiss() }) {
             HStack(spacing: 2.0) {
@@ -238,8 +238,8 @@ struct SNTBinaryMessageEventView: View {
         }
         .buttonStyle(ScalingButtonStyle())
         .opacity(0.0)  // Invisible!
-        .keyboardShortcut("d", modifiers: .command)
-        .help("⌘ d")
+        .keyboardShortcut("c", modifiers: [.command, .shift])
+        .help("⇧ ⌘  c")
       }
       Spacer()
     }
