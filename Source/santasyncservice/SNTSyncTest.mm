@@ -18,6 +18,7 @@
 #import <MOLXPCConnection/MOLXPCConnection.h>
 #import <OCMock/OCMock.h>
 
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
@@ -60,6 +61,10 @@
   self.daemonConnRop = OCMProtocolMock(@protocol(SNTDaemonControlXPC));
   OCMStub([self.syncState.daemonConn remoteObjectProxy]).andReturn(self.daemonConnRop);
   OCMStub([self.syncState.daemonConn synchronousRemoteObjectProxy]).andReturn(self.daemonConnRop);
+
+  id configMock = OCMClassMock([SNTConfigurator class]);
+  OCMStub([configMock configurator]).andReturn(configMock);
+  OCMStub([configMock syncEnableProtoTransfer]).andReturn(NO);
 
   id siMock = OCMClassMock([SNTSystemInfo class]);
   OCMStub([siMock serialNumber]).andReturn(@"QYGF4QM373");

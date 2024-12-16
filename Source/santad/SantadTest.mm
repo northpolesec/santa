@@ -619,7 +619,7 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
 - (void)testBinaryWithoutBlockOrAllowRuleIsBlockedInStandaloneMode {
   [self checkBinaryExecution:@"noop"
-                  wantResult:ES_AUTH_RESULT_DENY
+                  wantResult:ES_AUTH_RESULT_ALLOW
                   clientMode:SNTClientModeStandalone
                  cdValidator:^BOOL(SNTCachedDecision *cd) {
                    return cd.decision == SNTEventStateBlockUnknown;

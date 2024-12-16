@@ -195,11 +195,6 @@
   XCTAssertEqual(sut.get(3.1459124), 0);
 }
 
-template <>
-uint64_t SantaCacheHasher<std::string>(std::string const &s) {
-  return std::hash<std::string>{}(s);
-}
-
 - (void)testStrings {
   auto sut = SantaCache<std::string, std::string>();
 
@@ -248,11 +243,11 @@ struct S {
   bool operator==(const S &rhs) const {
     return first_val == rhs.first_val && second_val == rhs.second_val;
   }
+
+  template <typename H> friend H AbslHashValue(H h, const S& v) {
+    return H::combine(std::move(h), v.first_val, v.second_val);
+  }
 };
-template <>
-uint64_t SantaCacheHasher<S>(S const &s) {
-  return SantaCacheHasher<uint64_t>(s.first_val) ^ (SantaCacheHasher<uint64_t>(s.second_val) << 1);
-}
 
 - (void)testStructKeys {
   auto sut = SantaCache<S, uint64_t>(10, 2);

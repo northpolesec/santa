@@ -66,7 +66,7 @@ class MockAuthResultCache : public AuthResultCache {
 
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
-  std::set<es_event_type_t> expectedEventSubs{ES_EVENT_TYPE_AUTH_EXEC};
+  std::set<es_event_type_t> expectedEventSubs{ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_SIGNAL};
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
   id authClient =
