@@ -76,6 +76,15 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 - (void)validateExecEvent:(const santa::Message &)esMsg postAction:(bool (^)(SNTAction))postAction;
 
 ///
+///  Handles the logic of deciding whether to allow a signal through to a binary or not, sends the
+///  response to the given `postAction` block.
+///
+///  @param message The message reveived from the EndpointSecurity event provider.
+///  @param postAction The block invoked with the desired response result.
+///
+- (void)validateSignalEvent:(const santa::Message &)esMsg postAction:(void (^)(bool))postAction;
+
+///
 /// Perform light, synchronous processing of the given event to decide whether or not the
 /// event should undergo full processing. The checks done by this function MUST NOT block
 /// the thread (e.g. perform no XPC) and should be fast and efficient so as to mitigate
@@ -88,4 +97,5 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 
 - (void)updateEntitlementsPrefixFilter:(NSArray<NSString *> *)filter;
 - (void)updateEntitlementsTeamIDFilter:(NSArray<NSString *> *)filter;
+
 @end

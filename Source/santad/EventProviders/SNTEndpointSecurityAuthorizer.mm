@@ -63,6 +63,18 @@ using santa::Message;
 }
 
 - (void)processMessage:(const Message &)msg {
+  if (msg->event_type == ES_EVENT_TYPE_AUTH_SIGNAL) {
+    [self.execController validateSignalEvent:msg
+                                  postAction:^(bool allowed) {
+                                    es_auth_result_t authResult =
+                                        allowed ? ES_AUTH_RESULT_ALLOW : ES_AUTH_RESULT_DENY;
+                                    [self respondToMessage:msg
+                                            withAuthResult:authResult
+                                                 cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
+                                  }];
+    return;
+  }
+
   const es_file_t *targetFile = msg->event.exec.target->executable;
 
   while (true) {
@@ -103,9 +115,10 @@ using santa::Message;
 
 - (void)handleMessage:(Message &&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
-  if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
+  if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC &&
+               esMsg->event_type != ES_EVENT_TYPE_AUTH_SIGNAL)) {
     // This is a programming error
-    LOGE(@"Atteempting to authorize a non-exec event");
+    LOGE(@"Attempting to authorize a non-exec event");
     [NSException raise:@"Invalid event type"
                 format:@"Authorizing unexpected event type: %d", esMsg->event_type];
   }
@@ -153,6 +166,7 @@ using santa::Message;
 - (void)enable {
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_EXEC,
+                                    ES_EVENT_TYPE_AUTH_SIGNAL,
                                 }];
 }
 

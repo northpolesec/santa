@@ -41,6 +41,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
+#include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/String.h"
 #include "Source/common/Unit.h"
@@ -92,6 +93,7 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
   absl::Mutex _entitlementFilterMutex;
   std::set<std::string> _entitlementsTeamIDFilter;
   std::unique_ptr<PrefixTree<Unit>> _entitlementsPrefixFilter;
+  std::unique_ptr<SantaCache<pid_t, bool>> _procSignalCache;
 }
 
 static NSString *const kPrinterProxyPreMonterey =
@@ -119,6 +121,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _syncdQueue = syncdQueue;
     _ttyWriter = std::move(ttyWriter);
     _policyProcessor = [[SNTPolicyProcessor alloc] initWithRuleTable:_ruleTable];
+    _procSignalCache = std::make_unique<SantaCache<pid_t, bool>>(100000);
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -181,12 +184,17 @@ static NSString *const kPrinterProxyPostMonterey =
 #pragma mark Binary Validation
 
 - (bool)synchronousShouldProcessExecEvent:(const Message &)esMsg {
-  if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
-    // Programming error. Bail.
-    LOGE(@"Attempt to validate non-EXEC event. Event type: %d", esMsg->event_type);
-    [NSException
-         raise:@"Invalid event type"
-        format:@"synchronousShouldProcessExecEvent: Unexpected event type: %d", esMsg->event_type];
+  switch (esMsg->event_type) {
+    case ES_EVENT_TYPE_AUTH_SIGNAL: return YES;
+    case ES_EVENT_TYPE_AUTH_EXEC:
+      // Break out, the exec type has more complex processing.
+      break;
+    default:
+      // Programming error. Bail.
+      LOGE(@"Attempt to validate unhandled event. Event type: %d", esMsg->event_type);
+      [NSException raise:@"Invalid event type"
+                  format:@"synchronousShouldProcessExecEvent: Unexpected event type: %d",
+                         esMsg->event_type];
   }
 
   const es_process_t *targetProc = esMsg->event.exec.target;
@@ -312,8 +320,15 @@ static NSString *const kPrinterProxyPostMonterey =
     action = SNTActionRespondAllowCompiler;
   }
 
-  // Respond with the decision.
-  postAction(action);
+  pid_t newProcPid = audit_token_to_pid(targetProc->audit_token);
+  if (cd.decision == SNTEventStateBlockUnknown && config.clientMode == SNTClientModeStandalone) {
+    _procSignalCache->set(newProcPid, true);
+    kill(newProcPid, SIGSTOP);
+    postAction(SNTActionRespondAllow);
+  } else {
+    // Respond with the decision.
+    postAction(action);
+  }
 
   // Increment metric counters
   [self incrementEventCounters:cd.decision];
@@ -332,7 +347,7 @@ static NSString *const kPrinterProxyPostMonterey =
     se.teamID = cd.teamID;
     se.signingID = cd.signingID;
     se.cdhash = cd.cdhash;
-    se.pid = @(audit_token_to_pid(targetProc->audit_token));
+    se.pid = @(newProcPid);
     se.ppid = @(audit_token_to_pid(targetProc->parent_audit_token));
     se.parentName = @(esMsg.ParentProcessName().c_str());
     se.entitlements = cd.entitlements;
@@ -407,20 +422,28 @@ static NSString *const kPrinterProxyPostMonterey =
           self->_ttyWriter->Write(targetProc, msg);
         }
 
-        void (^replyBlock)(BOOL) = ^void(BOOL authenticated) {
+        void (^replyBlock)(BOOL) = ^(BOOL authenticated) {
         };
 
         // Only allow a user in standalone mode to override a block if an
         // explicit block rule is not set when using a sync service.
         if (config.clientMode == SNTClientModeStandalone &&
             se.decision == SNTEventStateBlockUnknown) {
-          replyBlock = ^void(BOOL authenticated) {
+          replyBlock = ^(BOOL authenticated) {
             LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                  authenticated);
             if (authenticated) {
               // Create a rule for the binary that was allowed by the user in
-              // standalone mode and notify the sync service
+              // standalone mode and notify the sync service.
               [self createRuleForStandaloneModeEvent:se];
+
+              // Allow the binary to begin running.
+              kill(newProcPid, SIGCONT);
+              _procSignalCache->remove(newProcPid);
+            } else {
+              // The user did not approve, so kill the stopped process.
+              kill(newProcPid, SIGKILL);
+              _procSignalCache->remove(newProcPid);
             }
           };
         }
@@ -433,6 +456,14 @@ static NSString *const kPrinterProxyPostMonterey =
       }
     }
   }
+}
+
+- (void)validateSignalEvent:(const santa::Message &)esMsg postAction:(void (^)(bool))postAction {
+  pid_t target = audit_token_to_pid(esMsg->event.signal.target->audit_token);
+  if (_procSignalCache->get(target)) {
+    return postAction(false);
+  }
+  postAction(true);
 }
 
 /**
