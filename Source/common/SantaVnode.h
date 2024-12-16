@@ -18,6 +18,10 @@
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <sys/types.h>
 
+#ifdef __cplusplus
+#include "absl/hash/hash.h"
+#endif
+
 // Struct to manage vnode IDs
 typedef struct SantaVnode {
   dev_t fsid;
@@ -37,6 +41,10 @@ typedef struct SantaVnode {
 
   static inline SantaVnode VnodeForFile(const es_file_t *es_file) {
     return VnodeForFile(es_file->stat);
+  }
+
+  template <typename H> friend H AbslHashValue(H h, const SantaVnode& v) {
+    return H::combine(std::move(h), v.fsid, v.fileid);
   }
 #endif
 } SantaVnode;

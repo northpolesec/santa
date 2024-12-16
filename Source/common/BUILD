@@ -51,7 +51,10 @@ objc_library(
 cc_library(
     name = "SantaCache",
     hdrs = ["SantaCache.h"],
-    deps = [":BranchPrediction"],
+    deps = [
+        ":BranchPrediction",
+        "@com_google_absl//absl/hash",
+    ],
 )
 
 santa_unit_test(
@@ -120,6 +123,9 @@ objc_library(
 objc_library(
     name = "SantaVnode",
     hdrs = ["SantaVnode.h"],
+    deps = [
+        "@com_google_absl//absl/hash",
+    ]
 )
 
 objc_library(
@@ -130,16 +136,6 @@ objc_library(
 objc_library(
     name = "String",
     hdrs = ["String.h"],
-)
-
-objc_library(
-    name = "SantaVnodeHash",
-    srcs = ["SantaVnodeHash.mm"],
-    hdrs = ["SantaVnodeHash.h"],
-    deps = [
-        ":SantaCache",
-        ":SantaVnode",
-    ],
 )
 
 objc_library(

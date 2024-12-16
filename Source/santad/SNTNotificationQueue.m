@@ -97,10 +97,17 @@ static const int kMaximumNotifications = 10;
   @synchronized(self.pendingNotifications) {
     NSMutableArray *postedNotifications = [NSMutableArray array];
     for (NSDictionary *d in self.pendingNotifications) {
+      void (^reply)(BOOL authenticated) = d[@"reply"];
+      if (reply == nil) {
+        // The reply block sent to the GUI cannot be nil.
+        reply = ^(BOOL _) {};
+      }
+
+
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
                        customURL:d[@"url"]
-                        andReply:d[@"reply"]];
+                        andReply:reply];
       [postedNotifications addObject:d];
     }
     [self.pendingNotifications removeObjectsInArray:postedNotifications];

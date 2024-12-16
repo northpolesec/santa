@@ -25,21 +25,12 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "absl/hash/hash.h"
+
 #include "Source/common/BranchPrediction.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
-/**
-  A type to specialize to help SantaCache with its hashing.
-
-  The default works for numeric types with a multiplicative hash
-  using a prime near to the golden ratio, per Knuth.
-*/
-template <typename T>
-uint64_t SantaCacheHasher(T const &t) {
-  return (uint64_t)t * 11400714819323198549UL;
-};
 
 /**
   A somewhat simple, concurrent linked-list hash table intended for use in IOKit
@@ -54,7 +45,7 @@ uint64_t SantaCacheHasher(T const &t) {
   The number of buckets is calculated as `maximum_size` / `per_bucket`
   rounded up to the next power of 2. Locking is done per-bucket.
 */
-template <typename KeyT, typename ValueT>
+template <typename KeyT, typename ValueT, class Hasher = absl::Hash<KeyT>>
 class SantaCache {
  public:
   /**
@@ -359,7 +350,7 @@ class SantaCache {
     Hash a key to determine which bucket it belongs in.
   */
   inline uint64_t hash(KeyT input) const {
-    return SantaCacheHasher<KeyT>(input) % bucket_count_;
+    return Hasher{}(input) % bucket_count_;
   }
 };
 

@@ -14,9 +14,10 @@
 ///    limitations under the License.
 
 #import "Source/santad/SNTExecutionController.h"
-#include <Foundation/Foundation.h>
 
+#import <Foundation/Foundation.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
+
 #include <bsm/libbsm.h>
 #include <copyfile.h>
 #include <libproc.h>
@@ -27,7 +28,9 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
 
+#include "absl/synchronization/mutex.h"
 #include "Source/common/BranchPrediction.h"
 #include "Source/common/PrefixTree.h"
 #import "Source/common/SNTBlockMessage.h"
@@ -51,7 +54,6 @@
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #import "Source/santad/SNTSyncdQueue.h"
-#include "absl/synchronization/mutex.h"
 
 using santa::Message;
 using santa::PrefixTree;
@@ -93,7 +95,7 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
   absl::Mutex _entitlementFilterMutex;
   std::set<std::string> _entitlementsTeamIDFilter;
   std::unique_ptr<PrefixTree<Unit>> _entitlementsPrefixFilter;
-  std::unique_ptr<SantaCache<pid_t, bool>> _procSignalCache;
+  std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
 }
 
 static NSString *const kPrinterProxyPreMonterey =
@@ -121,7 +123,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _syncdQueue = syncdQueue;
     _ttyWriter = std::move(ttyWriter);
     _policyProcessor = [[SNTPolicyProcessor alloc] initWithRuleTable:_ruleTable];
-    _procSignalCache = std::make_unique<SantaCache<pid_t, bool>>(100000);
+    _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -321,8 +323,9 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   pid_t newProcPid = audit_token_to_pid(targetProc->audit_token);
+  std::pair<pid_t, int> pidAndVersion = std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
   if (cd.decision == SNTEventStateBlockUnknown && config.clientMode == SNTClientModeStandalone) {
-    _procSignalCache->set(newProcPid, true);
+    _procSignalCache->set(pidAndVersion, true);
     kill(newProcPid, SIGSTOP);
     postAction(SNTActionRespondAllow);
   } else {
@@ -439,11 +442,11 @@ static NSString *const kPrinterProxyPostMonterey =
 
               // Allow the binary to begin running.
               kill(newProcPid, SIGCONT);
-              _procSignalCache->remove(newProcPid);
+              _procSignalCache->remove(pidAndVersion);
             } else {
               // The user did not approve, so kill the stopped process.
               kill(newProcPid, SIGKILL);
-              _procSignalCache->remove(newProcPid);
+              _procSignalCache->remove(pidAndVersion);
             }
           };
         }
@@ -459,8 +462,10 @@ static NSString *const kPrinterProxyPostMonterey =
 }
 
 - (void)validateSignalEvent:(const santa::Message &)esMsg postAction:(void (^)(bool))postAction {
-  pid_t target = audit_token_to_pid(esMsg->event.signal.target->audit_token);
-  if (_procSignalCache->get(target)) {
+  audit_token_t at = esMsg->event.signal.target->audit_token;
+  pid_t pid = audit_token_to_pid(at);
+  int pidVersion = audit_token_to_pidversion(at);
+  if (_procSignalCache->get(std::make_pair(pid, pidVersion))) {
     return postAction(false);
   }
   postAction(true);
