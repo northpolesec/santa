@@ -125,7 +125,7 @@ objc_library(
     hdrs = ["SantaVnode.h"],
     deps = [
         "@com_google_absl//absl/hash",
-    ]
+    ],
 )
 
 objc_library(

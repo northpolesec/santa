@@ -244,7 +244,8 @@ struct S {
     return first_val == rhs.first_val && second_val == rhs.second_val;
   }
 
-  template <typename H> friend H AbslHashValue(H h, const S& v) {
+  template <typename H>
+  friend H AbslHashValue(H h, const S &v) {
     return H::combine(std::move(h), v.first_val, v.second_val);
   }
 };

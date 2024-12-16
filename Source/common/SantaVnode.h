@@ -43,7 +43,8 @@ typedef struct SantaVnode {
     return VnodeForFile(es_file->stat);
   }
 
-  template <typename H> friend H AbslHashValue(H h, const SantaVnode& v) {
+  template <typename H>
+  friend H AbslHashValue(H h, const SantaVnode &v) {
     return H::combine(std::move(h), v.fsid, v.fileid);
   }
 #endif

@@ -25,9 +25,8 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "absl/hash/hash.h"
-
 #include "Source/common/BranchPrediction.h"
+#include "absl/hash/hash.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"

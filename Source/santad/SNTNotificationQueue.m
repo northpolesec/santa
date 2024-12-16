@@ -100,9 +100,9 @@ static const int kMaximumNotifications = 10;
       void (^reply)(BOOL authenticated) = d[@"reply"];
       if (reply == nil) {
         // The reply block sent to the GUI cannot be nil.
-        reply = ^(BOOL _) {};
+        reply = ^(BOOL _) {
+        };
       }
-
 
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]

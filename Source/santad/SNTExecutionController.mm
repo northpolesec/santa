@@ -30,7 +30,6 @@
 #include <string>
 #include <utility>
 
-#include "absl/synchronization/mutex.h"
 #include "Source/common/BranchPrediction.h"
 #include "Source/common/PrefixTree.h"
 #import "Source/common/SNTBlockMessage.h"
@@ -54,6 +53,7 @@
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#include "absl/synchronization/mutex.h"
 
 using santa::Message;
 using santa::PrefixTree;
@@ -323,12 +323,14 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   pid_t newProcPid = audit_token_to_pid(targetProc->audit_token);
-  std::pair<pid_t, int> pidAndVersion = std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
+  std::pair<pid_t, int> pidAndVersion =
+      std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
   if (cd.decision == SNTEventStateBlockUnknown && config.clientMode == SNTClientModeStandalone) {
-    // In standalone mode we want hold off on making a decision until the user has had a chance to approve.
-    // ES won't let us do this, we'd hit the response deadline. Instead, we send a SIGSTOP to hold stop
-    // the binary from executing but we respond to ES with an allow decision. If the user authorizes execution
-    // we send a SIGCONT instead. Any attempts to SIGCONT the paused binary outside of the auth flow will be blocked.
+    // In standalone mode we want hold off on making a decision until the user has had a chance to
+    // approve. ES won't let us do this, we'd hit the response deadline. Instead, we send a SIGSTOP
+    // to hold stop the binary from executing but we respond to ES with an allow decision. If the
+    // user authorizes execution we send a SIGCONT instead. Any attempts to SIGCONT the paused
+    // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
     kill(newProcPid, SIGSTOP);
     postAction(SNTActionRespondAllow);

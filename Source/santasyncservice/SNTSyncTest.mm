@@ -18,8 +18,8 @@
 #import <MOLXPCConnection/MOLXPCConnection.h>
 #import <OCMock/OCMock.h>
 
-#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTSyncConstants.h"
