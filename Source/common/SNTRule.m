@@ -147,14 +147,14 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return self;
 }
 
-//
-- (NSDictionary *)normalizeKeys:(NSDictionary *)dict {
+// lowercase policy keys and upper case the policy decision.
+- (NSDictionary *)normalizeRuleDictionary:(NSDictionary *)dict {
   NSMutableDictionary *newDict = [NSMutableDictionary dictionaryWithCapacity:dict.count];
   for (id rawKey in dict) {
-    if (![rawKey isKindOfClass:[NSString class]) continue;
-    NSString *key = (NSString *)rawKey; 
+    if (![rawKey isKindOfClass:[NSString class]]) continue;
+    NSString *key = (NSString *)rawKey;
     NSString *newKey = [key lowercaseString];
-    if (([newKey isEqualToString:kRulePolicy] || [newKey isEqualToString:kRuleType]) && 
+    if (([newKey isEqualToString:kRulePolicy] || [newKey isEqualToString:kRuleType]) &&
         [dict[key] isKindOfClass:[NSString class]]) {
       newDict[newKey] = [dict[key] uppercaseString];
     } else {
@@ -170,7 +170,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 - (instancetype)initWithDictionary:(NSDictionary *)rawDict {
   if (![rawDict isKindOfClass:[NSDictionary class]]) return nil;
 
-  NSDictionary *dict = [self normalizeKeys:rawDict];
+  NSDictionary *dict = [self normalizeRuleDictionary:rawDict];
 
   NSString *identifier = dict[kRuleIdentifier];
   if (![identifier isKindOfClass:[NSString class]] || !identifier.length) {
