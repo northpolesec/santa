@@ -279,7 +279,6 @@
 }
 
 - (void)testKeyCaseForInitWithDictionary {
-  NSLog(@"PLM PLM PLM PLM PLM\n");
   for (NSString *key in
        @[ kRulePolicy, kRuleIdentifier, kRuleType, kRuleCustomMsg, kRuleCustomURL, kRuleComment ]) {
     NSDictionary *expected = @{
