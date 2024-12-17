@@ -156,7 +156,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     NSString *newKey = [key lowercaseString];
     if (([newKey isEqualToString:kRulePolicy] || [newKey isEqualToString:kRuleType]) && 
         [dict[key] isKindOfClass:[NSString class]]) {
-      newDict[newKey] = [dict[key] uppercasestring];
+      newDict[newKey] = [dict[key] uppercaseString];
     } else {
       newDict[newKey] = dict[key];
     }
