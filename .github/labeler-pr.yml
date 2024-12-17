@@ -28,9 +28,3 @@ configurator:
       - any-glob-to-any-file:
         - "Source/common/SNTConfigurator.*"
 
-build:
-  - any:
-    - changed-files:
-      - any-glob-to-any-file:
-        - "**/BUILD"
-
