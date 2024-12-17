@@ -1,4 +1,3 @@
-/// Copyright 2015 Google Inc. All rights reserved.
 /// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,13 +12,18 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <Foundation/Foundation.h>
+#ifndef SANTA__COMMON__ENCODEENTITLEMENTS_H
+#define SANTA__COMMON__ENCODEENTITLEMENTS_H
 
-#import "SNTSyncStage.h"
-#import "Source/common/SNTStoredEvent.h"
+#include <Foundation/Foundation.h>
 
-@interface SNTSyncEventUpload : SNTSyncStage
+namespace santa {
 
-- (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events;
+void EncodeEntitlementsCommon(NSDictionary *entitlements, BOOL entitlements_filtered,
+                              void (^EncodeInitBlock)(NSUInteger count, bool is_filtered),
+                              void (^EncodeEntitlementBlock)(NSString *entitlement,
+                                                             NSString *value));
 
-@end
+}
+
+#endif
