@@ -150,7 +150,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 //
 - (NSDictionary *)normalizeKeys:(NSDictionary *)dict {
   NSMutableDictionary *newDict = [NSMutableDictionary dictionaryWithCapacity:dict.count];
-  for (NSString *key in dict) {
+  for (id rawKey in dict) {
+    if (![rawKey isKindOfClass:[NSString class]) continue;
+    NSString *key = (NSString *)rawKey; 
     NSString *newKey = [key lowercaseString];
     newDict[newKey] = dict[key];
   }
