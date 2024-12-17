@@ -1,0 +1,36 @@
+documentation:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file:
+        - "docs/**"
+
+gui:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file:
+        - "Source/gui/**"
+
+santactl:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file:
+        - "Source/santactl/**"
+
+daemon:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file:
+        - "Source/santad/**"
+
+configurator:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file:
+        - "Source/common/SNTConfigurator.*"
+
+build:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file:
+        - "**/BUILD"
+
