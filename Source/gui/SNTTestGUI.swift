@@ -68,45 +68,45 @@ struct BinaryView: View {
     VStack(spacing: 15.0) {
       GroupBox(label: Label("Event Properties", systemImage: "")) {
         Form {
-          TextField(text: $application, label: { Text("Application") })
-          TextField(text: $publisher, label: { Text("Publisher") })
-          TextField(text: $sha256, label: { Text("SHA-256") })
-          TextField(text: $cdhash, label: { Text("CDHash") })
-          TextField(text: $teamID, label: { Text("TeamID") })
-          TextField(text: $path, label: { Text("Path") })
-          TextField(text: $parent, label: { Text("Parent") })
+          TextField(text: $application, label: { Text(verbatim: "Application") })
+          TextField(text: $publisher, label: { Text(verbatim: "Publisher") })
+          TextField(text: $sha256, label: { Text(verbatim: "SHA-256") })
+          TextField(text: $cdhash, label: { Text(verbatim: "CDHash") })
+          TextField(text: $teamID, label: { Text(verbatim: "TeamID") })
+          TextField(text: $path, label: { Text(verbatim: "Path") })
+          TextField(text: $parent, label: { Text(verbatim: "Parent") })
         }
       }
 
       GroupBox(label: Label("Config Overrides", systemImage: "")) {
         Form {
           HStack {
-            TextField(text: $bannedBlockMessage, label: { Text("Banned Block Message") }).frame(width: 550.0)
+            TextField(text: $bannedBlockMessage, label: { Text(verbatim: "Banned Block Message") }).frame(width: 550.0)
             Button(action: {
               bannedBlockMessage =
                 "<img src='https://static.wikia.nocookie.net/villains/images/8/8a/Robot_Santa.png/revision/latest?cb=20200520230856' /><br /><br />Isn't Santa fun?"
             }) {
-              Text("Populate (With Image)").font(Font.subheadline)
+              Text(verbatim: "Populate (With Image)").font(Font.subheadline)
             }
             Button(action: { bannedBlockMessage = "You may not run this thing" }) {
-              Text("Populate (1-line)").font(Font.subheadline)
+              Text(verbatim: "Populate (1-line)").font(Font.subheadline)
             }
             Button(action: { bannedBlockMessage = "" }) { Text("Clear").font(Font.subheadline) }
           }
 
           HStack {
-            TextField(text: $eventDetailURL, label: { Text("Event Detail URL") })
+            TextField(text: $eventDetailURL, label: { Text(verbatim: "Event Detail URL") })
             Button(action: { eventDetailURL = "http://sync-server-hostname/blockables/%bundle_or_file_identifier%" }) {
               Text("Populate").font(Font.subheadline)
             }
-            Button(action: { eventDetailURL = "" }) { Text("Clear").font(Font.subheadline) }
+            Button(action: { eventDetailURL = "" }) { Text(verbatim: "Clear").font(Font.subheadline) }
           }
           HStack {
-            Picker(selection: $dateOverride, label: Text("Date :")) {
-              Text("Nov 25").tag(SpecialDates.Nov25)
-              Text("Apr 1").tag(SpecialDates.Apr1)
-              Text("May 4").tag(SpecialDates.May4)
-              Text("Oct 31").tag(SpecialDates.Oct31)
+            Picker(selection: $dateOverride, label: Text(verbatim: "Date :")) {
+              Text(verbatim: "Nov 25").tag(SpecialDates.Nov25)
+              Text(verbatim: "Apr 1").tag(SpecialDates.Apr1)
+              Text(verbatim: "May 4").tag(SpecialDates.May4)
+              Text(verbatim: "Oct 31").tag(SpecialDates.Oct31)
             }.pickerStyle(.segmented)
           }
         }
@@ -147,7 +147,8 @@ struct BinaryView: View {
             customMsg: customMsg as NSString?,
             customURL: customURL as NSString?,
             bundleProgress: SNTBundleProgress(),
-            uiStateCallback: { interval in print("Silence interval was set to \(interval)") }
+            uiStateCallback: { interval in print("Silence interval was set to \(interval)") },
+            replyCallback: { bool in return }
           ),
           window
         )
