@@ -186,17 +186,11 @@ static NSString *const kPrinterProxyPostMonterey =
 #pragma mark Binary Validation
 
 - (bool)synchronousShouldProcessExecEvent:(const Message &)esMsg {
-  switch (esMsg->event_type) {
-    case ES_EVENT_TYPE_AUTH_SIGNAL: return YES;
-    case ES_EVENT_TYPE_AUTH_EXEC:
-      // Break out, the exec type has more complex processing.
-      break;
-    default:
-      // Programming error. Bail.
-      LOGE(@"Attempt to validate unhandled event. Event type: %d", esMsg->event_type);
-      [NSException raise:@"Invalid event type"
-                  format:@"synchronousShouldProcessExecEvent: Unexpected event type: %d",
-                         esMsg->event_type];
+  if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
+    LOGE(@"Attempt to validate unhandled event. Event type: %d", esMsg->event_type);
+    [NSException
+         raise:@"Invalid event type"
+        format:@"synchronousShouldProcessExecEvent: Unexpected event type: %d", esMsg->event_type];
   }
 
   const es_process_t *targetProc = esMsg->event.exec.target;
@@ -466,6 +460,8 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 }
 
+#pragma mark Signal Validation
+
 - (void)validateSignalEvent:(const santa::Message &)esMsg postAction:(void (^)(bool))postAction {
   audit_token_t at = esMsg->event.signal.target->audit_token;
   pid_t pid = audit_token_to_pid(at);
@@ -475,6 +471,8 @@ static NSString *const kPrinterProxyPostMonterey =
   }
   postAction(true);
 }
+
+#pragma mark Helpers
 
 /**
   Workaround for issue with PrinterProxy.app.

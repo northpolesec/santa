@@ -115,18 +115,26 @@ using santa::Message;
 
 - (void)handleMessage:(Message &&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
-  if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC &&
-               esMsg->event_type != ES_EVENT_TYPE_AUTH_SIGNAL)) {
-    // This is a programming error
-    LOGE(@"Attempting to authorize a non-exec event");
-    [NSException raise:@"Invalid event type"
-                format:@"Authorizing unexpected event type: %d", esMsg->event_type];
-  }
-
-  if (![self.execController synchronousShouldProcessExecEvent:esMsg]) {
-    [self postAction:SNTActionRespondDeny forMessage:esMsg];
-    recordEventMetrics(EventDisposition::kDropped);
-    return;
+  switch (esMsg->event_type) {
+    case ES_EVENT_TYPE_AUTH_EXEC:
+      if (![self.execController synchronousShouldProcessExecEvent:esMsg]) {
+        [self postAction:SNTActionRespondDeny forMessage:esMsg];
+        recordEventMetrics(EventDisposition::kDropped);
+        return;
+      }
+      break;
+    case ES_EVENT_TYPE_AUTH_SIGNAL:
+      if (esMsg->event.signal.sig != SIGCONT) {
+        [self postAction:SNTActionRespondAllow forMessage:esMsg];
+        recordEventMetrics(EventDisposition::kProcessed);
+        return;
+      }
+      break;
+    default:
+      // This is a programming error
+      LOGE(@"Attempting to authorize a non-exec event");
+      [NSException raise:@"Invalid event type"
+                  format:@"Authorizing unexpected event type: %d", esMsg->event_type];
   }
 
   [self processMessage:std::move(esMsg)
