@@ -147,11 +147,23 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return self;
 }
 
+//
+- (NSDictionary *)normalizeKeys:(NSDictionary *)dict {
+  NSMutableDictionary *newDict = [NSMutableDictionary dictionaryWithCapacity:dict.count];
+  for (NSString *key in dict) {
+    NSString *newKey = [key lowercaseString];
+    newDict[newKey] = dict[key];
+  }
+  return newDict;
+}
+
 // Converts rule information downloaded from the server into a SNTRule.  Because any information
 // not recorded by SNTRule is thrown away here, this method is also responsible for dealing with
 // the extra bundle rule information (bundle_hash & rule_count).
-- (instancetype)initWithDictionary:(NSDictionary *)dict {
-  if (![dict isKindOfClass:[NSDictionary class]]) return nil;
+- (instancetype)initWithDictionary:(NSDictionary *)rawDict {
+  if (![rawDict isKindOfClass:[NSDictionary class]]) return nil;
+
+  NSDictionary *dict = [self normalizeKeys:rawDict];
 
   NSString *identifier = dict[kRuleIdentifier];
   if (![identifier isKindOfClass:[NSString class]] || !identifier.length) {

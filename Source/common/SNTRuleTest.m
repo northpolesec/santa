@@ -278,6 +278,31 @@
   XCTAssertEqualObjects(kRulePolicyRemove, [sut dictionaryRepresentation][kRulePolicy]);
 }
 
+- (void)testKeyCaseForInitWithDictionary {
+  NSLog(@"PLM PLM PLM PLM PLM\n");
+  for (NSString *key in
+       @[ kRulePolicy, kRuleIdentifier, kRuleType, kRuleCustomMsg, kRuleCustomURL, kRuleComment ]) {
+    NSDictionary *expected = @{
+      @"identifier" : @"84de9c61777ca36b13228e2446d53e966096e78db7a72c632b5c185b2ffe68a6",
+      @"policy" : @"ALLOWLIST",
+      @"rule_type" : @"BINARY",
+      @"custom_msg" : @"A custom block message",
+      @"custom_url" : @"https://example.com",
+      @"comment" : @"",
+    };
+
+    NSMutableDictionary *dict = [expected mutableCopy];
+    NSString *value = dict[key];
+    XCTAssertNotNil(value);
+    dict[[key uppercaseString]] = dict[key];
+    [dict removeObjectForKey:key];
+
+    SNTRule *rule = [[SNTRule alloc] initWithDictionary:dict];
+    NSDictionary *final = [rule dictionaryRepresentation];
+    XCTAssertEqualObjects(expected, final);
+  }
+}
+
 /*
 - (void)testRuleTypeToString {
   SNTRule *sut = [[SNTRule alloc] init];
