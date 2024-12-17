@@ -332,7 +332,7 @@ static NSString *const kPrinterProxyPostMonterey =
     // user authorizes execution we send a SIGCONT instead. Any attempts to SIGCONT the paused
     // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
-    kill(newProcPid, SIGSTOP);
+    [self sendSignal:SIGSTOP toPID:newProcPid];
     postAction(SNTActionRespondAllow);
   } else {
     // Respond with the decision.
@@ -446,11 +446,11 @@ static NSString *const kPrinterProxyPostMonterey =
               [self createRuleForStandaloneModeEvent:se];
 
               // Allow the binary to begin running.
-              kill(newProcPid, SIGCONT);
+              [self sendSignal:SIGCONT toPID:newProcPid];
               _procSignalCache->remove(pidAndVersion);
             } else {
               // The user did not approve, so kill the stopped process.
-              kill(newProcPid, SIGKILL);
+              [self sendSignal:SIGKILL toPID:newProcPid];
               _procSignalCache->remove(pidAndVersion);
             }
           };
@@ -577,6 +577,11 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   // TODO: Notify the sync service of the new rule.
+}
+
+// Wrapper around the kill() function that can be mocked out in tests.
+- (void)sendSignal:(int)signal toPID:(pid_t)pid {
+  kill(pid, signal);
 }
 
 @end

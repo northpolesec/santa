@@ -36,6 +36,7 @@
 #import "Source/santad/Metrics.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/SNTExecutionController.h"
 #include "Source/santad/SantadDeps.h"
 
 using santa::Message;
@@ -83,6 +84,10 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 @property(nonatomic) double defaultBudget;
 @property(nonatomic) int64_t minAllowedHeadroom;
 @property(nonatomic) int64_t maxAllowedHeadroom;
+@end
+
+@interface SNTExecutionController (Testing)
+- (void)sendSignal:(int)sig toPID:(pid_t)pid;
 @end
 
 @interface SantadTest : XCTestCase
@@ -133,6 +138,8 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   OCMStub([self.mockSNTDatabaseController databasePath]).andReturn(testPath);
 
   std::unique_ptr<SantadDeps> deps = SantadDeps::Create(mockConfigurator, nil);
+  id mockExecutionController = OCMPartialMock(deps->ExecController());
+  OCMStub([[mockExecutionController ignoringNonObjectArgs] sendSignal:0 toPID:0]);
 
   SNTEndpointSecurityAuthorizer *authClient =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
