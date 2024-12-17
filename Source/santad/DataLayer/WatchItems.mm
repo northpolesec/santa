@@ -39,13 +39,6 @@
 #import "Source/common/Unit.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 
-using santa::NSStringToUTF8String;
-using santa::NSStringToUTF8StringView;
-using santa::PrefixTree;
-using santa::Unit;
-using santa::WatchItemPathType;
-using santa::WatchItemPolicy;
-
 NSString *const kWatchItemConfigKeyVersion = @"Version";
 NSString *const kWatchItemConfigKeyEventDetailURL = @"EventDetailURL";
 NSString *const kWatchItemConfigKeyEventDetailText = @"EventDetailText";
@@ -105,7 +98,7 @@ namespace {
 using ValidatorBlock = bool (^)(id, NSError **);
 using PathAndTypePair = std::pair<std::string, WatchItemPathType>;
 using PathAndTypeVec = std::vector<PathAndTypePair>;
-using PolicyProcessVec = std::vector<WatchItemPolicy::Process>;
+using PolicyProcessVec = std::vector<WatchItemProcess>;
 }  // namespace
 
 static void PopulateError(NSError **err, NSString *msg) {
@@ -399,7 +392,7 @@ std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary
               return false;
             }
 
-            proc_list.push_back(WatchItemPolicy::Process(
+            proc_list.push_back(WatchItemProcess(
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesBinaryPath] ?: @""),
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesSigningID] ?: @""),
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesTeamID] ?: @""),
@@ -454,7 +447,8 @@ std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary
 /// </dict>
 bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
                                 NSDictionary *watch_item,
-                                std::vector<std::shared_ptr<WatchItemPolicy>> &policies,
+                                std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
+                                std::vector<std::shared_ptr<ProcessWatchItemPolicy>> &proc_policies,
                                 NSError **err) {
   if (!VerifyConfigKey(watch_item, kWatchItemConfigKeyPaths, [NSArray class], err, true)) {
     return false;
@@ -537,7 +531,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
   }
 
   for (const PathAndTypePair &path_type_pair : std::get<PathAndTypeVec>(path_list)) {
-    policies.push_back(std::make_shared<WatchItemPolicy>(
+    data_policies.push_back(std::make_shared<DataWatchItemPolicy>(
         NSStringToUTF8StringView(name), policy_version, path_type_pair.first, path_type_pair.second,
         allow_read_access, audit_only, rule_type, enable_silent_mode, enable_silent_tty_mode,
         NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
@@ -576,7 +570,9 @@ bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err) {
   return true;
 }
 
-bool ParseConfig(NSDictionary *config, std::vector<std::shared_ptr<WatchItemPolicy>> &policies,
+bool ParseConfig(NSDictionary *config,
+                 std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
+                 std::vector<std::shared_ptr<ProcessWatchItemPolicy>> &proc_policies,
                  NSError **err) {
   if (![config[kWatchItemConfigKeyVersion] isKindOfClass:[NSString class]]) {
     PopulateError(err, [NSString stringWithFormat:@"Missing top level string key '%@'",
@@ -636,7 +632,8 @@ bool ParseConfig(NSDictionary *config, std::vector<std::shared_ptr<WatchItemPoli
       return false;
     }
 
-    if (!ParseConfigSingleWatchItem(key, policy_version, watch_items[key], policies, err)) {
+    if (!ParseConfigSingleWatchItem(key, policy_version, watch_items[key], data_policies,
+                                    proc_policies, err)) {
       PopulateError(err, [NSString stringWithFormat:@"In watch item '%@': %@", key,
                                                     (err && *err) ? (*err).localizedDescription
                                                                   : @"Unknown failure"]);
@@ -645,6 +642,49 @@ bool ParseConfig(NSDictionary *config, std::vector<std::shared_ptr<WatchItemPoli
   }
 
   return true;
+}
+
+std::vector<std::pair<std::string, WatchItemPathType>> DataWatchItems::operator-(
+    const DataWatchItems &other) const {
+  std::vector<std::pair<std::string, WatchItemPathType>> diff;
+  std::set_difference(paths_.begin(), paths_.end(), other.paths_.begin(), other.paths_.end(),
+                      std::back_inserter(diff));
+  return diff;
+}
+
+bool DataWatchItems::Build(std::vector<std::shared_ptr<DataWatchItemPolicy>> data_policies) {
+  glob_t *g = (glob_t *)alloca(sizeof(glob_t));
+  for (const std::shared_ptr<DataWatchItemPolicy> &item : data_policies) {
+    int err = glob(item->path.c_str(), 0, nullptr, g);
+    if (err != 0 && err != GLOB_NOMATCH) {
+      LOGE(@"Failed to generate path names for watch item: %s", item->name.c_str());
+      return false;
+    }
+
+    for (size_t i = g->gl_offs; i < g->gl_pathc; i++) {
+      if (item->path_type == WatchItemPathType::kPrefix) {
+        tree_->InsertPrefix(g->gl_pathv[i], item);
+      } else {
+        tree_->InsertLiteral(g->gl_pathv[i], item);
+      }
+
+      paths_.insert({g->gl_pathv[i], item->path_type});
+    }
+    globfree(g);
+  }
+
+  return true;
+}
+
+std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> DataWatchItems::FindPolcies(
+    const std::vector<std::string_view> &paths) const {
+  std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> policies;
+
+  for (const auto &path : paths) {
+    policies.push_back(tree_->LookupLongestMatchingPrefix(path.data()));
+  }
+
+  return policies;
 }
 
 std::shared_ptr<WatchItems> WatchItems::Create(NSString *config_path,
@@ -689,8 +729,7 @@ WatchItems::WatchItems(NSString *config_path, dispatch_queue_t q, dispatch_sourc
       embedded_config_(nil),
       q_(q),
       timer_source_(timer_source),
-      periodic_task_complete_f_(periodic_task_complete_f),
-      watch_items_(std::make_unique<WatchItemsTree>()) {}
+      periodic_task_complete_f_(periodic_task_complete_f) {}
 
 WatchItems::WatchItems(NSDictionary *config, dispatch_queue_t q, dispatch_source_t timer_source,
                        void (^periodic_task_complete_f)(void))
@@ -698,8 +737,7 @@ WatchItems::WatchItems(NSDictionary *config, dispatch_queue_t q, dispatch_source
       embedded_config_(config),
       q_(q),
       timer_source_(timer_source),
-      periodic_task_complete_f_(periodic_task_complete_f),
-      watch_items_(std::make_unique<WatchItemsTree>()) {}
+      periodic_task_complete_f_(periodic_task_complete_f) {}
 
 WatchItems::~WatchItems() {
   if (!periodic_task_started_ && timer_source_ != NULL) {
@@ -711,41 +749,12 @@ WatchItems::~WatchItems() {
   }
 }
 
-bool WatchItems::BuildPolicyTree(const std::vector<std::shared_ptr<WatchItemPolicy>> &watch_items,
-                                 PrefixTree<std::shared_ptr<WatchItemPolicy>> &tree,
-                                 std::set<std::pair<std::string, WatchItemPathType>> &paths) {
-  glob_t *g = (glob_t *)alloca(sizeof(glob_t));
-  for (const std::shared_ptr<WatchItemPolicy> &item : watch_items) {
-    int err = glob(item->path.c_str(), 0, nullptr, g);
-    if (err != 0 && err != GLOB_NOMATCH) {
-      LOGE(@"Failed to generate path names for watch item: %s", item->name.c_str());
-      return false;
-    }
-
-    for (size_t i = g->gl_offs; i < g->gl_pathc; i++) {
-      if (item->path_type == WatchItemPathType::kPrefix) {
-        tree.InsertPrefix(g->gl_pathv[i], item);
-      } else {
-        tree.InsertLiteral(g->gl_pathv[i], item);
-      }
-
-      paths.insert({g->gl_pathv[i], item->path_type});
-    }
-    globfree(g);
-  }
-
-  return true;
-}
-
 void WatchItems::RegisterClient(id<SNTEndpointSecurityDynamicEventHandler> client) {
   absl::MutexLock lock(&lock_);
   registerd_clients_.insert(client);
 }
 
-void WatchItems::UpdateCurrentState(
-    std::unique_ptr<PrefixTree<std::shared_ptr<WatchItemPolicy>>> new_tree,
-    std::set<std::pair<std::string, WatchItemPathType>> &&new_monitored_paths,
-    NSDictionary *new_config) {
+void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items, NSDictionary *new_config) {
   absl::MutexLock lock(&lock_);
 
   // The following conditions require updating the current config:
@@ -755,23 +764,16 @@ void WatchItems::UpdateCurrentState(
   // 4. The configuration changed
   if ((current_config_ != nil && new_config == nil) ||
       (current_config_ == nil && new_config != nil) ||
-      (currently_monitored_paths_ != new_monitored_paths) ||
+      (data_watch_items_ != new_data_watch_items) ||
       (new_config && ![current_config_ isEqualToDictionary:new_config])) {
-    std::vector<std::pair<std::string, WatchItemPathType>> paths_to_watch;
-    std::vector<std::pair<std::string, WatchItemPathType>> paths_to_stop_watching;
-
     // New paths to watch are those that are in the new set, but not current
-    std::set_difference(new_monitored_paths.begin(), new_monitored_paths.end(),
-                        currently_monitored_paths_.begin(), currently_monitored_paths_.end(),
-                        std::back_inserter(paths_to_watch));
-
+    std::vector<std::pair<std::string, WatchItemPathType>> paths_to_watch =
+        new_data_watch_items - data_watch_items_;
     // Paths to stop watching are in the current set, but not new
-    std::set_difference(currently_monitored_paths_.begin(), currently_monitored_paths_.end(),
-                        new_monitored_paths.begin(), new_monitored_paths.end(),
-                        std::back_inserter(paths_to_stop_watching));
+    std::vector<std::pair<std::string, WatchItemPathType>> paths_to_stop_watching =
+        data_watch_items_ - new_data_watch_items;
 
-    std::swap(watch_items_, new_tree);
-    std::swap(currently_monitored_paths_, new_monitored_paths);
+    std::swap(data_watch_items_, new_data_watch_items);
     current_config_ = new_config;
     if (new_config) {
       policy_version_ = NSStringToUTF8String(new_config[kWatchItemConfigKeyVersion]);
@@ -799,7 +801,7 @@ void WatchItems::UpdateCurrentState(
       // trigger AUTH ES events that would attempt to re-enter this object and
       // potentially deadlock.
       dispatch_async(q_, ^{
-        [client watchItemsCount:currently_monitored_paths_.size()
+        [client watchItemsCount:data_watch_items_.Count()
                        newPaths:paths_to_watch
                    removedPaths:paths_to_stop_watching];
       });
@@ -810,25 +812,22 @@ void WatchItems::UpdateCurrentState(
 }
 
 void WatchItems::ReloadConfig(NSDictionary *new_config) {
-  std::vector<std::shared_ptr<WatchItemPolicy>> new_policies;
-  auto new_tree = std::make_unique<PrefixTree<std::shared_ptr<WatchItemPolicy>>>();
-  std::set<std::pair<std::string, WatchItemPathType>> new_monitored_paths;
+  DataWatchItems new_data_watch_items;
 
   if (new_config) {
+    std::vector<std::shared_ptr<DataWatchItemPolicy>> new_data_policies;
+    std::vector<std::shared_ptr<ProcessWatchItemPolicy>> new_proc_policies;
     NSError *err;
-    if (!ParseConfig(new_config, new_policies, &err)) {
+    if (!ParseConfig(new_config, new_data_policies, new_proc_policies, &err)) {
       LOGE(@"Failed to parse watch item config: %@",
            err ? err.localizedDescription : @"Unknown failure");
       return;
     }
 
-    if (!BuildPolicyTree(new_policies, *new_tree, new_monitored_paths)) {
-      LOGE(@"Failed to build new filesystem monitoring policy");
-      return;
-    }
+    new_data_watch_items.Build(std::move(new_data_policies));
   }
 
-  UpdateCurrentState(std::move(new_tree), std::move(new_monitored_paths), new_config);
+  UpdateCurrentState(std::move(new_data_watch_items), new_config);
 }
 
 NSDictionary *WatchItems::ReadConfig() {
@@ -870,13 +869,7 @@ void WatchItems::BeginPeriodicTask() {
 WatchItems::VersionAndPolicies WatchItems::FindPolciesForPaths(
     const std::vector<std::string_view> &paths) {
   absl::ReaderMutexLock lock(&lock_);
-  std::vector<std::optional<std::shared_ptr<WatchItemPolicy>>> policies;
-
-  for (const auto &path : paths) {
-    policies.push_back(watch_items_->LookupLongestMatchingPrefix(path.data()));
-  }
-
-  return {policy_version_, policies};
+  return {policy_version_, data_watch_items_.FindPolcies(paths)};
 }
 
 void WatchItems::SetConfigPath(NSString *config_path) {
@@ -919,7 +912,7 @@ std::optional<WatchItemsState> WatchItems::State() {
 }
 
 std::pair<NSString *, NSString *> WatchItems::EventDetailLinkInfo(
-    const std::shared_ptr<WatchItemPolicy> &watch_item) {
+    const std::shared_ptr<DataWatchItemPolicy> &watch_item) {
   absl::ReaderMutexLock lock(&lock_);
   if (!watch_item) {
     return {policy_event_detail_url_, policy_event_detail_text_};
