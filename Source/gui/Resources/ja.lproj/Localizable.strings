@@ -9,10 +9,10 @@
 
 /* File path
    Signing ID */
-"authorize execution of " = "実行を許可する";
+"authorize execution of %@" = "%@実行を許可する";
 
 /* Bundle name */
-"authorize execution of the application " = "アプリケーションの実行を許可する";
+"authorize execution of the application %@" = "%@アプリケーションの実行を許可する";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "バンドルハッシュ";
@@ -32,6 +32,12 @@
 /* No comment provided by engineer. */
 "Filename" = "ファイル名";
 
+/* No comment provided by engineer. */
+"Label after time period picker" = "停止します";
+
+/* No comment provided by engineer. */
+"Label before time period picker" = "このアプリケーションからの通知を";
+
 /* More Details button in binary block dialog */
 "More Details" = "さらに詳細";
 
@@ -49,9 +55,6 @@
 
 /* No comment provided by engineer. */
 "Path Accessed" = "アクセスされたパス";
-
-/* No comment provided by engineer. */
-"Prevent future notifications for this application for " = "このアプリケーションからの通知を停止します";
 
 /* No comment provided by engineer. */
 "Publisher" = "発行者";

@@ -102,14 +102,15 @@ public struct SNTNotificationSilenceView: View {
     )
 
     Toggle(isOn: $silence) {
-      HStack(spacing: 0.0) {
-        Text("Prevent future notifications for this application for ").font(Font.system(size: 11.0))
+      HStack(spacing: 5.0) {
+        Text("Label before time period picker").font(Font.system(size: 11.0))
         Picker("", selection: pi) {
           ForEach(NotificationSilencePeriods, id: \.self) { period in
             let text = dateFormatter.string(from: period) ?? "unknown"
             Text(text).font(Font.system(size: 11.0))
           }
         }.fixedSize()
+        Text("Label after time period picker").font(Font.system(size: 11.0))
       }
     }
   }
