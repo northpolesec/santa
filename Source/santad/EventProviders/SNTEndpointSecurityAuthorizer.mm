@@ -125,7 +125,7 @@ using santa::Message;
       break;
     case ES_EVENT_TYPE_AUTH_SIGNAL:
       if (esMsg->event.signal.sig != SIGCONT) {
-        [self postAction:SNTActionRespondAllow forMessage:esMsg];
+        [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:YES];
         recordEventMetrics(EventDisposition::kProcessed);
         return;
       }
