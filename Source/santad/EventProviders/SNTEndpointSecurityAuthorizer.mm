@@ -63,7 +63,7 @@ using santa::Message;
 }
 
 - (void)processMessage:(const Message &)msg {
-  if (msg->event_type == ES_EVENT_TYPE_AUTH_SIGNAL) {
+  if (msg->event_type == ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME) {
     [self.execController validateSignalEvent:msg
                                   postAction:^(bool allowed) {
                                     es_auth_result_t authResult =
@@ -123,8 +123,8 @@ using santa::Message;
         return;
       }
       break;
-    case ES_EVENT_TYPE_AUTH_SIGNAL:
-      if (esMsg->event.signal.sig != SIGCONT) {
+    case ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME:
+      if (esMsg->event.proc_suspend_resume.type != ES_PROC_SUSPEND_RESUME_TYPE_RESUME) {
         [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:YES];
         recordEventMetrics(EventDisposition::kProcessed);
         return;
@@ -174,7 +174,7 @@ using santa::Message;
 - (void)enable {
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_EXEC,
-                                    ES_EVENT_TYPE_AUTH_SIGNAL,
+                                    ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
                                 }];
 }
 

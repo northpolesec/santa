@@ -405,7 +405,11 @@ static NSString *const kPrinterProxyPostMonterey =
       }
 
       if (!cd.silentBlock) {
-        if (!config.enableSilentTTYMode && self->_ttyWriter && TTYWriter::CanWrite(targetProc)) {
+        [self maybeSendTTYMessageToTarget:targetProc messageCreator:^NSString * {
+          if (config.clientMode == SNTClientModeStandalone) {
+            return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this binary until approval is granted in the GUI...\n";
+          }
+
           // Let the user know what happened on the terminal
           NSAttributedString *s = [SNTBlockMessage attributedBlockMessageForEvent:se
                                                                     customMessage:cd.customMsg];
@@ -421,9 +425,8 @@ static NSString *const kPrinterProxyPostMonterey =
           if (detailURL) {
             [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
           }
-
-          self->_ttyWriter->Write(targetProc, msg);
-        }
+          return msg;
+        }];
 
         void (^replyBlock)(BOOL) = nil;
 
@@ -439,11 +442,18 @@ static NSString *const kPrinterProxyPostMonterey =
               // standalone mode and notify the sync service.
               [self createRuleForStandaloneModeEvent:se];
 
+              [self maybeSendTTYMessageToTarget:targetProc messageCreator:^NSString * {
+                return @"Authorized, allowing execution\n---\n\n";
+              }];
+
               // Allow the binary to begin running.
               [self sendSignal:SIGCONT toPID:newProcPid];
               _procSignalCache->remove(pidAndVersion);
             } else {
               // The user did not approve, so kill the stopped process.
+              [self maybeSendTTYMessageToTarget:targetProc messageCreator:^NSString * {
+                return @"Authorization not given, denying execution\n---\n\n";
+              }];
               [self sendSignal:SIGKILL toPID:newProcPid];
               _procSignalCache->remove(pidAndVersion);
             }
@@ -463,7 +473,7 @@ static NSString *const kPrinterProxyPostMonterey =
 #pragma mark Signal Validation
 
 - (void)validateSignalEvent:(const santa::Message &)esMsg postAction:(void (^)(bool))postAction {
-  audit_token_t at = esMsg->event.signal.target->audit_token;
+  audit_token_t at = esMsg->event.proc_suspend_resume.target->audit_token;
   pid_t pid = audit_token_to_pid(at);
   int pidVersion = audit_token_to_pidversion(at);
   if (_procSignalCache->get(std::make_pair(pid, pidVersion))) {
@@ -473,6 +483,14 @@ static NSString *const kPrinterProxyPostMonterey =
 }
 
 #pragma mark Helpers
+
+- (void)maybeSendTTYMessageToTarget:(const es_process_t *)proc messageCreator:(NSString * (^)())messageCreator {
+  if ([SNTConfigurator configurator].enableSilentTTYMode) return;
+  if (!self->_ttyWriter) return;
+  if (!TTYWriter::CanWrite(proc)) return;
+
+  self->_ttyWriter->Write(proc, messageCreator());
+}
 
 /**
   Workaround for issue with PrinterProxy.app.
@@ -577,9 +595,22 @@ static NSString *const kPrinterProxyPostMonterey =
   // TODO: Notify the sync service of the new rule.
 }
 
-// Wrapper around the kill() function that can be mocked out in tests.
+extern "C" int pid_suspend(pid_t pid);
+extern "C" int pid_resume(pid_t pid);
+
+// Wrapper around the pid_suspend() / pid_resume() / kill() functions that uses signal numbers
+// to determine which to use and which can be easily mocked out in tests;
 - (void)sendSignal:(int)signal toPID:(pid_t)pid {
-  kill(pid, signal);
+  switch(signal) {
+    case SIGSTOP:
+      pid_suspend(pid);
+      break;
+    case SIGCONT:
+      pid_resume(pid);
+      break;
+    case SIGKILL:
+      kill(pid, SIGKILL);
+  }
 }
 
 @end
