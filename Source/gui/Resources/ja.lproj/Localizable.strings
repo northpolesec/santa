@@ -75,7 +75,7 @@
 "Signing ID" = "署名ID";
 
 /* The default message to show the user when an unknown application is blocked */
-"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "次のアプリケーションは信頼性を判断できないため、<br />実行がブロックされました
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "次のアプリケーションは信頼性を判断できないため、<br />実行がブロックされました";
 
 /* The default message to show the user when a banned application is blocked */
 "The following application has been blocked from<br />executing because it has been deemed malicious" = "次のアプリケーションは悪意のあるプログラムと判断されたため、<br />実行がブロックされました";
