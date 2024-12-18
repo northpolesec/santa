@@ -4,6 +4,16 @@
 /* No comment provided by engineer. */
 "Application" = "アプリケーション";
 
+/* Default text for Approve */
+"Approve" = "許可する";
+
+/* File path
+   Signing ID */
+"authorize execution of " = "実行を許可する";
+
+/* Bundle name */
+"authorize execution of the application " = "アプリケーションの実行を許可する";
+
 /* No comment provided by engineer. */
 "Bundle Hash" = "バンドルハッシュ";
 
@@ -27,6 +37,9 @@
 
 /* No comment provided by engineer. */
 "More Info..." = "詳細情報…";
+
+/* Default text for Open button */
+"Open..." = "開く…";
 
 /* No comment provided by engineer. */
 "Parent" = "親プロセス";
