@@ -405,28 +405,32 @@ static NSString *const kPrinterProxyPostMonterey =
       }
 
       if (!cd.silentBlock) {
-        [self maybeSendTTYMessageToTarget:targetProc messageCreator:^NSString * {
-          if (config.clientMode == SNTClientModeStandalone) {
-            return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this binary until approval is granted in the GUI...\n";
-          }
+        [self maybeSendTTYMessageToTarget:targetProc
+                           messageCreator:^NSString * {
+                             if (config.clientMode == SNTClientModeStandalone) {
+                               return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
+                                      @"binary until approval is granted in the GUI...\n";
+                             }
 
-          // Let the user know what happened on the terminal
-          NSAttributedString *s = [SNTBlockMessage attributedBlockMessageForEvent:se
-                                                                    customMessage:cd.customMsg];
+                             // Let the user know what happened on the terminal
+                             NSAttributedString *s =
+                                 [SNTBlockMessage attributedBlockMessageForEvent:se
+                                                                   customMessage:cd.customMsg];
 
-          NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
-          // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
-          [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
-          [msg appendFormat:@"\033[1mPath:      \033[0m %@\n"
-                            @"\033[1mIdentifier:\033[0m %@\n"
-                            @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                            se.filePath, se.fileSHA256, se.parentName, se.ppid];
-          NSURL *detailURL = [SNTBlockMessage eventDetailURLForEvent:se customURL:cd.customURL];
-          if (detailURL) {
-            [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
-          }
-          return msg;
-        }];
+                             NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
+                             // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
+                             [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
+                             [msg appendFormat:@"\033[1mPath:      \033[0m %@\n"
+                                               @"\033[1mIdentifier:\033[0m %@\n"
+                                               @"\033[1mParent:    \033[0m %@ (%@)\n\n",
+                                               se.filePath, se.fileSHA256, se.parentName, se.ppid];
+                             NSURL *detailURL =
+                                 [SNTBlockMessage eventDetailURLForEvent:se customURL:cd.customURL];
+                             if (detailURL) {
+                               [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
+                             }
+                             return msg;
+                           }];
 
         void (^replyBlock)(BOOL) = nil;
 
@@ -442,18 +446,20 @@ static NSString *const kPrinterProxyPostMonterey =
               // standalone mode and notify the sync service.
               [self createRuleForStandaloneModeEvent:se];
 
-              [self maybeSendTTYMessageToTarget:targetProc messageCreator:^NSString * {
-                return @"Authorized, allowing execution\n---\n\n";
-              }];
+              [self maybeSendTTYMessageToTarget:targetProc
+                                 messageCreator:^NSString * {
+                                   return @"Authorized, allowing execution\n---\n\n";
+                                 }];
 
               // Allow the binary to begin running.
               [self sendSignal:SIGCONT toPID:newProcPid];
               _procSignalCache->remove(pidAndVersion);
             } else {
               // The user did not approve, so kill the stopped process.
-              [self maybeSendTTYMessageToTarget:targetProc messageCreator:^NSString * {
-                return @"Authorization not given, denying execution\n---\n\n";
-              }];
+              [self maybeSendTTYMessageToTarget:targetProc
+                                 messageCreator:^NSString * {
+                                   return @"Authorization not given, denying execution\n---\n\n";
+                                 }];
               [self sendSignal:SIGKILL toPID:newProcPid];
               _procSignalCache->remove(pidAndVersion);
             }
@@ -472,7 +478,8 @@ static NSString *const kPrinterProxyPostMonterey =
 
 #pragma mark Signal Validation
 
-- (void)validateSignalEvent:(const santa::Message &)esMsg postAction:(void (^)(bool))postAction {
+- (void)validateSuspendResumeEvent:(const santa::Message &)esMsg
+                        postAction:(void (^)(bool))postAction {
   audit_token_t at = esMsg->event.proc_suspend_resume.target->audit_token;
   pid_t pid = audit_token_to_pid(at);
   int pidVersion = audit_token_to_pidversion(at);
@@ -484,7 +491,8 @@ static NSString *const kPrinterProxyPostMonterey =
 
 #pragma mark Helpers
 
-- (void)maybeSendTTYMessageToTarget:(const es_process_t *)proc messageCreator:(NSString * (^)())messageCreator {
+- (void)maybeSendTTYMessageToTarget:(const es_process_t *)proc
+                     messageCreator:(NSString * (^)())messageCreator {
   if ([SNTConfigurator configurator].enableSilentTTYMode) return;
   if (!self->_ttyWriter) return;
   if (!TTYWriter::CanWrite(proc)) return;
@@ -601,15 +609,10 @@ extern "C" int pid_resume(pid_t pid);
 // Wrapper around the pid_suspend() / pid_resume() / kill() functions that uses signal numbers
 // to determine which to use and which can be easily mocked out in tests;
 - (void)sendSignal:(int)signal toPID:(pid_t)pid {
-  switch(signal) {
-    case SIGSTOP:
-      pid_suspend(pid);
-      break;
-    case SIGCONT:
-      pid_resume(pid);
-      break;
-    case SIGKILL:
-      kill(pid, SIGKILL);
+  switch (signal) {
+    case SIGSTOP: pid_suspend(pid); break;
+    case SIGCONT: pid_resume(pid); break;
+    case SIGKILL: kill(pid, SIGKILL);
   }
 }
 

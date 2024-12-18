@@ -76,13 +76,14 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 - (void)validateExecEvent:(const santa::Message &)esMsg postAction:(bool (^)(SNTAction))postAction;
 
 ///
-///  Handles the logic of deciding whether to allow a signal through to a binary or not, sends the
-///  response to the given `postAction` block.
+///  Handles the logic of deciding whether to allow a pid_suspend/pid_resume through to a binary or
+///  not, sends the response to the given `postAction` block.
 ///
 ///  @param message The message reveived from the EndpointSecurity event provider.
 ///  @param postAction The block invoked with the desired response result.
 ///
-- (void)validateSignalEvent:(const santa::Message &)esMsg postAction:(void (^)(bool))postAction;
+- (void)validateSuspendResumeEvent:(const santa::Message &)esMsg
+                        postAction:(void (^)(bool))postAction;
 
 ///
 /// Perform light, synchronous processing of the given event to decide whether or not the

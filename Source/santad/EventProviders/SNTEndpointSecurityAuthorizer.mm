@@ -64,14 +64,15 @@ using santa::Message;
 
 - (void)processMessage:(const Message &)msg {
   if (msg->event_type == ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME) {
-    [self.execController validateSignalEvent:msg
-                                  postAction:^(bool allowed) {
-                                    es_auth_result_t authResult =
-                                        allowed ? ES_AUTH_RESULT_ALLOW : ES_AUTH_RESULT_DENY;
-                                    [self respondToMessage:msg
-                                            withAuthResult:authResult
-                                                 cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
-                                  }];
+    [self.execController
+        validateSuspendResumeEvent:msg
+                        postAction:^(bool allowed) {
+                          es_auth_result_t authResult =
+                              allowed ? ES_AUTH_RESULT_ALLOW : ES_AUTH_RESULT_DENY;
+                          [self respondToMessage:msg
+                                  withAuthResult:authResult
+                                       cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
+                        }];
     return;
   }
 
