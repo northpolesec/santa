@@ -127,7 +127,7 @@ using santa::Message;
     case ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME:
       if (esMsg->event.proc_suspend_resume.type != ES_PROC_SUSPEND_RESUME_TYPE_RESUME) {
         [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:YES];
-        recordEventMetrics(EventDisposition::kProcessed);
+        recordEventMetrics(EventDisposition::kDropped);
         return;
       }
       break;

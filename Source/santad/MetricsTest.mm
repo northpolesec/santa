@@ -15,6 +15,7 @@
 
 #include "Source/santad/Metrics.h"
 
+#include <EndpointSecurity/ESTypes.h>
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
 #import <OCMock/OCMock.h>
@@ -185,8 +186,10 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
       {ES_EVENT_TYPE_AUTH_KEXTLOAD, @"AuthKextload"},
       {ES_EVENT_TYPE_AUTH_LINK, @"AuthLink"},
       {ES_EVENT_TYPE_AUTH_MOUNT, @"AuthMount"},
+      {ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME, @"AuthProcSuspendResume"},
       {ES_EVENT_TYPE_AUTH_REMOUNT, @"AuthRemount"},
       {ES_EVENT_TYPE_AUTH_RENAME, @"AuthRename"},
+      {ES_EVENT_TYPE_AUTH_SIGNAL, @"AuthSignal"},
       {ES_EVENT_TYPE_AUTH_TRUNCATE, @"AuthTruncate"},
       {ES_EVENT_TYPE_AUTH_UNLINK, @"AuthUnlink"},
       {ES_EVENT_TYPE_NOTIFY_CLOSE, @"NotifyClose"},

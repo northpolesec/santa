@@ -322,12 +322,12 @@ static NSString *const kPrinterProxyPostMonterey =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
   if (cd.decision == SNTEventStateBlockUnknown && config.clientMode == SNTClientModeStandalone) {
     // In standalone mode we want hold off on making a decision until the user has had a chance to
-    // approve. ES won't let us do this, we'd hit the response deadline. Instead, we send a SIGSTOP
-    // to hold stop the binary from executing but we respond to ES with an allow decision. If the
-    // user authorizes execution we send a SIGCONT instead. Any attempts to SIGCONT the paused
+    // approve. ES won't let us do this, we'd hit the response deadline. Instead, we suspend the
+    // new process to stop the binary from executing but we respond to ES with an allow decision.
+    // If the user authorizes execution we resume the process. Any attempts to resume the paused
     // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
-    stoppedProc = [self sendSignal:SIGSTOP toPID:newProcPid];
+    stoppedProc = [self manipulatePID:newProcPid withControl:ProcessControl::Suspend];
     postAction(SNTActionRespondAllow);
   } else {
     // Respond with the decision.
@@ -460,7 +460,7 @@ static NSString *const kPrinterProxyPostMonterey =
               }
 
               // Allow the binary to begin running.
-              [self sendSignal:SIGCONT toPID:newProcPid];
+              [self manipulatePID:newProcPid withControl:ProcessControl::Resume];
               _procSignalCache->remove(pidAndVersion);
             } else {
               // The user did not approve, so kill the stopped process.
@@ -470,7 +470,7 @@ static NSString *const kPrinterProxyPostMonterey =
                                      return @"Authorization not given, denying execution\n---\n\n";
                                    }];
               }
-              [self sendSignal:SIGKILL toPID:newProcPid];
+              [self manipulatePID:newProcPid withControl:ProcessControl::Kill];
               _procSignalCache->remove(pidAndVersion);
             }
           };
@@ -616,13 +616,15 @@ static NSString *const kPrinterProxyPostMonterey =
 extern "C" int pid_suspend(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
 extern "C" int pid_resume(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
 
+enum class ProcessControl { Suspend, Resume, Kill };
+
 // Wrapper around the pid_suspend() / pid_resume() / kill() functions that uses signal numbers
 // to determine which to use and which can be easily mocked out in tests;
-// Returns true if pid_suspend/pid_resume was used for SIGSTOP/SIGCONT and false if they weren't
+// Returns true if pid_suspend/pid_resume was used for Suspend/Resume and false if they weren't
 // available.
-- (bool)sendSignal:(int)signal toPID:(pid_t)pid {
-  switch (signal) {
-    case SIGSTOP:
+- (bool)manipulatePID:(pid_t)pid withControl:(ProcessControl)control {
+  switch (control) {
+    case ProcessControl::Suspend:
       if (pid_suspend == nullptr) {
         LOGW(@"pid_suspend() is not available, killing the target process %d", pid);
         kill(pid, SIGKILL);
@@ -630,7 +632,7 @@ extern "C" int pid_resume(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
       }
       pid_suspend(pid);
       return true;
-    case SIGCONT:
+    case ProcessControl::Resume:
       if (pid_resume == nullptr) {
         LOGW(@"pid_resume() is not available, killing the target process %d", pid);
         kill(pid, SIGKILL);
@@ -638,7 +640,7 @@ extern "C" int pid_resume(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
       }
       pid_resume(pid);
       return true;
-    case SIGKILL: kill(pid, SIGKILL); break;
+    case ProcessControl::Kill: kill(pid, SIGKILL); break;
   }
   return true;
 }

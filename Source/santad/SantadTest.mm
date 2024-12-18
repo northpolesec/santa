@@ -87,7 +87,7 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 @end
 
 @interface SNTExecutionController (Testing)
-- (void)sendSignal:(int)sig toPID:(pid_t)pid;
+- (void)manipulatePID:(pid_t)pid withControl:(int)control;
 @end
 
 @interface SantadTest : XCTestCase
@@ -139,7 +139,7 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
   std::unique_ptr<SantadDeps> deps = SantadDeps::Create(mockConfigurator, nil);
   id mockExecutionController = OCMPartialMock(deps->ExecController());
-  OCMStub([[mockExecutionController ignoringNonObjectArgs] sendSignal:0 toPID:0]);
+  OCMStub([[mockExecutionController ignoringNonObjectArgs] manipulatePID:0 withControl:0]);
 
   SNTEndpointSecurityAuthorizer *authClient =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
