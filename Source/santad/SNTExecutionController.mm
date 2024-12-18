@@ -624,6 +624,7 @@ extern "C" int pid_resume(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
   switch (signal) {
     case SIGSTOP:
       if (pid_suspend == nullptr) {
+        LOGW(@"pid_suspend() is not available, killing the target process %d", pid);
         kill(pid, SIGKILL);
         return false;
       }
@@ -631,6 +632,7 @@ extern "C" int pid_resume(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
       return true;
     case SIGCONT:
       if (pid_resume == nullptr) {
+        LOGW(@"pid_resume() is not available, killing the target process %d", pid);
         kill(pid, SIGKILL);
         return false;
       }
