@@ -378,7 +378,7 @@ struct SNTBinaryMessageWindowView: View {
       )
       msg = String.localizedStringWithFormat(format, bundleName)
     } else if !signingID.isEmpty {
-        let format = NSLocalizedString(
+      let format = NSLocalizedString(
         "authorize execution of %@",
         comment: "Authorize execution of an application with Signing ID or Path"
       )
