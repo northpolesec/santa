@@ -78,7 +78,7 @@
 ///
 ///  Initialize with a dictionary received from a sync server.
 ///
-- (instancetype)initWithDictionary:(NSDictionary *)dict;
+- (instancetype)initWithDictionarySlow:(NSDictionary *)dict;
 
 ///
 ///  Sets timestamp of rule to the current time.

@@ -66,7 +66,7 @@
 }
 
 - (void)testDecisionForBlockByCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"BLOCKLIST"
@@ -88,7 +88,7 @@
 }
 
 - (void)testDecisionForSilentBlockByCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -111,7 +111,7 @@
 }
 
 - (void)testDecisionForAllowbyCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"ALLOWLIST"
@@ -134,7 +134,7 @@
 }
 
 - (void)testDecisionForBlockBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"BLOCKLIST"
@@ -158,7 +158,7 @@
 }
 
 - (void)testDecisionForSilenBlockBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -182,7 +182,7 @@
 }
 
 - (void)testDecisionForAllowBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
@@ -205,7 +205,7 @@
 }
 
 - (void)testDecisionForSigningIDBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"ABCDEFGHIJ:ABCDEFGHIJ",
     @"policy" : @"BLOCKLIST"
@@ -229,7 +229,7 @@
 
 // Signing ID rules
 - (void)testDecisionForSigningIDSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -252,7 +252,7 @@
 }
 
 - (void)testDecisionForSigningIDAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"ALLOWLIST"
@@ -276,7 +276,7 @@
 
 //  Certificate rules
 - (void)testDecisionForCertificateBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"BLOCKLIST"
@@ -299,7 +299,7 @@
 }
 
 - (void)testDecisionForCertificateSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -322,7 +322,7 @@
 }
 
 - (void)testDecisionForCertificateAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
@@ -346,7 +346,7 @@
 
 // Team ID rules
 - (void)testDecisionForTeamIDBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"BLOCKLIST"
@@ -369,7 +369,7 @@
 }
 
 - (void)testDecisionForTeamIDSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -392,7 +392,7 @@
 }
 
 - (void)testDecisionForTeamIDAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"ALLOWLIST"
@@ -417,7 +417,7 @@
 // Compiler rules
 // CDHash
 - (void)testDecisionForCDHashCompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"ALLOWLIST_COMPILER"
@@ -441,7 +441,7 @@
 
 // SHA256
 - (void)testDecisionForSHA256CompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST_COMPILER"
@@ -465,7 +465,7 @@
 
 // SigningID
 - (void)testDecisionForSigningIDCompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"ALLOWLIST_COMPILER"
@@ -489,7 +489,7 @@
 
 // Transitive allowlist rules
 - (void)testDecisionForTransitiveAllowlistRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
@@ -516,7 +516,7 @@
 }
 
 - (void)testEnsureANonMatchingRuleResultsInUnknown {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
@@ -542,7 +542,7 @@
 }
 
 - (void)testEnsureCustomURLAndMessageAreSet {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST",

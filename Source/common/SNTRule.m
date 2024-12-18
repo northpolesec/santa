@@ -164,10 +164,11 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return newDict;
 }
 
-// Converts rule information downloaded from the server into a SNTRule.  Because any information
-// not recorded by SNTRule is thrown away here, this method is also responsible for dealing with
-// the extra bundle rule information (bundle_hash & rule_count).
-- (instancetype)initWithDictionary:(NSDictionary *)rawDict {
+// Converts rule information from santactl or static rules into a SNTRule.
+// Because any information not recorded by SNTRule is thrown away here, this
+// method is also responsible for dealing with the extra bundle rule information
+// (bundle_hash & rule_count).
+- (instancetype)initWithDictionarySlow:(NSDictionary *)rawDict {
   if (![rawDict isKindOfClass:[NSDictionary class]]) return nil;
 
   NSDictionary *dict = [self normalizeRuleDictionary:rawDict];
