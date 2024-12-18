@@ -1,0 +1,94 @@
+/* The default message to show the user when access to a file is blocked */
+"Access to a file has been denied" = "ファイルへのアクセスが拒否されました";
+
+/* No comment provided by engineer. */
+"Application" = "アプリケーション";
+
+/* Default text for Approve */
+"Approve" = "許可する";
+
+/* File path
+   Signing ID */
+"authorize execution of " = "実行を許可する";
+
+/* Bundle name */
+"authorize execution of the application " = "アプリケーションの実行を許可する";
+
+/* No comment provided by engineer. */
+"Bundle Hash" = "バンドルハッシュ";
+
+/* No comment provided by engineer. */
+"CDHash" = "CDハッシュ";
+
+/* Copy Details button in more details dialog */
+"Copy Details" = "詳細をコピー";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "閉じる";
+
+/* No comment provided by engineer. */
+"Dismiss & Silence" = "閉じて通知を停止";
+
+/* No comment provided by engineer. */
+"Filename" = "ファイル名";
+
+/* More Details button in binary block dialog */
+"More Details" = "さらに詳細";
+
+/* No comment provided by engineer. */
+"More Info..." = "詳細情報…";
+
+/* Default text for Open button */
+"Open..." = "開く…";
+
+/* No comment provided by engineer. */
+"Parent" = "親プロセス";
+
+/* No comment provided by engineer. */
+"Path" = "パス";
+
+/* No comment provided by engineer. */
+"Path Accessed" = "アクセスされたパス";
+
+/* No comment provided by engineer. */
+"Prevent future notifications for this application for " = "このアプリケーションからの通知を停止します";
+
+/* No comment provided by engineer. */
+"Publisher" = "発行者";
+
+/* No comment provided by engineer. */
+"Remount Mode" = "再マウントモード";
+
+/* No comment provided by engineer. */
+"Rule Name" = "ルール名";
+
+/* No comment provided by engineer. */
+"Rule Version" = "ルールバージョン";
+
+/* Explanation in About view */
+"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "SantaはmacOS向けアプリケーション制御システムです\n\n　ユーザーによる設定項目はありません";
+
+/* No comment provided by engineer. */
+"SHA-256" = "SHA-256";
+
+/* No comment provided by engineer. */
+"Signing ID" = "署名ID";
+
+/* The default message to show the user when an unknown application is blocked */
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "次のアプリケーションは信頼性を判断できないため、<br />実行がブロックされました";
+
+/* The default message to show the user when a banned application is blocked */
+"The following application has been blocked from<br />executing because it has been deemed malicious" = "次のアプリケーションは悪意のあるプログラムと判断されたため、<br />実行がブロックされました";
+
+/* The default message to show the user when a USB device is blocked from mounting */
+"The following device has been blocked from mounting" = "次のデバイスのマウントがブロックされました";
+
+/* The default message to show the user when a USB device is remounted with reduced permissions */
+"The following device has been remounted with reduced permissions" = "次のデバイスは権限を制限して再マウントされました";
+
+/* No comment provided by engineer. */
+unknown = "不明";
+
+/* No comment provided by engineer. */
+User = "ユーザー";
+
