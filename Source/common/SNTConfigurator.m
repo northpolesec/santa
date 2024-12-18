@@ -1445,7 +1445,7 @@ static SNTConfigurator *sharedConfigurator = nil;
       [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
   for (id rule in staticRules) {
     if (![rule isKindOfClass:[NSDictionary class]]) return;
-    SNTRule *r = [[SNTRule alloc] initWithDictionary:rule];
+    SNTRule *r = [[SNTRule alloc] initWithDictionarySlow:rule];
     if (!r) continue;
     rules[r.identifier] = r;
   }

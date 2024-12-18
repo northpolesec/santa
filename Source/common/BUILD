@@ -169,7 +169,6 @@ santa_unit_test(
     ],
 )
 
-
 objc_library(
     name = "SigningIDHelpers",
     srcs = ["SigningIDHelpers.m"],
