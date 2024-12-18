@@ -317,6 +317,7 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   pid_t newProcPid = audit_token_to_pid(targetProc->audit_token);
+  BOOL stoppedProc = false;
   std::pair<pid_t, int> pidAndVersion =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
   if (cd.decision == SNTEventStateBlockUnknown && config.clientMode == SNTClientModeStandalone) {
@@ -326,7 +327,7 @@ static NSString *const kPrinterProxyPostMonterey =
     // user authorizes execution we send a SIGCONT instead. Any attempts to SIGCONT the paused
     // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
-    [self sendSignal:SIGSTOP toPID:newProcPid];
+    stoppedProc = [self sendSignal:SIGSTOP toPID:newProcPid];
     postAction(SNTActionRespondAllow);
   } else {
     // Respond with the decision.
@@ -408,8 +409,13 @@ static NSString *const kPrinterProxyPostMonterey =
         [self maybeSendTTYMessageToTarget:targetProc
                            messageCreator:^NSString * {
                              if (config.clientMode == SNTClientModeStandalone) {
-                               return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
-                                      @"binary until approval is granted in the GUI...\n";
+                               if (stoppedProc) {
+                                 return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
+                                        @"binary until approval is granted in the GUI...\n";
+                               } else {
+                                 return @"---\n\033[1mSanta\033[0m\n\nUnable to hold execution so "
+                                        @"the process was killed\n---\n\n";
+                               }
                              }
 
                              // Let the user know what happened on the terminal
@@ -446,20 +452,24 @@ static NSString *const kPrinterProxyPostMonterey =
               // standalone mode and notify the sync service.
               [self createRuleForStandaloneModeEvent:se];
 
-              [self maybeSendTTYMessageToTarget:targetProc
-                                 messageCreator:^NSString * {
-                                   return @"Authorized, allowing execution\n---\n\n";
-                                 }];
+              if (stoppedProc) {
+                [self maybeSendTTYMessageToTarget:targetProc
+                                   messageCreator:^NSString * {
+                                     return @"Authorized, allowing execution\n---\n\n";
+                                   }];
+              }
 
               // Allow the binary to begin running.
               [self sendSignal:SIGCONT toPID:newProcPid];
               _procSignalCache->remove(pidAndVersion);
             } else {
               // The user did not approve, so kill the stopped process.
-              [self maybeSendTTYMessageToTarget:targetProc
-                                 messageCreator:^NSString * {
-                                   return @"Authorization not given, denying execution\n---\n\n";
-                                 }];
+              if (stoppedProc) {
+                [self maybeSendTTYMessageToTarget:targetProc
+                                   messageCreator:^NSString * {
+                                     return @"Authorization not given, denying execution\n---\n\n";
+                                   }];
+              }
               [self sendSignal:SIGKILL toPID:newProcPid];
               _procSignalCache->remove(pidAndVersion);
             }
@@ -603,17 +613,32 @@ static NSString *const kPrinterProxyPostMonterey =
   // TODO: Notify the sync service of the new rule.
 }
 
-extern "C" int pid_suspend(pid_t pid);
-extern "C" int pid_resume(pid_t pid);
+extern "C" int pid_suspend(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
+extern "C" int pid_resume(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
 
 // Wrapper around the pid_suspend() / pid_resume() / kill() functions that uses signal numbers
 // to determine which to use and which can be easily mocked out in tests;
-- (void)sendSignal:(int)signal toPID:(pid_t)pid {
+// Returns true if pid_suspend/pid_resume was used for SIGSTOP/SIGCONT and false if they weren't
+// available.
+- (bool)sendSignal:(int)signal toPID:(pid_t)pid {
   switch (signal) {
-    case SIGSTOP: pid_suspend(pid); break;
-    case SIGCONT: pid_resume(pid); break;
-    case SIGKILL: kill(pid, SIGKILL);
+    case SIGSTOP:
+      if (pid_suspend == nullptr) {
+        kill(pid, SIGKILL);
+        return false;
+      }
+      pid_suspend(pid);
+      return true;
+    case SIGCONT:
+      if (pid_resume == nullptr) {
+        kill(pid, SIGKILL);
+        return false;
+      }
+      pid_resume(pid);
+      return true;
+    case SIGKILL: kill(pid, SIGKILL); break;
   }
+  return true;
 }
 
 @end
