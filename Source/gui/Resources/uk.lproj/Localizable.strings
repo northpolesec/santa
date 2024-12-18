@@ -5,10 +5,10 @@
 "Application" = "Заявка";
 
 /* No Comment provided by engineer. */
-"authorize execution of " = "дозволити виконання ";
+"authorize execution of %@" = "дозволити виконання %@";
 
 /* No Comment provided by engineer. */
-"authorize execution of the application " = "дозволити виконання заявки ";
+"authorize execution of the application %@" = "дозволити виконання заявки %@";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Пакетний хеш";
@@ -31,6 +31,12 @@
 /* No comment provided by engineer. */
 "Filename" = "Ім'я файлу";
 
+/* No comment provided by engineer. */
+"Label after time period picker" = "";
+
+/* No comment provided by engineer. */
+"Label before time period picker" = "Запобігти майбутнім сповіщенням для цієї заявки для ";
+
 /* More Details button in binary block dialog */
 "More Details" = "Детальніше";
 
@@ -48,9 +54,6 @@
 
 /* No comment provided by engineer. */
 "Path Accessed" = "Шлях, до якого звернулися";
-
-/* No comment provided by engineer. */
-"Prevent future notifications for this application for " = "Запобігти майбутнім сповіщенням для цієї заявки для ";
 
 /* No comment provided by engineer. */
 "Publisher" = "Видавець";

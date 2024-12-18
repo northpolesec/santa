@@ -8,10 +8,10 @@
 "Application" = "Applikation";
 
 /* No comment provided by engineer. */
-"authorize execution of " = "genehmigen die Ausführung von ";
+"authorize execution of %@" = "genehmigen die Ausführung von %@";
 
 /* No comment provided by engineer. */
-"authorize execution of the application " = "Die Ausführung der Anwendung autorisieren ";
+"authorize execution of the application %@" = "Die Ausführung der Anwendung autorisieren %@";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Bundle-Hash";
@@ -31,6 +31,12 @@
 /* No comment provided by engineer. */
 "Filename" = "Dateiname";
 
+/* No comment provided by engineer. */
+"Label after time period picker" = "";
+
+/* No comment provided by engineer. */
+"Label before time period picker" = "Benachrichtigungen für diese Applikation unterdrücken für ";
+
 /* More Details button in binary block dialog */
 "More Details" = "Mehr Details";
 
@@ -48,9 +54,6 @@
 
 /* No comment provided by engineer. */
 "Path Accessed" = "Zugriffspfad";
-
-/* No comment provided by engineer. */
-"Prevent future notifications for this application for " = "Benachrichtigungen für diese Applikation unterdrücken für ";
 
 /* No comment provided by engineer. */
 "Publisher" = "Herausgeber";

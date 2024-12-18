@@ -8,10 +8,10 @@
 "Application" = "Приложение";
 
 /* No comment provided by engineer. */
-"authorize execution of " = "разрешить исполнение ";
+"authorize execution of %@" = "разрешить исполнение %@";
 
 /* No comment provided by engineer. */
-"authorize execution of the application " = "разрешить выполнение заявки ";
+"authorize execution of the application %@" = "разрешить выполнение заявки %@";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Бандл-хэш";
@@ -31,6 +31,12 @@
 /* No comment provided by engineer. */
 "Filename" = "Имя файла";
 
+/* No comment provided by engineer. */
+"Label after time period picker" = "";
+
+/* No comment provided by engineer. */
+"Label before time period picker" = "Предотвращение будущих уведомлений для этого приложения для ";
+
 /* More Details button in binary block dialog */
 "More Details" = "Подробнее";
 
@@ -48,9 +54,6 @@
 
 /* No comment provided by engineer. */
 "Path Accessed" = "Доступ к пути";
-
-/* No comment provided by engineer. */
-"Prevent future notifications for this application for " = "Предотвращение будущих уведомлений для этого приложения для ";
 
 /* No comment provided by engineer. */
 "Publisher" = "Издатель";

@@ -7,12 +7,11 @@
 /* Default text for Approve */
 "Approve" = "Approve";
 
-/* File path
-   Signing ID */
-"authorize execution of " = "authorize execution of ";
+/* Authorize execution of an application with Signing ID or Path */
+"authorize execution of %@" = "authorize execution of %@";
 
-/* Bundle name */
-"authorize execution of the application " = "authorize execution of the application ";
+/* Authorize execution of an application with name */
+"authorize execution of the application %@" = "authorize execution of the application %@";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Bundle Hash";
@@ -32,6 +31,12 @@
 /* No comment provided by engineer. */
 "Filename" = "Filename";
 
+/* No comment provided by engineer. */
+"Label after time period picker" = "Label after time period picker";
+
+/* No comment provided by engineer. */
+"Label before time period picker" = "Label before time period picker";
+
 /* More Details button */
 "More Details" = "More Details";
 
@@ -49,9 +54,6 @@
 
 /* No comment provided by engineer. */
 "Path Accessed" = "Path Accessed";
-
-/* No comment provided by engineer. */
-"Prevent future notifications for this application for " = "Prevent future notifications for this application for ";
 
 /* No comment provided by engineer. */
 "Publisher" = "Publisher";

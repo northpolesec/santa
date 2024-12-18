@@ -372,20 +372,23 @@ struct SNTBinaryMessageWindowView: View {
     var msg = "authorize execution"
 
     if !bundleName.isEmpty {
-      msg = NSLocalizedString(
-        "authorize execution of the application " + bundleName,
-        comment: "Bundle name"
+      let format = NSLocalizedString(
+        "authorize execution of the application %@",
+        comment: "Authorize execution of an application with name"
       )
+      msg = String.localizedStringWithFormat(format, bundleName)
     } else if !signingID.isEmpty {
-      msg = NSLocalizedString(
-        "authorize execution of " + signingID,
-        comment: "Signing ID"
+      let format = NSLocalizedString(
+        "authorize execution of %@",
+        comment: "Authorize execution of an application with Signing ID or Path"
       )
+      msg = String.localizedStringWithFormat(format, signingID)
     } else if !filePath.isEmpty {
-      msg = NSLocalizedString(
-        "authorize execution of " + (filePath as NSString).lastPathComponent,
-        comment: "File path"
+      let format = NSLocalizedString(
+        "authorize execution of %@",
+        comment: "Authorize execution of an application with Signing ID or Path"
       )
+      msg = String.localizedStringWithFormat(format, (filePath as NSString).lastPathComponent)
     }
 
     // Force unwrap the callback because it should always be set and is a

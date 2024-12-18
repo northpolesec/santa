@@ -1,6 +1,7 @@
 import SwiftUI
 
 import santa_common_SNTConfigurator
+import santa_common_SNTCommonEnums
 import santa_common_SNTDeviceEvent
 import santa_common_SNTStoredEvent
 import Source_gui_SNTDeviceMessageWindowView
@@ -60,6 +61,7 @@ struct BinaryView: View {
   @State var bannedBlockMessage: String = ""
   @State var eventDetailURL: String = "http://sync-server-hostname/blockables/%bundle_or_file_identifier%"
   @State var dateOverride: SpecialDates = .Nov25
+  @State var clientModeOverride: SNTClientMode = .lockdown
 
   @State var customMsg: String = ""
   @State var customURL: String = ""
@@ -102,11 +104,18 @@ struct BinaryView: View {
             Button(action: { eventDetailURL = "" }) { Text(verbatim: "Clear").font(Font.subheadline) }
           }
           HStack {
-            Picker(selection: $dateOverride, label: Text(verbatim: "Date :")) {
+            Picker(selection: $dateOverride, label: Text(verbatim: "Date")) {
               Text(verbatim: "Nov 25").tag(SpecialDates.Nov25)
               Text(verbatim: "Apr 1").tag(SpecialDates.Apr1)
               Text(verbatim: "May 4").tag(SpecialDates.May4)
               Text(verbatim: "Oct 31").tag(SpecialDates.Oct31)
+            }.pickerStyle(.segmented)
+          }
+          HStack {
+            Picker(selection: $clientModeOverride, label: Text(verbatim: "Client Mode")) {
+              Text(verbatim: "Monitor").tag(SNTClientMode.monitor)
+              Text(verbatim: "Lockdown").tag(SNTClientMode.lockdown)
+              Text(verbatim: "Standalone").tag(SNTClientMode.standalone)
             }.pickerStyle(.segmented)
           }
         }
@@ -119,9 +128,12 @@ struct BinaryView: View {
           "BannedBlockMessage": bannedBlockMessage,
           "EventDetailURL": eventDetailURL,
           "FunFontsOnSpecificDays": true,
+          "ClientMode": clientModeOverride.rawValue as NSNumber,
+          "EnableStandalonePasswordFallback": true,
         ])
 
         let event = SNTDebugStoredEvent(staticPublisher: publisher)
+        event.decision = .blockUnknown
         event.fileBundleName = application
         event.fileSHA256 = sha256
         event.cdhash = cdhash
@@ -148,7 +160,7 @@ struct BinaryView: View {
             customURL: customURL as NSString?,
             bundleProgress: SNTBundleProgress(),
             uiStateCallback: { interval in print("Silence interval was set to \(interval)") },
-            replyCallback: { bool in return }
+            replyCallback: { approved in print("Did user approve execution: \(approved)") }
           ),
           window
         )
