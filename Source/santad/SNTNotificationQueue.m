@@ -93,7 +93,7 @@ static const int kMaximumNotifications = 10;
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
                        customURL:d[@"url"]
-                        andReply:reply];
+                        andReply:[reply copy]];
       [postedNotifications addObject:d];
     }
     [self.pendingNotifications removeObjectsInArray:postedNotifications];
