@@ -19,7 +19,6 @@
 
 #include "Source/common/SantaCache.h"
 #import "Source/common/SantaVnode.h"
-#include "Source/common/SantaVnodeHash.h"
 #include "Source/common/String.h"
 
 // These functions are exported by the Security framework, but are not included in headers

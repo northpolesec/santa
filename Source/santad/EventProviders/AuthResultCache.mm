@@ -19,7 +19,6 @@
 #include <time.h>
 
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SantaVnodeHash.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Client.h"
 
 using santa::Client;

@@ -19,7 +19,6 @@
 #import "Source/common/SNTRule.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
-#include "Source/common/SantaVnodeHash.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
 

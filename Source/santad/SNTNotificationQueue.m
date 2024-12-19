@@ -69,20 +69,45 @@ static const int kMaximumNotifications = 10;
   @synchronized(self.pendingNotifications) {
     [self.pendingNotifications addObject:d];
   }
-  [self flushQueue];
+  [self flushQueueWithReplies:(reply != nil)];
 }
 
-- (void)flushQueue {
+- (void)flushQueueWithReplies:(BOOL)hasReplies {
   id rop = [self.notifierConnection remoteObjectProxy];
-  if (!rop) return;
+  if (!rop) {
+    if (hasReplies) {
+      // There is no connection to the GUI at present and flushQueue was called because of a new
+      // notification that requires an authorization response. To prevent those responses from
+      // piling up in the background while the UI is unavailble, we now respond with NO for each of
+      // these and then remove these pending notificatoins.
+      @synchronized(self.pendingNotifications) {
+        NSMutableArray *deletedNotifications = [NSMutableArray array];
+        for (NSDictionary *d in self.pendingNotifications) {
+          if (d[@"reply"] == nil) continue;
+          void (^reply)(BOOL authenticated) = d[@"reply"];
+          reply(NO);
+          [deletedNotifications addObject:d];
+        }
+        [self.pendingNotifications removeObjectsInArray:deletedNotifications];
+      }
+    }
+    return;
+  }
 
   @synchronized(self.pendingNotifications) {
     NSMutableArray *postedNotifications = [NSMutableArray array];
     for (NSDictionary *d in self.pendingNotifications) {
+      void (^reply)(BOOL authenticated) = d[@"reply"];
+      if (reply == nil) {
+        // The reply block sent to the GUI cannot be nil.
+        reply = ^(BOOL _) {
+        };
+      }
+
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
                        customURL:d[@"url"]
-                        andReply:d[@"reply"]];
+                        andReply:reply];
       [postedNotifications addObject:d];
     }
     [self.pendingNotifications removeObjectsInArray:postedNotifications];
@@ -91,7 +116,10 @@ static const int kMaximumNotifications = 10;
 
 - (void)setNotifierConnection:(MOLXPCConnection *)notifierConnection {
   _notifierConnection = notifierConnection;
-  [self flushQueue];
+  _notifierConnection.invalidationHandler = ^{
+    _notifierConnection = nil;
+  };
+  [self flushQueueWithReplies:NO];
 }
 
 @end
