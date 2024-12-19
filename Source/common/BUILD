@@ -183,6 +183,7 @@ objc_library(
     name = "RingBuffer",
     hdrs = ["RingBuffer.h"],
     deps = [
+        ":SNTLogging",
     ],
 )
 

@@ -17,8 +17,11 @@
 
 #include <Foundation/Foundation.h>
 
+#include <cstdlib>
+#include <deque>
 #include <optional>
-#include <vector>
+
+#include "Source/common/SNTLogging.h"
 
 namespace santa {
 
@@ -26,35 +29,38 @@ template <typename T>
 class RingBuffer {
  public:
   RingBuffer(size_t capacity) : capacity_(capacity) {
-    buffer_.reserve(capacity);
+    if (capacity == 0) {
+      LOGE(@"RingBuffer capacity must be greater than 0");
+      std::abort();
+    }
   }
 
-  RingBuffer(RingBuffer&& other) = default;
-  RingBuffer& operator=(RingBuffer&& rhs) = default;
+  RingBuffer(RingBuffer &&other) = default;
+  RingBuffer &operator=(RingBuffer &&rhs) = default;
 
   // Could be safe to implement these, but not currently needed
-  RingBuffer(const RingBuffer& other) = delete;
-  RingBuffer& operator=(const RingBuffer& other) = delete;
+  RingBuffer(const RingBuffer &other) = delete;
+  RingBuffer &operator=(const RingBuffer &other) = delete;
 
   inline size_t Capacity() const { return capacity_; }
   inline bool Empty() const { return buffer_.size() == 0; };
   inline bool Full() const { return buffer_.size() == capacity_; };
 
-  std::optional<T> Enqueue(const T& val) {
+  std::optional<T> Enqueue(const T &val) {
     std::optional<T> removed_value;
     if (Full()) {
       removed_value = std::move(buffer_.front());
-      buffer_.erase(buffer_.begin());
+      buffer_.pop_front();
     }
     buffer_.push_back(val);
     return removed_value;
   }
 
-  std::optional<T> Enqueue(T&& val) {
+  std::optional<T> Enqueue(T &&val) {
     std::optional<T> removed_value;
     if (Full()) {
       removed_value = std::move(buffer_.front());
-      buffer_.erase(buffer_.begin());
+      buffer_.pop_front();
     }
     buffer_.push_back(std::move(val));
     return removed_value;
@@ -65,19 +71,20 @@ class RingBuffer {
       return std::nullopt;
     } else {
       T value = std::move(buffer_.front());
-      buffer_.erase(buffer_.begin());
+      buffer_.pop_front();
       return std::make_optional<T>(value);
     }
   }
 
-  using iterator = typename std::vector<T>::iterator;
-  using const_iterator = typename std::vector<T>::const_iterator;
+  using iterator = typename std::deque<T>::iterator;
+  using const_iterator = typename std::deque<T>::const_iterator;
 
   // Erase methods similar to std::vector
   iterator Erase(const_iterator pos) {
     // Validate iterator
     if (pos < buffer_.cbegin() || pos >= buffer_.cend()) {
-      throw std::out_of_range("Iterator out of range");
+      LOGE(@"RingBuffer iterator out of range");
+      std::abort();
     }
     return buffer_.erase(pos);
   }
@@ -85,7 +92,8 @@ class RingBuffer {
   iterator Erase(const_iterator first, const_iterator last) {
     // Validate iterators
     if (first < buffer_.cbegin() || last > buffer_.cend() || first > last) {
-      throw std::out_of_range("Invalid iterator range");
+      LOGE(@"RingBuffer iterator out of range");
+      std::abort();
     }
     return buffer_.erase(first, last);
   }
@@ -100,7 +108,7 @@ class RingBuffer {
 
  private:
   size_t capacity_;
-  std::vector<T> buffer_;
+  std::deque<T> buffer_;
 };
 
 }  // namespace santa
