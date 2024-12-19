@@ -17,8 +17,8 @@
 
 #include <Foundation/Foundation.h>
 
-#include <optional>
 #include <deque>
+#include <optional>
 
 namespace santa {
 
