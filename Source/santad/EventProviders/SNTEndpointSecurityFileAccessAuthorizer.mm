@@ -43,7 +43,6 @@
 #import "Source/common/SNTStrengthify.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
-#include "Source/common/SantaVnodeHash.h"
 #include "Source/common/String.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/DataLayer/WatchItems.h"

@@ -149,7 +149,6 @@ objc_library(
         "//Source/common:SNTRule",
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
-        "//Source/common:SantaVnodeHash",
     ],
 )
 
@@ -434,7 +433,6 @@ objc_library(
         "//Source/common:SNTStrengthify",
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
-        "//Source/common:SantaVnodeHash",
         "//Source/common:String",
         "@MOLCertificate",
         "@MOLCodesignChecker",
@@ -474,7 +472,6 @@ objc_library(
         "//Source/common:SNTMetricSet",
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
-        "//Source/common:SantaVnodeHash",
     ],
 )
 
@@ -541,7 +538,6 @@ objc_library(
         ":SNTDecisionCache",
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
-        "//Source/common:SantaVnodeHash",
         "//Source/common:String",
     ],
 )

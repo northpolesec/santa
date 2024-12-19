@@ -14,9 +14,10 @@
 ///    limitations under the License.
 
 #import "Source/santad/SNTExecutionController.h"
-#include <Foundation/Foundation.h>
 
+#import <Foundation/Foundation.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
+
 #include <bsm/libbsm.h>
 #include <copyfile.h>
 #include <libproc.h>
@@ -27,6 +28,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
 
 #include "Source/common/BranchPrediction.h"
 #include "Source/common/PrefixTree.h"
@@ -41,6 +43,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
+#include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/String.h"
 #include "Source/common/Unit.h"
@@ -92,6 +95,7 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
   absl::Mutex _entitlementFilterMutex;
   std::set<std::string> _entitlementsTeamIDFilter;
   std::unique_ptr<PrefixTree<Unit>> _entitlementsPrefixFilter;
+  std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
 }
 
 static NSString *const kPrinterProxyPreMonterey =
@@ -119,6 +123,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _syncdQueue = syncdQueue;
     _ttyWriter = std::move(ttyWriter);
     _policyProcessor = [[SNTPolicyProcessor alloc] initWithRuleTable:_ruleTable];
+    _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -182,8 +187,7 @@ static NSString *const kPrinterProxyPostMonterey =
 
 - (bool)synchronousShouldProcessExecEvent:(const Message &)esMsg {
   if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
-    // Programming error. Bail.
-    LOGE(@"Attempt to validate non-EXEC event. Event type: %d", esMsg->event_type);
+    LOGE(@"Attempt to validate unhandled event. Event type: %d", esMsg->event_type);
     [NSException
          raise:@"Invalid event type"
         format:@"synchronousShouldProcessExecEvent: Unexpected event type: %d", esMsg->event_type];
@@ -312,8 +316,23 @@ static NSString *const kPrinterProxyPostMonterey =
     action = SNTActionRespondAllowCompiler;
   }
 
-  // Respond with the decision.
-  postAction(action);
+  pid_t newProcPid = audit_token_to_pid(targetProc->audit_token);
+  BOOL stoppedProc = false;
+  std::pair<pid_t, int> pidAndVersion =
+      std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
+  if (cd.decision == SNTEventStateBlockUnknown && config.clientMode == SNTClientModeStandalone) {
+    // In standalone mode we want hold off on making a decision until the user has had a chance to
+    // approve. ES won't let us do this, we'd hit the response deadline. Instead, we suspend the
+    // new process to stop the binary from executing but we respond to ES with an allow decision.
+    // If the user authorizes execution we resume the process. Any attempts to resume the paused
+    // binary outside of the auth flow will be blocked.
+    _procSignalCache->set(pidAndVersion, true);
+    stoppedProc = [self manipulatePID:newProcPid withControl:ProcessControl::Suspend];
+    postAction(SNTActionRespondAllow);
+  } else {
+    // Respond with the decision.
+    postAction(action);
+  }
 
   // Increment metric counters
   [self incrementEventCounters:cd.decision];
@@ -332,7 +351,7 @@ static NSString *const kPrinterProxyPostMonterey =
     se.teamID = cd.teamID;
     se.signingID = cd.signingID;
     se.cdhash = cd.cdhash;
-    se.pid = @(audit_token_to_pid(targetProc->audit_token));
+    se.pid = @(newProcPid);
     se.ppid = @(audit_token_to_pid(targetProc->parent_audit_token));
     se.parentName = @(esMsg.ParentProcessName().c_str());
     se.entitlements = cd.entitlements;
@@ -387,40 +406,72 @@ static NSString *const kPrinterProxyPostMonterey =
       }
 
       if (!cd.silentBlock) {
-        if (!config.enableSilentTTYMode && self->_ttyWriter && TTYWriter::CanWrite(targetProc)) {
-          // Let the user know what happened on the terminal
-          NSAttributedString *s = [SNTBlockMessage attributedBlockMessageForEvent:se
-                                                                    customMessage:cd.customMsg];
+        [self maybeSendTTYMessageToTarget:targetProc
+                           messageCreator:^NSString * {
+                             if (config.clientMode == SNTClientModeStandalone) {
+                               if (stoppedProc) {
+                                 return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
+                                        @"binary until approval is granted in the GUI...\n";
+                               } else {
+                                 return @"---\n\033[1mSanta\033[0m\n\nUnable to hold execution so "
+                                        @"the process was killed\n---\n\n";
+                               }
+                             }
 
-          NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
-          // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
-          [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
-          [msg appendFormat:@"\033[1mPath:      \033[0m %@\n"
-                            @"\033[1mIdentifier:\033[0m %@\n"
-                            @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                            se.filePath, se.fileSHA256, se.parentName, se.ppid];
-          NSURL *detailURL = [SNTBlockMessage eventDetailURLForEvent:se customURL:cd.customURL];
-          if (detailURL) {
-            [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
-          }
+                             // Let the user know what happened on the terminal
+                             NSAttributedString *s =
+                                 [SNTBlockMessage attributedBlockMessageForEvent:se
+                                                                   customMessage:cd.customMsg];
 
-          self->_ttyWriter->Write(targetProc, msg);
-        }
+                             NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
+                             // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
+                             [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
+                             [msg appendFormat:@"\033[1mPath:      \033[0m %@\n"
+                                               @"\033[1mIdentifier:\033[0m %@\n"
+                                               @"\033[1mParent:    \033[0m %@ (%@)\n\n",
+                                               se.filePath, se.fileSHA256, se.parentName, se.ppid];
+                             NSURL *detailURL =
+                                 [SNTBlockMessage eventDetailURLForEvent:se customURL:cd.customURL];
+                             if (detailURL) {
+                               [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
+                             }
+                             return msg;
+                           }];
 
-        void (^replyBlock)(BOOL) = ^void(BOOL authenticated) {
-        };
+        void (^replyBlock)(BOOL) = nil;
 
         // Only allow a user in standalone mode to override a block if an
         // explicit block rule is not set when using a sync service.
         if (config.clientMode == SNTClientModeStandalone &&
             se.decision == SNTEventStateBlockUnknown) {
-          replyBlock = ^void(BOOL authenticated) {
+          replyBlock = ^(BOOL authenticated) {
             LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                  authenticated);
             if (authenticated) {
               // Create a rule for the binary that was allowed by the user in
-              // standalone mode and notify the sync service
+              // standalone mode and notify the sync service.
               [self createRuleForStandaloneModeEvent:se];
+
+              if (stoppedProc) {
+                [self maybeSendTTYMessageToTarget:targetProc
+                                   messageCreator:^NSString * {
+                                     return @"Authorized, allowing execution\n---\n\n";
+                                   }];
+              }
+
+              // Allow the binary to begin running.
+              [self manipulatePID:newProcPid withControl:ProcessControl::Resume];
+              _procSignalCache->remove(pidAndVersion);
+            } else {
+              // The user did not approve, so kill the stopped process.
+              if (stoppedProc) {
+                [self maybeSendTTYMessageToTarget:targetProc
+                                   messageCreator:^NSString * {
+                                     return @"Authorization not given, denying execution\n---\n\n";
+                                   }];
+              }
+              [self manipulatePID:newProcPid withControl:ProcessControl::Kill];
+              _procSignalCache->remove(pidAndVersion);
             }
           };
         }
@@ -433,6 +484,30 @@ static NSString *const kPrinterProxyPostMonterey =
       }
     }
   }
+}
+
+#pragma mark Signal Validation
+
+- (void)validateSuspendResumeEvent:(const santa::Message &)esMsg
+                        postAction:(void (^)(bool))postAction {
+  audit_token_t at = esMsg->event.proc_suspend_resume.target->audit_token;
+  pid_t pid = audit_token_to_pid(at);
+  int pidVersion = audit_token_to_pidversion(at);
+  if (_procSignalCache->get(std::make_pair(pid, pidVersion))) {
+    return postAction(false);
+  }
+  postAction(true);
+}
+
+#pragma mark Helpers
+
+- (void)maybeSendTTYMessageToTarget:(const es_process_t *)proc
+                     messageCreator:(NSString * (^)())messageCreator {
+  if ([SNTConfigurator configurator].enableSilentTTYMode) return;
+  if (!self->_ttyWriter) return;
+  if (!TTYWriter::CanWrite(proc)) return;
+
+  self->_ttyWriter->Write(proc, messageCreator());
 }
 
 /**
@@ -536,6 +611,38 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   // TODO: Notify the sync service of the new rule.
+}
+
+extern "C" int pid_suspend(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
+extern "C" int pid_resume(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
+
+enum class ProcessControl { Suspend, Resume, Kill };
+
+// Wrapper around the pid_suspend() / pid_resume() / kill() functions that uses signal numbers
+// to determine which to use and which can be easily mocked out in tests;
+// Returns true if pid_suspend/pid_resume was used for Suspend/Resume and false if they weren't
+// available.
+- (bool)manipulatePID:(pid_t)pid withControl:(ProcessControl)control {
+  switch (control) {
+    case ProcessControl::Suspend:
+      if (pid_suspend == nullptr) {
+        LOGW(@"pid_suspend() is not available, killing the target process %d", pid);
+        kill(pid, SIGKILL);
+        return false;
+      }
+      pid_suspend(pid);
+      return true;
+    case ProcessControl::Resume:
+      if (pid_resume == nullptr) {
+        LOGW(@"pid_resume() is not available, killing the target process %d", pid);
+        kill(pid, SIGKILL);
+        return false;
+      }
+      pid_resume(pid);
+      return true;
+    case ProcessControl::Kill: kill(pid, SIGKILL); break;
+  }
+  return true;
 }
 
 @end
