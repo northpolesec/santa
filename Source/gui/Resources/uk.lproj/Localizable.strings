@@ -32,7 +32,7 @@
 "Filename" = "Ім'я файлу";
 
 /* No comment provided by engineer. */
-"Label after time period picker" = "";
+"Label after time period picker" = "\U2800";
 
 /* No comment provided by engineer. */
 "Label before time period picker" = "Запобігти майбутнім сповіщенням для цієї заявки для ";

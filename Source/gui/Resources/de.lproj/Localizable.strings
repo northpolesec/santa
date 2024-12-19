@@ -32,7 +32,7 @@
 "Filename" = "Dateiname";
 
 /* No comment provided by engineer. */
-"Label after time period picker" = "";
+"Label after time period picker" = "\U2800";
 
 /* No comment provided by engineer. */
 "Label before time period picker" = "Benachrichtigungen für diese Applikation unterdrücken für ";
