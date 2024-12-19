@@ -47,7 +47,7 @@ def find_localizations(rootdir):
   return [
       d
       for d in pathlib.Path(rootdir).glob('*')
-      if (d.is_dir() and d.name.endswith('.lproj') and d.name != 'en.lproj')
+      if (d.is_dir() and d.name.endswith('.lproj'))
   ]
 
 
