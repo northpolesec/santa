@@ -487,7 +487,7 @@ REGISTER_COMMAND_NAME(@"rule")
   NSMutableArray<SNTRule *> *parsedRules = [[NSMutableArray alloc] init];
 
   for (NSDictionary *jsonRule in rules[@"rules"]) {
-    SNTRule *rule = [[SNTRule alloc] initWithDictionary:jsonRule];
+    SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:jsonRule];
     if (!rule) {
       [self printErrorUsageAndExit:[NSString stringWithFormat:@"Invalid rule: %@", jsonRule]];
     }

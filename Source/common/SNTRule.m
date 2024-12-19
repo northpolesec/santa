@@ -147,11 +147,31 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return self;
 }
 
-// Converts rule information downloaded from the server into a SNTRule.  Because any information
-// not recorded by SNTRule is thrown away here, this method is also responsible for dealing with
-// the extra bundle rule information (bundle_hash & rule_count).
-- (instancetype)initWithDictionary:(NSDictionary *)dict {
-  if (![dict isKindOfClass:[NSDictionary class]]) return nil;
+// lowercase policy keys and upper case the policy decision.
+- (NSDictionary *)normalizeRuleDictionary:(NSDictionary *)dict {
+  NSMutableDictionary *newDict = [NSMutableDictionary dictionaryWithCapacity:dict.count];
+  for (id rawKey in dict) {
+    if (![rawKey isKindOfClass:[NSString class]]) continue;
+    NSString *key = (NSString *)rawKey;
+    NSString *newKey = [key lowercaseString];
+    if (([newKey isEqualToString:kRulePolicy] || [newKey isEqualToString:kRuleType]) &&
+        [dict[key] isKindOfClass:[NSString class]]) {
+      newDict[newKey] = [dict[key] uppercaseString];
+    } else {
+      newDict[newKey] = dict[key];
+    }
+  }
+  return newDict;
+}
+
+// Converts rule information from santactl or static rules into a SNTRule.
+// Because any information not recorded by SNTRule is thrown away here, this
+// method is also responsible for dealing with the extra bundle rule information
+// (bundle_hash & rule_count).
+- (instancetype)initWithDictionarySlow:(NSDictionary *)rawDict {
+  if (![rawDict isKindOfClass:[NSDictionary class]]) return nil;
+
+  NSDictionary *dict = [self normalizeRuleDictionary:rawDict];
 
   NSString *identifier = dict[kRuleIdentifier];
   if (![identifier isKindOfClass:[NSString class]] || !identifier.length) {
