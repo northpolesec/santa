@@ -249,7 +249,7 @@ using santa::WatchItemPathType;
                cacheable:(bool)cacheable {
   if (msg->event_type == ES_EVENT_TYPE_AUTH_OPEN) {
     return _esApi->RespondFlagsResult(
-        // For now, Santa is only concerned about alllowing all access or no
+        // For now, Santa is only concerned about allowing all access or no
         // access, hence the flags being translated here to all or nothing based
         // on the auth result. In the future it might be beneficial to expand the
         // scope of Santa to enforce things like read-only access.

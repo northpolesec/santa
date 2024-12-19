@@ -59,11 +59,15 @@ static const int kMaximumNotifications = 10;
   }
 
   if (reply) {
-    // Copy the block to the heap so it can be called later.
-    //
-    // This is necessary because the block is allocated on the stack in the
-    // Execution controller which goes out of scope.
-    d[@"reply"] = [reply copy];
+    if (!_notifierConnection) {
+      reply(NO);
+    } else {
+      // Copy the block to the heap so it can be called later.
+      //
+      // This is necessary because the block is allocated on the stack in the
+      // Execution controller which goes out of scope.
+      d[@"reply"] = [reply copy];
+    }
   }
 
   @synchronized(self.pendingNotifications) {
@@ -79,10 +83,17 @@ static const int kMaximumNotifications = 10;
   @synchronized(self.pendingNotifications) {
     NSMutableArray *postedNotifications = [NSMutableArray array];
     for (NSDictionary *d in self.pendingNotifications) {
+      void (^reply)(BOOL authenticated) = d[@"reply"];
+      if (reply == nil) {
+        // The reply block sent to the GUI cannot be nil.
+        reply = [^(BOOL _) {
+        } copy];
+      }
+
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
                        customURL:d[@"url"]
-                        andReply:d[@"reply"]];
+                        andReply:reply];
       [postedNotifications addObject:d];
     }
     [self.pendingNotifications removeObjectsInArray:postedNotifications];
@@ -91,6 +102,9 @@ static const int kMaximumNotifications = 10;
 
 - (void)setNotifierConnection:(MOLXPCConnection *)notifierConnection {
   _notifierConnection = notifierConnection;
+  _notifierConnection.invalidationHandler = ^{
+    _notifierConnection = nil;
+  };
   [self flushQueue];
 }
 

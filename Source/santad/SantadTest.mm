@@ -36,6 +36,7 @@
 #import "Source/santad/Metrics.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/SNTExecutionController.h"
 #include "Source/santad/SantadDeps.h"
 
 using santa::Message;
@@ -83,6 +84,10 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 @property(nonatomic) double defaultBudget;
 @property(nonatomic) int64_t minAllowedHeadroom;
 @property(nonatomic) int64_t maxAllowedHeadroom;
+@end
+
+@interface SNTExecutionController (Testing)
+- (void)manipulatePID:(pid_t)pid withControl:(int)control;
 @end
 
 @interface SantadTest : XCTestCase
@@ -133,6 +138,8 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   OCMStub([self.mockSNTDatabaseController databasePath]).andReturn(testPath);
 
   std::unique_ptr<SantadDeps> deps = SantadDeps::Create(mockConfigurator, nil);
+  id mockExecutionController = OCMPartialMock(deps->ExecController());
+  OCMStub([[mockExecutionController ignoringNonObjectArgs] manipulatePID:0 withControl:0]);
 
   SNTEndpointSecurityAuthorizer *authClient =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
@@ -619,7 +626,7 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
 - (void)testBinaryWithoutBlockOrAllowRuleIsBlockedInStandaloneMode {
   [self checkBinaryExecution:@"noop"
-                  wantResult:ES_AUTH_RESULT_DENY
+                  wantResult:ES_AUTH_RESULT_ALLOW
                   clientMode:SNTClientModeStandalone
                  cdValidator:^BOOL(SNTCachedDecision *cd) {
                    return cd.decision == SNTEventStateBlockUnknown;

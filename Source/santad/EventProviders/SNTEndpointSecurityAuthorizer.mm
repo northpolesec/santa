@@ -63,6 +63,19 @@ using santa::Message;
 }
 
 - (void)processMessage:(const Message &)msg {
+  if (msg->event_type == ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME) {
+    [self.execController
+        validateSuspendResumeEvent:msg
+                        postAction:^(bool allowed) {
+                          es_auth_result_t authResult =
+                              allowed ? ES_AUTH_RESULT_ALLOW : ES_AUTH_RESULT_DENY;
+                          [self respondToMessage:msg
+                                  withAuthResult:authResult
+                                       cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
+                        }];
+    return;
+  }
+
   const es_file_t *targetFile = msg->event.exec.target->executable;
 
   while (true) {
@@ -103,17 +116,26 @@ using santa::Message;
 
 - (void)handleMessage:(Message &&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
-  if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
-    // This is a programming error
-    LOGE(@"Atteempting to authorize a non-exec event");
-    [NSException raise:@"Invalid event type"
-                format:@"Authorizing unexpected event type: %d", esMsg->event_type];
-  }
-
-  if (![self.execController synchronousShouldProcessExecEvent:esMsg]) {
-    [self postAction:SNTActionRespondDeny forMessage:esMsg];
-    recordEventMetrics(EventDisposition::kDropped);
-    return;
+  switch (esMsg->event_type) {
+    case ES_EVENT_TYPE_AUTH_EXEC:
+      if (![self.execController synchronousShouldProcessExecEvent:esMsg]) {
+        [self postAction:SNTActionRespondDeny forMessage:esMsg];
+        recordEventMetrics(EventDisposition::kDropped);
+        return;
+      }
+      break;
+    case ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME:
+      if (esMsg->event.proc_suspend_resume.type != ES_PROC_SUSPEND_RESUME_TYPE_RESUME) {
+        [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:YES];
+        recordEventMetrics(EventDisposition::kDropped);
+        return;
+      }
+      break;
+    default:
+      // This is a programming error
+      LOGE(@"Attempting to authorize a non-exec event");
+      [NSException raise:@"Invalid event type"
+                  format:@"Authorizing unexpected event type: %d", esMsg->event_type];
   }
 
   [self processMessage:std::move(esMsg)
@@ -153,6 +175,7 @@ using santa::Message;
 - (void)enable {
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_EXEC,
+                                    ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
                                 }];
 }
 
