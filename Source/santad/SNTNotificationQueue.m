@@ -86,14 +86,14 @@ static const int kMaximumNotifications = 10;
       void (^reply)(BOOL authenticated) = d[@"reply"];
       if (reply == nil) {
         // The reply block sent to the GUI cannot be nil.
-        reply = ^(BOOL _) {
-        };
+        reply = [^(BOOL _) {
+        } copy];
       }
 
       [rop postBlockNotification:d[@"event"]
                withCustomMessage:d[@"message"]
                        customURL:d[@"url"]
-                        andReply:[reply copy]];
+                        andReply:reply];
       [postedNotifications addObject:d];
     }
     [self.pendingNotifications removeObjectsInArray:postedNotifications];
