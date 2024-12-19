@@ -18,16 +18,14 @@
 #include <Foundation/Foundation.h>
 
 #include <optional>
-#include <vector>
+#include <deque>
 
 namespace santa {
 
 template <typename T>
 class RingBuffer {
  public:
-  RingBuffer(size_t capacity) : capacity_(capacity) {
-    buffer_.reserve(capacity);
-  }
+  RingBuffer(size_t capacity) : capacity_(capacity) {}
 
   RingBuffer(RingBuffer&& other) = default;
   RingBuffer& operator=(RingBuffer&& rhs) = default;
@@ -44,7 +42,7 @@ class RingBuffer {
     std::optional<T> removed_value;
     if (Full()) {
       removed_value = std::move(buffer_.front());
-      buffer_.erase(buffer_.begin());
+      buffer_.pop_front();
     }
     buffer_.push_back(val);
     return removed_value;
@@ -54,7 +52,7 @@ class RingBuffer {
     std::optional<T> removed_value;
     if (Full()) {
       removed_value = std::move(buffer_.front());
-      buffer_.erase(buffer_.begin());
+      buffer_.pop_front();
     }
     buffer_.push_back(std::move(val));
     return removed_value;
@@ -65,13 +63,13 @@ class RingBuffer {
       return std::nullopt;
     } else {
       T value = std::move(buffer_.front());
-      buffer_.erase(buffer_.begin());
+      buffer_.pop_front();
       return std::make_optional<T>(value);
     }
   }
 
-  using iterator = typename std::vector<T>::iterator;
-  using const_iterator = typename std::vector<T>::const_iterator;
+  using iterator = typename std::deque<T>::iterator;
+  using const_iterator = typename std::deque<T>::const_iterator;
 
   // Erase methods similar to std::vector
   iterator Erase(const_iterator pos) {
@@ -100,7 +98,7 @@ class RingBuffer {
 
  private:
   size_t capacity_;
-  std::vector<T> buffer_;
+  std::deque<T> buffer_;
 };
 
 }  // namespace santa
