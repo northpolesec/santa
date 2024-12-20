@@ -14,6 +14,7 @@
 
 #include "Source/common/RingBuffer.h"
 
+#include <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 #include <optional>
@@ -187,7 +188,6 @@ using santa::RingBuffer;
 
   rb.Erase(std::remove_if(rb.begin(), rb.end(),
                           [](const Foo &f) {
-                            printf("fx: %d, fy: %d, fx<fy: %d\n", f.x, f.y, f.x < f.y);
                             return f.x < f.y;
                           }),
            rb.end());

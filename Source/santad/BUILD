@@ -173,11 +173,13 @@ objc_library(
 
 objc_library(
     name = "SNTNotificationQueue",
-    srcs = ["SNTNotificationQueue.m"],
+    srcs = ["SNTNotificationQueue.mm"],
     hdrs = ["SNTNotificationQueue.h"],
     deps = [
+        "//Source/common:RingBuffer",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
         "@MOLXPCConnection",
     ],
