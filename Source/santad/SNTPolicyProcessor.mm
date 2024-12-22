@@ -1,16 +1,17 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santad/SNTPolicyProcessor.h"
 #include <Foundation/Foundation.h>
@@ -20,6 +21,7 @@
 #import <Security/SecCode.h>
 #import <Security/Security.h>
 
+#import "Source/common/CertificateHelpers.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeepCopy.h"
@@ -35,6 +37,53 @@ enum class PlatformBinaryState {
   kRuntimeFalse,
   kStaticCheck,
 };
+
+struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
+  NSString *cdhash;
+  NSString *binarySHA256;
+  NSString *signingID;
+  NSString *certificateSHA256;
+  NSString *teamID;
+
+  // Waterfall thru the signing status in order of most-to-least permissive
+  // in terms of identifiers allowed for policy match search. Fields from
+  // the given SNTCachedDecision are assigned only when valid for a given
+  // signing status.
+  //
+  // Do not evaluate TeamID/SigningID rules for dev-signed code based on the
+  // assumption that orgs are generally more relaxed about dev signed cert
+  // protections and users can more easily produce dev-signed code that
+  // would otherwise be inadvertently allowed.
+  //
+  // Note: All labels fall through.
+  // clang-format off
+  switch (cd.signingStatus) {
+    case SNTSigningStatusProduction:
+      signingID = cd.signingID;
+      teamID = cd.teamID;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusDevelopment:
+      certificateSHA256 = cd.certSHA256;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusAdhoc:
+      cdhash = cd.cdhash;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusInvalid:
+      OS_FALLTHROUGH;
+    case SNTSigningStatusUnsigned:
+      binarySHA256 = cd.sha256;
+      break;
+  }
+  // clang-format on
+
+  return (struct RuleIdentifiers){
+      .cdhash = cdhash,
+      .binarySHA256 = binarySHA256,
+      .signingID = signingID,
+      .certificateSHA256 = certificateSHA256,
+      .teamID = teamID,
+  };
+}
 
 @interface SNTPolicyProcessor ()
 @property SNTRuleTable *ruleTable;
@@ -187,9 +236,9 @@ static void UpdateCachedDecisionSigningInfo(
                         teamID:(nullable NSString *)teamID
                      signingID:(nullable NSString *)signingID
            platformBinaryState:(PlatformBinaryState)platformBinaryState
-          isProdSignedCallback:(BOOL (^_Nonnull)())isProdSignedCallback
+         signingStatusCallback:(SNTSigningStatus (^_Nonnull)())SigningStatusCallback
     entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nullable)(
-                                   NSDictionary *_Nullable entitlements))entitlementsFilterCallback
+                                   NSDictionary *_Nullable entitlements))EntitlementsFilterCallback
       preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback {
   // Check the hash before allocating a SNTCachedDecision.
   NSString *fileHash = fileSHA256 ?: fileInfo.SHA256;
@@ -210,6 +259,7 @@ static void UpdateCachedDecisionSigningInfo(
   cd.sha256 = fileHash;
   cd.teamID = teamID;
   cd.signingID = signingID;
+  cd.signingStatus = SigningStatusCallback();
   cd.decisionClientMode = mode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
@@ -222,40 +272,20 @@ static void UpdateCachedDecisionSigningInfo(
     }
 
     // Grab the code signature, if there's an error don't try to capture
-    // any of the signature details. Also clear out any rule lookup parameters
-    // that would require being validly signed.
+    // any of the signature details.
     MOLCodesignChecker *csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
     if (csInfoError) {
       csInfo = nil;
       cd.decisionExtra = [NSString
           stringWithFormat:@"Signature ignored due to error: %ld", (long)csInfoError.code];
-      cd.teamID = nil;
-      cd.signingID = nil;
-      cd.cdhash = nil;
+      cd.signingStatus = (cd.signingStatus == SNTSigningStatusUnsigned ? SNTSigningStatusUnsigned
+                                                                       : SNTSigningStatusInvalid);
     } else {
-      UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, entitlementsFilterCallback);
+      UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, EntitlementsFilterCallback);
     }
   }
 
-  // Do not evaluate TeamID/SigningID rules for dev-signed code based on the
-  // assumption that orgs are generally more relaxed about dev signed cert
-  // protections and users can more easily produce dev-signed code that
-  // would otherwise be inadvertently allowed.
-  // Note: Only perform the check if the SigningID is still set, otherwise
-  // it is unsigned or had issues above that already cleared the values.
-  if (cd.signingID && !isProdSignedCallback()) {
-    LOGD(@"Ignoring TeamID and SigningID rules for code not signed with production cert: %@",
-         cd.signingID);
-    cd.teamID = nil;
-    cd.signingID = nil;
-  }
-
-  SNTRule *rule = [self.ruleTable
-      ruleForIdentifiers:(struct RuleIdentifiers){.cdhash = cd.cdhash,
-                                                  .binarySHA256 = cd.sha256,
-                                                  .signingID = cd.signingID,
-                                                  .certificateSHA256 = cd.certSHA256,
-                                                  .teamID = cd.teamID}];
+  SNTRule *rule = [self.ruleTable ruleForIdentifiers:CreateRuleIDs(cd)];
   if (rule) {
     // If we have a rule match we don't need to process any further.
     if ([self decision:cd
@@ -347,8 +377,19 @@ static void UpdateCachedDecisionSigningInfo(
       signingID:signingID
       platformBinaryState:targetProc->is_platform_binary ? PlatformBinaryState::kRuntimeTrue
                                                          : PlatformBinaryState::kRuntimeFalse
-      isProdSignedCallback:^BOOL {
-        return ((targetProc->codesigning_flags & CS_DEV_CODE) == 0);
+      signingStatusCallback:^SNTSigningStatus {
+        uint32_t csFlags = targetProc->codesigning_flags;
+        if ((csFlags & CS_SIGNED) == 0) {
+          return SNTSigningStatusUnsigned;
+        } else if ((csFlags & CS_VALID) == 0) {
+          return SNTSigningStatusInvalid;
+        } else if ((csFlags & CS_ADHOC) == CS_ADHOC) {
+          return SNTSigningStatusAdhoc;
+        } else if ((csFlags & CS_DEV_CODE) == CS_DEV_CODE) {
+          return SNTSigningStatusDevelopment;
+        } else {
+          return SNTSigningStatusProduction;
+        }
       }
       entitlementsFilterCallback:^NSDictionary *(NSDictionary *entitlements) {
         return entitlementsFilterCallback(entitlementsFilterTeamID, entitlements);
@@ -368,7 +409,8 @@ static void UpdateCachedDecisionSigningInfo(
   } else {
     csInfo = [fileInfo codesignCheckerWithError:&error];
     if (error) {
-      LOGW(@"Failed to get codesign ingo for file %@: %@", filePath, error.localizedDescription);
+      LOGW(@"Failed to get codesign info for file %@: %@", filePath, error.localizedDescription);
+      csInfo = nil;
     }
   }
 
@@ -379,18 +421,23 @@ static void UpdateCachedDecisionSigningInfo(
                             teamID:identifiers.teamID
                          signingID:identifiers.signingID
                platformBinaryState:PlatformBinaryState::kStaticCheck
-              isProdSignedCallback:^BOOL {
-                if (csInfo) {
-                  // Development OID values defined by Apple and used by the Security Framework
-                  // https://images.apple.com/certificateauthority/pdf/Apple_WWDR_CPS_v1.31.pdf
-                  NSArray *keys = @[ @"1.2.840.113635.100.6.1.2", @"1.2.840.113635.100.6.1.12" ];
-                  NSDictionary *vals = CFBridgingRelease(SecCertificateCopyValues(
-                      csInfo.leafCertificate.certRef, (__bridge CFArrayRef)keys, NULL));
-                  return vals.count == 0;
-                } else {
-                  return NO;
-                }
-              }
+             signingStatusCallback:^SNTSigningStatus {
+               if (csInfo) {
+                 if (csInfo.signatureFlags & kSecCodeSignatureAdhoc) {
+                   return SNTSigningStatusAdhoc;
+                 } else if (IsDevelopmentCert(csInfo.leafCertificate)) {
+                   return SNTSigningStatusDevelopment;
+                 } else {
+                   return SNTSigningStatusProduction;
+                 }
+               } else {
+                 if (error.code == errSecCSUnsigned) {
+                   return SNTSigningStatusUnsigned;
+                 } else {
+                   return SNTSigningStatusInvalid;
+                 }
+               }
+             }
         entitlementsFilterCallback:nil
           preCodesignCheckCallback:nil];
 }

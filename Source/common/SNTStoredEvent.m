@@ -59,6 +59,8 @@
   ENCODE(self.teamID, @"teamID");
   ENCODE(self.signingID, @"signingID");
   ENCODE(self.cdhash, @"cdhash");
+  ENCODE(@(self.codesigningFlags), @"codesigningFlags");
+  ENCODE(@(self.signingStatus), @"signingStatus");
   ENCODE(self.entitlements, @"entitlements");
   ENCODE(@(self.entitlementsFiltered), @"entitlementsFiltered");
 
@@ -108,6 +110,8 @@
     _teamID = DECODE(NSString, @"teamID");
     _signingID = DECODE(NSString, @"signingID");
     _cdhash = DECODE(NSString, @"cdhash");
+    _codesigningFlags = [DECODE(NSNumber, @"codesigningFlags") unsignedIntValue];
+    _signingStatus = (SNTSigningStatus)[DECODE(NSNumber, @"signingStatus") integerValue];
     _entitlements = DECODEDICT(@"entitlements");
     _entitlementsFiltered = [DECODE(NSNumber, @"entitlementsFiltered") boolValue];
 

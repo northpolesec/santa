@@ -299,6 +299,7 @@ static NSString *const kPrinterProxyPostMonterey =
         }
       }];
 
+  cd.codesigningFlags = targetProc->codesigning_flags;
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
 
   // Formulate an initial action from the decision.
@@ -351,6 +352,8 @@ static NSString *const kPrinterProxyPostMonterey =
     se.teamID = cd.teamID;
     se.signingID = cd.signingID;
     se.cdhash = cd.cdhash;
+    se.codesigningFlags = cd.codesigningFlags;
+    se.signingStatus = cd.signingStatus;
     se.pid = @(newProcPid);
     se.ppid = @(audit_token_to_pid(targetProc->parent_audit_token));
     se.parentName = @(esMsg.ParentProcessName().c_str());
@@ -581,17 +584,22 @@ static NSString *const kPrinterProxyPostMonterey =
 
 // Creates a rule for the binary that was allowed by the user in standalone mode.
 - (void)createRuleForStandaloneModeEvent:(SNTStoredEvent *)se {
-  SNTRuleType ruleType = SNTRuleTypeSigningID;
-  NSString *ruleIdentifier = se.signingID;
-  SNTRuleState newRuleState = SNTRuleStateAllowLocalSigningID;
+  SNTRuleType ruleType;
+  NSString *ruleIdentifier;
+  SNTRuleState newRuleState;
 
-  // Check here to see if the binary is validly signed if not
-  // then use a hash rule instead of a signing ID
-  if (se.signingChain.count == 0) {
-    LOGD(@"No certificate chain found for %@", se.filePath);
+  if (se.signingStatus == SNTSigningStatusProduction && se.signingID) {
+    ruleType = SNTRuleTypeSigningID;
+    ruleIdentifier = se.signingID;
+    newRuleState = SNTRuleStateAllowLocalSigningID;
+  } else if (se.fileSHA256) {
     ruleType = SNTRuleTypeBinary;
     ruleIdentifier = se.fileSHA256;
     newRuleState = SNTRuleStateAllowLocalBinary;
+  } else {
+    LOGE(@"No appropriate identifiers available to add rule in standalone mode for %@",
+         se.filePath);
+    return;
   }
 
   NSString *commentStr = [NSString stringWithFormat:@"%@", se.filePath];

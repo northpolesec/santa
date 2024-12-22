@@ -1,16 +1,17 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/common/SNTCommonEnums.h"
@@ -19,6 +20,7 @@
 #import <MOLCertificate/MOLCertificate.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 
+#import "Source/common/CertificateHelpers.h"
 #import "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
@@ -161,6 +163,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     cd.sha256 = binInfo.SHA256;
     cd.signingID = FormatSigningID(csInfo);
     cd.cdhash = csInfo.cdhash;
+    cd.signingStatus = IsDevelopmentCert(csInfo.leafCertificate) ? SNTSigningStatusDevelopment
+                                                                 : SNTSigningStatusProduction;
 
     // Normalized by the FormatSigningID function so this will always have a
     // prefix.

@@ -26,6 +26,7 @@ objc_library(
     ],
     deps = [
         ":SNTDatabaseTable",
+        "//Source/common:CertificateHelpers",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
@@ -201,6 +202,7 @@ objc_library(
     hdrs = ["SNTPolicyProcessor.h"],
     deps = [
         ":SNTRuleTable",
+        "//Source/common:CertificateHelpers",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -955,6 +957,7 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
+        "//Source/common:CertificateHelpers",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
