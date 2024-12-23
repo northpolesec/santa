@@ -46,8 +46,8 @@ git_override(
 bazel_dep(name = "molxpcconnection", version = "2.1", repo_name = "MOLXPCConnection")
 git_override(
     module_name = "molxpcconnection",
-    commit = "da816dc49becac96d941ef6a5c4153ed39d1fe7c",
-    remote = "https://github.com/russellhancox/macops-molxpcconnection.git",
+    commit = "bd75ae9329fe26197f50ceb84bc4932f706df573",
+    remote = "https://github.com/google/macops-molxpcconnection.git",
 )
 
 # FMDB
