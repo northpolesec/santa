@@ -174,8 +174,12 @@ using santa::NSStringToUTF8StringView;
     case SNTSigningStatusUnsigned: e->set_signing_status(::pbv1::SIGNING_STATUS_UNSIGNED); break;
     case SNTSigningStatusInvalid: e->set_signing_status(::pbv1::SIGNING_STATUS_INVALID); break;
     case SNTSigningStatusAdhoc: e->set_signing_status(::pbv1::SIGNING_STATUS_ADHOC); break;
-    case SNTSigningStatusDevelopment: e->set_signing_status(::pbv1::SIGNING_STATUS_DEVELOPMENT); break;
-    case SNTSigningStatusProduction: e->set_signing_status(::pbv1::SIGNING_STATUS_PRODUCTION); break;
+    case SNTSigningStatusDevelopment:
+      e->set_signing_status(::pbv1::SIGNING_STATUS_DEVELOPMENT);
+      break;
+    case SNTSigningStatusProduction:
+      e->set_signing_status(::pbv1::SIGNING_STATUS_PRODUCTION);
+      break;
     default: e->set_signing_status(::pbv1::SIGNING_STATUS_UNSPECIFIED); break;
   }
 
