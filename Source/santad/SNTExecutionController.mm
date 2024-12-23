@@ -321,6 +321,9 @@ static NSString *const kPrinterProxyPostMonterey =
   BOOL stoppedProc = false;
   std::pair<pid_t, int> pidAndVersion =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
+  bool holdAndAsk = false;
+  // Only allow a user in standalone mode to override a block if an
+  // explicit block rule is not set when using a sync service.
   if (cd.decision == SNTEventStateBlockUnknown && config.clientMode == SNTClientModeStandalone) {
     // In standalone mode we want hold off on making a decision until the user has had a chance to
     // approve. ES won't let us do this, we'd hit the response deadline. Instead, we suspend the
@@ -330,6 +333,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _procSignalCache->set(pidAndVersion, true);
     stoppedProc = [self manipulatePID:newProcPid withControl:ProcessControl::Suspend];
     postAction(SNTActionRespondAllow);
+    holdAndAsk = true;
   } else {
     // Respond with the decision.
     postAction(action);
@@ -411,7 +415,7 @@ static NSString *const kPrinterProxyPostMonterey =
       if (!cd.silentBlock) {
         [self maybeSendTTYMessageToTarget:targetProc
                            messageCreator:^NSString * {
-                             if (config.clientMode == SNTClientModeStandalone) {
+                             if (holdAndAsk) {
                                if (stoppedProc) {
                                  return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
                                         @"binary until approval is granted in the GUI...\n";
@@ -443,10 +447,7 @@ static NSString *const kPrinterProxyPostMonterey =
 
         void (^replyBlock)(BOOL) = nil;
 
-        // Only allow a user in standalone mode to override a block if an
-        // explicit block rule is not set when using a sync service.
-        if (config.clientMode == SNTClientModeStandalone &&
-            se.decision == SNTEventStateBlockUnknown) {
+        if (holdAndAsk) {
           replyBlock = ^(BOOL authenticated) {
             LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                  authenticated);
