@@ -114,6 +114,16 @@
 @property NSString *cdhash;
 
 ///
+/// Codesigning flags for the process (from `<Kernel/kern/cs_blobs.h>`)
+///
+@property uint32_t codesigningFlags;
+
+///
+/// The signing status of the executable file
+///
+@property SNTSigningStatus signingStatus;
+
+///
 ///  The user who executed the binary.
 ///
 @property NSString *executingUser;

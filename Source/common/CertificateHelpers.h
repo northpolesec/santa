@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -39,5 +40,14 @@ NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID);
   for a long time be careful to properly CFRetain/CFRelease the returned items.
 */
 NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs);
+
+/**
+  Test if the given certificate contains development OID values.
+
+  @param cert The cert to test
+
+  @return True if any development OIDs exist, otherwise false.
+*/
+BOOL IsDevelopmentCert(MOLCertificate *cert);
 
 __END_DECLS

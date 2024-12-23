@@ -43,6 +43,8 @@
 @property NSString *cdhash;
 @property NSDictionary *entitlements;
 @property BOOL entitlementsFiltered;
+@property uint32_t codesigningFlags;
+@property SNTSigningStatus signingStatus;
 
 @property NSString *quarantineURL;
 

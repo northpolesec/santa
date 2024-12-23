@@ -12,15 +12,44 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
-#include <Foundation/Foundation.h>
 #import "Source/santad/SNTPolicyProcessor.h"
 
+#include <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
+
 #import "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTRuleIdentifiers.h"
 
 #import "Source/santad/SNTPolicyProcessor.h"
+
+extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd);
+
+BOOL CompareMaybeNilStrings(NSString *s1, NSString *s2) {
+  return (!s1 && !s2) || [s1 isEqualToString:s2];
+}
+
+BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r2) {
+  BOOL res = CompareMaybeNilStrings(r1.cdhash, r2.cdhash);
+  XCTAssertTrue(res, "cdhash mismatch: got: %@, want: %@", r1.cdhash, r2.cdhash);
+
+  res = CompareMaybeNilStrings(r1.binarySHA256, r2.binarySHA256) && res;
+  XCTAssertTrue(res, "binarySHA256 mismatch: got: %@, want: %@", r1.binarySHA256, r2.binarySHA256);
+
+  res = CompareMaybeNilStrings(r1.signingID, r2.signingID) && res;
+  XCTAssertTrue(res, "signingID mismatch: got: %@, want: %@", r1.signingID, r2.signingID);
+
+  res = CompareMaybeNilStrings(r1.certificateSHA256, r2.certificateSHA256) && res;
+  XCTAssertTrue(res, "certificateSHA256 mismatch: got: %@, want: %@", r1.certificateSHA256,
+                r2.certificateSHA256);
+
+  res = CompareMaybeNilStrings(r1.teamID, r2.teamID) && res;
+  XCTAssertTrue(res, "teamID mismatch: got: %@, want: %@", r1.teamID, r2.teamID);
+
+  return res;
+}
 
 @interface SNTPolicyProcessorTest : XCTestCase
 @property SNTPolicyProcessor *processor;
@@ -559,6 +588,61 @@
 
   XCTAssertEqualObjects(cd.customMsg, @"Custom Message");
   XCTAssertEqualObjects(cd.customURL, @"https://example.com");
+}
+
+- (void)testCreateRuleIDs {
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+
+  cd.cdhash = @"mycdhash";
+  cd.sha256 = @"myhash";
+  cd.signingID = @"mysid";
+  cd.certSHA256 = @"mycerthash";
+  cd.teamID = @"mytid";
+
+  cd.signingStatus = SNTSigningStatusProduction;
+  XCTAssertTrue(RuleIdentifiersAreEqual(CreateRuleIDs(cd), ((struct RuleIdentifiers){
+                                                               .cdhash = @"mycdhash",
+                                                               .binarySHA256 = @"myhash",
+                                                               .signingID = @"mysid",
+                                                               .certificateSHA256 = @"mycerthash",
+                                                               .teamID = @"mytid",
+                                                           })));
+
+  cd.signingStatus = SNTSigningStatusDevelopment;
+  XCTAssertTrue(RuleIdentifiersAreEqual(CreateRuleIDs(cd), ((struct RuleIdentifiers){
+                                                               .cdhash = @"mycdhash",
+                                                               .binarySHA256 = @"myhash",
+                                                               .signingID = nil,
+                                                               .certificateSHA256 = @"mycerthash",
+                                                               .teamID = nil,
+                                                           })));
+
+  cd.signingStatus = SNTSigningStatusAdhoc;
+  XCTAssertTrue(RuleIdentifiersAreEqual(CreateRuleIDs(cd), ((struct RuleIdentifiers){
+                                                               .cdhash = @"mycdhash",
+                                                               .binarySHA256 = @"myhash",
+                                                               .signingID = nil,
+                                                               .certificateSHA256 = nil,
+                                                               .teamID = nil,
+                                                           })));
+
+  cd.signingStatus = SNTSigningStatusInvalid;
+  XCTAssertTrue(RuleIdentifiersAreEqual(CreateRuleIDs(cd), ((struct RuleIdentifiers){
+                                                               .cdhash = nil,
+                                                               .binarySHA256 = @"myhash",
+                                                               .signingID = nil,
+                                                               .certificateSHA256 = nil,
+                                                               .teamID = nil,
+                                                           })));
+
+  cd.signingStatus = SNTSigningStatusUnsigned;
+  XCTAssertTrue(RuleIdentifiersAreEqual(CreateRuleIDs(cd), ((struct RuleIdentifiers){
+                                                               .cdhash = nil,
+                                                               .binarySHA256 = @"myhash",
+                                                               .signingID = nil,
+                                                               .certificateSHA256 = nil,
+                                                               .teamID = nil,
+                                                           })));
 }
 
 @end
