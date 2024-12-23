@@ -236,9 +236,9 @@ static void UpdateCachedDecisionSigningInfo(
                         teamID:(nullable NSString *)teamID
                      signingID:(nullable NSString *)signingID
            platformBinaryState:(PlatformBinaryState)platformBinaryState
-         signingStatusCallback:(SNTSigningStatus (^_Nonnull)())SigningStatusCallback
+         signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
     entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nullable)(
-                                   NSDictionary *_Nullable entitlements))EntitlementsFilterCallback
+                                   NSDictionary *_Nullable entitlements))entitlementsFilterCallback
       preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback {
   // Check the hash before allocating a SNTCachedDecision.
   NSString *fileHash = fileSHA256 ?: fileInfo.SHA256;
@@ -259,7 +259,7 @@ static void UpdateCachedDecisionSigningInfo(
   cd.sha256 = fileHash;
   cd.teamID = teamID;
   cd.signingID = signingID;
-  cd.signingStatus = SigningStatusCallback();
+  cd.signingStatus = signingStatusCallback();
   cd.decisionClientMode = mode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
@@ -273,6 +273,9 @@ static void UpdateCachedDecisionSigningInfo(
 
     // Grab the code signature, if there's an error don't try to capture
     // any of the signature details.
+    // TODO(mlw): MOLCodesignChecker should be updated to still grab signing information
+    // even if validity check fails. Once that is done, this code can be updated to grab
+    // cert information so that it can still be reported to the sync server.
     MOLCodesignChecker *csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
     if (csInfoError) {
       csInfo = nil;
@@ -281,7 +284,7 @@ static void UpdateCachedDecisionSigningInfo(
       cd.signingStatus = (cd.signingStatus == SNTSigningStatusUnsigned ? SNTSigningStatusUnsigned
                                                                        : SNTSigningStatusInvalid);
     } else {
-      UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, EntitlementsFilterCallback);
+      UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, entitlementsFilterCallback);
     }
   }
 
