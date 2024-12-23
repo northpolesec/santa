@@ -168,6 +168,16 @@ using santa::NSStringToUTF8StringView;
   e->set_team_id(NSStringToUTF8String(event.teamID));
   e->set_signing_id(NSStringToUTF8String(event.signingID));
   e->set_cdhash(NSStringToUTF8String(event.cdhash));
+  e->set_cs_flags(event.codesigningFlags);
+
+  switch (event.signingStatus) {
+    case SNTSigningStatusUnsigned: e->set_signing_status(::pbv1::SIGNING_STATUS_UNSIGNED); break;
+    case SNTSigningStatusInvalid: e->set_signing_status(::pbv1::SIGNING_STATUS_INVALID); break;
+    case SNTSigningStatusAdhoc: e->set_signing_status(::pbv1::SIGNING_STATUS_ADHOC); break;
+    case SNTSigningStatusDevelopment: e->set_signing_status(::pbv1::SIGNING_STATUS_DEVELOPMENT); break;
+    case SNTSigningStatusProduction: e->set_signing_status(::pbv1::SIGNING_STATUS_PRODUCTION); break;
+    default: e->set_signing_status(::pbv1::SIGNING_STATUS_UNSPECIFIED); break;
+  }
 
   for (MOLCertificate *cert in event.signingChain) {
     ::pbv1::Certificate *c = e->add_signing_chain();
