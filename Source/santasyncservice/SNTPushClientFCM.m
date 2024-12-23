@@ -12,7 +12,7 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License
 
-#import "Source/santasyncservice/SNTPushNotifications.h"
+#import "Source/santasyncservice/SNTPushClientFCM.h"
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
@@ -27,7 +27,9 @@ static NSString *const kFCMFileHashKey = @"file_hash";
 static NSString *const kFCMFileNameKey = @"file_name";
 static NSString *const kFCMTargetHostIDKey = @"target_host_id";
 
-@interface SNTPushNotifications ()
+@interface SNTPushClientFCM ()
+
+@property(weak) id<SNTPushNotificationsSyncDelegate> delegate;
 
 @property SNTSyncFCM *FCMClient;
 @property NSString *token;
@@ -37,17 +39,34 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
 
 @end
 
-@implementation SNTPushNotifications
+@implementation SNTPushClientFCM
 
 #pragma mark push notification methods
 
-- (instancetype)init {
+- (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate {
   self = [super init];
   if (self) {
+    _delegate = syncDelegate;
     _pushNotificationsFullSyncInterval = kDefaultPushNotificationsFullSyncInterval;
     _pushNotificationsGlobalRuleSyncDeadline = kDefaultPushNotificationsGlobalRuleSyncDeadline;
   }
   return self;
+}
+
+- (BOOL)isConnected {
+  return self.FCMClient.isConnected;
+}
+
+- (NSString *)getToken {
+  return self.token;
+}
+
+- (NSUInteger)getFullSyncInterval {
+  return self.pushNotificationsFullSyncInterval;
+}
+
+- (void)handlePreflightSyncState:(SNTSyncState *)syncState {
+  [self listenWithSyncState:syncState];
 }
 
 - (void)listenWithSyncState:(SNTSyncState *)syncState {
@@ -180,10 +199,6 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
     }
   }
   return message.count ? [message copy] : nil;
-}
-
-- (BOOL)isConnected {
-  return self.FCMClient.isConnected;
 }
 
 @end
