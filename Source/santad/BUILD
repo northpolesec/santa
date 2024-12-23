@@ -185,6 +185,19 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "SNTNotificationQueueTest",
+    srcs = ["SNTNotificationQueueTest.mm"],
+    deps = [
+        ":SNTNotificationQueue",
+        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:TestUtils",
+        "@MOLXPCConnection",
+        "@OCMock",
+    ],
+)
+
 objc_library(
     name = "SNTSyncdQueue",
     srcs = ["SNTSyncdQueue.m"],
@@ -822,6 +835,7 @@ objc_library(
         ":TTYWriter",
         ":WatchItems",
         "//Source/common:PrefixTree",
+        "//Source/common:RingBuffer",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
@@ -1494,6 +1508,7 @@ test_suite(
         ":SNTExecutionControllerTest",
         ":SNTPolicyProcessorTest",
         ":SNTRuleTableTest",
+        ":SNTNotificationQueueTest",
         ":SantadTest",
         ":WatchItemsTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",

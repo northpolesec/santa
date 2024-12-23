@@ -23,8 +23,6 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 
-static const int kMaximumNotifications = 10;
-
 @interface SNTNotificationQueue ()
 @property dispatch_queue_t pendingQueue;
 @end
@@ -33,12 +31,14 @@ static const int kMaximumNotifications = 10;
   std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>> _pendingNotifications;
 }
 
-- (instancetype)init {
+- (instancetype)initWithRingBuffer:
+    (std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>>)pendingNotifications {
   self = [super init];
   if (self) {
+    _pendingNotifications = std::move(pendingNotifications);
+
     _pendingQueue = dispatch_queue_create("com.northpolesec.santa.daemon.SNTNotificationQueue",
                                           DISPATCH_QUEUE_SERIAL);
-    _pendingNotifications = std::make_unique<santa::RingBuffer<NSMutableDictionary *>>(kMaximumNotifications);
   }
   return self;
 }
@@ -65,8 +65,8 @@ static const int kMaximumNotifications = 10;
     NSDictionary *msg = _pendingNotifications->Enqueue(d).value_or(nil);
 
     if (msg != nil) {
-      LOGI(@"Pending GUI notification count is over %d, dropping oldest notification.",
-           kMaximumNotifications);
+      LOGI(@"Pending GUI notification count is over %zu, dropping oldest notification.",
+           _pendingNotifications->Capacity());
       // Check if the dropped notification had a reply block and if so, call it
       // so any resources can be cleaned up.
       void (^replyBlock)(BOOL) = msg[@"reply"];

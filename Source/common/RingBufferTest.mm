@@ -186,11 +186,7 @@ using santa::RingBuffer;
   rb.Enqueue({700, 7});
   rb.Enqueue({8, 800});
 
-  rb.Erase(std::remove_if(rb.begin(), rb.end(),
-                          [](const Foo &f) {
-                            return f.x < f.y;
-                          }),
-           rb.end());
+  rb.Erase(std::remove_if(rb.begin(), rb.end(), [](const Foo &f) { return f.x < f.y; }), rb.end());
 
   res = rb.Dequeue().value_or(Foo{0, 0});
   XCTAssertEqual(res.x, 500);

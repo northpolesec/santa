@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <memory>
 
+#include "Source/common/RingBuffer.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -76,7 +77,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  SNTNotificationQueue *notifier_queue = [[SNTNotificationQueue alloc] init];
+  auto ringbuf = std::make_unique<RingBuffer<NSMutableDictionary*>>(10);
+  SNTNotificationQueue *notifier_queue = [[SNTNotificationQueue alloc] initWithRingBuffer:std::move(ringbuf)];
   if (!notifier_queue) {
     LOGE(@"Failed to initialize notification queue.");
     exit(EXIT_FAILURE);
