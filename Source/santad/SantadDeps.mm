@@ -77,8 +77,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  auto ringbuf = std::make_unique<RingBuffer<NSMutableDictionary*>>(10);
-  SNTNotificationQueue *notifier_queue = [[SNTNotificationQueue alloc] initWithRingBuffer:std::move(ringbuf)];
+  auto ringbuf = std::make_unique<RingBuffer<NSMutableDictionary *>>(10);
+  SNTNotificationQueue *notifier_queue =
+      [[SNTNotificationQueue alloc] initWithRingBuffer:std::move(ringbuf)];
   if (!notifier_queue) {
     LOGE(@"Failed to initialize notification queue.");
     exit(EXIT_FAILURE);

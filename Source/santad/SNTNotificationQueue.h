@@ -27,7 +27,8 @@
 @property(nonatomic) MOLXPCConnection *notifierConnection;
 
 - (instancetype)initWithRingBuffer:
-    (std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>>)pendingNotifications NS_DESIGNATED_INITIALIZER;
+    (std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>>)pendingNotifications
+    NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 
