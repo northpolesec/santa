@@ -472,6 +472,22 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCSInvalidated &
   return FinalizeString(str);
 }
 
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClone &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=CLONE");
+
+  return FinalizeString(str);
+}
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCopyfile &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=COPYFILE");
+
+  return FinalizeString(str);
+}
+
 #if HAVE_MACOS_13
 
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLogin &msg) {

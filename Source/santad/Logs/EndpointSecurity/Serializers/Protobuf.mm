@@ -638,6 +638,14 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCSInvalidated &msg
   return FinalizeProto(santa_msg);
 }
 
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClone &msg) {
+  return {};
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCopyfile &msg) {
+  return {};
+}
+
 #if HAVE_MACOS_13
 
 ::pbv1::SocketAddress::Type GetSocketAddressType(es_address_type_t type) {

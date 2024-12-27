@@ -878,6 +878,39 @@ message Authentication {
   }
 }
 
+// Information about a clone event
+message Clone {
+  // The process cloning the file
+  optional ProcessInfoLight instigator = 1;
+
+  // The source file being cloned
+  optional FileInfo source = 2;
+
+  // The target path when the clone is complete
+  optional string target = 3;
+}
+
+// Information about a copyfile syscall event (not to be confused with `copyfile(3)`)
+message Copyfile {
+  // The process calling the copyfile syscall
+  optional ProcessInfoLight instigator = 1;
+
+  // The source file being copied
+  optional FileInfo source = 2;
+
+  // The target path when the copyfile is complete
+  optional string target = 3;
+
+  // Whether or not the target path previously existed
+  optional bool target_existed = 4;
+
+  // The mode argument of the copyfile syscall
+  uint32 mode = 5;
+
+  // Flags used in the copyfile syscall
+  int32 flags = 6;
+}
+
 // A message encapsulating a single event
 message SantaMessage {
   // Machine ID of the host emitting this log
@@ -910,6 +943,8 @@ message SantaMessage {
     ScreenSharing screen_sharing = 25;
     OpenSSH open_ssh = 26;
     Authentication authentication = 27;
+    Clone clone = 28;
+    Copyfile copyfile = 29;
   };
 }
 

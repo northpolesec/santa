@@ -580,17 +580,46 @@ class EnrichedAuthenticationAutoUnlock : public EnrichedEventType {
   std::optional<uid_t> uid_;
 };
 
-using EnrichedType =
-    std::variant<EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit,
-                 EnrichedFork, EnrichedLink, EnrichedRename, EnrichedUnlink,
-                 EnrichedCSInvalidated, EnrichedLoginWindowSessionLogin,
-                 EnrichedLoginWindowSessionLogout,
-                 EnrichedLoginWindowSessionLock,
-                 EnrichedLoginWindowSessionUnlock, EnrichedScreenSharingAttach,
-                 EnrichedScreenSharingDetach, EnrichedOpenSSHLogin,
-                 EnrichedOpenSSHLogout, EnrichedLoginLogin, EnrichedLoginLogout,
-                 EnrichedAuthenticationOD, EnrichedAuthenticationTouchID,
-                 EnrichedAuthenticationToken, EnrichedAuthenticationAutoUnlock>;
+class EnrichedClone : public EnrichedEventType {
+ public:
+  EnrichedClone(Message &&es_msg, EnrichedProcess &&instigator,
+                EnrichedFile &&source)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        source_(std::move(source)) {}
+
+  EnrichedClone(EnrichedClone &&) = default;
+
+  const EnrichedFile &source() const { return source_; }
+
+ private:
+  EnrichedFile source_;
+};
+
+class EnrichedCopyfile : public EnrichedEventType {
+ public:
+  EnrichedCopyfile(Message &&es_msg, EnrichedProcess &&instigator,
+                   EnrichedFile &&source)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        source_(std::move(source)) {}
+
+  EnrichedCopyfile(EnrichedCopyfile &&) = default;
+
+  const EnrichedFile &source() const { return source_; }
+
+ private:
+  EnrichedFile source_;
+};
+
+using EnrichedType = std::variant<
+    EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit, EnrichedFork,
+    EnrichedLink, EnrichedRename, EnrichedUnlink, EnrichedCSInvalidated,
+    EnrichedLoginWindowSessionLogin, EnrichedLoginWindowSessionLogout,
+    EnrichedLoginWindowSessionLock, EnrichedLoginWindowSessionUnlock,
+    EnrichedScreenSharingAttach, EnrichedScreenSharingDetach,
+    EnrichedOpenSSHLogin, EnrichedOpenSSHLogout, EnrichedLoginLogin,
+    EnrichedLoginLogout, EnrichedAuthenticationOD,
+    EnrichedAuthenticationTouchID, EnrichedAuthenticationToken,
+    EnrichedAuthenticationAutoUnlock, EnrichedClone, EnrichedCopyfile>;
 
 class EnrichedMessage {
  public:

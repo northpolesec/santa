@@ -42,7 +42,9 @@ using santa::santad::process_tree::ProcessTree;
 
 es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
   switch (msg->event_type) {
+    case ES_EVENT_TYPE_NOTIFY_CLONE: return msg->event.clone.source;
     case ES_EVENT_TYPE_NOTIFY_CLOSE: return msg->event.close.target;
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE: return msg->event.copyfile.source;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: return msg->event.exchangedata.file1;
     case ES_EVENT_TYPE_NOTIFY_LINK: return msg->event.link.source;
     case ES_EVENT_TYPE_NOTIFY_RENAME: return msg->event.rename.source;
@@ -139,7 +141,9 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
   }
 
   switch (esMsg->event_type) {
+    case ES_EVENT_TYPE_NOTIFY_CLONE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_CLOSE: OS_FALLTHROUGH;
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_LINK: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_RENAME: OS_FALLTHROUGH;
@@ -194,7 +198,9 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
 - (void)enable {
   // clang-format off
   std::set<es_event_type_t> events{
+    ES_EVENT_TYPE_NOTIFY_CLONE,
     ES_EVENT_TYPE_NOTIFY_CLOSE,
+    ES_EVENT_TYPE_NOTIFY_COPYFILE,
     ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED,
     ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA,
     ES_EVENT_TYPE_NOTIFY_EXEC,

@@ -59,6 +59,14 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedCSInvalidated &msg) {
   return {};
 }
 
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedClone &msg) {
+  return {};
+}
+
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedCopyfile &msg) {
+  return {};
+}
+
 std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLogin &msg) {
   return {};
 }
