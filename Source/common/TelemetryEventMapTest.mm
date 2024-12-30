@@ -50,6 +50,8 @@ using santa::TelemetryEvent;
       {"screensharing", TelemetryEvent::kScreenSharing},
       {"openssh", TelemetryEvent::kOpenSSH},
       {"authentication", TelemetryEvent::kAuthentication},
+      {"clone", TelemetryEvent::kClone},
+      {"copyfile", TelemetryEvent::kCopyfile},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -79,7 +81,9 @@ using santa::TelemetryEvent;
 
 - (void)testESEventToTelemetryEvent {
   std::map<es_event_type_t, TelemetryEvent> esEventToTelemetryEvent = {
+      {ES_EVENT_TYPE_NOTIFY_CLONE, TelemetryEvent::kClone},
       {ES_EVENT_TYPE_NOTIFY_CLOSE, TelemetryEvent::kClose},
+      {ES_EVENT_TYPE_NOTIFY_COPYFILE, TelemetryEvent::kCopyfile},
       {ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED, TelemetryEvent::kCodesigningInvalidated},
       {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, TelemetryEvent::kExchangeData},
       {ES_EVENT_TYPE_NOTIFY_EXEC, TelemetryEvent::kExecution},

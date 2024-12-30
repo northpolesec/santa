@@ -32,8 +32,6 @@
 #include "Source/santad/ProcessTree/process_tree.h"
 #include "Source/santad/ProcessTree/process_tree_macos.h"
 
-using santa::StringTokenToStringView;
-
 namespace santa {
 
 Enricher::Enricher(std::shared_ptr<::santa::santad::process_tree::ProcessTree> pt)
@@ -86,6 +84,12 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
     case ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED:
       return std::make_unique<EnrichedMessage>(
           EnrichedCSInvalidated(std::move(es_msg), Enrich(*es_msg->process)));
+    case ES_EVENT_TYPE_NOTIFY_CLONE:
+      return std::make_unique<EnrichedMessage>(EnrichedClone(
+          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.clone.source)));
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE:
+      return std::make_unique<EnrichedMessage>(EnrichedCopyfile(
+          std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.copyfile.source)));
 #if HAVE_MACOS_13
     case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION:
       switch (es_msg->event.authentication->type) {

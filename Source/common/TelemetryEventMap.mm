@@ -41,6 +41,8 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
       {"screensharing", TelemetryEvent::kScreenSharing},
       {"openssh", TelemetryEvent::kOpenSSH},
       {"authentication", TelemetryEvent::kAuthentication},
+      {"clone", TelemetryEvent::kClone},
+      {"copyfile", TelemetryEvent::kCopyfile},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -76,7 +78,9 @@ TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry,
 
 TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event) {
   switch (event) {
+    case ES_EVENT_TYPE_NOTIFY_CLONE: return TelemetryEvent::kClone;
     case ES_EVENT_TYPE_NOTIFY_CLOSE: return TelemetryEvent::kClose;
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE: return TelemetryEvent::kCopyfile;
     case ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED: return TelemetryEvent::kCodesigningInvalidated;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: return TelemetryEvent::kExchangeData;
     case ES_EVENT_TYPE_NOTIFY_EXEC: return TelemetryEvent::kExecution;
