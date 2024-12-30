@@ -62,3 +62,34 @@ git_override(
     commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
     remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
 )
+
+# Rust toolchain
+# 0.55.0 - 0.56.0 are broken. Fix is in
+# https://github.com/bazelbuild/rules_rust/pull/3142, which is not yet released.
+bazel_dep(name = "rules_rust", version = "0.53.0")
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2021",
+    versions = ["1.80.1"],
+)
+use_repo(rust, "rust_toolchains")
+register_toolchains("@rust_toolchains//:all")
+
+# Rust crates
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+
+# Crates are pinned in the root Cargo.lock, but dependencies can be declared
+# locally. Each BUILD file that contains rust targets should have a Cargo.toml
+# file to declare dependencies. This makes it possible to run tests quickly
+# using cargo (which also enables inline support in IDEs like VSCode).
+crate.from_cargo(
+    name = "crate_index",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = [
+        "//:Cargo.toml",
+
+        # Keep this list in sync with the root Cargo.toml.
+        "//:Source/santad/Logs/EndpointSecurity/ParquetLogger/Cargo.toml",
+    ],
+)
+use_repo(crate, "crate_index")
