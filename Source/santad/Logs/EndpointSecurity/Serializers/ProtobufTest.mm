@@ -128,6 +128,8 @@ NSString *ConstructFilename(es_event_type_t eventType, NSString *variant = nil) 
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT: name = @"openssh_logout"; break;
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN: name = @"login_login"; break;
     case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION: name = @"authentication"; break;
+    case ES_EVENT_TYPE_NOTIFY_CLONE: name = @"clone"; break;
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE: name = @"copyfile"; break;
     default:
       XCTFail(@"Failed to construct filename: Unhandled event type: %d", eventType);
       return nil;
@@ -188,6 +190,8 @@ const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &s
     case ::pbv1::SantaMessage::kOpenSsh: return santaMsg.open_ssh();
     case ::pbv1::SantaMessage::kLoginLogout: return santaMsg.login_logout();
     case ::pbv1::SantaMessage::kAuthentication: return santaMsg.authentication();
+    case ::pbv1::SantaMessage::kClone: return santaMsg.clone();
+    case ::pbv1::SantaMessage::kCopyfile: return santaMsg.copyfile();
     case ::pbv1::SantaMessage::EVENT_NOT_SET:
       XCTFail(@"Protobuf message SantaMessage did not set an 'event' field");
       OS_FALLTHROUGH;
@@ -826,6 +830,44 @@ void SerializeAndCheckNonESEvents(
                                  es_message_t *esMsg) {
                   }
                           json:NO];
+}
+
+- (void)testSerializeMessageClone {
+  __block es_file_t fileSource = MakeESFile("source", MakeStat(300));
+  __block es_file_t fileTargetDir = MakeESFile("target_dir");
+  es_string_token_t targetTok = MakeESStringToken("target_file");
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_CLONE
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.clone.source = &fileSource;
+                    esMsg->event.clone.target_dir = &fileTargetDir;
+                    esMsg->event.clone.target_name = targetTok;
+                  }];
+}
+
+- (void)testSerializeMessageCopyfile {
+  __block es_file_t fileSource = MakeESFile("source", MakeStat(300));
+  __block es_file_t fileTargetDir = MakeESFile("target_dir");
+  es_string_token_t targetTok = MakeESStringToken("target_file");
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_COPYFILE
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.copyfile.source = &fileSource;
+                    esMsg->event.copyfile.target_dir = &fileTargetDir;
+                    esMsg->event.copyfile.target_name = targetTok;
+                    esMsg->event.copyfile.mode = 0x123;
+                    esMsg->event.copyfile.flags = 0x456;
+
+                    // For one of the versions don't set the target file to
+                    // simulate output when a target doesn't already exist
+                    if (esMsg->version == 7) {
+                      esMsg->event.copyfile.target_file = NULL;
+                    } else {
+                      esMsg->event.copyfile.target_file = &fileTargetDir;
+                    }
+                  }];
 }
 
 #if HAVE_MACOS_13
