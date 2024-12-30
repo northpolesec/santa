@@ -475,7 +475,13 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCSInvalidated &
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClone &msg) {
   std::string str = CreateDefaultString();
 
-  str.append("action=CLONE");
+  str.append("action=CLONE|source=");
+  str.append(FilePath(msg->event.clone.source).Sanitized());
+  str.append("|target=");
+  str.append(FilePath(msg->event.clone.target_dir).Sanitized());
+  str.append("/");
+  str.append(SanitizableString(msg->event.clone.target_name).Sanitized());
+  AppendInstigator(str, msg);
 
   return FinalizeString(str);
 }
@@ -483,7 +489,13 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClone &msg) {
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCopyfile &msg) {
   std::string str = CreateDefaultString();
 
-  str.append("action=COPYFILE");
+  str.append("action=COPYFILE|source=");
+  str.append(FilePath(msg->event.copyfile.source).Sanitized());
+  str.append("|target=");
+  str.append(FilePath(msg->event.copyfile.target_dir).Sanitized());
+  str.append("/");
+  str.append(SanitizableString(msg->event.copyfile.target_name).Sanitized());
+  AppendInstigator(str, msg);
 
   return FinalizeString(str);
 }
