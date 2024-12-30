@@ -137,7 +137,7 @@
 #pragma mark Push Notifications
 
 - (void)application:(NSApplication *)application
-  didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)tokenData {
+    didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)tokenData {
   NSMutableString *deviceToken = [NSMutableString stringWithCapacity:tokenData.length * 2];
   const unsigned char *bytes = tokenData.bytes;
   for (NSUInteger i = 0; i < tokenData.length; ++i) {
@@ -148,12 +148,12 @@
 }
 
 - (void)application:(NSApplication *)application
-  didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
+    didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
   LOGE(@"Failed to register with APNS: %@", error);
 }
 
 - (void)application:(NSApplication *)application
-  didReceiveRemoteNotification:(NSDictionary<NSString *, id> *)message {
+    didReceiveRemoteNotification:(NSDictionary<NSString *, id> *)message {
   LOGD(@"APNS Message: %@", message);
   MOLXPCConnection *syncConn = [SNTXPCSyncServiceInterface configuredConnection];
   [syncConn resume];

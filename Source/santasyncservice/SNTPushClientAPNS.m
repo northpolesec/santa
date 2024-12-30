@@ -43,9 +43,9 @@
 
 - (void)updateToken {
   [[self.delegate daemonConnection].remoteObjectProxy
-    requestAPNSToken:^void(NSString *deviceToken) {
-      self.deviceToken = deviceToken;
-    }];
+      requestAPNSToken:^void(NSString *deviceToken) {
+        self.deviceToken = deviceToken;
+      }];
 }
 
 - (BOOL)isConnected {
