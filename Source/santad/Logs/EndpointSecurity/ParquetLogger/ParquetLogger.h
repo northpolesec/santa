@@ -1,8 +1,6 @@
-#include <stdint.h>
+#include "Source/santad/Logs/EndpointSecurity/ParquetLogger/cpp_api.rs.h"
 
-#ifndef SANTA__FOO_H
-#define SANTA__FOO_H
-
-bool BloomFilterContains(int64_t x);
+#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_PARQUETLOGGER_PARQUETLOGGER_H
+#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_PARQUETLOGGER_PARQUETLOGGER_H
 
 #endif

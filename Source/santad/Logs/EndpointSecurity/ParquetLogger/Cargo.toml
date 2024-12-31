@@ -9,6 +9,7 @@ description = "Parquet output support for Santa"
 [lib]
 name = "parquet_logger"
 path = "parquet_logger.rs"
+crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 parquet2 = "0.17.2"

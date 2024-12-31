@@ -6,7 +6,15 @@ load("//:helper.bzl", "santa_unit_test")
 
 rust_static_library(
     name = "parquet_logger",
-    srcs = ["parquet_logger.rs"],
+    srcs = [
+        "column_builder.rs",
+        "cpp_api.rs",
+        "page_builder.rs",
+        "parquet_logger.rs",
+        "table.rs",
+        "value.rs",
+        "writer.rs",
+    ],
     aliases = aliases(),
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
@@ -36,6 +44,6 @@ santa_unit_test(
 
 rust_cxx_bridge(
     name = "parquet_bridge",
-    src = "parquet_logger.rs",
+    src = "cpp_api.rs",
     deps = [":parquet_logger"],
 )
