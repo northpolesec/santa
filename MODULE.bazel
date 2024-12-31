@@ -62,3 +62,56 @@ git_override(
     commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
     remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
 )
+
+# Rust toolchain
+# 0.55.0 - 0.56.0 are broken. Fix is in
+# https://github.com/bazelbuild/rules_rust/pull/3142, which is not yet released.
+#
+# If you change this version, also update cxx.rs below to a version that depends
+# on the matching rules_rust version.
+bazel_dep(name = "rules_rust", version = "0.54.1")
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2021",
+    versions = ["1.80.1"],
+)
+use_repo(rust, "rust_toolchains")
+register_toolchains("@rust_toolchains//:all")
+
+# Rust crates
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+
+# Crates are pinned in the root Cargo.lock, but dependencies can be declared
+# locally. Each BUILD file that contains rust targets should have a Cargo.toml
+# file to declare dependencies. This makes it possible to run tests quickly
+# using cargo (which also enables inline support in IDEs like VSCode).
+crate.from_cargo(
+    name = "crate_index",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = [
+        "//:Cargo.toml",
+
+        # Keep this list in sync with the root Cargo.toml.
+        "//:Source/santad/Logs/EndpointSecurity/ParquetLogger/Cargo.toml",
+    ],
+)
+use_repo(crate, "crate_index")
+
+# CXX bridge. Rust has a builtin FFI via C, but CXX makes it a lot easier to
+# pass C++ types around.
+bazel_dep(name="cxx.rs")
+git_override(
+    module_name = "cxx.rs",
+    # If you change this version, also update the rules_rust version to the one
+    # cxx uses.
+    commit = "121bb6f8",
+    remote = "https://github.com/dtolnay/cxx",
+    patches = [
+        # This patch makes cxx.rs explicitly request cc_rules. Once we upgrade
+        # the cxx dependency to a new release, the patch can be removed.
+        #
+        # (cxx at HEAD depends on rules_rust 0.56.0 which is broken, so we can't
+        # upgrade yet.)
+        ":0001-cc_rules.cxx.rs.patch",
+    ],
+)
