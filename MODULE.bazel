@@ -66,7 +66,10 @@ git_override(
 # Rust toolchain
 # 0.55.0 - 0.56.0 are broken. Fix is in
 # https://github.com/bazelbuild/rules_rust/pull/3142, which is not yet released.
-bazel_dep(name = "rules_rust", version = "0.53.0")
+#
+# If you change this version, also update cxx.rs below to a version that depends
+# on the matching rules_rust version.
+bazel_dep(name = "rules_rust", version = "0.54.1")
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
@@ -93,3 +96,22 @@ crate.from_cargo(
     ],
 )
 use_repo(crate, "crate_index")
+
+# CXX bridge. Rust has a builtin FFI via C, but CXX makes it a lot easier to
+# pass C++ types around.
+bazel_dep(name="cxx.rs")
+git_override(
+    module_name = "cxx.rs",
+    # If you change this version, also update the rules_rust version to the one
+    # cxx uses.
+    commit = "121bb6f8",
+    remote = "https://github.com/dtolnay/cxx",
+    patches = [
+        # This patch makes cxx.rs explicitly request cc_rules. Once we upgrade
+        # the cxx dependency to a new release, the patch can be removed.
+        #
+        # (cxx at HEAD depends on rules_rust 0.56.0 which is broken, so we can't
+        # upgrade yet.)
+        ":0001-cc_rules.cxx.rs.patch",
+    ],
+)
