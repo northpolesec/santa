@@ -12,3 +12,4 @@ path = "parquet_logger.rs"
 
 [dependencies]
 parquet2 = "0.17.2"
+cxx = "1.0.136"
