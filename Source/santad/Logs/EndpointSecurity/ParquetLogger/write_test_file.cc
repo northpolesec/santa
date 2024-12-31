@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "Source/santad/Logs/EndpointSecurity/ParquetLogger/gen/cpp_api.rs.h"
+#include "Source/santad/Logs/EndpointSecurity/ParquetLogger/cpp_api.rs.h"
 
 // This demonstrates the use of the C++ API for parquet_logger, which is
 // implemented in Rust. The C++ API uses an opaque type called Table, which is
