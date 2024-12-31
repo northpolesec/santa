@@ -1,6 +1,6 @@
 load("@crate_index//:defs.bzl", "aliases", "all_crate_deps")
 load("@cxx.rs//tools/bazel:rust_cxx_bridge.bzl", "rust_cxx_bridge")
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
 load("@rules_rust//rust:defs.bzl", "rust_static_library", "rust_test")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -46,4 +46,11 @@ rust_cxx_bridge(
     name = "parquet_bridge",
     src = "cpp_api.rs",
     deps = [":parquet_logger"],
+)
+
+# Used to produce a test file for the e2e test.
+cc_binary(
+    name = "write_test_file",
+    srcs = ["write_test_file.cc"],
+    deps = [":parquet_bridge"],
 )
