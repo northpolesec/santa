@@ -1,0 +1,4 @@
+# This specifies the version of tooling to use, and importantly enables
+# rust-analyzer to function with IDEs.
+[toolchain]
+channel = "nightly"
