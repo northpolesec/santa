@@ -29,6 +29,8 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/common/SNTXPCSyncServiceInterface.h"
+#import "Source/gui/SNTAppDelegate.h"
 #import "Source/gui/SNTBinaryMessageWindowController.h"
 #import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 #import "Source/gui/SNTDeviceMessageWindowController.h"
@@ -46,6 +48,17 @@
 // A serial queue for holding hashBundleBinaries requests
 @property dispatch_queue_t hashBundleBinariesQueue;
 
+// The APNS device token. If configured, the GUI app registers with APNS. Once the registration is
+// complete, the app delegate will notify this class. Any pending requests for the token will then
+// be processed.
+@property(atomic) NSString *APNSDeviceToken;
+
+// A queue for serializing APNS token requests.
+@property dispatch_queue_t APNSQueue;
+
+// Stores APNS token requests, while waiting for APNS registration.
+@property NSMutableArray<void (^)(NSString *)> *APNSTokenRequests;
+
 @end
 
 @implementation SNTNotificationManager
@@ -58,6 +71,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     _pendingNotifications = [[NSMutableArray alloc] init];
     _hashBundleBinariesQueue = dispatch_queue_create("com.northpolesec.santagui.hashbundlebinaries",
                                                      DISPATCH_QUEUE_SERIAL);
+    _APNSQueue = dispatch_queue_create("com.northpolesec.santagui.apns", DISPATCH_QUEUE_SERIAL);
+    _APNSTokenRequests = [NSMutableArray array];
   }
   return self;
 }
@@ -398,6 +413,39 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                                                        customText:text];
 
   [self queueMessage:pendingMsg];
+}
+
+// XPC handler. The sync service requests the APNS token, by way of the daemon.
+- (void)requestAPNSToken:(void (^)(NSString *))reply {
+  if (self.APNSDeviceToken.length) {
+    reply(self.APNSDeviceToken);
+    return;
+  }
+
+  // If APNS is enabled, `-[NSApp registerForRemoteNotifications]` is run when the application
+  // finishes launching at startup. If APNS is enabled after startup, register now.
+  [NSApp registerForRemoteNotifications];
+  dispatch_async(self.APNSQueue, ^{
+    [self.APNSTokenRequests addObject:reply];
+  });
+}
+
+- (void)didRegisterForAPNS:(NSString *)deviceToken {
+  self.APNSDeviceToken = deviceToken;
+  [self APNSTokenChanged];
+  dispatch_async(self.APNSQueue, ^{
+    for (void (^reply)(NSString *) in self.APNSTokenRequests) {
+      reply(deviceToken);
+    }
+    [self.APNSTokenRequests removeAllObjects];
+  });
+}
+
+- (void)APNSTokenChanged {
+  MOLXPCConnection *syncConn = [SNTXPCSyncServiceInterface configuredConnection];
+  [syncConn resume];
+  [[syncConn remoteObjectProxy] APNSTokenChanged];
+  [syncConn invalidate];
 }
 
 #pragma mark SNTBundleNotifierXPC protocol methods
