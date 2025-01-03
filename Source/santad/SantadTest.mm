@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -129,6 +130,7 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   OCMStub([mockConfigurator clientMode]).andReturn(clientMode);
   OCMStub([mockConfigurator failClosed]).andReturn(NO);
   OCMStub([mockConfigurator fileAccessPolicyUpdateIntervalSec]).andReturn(600);
+  OCMStub([mockConfigurator enableSilentTTYMode]).andReturn(NO);
 
   NSString *testPath = [NSString pathWithComponents:@[
     [[NSBundle bundleForClass:[self class]] resourcePath],
@@ -146,7 +148,8 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
                                                    metrics:deps->Metrics()
                                             execController:deps->ExecController()
                                         compilerController:deps->CompilerController()
-                                           authResultCache:deps->AuthResultCache()];
+                                           authResultCache:deps->AuthResultCache()
+                                                 ttyWriter:deps->TTYWriter()];
 
   XCTestExpectation *expectation =
       [self expectationWithDescription:@"Wait for santa's Auth dispatch queue"];

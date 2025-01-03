@@ -5,13 +5,13 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santad/SNTExecutionController.h"
 
@@ -413,37 +413,34 @@ static NSString *const kPrinterProxyPostMonterey =
       }
 
       if (!cd.silentBlock) {
-        [self maybeSendTTYMessageToTarget:targetProc
-                           messageCreator:^NSString * {
-                             if (holdAndAsk) {
-                               if (stoppedProc) {
-                                 return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
-                                        @"binary until approval is granted in the GUI...\n";
-                               } else {
-                                 return @"---\n\033[1mSanta\033[0m\n\nUnable to hold execution so "
-                                        @"the process was killed\n---\n\n";
-                               }
-                             }
+        _ttyWriter->Write(targetProc, ^NSString * {
+          if (holdAndAsk) {
+            if (stoppedProc) {
+              return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
+                     @"binary until approval is granted in the GUI...\n";
+            } else {
+              return @"---\n\033[1mSanta\033[0m\n\nUnable to hold execution so "
+                     @"the process was killed\n---\n\n";
+            }
+          }
 
-                             // Let the user know what happened on the terminal
-                             NSAttributedString *s =
-                                 [SNTBlockMessage attributedBlockMessageForEvent:se
-                                                                   customMessage:cd.customMsg];
+          // Let the user know what happened on the terminal
+          NSAttributedString *s = [SNTBlockMessage attributedBlockMessageForEvent:se
+                                                                    customMessage:cd.customMsg];
 
-                             NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
-                             // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
-                             [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
-                             [msg appendFormat:@"\033[1mPath:      \033[0m %@\n"
-                                               @"\033[1mIdentifier:\033[0m %@\n"
-                                               @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                                               se.filePath, se.fileSHA256, se.parentName, se.ppid];
-                             NSURL *detailURL =
-                                 [SNTBlockMessage eventDetailURLForEvent:se customURL:cd.customURL];
-                             if (detailURL) {
-                               [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
-                             }
-                             return msg;
-                           }];
+          NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
+          // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
+          [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
+          [msg appendFormat:@"\033[1mPath:      \033[0m %@\n"
+                            @"\033[1mIdentifier:\033[0m %@\n"
+                            @"\033[1mParent:    \033[0m %@ (%@)\n\n",
+                            se.filePath, se.fileSHA256, se.parentName, se.ppid];
+          NSURL *detailURL = [SNTBlockMessage eventDetailURLForEvent:se customURL:cd.customURL];
+          if (detailURL) {
+            [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
+          }
+          return msg;
+        });
 
         void (^replyBlock)(BOOL) = nil;
 
@@ -457,10 +454,7 @@ static NSString *const kPrinterProxyPostMonterey =
               [self createRuleForStandaloneModeEvent:se];
 
               if (stoppedProc) {
-                [self maybeSendTTYMessageToTarget:targetProc
-                                   messageCreator:^NSString * {
-                                     return @"Authorized, allowing execution\n---\n\n";
-                                   }];
+                _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
               }
 
               // Allow the binary to begin running.
@@ -469,14 +463,14 @@ static NSString *const kPrinterProxyPostMonterey =
             } else {
               // The user did not approve, so kill the stopped process.
               if (stoppedProc) {
-                [self maybeSendTTYMessageToTarget:targetProc
-                                   messageCreator:^NSString * {
-                                     return @"Authorization not given, denying execution\n---\n\n";
-                                   }];
+                _ttyWriter->Write(targetProc,
+                                  @"Authorization not given, denying execution\n---\n\n");
               }
               [self manipulatePID:newProcPid withControl:ProcessControl::Kill];
               _procSignalCache->remove(pidAndVersion);
             }
+
+            postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied);
           };
         }
 
@@ -504,15 +498,6 @@ static NSString *const kPrinterProxyPostMonterey =
 }
 
 #pragma mark Helpers
-
-- (void)maybeSendTTYMessageToTarget:(const es_process_t *)proc
-                     messageCreator:(NSString * (^)())messageCreator {
-  if ([SNTConfigurator configurator].enableSilentTTYMode) return;
-  if (!self->_ttyWriter) return;
-  if (!TTYWriter::CanWrite(proc)) return;
-
-  self->_ttyWriter->Write(proc, messageCreator());
-}
 
 /**
   Workaround for issue with PrinterProxy.app.

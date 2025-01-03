@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include <EndpointSecurity/ESTypes.h>
 #import <OCMock/OCMock.h>
@@ -32,6 +33,7 @@
 #include "Source/santad/Metrics.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
+#include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;
 using santa::EventDisposition;
@@ -123,7 +125,8 @@ class MockAuthResultCache : public AuthResultCache {
                                                      metrics:nullptr
                                               execController:self.mockExecController
                                           compilerController:nil
-                                             authResultCache:nullptr];
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr];
 
     // Temporarily change the event type
     esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXEC;
@@ -147,7 +150,8 @@ class MockAuthResultCache : public AuthResultCache {
                                                      metrics:nullptr
                                               execController:self.mockExecController
                                           compilerController:nil
-                                             authResultCache:nullptr];
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr];
 
     id mockAuthClient = OCMPartialMock(authClient);
 
@@ -194,7 +198,8 @@ class MockAuthResultCache : public AuthResultCache {
                                                      metrics:nullptr
                                               execController:self.mockExecController
                                           compilerController:nil
-                                             authResultCache:nullptr];
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr];
 
     id mockAuthClient = OCMPartialMock(authClient);
 
@@ -244,7 +249,8 @@ class MockAuthResultCache : public AuthResultCache {
       .WillOnce(testing::Return(SNTActionRequestBinary))
       .WillOnce(testing::Return(SNTActionRequestBinary))
       .WillOnce(testing::Return(SNTActionRespondAllowCompiler))
-      .WillOnce(testing::Return(SNTActionUnset));
+      .WillOnce(testing::Return(SNTActionUnset))
+      .WillOnce(testing::Return(SNTActionRespondHold));
   EXPECT_CALL(*mockAuthCache, AddToCache(testing::_, SNTActionRequestBinary))
       .WillOnce(testing::Return(true));
 
@@ -256,7 +262,8 @@ class MockAuthResultCache : public AuthResultCache {
                                                    metrics:nullptr
                                             execController:self.mockExecController
                                         compilerController:mockCompilerController
-                                           authResultCache:mockAuthCache];
+                                           authResultCache:mockAuthCache
+                                                 ttyWriter:santa::TTYWriter::Create(true)];
   id mockAuthClient = OCMPartialMock(authClient);
 
   // This block tests that processing is held up until an outstanding thread
@@ -280,6 +287,19 @@ class MockAuthResultCache : public AuthResultCache {
     Message msg(mockESApi, &esMsg);
     OCMExpect([self.mockExecController validateExecEvent:msg postAction:OCMOCK_ANY])
         .ignoringNonObjectArgs();
+
+    [mockAuthClient processMessage:msg];
+
+    XCTAssertTrue(OCMVerifyAll(mockAuthClient));
+    XCTAssertTrue(OCMVerifyAll(mockCompilerController));
+  }
+
+  // Test that encountering SNTActionRespondHold results in denying the operation.
+  {
+    Message msg(mockESApi, &esMsg);
+    OCMExpect([mockAuthClient respondToMessage:msg
+                                withAuthResult:ES_AUTH_RESULT_DENY
+                                     cacheable:false]);
 
     [mockAuthClient processMessage:msg];
 
@@ -313,6 +333,8 @@ class MockAuthResultCache : public AuthResultCache {
       .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondDeny))
       .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondHold))
+      .WillOnce(testing::Return(true));
 
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
@@ -322,7 +344,8 @@ class MockAuthResultCache : public AuthResultCache {
                                                    metrics:nullptr
                                             execController:self.mockExecController
                                         compilerController:mockCompilerController
-                                           authResultCache:mockAuthCache];
+                                           authResultCache:mockAuthCache
+                                                 ttyWriter:nullptr];
   id mockAuthClient = OCMPartialMock(authClient);
 
   {
@@ -334,14 +357,26 @@ class MockAuthResultCache : public AuthResultCache {
         {SNTActionRespondAllowCompiler, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondAllow, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondDeny, ES_AUTH_RESULT_DENY},
+        {SNTActionRespondHold, ES_AUTH_RESULT_ALLOW},
     };
 
-    for (const auto &kv : actions) {
-      OCMExpect([mockAuthClient respondToMessage:msg
-                                  withAuthResult:kv.second
-                                       cacheable:kv.second == ES_AUTH_RESULT_ALLOW]);
+    __block es_auth_result_t gotAuthResult;
+    __block bool gotCachable;
+    OCMStub([mockAuthClient respondToMessage:Message(mockESApi, &esMsg)
+                              withAuthResult:(es_auth_result_t)0
+                                   cacheable:false])
+        .ignoringNonObjectArgs()
+        .andDo(^(NSInvocation *inv) {
+          [inv getArgument:&gotAuthResult atIndex:3];
+          [inv getArgument:&gotCachable atIndex:4];
+        });
 
+    for (const auto &kv : actions) {
       [mockAuthClient postAction:kv.first forMessage:msg];
+
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertEqual(gotCachable,
+                     kv.second == ES_AUTH_RESULT_ALLOW && kv.first != SNTActionRespondHold);
     }
   }
 

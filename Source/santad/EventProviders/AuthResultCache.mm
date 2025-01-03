@@ -112,13 +112,28 @@ bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision) {
   SantaVnode vnode_id = SantaVnode::VnodeForFile(es_file);
   SantaCache<SantaVnode, uint64_t> *cache = CacheForVnodeID(vnode_id);
   switch (decision) {
+    // SNTActionRequestBinary and SNTActionRespondHold are not terminal states and should not
+    // contain a timestamp to allow for proper transitions out of the state.
     case SNTActionRequestBinary:
       return cache->set(vnode_id, CacheableAction(SNTActionRequestBinary, 0), 0);
+    case SNTActionRespondHold:
+      return cache->set(vnode_id, CacheableAction(SNTActionRespondHold, 0),
+                        CacheableAction(SNTActionRequestBinary, 0));
+
     case SNTActionRespondAllow: OS_FALLTHROUGH;
     case SNTActionRespondAllowCompiler: OS_FALLTHROUGH;
     case SNTActionRespondDeny:
       return cache->set(vnode_id, CacheableAction(decision),
                         CacheableAction(SNTActionRequestBinary, 0));
+
+    // SNTActionHoldAllowed and  SNTActionHoldDenied are used for transitions, however the
+    // cached action is translated to SNTActionRespondAllow or SNTActionRespondDeny respectively.
+    case SNTActionHoldAllowed: OS_FALLTHROUGH;
+    case SNTActionHoldDenied:
+      return cache->set(vnode_id,
+                        CacheableAction(decision == SNTActionHoldAllowed ? SNTActionRespondAllow
+                                                                         : SNTActionRespondDeny),
+                        CacheableAction(SNTActionRespondHold, 0));
     default:
       // This is a programming error. Bail.
       LOGE(@"Invalid cache value, exiting.");

@@ -415,6 +415,7 @@ objc_library(
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         ":SNTExecutionController",
+        ":TTYWriter",
         "//Source/common:BranchPrediction",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
@@ -1129,6 +1130,7 @@ santa_unit_test(
     deps = [
         ":AuthResultCache",
         ":MockEndpointSecurityAPI",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "@OCMock",
@@ -1350,6 +1352,7 @@ santa_unit_test(
         ":SNTCompilerController",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTExecutionController",
+        ":TTYWriter",
         "//Source/common:SNTCommonEnums",
         "//Source/common:TestUtils",
         "@OCMock",
