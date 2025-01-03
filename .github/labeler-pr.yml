@@ -1,30 +1,52 @@
-documentation:
-  - any:
-    - changed-files:
-      - any-glob-to-any-file:
-        - "docs/**"
+docs:
+  - changed-files:
+    - any-glob-to-any-file: ["docs/**", "*.md"]
 
-gui:
-  - any:
-    - changed-files:
-      - any-glob-to-any-file:
-        - "Source/gui/**"
-
-santactl:
-  - any:
-    - changed-files:
-      - any-glob-to-any-file:
-        - "Source/santactl/**"
-
-daemon:
-  - any:
-    - changed-files:
-      - any-glob-to-any-file:
-        - "Source/santad/**"
+workflows:
+  - changed-files:
+    - any-glob-to-any-file: '.github/**'
 
 configurator:
-  - any:
-    - changed-files:
-      - any-glob-to-any-file:
-        - "Source/common/SNTConfigurator.*"
+  - changed-files:
+    - any-glob-to-any-file: 'Source/common/SNTConfigurator.*'
+
+lang/objc:
+  - changed-files:
+    - any-glob-to-any-file: "**/*.m"
+
+lang/objc++:
+  - changed-files:
+    - any-glob-to-any-file: "**/*.mm"
+
+lang/swift:
+  - changed-files:
+    - any-glob-to-any-file: "**/*.swift"
+
+comp/common:
+  - changed-files:
+    - any-glob-to-any-file: "Source/common/**"
+
+comp/gui:
+  - changed-files:
+    - any-glob-to-any-file: "Source/gui/**"
+
+comp/santabundleservice:
+  - changed-files:
+    - any-glob-to-any-file: "Source/santabundleservice/**"
+
+comp/santactl:
+  - changed-files:
+    - any-glob-to-any-file: "Source/santactl/**"
+
+comp/santad:
+  - changed-files:
+    - any-glob-to-any-file: "Source/santad/**"
+
+comp/santametricservice:
+  - changed-files:
+    - any-glob-to-any-file: "Source/santametricservice/**"
+
+comp/santasyncservice:
+  - changed-files:
+    - any-glob-to-any-file: "Source/santasyncservice/**"
 
