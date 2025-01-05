@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 
@@ -292,7 +293,7 @@ using santa::WatchItemPathType;
   return nanosUntilDeadline - headroom;
 }
 
-- (void)processMessage:(Message &&)msg handler:(void (^)(const Message &))messageHandler {
+- (void)processMessage:(Message &&)msg handler:(void (^)(Message))messageHandler {
   if (unlikely(msg->action_type != ES_ACTION_TYPE_AUTH)) {
     // This is a programming error
     LOGE(@"Attempting to process non-AUTH message");
@@ -310,15 +311,15 @@ using santa::WatchItemPathType;
   int64_t processingBudget = [self computeBudgetForDeadline:msg->deadline
                                                 currentTime:mach_absolute_time()];
 
-  // Workaround for compiler bug that doesn't properly close over variables
-  __block Message processMsg = msg;
-  __block Message deadlineMsg = msg;
-
+  // Copy the original message and then move into the auto-responder block
+  __block Message tmpDeadlineMsg = msg;
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, processingBudget), self->_authQueue, ^(void) {
     if (dispatch_semaphore_wait(processingSema, DISPATCH_TIME_NOW) != 0) {
       // Handler has already responded, nothing to do.
       return;
     }
+
+    Message deadlineMsg = std::move(tmpDeadlineMsg);
 
     es_auth_result_t authResult;
     if (self.configurator.failClosed) {
@@ -335,8 +336,10 @@ using santa::WatchItemPathType;
     dispatch_semaphore_signal(deadlineExpiredSema);
   });
 
+  // Move the original msg into the client handler block
+  __block Message tmpMsg = std::move(msg);
   dispatch_async(self->_authQueue, ^{
-    messageHandler(processMsg);
+    messageHandler(std::move(tmpMsg));
     if (dispatch_semaphore_wait(processingSema, DISPATCH_TIME_NOW) != 0) {
       // Deadline expired, wait for deadline block to finish.
       dispatch_semaphore_wait(deadlineExpiredSema, DISPATCH_TIME_FOREVER);

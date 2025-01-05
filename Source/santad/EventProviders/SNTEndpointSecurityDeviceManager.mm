@@ -412,7 +412,7 @@ NS_ASSUME_NONNULL_BEGIN
   }
 
   [self processMessage:std::move(esMsg)
-               handler:^(const Message &msg) {
+               handler:^(Message msg) {
                  es_auth_result_t result = [self handleAuthMount:msg];
                  [self respondToMessage:msg withAuthResult:result cacheable:false];
                  recordEventMetrics(EventDisposition::kProcessed);

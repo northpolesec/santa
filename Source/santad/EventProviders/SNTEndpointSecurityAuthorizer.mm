@@ -66,7 +66,7 @@ using santa::Message;
   return @"Authorizer";
 }
 
-- (void)processMessage:(const Message &)msg {
+- (void)processMessage:(Message)msg {
   if (msg->event_type == ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME) {
     [self.execController
         validateSuspendResumeEvent:msg
@@ -102,13 +102,13 @@ using santa::Message;
     } else if (returnAction == SNTActionRespondHold) {
       _ttyWriter->Write(
           targetProc,
-          [NSString stringWithFormat:@"---\n\033[1mSanta\033[0m\n"
+          [NSString stringWithFormat:@"---\n"
+                                     @"\033[1mSanta\033[0m\n"
                                      @"\n"
                                      @"Blocked: %s\n"
                                      @"\n"
                                      @"Execution of this binary was blocked because a separate\n"
                                      @"instance is currently pending user authorization.\n"
-                                     @"\n"
                                      @"---\n"
                                      @"\n",
                                      targetProc->executable->path.data]);
@@ -158,8 +158,8 @@ using santa::Message;
   }
 
   [self processMessage:std::move(esMsg)
-               handler:^(const Message &msg) {
-                 [self processMessage:msg];
+               handler:^(Message msg) {
+                 [self processMessage:std::move(msg)];
                  recordEventMetrics(EventDisposition::kProcessed);
                }];
 }
