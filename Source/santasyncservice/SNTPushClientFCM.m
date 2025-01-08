@@ -32,10 +32,10 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
 @property(weak) id<SNTPushNotificationsSyncDelegate> delegate;
 
 @property SNTSyncFCM *FCMClient;
-@property NSString *token;
+@property NSUInteger globalRuleSyncDeadline;
 
-@property NSUInteger pushNotificationsFullSyncInterval;
-@property NSUInteger pushNotificationsGlobalRuleSyncDeadline;
+@property NSString *token;
+@property NSUInteger fullSyncInterval;
 
 @end
 
@@ -47,8 +47,8 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
   self = [super init];
   if (self) {
     _delegate = syncDelegate;
-    _pushNotificationsFullSyncInterval = kDefaultPushNotificationsFullSyncInterval;
-    _pushNotificationsGlobalRuleSyncDeadline = kDefaultPushNotificationsGlobalRuleSyncDeadline;
+    _fullSyncInterval = kDefaultPushNotificationsFullSyncInterval;
+    _globalRuleSyncDeadline = kDefaultPushNotificationsGlobalRuleSyncDeadline;
   }
   return self;
 }
@@ -57,21 +57,13 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
   return self.FCMClient.isConnected;
 }
 
-- (NSString *)getToken {
-  return self.token;
-}
-
-- (NSUInteger)getFullSyncInterval {
-  return self.pushNotificationsFullSyncInterval;
-}
-
 - (void)handlePreflightSyncState:(SNTSyncState *)syncState {
   [self listenWithSyncState:syncState];
 }
 
 - (void)listenWithSyncState:(SNTSyncState *)syncState {
-  self.pushNotificationsFullSyncInterval = syncState.pushNotificationsFullSyncInterval;
-  self.pushNotificationsGlobalRuleSyncDeadline = syncState.pushNotificationsGlobalRuleSyncDeadline;
+  self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval;
+  self.globalRuleSyncDeadline = syncState.pushNotificationsGlobalRuleSyncDeadline;
 
   if ([self.token isEqualToString:syncState.pushNotificationsToken]) {
     LOGD(@"Already listening for push notifications");
@@ -160,8 +152,7 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
       LOGD(@"Targeted rule_sync for host_id: %@", targetHostID);
       [self.delegate ruleSync];
     } else {
-      uint32_t delaySeconds =
-          arc4random_uniform((uint32_t)self.pushNotificationsGlobalRuleSyncDeadline);
+      uint32_t delaySeconds = arc4random_uniform((uint32_t)self.globalRuleSyncDeadline);
       LOGD(@"Global rule_sync, staggering: %u second delay", delaySeconds);
       [self.delegate ruleSyncSecondsFromNow:delaySeconds];
     }

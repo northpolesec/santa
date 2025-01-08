@@ -78,7 +78,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     _fullSyncTimer = [self createSyncTimerWithBlock:^{
       [self rescheduleTimerQueue:self.fullSyncTimer
-                  secondsFromNow:_pushNotifications ? [_pushNotifications getFullSyncInterval]
+                  secondsFromNow:_pushNotifications ? _pushNotifications.fullSyncInterval
                                                     : kDefaultFullSyncInterval];
       [self syncType:SNTSyncTypeNormal withReply:NULL];
     }];
@@ -402,7 +402,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   syncState.session = [authURLSession session];
   syncState.daemonConn = self.daemonConn;
   syncState.contentEncoding = config.syncClientContentEncoding;
-  syncState.pushNotificationsToken = [self.pushNotifications getToken];
+  syncState.pushNotificationsToken = self.pushNotifications.token;
 
   return syncState;
 }

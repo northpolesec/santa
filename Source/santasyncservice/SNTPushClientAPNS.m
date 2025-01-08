@@ -23,7 +23,7 @@
 
 @interface SNTPushClientAPNS ()
 @property(weak) id<SNTPushNotificationsSyncDelegate> delegate;
-@property(atomic) NSString *deviceToken;
+@property(atomic) NSString *token;
 @property NSUInteger fullSyncInterval;
 @property NSUInteger globalRuleSyncDeadline;
 @end
@@ -44,20 +44,12 @@
 - (void)updateToken {
   [[self.delegate daemonConnection].remoteObjectProxy
       requestAPNSToken:^void(NSString *deviceToken) {
-        self.deviceToken = deviceToken;
+        self.token = deviceToken;
       }];
 }
 
 - (BOOL)isConnected {
-  return self.deviceToken.length > 0;
-}
-
-- (NSString *)getToken {
-  return self.deviceToken;
-}
-
-- (NSUInteger)getFullSyncInterval {
-  return self.fullSyncInterval;
+  return self.token.length > 0;
 }
 
 - (void)APNSTokenChanged {

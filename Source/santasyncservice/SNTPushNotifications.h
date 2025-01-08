@@ -30,7 +30,7 @@
 @protocol SNTPushNotificationsClientDelegate <NSObject>
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
 - (BOOL)isConnected;
-- (NSString *)getToken;
-- (NSUInteger)getFullSyncInterval;
+@property(readonly) NSString *token;
+@property(readonly) NSUInteger fullSyncInterval;
 - (void)handlePreflightSyncState:(SNTSyncState *)syncState;
 @end
