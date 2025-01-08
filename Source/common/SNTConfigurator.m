@@ -66,7 +66,7 @@ NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist
 #endif
 
 /// The domain used by mobileconfig.
-#define K_MOBILE_CONFIG_DOMAIN "com.northpolesec.santa"
+static const CFStringRef kMobileConfigDomain = CFSTR("com.northpolesec.santa");
 
 /// The keys managed by a mobileconfig.
 static NSString *const kStaticRules = @"StaticRules";
@@ -1364,8 +1364,8 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (id)forcedConfigValueForKey:(NSString *)key {
   CFStringRef keyRef = (__bridge CFStringRef)key;
-  if (CFPreferencesAppValueIsForced(keyRef, CFSTR(K_MOBILE_CONFIG_DOMAIN))) {
-    return CFBridgingRelease(CFPreferencesCopyAppValue(keyRef, CFSTR(K_MOBILE_CONFIG_DOMAIN)));
+  if (CFPreferencesAppValueIsForced(keyRef, kMobileConfigDomain)) {
+    return CFBridgingRelease(CFPreferencesCopyAppValue(keyRef, kMobileConfigDomain));
   }
   return nil;
 }
