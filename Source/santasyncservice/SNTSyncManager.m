@@ -217,8 +217,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   uint64_t leeway = (seconds * 0.5) * NSEC_PER_SEC;
   dispatch_source_set_timer(timerQueue, dispatch_walltime(NULL, interval), interval, leeway);
 }
+
 - (void)ruleSyncImpl {
-  // Rule only syncs are exclusivly scheduled by self.ruleSyncTimer. We do not need to worry about
+  // Rule only syncs are exclusively scheduled by self.ruleSyncTimer. We do not need to worry about
   // using self.syncLimiter here. However we do want to do the work on self.syncQueue so we do not
   // overlap with a full sync.
   dispatch_async(self.syncQueue, ^() {
@@ -238,7 +239,25 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 }
 
 - (void)preflightSync {
-  [self preflightOnly:YES];
+  SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
+  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  if (!syncState) {
+    LOGE(@"Unable to create sync state: %lu", status);
+    return;
+  }
+  syncState.preflightOnly = YES;
+  [self preflightWithSyncState:syncState];
+}
+
+- (void)pushNotificationSync {
+  SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
+  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  if (!syncState) {
+    LOGE(@"Unable to create sync state: %lu", status);
+    return;
+  }
+  syncState.pushNotificationSync = YES;
+  [self preflightWithSyncState:syncState];
 }
 
 - (MOLXPCConnection *)daemonConnection {
@@ -248,16 +267,15 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 #pragma mark syncing chain
 
 - (SNTSyncStatusType)preflight {
-  return [self preflightOnly:NO];
-}
-
-- (SNTSyncStatusType)preflightOnly:(BOOL)preflightOnly {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
   SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     return status;
   }
+  return [self preflightWithSyncState:syncState];
+}
 
+- (SNTSyncStatusType)preflightWithSyncState:(SNTSyncState *)syncState {
   SLOGD(@"Preflight starting");
   SNTSyncPreflight *p = [[SNTSyncPreflight alloc] initWithState:syncState];
   if ([p sync]) {
@@ -280,7 +298,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:syncState.fullSyncInterval];
     }
 
-    if (preflightOnly) return SNTSyncStatusTypeSuccess;
+    if (syncState.preflightOnly) return SNTSyncStatusTypeSuccess;
     return [self eventUploadWithSyncState:syncState];
   }
 
