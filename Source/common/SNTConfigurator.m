@@ -37,9 +37,6 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 }
 
 @interface SNTConfigurator ()
-/// A NSUserDefaults object set to use the com.northpolesec.santa suite.
-@property(readonly, nonatomic) NSUserDefaults *defaults;
-
 /// Keys and expected value types.
 @property(readonly, nonatomic) NSDictionary *syncServerKeyTypes;
 @property(readonly, nonatomic) NSDictionary *forcedConfigKeyTypes;
@@ -69,7 +66,7 @@ NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist
 #endif
 
 /// The domain used by mobileconfig.
-static NSString *const kMobileConfigDomain = @"com.northpolesec.santa";
+static const CFStringRef kMobileConfigDomain = CFSTR("com.northpolesec.santa");
 
 /// The keys managed by a mobileconfig.
 static NSString *const kStaticRules = @"StaticRules";
@@ -296,8 +293,6 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
     _syncStateFilePath = syncStateFilePath;
     _syncStateAccessAuthorizerBlock = syncStateAccessAuthorizer;
 
-    _defaults = [NSUserDefaults standardUserDefaults];
-    [_defaults addSuiteNamed:@"com.northpolesec.santa"];
     _configState = [self readForcedConfig];
     [self cacheStaticRules];
 
@@ -1368,8 +1363,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (id)forcedConfigValueForKey:(NSString *)key {
-  id obj = [self.defaults objectForKey:key];
-  return [self.defaults objectIsForcedForKey:key inDomain:kMobileConfigDomain] ? obj : nil;
+  CFStringRef keyRef = (__bridge CFStringRef)key;
+  if (CFPreferencesAppValueIsForced(keyRef, kMobileConfigDomain)) {
+    return CFBridgingRelease(CFPreferencesCopyAppValue(keyRef, kMobileConfigDomain));
+  }
+  return nil;
 }
 
 - (void)startWatchingDefaults {
