@@ -1,17 +1,17 @@
 /// Copyright 2015 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/gui/SNTNotificationManager.h"
 #include <Foundation/Foundation.h>
@@ -29,6 +29,8 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/common/SNTXPCSyncServiceInterface.h"
+#import "Source/gui/SNTAppDelegate.h"
 #import "Source/gui/SNTBinaryMessageWindowController.h"
 #import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 #import "Source/gui/SNTDeviceMessageWindowController.h"
@@ -45,6 +47,11 @@
 
 // A serial queue for holding hashBundleBinaries requests
 @property dispatch_queue_t hashBundleBinariesQueue;
+
+// The APNS device token. If configured, the GUI app registers with APNS. Once the registration is
+// complete, the app delegate will notify this class. Any pending requests for the token will then
+// be processed.
+@property(atomic) NSString *APNSDeviceToken;
 
 @end
 
@@ -398,6 +405,32 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                                                        customText:text];
 
   [self queueMessage:pendingMsg];
+}
+
+// XPC handler. The sync service requests the APNS token, by way of the daemon.
+- (void)requestAPNSToken:(void (^)(NSString *))reply {
+  if (self.APNSDeviceToken.length) {
+    reply(self.APNSDeviceToken);
+    return;
+  }
+
+  // If APNS is enabled, `-[NSApp registerForRemoteNotifications]` is run when the application
+  // finishes launching at startup. If APNS is enabled after startup, register now. Upon successful
+  // registration, the sync service will be notified that the token has changed.
+  [NSApp registerForRemoteNotifications];
+  reply(nil);
+}
+
+- (void)didRegisterForAPNS:(NSString *)deviceToken {
+  self.APNSDeviceToken = deviceToken;
+  [self APNSTokenChanged];
+}
+
+- (void)APNSTokenChanged {
+  MOLXPCConnection *syncConn = [SNTXPCSyncServiceInterface configuredConnection];
+  [syncConn resume];
+  [[syncConn remoteObjectProxy] APNSTokenChanged];
+  [syncConn invalidate];
 }
 
 #pragma mark SNTBundleNotifierXPC protocol methods

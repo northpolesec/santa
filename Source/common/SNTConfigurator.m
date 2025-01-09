@@ -1,11 +1,11 @@
 /// Copyright 2014-2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -139,6 +139,8 @@ static NSString *const kClientContentEncoding = @"SyncClientContentEncoding";
 static NSString *const kFCMProject = @"FCMProject";
 static NSString *const kFCMEntity = @"FCMEntity";
 static NSString *const kFCMAPIKey = @"FCMAPIKey";
+
+static NSString *const kEnableAPNS = @"EnableAPNS";
 
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
@@ -276,6 +278,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFCMProject : string,
       kFCMEntity : string,
       kFCMAPIKey : string,
+      kEnableAPNS : number,
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
@@ -589,6 +592,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingFcmEnabled {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableAPNS {
   return [self configStateSet];
 }
 
@@ -1106,6 +1113,12 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (BOOL)fcmEnabled {
   return (self.fcmProject.length && self.fcmEntity.length && self.fcmAPIKey.length);
+}
+
+- (BOOL)enableAPNS {
+  // TODO: Consider supporting enablement from the sync server.
+  NSNumber *number = self.configState[kEnableAPNS];
+  return [number boolValue];
 }
 
 - (void)setBlockUSBMount:(BOOL)enabled {

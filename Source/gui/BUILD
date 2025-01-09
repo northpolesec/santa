@@ -107,6 +107,7 @@ objc_library(
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
         "@MOLCertificate",
         "@MOLCodesignChecker",
         "@MOLXPCConnection",
