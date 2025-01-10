@@ -117,8 +117,15 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
   id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
+
+  // Capture the decision to be used in the cacheability check below
+  __block SNTEventState eventState = SNTEventStateUnknown;
   if (cdValidator) {
-    OCMExpect([mockDecisionCache cacheDecision:[OCMArg checkWithBlock:cdValidator]]);
+    BOOL (^cdValidatorWrapper)(SNTCachedDecision *) = ^BOOL(SNTCachedDecision *cd) {
+      eventState = cd.decision;
+      return cdValidator(cd);
+    };
+    OCMExpect([mockDecisionCache cacheDecision:[OCMArg checkWithBlock:cdValidatorWrapper]]);
   }
 
   id mockConfigurator = OCMClassMock([SNTConfigurator class]);
@@ -154,8 +161,17 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   XCTestExpectation *expectation =
       [self expectationWithDescription:@"Wait for santa's Auth dispatch queue"];
 
+  // Note: Determining cacheability is slightly different than the real check because
+  // the test does not have access to the SNTAction used when calling postAction.
+  // Checking client mode and the eventState is a sufficient stand-in since this
+  // combination is used to determine if SNTActionRespondHold is used.
   EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, wantResult,
-                                            wantResult == ES_AUTH_RESULT_ALLOW))
+                                            testing::Truly(^BOOL(const bool cacheable) {
+                                              return cacheable ==
+                                                     (wantResult == ES_AUTH_RESULT_ALLOW &&
+                                                      (clientMode != SNTClientModeStandalone ||
+                                                       eventState != SNTEventStateBlockUnknown));
+                                            })))
       .WillOnce(testing::InvokeWithoutArgs(^bool {
         [expectation fulfill];
         return true;

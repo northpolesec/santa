@@ -458,7 +458,7 @@ using santa::WatchItemPathType;
 
   {
     XCTAssertThrows([client processMessage:Message(mockESApi, &esMsg)
-                                   handler:^(const Message &msg){
+                                   handler:^(Message msg){
                                    }]);
   }
 
@@ -489,7 +489,7 @@ using santa::WatchItemPathType;
 
   {
     XCTAssertNoThrow([client processMessage:Message(mockESApi, &esMsg)
-                                    handler:^(const Message &msg) {
+                                    handler:^(Message msg) {
                                       dispatch_semaphore_signal(sema);
                                     }]);
 
@@ -589,7 +589,7 @@ using santa::WatchItemPathType;
   {
     __block long result;
     XCTAssertNoThrow([client processMessage:Message(mockESApi, &esMsg)
-                                    handler:^(const Message &msg) {
+                                    handler:^(Message msg) {
                                       result = dispatch_semaphore_wait(
                                           deadlineSema,
                                           dispatch_time(DISPATCH_TIME_NOW, 4 * NSEC_PER_SEC));
