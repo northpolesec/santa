@@ -1,11 +1,11 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -655,6 +655,12 @@
 ///  True if fcmProject, fcmEntity and fcmAPIKey are all set. Defaults to false.
 ///
 @property(readonly, nonatomic) BOOL fcmEnabled;
+
+///
+///  Set to true to use APNS. Defaults to false.
+///  If fcmEnabled and enableAPNS are both enabled, only enableAPNS will be used.
+///
+@property(readonly, nonatomic) BOOL enableAPNS;
 
 ///
 /// True if metricsFormat and metricsURL are set. False otherwise.

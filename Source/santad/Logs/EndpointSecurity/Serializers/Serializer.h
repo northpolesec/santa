@@ -54,6 +54,8 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedRename &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedUnlink &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone &) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
       const santa::EnrichedLoginWindowSessionLogout &) = 0;

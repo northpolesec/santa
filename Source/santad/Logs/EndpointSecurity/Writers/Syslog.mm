@@ -18,12 +18,17 @@
 
 namespace santa {
 
+// Max length of data that should be displayed in a single line.
+// Typed as size_type to match vector.size(), but must be convertible to int.
+static constexpr std::vector<uint8_t>::size_type kMaxLineLength = 1024;
+static_assert(kMaxLineLength <= INT_MAX);
+
 std::shared_ptr<Syslog> Syslog::Create() {
   return std::make_shared<Syslog>();
 }
 
 void Syslog::Write(std::vector<uint8_t> &&bytes) {
-  os_log(OS_LOG_DEFAULT, "%{public}s", bytes.data());
+  os_log(OS_LOG_DEFAULT, "%{public}.*s", (int)std::min(kMaxLineLength, bytes.size()), bytes.data());
 }
 
 void Syslog::Flush() {

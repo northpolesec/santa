@@ -41,6 +41,12 @@ using santa::NSStringToUTF8String;
   req->set_rules_received(static_cast<uint32_t>(self.syncState.rulesReceived));
   req->set_rules_processed(static_cast<uint32_t>(self.syncState.rulesProcessed));
 
+  switch (self.syncState.syncType) {
+    case SNTSyncTypeNormal: req->set_sync_type(::pbv1::NORMAL); break;
+    case SNTSyncTypeClean: req->set_sync_type(::pbv1::CLEAN); break;
+    case SNTSyncTypeCleanAll: req->set_sync_type(::pbv1::CLEAN_ALL); break;
+  }
+
   ::pbv1::PostflightResponse response;
   [self performRequest:[self requestWithMessage:req] intoMessage:&response timeout:30];
 

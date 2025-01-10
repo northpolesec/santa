@@ -638,6 +638,36 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCSInvalidated &msg
   return FinalizeProto(santa_msg);
 }
 
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClone &msg) {
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  ::pbv1::Clone *pb_clone = santa_msg->mutable_clone();
+  EncodeProcessInfoLight(pb_clone->mutable_instigator(), msg);
+  EncodeFileInfo(pb_clone->mutable_source(), msg->event.clone.source, msg.source());
+  EncodePath(pb_clone->mutable_target(), msg->event.clone.target_dir, msg->event.clone.target_name);
+
+  return FinalizeProto(santa_msg);
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCopyfile &msg) {
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  ::pbv1::Copyfile *pb_copyfile = santa_msg->mutable_copyfile();
+  EncodeProcessInfoLight(pb_copyfile->mutable_instigator(), msg);
+  EncodeFileInfo(pb_copyfile->mutable_source(), msg->event.copyfile.source, msg.source());
+  EncodePath(pb_copyfile->mutable_target(), msg->event.copyfile.target_dir,
+             msg->event.copyfile.target_name);
+
+  // If `target_file` is set, it is an existing file that will be overwritten
+  pb_copyfile->set_target_existed(msg->event.copyfile.target_file != NULL);
+  pb_copyfile->set_mode(msg->event.copyfile.mode);
+  pb_copyfile->set_flags(msg->event.copyfile.flags);
+
+  return FinalizeProto(santa_msg);
+}
+
 #if HAVE_MACOS_13
 
 ::pbv1::SocketAddress::Type GetSocketAddressType(es_address_type_t type) {

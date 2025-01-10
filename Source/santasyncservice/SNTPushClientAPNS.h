@@ -1,4 +1,3 @@
-/// Copyright 2015 Google Inc. All rights reserved.
 /// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,17 +12,10 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <Cocoa/Cocoa.h>
+#import "Source/santasyncservice/SNTPushNotifications.h"
 
-#import "Source/common/SNTXPCNotifierInterface.h"
-#import "Source/gui/SNTMessageWindowController.h"
-
-///
-///  Keeps track of pending notifications and ensures only one is presented to the user at a time.
-///
-@interface SNTNotificationManager : NSObject <SNTMessageWindowControllerDelegate, SNTNotifierXPC>
-
-@property NSXPCListenerEndpoint *notificationListener;
-- (void)didRegisterForAPNS:(NSString *)deviceToken;
+@interface SNTPushClientAPNS : NSObject <SNTPushNotificationsClientDelegate>
+- (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
 - (void)APNSTokenChanged;
+- (void)handleAPNSMessage:(NSDictionary *)message;
 @end

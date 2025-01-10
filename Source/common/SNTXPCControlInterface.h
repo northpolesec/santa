@@ -1,5 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -64,6 +64,7 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 ///  Syncd Ops
 ///
 - (void)postRuleSyncNotificationWithCustomMessage:(NSString *)message reply:(void (^)(void))reply;
+- (void)requestAPNSToken:(void (^)(NSString *))reply;
 
 ///
 /// Control Ops

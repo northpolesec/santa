@@ -1,18 +1,19 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
-#import "Source/santasyncservice/SNTPushNotifications.h"
+#import "Source/santasyncservice/SNTPushClientFCM.h"
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
@@ -27,32 +28,43 @@ static NSString *const kFCMFileHashKey = @"file_hash";
 static NSString *const kFCMFileNameKey = @"file_name";
 static NSString *const kFCMTargetHostIDKey = @"target_host_id";
 
-@interface SNTPushNotifications ()
+@interface SNTPushClientFCM ()
+
+@property(weak) id<SNTPushNotificationsSyncDelegate> delegate;
 
 @property SNTSyncFCM *FCMClient;
-@property NSString *token;
+@property NSUInteger globalRuleSyncDeadline;
 
-@property NSUInteger pushNotificationsFullSyncInterval;
-@property NSUInteger pushNotificationsGlobalRuleSyncDeadline;
+@property NSString *token;
+@property NSUInteger fullSyncInterval;
 
 @end
 
-@implementation SNTPushNotifications
+@implementation SNTPushClientFCM
 
 #pragma mark push notification methods
 
-- (instancetype)init {
+- (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate {
   self = [super init];
   if (self) {
-    _pushNotificationsFullSyncInterval = kDefaultPushNotificationsFullSyncInterval;
-    _pushNotificationsGlobalRuleSyncDeadline = kDefaultPushNotificationsGlobalRuleSyncDeadline;
+    _delegate = syncDelegate;
+    _fullSyncInterval = kDefaultPushNotificationsFullSyncInterval;
+    _globalRuleSyncDeadline = kDefaultPushNotificationsGlobalRuleSyncDeadline;
   }
   return self;
 }
 
+- (BOOL)isConnected {
+  return self.FCMClient.isConnected;
+}
+
+- (void)handlePreflightSyncState:(SNTSyncState *)syncState {
+  [self listenWithSyncState:syncState];
+}
+
 - (void)listenWithSyncState:(SNTSyncState *)syncState {
-  self.pushNotificationsFullSyncInterval = syncState.pushNotificationsFullSyncInterval;
-  self.pushNotificationsGlobalRuleSyncDeadline = syncState.pushNotificationsGlobalRuleSyncDeadline;
+  self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval;
+  self.globalRuleSyncDeadline = syncState.pushNotificationsGlobalRuleSyncDeadline;
 
   if ([self.token isEqualToString:syncState.pushNotificationsToken]) {
     LOGD(@"Already listening for push notifications");
@@ -141,8 +153,7 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
       LOGD(@"Targeted rule_sync for host_id: %@", targetHostID);
       [self.delegate ruleSync];
     } else {
-      uint32_t delaySeconds =
-          arc4random_uniform((uint32_t)self.pushNotificationsGlobalRuleSyncDeadline);
+      uint32_t delaySeconds = arc4random_uniform((uint32_t)self.globalRuleSyncDeadline);
       LOGD(@"Global rule_sync, staggering: %u second delay", delaySeconds);
       [self.delegate ruleSyncSecondsFromNow:delaySeconds];
     }
@@ -180,10 +191,6 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
     }
   }
   return message.count ? [message copy] : nil;
-}
-
-- (BOOL)isConnected {
-  return self.FCMClient.isConnected;
 }
 
 @end

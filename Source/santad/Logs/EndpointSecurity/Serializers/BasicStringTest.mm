@@ -263,6 +263,42 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   XCTAssertCppStringEqual(got, want);
 }
 
+- (void)testSerializeMessageClone {
+  es_file_t procFile = MakeESFile("foo");
+  es_file_t srcFile = MakeESFile("clone_src");
+  es_file_t targetDirFile = MakeESFile("target_dir");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLONE, &proc);
+  esMsg.event.clone.source = &srcFile;
+  esMsg.event.clone.target_dir = &targetDirFile;
+  esMsg.event.clone.target_name = MakeESStringToken("target_name");
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want = "action=CLONE|source=clone_src|target=target_dir/target_name"
+                     "|pid=12|ppid=56|process=foo|processpath=foo"
+                     "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+- (void)testSerializeMessageCopyfile {
+  es_file_t procFile = MakeESFile("foo");
+  es_file_t srcFile = MakeESFile("copyfile_src");
+  es_file_t targetDirFile = MakeESFile("target_dir");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_COPYFILE, &proc);
+  esMsg.event.copyfile.source = &srcFile;
+  esMsg.event.copyfile.target_dir = &targetDirFile;
+  esMsg.event.copyfile.target_name = MakeESStringToken("target_name");
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want = "action=COPYFILE|source=copyfile_src|target=target_dir/target_name"
+                     "|pid=12|ppid=56|process=foo|processpath=foo"
+                     "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
 #if HAVE_MACOS_13
 
 - (void)testSerializeMessageLoginWindowSessionLogin {

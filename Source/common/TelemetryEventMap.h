@@ -41,6 +41,8 @@ enum class TelemetryEvent : uint64_t {
   kScreenSharing           = 1 << 15,
   kOpenSSH                 = 1 << 16,
   kAuthentication          = 1 << 17,
+  kClone                   = 1 << 18,
+  kCopyfile                = 1 << 19,
   kEverything              = ~0ULL,
 };
 // clang-format on
