@@ -24,6 +24,8 @@ straight to [Getting Started](getting-started.md).
 ## Migration Steps
 
 ### 1. Configure System Extensions
+- (Optional) Add a Team ID Rule for North Pole Security's Team ID (ZMCG7MLDV9) to Google Santa
+  - Either add it as a [static rule](https://northpole.dev/deployment/configuration.html#static-rules), `santactl rule` or via your sync service
 - First, update your MDM configuration to allow both Google and NPS system
 extensions simultaneously. This dual-authorization is temporary but necessary
 for a seamless transition.
