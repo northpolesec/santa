@@ -271,7 +271,7 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
       return;
     }
 
-    shared_metrics->ExportLocked(metric_set);
+    shared_metrics->ExportSerialized(metric_set);
   });
 
   return metrics;
@@ -323,11 +323,11 @@ void Metrics::EstablishConnection() {
 
 void Metrics::Export() {
   dispatch_sync(q_, ^{
-    ExportLocked(metric_set_);
+    ExportSerialized(metric_set_);
   });
 }
 
-void Metrics::ExportLocked(SNTMetricSet *metric_set) {
+void Metrics::ExportSerialized(SNTMetricSet *metric_set) {
   FlushMetrics();
   [[metrics_connection_ remoteObjectProxy] exportForMonitoring:[metric_set export]];
 }

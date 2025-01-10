@@ -39,7 +39,7 @@ std::shared_ptr<File> File::Create(NSString *path, uint64_t flush_timeout_ms,
     if (!shared_writer) {
       return;
     }
-    shared_writer->FlushLocked();
+    shared_writer->FlushSerialized();
   });
 
   dispatch_resume(ret_writer->timer_source_);
@@ -55,7 +55,7 @@ File::File(NSString *path, size_t batch_size_bytes, size_t max_expected_write_si
       timer_source_(timer_source),
       watch_source_(nullptr) {
   path_ = path;
-  OpenFileHandleLocked();
+  OpenFileHandleSerialized();
 }
 
 void File::WatchLogFile() {
@@ -69,7 +69,7 @@ void File::WatchLogFile() {
   auto shared_this = shared_from_this();
   dispatch_source_set_event_handler(watch_source_, ^{
     [shared_this->file_handle_ closeFile];
-    shared_this->OpenFileHandleLocked();
+    shared_this->OpenFileHandleSerialized();
     shared_this->WatchLogFile();
   });
 
@@ -83,7 +83,7 @@ File::~File() {
 }
 
 // IMPORTANT: Not thread safe.
-void File::OpenFileHandleLocked() {
+void File::OpenFileHandleSerialized() {
   NSFileManager *fm = [NSFileManager defaultManager];
   if (![fm fileExistsAtPath:path_]) {
     [fm createFileAtPath:path_ contents:nil attributes:nil];
@@ -101,10 +101,10 @@ void File::Write(std::vector<uint8_t> &&bytes) {
   dispatch_async(q_, ^{
     std::vector<uint8_t> moved_bytes = std::move(temp_bytes);
 
-    shared_this->CopyDataLocked(moved_bytes);
+    shared_this->CopyDataSerialized(moved_bytes);
 
     if (shared_this->ShouldFlush()) {
-      shared_this->FlushLocked();
+      shared_this->FlushSerialized();
     }
   });
 }
@@ -115,26 +115,26 @@ bool File::ShouldFlush() {
 
 void File::Flush() {
   dispatch_sync(q_, ^{
-    FlushLocked();
+    FlushSerialized();
   });
 }
 
 // IMPORTANT: Not thread safe.
-void File::EnsureCapacityLocked(size_t additional_bytes) {
+void File::EnsureCapacitySerialized(size_t additional_bytes) {
   if ((buffer_offset_ + additional_bytes) > buffer_.capacity()) {
     buffer_.resize(buffer_.capacity() * 2);
   }
 }
 
 // IMPORTANT: Not thread safe.
-void File::CopyDataLocked(const std::vector<uint8_t> &bytes) {
-  EnsureCapacityLocked(bytes.size());
+void File::CopyDataSerialized(const std::vector<uint8_t> &bytes) {
+  EnsureCapacitySerialized(bytes.size());
   std::copy(bytes.begin(), bytes.end(), buffer_.begin() + buffer_offset_);
   buffer_offset_ += bytes.size();
 }
 
 // IMPORTANT: Not thread safe.
-void File::FlushLocked() {
+void File::FlushSerialized() {
   if (likely(buffer_offset_ > 0)) {
     write(file_handle_.fileDescriptor, buffer_.data(), buffer_offset_);
 

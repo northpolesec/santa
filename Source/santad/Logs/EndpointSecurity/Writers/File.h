@@ -47,13 +47,13 @@ class File : public Writer, public std::enable_shared_from_this<File> {
   friend class santa::FilePeer;
 
  private:
-  void OpenFileHandleLocked();
+  void OpenFileHandleSerialized();
   void WatchLogFile();
-  void FlushLocked();
+  void FlushSerialized();
   bool ShouldFlush();
 
-  void EnsureCapacityLocked(size_t additional_bytes);
-  void CopyDataLocked(const std::vector<uint8_t> &bytes);
+  void EnsureCapacitySerialized(size_t additional_bytes);
+  void CopyDataSerialized(const std::vector<uint8_t> &bytes);
 
   std::vector<uint8_t> buffer_;
   size_t batch_size_bytes_;
