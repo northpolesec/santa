@@ -14,6 +14,7 @@
 
 #include "Source/common/RingBuffer.h"
 
+#include <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 #include <optional>
@@ -185,12 +186,7 @@ using santa::RingBuffer;
   rb.Enqueue({700, 7});
   rb.Enqueue({8, 800});
 
-  rb.Erase(std::remove_if(rb.begin(), rb.end(),
-                          [](const Foo &f) {
-                            printf("fx: %d, fy: %d, fx<fy: %d\n", f.x, f.y, f.x < f.y);
-                            return f.x < f.y;
-                          }),
-           rb.end());
+  rb.Erase(std::remove_if(rb.begin(), rb.end(), [](const Foo &f) { return f.x < f.y; }), rb.end());
 
   res = rb.Dequeue().value_or(Foo{0, 0});
   XCTAssertEqual(res.x, 500);

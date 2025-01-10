@@ -15,12 +15,22 @@
 
 #import <Foundation/Foundation.h>
 
+#include <memory>
+
+#include "Source/common/RingBuffer.h"
+
 @class SNTStoredEvent;
 @class MOLXPCConnection;
 
 @interface SNTNotificationQueue : NSObject
 
 @property(nonatomic) MOLXPCConnection *notifierConnection;
+
+- (instancetype)initWithRingBuffer:
+    (std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>>)pendingNotifications
+    NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)init NS_UNAVAILABLE;
 
 - (void)addEvent:(SNTStoredEvent *)event
     withCustomMessage:(NSString *)message
