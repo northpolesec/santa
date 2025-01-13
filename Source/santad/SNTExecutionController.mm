@@ -57,6 +57,7 @@
 
 using santa::Message;
 using santa::PrefixTree;
+using santa::ProcessControl;
 using santa::TTYWriter;
 using santa::Unit;
 
@@ -86,6 +87,7 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
 @property SNTRuleTable *ruleTable;
 @property SNTSyncdQueue *syncdQueue;
 @property SNTMetricCounter *events;
+@property santa::ProcessControlBlock processControlBlock;
 
 @property dispatch_queue_t eventQueue;
 @end
@@ -114,7 +116,8 @@ static NSString *const kPrinterProxyPostMonterey =
                        syncdQueue:(SNTSyncdQueue *)syncdQueue
                         ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
          entitlementsPrefixFilter:(NSArray<NSString *> *)entitlementsPrefixFilter
-         entitlementsTeamIDFilter:(NSArray<NSString *> *)entitlementsTeamIDFilter {
+         entitlementsTeamIDFilter:(NSArray<NSString *> *)entitlementsTeamIDFilter
+              processControlBlock:(santa::ProcessControlBlock)processControlBlock {
   self = [super init];
   if (self) {
     _ruleTable = ruleTable;
@@ -124,6 +127,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _ttyWriter = std::move(ttyWriter);
     _policyProcessor = [[SNTPolicyProcessor alloc] initWithRuleTable:_ruleTable];
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
+    _processControlBlock = processControlBlock;
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -331,7 +335,7 @@ static NSString *const kPrinterProxyPostMonterey =
     // If the user authorizes execution we resume the process. Any attempts to resume the paused
     // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
-    stoppedProc = [self manipulatePID:newProcPid withControl:ProcessControl::Suspend];
+    stoppedProc = self.processControlBlock(newProcPid, ProcessControl::Suspend);
     postAction(SNTActionRespondHold);
     holdAndAsk = true;
   } else {
@@ -458,18 +462,17 @@ static NSString *const kPrinterProxyPostMonterey =
               }
 
               // Allow the binary to begin running.
-              [self manipulatePID:newProcPid withControl:ProcessControl::Resume];
-              _procSignalCache->remove(pidAndVersion);
+              self.processControlBlock(newProcPid, ProcessControl::Resume);
             } else {
               // The user did not approve, so kill the stopped process.
               if (stoppedProc) {
                 _ttyWriter->Write(targetProc,
                                   @"Authorization not given, denying execution\n---\n\n");
               }
-              [self manipulatePID:newProcPid withControl:ProcessControl::Kill];
-              _procSignalCache->remove(pidAndVersion);
+              self.processControlBlock(newProcPid, ProcessControl::Kill);
             }
 
+            _procSignalCache->remove(pidAndVersion);
             postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied);
           };
         }
@@ -605,38 +608,6 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   // TODO: Notify the sync service of the new rule.
-}
-
-extern "C" int pid_suspend(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
-extern "C" int pid_resume(pid_t pid) WEAK_IMPORT_ATTRIBUTE;
-
-enum class ProcessControl { Suspend, Resume, Kill };
-
-// Wrapper around the pid_suspend() / pid_resume() / kill() functions that uses signal numbers
-// to determine which to use and which can be easily mocked out in tests;
-// Returns true if pid_suspend/pid_resume was used for Suspend/Resume and false if they weren't
-// available.
-- (bool)manipulatePID:(pid_t)pid withControl:(ProcessControl)control {
-  switch (control) {
-    case ProcessControl::Suspend:
-      if (pid_suspend == nullptr) {
-        LOGW(@"pid_suspend() is not available, killing the target process %d", pid);
-        kill(pid, SIGKILL);
-        return false;
-      }
-      pid_suspend(pid);
-      return true;
-    case ProcessControl::Resume:
-      if (pid_resume == nullptr) {
-        LOGW(@"pid_resume() is not available, killing the target process %d", pid);
-        kill(pid, SIGKILL);
-        return false;
-      }
-      pid_resume(pid);
-      return true;
-    case ProcessControl::Kill: kill(pid, SIGKILL); break;
-  }
-  return true;
 }
 
 @end

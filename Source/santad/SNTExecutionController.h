@@ -16,6 +16,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/santad/ProcessControl.h"
 #include "Source/santad/TTYWriter.h"
 
 const static NSString *kBlockBinary = @"BlockBinary";
@@ -63,7 +64,8 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
                        syncdQueue:(SNTSyncdQueue *)syncdQueue
                         ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
          entitlementsPrefixFilter:(NSArray<NSString *> *)prefixFilter
-         entitlementsTeamIDFilter:(NSArray<NSString *> *)teamIDFilter;
+         entitlementsTeamIDFilter:(NSArray<NSString *> *)teamIDFilter
+              processControlBlock:(santa::ProcessControlBlock)processControlBlock;
 
 ///
 ///  Handles the logic of deciding whether to allow the binary to run or not, sends the response to

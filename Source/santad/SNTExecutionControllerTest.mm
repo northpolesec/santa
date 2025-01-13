@@ -32,6 +32,7 @@
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTExecutionController.h"
 
@@ -99,7 +100,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                                                     syncdQueue:nil
                                                      ttyWriter:santa::TTYWriter::Create(true)
                                       entitlementsPrefixFilter:nil
-                                      entitlementsTeamIDFilter:nil];
+                                      entitlementsTeamIDFilter:nil
+                                           processControlBlock:santa::ProdSuspendResumeBlock()];
 }
 
 - (void)tearDown {

@@ -126,7 +126,7 @@ bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision) {
       return cache->set(vnode_id, CacheableAction(decision),
                         CacheableAction(SNTActionRequestBinary, 0));
 
-    // SNTActionHoldAllowed and  SNTActionHoldDenied are used for transitions, however the
+    // SNTActionHoldAllowed and SNTActionHoldDenied are used for transitions, however the
     // cached action is translated to SNTActionRespondAllow or SNTActionRespondDeny respectively.
     case SNTActionHoldAllowed: OS_FALLTHROUGH;
     case SNTActionHoldDenied:

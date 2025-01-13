@@ -66,14 +66,7 @@ using santa::Message;
   return @"Authorizer";
 }
 
-// Due to limitations with OCMock partial mocks with objects that contain std::optonal
-// members (which includes the Message object) this method receives the Message as a const
-// ref to get around OCMock bugs which would otherwise not allow this method to be stubbed.
-// A copy of the received Message parameter is made to ensure that it gets copied again
-// when the block passed to `postAction` below is created to ensure the message is not
-// prematurely released.
-- (void)processMessage:(const Message &)msgRefDoNotUse {
-  Message msg(msgRefDoNotUse);
+- (void)processMessage:(Message)msg {
   if (msg->event_type == ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME) {
     [self.execController
         validateSuspendResumeEvent:msg
@@ -166,7 +159,7 @@ using santa::Message;
 
   [self processMessage:std::move(esMsg)
                handler:^(Message msg) {
-                 [self processMessage:msg];
+                 [self processMessage:std::move(msg)];
                  recordEventMetrics(EventDisposition::kProcessed);
                }];
 }

@@ -262,11 +262,21 @@ objc_library(
 )
 
 objc_library(
+    name = "ProcessControl",
+    srcs = ["ProcessControl.mm"],
+    hdrs = ["ProcessControl.h"],
+    deps = [
+        "//Source/common:SNTLogging",
+    ],
+)
+
+objc_library(
     name = "SNTExecutionController",
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
     deps = [
         ":EndpointSecurityMessage",
+        ":ProcessControl",
         ":SNTDecisionCache",
         ":SNTEventTable",
         ":SNTNotificationQueue",
@@ -826,6 +836,7 @@ objc_library(
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":Metrics",
+        ":ProcessControl",
         ":SNTCompilerController",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
@@ -871,6 +882,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SystemResources",
+        "//Source/santad:ProcessControl",
     ],
 )
 
@@ -1010,6 +1022,7 @@ santa_unit_test(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":MockEndpointSecurityAPI",
+        ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
@@ -1318,6 +1331,7 @@ santa_unit_test(
     deps = [
         ":EndpointSecurityMessage",
         ":MockEndpointSecurityAPI",
+        ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEventTable",

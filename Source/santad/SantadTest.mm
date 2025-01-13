@@ -35,6 +35,7 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/Metrics.h"
+#include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/SNTExecutionController.h"
@@ -137,7 +138,7 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   OCMStub([mockConfigurator clientMode]).andReturn(clientMode);
   OCMStub([mockConfigurator failClosed]).andReturn(NO);
   OCMStub([mockConfigurator fileAccessPolicyUpdateIntervalSec]).andReturn(600);
-  OCMStub([mockConfigurator enableSilentTTYMode]).andReturn(NO);
+  OCMStub([mockConfigurator enableSilentTTYMode]).andReturn(YES);
 
   NSString *testPath = [NSString pathWithComponents:@[
     [[NSBundle bundleForClass:[self class]] resourcePath],
@@ -146,9 +147,11 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
   OCMStub([self.mockSNTDatabaseController databasePath]).andReturn(testPath);
 
-  std::unique_ptr<SantadDeps> deps = SantadDeps::Create(mockConfigurator, nil);
-  id mockExecutionController = OCMPartialMock(deps->ExecController());
-  OCMStub([[mockExecutionController ignoringNonObjectArgs] manipulatePID:0 withControl:0]);
+  // Create deps and inject a ProcessControlBlock that has no side effects
+  std::unique_ptr<SantadDeps> deps =
+      SantadDeps::Create(mockConfigurator, nil, ^bool(pid_t, santa::ProcessControl) {
+        return true;
+      });
 
   SNTEndpointSecurityAuthorizer *authClient =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
