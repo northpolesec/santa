@@ -2,6 +2,7 @@
 
 load("@build_bazel_rules_apple//apple:macos.bzl", "macos_unit_test")
 load("@build_bazel_rules_apple//apple:resources.bzl", "apple_resource_group")
+load("@rules_cc//cc:defs.bzl", "objc_library")
 
 def run_command(name, cmd, **kwargs):
     """A rule to run a command."""
@@ -34,7 +35,7 @@ def santa_unit_test(
         structured_resources = structured_resources,
     )
 
-    native.objc_library(
+    objc_library(
         name = "%s_lib" % name,
         testonly = 1,
         srcs = srcs,
