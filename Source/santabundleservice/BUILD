@@ -1,4 +1,5 @@
 load("@build_bazel_rules_apple//apple:macos.bzl", "macos_command_line_application")
+load("@rules_cc//cc:defs.bzl", "objc_library")
 
 licenses(["notice"])
 
