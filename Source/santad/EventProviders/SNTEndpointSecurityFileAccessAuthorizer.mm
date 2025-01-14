@@ -754,8 +754,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   return policyDecision;
 }
 
-- (void)processMessage:(const Message &)msg
-        overrideAction:(SNTOverrideFileAccessAction)overrideAction {
+- (void)processMessage:(Message)msg overrideAction:(SNTOverrideFileAccessAction)overrideAction {
   std::vector<PathTarget> targets;
   targets.reserve(2);
   PopulatePathTargets(msg, targets);
@@ -830,8 +829,8 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   }
 
   [self processMessage:std::move(esMsg)
-               handler:^(const Message &msg) {
-                 [self processMessage:msg overrideAction:overrideAction];
+               handler:^(Message msg) {
+                 [self processMessage:std::move(msg) overrideAction:overrideAction];
                  recordEventMetrics(EventDisposition::kProcessed);
                }];
 }

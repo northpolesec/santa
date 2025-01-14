@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 
+#include <atomic>
 #include <memory>
 
 namespace santa {
@@ -26,9 +28,9 @@ namespace santa {
 // Small helper class to synchronize writing to TTYs
 class TTYWriter {
  public:
-  static std::unique_ptr<TTYWriter> Create();
+  static std::unique_ptr<TTYWriter> Create(bool silent_tty_mode);
 
-  TTYWriter(dispatch_queue_t q);
+  TTYWriter(dispatch_queue_t q, bool silent_tty_mode);
 
   // Moves can be safe, but not currently needed/implemented
   TTYWriter(TTYWriter &&other) = delete;
@@ -40,10 +42,14 @@ class TTYWriter {
 
   static bool CanWrite(const es_process_t *proc);
 
+  void Write(const es_process_t *proc, NSString * (^messageCreator)(void));
   void Write(const es_process_t *proc, NSString *msg);
+
+  void EnableSilentTTYMode(bool silent_tty_mode);
 
  private:
   dispatch_queue_t q_;
+  std::atomic<bool> silent_tty_mode_;
 };
 
 }  // namespace santa

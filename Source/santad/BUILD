@@ -262,11 +262,21 @@ objc_library(
 )
 
 objc_library(
+    name = "ProcessControl",
+    srcs = ["ProcessControl.mm"],
+    hdrs = ["ProcessControl.h"],
+    deps = [
+        "//Source/common:SNTLogging",
+    ],
+)
+
+objc_library(
     name = "SNTExecutionController",
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
     deps = [
         ":EndpointSecurityMessage",
+        ":ProcessControl",
         ":SNTDecisionCache",
         ":SNTEventTable",
         ":SNTNotificationQueue",
@@ -415,6 +425,7 @@ objc_library(
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         ":SNTExecutionController",
+        ":TTYWriter",
         "//Source/common:BranchPrediction",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
@@ -825,6 +836,7 @@ objc_library(
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":Metrics",
+        ":ProcessControl",
         ":SNTCompilerController",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
@@ -870,6 +882,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SystemResources",
+        "//Source/santad:ProcessControl",
     ],
 )
 
@@ -1009,6 +1022,7 @@ santa_unit_test(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":MockEndpointSecurityAPI",
+        ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
@@ -1129,6 +1143,7 @@ santa_unit_test(
     deps = [
         ":AuthResultCache",
         ":MockEndpointSecurityAPI",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "@OCMock",
@@ -1316,6 +1331,7 @@ santa_unit_test(
     deps = [
         ":EndpointSecurityMessage",
         ":MockEndpointSecurityAPI",
+        ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEventTable",
@@ -1350,6 +1366,7 @@ santa_unit_test(
         ":SNTCompilerController",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTExecutionController",
+        ":TTYWriter",
         "//Source/common:SNTCommonEnums",
         "//Source/common:TestUtils",
         "@OCMock",

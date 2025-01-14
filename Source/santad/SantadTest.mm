@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -34,6 +35,7 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/Metrics.h"
+#include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/SNTExecutionController.h"
@@ -116,8 +118,15 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
   id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
+
+  // Capture the decision to be used in the cacheability check below
+  __block SNTEventState eventState = SNTEventStateUnknown;
   if (cdValidator) {
-    OCMExpect([mockDecisionCache cacheDecision:[OCMArg checkWithBlock:cdValidator]]);
+    BOOL (^cdValidatorWrapper)(SNTCachedDecision *) = ^BOOL(SNTCachedDecision *cd) {
+      eventState = cd.decision;
+      return cdValidator(cd);
+    };
+    OCMExpect([mockDecisionCache cacheDecision:[OCMArg checkWithBlock:cdValidatorWrapper]]);
   }
 
   id mockConfigurator = OCMClassMock([SNTConfigurator class]);
@@ -129,6 +138,7 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   OCMStub([mockConfigurator clientMode]).andReturn(clientMode);
   OCMStub([mockConfigurator failClosed]).andReturn(NO);
   OCMStub([mockConfigurator fileAccessPolicyUpdateIntervalSec]).andReturn(600);
+  OCMStub([mockConfigurator enableSilentTTYMode]).andReturn(YES);
 
   NSString *testPath = [NSString pathWithComponents:@[
     [[NSBundle bundleForClass:[self class]] resourcePath],
@@ -137,22 +147,34 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
   OCMStub([self.mockSNTDatabaseController databasePath]).andReturn(testPath);
 
-  std::unique_ptr<SantadDeps> deps = SantadDeps::Create(mockConfigurator, nil);
-  id mockExecutionController = OCMPartialMock(deps->ExecController());
-  OCMStub([[mockExecutionController ignoringNonObjectArgs] manipulatePID:0 withControl:0]);
+  // Create deps and inject a ProcessControlBlock that has no side effects
+  std::unique_ptr<SantadDeps> deps =
+      SantadDeps::Create(mockConfigurator, nil, ^bool(pid_t, santa::ProcessControl) {
+        return true;
+      });
 
   SNTEndpointSecurityAuthorizer *authClient =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
                                                    metrics:deps->Metrics()
                                             execController:deps->ExecController()
                                         compilerController:deps->CompilerController()
-                                           authResultCache:deps->AuthResultCache()];
+                                           authResultCache:deps->AuthResultCache()
+                                                 ttyWriter:deps->TTYWriter()];
 
   XCTestExpectation *expectation =
       [self expectationWithDescription:@"Wait for santa's Auth dispatch queue"];
 
+  // Note: Determining cacheability is slightly different than the real check because
+  // the test does not have access to the SNTAction used when calling postAction.
+  // Checking client mode and the eventState is a sufficient stand-in since this
+  // combination is used to determine if SNTActionRespondHold is used.
   EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, wantResult,
-                                            wantResult == ES_AUTH_RESULT_ALLOW))
+                                            testing::Truly(^BOOL(const bool cacheable) {
+                                              return cacheable ==
+                                                     (wantResult == ES_AUTH_RESULT_ALLOW &&
+                                                      (clientMode != SNTClientModeStandalone ||
+                                                       eventState != SNTEventStateBlockUnknown));
+                                            })))
       .WillOnce(testing::InvokeWithoutArgs(^bool {
         [expectation fulfill];
         return true;

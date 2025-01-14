@@ -46,7 +46,8 @@ using santa::WatchItems;
 namespace santa {
 
 std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
-                                               SNTMetricSet *metric_set) {
+                                               SNTMetricSet *metric_set,
+                                               santa::ProcessControlBlock processControlBlock) {
   // TODO(mlw): The XPC interfaces should be injectable. Could either make a new
   // protocol defining appropriate methods or accept values as params.
   MOLXPCConnection *control_connection =
@@ -91,9 +92,10 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  std::shared_ptr<::TTYWriter> tty_writer = TTYWriter::Create();
+  std::shared_ptr<::TTYWriter> tty_writer = TTYWriter::Create(configurator.enableSilentTTYMode);
   if (!tty_writer) {
-    LOGW(@"Unable to initialize TTY writer");
+    LOGE(@"Failed to initialize TTY writer");
+    exit(EXIT_FAILURE);
   }
 
   SNTExecutionController *exec_controller =
@@ -103,7 +105,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
                                              syncdQueue:syncd_queue
                                               ttyWriter:tty_writer
                                entitlementsPrefixFilter:[configurator entitlementsPrefixFilter]
-                               entitlementsTeamIDFilter:[configurator entitlementsTeamIDFilter]];
+                               entitlementsTeamIDFilter:[configurator entitlementsTeamIDFilter]
+                                    processControlBlock:processControlBlock];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);

@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Foundation/Foundation.h>
@@ -21,7 +22,9 @@
 #include <time.h>
 
 #include <memory>
+#include <vector>
 
+#import "Source/common/SNTCommonEnums.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
@@ -166,22 +169,30 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondAllow));
   XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondAllowCompiler));
   XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondDeny));
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondHold));
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionHoldAllowed));
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionHoldDenied));
   XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionUnset);
 
   XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRequestBinary));
   XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
 
   // Items in the `SNTActionRequestBinary` state cannot reenter the same state
+  // or the SNTActionHoldAllowed/SNTActionHoldDenied states
   XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRequestBinary));
   XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionHoldAllowed));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionHoldDenied));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
 
-  SNTAction allowed_transitions[] = {
+  std::vector<SNTAction> allowedTransitions = {
       SNTActionRespondAllow,
       SNTActionRespondAllowCompiler,
       SNTActionRespondDeny,
   };
 
-  for (size_t i = 0; i < sizeof(allowed_transitions) / sizeof(allowed_transitions[0]); i++) {
+  for (const SNTAction transition : allowedTransitions) {
     // First make sure the item doesn't exist
     cache->RemoveFromCache(&rootFile);
     XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionUnset);
@@ -191,9 +202,55 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
     XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
 
     // Now assert the allowed transition
-    XCTAssertTrue(cache->AddToCache(&rootFile, allowed_transitions[i]));
-    XCTAssertEqual(cache->CheckCache(&rootFile), allowed_transitions[i]);
+    XCTAssertTrue(cache->AddToCache(&rootFile, transition));
+    XCTAssertEqual(cache->CheckCache(&rootFile), transition);
   }
+
+  allowedTransitions = {
+      SNTActionHoldAllowed,
+      SNTActionHoldDenied,
+  };
+
+  // Check hold-related states
+  for (const SNTAction transition : allowedTransitions) {
+    // First make sure the item doesn't exist and move into the starting state
+    cache->RemoveFromCache(&rootFile);
+    XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionUnset);
+    XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRequestBinary));
+    XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
+
+    // Check the item can transition to the new hold state
+    XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRespondHold));
+    XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRespondHold);
+
+    // Now assert the allowed transition
+    // Note: hold transitions converted to SNTActionRespondAllow/SNTActionRespondDeny states
+    XCTAssertTrue(cache->AddToCache(&rootFile, transition));
+    XCTAssertEqual(cache->CheckCache(&rootFile), transition == SNTActionHoldAllowed
+                                                     ? SNTActionRespondAllow
+                                                     : SNTActionRespondDeny);
+  }
+
+  // Ensure improper transitions from the hold state are disallowed
+  // First, get into the hold state
+  cache->RemoveFromCache(&rootFile);
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionUnset);
+  XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRequestBinary));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
+  XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRespondHold));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRespondHold);
+
+  // Ensure all the following state transition attempts fail
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondHold));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRespondHold);
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondAllow));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRespondHold);
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondAllowCompiler));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRespondHold);
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondDeny));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRespondHold);
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRequestBinary));
+  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRespondHold);
 }
 
 - (void)testCacheExpiry {

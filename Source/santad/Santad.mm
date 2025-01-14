@@ -129,7 +129,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                    metrics:metrics
                                             execController:exec_controller
                                         compilerController:compiler_controller
-                                           authResultCache:auth_result_cache];
+                                           authResultCache:auth_result_cache
+                                                 ttyWriter:tty_writer];
 
   SNTEndpointSecurityTamperResistance *tamper_client =
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:esapi
@@ -451,6 +452,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                         newBool);
                                    logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(
                                        configurator.telemetry, newBool));
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(enableSilentTTYMode)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"enableSilentTTYMode changed %d -> %d", oldBool, newBool);
+
+                                   tty_writer->EnableSilentTTYMode(newBool);
                                  }],
   ]];
 

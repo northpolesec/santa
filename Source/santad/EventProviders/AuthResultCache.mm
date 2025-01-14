@@ -1,17 +1,17 @@
-
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include "Source/santad/EventProviders/AuthResultCache.h"
 
@@ -112,13 +112,28 @@ bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision) {
   SantaVnode vnode_id = SantaVnode::VnodeForFile(es_file);
   SantaCache<SantaVnode, uint64_t> *cache = CacheForVnodeID(vnode_id);
   switch (decision) {
+    // SNTActionRequestBinary and SNTActionRespondHold are not terminal states and should not
+    // contain a timestamp to allow for proper transitions out of the state.
     case SNTActionRequestBinary:
       return cache->set(vnode_id, CacheableAction(SNTActionRequestBinary, 0), 0);
+    case SNTActionRespondHold:
+      return cache->set(vnode_id, CacheableAction(SNTActionRespondHold, 0),
+                        CacheableAction(SNTActionRequestBinary, 0));
+
     case SNTActionRespondAllow: OS_FALLTHROUGH;
     case SNTActionRespondAllowCompiler: OS_FALLTHROUGH;
     case SNTActionRespondDeny:
       return cache->set(vnode_id, CacheableAction(decision),
                         CacheableAction(SNTActionRequestBinary, 0));
+
+    // SNTActionHoldAllowed and SNTActionHoldDenied are used for transitions, however the
+    // cached action is translated to SNTActionRespondAllow or SNTActionRespondDeny respectively.
+    case SNTActionHoldAllowed: OS_FALLTHROUGH;
+    case SNTActionHoldDenied:
+      return cache->set(vnode_id,
+                        CacheableAction(decision == SNTActionHoldAllowed ? SNTActionRespondAllow
+                                                                         : SNTActionRespondDeny),
+                        CacheableAction(SNTActionRespondHold, 0));
     default:
       // This is a programming error. Bail.
       LOGE(@"Invalid cache value, exiting.");

@@ -31,6 +31,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
+#include "Source/santad/ProcessControl.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
@@ -42,8 +43,9 @@ namespace santa {
 
 class SantadDeps {
  public:
-  static std::unique_ptr<SantadDeps> Create(SNTConfigurator *configurator,
-                                            SNTMetricSet *metric_set);
+  static std::unique_ptr<SantadDeps> Create(
+      SNTConfigurator *configurator, SNTMetricSet *metric_set,
+      santa::ProcessControlBlock processControlBlock);
 
   SantadDeps(
       std::shared_ptr<santa::EndpointSecurityAPI> esapi,
