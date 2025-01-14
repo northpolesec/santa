@@ -55,7 +55,8 @@ Spool::Spool(dispatch_queue_t q, dispatch_source_t timer_source, std::string_vie
                                           spool_file_size_threshold_leniency_factor_),
       write_complete_f_(write_complete_f),
       flush_task_complete_f_(flush_task_complete_f) {
-  type_url_ = kTypeGoogleApisComPrefix + ::santa::pb::v1::SantaMessage::descriptor()->full_name();
+  type_url_ = absl::StrCat(kTypeGoogleApisComPrefix,
+                           ::santa::pb::v1::SantaMessage::descriptor()->full_name());
 }
 
 Spool::~Spool() {
