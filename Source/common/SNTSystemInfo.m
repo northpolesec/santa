@@ -56,6 +56,10 @@
   dispatch_once(&onceToken, ^{
     uuid_string_t bootSessionUUID = {};
     size_t uuidLength = sizeof(bootSessionUUID);
+    // If this fails, bootSessionUUID is left as a fixed stack array of 0's,
+    // so the line following will create a zero-length NSString. There's not
+    // much we can really do if this fails, there are no other ways to get this
+    // information.
     sysctlbyname("kern.bootsessionuuid", bootSessionUUID, &uuidLength, NULL, 0);
     uuid = @(bootSessionUUID);
   });
