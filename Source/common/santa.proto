@@ -22,7 +22,10 @@ message GroupInfo {
   optional string name = 2;
 }
 
-// A process is uniquely identified on macOS by its pid and pidversion
+// A macOS process is identified by its pid and pidversion.
+//
+// This identifier is unique during the runtime of the operating system,
+// but not unique across restarts.
 message ProcessID {
   optional int32 pid = 1;
   optional int32 pidversion = 2;
