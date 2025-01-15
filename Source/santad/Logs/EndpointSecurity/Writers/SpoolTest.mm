@@ -28,7 +28,7 @@ namespace santa {
 class SpoolPeer : public Spool {
  public:
   // Make constructors visible
-  using Spool::FlushLocked;
+  using Spool::FlushSerialized;
   using Spool::Spool;
 
   std::string GetTypeUrl() { return type_url_; }
@@ -124,7 +124,7 @@ using santa::SpoolPeer;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 0);
 
   // Manual Flush
-  XCTAssertTrue(spool->FlushLocked());
+  XCTAssertTrue(spool->FlushSerialized());
 
   // A new log entry should exist
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);

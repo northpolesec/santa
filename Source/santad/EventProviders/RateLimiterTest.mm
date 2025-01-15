@@ -30,9 +30,9 @@ class RateLimiterPeer : public RateLimiter {
  public:
   using RateLimiter::RateLimiter;
 
-  using RateLimiter::EventsRateLimitedLocked;
-  using RateLimiter::ShouldRateLimitLocked;
-  using RateLimiter::TryResetLocked;
+  using RateLimiter::EventsRateLimitedSerialized;
+  using RateLimiter::ShouldRateLimitSerialized;
+  using RateLimiter::TryResetSerialized;
 
   using RateLimiter::log_count_total_;
   using RateLimiter::reset_mach_time_;
@@ -47,7 +47,7 @@ using santa::RateLimiterPeer;
 
 @implementation RateLimiterTest
 
-- (void)testTryResetLocked {
+- (void)testTryResetSerialized {
   // Create an object supporting 1 QPS, and a reset duration of 2s
   uint16_t maxQps = 1;
   NSTimeInterval resetDuration = 2;
@@ -64,20 +64,20 @@ using santa::RateLimiterPeer;
   // Set a higher log count to ensure it is reset
   rlp.log_count_total_ = 123;
 
-  rlp.TryResetLocked(curMachTime);
+  rlp.TryResetSerialized(curMachTime);
 
   // Ensure values are reset appropriately
   XCTAssertEqual(rlp.log_count_total_, 0);
   XCTAssertGreaterThanOrEqual(rlp.reset_mach_time_, expectedMachTime);
 
-  // Setup values so that calling TryResetLocked shouldn't reset anything
+  // Setup values so that calling TryResetSerialized shouldn't reset anything
   size_t expectedLogCount = 123;
   expectedMachTime = 456;
   rlp.log_count_total_ = expectedLogCount;
   rlp.reset_mach_time_ = expectedMachTime;
   curMachTime = rlp.reset_mach_time_;
 
-  rlp.TryResetLocked(curMachTime);
+  rlp.TryResetSerialized(curMachTime);
 
   // Ensure the values were not changed
   XCTAssertEqual(rlp.log_count_total_, expectedLogCount);
@@ -129,20 +129,20 @@ using santa::RateLimiterPeer;
   RateLimiterPeer rlp(nullptr, kDefaultProcessor, maxQps, resetDuration);
 
   // Initially no rate limiting should apply
-  XCTAssertFalse(rlp.ShouldRateLimitLocked());
-  XCTAssertEqual(rlp.EventsRateLimitedLocked(), 0);
+  XCTAssertFalse(rlp.ShouldRateLimitSerialized());
+  XCTAssertEqual(rlp.EventsRateLimitedSerialized(), 0);
 
   // Simulate a smmaller volume of logs received than QPS
   rlp.log_count_total_ = allowedLogsPerDuration - 1;
 
-  XCTAssertFalse(rlp.ShouldRateLimitLocked());
-  XCTAssertEqual(rlp.EventsRateLimitedLocked(), 0);
+  XCTAssertFalse(rlp.ShouldRateLimitSerialized());
+  XCTAssertEqual(rlp.EventsRateLimitedSerialized(), 0);
 
   // Simulate a larger volume of logs received than QPS
   rlp.log_count_total_ = allowedLogsPerDuration + logsOverQPS;
 
-  XCTAssertTrue(rlp.ShouldRateLimitLocked());
-  XCTAssertEqual(rlp.EventsRateLimitedLocked(), logsOverQPS);
+  XCTAssertTrue(rlp.ShouldRateLimitSerialized());
+  XCTAssertEqual(rlp.EventsRateLimitedSerialized(), logsOverQPS);
 }
 
 @end
