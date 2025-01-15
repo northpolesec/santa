@@ -18,34 +18,47 @@
 @implementation SNTSystemInfo
 
 + (NSString *)serialNumber {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  io_service_t platformExpert = IOServiceGetMatchingService(
-      kIOMasterPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
-#pragma clang diagnostic pop
-  if (!platformExpert) return nil;
+  static NSString *serial;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    io_service_t platformExpert = IOServiceGetMatchingService(
+        kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
+    if (!platformExpert) return;
 
-  NSString *serial = CFBridgingRelease(IORegistryEntryCreateCFProperty(
-      platformExpert, CFSTR(kIOPlatformSerialNumberKey), kCFAllocatorDefault, 0));
+    serial = CFBridgingRelease(IORegistryEntryCreateCFProperty(
+        platformExpert, CFSTR(kIOPlatformSerialNumberKey), kCFAllocatorDefault, 0));
 
-  IOObjectRelease(platformExpert);
-
+    IOObjectRelease(platformExpert);
+  });
   return serial;
 }
 
 + (NSString *)hardwareUUID {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  io_service_t platformExpert = IOServiceGetMatchingService(
-      kIOMasterPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
-#pragma clang diagnostic pop
-  if (!platformExpert) return nil;
+  static NSString *uuid;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    io_service_t platformExpert = IOServiceGetMatchingService(
+        kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
+    if (!platformExpert) return;
 
-  NSString *uuid = CFBridgingRelease(IORegistryEntryCreateCFProperty(
-      platformExpert, CFSTR(kIOPlatformUUIDKey), kCFAllocatorDefault, 0));
+    uuid = CFBridgingRelease(IORegistryEntryCreateCFProperty(
+        platformExpert, CFSTR(kIOPlatformUUIDKey), kCFAllocatorDefault, 0));
 
-  IOObjectRelease(platformExpert);
+    IOObjectRelease(platformExpert);
+  });
 
+  return uuid;
+}
+
++ (NSString *)bootSessionUUID {
+  static NSString *uuid;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    uuid_string_t bootSessionUUID = {};
+    size_t uuidLength = sizeof(bootSessionUUID);
+    sysctlbyname("kern.bootsessionuuid", bootSessionUUID, &uuidLength, NULL, 0);
+    uuid = @(bootSessionUUID);
+  });
   return uuid;
 }
 
