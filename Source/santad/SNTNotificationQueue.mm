@@ -128,7 +128,7 @@
 
     NotificationReplyBlock replyBlock = d[@"reply"];
     if (replyBlock == nil) {
-      // The reply block sent tflushQueueSerializedo the GUI cannot be nil.
+      // The reply block sent to the GUI cannot be nil. Provide one now if one was not given.
       // The copy is necessary so the block is on the heap.
       replyBlock = [^(BOOL _) {
       } copy];
