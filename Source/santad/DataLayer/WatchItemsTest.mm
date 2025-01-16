@@ -987,6 +987,25 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertGreaterThanOrEqual(state.last_config_load_epoch, startTime);
 }
 
+- (void)testPathPatternExpectations {
+  NSMutableDictionary *config = WrapWatchItemsConfig(@{
+    @"rule1" : @{kWatchItemConfigKeyPaths : @[ @"abc", @"xyz*" ]},
+  });
+
+  WatchItemsPeer watchItems(@"my_fake_config_path", NULL, NULL);
+  watchItems.ReloadConfig(config);
+
+  // Ensure that non-glob patterns are watched
+  WatchItems::VersionAndPolicies policies = watchItems.FindPolciesForPaths({"abc"});
+  XCTAssertCStringEqual(policies.second[0].value_or(MakeBadPolicy())->name.c_str(), "rule1");
+
+  // Check that patterns with globs are not returned
+  policies = watchItems.FindPolciesForPaths({"xyz"});
+  XCTAssertFalse(policies.second[0].has_value());
+  policies = watchItems.FindPolciesForPaths({"xyzbar"});
+  XCTAssertFalse(policies.second[0].has_value());
+}
+
 - (void)testSetConfigAndSetConfigPath {
   // Test internal state when switching back and forth between path-based and
   // dictionary-based config options.
