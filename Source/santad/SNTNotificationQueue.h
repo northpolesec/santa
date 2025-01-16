@@ -22,6 +22,8 @@
 @class SNTStoredEvent;
 @class MOLXPCConnection;
 
+using NotificationReplyBlock = void (^)(BOOL);
+
 @interface SNTNotificationQueue : NSObject
 
 @property(nonatomic) MOLXPCConnection *notifierConnection;
