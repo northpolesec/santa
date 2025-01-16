@@ -15,6 +15,7 @@
 
 #import "Source/santad/SNTNotificationQueue.h"
 
+#include <Foundation/Foundation.h>
 #import <MOLXPCConnection/MOLXPCConnection.h>
 
 #import "Source/common/RingBuffer.h"
@@ -25,6 +26,7 @@
 
 @interface SNTNotificationQueue ()
 @property dispatch_queue_t pendingQueue;
+@property NSMutableArray *sentToUser;
 @end
 
 @implementation SNTNotificationQueue {
@@ -39,6 +41,8 @@
 
     _pendingQueue = dispatch_queue_create("com.northpolesec.santa.daemon.SNTNotificationQueue",
                                           DISPATCH_QUEUE_SERIAL);
+
+    _sentToUser = [NSMutableArray array];
   }
   return self;
 }
@@ -84,6 +88,15 @@
 /// For each pending notification, call the reply block if set then clear the
 /// reply so it won't be called again when the notification is eventually sent.
 - (void)clearAllPendingWithRepliesSerialized {
+  // Auto-respond to blocks that have been sent to the UI but have not yet received a response.
+  for (NSDictionary *d in self.sentToUser) {
+    NotificationReplyBlock replyBlock = d[@"reply"];
+    if (replyBlock) {
+      replyBlock(NO);
+    }
+  }
+  [self.sentToUser removeAllObjects];
+
   _pendingNotifications->Erase(
       std::remove_if(_pendingNotifications->begin(), _pendingNotifications->end(),
                      [](NSMutableDictionary *d) {
@@ -121,10 +134,26 @@
       } copy];
     }
 
+    // Track the object we're going to send to the user and wrap the call to
+    // the replyBlock so that we can remove that object when we get a response
+    // from the UI.
+    // NB: It is required for this wrapped block to be called asynchronously.
+    [self.sentToUser addObject:d];
+    WEAKIFY(self);
+    NotificationReplyBlock wrappedReplyBlock = ^(BOOL authenticated) {
+      STRONGIFY(self);
+      if (self) {
+        dispatch_sync(self.pendingQueue, ^{
+          [self.sentToUser removeObject:d];
+        });
+      }
+      replyBlock(authenticated);
+    };
+
     [rop postBlockNotification:d[@"event"]
              withCustomMessage:d[@"message"]
                      customURL:d[@"url"]
-                      andReply:replyBlock];
+                      andReply:wrappedReplyBlock];
   }
 }
 
