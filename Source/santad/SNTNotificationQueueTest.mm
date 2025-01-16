@@ -26,7 +26,7 @@
 #include "Source/common/TestUtils.h"
 
 @interface SNTNotificationQueue (Testing)
-- (void)clearAllPendingRepliesLocked;
+- (void)clearAllPendingWithRepliesSerialized;
 @end
 
 @interface SNTNotificationQueueTest : XCTestCase
@@ -65,7 +65,10 @@
         // Extract the reply block from the invocation and call it
         void (^replyBlock)(BOOL);
         [inv getArgument:&replyBlock atIndex:5];
-        replyBlock(YES);
+        // Note: The replyBlock must be called asynchronously
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          replyBlock(YES);
+        });
       });
 
   [self.sut addEvent:se
@@ -176,7 +179,10 @@
       .andDo(^(NSInvocation *invocation) {
         void (^replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:5];
-        replyBlock(YES);
+        // Note: The replyBlock must be called asynchronously
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          replyBlock(YES);
+        });
       });
 
   OCMExpect([self.mockProxy postBlockNotification:se3
@@ -186,7 +192,10 @@
       .andDo(^(NSInvocation *invocation) {
         void (^replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:5];
-        replyBlock(YES);
+        // Note: The replyBlock must be called asynchronously
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          replyBlock(YES);
+        });
       });
 
   OCMExpect([self.mockProxy postBlockNotification:se4
@@ -196,7 +205,10 @@
       .andDo(^(NSInvocation *inv) {
         void (^replyBlock)(BOOL);
         [inv getArgument:&replyBlock atIndex:5];
-        replyBlock(YES);
+        // Note: The replyBlock must be called asynchronously
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+          replyBlock(YES);
+        });
       });
 
   [self.sut addEvent:se4 withCustomMessage:customMessage customURL:customURL andReply:replyBlock4];
@@ -209,7 +221,7 @@
   OCMVerifyAll(self.mockProxy);
 }
 
-- (void)testClearAllPendingRepliesLocked {
+- (void)testClearAllPendingWithRepliesSerialized {
   SNTStoredEvent *se1 = [[SNTStoredEvent alloc] init];
   SNTStoredEvent *se2 = [[SNTStoredEvent alloc] init];
   SNTStoredEvent *se3 = [[SNTStoredEvent alloc] init];
@@ -256,23 +268,21 @@
   XCTAssertTrue(self.ringbuf->Full());
   XCTAssertFalse(self.ringbuf->Empty());
 
-  [self.sut clearAllPendingRepliesLocked];
+  [self.sut clearAllPendingWithRepliesSerialized];
 
   // Wait for the reply blocks to be called
   [self waitForExpectationsWithTimeout:1.0 handler:nil];
 
-  // Check the ring is still full (replies are cleared, but entries are not removed)
-  XCTAssertTrue(self.ringbuf->Full());
+  // Check the ring is no longer full (entries with replyBlocks were removed)
+  XCTAssertFalse(self.ringbuf->Full());
   XCTAssertFalse(self.ringbuf->Empty());
 
-  // Verify that the reply keys were removed from the dictionaries
-  XCTAssertNil(d1[@"reply"]);
-  XCTAssertNil(d2[@"reply"]);
+  // There should only be one item left in the ringbuf, d3, which didn't have a replyBlock
+  NSMutableDictionary *d = self.ringbuf->Dequeue().value_or(nil);
+  XCTAssertNotNil(d);
+  XCTAssertEqualObjects(d, d3);
 
-  // Verify d3 remains unchanged (it never had a reply block)
-  XCTAssertNil(d3[@"reply"]);
-  XCTAssertEqual(d3[@"message"], @"Message 3");
-  XCTAssertEqual(d3[@"url"], @"https://northpolesec.com/3");
+  XCTAssertTrue(self.ringbuf->Empty());
 }
 
 @end

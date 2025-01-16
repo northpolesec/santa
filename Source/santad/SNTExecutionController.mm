@@ -446,7 +446,7 @@ static NSString *const kPrinterProxyPostMonterey =
           return msg;
         });
 
-        void (^replyBlock)(BOOL) = nil;
+        NotificationReplyBlock replyBlock = nil;
 
         if (holdAndAsk) {
           replyBlock = ^(BOOL authenticated) {
