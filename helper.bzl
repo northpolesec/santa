@@ -2,6 +2,7 @@
 
 load("@build_bazel_rules_apple//apple:macos.bzl", "macos_unit_test")
 load("@build_bazel_rules_apple//apple:resources.bzl", "apple_resource_group")
+load("@build_bazel_rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 
 def run_command(name, cmd, **kwargs):
@@ -13,7 +14,7 @@ def run_command(name, cmd, **kwargs):
         cmd = "echo '#!/bin/bash' > $@ && echo '%s' >> $@" % cmd,
         **kwargs
     )
-    native.sh_binary(
+    sh_binary(
         name = name,
         srcs = ["%s.sh" % name],
     )
