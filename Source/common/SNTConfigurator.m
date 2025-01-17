@@ -298,6 +298,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
     _syncStateFilePath = syncStateFilePath;
     _syncStateAccessAuthorizerBlock = syncStateAccessAuthorizer;
 
+    // This is used to keep KVO on changes, but we use `CFPreferences*` for reading.
     _defaults = [NSUserDefaults standardUserDefaults];
     [_defaults addSuiteNamed:@"com.northpolesec.santa"];
 
