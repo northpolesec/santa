@@ -54,7 +54,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool> {
   friend class santa::SpoolPeer;
 
  private:
-  bool FlushLocked();
+  bool FlushSerialized();
 
   dispatch_queue_t q_ = NULL;
   dispatch_source_t timer_source_ = NULL;

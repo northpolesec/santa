@@ -661,14 +661,26 @@ bool DataWatchItems::Build(std::vector<std::shared_ptr<DataWatchItemPolicy>> dat
       return false;
     }
 
-    for (size_t i = g->gl_offs; i < g->gl_pathc; i++) {
+    // If no paths were returned, check if the search pattern contained any magic
+    // characters. If not, we can go ahead and start monitoring the configured path.
+    if (g->gl_pathc == 0 && ((g->gl_flags & GLOB_MAGCHAR) == 0)) {
       if (item->path_type == WatchItemPathType::kPrefix) {
-        tree_->InsertPrefix(g->gl_pathv[i], item);
+        tree_->InsertPrefix(item->path.c_str(), item);
       } else {
-        tree_->InsertLiteral(g->gl_pathv[i], item);
+        tree_->InsertLiteral(item->path.c_str(), item);
       }
 
-      paths_.insert({g->gl_pathv[i], item->path_type});
+      paths_.insert({item->path.c_str(), item->path_type});
+    } else {
+      for (size_t i = g->gl_offs; i < g->gl_pathc; i++) {
+        if (item->path_type == WatchItemPathType::kPrefix) {
+          tree_->InsertPrefix(g->gl_pathv[i], item);
+        } else {
+          tree_->InsertLiteral(g->gl_pathv[i], item);
+        }
+
+        paths_.insert({g->gl_pathv[i], item->path_type});
+      }
     }
     globfree(g);
   }

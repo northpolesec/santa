@@ -32,6 +32,15 @@ typedef NS_ENUM(NSInteger, SNTAction) {
   SNTActionRespondAllow,
   SNTActionRespondDeny,
   SNTActionRespondAllowCompiler,
+
+  // If an operation is awaiting a cache decision via hold-an-ask, additional
+  // executions will be automatically blocked.
+  SNTActionRespondHold,
+
+  // FOLLOWUP ACTIONS
+  // Executions that were previously put on hold can either be allowed or denied.
+  SNTActionHoldAllowed,
+  SNTActionHoldDenied,
 };
 
 #define RESPONSE_VALID(x) \

@@ -1,4 +1,5 @@
 load("@build_bazel_rules_apple//apple:macos.bzl", "macos_command_line_application")
+load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 licenses(["notice"])
@@ -22,8 +23,11 @@ objc_library(
     srcs = [
         "NSData+Zlib.h",
         "NSData+Zlib.m",
+        "SNTPushClientAPNS.h",
+        "SNTPushClientAPNS.m",
+        "SNTPushClientFCM.h",
+        "SNTPushClientFCM.m",
         "SNTPushNotifications.h",
-        "SNTPushNotifications.m",
         "SNTPushNotificationsTracker.h",
         "SNTPushNotificationsTracker.m",
         "SNTSyncEventUpload.h",
@@ -77,8 +81,11 @@ santa_unit_test(
     srcs = [
         "NSData+Zlib.h",
         "NSData+Zlib.m",
+        "SNTPushClientAPNS.h",
+        "SNTPushClientAPNS.m",
+        "SNTPushClientFCM.h",
+        "SNTPushClientFCM.m",
         "SNTPushNotifications.h",
-        "SNTPushNotifications.m",
         "SNTPushNotificationsTracker.h",
         "SNTPushNotificationsTracker.m",
         "SNTSyncEventUpload.h",

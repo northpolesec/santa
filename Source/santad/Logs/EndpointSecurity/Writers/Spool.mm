@@ -55,7 +55,8 @@ Spool::Spool(dispatch_queue_t q, dispatch_source_t timer_source, std::string_vie
                                           spool_file_size_threshold_leniency_factor_),
       write_complete_f_(write_complete_f),
       flush_task_complete_f_(flush_task_complete_f) {
-  type_url_ = kTypeGoogleApisComPrefix + ::santa::pb::v1::SantaMessage::descriptor()->full_name();
+  type_url_ = absl::StrCat(kTypeGoogleApisComPrefix,
+                           ::santa::pb::v1::SantaMessage::descriptor()->full_name());
 }
 
 Spool::~Spool() {
@@ -81,7 +82,7 @@ void Spool::BeginFlushTask() {
       return;
     }
 
-    if (!shared_writer->FlushLocked()) {
+    if (!shared_writer->FlushSerialized()) {
       LOGE(@"Spool writer: periodic flush failed.");
     }
 
@@ -96,11 +97,11 @@ void Spool::BeginFlushTask() {
 
 void Spool::Flush() {
   dispatch_sync(q_, ^{
-    FlushLocked();
+    FlushSerialized();
   });
 }
 
-bool Spool::FlushLocked() {
+bool Spool::FlushSerialized() {
   if (log_batch_writer_.Flush().ok()) {
     accumulated_bytes_ = 0;
     return true;
@@ -128,7 +129,7 @@ void Spool::Write(std::vector<uint8_t> &&bytes) {
     any.set_type_url(type_url_);
 
     if (shared_this->accumulated_bytes_ >= shared_this->spool_file_size_threshold_) {
-      shared_this->FlushLocked();
+      shared_this->FlushSerialized();
     }
 
     // Only write the new message if we have room left.

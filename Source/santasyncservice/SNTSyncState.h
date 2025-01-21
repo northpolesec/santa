@@ -86,4 +86,7 @@
 @property NSUInteger rulesReceived;
 @property NSUInteger rulesProcessed;
 
+@property BOOL preflightOnly;
+@property BOOL pushNotificationSync;
+
 @end

@@ -1,11 +1,11 @@
 /// Copyright 2014-2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,7 +37,6 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 }
 
 @interface SNTConfigurator ()
-/// A NSUserDefaults object set to use the com.northpolesec.santa suite.
 @property(readonly, nonatomic) NSUserDefaults *defaults;
 
 /// Keys and expected value types.
@@ -69,7 +68,7 @@ NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist
 #endif
 
 /// The domain used by mobileconfig.
-static NSString *const kMobileConfigDomain = @"com.northpolesec.santa";
+static const CFStringRef kMobileConfigDomain = CFSTR("com.northpolesec.santa");
 
 /// The keys managed by a mobileconfig.
 static NSString *const kStaticRules = @"StaticRules";
@@ -142,6 +141,8 @@ static NSString *const kClientContentEncoding = @"SyncClientContentEncoding";
 static NSString *const kFCMProject = @"FCMProject";
 static NSString *const kFCMEntity = @"FCMEntity";
 static NSString *const kFCMAPIKey = @"FCMAPIKey";
+
+static NSString *const kEnableAPNS = @"EnableAPNS";
 
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
@@ -279,6 +280,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFCMProject : string,
       kFCMEntity : string,
       kFCMAPIKey : string,
+      kEnableAPNS : number,
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
@@ -296,8 +298,10 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
     _syncStateFilePath = syncStateFilePath;
     _syncStateAccessAuthorizerBlock = syncStateAccessAuthorizer;
 
+    // This is used to keep KVO on changes, but we use `CFPreferences*` for reading.
     _defaults = [NSUserDefaults standardUserDefaults];
     [_defaults addSuiteNamed:@"com.northpolesec.santa"];
+
     _configState = [self readForcedConfig];
     [self cacheStaticRules];
 
@@ -594,6 +598,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingFcmEnabled {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableAPNS {
   return [self configStateSet];
 }
 
@@ -1113,6 +1121,12 @@ static SNTConfigurator *sharedConfigurator = nil;
   return (self.fcmProject.length && self.fcmEntity.length && self.fcmAPIKey.length);
 }
 
+- (BOOL)enableAPNS {
+  // TODO: Consider supporting enablement from the sync server.
+  NSNumber *number = self.configState[kEnableAPNS];
+  return [number boolValue];
+}
+
 - (void)setBlockUSBMount:(BOOL)enabled {
   [self updateSyncStateForKey:kBlockUSBMountKey value:@(enabled)];
 }
@@ -1368,8 +1382,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (id)forcedConfigValueForKey:(NSString *)key {
-  id obj = [self.defaults objectForKey:key];
-  return [self.defaults objectIsForcedForKey:key inDomain:kMobileConfigDomain] ? obj : nil;
+  CFStringRef keyRef = (__bridge CFStringRef)key;
+  if (CFPreferencesAppValueIsForced(keyRef, kMobileConfigDomain)) {
+    return CFBridgingRelease(CFPreferencesCopyAppValue(keyRef, kMobileConfigDomain));
+  }
+  return nil;
 }
 
 - (void)startWatchingDefaults {

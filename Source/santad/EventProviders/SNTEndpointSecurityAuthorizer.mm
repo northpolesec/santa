@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 
@@ -38,13 +39,15 @@ using santa::Message;
 
 @implementation SNTEndpointSecurityAuthorizer {
   std::shared_ptr<AuthResultCache> _authResultCache;
+  std::shared_ptr<santa::TTYWriter> _ttyWriter;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::Metrics>)metrics
                execController:(SNTExecutionController *)execController
            compilerController:(SNTCompilerController *)compilerController
-              authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache {
+              authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
+                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kAuthorizer];
@@ -52,6 +55,7 @@ using santa::Message;
     _execController = execController;
     _compilerController = compilerController;
     _authResultCache = authResultCache;
+    _ttyWriter = std::move(ttyWriter);
 
     [self establishClientOrDie];
   }
@@ -62,7 +66,7 @@ using santa::Message;
   return @"Authorizer";
 }
 
-- (void)processMessage:(const Message &)msg {
+- (void)processMessage:(Message)msg {
   if (msg->event_type == ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME) {
     [self.execController
         validateSuspendResumeEvent:msg
@@ -76,10 +80,10 @@ using santa::Message;
     return;
   }
 
-  const es_file_t *targetFile = msg->event.exec.target->executable;
+  const es_process_t *targetProc = msg->event.exec.target;
 
   while (true) {
-    SNTAction returnAction = self->_authResultCache->CheckCache(targetFile);
+    SNTAction returnAction = self->_authResultCache->CheckCache(targetProc->executable);
     if (RESPONSE_VALID(returnAction)) {
       es_auth_result_t authResult = ES_AUTH_RESULT_DENY;
 
@@ -95,6 +99,21 @@ using santa::Message;
               withAuthResult:authResult
                    cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
       return;
+    } else if (returnAction == SNTActionRespondHold) {
+      _ttyWriter->Write(
+          targetProc,
+          [NSString stringWithFormat:@"---\n"
+                                     @"\033[1mSanta\033[0m\n"
+                                     @"\n"
+                                     @"Blocked: %s\n"
+                                     @"\n"
+                                     @"Execution of this binary was blocked because a separate\n"
+                                     @"instance is currently pending user authorization.\n"
+                                     @"---\n"
+                                     @"\n",
+                                     targetProc->executable->path.data]);
+      [self respondToMessage:msg withAuthResult:ES_AUTH_RESULT_DENY cacheable:false];
+      return;
     } else if (returnAction == SNTActionRequestBinary) {
       // TODO(mlw): Add a metric here to observe how ofthen this happens in practice.
       // TODO(mlw): Look into caching a `Deferred<value>` to better prevent
@@ -106,7 +125,7 @@ using santa::Message;
     }
   }
 
-  self->_authResultCache->AddToCache(targetFile, SNTActionRequestBinary);
+  self->_authResultCache->AddToCache(targetProc->executable, SNTActionRequestBinary);
 
   [self.execController validateExecEvent:msg
                               postAction:^bool(SNTAction action) {
@@ -139,8 +158,8 @@ using santa::Message;
   }
 
   [self processMessage:std::move(esMsg)
-               handler:^(const Message &msg) {
-                 [self processMessage:msg];
+               handler:^(Message msg) {
+                 [self processMessage:std::move(msg)];
                  recordEventMetrics(EventDisposition::kProcessed);
                }];
 }
@@ -152,8 +171,14 @@ using santa::Message;
     case SNTActionRespondAllowCompiler:
       [self.compilerController setProcess:esMsg->event.exec.target->audit_token isCompiler:true];
       OS_FALLTHROUGH;
+    case SNTActionRespondHold: OS_FALLTHROUGH;
     case SNTActionRespondAllow: authResult = ES_AUTH_RESULT_ALLOW; break;
     case SNTActionRespondDeny: authResult = ES_AUTH_RESULT_DENY; break;
+
+    // Not setting `authResult` intentionally as no ES response takes place
+    case SNTActionHoldAllowed: OS_FALLTHROUGH;
+    case SNTActionHoldDenied: break;
+
     default:
       // This is a programming error. Bail.
       LOGE(@"Invalid action for postAction, exiting.");
@@ -162,14 +187,19 @@ using santa::Message;
 
   self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, action);
 
-  // Don't let the ES framework cache DENY results. Santa only flushes ES cache
-  // when a new DENY rule is received. If DENY results were cached and a rule
-  // update made the executable allowable, ES would continue to apply the DENY
-  // cached result. Note however that the local AuthResultCache will cache
-  // DENY results.
-  return [self respondToMessage:esMsg
-                 withAuthResult:authResult
-                      cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
+  if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
+    // Don't let the ES framework cache DENY results. Santa only flushes ES cache
+    // when a new DENY rule is received. If DENY results were cached and a rule
+    // update made the executable allowable, ES would continue to apply the DENY
+    // cached result. Note however that the local AuthResultCache will cache
+    // DENY results.
+    return [self
+        respondToMessage:esMsg
+          withAuthResult:authResult
+               cacheable:(authResult == ES_AUTH_RESULT_ALLOW && action != SNTActionRespondHold)];
+  } else {
+    return true;
+  }
 }
 
 - (void)enable {

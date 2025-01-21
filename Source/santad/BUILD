@@ -1,4 +1,5 @@
 load("@build_bazel_rules_apple//apple:macos.bzl", "macos_bundle")
+load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
@@ -173,13 +174,28 @@ objc_library(
 
 objc_library(
     name = "SNTNotificationQueue",
-    srcs = ["SNTNotificationQueue.m"],
+    srcs = ["SNTNotificationQueue.mm"],
     hdrs = ["SNTNotificationQueue.h"],
     deps = [
+        "//Source/common:RingBuffer",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
         "@MOLXPCConnection",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTNotificationQueueTest",
+    srcs = ["SNTNotificationQueueTest.mm"],
+    deps = [
+        ":SNTNotificationQueue",
+        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:TestUtils",
+        "@MOLXPCConnection",
+        "@OCMock",
     ],
 )
 
@@ -246,11 +262,21 @@ objc_library(
 )
 
 objc_library(
+    name = "ProcessControl",
+    srcs = ["ProcessControl.mm"],
+    hdrs = ["ProcessControl.h"],
+    deps = [
+        "//Source/common:SNTLogging",
+    ],
+)
+
+objc_library(
     name = "SNTExecutionController",
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
     deps = [
         ":EndpointSecurityMessage",
+        ":ProcessControl",
         ":SNTDecisionCache",
         ":SNTEventTable",
         ":SNTNotificationQueue",
@@ -399,6 +425,7 @@ objc_library(
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         ":SNTExecutionController",
+        ":TTYWriter",
         "//Source/common:BranchPrediction",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
@@ -809,6 +836,7 @@ objc_library(
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":Metrics",
+        ":ProcessControl",
         ":SNTCompilerController",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
@@ -820,6 +848,7 @@ objc_library(
         ":TTYWriter",
         ":WatchItems",
         "//Source/common:PrefixTree",
+        "//Source/common:RingBuffer",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
@@ -853,6 +882,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SystemResources",
+        "//Source/santad:ProcessControl",
     ],
 )
 
@@ -992,6 +1022,7 @@ santa_unit_test(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":MockEndpointSecurityAPI",
+        ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
@@ -1112,6 +1143,7 @@ santa_unit_test(
     deps = [
         ":AuthResultCache",
         ":MockEndpointSecurityAPI",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "@OCMock",
@@ -1299,6 +1331,7 @@ santa_unit_test(
     deps = [
         ":EndpointSecurityMessage",
         ":MockEndpointSecurityAPI",
+        ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEventTable",
@@ -1333,6 +1366,7 @@ santa_unit_test(
         ":SNTCompilerController",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTExecutionController",
+        ":TTYWriter",
         "//Source/common:SNTCommonEnums",
         "//Source/common:TestUtils",
         "@OCMock",
@@ -1492,6 +1526,7 @@ test_suite(
         ":SNTExecutionControllerTest",
         ":SNTPolicyProcessorTest",
         ":SNTRuleTableTest",
+        ":SNTNotificationQueueTest",
         ":SantadTest",
         ":WatchItemsTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",

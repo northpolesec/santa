@@ -1,4 +1,3 @@
-/// Copyright 2015 Google Inc. All rights reserved.
 /// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,17 +12,19 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <Cocoa/Cocoa.h>
+#ifndef SANTA__SANTAD__PROCESSCONTROL_H
+#define SANTA__SANTAD__PROCESSCONTROL_H
 
-#import "Source/common/SNTXPCNotifierInterface.h"
-#import "Source/gui/SNTMessageWindowController.h"
+#include <sys/types.h>
 
-///
-///  Keeps track of pending notifications and ensures only one is presented to the user at a time.
-///
-@interface SNTNotificationManager : NSObject <SNTMessageWindowControllerDelegate, SNTNotifierXPC>
+namespace santa {
 
-@property NSXPCListenerEndpoint *notificationListener;
-- (void)didRegisterForAPNS:(NSString *)deviceToken;
-- (void)APNSTokenChanged;
-@end
+enum class ProcessControl { Suspend, Resume, Kill };
+
+using ProcessControlBlock = bool (^)(pid_t, ProcessControl);
+
+ProcessControlBlock ProdSuspendResumeBlock();
+
+}  // namespace santa
+
+#endif

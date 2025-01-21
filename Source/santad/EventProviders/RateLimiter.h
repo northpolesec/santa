@@ -56,9 +56,9 @@ class RateLimiter {
   friend class santa::RateLimiterPeer;
 
  private:
-  bool ShouldRateLimitLocked();
-  size_t EventsRateLimitedLocked();
-  void TryResetLocked(uint64_t cur_mach_time);
+  bool ShouldRateLimitSerialized();
+  size_t EventsRateLimitedSerialized();
+  void TryResetSerialized(uint64_t cur_mach_time);
 
   static constexpr NSTimeInterval kDefaultResetDuration = 15.0;
 

@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
@@ -74,6 +75,34 @@
                                    return YES;
                                  }]
                        deliverImmediately:YES]);
+}
+
+- (void)testDidRegisterForAPNS {
+  SNTNotificationManager *nm = [[SNTNotificationManager alloc] init];
+
+  // The manager has not registered with APNS, the token in the reply block should be nil.
+  __block NSString *token;
+  [nm requestAPNSToken:^(NSString *reply) {
+    token = reply;
+  }];
+  NSString *wantToken;
+  XCTAssertEqualObjects(token, wantToken);
+
+  // Register with APNS, the token should now be returned.
+  wantToken = @"123";
+  token = nil;
+  [nm didRegisterForAPNS:wantToken];
+  [nm requestAPNSToken:^(NSString *reply) {
+    token = reply;
+  }];
+  XCTAssertEqualObjects(token, wantToken);
+
+  // Subsequent requests should also return the token.
+  token = nil;
+  [nm requestAPNSToken:^(NSString *reply) {
+    token = reply;
+  }];
+  XCTAssertEqualObjects(token, wantToken);
 }
 
 @end

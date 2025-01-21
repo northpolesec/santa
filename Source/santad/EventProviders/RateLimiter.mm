@@ -41,22 +41,22 @@ RateLimiter::RateLimiter(std::shared_ptr<Metrics> metrics, Processor processor, 
                                               QOS_CLASS_USER_INTERACTIVE, 0));
 }
 
-bool RateLimiter::ShouldRateLimitLocked() {
+bool RateLimiter::ShouldRateLimitSerialized() {
   return log_count_total_ > max_log_count_total_;
 }
 
-size_t RateLimiter::EventsRateLimitedLocked() {
-  if (unlikely(ShouldRateLimitLocked())) {
+size_t RateLimiter::EventsRateLimitedSerialized() {
+  if (unlikely(ShouldRateLimitSerialized())) {
     return log_count_total_ - max_log_count_total_;
   } else {
     return 0;
   }
 }
 
-void RateLimiter::TryResetLocked(uint64_t cur_mach_time) {
+void RateLimiter::TryResetSerialized(uint64_t cur_mach_time) {
   if (cur_mach_time > reset_mach_time_) {
     if (metrics_) {
-      metrics_->SetRateLimitingMetrics(processor_, EventsRateLimitedLocked());
+      metrics_->SetRateLimitingMetrics(processor_, EventsRateLimitedSerialized());
     }
 
     log_count_total_ = 0;
@@ -68,11 +68,11 @@ RateLimiter::Decision RateLimiter::Decide(uint64_t cur_mach_time) {
   __block RateLimiter::Decision decision;
 
   dispatch_sync(q_, ^{
-    TryResetLocked(cur_mach_time);
+    TryResetSerialized(cur_mach_time);
 
     ++log_count_total_;
 
-    if (unlikely(ShouldRateLimitLocked())) {
+    if (unlikely(ShouldRateLimitSerialized())) {
       decision = Decision::kRateLimited;
     } else {
       decision = RateLimiter::Decision::kAllowed;

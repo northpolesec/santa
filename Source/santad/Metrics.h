@@ -105,7 +105,7 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
   };
 
   void FlushMetrics();
-  void ExportLocked(SNTMetricSet *metric_set);
+  void ExportSerialized(SNTMetricSet *metric_set);
 
   MOLXPCConnection *metrics_connection_;
   dispatch_queue_t q_;

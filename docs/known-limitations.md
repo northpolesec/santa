@@ -25,3 +25,11 @@ nav_order: 7
 *   Metrics reported by Santa are not currently in a format that is friendly to
     open source solutions
     ([Issue #563](https://github.com/google/santa/issues/563))
+
+*   Standalone Mode
+    *   Users will not be notified of processes that were blocked while a user
+        was not logged in to the system.
+    *   Fast user switching and/or logging out while an authorization dialog is
+        presented to the user can sometimes result in the process being kept in a
+        suspended state, preventing subsequent launches. The user must manually
+        kill the affected process (e.g. `kill -9 <pid>`).

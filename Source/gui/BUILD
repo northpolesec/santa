@@ -1,5 +1,6 @@
 load("@build_bazel_rules_apple//apple:macos.bzl", "macos_application")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 licenses(["notice"])
@@ -107,6 +108,7 @@ objc_library(
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
         "@MOLCertificate",
         "@MOLCodesignChecker",
         "@MOLXPCConnection",

@@ -115,7 +115,7 @@ class ProcessSet {
     dispatch_sync(q_, ^{
       std::pair<pid_t, pid_t> pidPidver = {audit_token_to_pid(proc->audit_token),
                                            audit_token_to_pidversion(proc->audit_token)};
-      SetLocked(pidPidver, valueBlock());
+      SetSerialized(pidPidver, valueBlock());
     });
   }
 
@@ -142,18 +142,18 @@ class ProcessSet {
   // Clear all cache entries
   void Clear() {
     dispatch_sync(q_, ^{
-      ClearLocked();
+      ClearSerialized();
     });
   }
 
  private:
   // Remove everything in the cache.
-  void ClearLocked() { cache_.clear(); }
+  void ClearSerialized() { cache_.clear(); }
 
-  void SetLocked(std::pair<pid_t, pid_t> pidPidver, ValueT value) {
+  void SetSerialized(std::pair<pid_t, pid_t> pidPidver, ValueT value) {
     // If we hit the size limit, clear the cache to prevent unbounded growth
     if (cache_.size() >= kMaxCacheSize) {
-      ClearLocked();
+      ClearSerialized();
     }
 
     FileSet &fs = cache_[std::move(pidPidver)];
@@ -179,7 +179,7 @@ class ProcessSet {
       if (iter != cache_.end() && iter->second.count(value) > 0) {
         exists = true;
       } else if (shouldSet) {
-        SetLocked(pidPidver, value);
+        SetSerialized(pidPidver, value);
       }
     });
 
@@ -754,8 +754,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   return policyDecision;
 }
 
-- (void)processMessage:(const Message &)msg
-        overrideAction:(SNTOverrideFileAccessAction)overrideAction {
+- (void)processMessage:(Message)msg overrideAction:(SNTOverrideFileAccessAction)overrideAction {
   std::vector<PathTarget> targets;
   targets.reserve(2);
   PopulatePathTargets(msg, targets);
@@ -830,8 +829,8 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   }
 
   [self processMessage:std::move(esMsg)
-               handler:^(const Message &msg) {
-                 [self processMessage:msg overrideAction:overrideAction];
+               handler:^(Message msg) {
+                 [self processMessage:std::move(msg) overrideAction:overrideAction];
                  recordEventMetrics(EventDisposition::kProcessed);
                }];
 }

@@ -1,16 +1,17 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/gui/SNTAppDelegate.h"
 
@@ -20,6 +21,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/common/SNTXPCSyncServiceInterface.h"
 #import "Source/gui/SNTAboutWindowController.h"
 #import "Source/gui/SNTNotificationManager.h"
 
@@ -34,6 +36,10 @@
 #pragma mark App Delegate methods
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+  if ([SNTConfigurator configurator].enableAPNS) {
+    [NSApp registerForRemoteNotifications];
+  }
+
   [self setupMenu];
   self.notificationManager = [[SNTNotificationManager alloc] init];
 
@@ -100,6 +106,10 @@
   // Now wait for the connection to come in.
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
     [self attemptDaemonReconnection];
+  } else {
+    // Let the sync service know the APNS token may have changed. The sync service will call back on
+    // the above listener to get the updated token.
+    [self.notificationManager APNSTokenChanged];
   }
 }
 
@@ -123,6 +133,33 @@
   [editMenuItem setSubmenu:editMenu];
   [mainMenu addItem:editMenuItem];
   [NSApp setMainMenu:mainMenu];
+}
+
+#pragma mark Push Notifications
+
+- (void)application:(NSApplication *)application
+    didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)tokenData {
+  NSMutableString *deviceToken = [NSMutableString stringWithCapacity:tokenData.length * 2];
+  const unsigned char *bytes = tokenData.bytes;
+  for (NSUInteger i = 0; i < tokenData.length; ++i) {
+    [deviceToken appendFormat:@"%02x", bytes[i]];
+  }
+  LOGD(@"APNS Token: %@", deviceToken);
+  [self.notificationManager didRegisterForAPNS:deviceToken];
+}
+
+- (void)application:(NSApplication *)application
+    didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
+  LOGE(@"Failed to register with APNS: %@", error);
+}
+
+- (void)application:(NSApplication *)application
+    didReceiveRemoteNotification:(NSDictionary<NSString *, id> *)message {
+  LOGD(@"APNS Message: %@", message);
+  MOLXPCConnection *syncConn = [SNTXPCSyncServiceInterface configuredConnection];
+  [syncConn resume];
+  [[syncConn remoteObjectProxy] handleAPNSMessage:message];
+  [syncConn invalidate];
 }
 
 @end

@@ -1,5 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -349,10 +349,21 @@ double watchdogRAMPeak = 0;
   self.notQueue.notifierConnection = c;
 }
 
+- (void)requestAPNSToken:(void (^)(NSString *))reply {
+  // Simply forward request to the active GUI (if any).
+  [self.notQueue.notifierConnection.remoteObjectProxy requestAPNSToken:reply];
+}
+
 #pragma mark syncd Ops
 
 - (void)pushNotifications:(void (^)(BOOL))reply {
-  [self.syncdQueue.syncConnection.remoteObjectProxy isFCMListening:^(BOOL response) {
+  // This message should be handled in a timely manner, santactl status waits for the response.
+  // Instead of reusing the existing connection, create a new connection to the sync service.
+  // Otherwise, the isFCMListening message would potentially be queued behind various long lived
+  // sync operations.
+  MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
+  [conn resume];
+  [conn.remoteObjectProxy isPushConnected:^(BOOL response) {
     reply(response);
   }];
 }
