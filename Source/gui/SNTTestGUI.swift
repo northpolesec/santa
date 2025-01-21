@@ -131,7 +131,7 @@ struct BinaryView: View {
           "EnableStandalonePasswordFallback": true,
         ]
         if !eventDetailURL.isEmpty {
-            configMap["EventDetailURL"] = eventDetailURL
+          configMap["EventDetailURL"] = eventDetailURL
         }
         SNTConfigurator.overrideConfig(configMap)
 
