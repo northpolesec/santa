@@ -5,6 +5,8 @@ package(
     default_visibility = ["//:santa_package_group"],
 )
 
+licenses(["notice"])
+
 exports_files([
     "LICENSE",
     "Conf/install_services.sh",
