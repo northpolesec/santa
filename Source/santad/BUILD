@@ -4,6 +4,9 @@ load("//:helper.bzl", "santa_unit_test")
 
 package(
     default_visibility = ["//:santa_package_group"],
+    features = [
+        "-layering_check",
+    ],
 )
 
 licenses(["notice"])
@@ -1414,6 +1417,7 @@ santa_unit_test(
         ":MockEndpointSecurityAPI",
         ":SNTEndpointSecurityTamperResistance",
         ":WatchItemPolicy",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
         "//Source/common:TestUtils",
         "@OCMock",
