@@ -124,13 +124,16 @@ struct BinaryView: View {
       Divider()
 
       Button("Display") {
-        SNTConfigurator.overrideConfig([
+        var configMap = [
           "BannedBlockMessage": bannedBlockMessage,
-          "EventDetailURL": eventDetailURL,
           "FunFontsOnSpecificDays": true,
           "ClientMode": clientModeOverride.rawValue as NSNumber,
           "EnableStandalonePasswordFallback": true,
-        ])
+        ]
+        if !eventDetailURL.isEmpty {
+            configMap["EventDetailURL"] = eventDetailURL
+        }
+        SNTConfigurator.overrideConfig(configMap)
 
         let event = SNTDebugStoredEvent(staticPublisher: publisher)
         event.decision = .blockUnknown

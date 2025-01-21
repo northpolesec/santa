@@ -293,7 +293,7 @@ struct SNTBinaryMessageWindowView: View {
       }
 
       HStack(spacing: 15.0) {
-        if !(c.eventDetailURL?.isEmpty ?? false)
+        if !(c.eventDetailURL?.isEmpty ?? true)
           && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && c.clientMode != .standalone
         {
           OpenEventButton(customText: c.eventDetailText, action: openButton)
