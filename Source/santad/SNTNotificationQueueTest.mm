@@ -21,7 +21,7 @@
 
 #include <memory>
 
-#import "Source/common/SNTExecAuthConfigState.h"
+#import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/TestUtils.h"

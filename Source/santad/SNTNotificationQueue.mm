@@ -50,7 +50,7 @@
 - (void)addEvent:(SNTStoredEvent *)event
     withCustomMessage:(NSString *)message
             customURL:(NSString *)url
-          configState:(SNTExecAuthConfigState *)configState
+          configState:(SNTConfigState *)configState
              andReply:(NotificationReplyBlock)replyBlock {
   if (!event) {
     if (replyBlock) {

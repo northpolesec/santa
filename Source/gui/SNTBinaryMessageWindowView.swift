@@ -16,7 +16,8 @@ import SwiftUI
 
 import santa_common_SNTBlockMessage
 import santa_common_SNTCommonEnums
-import santa_common_SNTExecAuthConfigState
+import santa_common_SNTConfigState
+import santa_common_SNTConfigurator
 import santa_common_SNTStoredEvent
 import santa_gui_SNTMessageView
 
@@ -34,7 +35,7 @@ import santa_gui_SNTMessageView
     event: SNTStoredEvent,
     customMsg: NSString?,
     customURL: NSString?,
-    configState: SNTExecAuthConfigState,
+    configState: SNTConfigState,
     bundleProgress: SNTBundleProgress,
     uiStateCallback: ((TimeInterval) -> Void)?,
     replyCallback: ((Bool) -> Void)?
@@ -253,7 +254,7 @@ struct SNTBinaryMessageWindowView: View {
   let event: SNTStoredEvent?
   let customMsg: NSString?
   let customURL: NSString?
-  let configState: SNTExecAuthConfigState
+  let configState: SNTConfigState
   @StateObject var bundleProgress: SNTBundleProgress
   let uiStateCallback: ((TimeInterval) -> Void)?
   let replyCallback: ((Bool) -> Void)?

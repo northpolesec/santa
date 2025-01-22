@@ -42,7 +42,7 @@
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
                     customURL:(NSString *)url
-                  configState:(SNTExecAuthConfigState *)configState
+                  configState:(SNTConfigState *)configState
                         reply:(void (^)(BOOL))replyBlock {
   self = [super init];
   if (self) {

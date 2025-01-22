@@ -396,10 +396,10 @@ objc_library(
 )
 
 objc_library(
-    name = "SNTExecAuthConfigState",
-    srcs = ["SNTExecAuthConfigState.m"],
-    hdrs = ["SNTExecAuthConfigState.h"],
-    module_name = "santa_common_SNTExecAuthConfigState",
+    name = "SNTConfigState",
+    srcs = ["SNTConfigState.m"],
+    hdrs = ["SNTConfigState.h"],
+    module_name = "santa_common_SNTConfigState",
     deps = [
         ":CoderMacros",
         ":SNTConfigurator",
@@ -476,7 +476,7 @@ objc_library(
     hdrs = ["SNTXPCNotifierInterface.h"],
     deps = [
         ":SNTCommonEnums",
-        ":SNTExecAuthConfigState",
+        ":SNTConfigState",
         ":SNTXPCBundleServiceInterface",
     ],
 )

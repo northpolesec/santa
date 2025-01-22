@@ -17,20 +17,12 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 
-@interface SNTExecAuthConfigState : NSObject <NSSecureCoding>
+@interface SNTConfigState : NSObject <NSSecureCoding>
 
 //
 // Properties here mirror the SNTConfigurator at a point in time
 //
 @property(readonly) SNTClientMode clientMode;
-@property(readonly) BOOL disableUnknownEventUpload;
-@property(readonly) NSString *dismissText;
-@property(readonly) BOOL enableAllEventUpload;
-@property(readonly) BOOL enableBundles;
-@property(readonly) NSString *eventDetailText;
-@property(readonly) NSString *eventDetailURL;
-@property(readonly) BOOL failClosed;
-@property(readonly) NSURL *syncBaseURL;
 
 - (instancetype)initWithConfig:(SNTConfigurator *)config;
 

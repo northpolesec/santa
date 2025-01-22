@@ -35,10 +35,10 @@
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTDropRootPrivs.h"
-#import "Source/common/SNTExecAuthConfigState.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
@@ -234,11 +234,12 @@ static NSString *const kPrinterProxyPostMonterey =
         format:@"validateExecEvent:postAction: Unexpected event type: %d", esMsg->event_type];
   }
 
-  // Get info about the file. If we can't get this info, respond appropriately and log an error.
-  SNTExecAuthConfigState *config =
-      [[SNTExecAuthConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTConfigState *configState = [[SNTConfigState alloc] initWithConfig:config];
+
   const es_process_t *targetProc = esMsg->event.exec.target;
 
+  // Get info about the file. If we can't get this info, respond appropriately and log an error.
   NSError *fileInfoError;
   SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithEndpointSecurityFile:targetProc->executable
                                                                      error:&fileInfoError];
@@ -269,6 +270,7 @@ static NSString *const kPrinterProxyPostMonterey =
 
   SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo
       targetProcess:targetProc
+      configState:configState
       preCodesignCheckCallback:^(void) {
         esMsg.UpdateStatState(StatChangeStep::kCodesignValidation);
       }
@@ -330,7 +332,8 @@ static NSString *const kPrinterProxyPostMonterey =
   bool holdAndAsk = false;
   // Only allow a user in standalone mode to override a block if an
   // explicit block rule is not set when using a sync service.
-  if (cd.decision == SNTEventStateBlockUnknown && config.clientMode == SNTClientModeStandalone) {
+  if (cd.decision == SNTEventStateBlockUnknown &&
+      configState.clientMode == SNTClientModeStandalone) {
     // In standalone mode we want hold off on making a decision until the user has had a chance to
     // approve. ES won't let us do this, we'd hit the response deadline. Instead, we suspend the
     // new process to stop the binary from executing but we respond to ES with an allow decision.
@@ -483,7 +486,7 @@ static NSString *const kPrinterProxyPostMonterey =
         [self.notifierQueue addEvent:se
                    withCustomMessage:cd.customMsg
                            customURL:cd.customURL
-                         configState:config
+                         configState:configState
                             andReply:replyBlock];
       }
     }
