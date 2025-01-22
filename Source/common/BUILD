@@ -379,6 +379,11 @@ objc_library(
 )
 
 objc_library(
+    name = "CoderMacros",
+    hdrs = ["CoderMacros.h"],
+)
+
+objc_library(
     name = "SNTStoredEvent",
     srcs = ["SNTStoredEvent.m"],
     hdrs = ["SNTStoredEvent.h"],
@@ -387,6 +392,18 @@ objc_library(
         ":CertificateHelpers",
         ":SNTCommonEnums",
         "@MOLCertificate",
+    ],
+)
+
+objc_library(
+    name = "SNTExecAuthConfigState",
+    srcs = ["SNTExecAuthConfigState.m"],
+    hdrs = ["SNTExecAuthConfigState.h"],
+    module_name = "santa_common_SNTExecAuthConfigState",
+    deps = [
+        ":CoderMacros",
+        ":SNTConfigurator",
+        ":SNTCommonEnums",
     ],
 )
 
@@ -459,6 +476,7 @@ objc_library(
     hdrs = ["SNTXPCNotifierInterface.h"],
     deps = [
         ":SNTCommonEnums",
+        ":SNTExecAuthConfigState",
         ":SNTXPCBundleServiceInterface",
     ],
 )

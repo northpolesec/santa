@@ -31,7 +31,7 @@ swift_library(
         ":SNTMessageView",
         "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTCommonEnums",
-        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTExecAuthConfigState",
         "//Source/common:SNTStoredEvent",
     ],
 )
@@ -101,6 +101,7 @@ objc_library(
         "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
+        "//Source/common:SNTExecAuthConfigState",
         "//Source/common:SNTFileAccessEvent",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",

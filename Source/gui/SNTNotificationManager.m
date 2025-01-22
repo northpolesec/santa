@@ -24,6 +24,7 @@
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
+#import "Source/common/SNTExecAuthConfigState.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStrengthify.h"
@@ -363,6 +364,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
                     customURL:(NSString *)url
+                  configState:(SNTExecAuthConfigState *)configState
                      andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
@@ -373,6 +375,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
       [[SNTBinaryMessageWindowController alloc] initWithEvent:event
                                                     customMsg:message
                                                     customURL:url
+                                                  configState:configState
                                                         reply:replyBlock];
 
   [self queueMessage:pendingMsg];

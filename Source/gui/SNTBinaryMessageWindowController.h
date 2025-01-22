@@ -15,6 +15,7 @@
 
 #import <Cocoa/Cocoa.h>
 
+#import "Source/common/SNTExecAuthConfigState.h"
 #import "Source/gui/SNTMessageWindowController.h"
 
 @class SNTStoredEvent;
@@ -28,6 +29,7 @@
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
                     customURL:(NSString *)url
+                  configState:(SNTExecAuthConfigState *)configState
                         reply:(void (^)(BOOL authenticated))replyBlock;
 
 - (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash;
@@ -44,6 +46,11 @@
 /// Is displayed if calculating the bundle hash is taking a bit.
 ///
 @property(readonly) SNTBundleProgress *bundleProgress;
+
+///
+/// Snapshot of configuration used for processing the event.
+///
+@property(readonly) SNTExecAuthConfigState *configState;
 
 ///
 ///  The execution event that this window is for

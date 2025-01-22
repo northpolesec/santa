@@ -21,6 +21,7 @@
 
 #include <memory>
 
+#import "Source/common/SNTExecAuthConfigState.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/TestUtils.h"
@@ -60,11 +61,12 @@
   OCMExpect([self.mockProxy postBlockNotification:se
                                 withCustomMessage:customMessage
                                         customURL:customURL
+                                      configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *inv) {
         // Extract the reply block from the invocation and call it
         void (^replyBlock)(BOOL);
-        [inv getArgument:&replyBlock atIndex:5];
+        [inv getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           replyBlock(YES);
@@ -74,6 +76,7 @@
   [self.sut addEvent:se
       withCustomMessage:customMessage
               customURL:customURL
+            configState:nil
                andReply:^(BOOL) {
                  dispatch_semaphore_signal(sema);
                }];
@@ -90,6 +93,7 @@
   [self.sut addEvent:nil
       withCustomMessage:customMessage
               customURL:customURL
+            configState:OCMOCK_ANY
                andReply:^(BOOL val) {
                  XCTAssertFalse(val);
                  dispatch_semaphore_signal(sema);
@@ -100,6 +104,7 @@
   OCMVerify(never(), [self.mockProxy postBlockNotification:OCMOCK_ANY
                                          withCustomMessage:OCMOCK_ANY
                                                  customURL:OCMOCK_ANY
+                                               configState:OCMOCK_ANY
                                                   andReply:OCMOCK_ANY]);
 }
 
@@ -170,15 +175,17 @@
   OCMVerify(never(), [self.mockProxy postBlockNotification:se1
                                          withCustomMessage:@"Message 1"
                                                  customURL:@"https://northpolesec.com/1"
+                                               configState:OCMOCK_ANY
                                                   andReply:OCMOCK_ANY]);
 
   OCMExpect([self.mockProxy postBlockNotification:se2
                                 withCustomMessage:@"Message 2"
                                         customURL:@"https://northpolesec.com/2"
+                                      configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *invocation) {
         void (^replyBlock)(BOOL);
-        [invocation getArgument:&replyBlock atIndex:5];
+        [invocation getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           replyBlock(YES);
@@ -188,10 +195,11 @@
   OCMExpect([self.mockProxy postBlockNotification:se3
                                 withCustomMessage:@"Message 3"
                                         customURL:@"https://northpolesec.com/3"
+                                      configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *invocation) {
         void (^replyBlock)(BOOL);
-        [invocation getArgument:&replyBlock atIndex:5];
+        [invocation getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           replyBlock(YES);
@@ -201,17 +209,22 @@
   OCMExpect([self.mockProxy postBlockNotification:se4
                                 withCustomMessage:customMessage
                                         customURL:customURL
+                                      configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *inv) {
         void (^replyBlock)(BOOL);
-        [inv getArgument:&replyBlock atIndex:5];
+        [inv getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           replyBlock(YES);
         });
       });
 
-  [self.sut addEvent:se4 withCustomMessage:customMessage customURL:customURL andReply:replyBlock4];
+  [self.sut addEvent:se4
+      withCustomMessage:customMessage
+              customURL:customURL
+            configState:nil
+               andReply:replyBlock4];
 
   [self waitForExpectationsWithTimeout:4.0 handler:nil];
 

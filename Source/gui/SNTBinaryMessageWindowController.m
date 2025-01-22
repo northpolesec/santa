@@ -42,12 +42,14 @@
 - (instancetype)initWithEvent:(SNTStoredEvent *)event
                     customMsg:(NSString *)message
                     customURL:(NSString *)url
+                  configState:(SNTExecAuthConfigState *)configState
                         reply:(void (^)(BOOL))replyBlock {
   self = [super init];
   if (self) {
     _event = event;
     _customMessage = message;
     _customURL = url;
+    _configState = configState;
     _replyBlock = replyBlock;
     _progress = [NSProgress discreteProgressWithTotalUnitCount:1];
     [_progress addObserver:self
@@ -98,6 +100,7 @@
                  event:self.event
              customMsg:self.customMessage
              customURL:self.customURL
+           configState:self.configState
         bundleProgress:self.bundleProgress
        uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
          self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;

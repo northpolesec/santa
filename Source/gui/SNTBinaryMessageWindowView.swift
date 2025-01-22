@@ -15,8 +15,8 @@
 import SwiftUI
 
 import santa_common_SNTBlockMessage
-import santa_common_SNTConfigurator
 import santa_common_SNTCommonEnums
+import santa_common_SNTExecAuthConfigState
 import santa_common_SNTStoredEvent
 import santa_gui_SNTMessageView
 
@@ -34,6 +34,7 @@ import santa_gui_SNTMessageView
     event: SNTStoredEvent,
     customMsg: NSString?,
     customURL: NSString?,
+    configState: SNTExecAuthConfigState,
     bundleProgress: SNTBundleProgress,
     uiStateCallback: ((TimeInterval) -> Void)?,
     replyCallback: ((Bool) -> Void)?
@@ -44,6 +45,7 @@ import santa_gui_SNTMessageView
         event: event,
         customMsg: customMsg,
         customURL: customURL,
+        configState: configState,
         bundleProgress: bundleProgress,
         uiStateCallback: uiStateCallback,
         replyCallback: replyCallback
@@ -251,6 +253,7 @@ struct SNTBinaryMessageWindowView: View {
   let event: SNTStoredEvent?
   let customMsg: NSString?
   let customURL: NSString?
+  let configState: SNTExecAuthConfigState
   @StateObject var bundleProgress: SNTBundleProgress
   let uiStateCallback: ((TimeInterval) -> Void)?
   let replyCallback: ((Bool) -> Void)?
@@ -283,7 +286,7 @@ struct SNTBinaryMessageWindowView: View {
       }
 
       // Display the standalone error message to the user if one is provided.
-      if c.clientMode == .standalone {
+      if configState.clientMode == .standalone {
         let (canAuthz, err) = CanAuthorizeWithTouchID()
         if !canAuthz {
           if let errMsg = err {
@@ -310,7 +313,7 @@ struct SNTBinaryMessageWindowView: View {
   }
 
   func shouldAddStandaloneButton() -> Bool {
-    var shouldDisplay = c.clientMode == .standalone
+    var shouldDisplay = configState.clientMode == .standalone
 
     let (canAuthz, _) = CanAuthorizeWithTouchID()
     if !canAuthz {

@@ -38,6 +38,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTDropRootPrivs.h"
+#import "Source/common/SNTExecAuthConfigState.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
@@ -234,7 +235,8 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   // Get info about the file. If we can't get this info, respond appropriately and log an error.
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTExecAuthConfigState *config =
+      [[SNTExecAuthConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
   const es_process_t *targetProc = esMsg->event.exec.target;
 
   NSError *fileInfoError;
@@ -481,6 +483,7 @@ static NSString *const kPrinterProxyPostMonterey =
         [self.notifierQueue addEvent:se
                    withCustomMessage:cd.customMsg
                            customURL:cd.customURL
+                         configState:config
                             andReply:replyBlock];
       }
     }

@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTExecAuthConfigState.h"
 #import "Source/common/SNTXPCBundleServiceInterface.h"
 
 @class SNTDeviceEvent;
@@ -27,6 +28,7 @@
 - (void)postBlockNotification:(SNTStoredEvent *)event
             withCustomMessage:(NSString *)message
                     customURL:(NSString *)url
+                  configState:(SNTExecAuthConfigState *)configState
                      andReply:(void (^)(BOOL authenticated))reply;
 - (void)postUSBBlockNotification:(SNTDeviceEvent *)event;
 - (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event

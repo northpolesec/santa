@@ -178,6 +178,7 @@ objc_library(
     hdrs = ["SNTNotificationQueue.h"],
     deps = [
         "//Source/common:RingBuffer",
+        "//Source/common:SNTExecAuthConfigState",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStrengthify",
@@ -191,6 +192,7 @@ santa_unit_test(
     srcs = ["SNTNotificationQueueTest.mm"],
     deps = [
         ":SNTNotificationQueue",
+        "//Source/common:SNTExecAuthConfigState",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:TestUtils",
@@ -292,6 +294,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeepCopy",
         "//Source/common:SNTDropRootPrivs",
+        "//Source/common:SNTExecAuthConfigState",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
