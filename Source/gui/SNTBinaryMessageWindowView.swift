@@ -293,12 +293,10 @@ struct SNTBinaryMessageWindowView: View {
       }
 
       HStack(spacing: 15.0) {
-        if !(c.eventDetailURL?.isEmpty ?? true)
-          && !(event?.needsBundleHash ?? false && !bundleProgress.isFinished) && c.clientMode != .standalone
-        {
-          OpenEventButton(customText: c.eventDetailText, action: openButton)
-        } else if addStandaloneButton() {
+        if shouldAddStandaloneButton() {
           StandaloneButton(action: standAloneButton)
+        } else if shouldAddOpenButton() {
+          OpenEventButton(customText: c.eventDetailText, action: openButton)
         }
 
         DismissButton(
@@ -311,7 +309,7 @@ struct SNTBinaryMessageWindowView: View {
     }.fixedSize()
   }
 
-  func addStandaloneButton() -> Bool {
+  func shouldAddStandaloneButton() -> Bool {
     var shouldDisplay = c.clientMode == .standalone
 
     let (canAuthz, _) = CanAuthorizeWithTouchID()
@@ -330,6 +328,16 @@ struct SNTBinaryMessageWindowView: View {
     }
 
     return shouldDisplay
+  }
+
+  func shouldAddOpenButton() -> Bool {
+    if c.eventDetailURL?.isEmpty ?? true {
+      return false
+    }
+    if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
+      return false
+    }
+    return true
   }
 
   func openButton() {
