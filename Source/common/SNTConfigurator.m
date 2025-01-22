@@ -1456,12 +1456,15 @@ static SNTConfigurator *sharedConfigurator = nil;
 ///
 - (void)cacheStaticRules {
   NSArray *staticRules = self.configState[kStaticRules];
-  if (![staticRules isKindOfClass:[NSArray class]]) return;
+  if (![staticRules isKindOfClass:[NSArray class]]) {
+    self.cachedStaticRules = nil;
+    return;
+  }
 
   NSMutableDictionary<NSString *, SNTRule *> *rules =
       [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
   for (id rule in staticRules) {
-    if (![rule isKindOfClass:[NSDictionary class]]) return;
+    if (![rule isKindOfClass:[NSDictionary class]]) continue;
     SNTRule *r = [[SNTRule alloc] initWithDictionarySlow:rule];
     if (!r) continue;
     rules[r.identifier] = r;
