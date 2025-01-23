@@ -50,6 +50,7 @@
 - (void)addEvent:(SNTStoredEvent *)event
     withCustomMessage:(NSString *)message
             customURL:(NSString *)url
+          configState:(SNTConfigState *)configState
              andReply:(NotificationReplyBlock)replyBlock {
   if (!event) {
     if (replyBlock) {
@@ -62,6 +63,7 @@
   [d setValue:event forKey:@"event"];
   [d setValue:message forKey:@"message"];
   [d setValue:url forKey:@"url"];
+  [d setValue:configState forKey:@"config"];
   // Copy the block to the heap so it can be called later.
   // This is necessary because the block is allocated on the stack in the
   // Execution controller which goes out of scope.
@@ -153,6 +155,7 @@
     [rop postBlockNotification:d[@"event"]
              withCustomMessage:d[@"message"]
                      customURL:d[@"url"]
+                   configState:d[@"config"]
                       andReply:wrappedReplyBlock];
   }
 }

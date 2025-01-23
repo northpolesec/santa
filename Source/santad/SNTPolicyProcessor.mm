@@ -14,8 +14,8 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTPolicyProcessor.h"
-#include <Foundation/Foundation.h>
 
+#include <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
 #import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <Security/SecCode.h>
@@ -230,6 +230,7 @@ static void UpdateCachedDecisionSigningInfo(
 
 - (nonnull SNTCachedDecision *)
            decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                   configState:(nonnull SNTConfigState *)configState
                         cdhash:(nullable NSString *)cdhash
                     fileSHA256:(nullable NSString *)fileSHA256
              certificateSHA256:(nullable NSString *)certificateSHA256
@@ -242,7 +243,7 @@ static void UpdateCachedDecisionSigningInfo(
       preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback {
   // Check the hash before allocating a SNTCachedDecision.
   NSString *fileHash = fileSHA256 ?: fileInfo.SHA256;
-  SNTClientMode mode = [self.configurator clientMode];
+  SNTClientMode mode = configState.clientMode;
 
   // If the binary is a critical system binary, don't check its signature.
   // The binary was validated at startup when the rule table was initialized.
@@ -330,6 +331,7 @@ static void UpdateCachedDecisionSigningInfo(
 
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                                      targetProcess:(nonnull const es_process_t *)targetProc
+                                       configState:(nonnull SNTConfigState *)configState
                           preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback
                         entitlementsFilterCallback:
                             (NSDictionary *_Nullable (^_Nonnull)(
@@ -373,6 +375,7 @@ static void UpdateCachedDecisionSigningInfo(
   }
 
   return [self decisionForFileInfo:fileInfo
+      configState:configState
       cdhash:cdhash
       fileSHA256:nil
       certificateSHA256:nil
@@ -418,6 +421,7 @@ static void UpdateCachedDecisionSigningInfo(
   }
 
   return [self decisionForFileInfo:fileInfo
+                       configState:[[SNTConfigState alloc] initWithConfig:self.configurator]
                             cdhash:identifiers.cdhash
                         fileSHA256:identifiers.binarySHA256
                  certificateSHA256:identifiers.certificateSHA256

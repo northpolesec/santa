@@ -17,6 +17,7 @@
 #import <MOLCertificate/MOLCertificate.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 
@@ -47,6 +48,7 @@
 ///
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                                      targetProcess:(nonnull const es_process_t *)targetProc
+                                       configState:(nonnull SNTConfigState *)configState
                           preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback
                         entitlementsFilterCallback:
                             (NSDictionary *_Nullable (^_Nonnull)(

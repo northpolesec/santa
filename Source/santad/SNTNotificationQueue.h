@@ -18,6 +18,7 @@
 #include <memory>
 
 #include "Source/common/RingBuffer.h"
+#import "Source/common/SNTConfigState.h"
 
 @class SNTStoredEvent;
 @class MOLXPCConnection;
@@ -37,6 +38,7 @@ using NotificationReplyBlock = void (^)(BOOL);
 - (void)addEvent:(SNTStoredEvent *)event
     withCustomMessage:(NSString *)message
             customURL:(NSString *)url
+          configState:(SNTConfigState *)configState
              andReply:(void (^)(BOOL authenticated))reply;
 
 @end
