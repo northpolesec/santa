@@ -1306,7 +1306,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   syncState[kAllowedPathRegexKey] = [syncState[kAllowedPathRegexKey] pattern];
   syncState[kBlockedPathRegexKey] = [syncState[kBlockedPathRegexKey] pattern];
   [syncState writeToFile:self.syncStateFilePath atomically:YES];
-  [[NSFileManager defaultManager] setAttributes:@{NSFilePosixPermissions : @0644}
+  [[NSFileManager defaultManager] setAttributes:@{NSFilePosixPermissions : @0600}
                                    ofItemAtPath:self.syncStateFilePath
                                           error:NULL];
 }
