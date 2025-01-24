@@ -29,6 +29,7 @@ swift_library(
     generates_header = 1,
     deps = [
         ":SNTMessageView",
+        "//Source/common:CertificateHelpers"
         "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigState",
