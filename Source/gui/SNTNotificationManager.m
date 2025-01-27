@@ -398,7 +398,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 - (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event
                           customMessage:(NSString *)message
                               customURL:(NSString *)url
-                             customText:(NSString *)text API_AVAILABLE(macos(13.0)) {
+                             customText:(NSString *)text
+                            configState:(SNTConfigState *)configState API_AVAILABLE(macos(13.0)) {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
@@ -408,7 +409,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
       [[SNTFileAccessMessageWindowController alloc] initWithEvent:event
                                                     customMessage:message
                                                         customURL:url
-                                                       customText:text];
+                                                       customText:text
+                                                      configState:configState];
 
   [self queueMessage:pendingMsg ignoringSilences:NO];
 }
