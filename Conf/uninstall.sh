@@ -32,6 +32,9 @@ user=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/rm -f /private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf
 /bin/rm -f /usr/local/bin/santactl # just a symlink
 
+#forget receipt
+/usr/sbin/pkgutil --forget com.northpolesec.santa
+
 #uncomment to remove the config file and all databases, log files
 #/bin/rm -rf /var/db/santa
 #/bin/rm -f /var/log/santa*
