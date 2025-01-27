@@ -402,8 +402,8 @@ objc_library(
     module_name = "santa_common_SNTConfigState",
     deps = [
         ":CoderMacros",
-        ":SNTConfigurator",
         ":SNTCommonEnums",
+        ":SNTConfigurator",
     ],
 )
 

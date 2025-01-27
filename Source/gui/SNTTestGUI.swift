@@ -1,5 +1,6 @@
 import SwiftUI
 
+import santa_common_SNTConfigState
 import santa_common_SNTConfigurator
 import santa_common_SNTCommonEnums
 import santa_common_SNTDeviceEvent
@@ -58,10 +59,11 @@ struct BinaryView: View {
   @State var path: String = "/Applications/Malware.app/Contents/MacOS"
   @State var parent: String = "launchd"
 
-  @State var bannedBlockMessage: String = ""
+  @State var unknownBlockMessage: String = ""
   @State var eventDetailURL: String = "http://sync-server-hostname/blockables/%bundle_or_file_identifier%"
   @State var dateOverride: SpecialDates = .Nov25
   @State var clientModeOverride: SNTClientMode = .lockdown
+  @State var allowNotificationSilence: Bool = true
 
   @State var customMsg: String = ""
   @State var customURL: String = ""
@@ -83,17 +85,17 @@ struct BinaryView: View {
       GroupBox(label: Label("Config Overrides", systemImage: "")) {
         Form {
           HStack {
-            TextField(text: $bannedBlockMessage, label: { Text(verbatim: "Banned Block Message") }).frame(width: 550.0)
+            TextField(text: $unknownBlockMessage, label: { Text(verbatim: "Banned Block Message") }).frame(width: 550.0)
             Button(action: {
-              bannedBlockMessage =
+              unknownBlockMessage =
                 "<img src='https://static.wikia.nocookie.net/villains/images/8/8a/Robot_Santa.png/revision/latest?cb=20200520230856' /><br /><br />Isn't Santa fun?"
             }) {
               Text(verbatim: "Populate (With Image)").font(Font.subheadline)
             }
-            Button(action: { bannedBlockMessage = "You may not run this thing" }) {
+            Button(action: { unknownBlockMessage = "You may not run this thing" }) {
               Text(verbatim: "Populate (1-line)").font(Font.subheadline)
             }
-            Button(action: { bannedBlockMessage = "" }) { Text("Clear").font(Font.subheadline) }
+            Button(action: { unknownBlockMessage = "" }) { Text("Clear").font(Font.subheadline) }
           }
 
           HStack {
@@ -118,6 +120,11 @@ struct BinaryView: View {
               Text(verbatim: "Standalone").tag(SNTClientMode.standalone)
             }.pickerStyle(.segmented)
           }
+          HStack {
+            Toggle(isOn: $allowNotificationSilence) {
+              Text(verbatim: "Allow notification silences")
+            }
+          }
         }
       }
 
@@ -125,10 +132,11 @@ struct BinaryView: View {
 
       Button("Display") {
         var configMap = [
-          "BannedBlockMessage": bannedBlockMessage,
           "FunFontsOnSpecificDays": true,
           "ClientMode": clientModeOverride.rawValue as NSNumber,
           "EnableStandalonePasswordFallback": true,
+          "UnknownBlockMessage": unknownBlockMessage,
+          "EnableNotificationSilences": allowNotificationSilence,
         ]
         if !eventDetailURL.isEmpty {
           configMap["EventDetailURL"] = eventDetailURL
@@ -161,6 +169,7 @@ struct BinaryView: View {
             event: event,
             customMsg: customMsg as NSString?,
             customURL: customURL as NSString?,
+            configState: SNTConfigState(config: SNTConfigurator.configurator()),
             bundleProgress: SNTBundleProgress(),
             uiStateCallback: { interval in print("Silence interval was set to \(interval)") },
             replyCallback: { approved in print("Did user approve execution: \(approved)") }

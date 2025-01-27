@@ -17,6 +17,7 @@
 #import "Source/gui/SNTFileAccessMessageWindowView-Swift.h"
 
 #import "Source/common/SNTBlockMessage.h"
+#import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTLogging.h"
 
@@ -24,6 +25,7 @@
 @property NSString *customMessage;
 @property NSString *customURL;
 @property NSString *customText;
+@property SNTConfigState *configState;
 @property SNTFileAccessEvent *event;
 @end
 
@@ -32,13 +34,15 @@
 - (instancetype)initWithEvent:(SNTFileAccessEvent *)event
                 customMessage:(nullable NSString *)message
                     customURL:(nullable NSString *)url
-                   customText:(nullable NSString *)text {
+                   customText:(nullable NSString *)text
+                  configState:(nullable SNTConfigState *)configState {
   self = [super init];
   if (self) {
     _event = event;
     _customMessage = message;
     _customURL = url;
     _customText = text;
+    _configState = configState;
   }
   return self;
 }
@@ -70,6 +74,7 @@
          customMessage:self.customMessage
              customURL:self.customURL
             customText:self.customText
+           configState:self.configState
        uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
          self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
        }];

@@ -107,6 +107,7 @@ static NSString *const kRemountUSBBlockMessage = @"RemountUSBBlockMessage";
 static NSString *const kModeNotificationMonitor = @"ModeNotificationMonitor";
 static NSString *const kModeNotificationLockdown = @"ModeNotificationLockdown";
 static NSString *const kModeNotificationStandalone = @"ModeNotificationStandalone";
+static NSString *const kEnableNotificationSilences = @"EnableNotificationSilences";
 static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
 
 static NSString *const kEnablePageZeroProtectionKey = @"EnablePageZeroProtection";
@@ -243,6 +244,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kModeNotificationMonitor : string,
       kModeNotificationLockdown : string,
       kModeNotificationStandalone : string,
+      kEnableNotificationSilences : number,
       kFunFontsOnSpecificDays : number,
       kStaticRules : array,
       kSyncBaseURLKey : string,
@@ -466,6 +468,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingModeNotificationLockdown {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableNotificationSilences {
   return [self configStateSet];
 }
 
@@ -868,6 +874,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSString *)modeNotificationStandalone {
   return self.configState[kModeNotificationStandalone];
+}
+
+- (BOOL)enableNotificationSilences {
+  NSNumber *number = self.configState[kEnableNotificationSilences];
+  return number ? [number boolValue] : YES;
 }
 
 - (BOOL)funFontsOnSpecificDays {

@@ -61,6 +61,7 @@ swift_library(
     deps = [
         ":SNTMessageView",
         "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigState",
         "//Source/common:SNTFileAccessEvent",
     ],
 )
@@ -101,9 +102,9 @@ objc_library(
         ":SNTFileAccessMessageWindowView",
         "//Source/common:CertificateHelpers",
         "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
-        "//Source/common:SNTConfigState",
         "//Source/common:SNTFileAccessEvent",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",

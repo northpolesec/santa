@@ -419,6 +419,15 @@
 @property(nullable, readonly, nonatomic) NSString *modeNotificationStandalone;
 
 ///
+///  If set to true, when a user is presented with a GUI notification there will be
+///  a checkbox and dropdown to allow silencing these notifications for a short
+///  period of time.
+///
+///  Defaults to true.
+///
+@property(readonly, nonatomic) BOOL enableNotificationSilences;
+
+///
 ///  If this is set to true, the UI will use different fonts on April 1st, May 4th and October 31st.
 ///
 @property(readonly, nonatomic) BOOL funFontsOnSpecificDays;

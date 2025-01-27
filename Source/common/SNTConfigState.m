@@ -23,6 +23,7 @@
   self = [super init];
   if (self) {
     _clientMode = config.clientMode;
+    _enableNotificationSilences = config.enableNotificationSilences;
   }
   return self;
 }
@@ -33,12 +34,14 @@
 
 - (void)encodeWithCoder:(NSCoder *)coder {
   ENCODE_BOXABLE(coder, clientMode);
+  ENCODE_BOXABLE(coder, enableNotificationSilences);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super init];
   if (self) {
     DECODE_SELECTOR(decoder, clientMode, NSNumber, integerValue);
+    DECODE_SELECTOR(decoder, enableNotificationSilences, NSNumber, boolValue);
   }
   return self;
 };

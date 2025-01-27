@@ -18,6 +18,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@class SNTConfigState;
 @class SNTFileAccessEvent;
 
 ///
@@ -29,7 +30,8 @@ API_AVAILABLE(macos(13.0))
 - (instancetype)initWithEvent:(SNTFileAccessEvent *)event
                 customMessage:(nullable NSString *)message
                     customURL:(nullable NSString *)url
-                   customText:(nullable NSString *)text;
+                   customText:(nullable NSString *)text
+                  configState:(nullable SNTConfigState *)configState;
 
 @property(readonly) SNTFileAccessEvent *event;
 

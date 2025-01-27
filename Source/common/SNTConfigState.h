@@ -23,6 +23,7 @@
 // Properties here mirror the SNTConfigurator at a point in time
 //
 @property(readonly) SNTClientMode clientMode;
+@property(readonly) BOOL enableNotificationSilences;
 
 - (instancetype)initWithConfig:(SNTConfigurator *)config;
 
