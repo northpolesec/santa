@@ -111,7 +111,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   return NO;
 }
 
-- (void)queueMessage:(SNTMessageWindowController *)pendingMsg {
+- (void)queueMessage:(SNTMessageWindowController *)pendingMsg
+    ignoringSilences:(BOOL)ignoreSilences {
   // Post a distributed notification, regardless of queue state.
   [self postDistributedNotification:pendingMsg];
 
@@ -130,19 +131,21 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     }
 
     // See if this message has been user-silenced.
-    NSString *messageHash = [pendingMsg messageHash];
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    NSDate *silenceDate = [ud objectForKey:silencedNotificationsKey][messageHash];
-    if ([silenceDate isKindOfClass:[NSDate class]]) {
-      switch ([silenceDate compare:[NSDate date]]) {
-        case NSOrderedDescending:
-          LOGI(@"Notification silence: dropping notification for %@", messageHash);
-          return;
-        case NSOrderedAscending:
-          LOGI(@"Notification silence: silence has expired, deleting");
-          [self updateSilenceDate:nil forHash:messageHash];
-          break;
-        default: break;
+    if (!ignoreSilences) {
+      NSString *messageHash = [pendingMsg messageHash];
+      NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+      NSDate *silenceDate = [ud objectForKey:silencedNotificationsKey][messageHash];
+      if ([silenceDate isKindOfClass:[NSDate class]]) {
+        switch ([silenceDate compare:[NSDate date]]) {
+          case NSOrderedDescending:
+            LOGI(@"Notification silence: dropping notification for %@", messageHash);
+            return;
+          case NSOrderedAscending:
+            LOGI(@"Notification silence: silence has expired, deleting");
+            [self updateSilenceDate:nil forHash:messageHash];
+            break;
+          default: break;
+        }
       }
     }
 
@@ -378,7 +381,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                                                   configState:configState
                                                         reply:replyBlock];
 
-  [self queueMessage:pendingMsg];
+  [self queueMessage:pendingMsg ignoringSilences:(configState.enableNotificationSilences != YES)];
 }
 
 - (void)postUSBBlockNotification:(SNTDeviceEvent *)event {
@@ -389,7 +392,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   SNTDeviceMessageWindowController *pendingMsg =
       [[SNTDeviceMessageWindowController alloc] initWithEvent:event];
 
-  [self queueMessage:pendingMsg];
+  [self queueMessage:pendingMsg ignoringSilences:NO];
 }
 
 - (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event
@@ -407,7 +410,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                                                         customURL:url
                                                        customText:text];
 
-  [self queueMessage:pendingMsg];
+  [self queueMessage:pendingMsg ignoringSilences:NO];
 }
 
 // XPC handler. The sync service requests the APNS token, by way of the daemon.

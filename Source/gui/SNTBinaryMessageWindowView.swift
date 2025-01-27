@@ -272,7 +272,9 @@ struct SNTBinaryMessageWindowView: View {
     ) {
       SNTBinaryMessageEventView(e: event!, customURL: customURL, bundleProgress: bundleProgress)
 
-      SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
+      if configState.enableNotificationSilences {
+        SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
+      }
 
       if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
         if bundleProgress.fractionCompleted == 0.0 {
