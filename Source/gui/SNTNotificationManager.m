@@ -111,8 +111,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   return NO;
 }
 
-- (void)queueMessage:(SNTMessageWindowController *)pendingMsg
-      enableSilences:(BOOL)enableSilences {
+- (void)queueMessage:(SNTMessageWindowController *)pendingMsg enableSilences:(BOOL)enableSilences {
   // Post a distributed notification, regardless of queue state.
   [self postDistributedNotification:pendingMsg];
 
