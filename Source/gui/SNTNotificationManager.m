@@ -112,7 +112,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 }
 
 - (void)queueMessage:(SNTMessageWindowController *)pendingMsg
-    ignoringSilences:(BOOL)ignoreSilences {
+      enableSilences:(BOOL)enableSilences {
   // Post a distributed notification, regardless of queue state.
   [self postDistributedNotification:pendingMsg];
 
@@ -131,7 +131,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     }
 
     // See if this message has been user-silenced.
-    if (!ignoreSilences) {
+    if (enableSilences) {
       NSString *messageHash = [pendingMsg messageHash];
       NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
       NSDate *silenceDate = [ud objectForKey:silencedNotificationsKey][messageHash];
@@ -381,7 +381,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                                                   configState:configState
                                                         reply:replyBlock];
 
-  [self queueMessage:pendingMsg ignoringSilences:(configState.enableNotificationSilences != YES)];
+  [self queueMessage:pendingMsg enableSilences:configState.enableNotificationSilences];
 }
 
 - (void)postUSBBlockNotification:(SNTDeviceEvent *)event {
@@ -392,7 +392,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   SNTDeviceMessageWindowController *pendingMsg =
       [[SNTDeviceMessageWindowController alloc] initWithEvent:event];
 
-  [self queueMessage:pendingMsg ignoringSilences:NO];
+  [self queueMessage:pendingMsg enableSilences:YES];
 }
 
 - (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event
@@ -412,7 +412,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                                                        customText:text
                                                       configState:configState];
 
-  [self queueMessage:pendingMsg ignoringSilences:NO];
+  [self queueMessage:pendingMsg enableSilences:YES];
 }
 
 // XPC handler. The sync service requests the APNS token, by way of the daemon.
