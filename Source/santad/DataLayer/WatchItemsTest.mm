@@ -34,12 +34,16 @@
 #import "Source/common/Unit.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/DataLayer/WatchItems.h"
+#include "absl/container/flat_hash_set.h"
 
 using santa::DataWatchItemPolicy;
 using santa::kWatchItemPolicyDefaultAllowReadAccess;
 using santa::kWatchItemPolicyDefaultAuditOnly;
 using santa::kWatchItemPolicyDefaultPathType;
 using santa::kWatchItemPolicyDefaultRuleType;
+using santa::PathAndTypePair;
+using santa::PathAndTypeVec;
+using santa::PolicyProcessVec;
 using santa::ProcessWatchItemPolicy;
 using santa::Unit;
 using santa::WatchItemPathType;
@@ -47,23 +51,16 @@ using santa::WatchItemProcess;
 using santa::WatchItems;
 using santa::WatchItemsState;
 
-namespace {
-using PathAndTypePair = std::pair<std::string, WatchItemPathType>;
-using PathAndTypeVec = std::vector<PathAndTypePair>;
-using PolicyProcessVec = std::vector<WatchItemProcess>;
-}  // namespace
-
 namespace santa {
 
 extern bool ParseConfig(NSDictionary *config,
                         std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
-                        std::vector<std::shared_ptr<ProcessWatchItemPolicy>> &proc_policies,
-                        NSError **err);
+                        ProcessWatchItemPolicySet &proc_policies, NSError **err);
 extern bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err);
-extern bool ParseConfigSingleWatchItem(
-    NSString *name, std::string_view policy_version, NSDictionary *watch_item,
-    std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
-    std::vector<std::shared_ptr<ProcessWatchItemPolicy>> &proc_policies, NSError **err);
+bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
+                                NSDictionary *watch_item,
+                                std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
+                                ProcessWatchItemPolicySet &proc_policies, NSError **err);
 extern std::variant<Unit, PathAndTypeVec> VerifyConfigWatchItemPaths(NSArray<id> *paths,
                                                                      NSError **err);
 extern std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary *watch_item,
@@ -200,7 +197,23 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertTrue(ruleType.has_value());
   XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kPathsWithDeniedProcesses);
 
-  ruleType = GetRuleType(@"InvertExceptions");
+  ruleType = GetRuleType(@"ProcessesWithDeniedPaths");
+  XCTAssertTrue(ruleType.has_value());
+  XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kProcessesWithDeniedPaths);
+
+  ruleType = GetRuleType(@"ProCEssESwIThdENieDpaTHs");
+  XCTAssertTrue(ruleType.has_value());
+  XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kProcessesWithDeniedPaths);
+
+  ruleType = GetRuleType(@"ProcessesWithAllowedPaths");
+  XCTAssertTrue(ruleType.has_value());
+  XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kProcessesWithAllowedPaths);
+
+  ruleType = GetRuleType(@"ProCEssESwIThaLLowEDpaTHs");
+  XCTAssertTrue(ruleType.has_value());
+  XCTAssertEqual(ruleType.value(), santa::WatchItemRuleType::kProcessesWithAllowedPaths);
+
+  ruleType = GetRuleType(@"NotARealRuleType");
   XCTAssertFalse(ruleType.has_value());
 }
 
@@ -717,7 +730,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 - (void)testParseConfig {
   NSError *err;
   std::vector<std::shared_ptr<DataWatchItemPolicy>> data_policies;
-  std::vector<std::shared_ptr<ProcessWatchItemPolicy>> proc_policies;
+  santa::ProcessWatchItemPolicySet proc_policies;
 
   // Ensure top level keys must exist and be correct types
   XCTAssertFalse(ParseConfig(@{}, data_policies, proc_policies, &err));
@@ -768,9 +781,9 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
                             data_policies, proc_policies, &err));
 }
 
-- (void)testParseConfigSingleWatchItem {
+- (void)testParseConfigSingleWatchItemGeneral {
   std::vector<std::shared_ptr<DataWatchItemPolicy>> data_policies;
-  std::vector<std::shared_ptr<ProcessWatchItemPolicy>> proc_policies;
+  santa::ProcessWatchItemPolicySet proc_policies;
   NSError *err;
 
   // There must be valid Paths in a watch item
@@ -922,33 +935,44 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
       DataWatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType,
                           kWatchItemPolicyDefaultAllowReadAccess, kWatchItemPolicyDefaultAuditOnly,
                           kWatchItemPolicyDefaultRuleType));
+}
 
-  // Test multiple paths, options, and processes
+- (void)testParseConfigSingleWatchItemPolicies {
+  std::vector<std::shared_ptr<DataWatchItemPolicy>> data_policies;
+  santa::ProcessWatchItemPolicySet proc_policies;
+  NSError *err;
+
+  // Data FAA - Test multiple paths, options, and processes
   data_policies.clear();
+  proc_policies.clear();
   std::vector<WatchItemProcess> procs = {
       WatchItemProcess("pa", "", "", {}, "", std::nullopt),
       WatchItemProcess("pb", "", "", {}, "", std::nullopt),
   };
 
-  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, @{
+  NSMutableDictionary *singleWatchItemConfig = [@{
     kWatchItemConfigKeyPaths : @[
       @"a", @{kWatchItemConfigKeyPathsPath : @"b", kWatchItemConfigKeyPathsIsPrefix : @(YES)}
     ],
-    kWatchItemConfigKeyOptions : @{
+    kWatchItemConfigKeyOptions : [@{
       kWatchItemConfigKeyOptionsAllowReadAccess : @(YES),
       kWatchItemConfigKeyOptionsAuditOnly : @(NO),
-      kWatchItemConfigKeyOptionsRuleType : @"PathsWithDeniedProcesses",
       kWatchItemConfigKeyOptionsEnableSilentMode : @(YES),
-      kWatchItemConfigKeyOptionsEnableSilentMode : @(NO),
+      kWatchItemConfigKeyOptionsEnableSilentTTYMode : @(NO),
       kWatchItemConfigKeyOptionsCustomMessage : @"",
-    },
+    } mutableCopy],
     kWatchItemConfigKeyProcesses : @[
       @{kWatchItemConfigKeyProcessesBinaryPath : @"pa"},
       @{kWatchItemConfigKeyProcessesBinaryPath : @"pb"}
     ]
-  },
-                                           data_policies, proc_policies, &err));
+  } mutableCopy];
 
+  singleWatchItemConfig[kWatchItemConfigKeyOptions][kWatchItemConfigKeyOptionsRuleType] =
+      @"PathsWithDeniedProcesses";
+  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, data_policies,
+                                           proc_policies, &err));
+
+  XCTAssertEqual(proc_policies.size(), 0);
   XCTAssertEqual(data_policies.size(), 2);
   XCTAssertEqual(*data_policies[0].get(),
                  DataWatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType, true,
@@ -958,6 +982,18 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
                  DataWatchItemPolicy("rule", kVersion, "b", WatchItemPathType::kPrefix, true, false,
                                      santa::WatchItemRuleType::kPathsWithDeniedProcesses, true,
                                      false, "", nil, nil, procs));
+
+  // Proc FAA - Test multiple paths, options, and processes
+  data_policies.clear();
+  proc_policies.clear();
+
+  singleWatchItemConfig[kWatchItemConfigKeyOptions][kWatchItemConfigKeyOptionsRuleType] =
+      @"ProcessesWithDeniedPaths";
+  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, data_policies,
+                                           proc_policies, &err));
+
+  XCTAssertEqual(proc_policies.size(), 1);
+  XCTAssertEqual(data_policies.size(), 0);
 }
 
 - (void)testState {

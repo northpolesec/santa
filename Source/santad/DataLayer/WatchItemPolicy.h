@@ -26,8 +26,19 @@
 
 #import "Source/common/PrefixTree.h"
 #import "Source/common/Unit.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace santa {
+
+// Forward declarations
+enum class WatchItemPathType;
+enum class WatchItemRuleType;
+struct WatchItemProcess;
+
+// Helper type aliases
+using PathAndTypePair = std::pair<std::string, WatchItemPathType>;
+using PathAndTypeVec = std::vector<PathAndTypePair>;
+using PolicyProcessVec = std::vector<WatchItemProcess>;
 
 enum class WatchItemPathType {
   kPrefix,
@@ -37,6 +48,8 @@ enum class WatchItemPathType {
 enum class WatchItemRuleType {
   kPathsWithAllowedProcesses,
   kPathsWithDeniedProcesses,
+  kProcessesWithAllowedPaths,
+  kProcessesWithDeniedPaths,
 };
 
 static constexpr WatchItemPathType kWatchItemPolicyDefaultPathType = WatchItemPathType::kLiteral;
@@ -62,11 +75,16 @@ struct WatchItemProcess {
            team_id == other.team_id && cdhash == other.cdhash &&
            certificate_sha256 == other.certificate_sha256 &&
            platform_binary.has_value() == other.platform_binary.has_value() &&
-           platform_binary.value_or(false) == other.platform_binary.value_or(false);
+           platform_binary == other.platform_binary;
   }
 
   bool operator!=(const WatchItemProcess &other) const { return !(*this == other); }
 
+  template <typename H>
+  friend H AbslHashValue(H h, const WatchItemProcess &p) {
+    return H::combine(std::move(h), p.binary_path, p.signing_id, p.team_id, p.cdhash,
+                      p.certificate_sha256, p.platform_binary);
+  }
   std::string binary_path;
   std::string signing_id;
   std::string team_id;
@@ -154,8 +172,7 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
 };
 
 struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
-  ProcessWatchItemPolicy(std::string_view n, std::string_view v, std::string_view p,
-                         WatchItemPathType pt = kWatchItemPolicyDefaultPathType,
+  ProcessWatchItemPolicy(std::string_view n, std::string_view v, PathAndTypeVec pt,
                          bool ara = kWatchItemPolicyDefaultAllowReadAccess,
                          bool ao = kWatchItemPolicyDefaultAuditOnly,
                          WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
@@ -164,10 +181,61 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
                          std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
                          std::vector<WatchItemProcess> procs = {})
       : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt),
-        processes(std::move(procs)) {}
+        tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
+    // TODO(mlw): The `pt` and `procs` params should be changed to sets to alleviate these copies
+    for (const auto &item : pt) {
+      path_type_pairs.insert(item);
+    }
+    for (const auto &item : procs) {
+      processes.insert(item);
+    }
 
-  PrefixTree<Unit> paths;
-  std::vector<WatchItemProcess> processes;
+    // Build tree
+    for (const auto &pt_pair : path_type_pairs) {
+      if (pt_pair.second == WatchItemPathType::kPrefix) {
+        tree->InsertPrefix(pt_pair.first.c_str(), santa::Unit{});
+      } else {
+        tree->InsertLiteral(pt_pair.first.c_str(), santa::Unit{});
+      }
+    }
+  }
+
+  bool operator==(const WatchItemPolicyBase &other) const override {
+    const ProcessWatchItemPolicy *otherPolicy =
+        dynamic_cast<const ProcessWatchItemPolicy *>(&other);
+    if (!otherPolicy) {
+      return false;
+    }
+
+    // Now compare base and derived class attributes
+    return WatchItemPolicyBase::operator==(*otherPolicy) && processes == otherPolicy->processes &&
+           path_type_pairs == otherPolicy->path_type_pairs;
+  }
+
+  bool operator!=(const WatchItemPolicyBase &other) const override { return !(*this == other); }
+
+  absl::flat_hash_set<std::pair<std::string, WatchItemPathType>> path_type_pairs;
+  absl::flat_hash_set<WatchItemProcess> processes;
+  std::unique_ptr<santa::PrefixTree<Unit>> tree;
+};
+
+// Hash and equality call operators for sets of shared_ptr types
+struct SharedPtrProcessWatchItemPolicyHash {
+  std::size_t operator()(const std::shared_ptr<ProcessWatchItemPolicy> &ptr) const {
+    return absl::Hash<std::string>()(ptr->name);
+  }
+};
+
+struct SharedPtrProcessWatchItemPolicyEqual {
+  bool operator()(const std::shared_ptr<ProcessWatchItemPolicy> &a,
+                  const std::shared_ptr<ProcessWatchItemPolicy> &b) const {
+    // Handle null pointer cases
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+
+    // Compare the actual Items contents
+    return *a == *b;
+  }
 };
 
 }  // namespace santa
