@@ -16,6 +16,7 @@
 import SwiftUI
 
 import santa_common_SNTBlockMessage
+import santa_common_SNTConfigState
 import santa_common_SNTFileAccessEvent
 import santa_gui_SNTMessageView
 
@@ -27,6 +28,7 @@ import santa_gui_SNTMessageView
     customMessage: NSString?,
     customURL: NSString?,
     customText: NSString?,
+    configState: SNTConfigState,
     uiStateCallback: ((TimeInterval) -> Void)?
   ) -> NSViewController {
     return NSHostingController(
@@ -36,6 +38,7 @@ import santa_gui_SNTMessageView
         customMessage: customMessage,
         customURL: customURL as String?,
         customText: customText as String?,
+        configState: configState,
         uiStateCallback: uiStateCallback
       )
       .frame(minWidth: MAX_OUTER_VIEW_WIDTH, minHeight: MAX_OUTER_VIEW_HEIGHT)
@@ -168,6 +171,7 @@ struct SNTFileAccessMessageWindowView: View {
   let customMessage: NSString?
   let customURL: String?
   let customText: String?
+  let configState: SNTConfigState
   let uiStateCallback: ((TimeInterval) -> Void)?
 
   @Environment(\.openURL) var openURL
@@ -182,10 +186,9 @@ struct SNTFileAccessMessageWindowView: View {
       Event(e: event!, window: window)
 
       VStack(spacing: 15.0) {
-        SNTNotificationSilenceView(
-          silence: $preventFutureNotifications,
-          period: $preventFutureNotificationPeriod
-        )
+        if configState.enableNotificationSilences {
+          SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
+        }
 
         HStack(spacing: 15.0) {
           if customURL != nil {

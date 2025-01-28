@@ -151,11 +151,15 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
     access_authorizer_client.fileAccessBlockCallback = ^(
         SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {
+
+      // TODO: The config state should be an argument to the block.
+      SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
       [[notifier_queue.notifierConnection remoteObjectProxy]
           postFileAccessBlockNotification:event
                             customMessage:customMsg
                                 customURL:customURL
-                               customText:customText];
+                               customText:customText
+                              configState:cs];
     };
   }
 

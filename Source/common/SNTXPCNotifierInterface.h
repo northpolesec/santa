@@ -34,7 +34,8 @@
 - (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event
                           customMessage:(NSString *)message
                               customURL:(NSString *)url
-                             customText:(NSString *)text API_AVAILABLE(macos(13.0));
+                             customText:(NSString *)text
+                            configState:(SNTConfigState *)configState API_AVAILABLE(macos(13.0));
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
 - (void)postRuleSyncNotificationWithCustomMessage:(NSString *)message;
 - (void)updateCountsForEvent:(SNTStoredEvent *)event
