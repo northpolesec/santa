@@ -630,6 +630,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTSystemInfo",
         "//Source/common:String",
         "//Source/common:santa_cc_proto_library_wrapper",
         "@com_google_absl//absl/status",

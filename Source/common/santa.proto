@@ -926,6 +926,10 @@ message SantaMessage {
   // Timestamp when Santa finished processing the event
   optional google.protobuf.Timestamp processed_time = 3;
 
+  // The boot session UUID uniquely identifies a boot cycle. The value
+  // will remain the same across sleep/wake/hibernate cycles.
+  optional string boot_session_uuid = 4;
+
   // Event type being described by this message
   oneof event {
     Execution execution = 10;
