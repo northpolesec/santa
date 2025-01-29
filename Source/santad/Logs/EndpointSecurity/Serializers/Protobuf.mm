@@ -34,6 +34,7 @@
 #include "Source/common/SNTCommonEnums.h"
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
+#include "Source/common/SNTSystemInfo.h"
 #import "Source/common/String.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
@@ -391,6 +392,8 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
   }
   EncodeTimestamp(santa_msg->mutable_event_time(), event_time);
   EncodeTimestamp(santa_msg->mutable_processed_time(), processed_time);
+  EncodeString([santa_msg] { return santa_msg->mutable_boot_session_uuid(); },
+               [SNTSystemInfo bootSessionUUID]);
 
   return santa_msg;
 }

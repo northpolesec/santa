@@ -61,7 +61,11 @@
     // much we can really do if this fails, there are no other ways to get this
     // information.
     sysctlbyname("kern.bootsessionuuid", bootSessionUUID, &uuidLength, NULL, 0);
-    uuid = @(bootSessionUUID);
+
+    // Remove hyphens (small space reduction) and convert to lowercase (matching other IDs like
+    // hashes)
+    uuid = [[@(bootSessionUUID) stringByReplacingOccurrencesOfString:@"-"
+                                                          withString:@""] lowercaseString];
   });
   return uuid;
 }
