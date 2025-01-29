@@ -47,7 +47,7 @@
 
 // Decode a property of an array of objects of the given type
 // and assign the value to the named property.
-#define DECODE_ARRAY(d, o, c)                                                               \
+#define DECODE_ARRAY(d, o, c)                                                              \
   do {                                                                                     \
     _##o = [d decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [c class], nil] \
                              forKey:@(#o)];                                                \
@@ -55,12 +55,12 @@
 
 // Decode a property of a dictionary of objects of many common types
 // and assign the value to the named property.
-#define DECODE_DICT(d, o)                                                                       \
-do {                                                         \
+#define DECODE_DICT(d, o)                                                                        \
+  do {                                                                                           \
     _##o = [d decodeObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], \
-                                                         [NSString class], [NSNumber class],    \
-                                                         [NSData class], nil]                   \
-                            forKey:@(#o)]; \
-                              } while (0)
+                                                          [NSString class], [NSNumber class],    \
+                                                          [NSData class], nil]                   \
+                             forKey:@(#o)];                                                      \
+  } while (0)
 
 #endif

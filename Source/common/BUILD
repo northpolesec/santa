@@ -395,8 +395,8 @@ objc_library(
     hdrs = ["SNTStoredEvent.h"],
     module_name = "santa_common_SNTStoredEvent",
     deps = [
-        ":CoderMacros",
         ":CertificateHelpers",
+        ":CoderMacros",
         ":SNTCommonEnums",
         "@MOLCertificate",
     ],
