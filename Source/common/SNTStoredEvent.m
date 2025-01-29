@@ -18,66 +18,53 @@
 #import <MOLCertificate/MOLCertificate.h>
 
 #import "Source/common/CertificateHelpers.h"
+#import "Source/common/CoderMacros.h"
 
 @implementation SNTStoredEvent
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wobjc-literal-conversion"
-
-#define ENCODE(obj, key) \
-  if (obj) [coder encodeObject:obj forKey:key]
-#define DECODE(cls, key) [decoder decodeObjectOfClass:[cls class] forKey:key]
-#define DECODEARRAY(cls, key)                                                             \
-  [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [cls class], nil] \
-                          forKey:key]
-#define DECODEDICT(key)                                                                       \
-  [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], \
-                                                       [NSString class], [NSNumber class],    \
-                                                       [NSData class], nil]                   \
-                          forKey:key]
 + (BOOL)supportsSecureCoding {
   return YES;
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(self.idx, @"idx");
-  ENCODE(self.fileSHA256, @"fileSHA256");
-  ENCODE(self.filePath, @"filePath");
+  ENCODE(coder, idx);
+  ENCODE(coder, fileSHA256);
+  ENCODE(coder, filePath);
 
-  ENCODE(@(self.needsBundleHash), @"needsBundleHash");
-  ENCODE(self.fileBundleHash, @"fileBundleHash");
-  ENCODE(self.fileBundleHashMilliseconds, @"fileBundleHashMilliseconds");
-  ENCODE(self.fileBundleBinaryCount, @"fileBundleBinaryCount");
-  ENCODE(self.fileBundleName, @"fileBundleName");
-  ENCODE(self.fileBundlePath, @"fileBundlePath");
-  ENCODE(self.fileBundleExecutableRelPath, @"fileBundleExecutableRelPath");
-  ENCODE(self.fileBundleID, @"fileBundleID");
-  ENCODE(self.fileBundleVersion, @"fileBundleVersion");
-  ENCODE(self.fileBundleVersionString, @"fileBundleVersionString");
+  ENCODE_BOXABLE(coder, needsBundleHash);
+  ENCODE(coder, fileBundleHash);
+  ENCODE(coder, fileBundleHashMilliseconds);
+  ENCODE(coder, fileBundleBinaryCount);
+  ENCODE(coder, fileBundleName);
+  ENCODE(coder, fileBundlePath);
+  ENCODE(coder, fileBundleExecutableRelPath);
+  ENCODE(coder, fileBundleID);
+  ENCODE(coder, fileBundleVersion);
+  ENCODE(coder, fileBundleVersionString);
 
-  ENCODE(self.signingChain, @"signingChain");
-  ENCODE(self.teamID, @"teamID");
-  ENCODE(self.signingID, @"signingID");
-  ENCODE(self.cdhash, @"cdhash");
-  ENCODE(@(self.codesigningFlags), @"codesigningFlags");
-  ENCODE(@(self.signingStatus), @"signingStatus");
-  ENCODE(self.entitlements, @"entitlements");
-  ENCODE(@(self.entitlementsFiltered), @"entitlementsFiltered");
+  ENCODE(coder, signingChain);
+  ENCODE(coder, teamID);
+  ENCODE(coder, signingID);
+  ENCODE(coder, cdhash);
+  ENCODE_BOXABLE(coder, codesigningFlags);
+  ENCODE_BOXABLE(coder, signingStatus);
+  ENCODE(coder, entitlements);
+  ENCODE_BOXABLE(coder, entitlementsFiltered);
 
-  ENCODE(self.executingUser, @"executingUser");
-  ENCODE(self.occurrenceDate, @"occurrenceDate");
-  ENCODE(@(self.decision), @"decision");
-  ENCODE(self.pid, @"pid");
-  ENCODE(self.ppid, @"ppid");
-  ENCODE(self.parentName, @"parentName");
+  ENCODE(coder, executingUser);
+  ENCODE(coder, occurrenceDate);
+  ENCODE_BOXABLE(coder, decision);
+  ENCODE(coder, pid);
+  ENCODE(coder, ppid);
+  ENCODE(coder, parentName);
 
-  ENCODE(self.loggedInUsers, @"loggedInUsers");
-  ENCODE(self.currentSessions, @"currentSessions");
+  ENCODE(coder, loggedInUsers);
+  ENCODE(coder, currentSessions);
 
-  ENCODE(self.quarantineDataURL, @"quarantineDataURL");
-  ENCODE(self.quarantineRefererURL, @"quarantineRefererURL");
-  ENCODE(self.quarantineTimestamp, @"quarantineTimestamp");
-  ENCODE(self.quarantineAgentBundleID, @"quarantineAgentBundleID");
+  ENCODE(coder, quarantineDataURL);
+  ENCODE(coder, quarantineRefererURL);
+  ENCODE(coder, quarantineTimestamp);
+  ENCODE(coder, quarantineAgentBundleID);
 }
 
 - (instancetype)init {
@@ -91,44 +78,44 @@
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super init];
   if (self) {
-    _idx = DECODE(NSNumber, @"idx");
-    _fileSHA256 = DECODE(NSString, @"fileSHA256");
-    _filePath = DECODE(NSString, @"filePath");
+    DECODE(decoder, idx, NSNumber);
+    DECODE(decoder, fileSHA256, NSString);
+    DECODE(decoder, filePath, NSString);
 
-    _needsBundleHash = [DECODE(NSNumber, @"needsBundleHash") boolValue];
-    _fileBundleHash = DECODE(NSString, @"fileBundleHash");
-    _fileBundleHashMilliseconds = DECODE(NSNumber, @"fileBundleHashMilliseconds");
-    _fileBundleBinaryCount = DECODE(NSNumber, @"fileBundleBinaryCount");
-    _fileBundleName = DECODE(NSString, @"fileBundleName");
-    _fileBundlePath = DECODE(NSString, @"fileBundlePath");
-    _fileBundleExecutableRelPath = DECODE(NSString, @"fileBundleExecutableRelPath");
-    _fileBundleID = DECODE(NSString, @"fileBundleID");
-    _fileBundleVersion = DECODE(NSString, @"fileBundleVersion");
-    _fileBundleVersionString = DECODE(NSString, @"fileBundleVersionString");
+    DECODE_SELECTOR(decoder, needsBundleHash, NSNumber, boolValue);
+    DECODE(decoder, fileBundleHash, NSString);
+    DECODE(decoder, fileBundleHashMilliseconds, NSNumber);
+    DECODE(decoder, fileBundleBinaryCount, NSNumber);
+    DECODE(decoder, fileBundleName, NSString);
+    DECODE(decoder, fileBundlePath, NSString);
+    DECODE(decoder, fileBundleExecutableRelPath, NSString);
+    DECODE(decoder, fileBundleID, NSString);
+    DECODE(decoder, fileBundleVersion, NSString);
+    DECODE(decoder, fileBundleVersionString, NSString);
 
-    _signingChain = DECODEARRAY(MOLCertificate, @"signingChain");
-    _teamID = DECODE(NSString, @"teamID");
-    _signingID = DECODE(NSString, @"signingID");
-    _cdhash = DECODE(NSString, @"cdhash");
-    _codesigningFlags = [DECODE(NSNumber, @"codesigningFlags") unsignedIntValue];
-    _signingStatus = (SNTSigningStatus)[DECODE(NSNumber, @"signingStatus") integerValue];
-    _entitlements = DECODEDICT(@"entitlements");
-    _entitlementsFiltered = [DECODE(NSNumber, @"entitlementsFiltered") boolValue];
+    DECODE_ARRAY(decoder, signingChain, MOLCertificate);
+    DECODE(decoder, teamID, NSString);
+    DECODE(decoder, signingID, NSString);
+    DECODE(decoder, cdhash, NSString);
+    DECODE_SELECTOR(decoder, codesigningFlags, NSNumber, unsignedIntValue);
+    DECODE_SELECTOR(decoder, signingStatus, NSNumber, integerValue);
+    DECODE_DICT(decoder, entitlements);
+    DECODE_SELECTOR(decoder, entitlementsFiltered, NSNumber, boolValue);
 
-    _executingUser = DECODE(NSString, @"executingUser");
-    _occurrenceDate = DECODE(NSDate, @"occurrenceDate");
-    _decision = (SNTEventState)[DECODE(NSNumber, @"decision") unsignedLongLongValue];
-    _pid = DECODE(NSNumber, @"pid");
-    _ppid = DECODE(NSNumber, @"ppid");
-    _parentName = DECODE(NSString, @"parentName");
+    DECODE(decoder, executingUser, NSString);
+    DECODE(decoder, occurrenceDate, NSDate);
+    DECODE_SELECTOR(decoder, decision, NSNumber, unsignedLongLongValue);
+    DECODE(decoder, pid, NSNumber);
+    DECODE(decoder, ppid, NSNumber);
+    DECODE(decoder, parentName, NSString);
 
-    _loggedInUsers = DECODEARRAY(NSString, @"loggedInUsers");
-    _currentSessions = DECODEARRAY(NSString, @"currentSessions");
+    DECODE_ARRAY(decoder, loggedInUsers, NSString);
+    DECODE_ARRAY(decoder, currentSessions, NSString);
 
-    _quarantineDataURL = DECODE(NSString, @"quarantineDataURL");
-    _quarantineRefererURL = DECODE(NSString, @"quarantineRefererURL");
-    _quarantineTimestamp = DECODE(NSDate, @"quarantineTimestamp");
-    _quarantineAgentBundleID = DECODE(NSString, @"quarantineAgentBundleID");
+    DECODE(decoder, quarantineDataURL, NSString);
+    DECODE(decoder, quarantineRefererURL, NSString);
+    DECODE(decoder, quarantineTimestamp, NSDate);
+    DECODE(decoder, quarantineAgentBundleID, NSString);
   }
   return self;
 }
@@ -161,7 +148,5 @@
 - (NSArray *)signingChainCertRefs {
   return CertificateChain(self.signingChain);
 }
-
-#pragma clang diagnostic pop
 
 @end
