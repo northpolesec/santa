@@ -81,7 +81,10 @@ static NSMutableDictionary *registeredCommands;
 
   if (required) {
     daemonConn.invalidationHandler = ^{
-      printf("An error occurred communicating with the daemon, is it running?\n");
+      printf("An error occurred communicating with the Santa daemon. Check to make sure\n"
+             "the process is running and has been granted Full Disk Access permissions.\n"
+             "\n"
+             "For detailed steps, see: https://northpole.dev/deployment/troubleshooting\n");
       exit(1);
     };
     [daemonConn resume];
