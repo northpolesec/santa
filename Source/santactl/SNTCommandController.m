@@ -81,31 +81,10 @@ static NSMutableDictionary *registeredCommands;
 
   if (required) {
     daemonConn.invalidationHandler = ^{
-      // Disabling clang format to make desired formatting more apparent
-      // clang-format off
-      printf("An error occurred communicating with the Santa daemon, is it running?\n"
-             "\n"
-             "Common troubleshooting steps:\n"
-             "\n"
-             "    1. Check that the Santa system extension is properly loaded. Run the following\n"
-             "       command in a terminal and verify a line item exists for \"com.northpolesec.santa.daemon\"\n"
-             "       and it is in the \"activated enabled\" state:\n"
-             "\n"
-             "       systemextensionsctl list com.apple.system_extension.endpoint_security\n"
-             "\n"
-             "       If the expected data isn't found, reinstall Santa.\n"
-             "\n"
-             "    2. Ensure the Santa daemon has been granted Full Disk Access permissions:\n"
-             "        * Open System Settings and navigate to \"Privacy & Security > Full Disk Access\"\n"
-             "        * Ensure \"com.northpolesec.santa.daemon\" is enabled\n"
-             "\n"
-             "    3. Check system logs. The daemon will attempt to start about every 10 seconds and\n"
-             "       will log if any errors are encountered. In a terminal, run the following command\n"
-             "       to view the Santa daemon logs:\n"
-             "\n"
-             "       log stream --level debug --predicate 'sender == \"com.northpolesec.santa.daemon\"'\n");
-      // clang-format on
-
+      printf(
+          "An error occurred communicating with the Santa daemon. Check to make sure the process\n"
+          "is running and has been granted Full Disk Access permissions. For more detailed\n"
+          "troubleshooting steps, please see: https://northpole.dev/deployment/troubleshooting\n");
       exit(1);
     };
     [daemonConn resume];
