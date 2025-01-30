@@ -15,25 +15,9 @@
 
 #import "Source/common/SNTFileAccessEvent.h"
 
+#import "Source/common/CoderMacros.h"
+
 @implementation SNTFileAccessEvent
-
-#define ENCODE(o)                               \
-  do {                                          \
-    if (self.o) {                               \
-      [coder encodeObject:self.o forKey:@(#o)]; \
-    }                                           \
-  } while (0)
-
-#define DECODE(o, c)                                             \
-  do {                                                           \
-    _##o = [decoder decodeObjectOfClass:[c class] forKey:@(#o)]; \
-  } while (0)
-
-#define DECODEARRAY(o, c)                                                                        \
-  do {                                                                                           \
-    _##o = [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [c class], nil] \
-                                   forKey:@(#o)];                                                \
-  } while (0)
 
 + (BOOL)supportsSecureCoding {
   return YES;
@@ -41,19 +25,19 @@
 
 - (void)encodeWithCoder:(NSCoder *)coder {
   [super encodeWithCoder:coder];
-  ENCODE(accessedPath);
-  ENCODE(ruleVersion);
-  ENCODE(ruleName);
-  ENCODE(application);
+  ENCODE(coder, accessedPath);
+  ENCODE(coder, ruleVersion);
+  ENCODE(coder, ruleName);
+  ENCODE(coder, application);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
-    DECODE(accessedPath, NSString);
-    DECODE(ruleVersion, NSString);
-    DECODE(ruleName, NSString);
-    DECODE(application, NSString);
+    DECODE(decoder, accessedPath, NSString);
+    DECODE(decoder, ruleVersion, NSString);
+    DECODE(decoder, ruleName, NSString);
+    DECODE(decoder, application, NSString);
   }
   return self;
 }

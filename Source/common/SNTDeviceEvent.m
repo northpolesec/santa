@@ -1,16 +1,8 @@
 #import "Source/common/SNTDeviceEvent.h"
 
+#import "Source/common/CoderMacros.h"
+
 @implementation SNTDeviceEvent
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wobjc-literal-conversion"
-
-#define ENCODE(obj, key) \
-  if (obj) [coder encodeObject:obj forKey:key]
-#define DECODE(cls, key) [decoder decodeObjectOfClass:[cls class] forKey:key]
-#define DECODEARRAY(cls, key)                                                             \
-  [decoder decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [cls class], nil] \
-                          forKey:key]
 
 - (instancetype)initWithOnName:(NSString *)mntonname fromName:(NSString *)mntfromname {
   self = [super init];
@@ -26,17 +18,17 @@
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(self.mntonname, @"mntonname");
-  ENCODE(self.mntfromname, @"mntfromname");
-  ENCODE(self.remountArgs, @"remountArgs");
+  ENCODE(coder, mntonname);
+  ENCODE(coder, mntfromname);
+  ENCODE(coder, remountArgs);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super init];
   if (self) {
-    _mntonname = DECODE(NSString, @"mntonname");
-    _mntfromname = DECODE(NSString, @"mntfromname");
-    _remountArgs = DECODEARRAY(NSString, @"remountArgs");
+    DECODE(decoder, mntonname, NSString);
+    DECODE(decoder, mntfromname, NSString);
+    DECODE_ARRAY(decoder, remountArgs, NSString);
   }
   return self;
 }

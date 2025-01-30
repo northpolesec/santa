@@ -14,6 +14,8 @@
 
 #import "Source/common/SNTRuleIdentifiers.h"
 
+#import "Source/common/CoderMacros.h"
+
 @implementation SNTRuleIdentifiers
 
 - (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)identifiers {
@@ -38,12 +40,6 @@
 
 #pragma mark NSSecureCoding
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wobjc-literal-conversion"
-#define ENCODE(obj, key) \
-  if (obj) [coder encodeObject:obj forKey:key]
-#define DECODE(cls, key) [decoder decodeObjectOfClass:[cls class] forKey:key]
-
 + (BOOL)supportsSecureCoding {
   return YES;
 }
@@ -51,23 +47,21 @@
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [self init];
   if (self) {
-    _cdhash = DECODE(NSString, @"cdhash");
-    _binarySHA256 = DECODE(NSString, @"binarySHA256");
-    _signingID = DECODE(NSString, @"signingID");
-    _certificateSHA256 = DECODE(NSString, @"certificateSHA256");
-    _teamID = DECODE(NSString, @"teamID");
+    DECODE(decoder, cdhash, NSString);
+    DECODE(decoder, binarySHA256, NSString);
+    DECODE(decoder, signingID, NSString);
+    DECODE(decoder, certificateSHA256, NSString);
+    DECODE(decoder, teamID, NSString);
   }
   return self;
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(self.cdhash, @"cdhash");
-  ENCODE(self.binarySHA256, @"binarySHA256");
-  ENCODE(self.signingID, @"signingID");
-  ENCODE(self.certificateSHA256, @"certificateSHA256");
-  ENCODE(self.teamID, @"teamID");
+  ENCODE(coder, cdhash);
+  ENCODE(coder, binarySHA256);
+  ENCODE(coder, signingID);
+  ENCODE(coder, certificateSHA256);
+  ENCODE(coder, teamID);
 }
-
-#pragma clang diagnostic pop
 
 @end

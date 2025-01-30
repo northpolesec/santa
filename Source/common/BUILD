@@ -254,6 +254,7 @@ objc_library(
         "Foundation",
     ],
     deps = [
+        ":CoderMacros",
         ":SNTCommonEnums",
     ],
 )
@@ -267,6 +268,7 @@ objc_library(
         "Foundation",
     ],
     deps = [
+        ":CoderMacros",
         ":SNTStoredEvent",
     ],
 )
@@ -357,6 +359,7 @@ objc_library(
         "Foundation",
     ],
     deps = [
+        ":CoderMacros",
         ":SNTCommonEnums",
         ":SNTSyncConstants",
     ],
@@ -376,6 +379,9 @@ objc_library(
     name = "SNTRuleIdentifiers",
     srcs = ["SNTRuleIdentifiers.m"],
     hdrs = ["SNTRuleIdentifiers.h"],
+    deps = [
+        ":CoderMacros",
+    ],
 )
 
 objc_library(
@@ -390,6 +396,7 @@ objc_library(
     module_name = "santa_common_SNTStoredEvent",
     deps = [
         ":CertificateHelpers",
+        ":CoderMacros",
         ":SNTCommonEnums",
         "@MOLCertificate",
     ],

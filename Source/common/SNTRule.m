@@ -19,6 +19,7 @@
 #include <Kernel/kern/cs_blobs.h>
 #include <os/base.h>
 
+#import "Source/common/CoderMacros.h"
 #import "Source/common/SNTSyncConstants.h"
 
 // https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/
@@ -238,36 +239,30 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
 #pragma mark NSSecureCoding
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wobjc-literal-conversion"
-#define ENCODE(obj, key) \
-  if (obj) [coder encodeObject:obj forKey:key]
-#define DECODE(cls, key) [decoder decodeObjectOfClass:[cls class] forKey:key]
-
 + (BOOL)supportsSecureCoding {
   return YES;
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(self.identifier, @"identifier");
-  ENCODE(@(self.state), @"state");
-  ENCODE(@(self.type), @"type");
-  ENCODE(self.customMsg, @"custommsg");
-  ENCODE(self.customURL, @"customurl");
-  ENCODE(@(self.timestamp), @"timestamp");
-  ENCODE(self.comment, @"comment");
+  ENCODE(coder, identifier);
+  ENCODE_BOXABLE(coder, state);
+  ENCODE_BOXABLE(coder, type);
+  ENCODE(coder, customMsg);
+  ENCODE(coder, customURL);
+  ENCODE_BOXABLE(coder, timestamp);
+  ENCODE(coder, comment);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super init];
   if (self) {
-    _identifier = DECODE(NSString, @"identifier");
-    _state = [DECODE(NSNumber, @"state") intValue];
-    _type = [DECODE(NSNumber, @"type") intValue];
-    _customMsg = DECODE(NSString, @"custommsg");
-    _customURL = DECODE(NSString, @"customurl");
-    _timestamp = [DECODE(NSNumber, @"timestamp") unsignedIntegerValue];
-    _comment = DECODE(NSString, @"comment");
+    DECODE(decoder, identifier, NSString);
+    DECODE_SELECTOR(decoder, state, NSNumber, intValue);
+    DECODE_SELECTOR(decoder, type, NSNumber, intValue);
+    DECODE(decoder, customMsg, NSString);
+    DECODE(decoder, customURL, NSString);
+    DECODE_SELECTOR(decoder, timestamp, NSNumber, unsignedIntegerValue);
+    DECODE(decoder, comment, NSString);
   }
   return self;
 }
@@ -311,10 +306,6 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     kRuleComment : self.comment ?: @"",
   };
 }
-
-#undef DECODE
-#undef ENCODE
-#pragma clang diagnostic pop
 
 - (BOOL)isEqual:(id)other {
   if (other == self) return YES;
