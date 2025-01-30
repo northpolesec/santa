@@ -536,6 +536,24 @@
 @property(readonly, nonatomic) BOOL enableNotificationSilences;
 
 ///
+///  If this value is set to a valid URL referencing an image file,
+///  this logo will be displayed at the bottom of the Santa events UI
+///  after the words "Managed by:". The image is limited to 48x48px
+///  but a larger image will be scaled down to fit.
+///
+///  This feature only works on macOS 13.0+
+///
+@property(nullable, readonly, nonatomic) NSURL *brandingCompanyLogo;
+
+///
+///  If this value is set, the text will be appended to the end of the
+///  words "Managed by:" at the botto mof the Santa events UI.
+///
+///  This setting is ignored if brandingCompanyLogo is set.
+///
+@property(nullable, readonly, nonatomic) NSString *brandingCompanyName;
+
+///
 ///  If this is set to true, the UI will use different fonts on April 1st, May 4th and October 31st.
 ///
 @property(readonly, nonatomic) BOOL funFontsOnSpecificDays;

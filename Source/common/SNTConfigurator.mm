@@ -132,6 +132,8 @@ static NSString *const kModeNotificationMonitor = @"ModeNotificationMonitor";
 static NSString *const kModeNotificationLockdown = @"ModeNotificationLockdown";
 static NSString *const kModeNotificationStandalone = @"ModeNotificationStandalone";
 static NSString *const kEnableNotificationSilences = @"EnableNotificationSilences";
+static NSString *const kBrandingCompanyName = @"BrandingCompanyName";
+static NSString *const kBrandingCompanyLogo = @"BrandingCompanyLogo";
 static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
 static NSString *const kEnableMenuItem = @"EnableMenuItem";
 
@@ -548,6 +550,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEnableNotificationSilences {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBrandingCompanyLogo {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBrandingCompanyName {
   return [self configStateSet];
 }
 
@@ -1099,6 +1109,15 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (BOOL)enableMenuItem {
   NSNumber *number = self.configState[kEnableMenuItem];
   return number ? [number boolValue] : YES;
+}
+
+- (NSURL *)brandingCompanyLogo {
+  NSString *logoVal = self.configState[kBrandingCompanyLogo];
+  return [NSURL URLWithString:logoVal];
+}
+
+- (NSString *)brandingCompanyName {
+  return self.configState[kBrandingCompanyName];
 }
 
 - (NSString *)syncClientAuthCertificateFile {

@@ -69,8 +69,34 @@ public struct SNTMessageView<Content: View>: View {
       content
     }
     .padding([.leading, .trailing], 40.0)
-    .padding([.bottom], 10.0)
     .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
+
+    HStack(spacing: 3.0) {
+      SNTBrandingView()
+    }.padding(10.0).fixedSize()
+  }
+}
+
+public struct SNTBrandingView: View {
+  let c = SNTConfigurator.configurator()
+
+  public var body: some View {
+    if #available(macOS 13.0, *), let url = c.brandingCompanyLogo, let nsi = NSImage(contentsOf: url) {
+      Text("Managed by:").font(.footnote).fixedSize()
+      ViewThatFits {
+        Image(nsImage: nsi)
+
+        Image(nsImage: nsi)
+          .resizable()
+          .scaledToFit()
+      }.frame(maxWidth: 96.0, maxHeight: 32.0)
+    } else if let companyName = c.brandingCompanyName {
+      Text("Managed by:").font(.footnote).fixedSize()
+      Text(verbatim: companyName).font(.footnote).fontWeight(.bold).fixedSize()
+      Spacer()
+    } else {
+      Spacer()
+    }
   }
 }
 
