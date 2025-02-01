@@ -80,7 +80,7 @@ using santa::WatchItemRuleType;
 }
 
 - (void)testSetSharedProcessWatchItemPolicy {
-  // Test that hash/eq funcitons for set of shared pointers works as expected
+  // Test that hash/eq functions for set of shared pointers works as expected
   absl::flat_hash_set<std::shared_ptr<ProcessWatchItemPolicy>, SharedPtrProcessWatchItemPolicyHash,
                       SharedPtrProcessWatchItemPolicyEqual>
       procSet;
@@ -97,7 +97,7 @@ using santa::WatchItemRuleType;
       "name", "v1", PathAndTypeVec{{"/bar", WatchItemPathType::kLiteral}}, true, true,
       WatchItemRuleType::kProcessesWithDeniedPaths);
 
-  // UNderlying pointers should be different
+  // Underlying pointers should be different
   XCTAssertNotEqual(sharedProcPolicy1, sharedProcPolicy2);
   XCTAssertNotEqual(sharedProcPolicy1, sharedProcPolicy3);
   XCTAssertNotEqual(sharedProcPolicy2, sharedProcPolicy3);

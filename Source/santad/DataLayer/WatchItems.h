@@ -105,7 +105,6 @@ using ProcessWatchItemPolicySet =
     absl::flat_hash_set<std::shared_ptr<ProcessWatchItemPolicy>,
                         SharedPtrProcessWatchItemPolicyHash, SharedPtrProcessWatchItemPolicyEqual>;
 class ProcessWatchItems {
- private:
  public:
   ProcessWatchItems() = default;
 
