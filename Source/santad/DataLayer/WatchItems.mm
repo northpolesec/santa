@@ -96,9 +96,6 @@ namespace santa {
 namespace {
 // Type aliases
 using ValidatorBlock = bool (^)(id, NSError **);
-using PathAndTypePair = std::pair<std::string, WatchItemPathType>;
-using PathAndTypeVec = std::vector<PathAndTypePair>;
-using PolicyProcessVec = std::vector<WatchItemProcess>;
 }  // namespace
 
 static void PopulateError(NSError **err, NSString *msg) {
@@ -151,10 +148,15 @@ static inline bool GetBoolValue(NSDictionary *options, NSString *key, bool defau
 }
 
 std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type) {
-  if ([[rule_type lowercaseString] isEqualToString:@"pathswithallowedprocesses"]) {
+  rule_type = [rule_type lowercaseString];
+  if ([rule_type isEqualToString:@"pathswithallowedprocesses"]) {
     return WatchItemRuleType::kPathsWithAllowedProcesses;
-  } else if ([[rule_type lowercaseString] isEqualToString:@"pathswithdeniedprocesses"]) {
+  } else if ([rule_type isEqualToString:@"pathswithdeniedprocesses"]) {
     return WatchItemRuleType::kPathsWithDeniedProcesses;
+  } else if ([rule_type isEqualToString:@"processeswithallowedpaths"]) {
+    return WatchItemRuleType::kProcessesWithAllowedPaths;
+  } else if ([rule_type isEqualToString:@"processeswithdeniedpaths"]) {
+    return WatchItemRuleType::kProcessesWithDeniedPaths;
   } else {
     return std::nullopt;
   }
@@ -448,8 +450,7 @@ std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary
 bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
                                 NSDictionary *watch_item,
                                 std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
-                                std::vector<std::shared_ptr<ProcessWatchItemPolicy>> &proc_policies,
-                                NSError **err) {
+                                ProcessWatchItemPolicySet &proc_policies, NSError **err) {
   if (!VerifyConfigKey(watch_item, kWatchItemConfigKeyPaths, [NSArray class], err, true)) {
     return false;
   }
@@ -530,13 +531,33 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
     }
   }
 
-  for (const PathAndTypePair &path_type_pair : std::get<PathAndTypeVec>(path_list)) {
-    data_policies.push_back(std::make_shared<DataWatchItemPolicy>(
-        NSStringToUTF8StringView(name), policy_version, path_type_pair.first, path_type_pair.second,
-        allow_read_access, audit_only, rule_type, enable_silent_mode, enable_silent_tty_mode,
-        NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
-        options[kWatchItemConfigKeyOptionsEventDetailURL],
-        options[kWatchItemConfigKeyOptionsEventDetailText], std::get<PolicyProcessVec>(proc_list)));
+  switch (rule_type) {
+    case WatchItemRuleType::kPathsWithAllowedProcesses: [[fallthrough]];
+    case WatchItemRuleType::kPathsWithDeniedProcesses:
+      for (const PathAndTypePair &path_type_pair : std::get<PathAndTypeVec>(path_list)) {
+        data_policies.push_back(std::make_shared<DataWatchItemPolicy>(
+            NSStringToUTF8StringView(name), policy_version, path_type_pair.first,
+            path_type_pair.second, allow_read_access, audit_only, rule_type, enable_silent_mode,
+            enable_silent_tty_mode,
+            NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
+            options[kWatchItemConfigKeyOptionsEventDetailURL],
+            options[kWatchItemConfigKeyOptionsEventDetailText],
+            std::get<PolicyProcessVec>(proc_list)));
+      }
+
+      break;
+
+    case WatchItemRuleType::kProcessesWithAllowedPaths: [[fallthrough]];
+    case WatchItemRuleType::kProcessesWithDeniedPaths:
+      proc_policies.insert(std::make_shared<ProcessWatchItemPolicy>(
+          NSStringToUTF8StringView(name), policy_version, std::get<PathAndTypeVec>(path_list),
+          allow_read_access, audit_only, rule_type, enable_silent_mode, enable_silent_tty_mode,
+          NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
+          options[kWatchItemConfigKeyOptionsEventDetailURL],
+          options[kWatchItemConfigKeyOptionsEventDetailText],
+          std::get<PolicyProcessVec>(proc_list)));
+
+      break;
   }
 
   return true;
@@ -572,8 +593,7 @@ bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err) {
 
 bool ParseConfig(NSDictionary *config,
                  std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
-                 std::vector<std::shared_ptr<ProcessWatchItemPolicy>> &proc_policies,
-                 NSError **err) {
+                 ProcessWatchItemPolicySet &proc_policies, NSError **err) {
   if (![config[kWatchItemConfigKeyVersion] isKindOfClass:[NSString class]]) {
     PopulateError(err, [NSString stringWithFormat:@"Missing top level string key '%@'",
                                                   kWatchItemConfigKeyVersion]);
@@ -644,6 +664,8 @@ bool ParseConfig(NSDictionary *config,
   return true;
 }
 
+#pragma mark DataWatchItems
+
 std::vector<std::pair<std::string, WatchItemPathType>> DataWatchItems::operator-(
     const DataWatchItems &other) const {
   std::vector<std::pair<std::string, WatchItemPathType>> diff;
@@ -698,6 +720,15 @@ std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> DataWatchItems:
 
   return policies;
 }
+
+#pragma mark ProcessWatchItems
+
+bool ProcessWatchItems::Build(ProcessWatchItemPolicySet proc_policies) {
+  policies_ = std::move(proc_policies);
+  return true;
+}
+
+#pragma mark WatchItems
 
 std::shared_ptr<WatchItems> WatchItems::Create(NSString *config_path,
                                                uint64_t reapply_config_frequency_secs) {
@@ -766,7 +797,9 @@ void WatchItems::RegisterClient(id<SNTEndpointSecurityDynamicEventHandler> clien
   registerd_clients_.insert(client);
 }
 
-void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items, NSDictionary *new_config) {
+void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
+                                    ProcessWatchItems new_proc_watch_items,
+                                    NSDictionary *new_config) {
   absl::MutexLock lock(&lock_);
 
   // The following conditions require updating the current config:
@@ -774,6 +807,10 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items, NSDicti
   // 2. The current config exists but the new one doesn't
   // 3. The set of monitored paths changed
   // 4. The configuration changed
+  //
+  // Note: Because there is not a dynamic component to monitored processes like there is for
+  // monitored paths (due to glob expansion), it is sufficient to rely only on detecting changes to
+  // the config as that is the only way the set of ProcessWatchItems could change.
   if ((current_config_ != nil && new_config == nil) ||
       (current_config_ == nil && new_config != nil) ||
       (data_watch_items_ != new_data_watch_items) ||
@@ -786,6 +823,7 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items, NSDicti
         data_watch_items_ - new_data_watch_items;
 
     std::swap(data_watch_items_, new_data_watch_items);
+    std::swap(proc_watch_items_, new_proc_watch_items);
     current_config_ = new_config;
     if (new_config) {
       policy_version_ = NSStringToUTF8String(new_config[kWatchItemConfigKeyVersion]);
@@ -825,10 +863,11 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items, NSDicti
 
 void WatchItems::ReloadConfig(NSDictionary *new_config) {
   DataWatchItems new_data_watch_items;
+  ProcessWatchItems new_proc_watch_items;
 
   if (new_config) {
     std::vector<std::shared_ptr<DataWatchItemPolicy>> new_data_policies;
-    std::vector<std::shared_ptr<ProcessWatchItemPolicy>> new_proc_policies;
+    ProcessWatchItemPolicySet new_proc_policies;
     NSError *err;
     if (!ParseConfig(new_config, new_data_policies, new_proc_policies, &err)) {
       LOGE(@"Failed to parse watch item config: %@",
@@ -837,9 +876,10 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
     }
 
     new_data_watch_items.Build(std::move(new_data_policies));
+    new_proc_watch_items.Build(std::move(new_proc_policies));
   }
 
-  UpdateCurrentState(std::move(new_data_watch_items), new_config);
+  UpdateCurrentState(std::move(new_data_watch_items), std::move(new_proc_watch_items), new_config);
 }
 
 NSDictionary *WatchItems::ReadConfig() {

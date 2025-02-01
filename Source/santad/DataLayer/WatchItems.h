@@ -31,6 +31,7 @@
 #include "Source/common/PrefixTree.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
+#include "absl/container/flat_hash_set.h"
 
 extern NSString *const kWatchItemConfigKeyVersion;
 extern NSString *const kWatchItemConfigKeyWatchItems;
@@ -100,6 +101,29 @@ class DataWatchItems {
   std::set<std::pair<std::string, WatchItemPathType>> paths_;
 };
 
+using ProcessWatchItemPolicySet =
+    absl::flat_hash_set<std::shared_ptr<ProcessWatchItemPolicy>,
+                        SharedPtrProcessWatchItemPolicyHash, SharedPtrProcessWatchItemPolicyEqual>;
+class ProcessWatchItems {
+ public:
+  ProcessWatchItems() = default;
+
+  ProcessWatchItems(ProcessWatchItems &&other) = default;
+  ProcessWatchItems &operator=(ProcessWatchItems &&rhs) = default;
+
+  // Copying not supported
+  ProcessWatchItems(const ProcessWatchItems &other) = delete;
+  ProcessWatchItems &operator=(const ProcessWatchItems &other) = delete;
+
+  bool operator==(const ProcessWatchItems &other) const { return policies_ == other.policies_; }
+  bool operator!=(const ProcessWatchItems &other) const { return !(*this == other); }
+
+  bool Build(ProcessWatchItemPolicySet proc_policies);
+
+ private:
+  ProcessWatchItemPolicySet policies_;
+};
+
 class WatchItems : public std::enable_shared_from_this<WatchItems> {
  public:
   using VersionAndPolicies =
@@ -141,7 +165,8 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   NSDictionary *ReadConfig();
   NSDictionary *ReadConfigLocked() ABSL_SHARED_LOCKS_REQUIRED(lock_);
   void ReloadConfig(NSDictionary *new_config);
-  void UpdateCurrentState(DataWatchItems new_data_watch_items, NSDictionary *new_config);
+  void UpdateCurrentState(DataWatchItems new_data_watch_items,
+                          ProcessWatchItems new_proc_watch_items, NSDictionary *new_config);
 
   NSString *config_path_;
   NSDictionary *embedded_config_;
@@ -152,6 +177,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   absl::Mutex lock_;
 
   DataWatchItems data_watch_items_ ABSL_GUARDED_BY(lock_);
+  ProcessWatchItems proc_watch_items_ ABSL_GUARDED_BY(lock_);
   NSDictionary *current_config_ ABSL_GUARDED_BY(lock_);
   NSTimeInterval last_update_time_ ABSL_GUARDED_BY(lock_);
   std::string policy_version_ ABSL_GUARDED_BY(lock_);

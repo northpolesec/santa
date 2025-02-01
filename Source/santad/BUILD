@@ -48,6 +48,16 @@ objc_library(
     deps = [
         "//Source/common:PrefixTree",
         "//Source/common:Unit",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
+
+santa_unit_test(
+    name = "WatchItemPolicyTest",
+    srcs = ["DataLayer/WatchItemPolicyTest.mm"],
+    deps = [
+        ":WatchItemPolicy",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -62,6 +72,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:String",
         "//Source/common:Unit",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -75,6 +86,7 @@ santa_unit_test(
         "//Source/common:TestUtils",
         "//Source/common:Unit",
         "@OCMock",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -1533,6 +1545,7 @@ test_suite(
         ":SNTPolicyProcessorTest",
         ":SNTRuleTableTest",
         ":SantadTest",
+        ":WatchItemPolicyTest",
         ":WatchItemsTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
         "//Source/santad/ProcessTree:process_tree_test",
