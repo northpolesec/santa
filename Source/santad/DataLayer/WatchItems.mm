@@ -287,8 +287,9 @@ bool VerifyConfigKeyArray(NSDictionary *dict, NSString *key, Class expected, NSE
 ///     <true/>
 ///   </dict>
 /// </array>
-std::variant<Unit, PathAndTypeVec> VerifyConfigWatchItemPaths(NSArray<id> *paths, NSError **err) {
-  PathAndTypeVec path_list;
+std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id> *paths,
+                                                                  NSError **err) {
+  SetPairPathAndType path_list;
 
   for (id path in paths) {
     if ([path isKindOfClass:[NSDictionary class]]) {
@@ -309,7 +310,7 @@ std::variant<Unit, PathAndTypeVec> VerifyConfigWatchItemPaths(NSArray<id> *paths
         return Unit{};
       }
 
-      path_list.push_back({NSStringToUTF8String(path_str), path_type});
+      path_list.insert({NSStringToUTF8String(path_str), path_type});
     } else if ([path isKindOfClass:[NSString class]]) {
       if (!LenRangeValidator(1, PATH_MAX)(path, err)) {
         PopulateError(err, [NSString stringWithFormat:@"Invalid path length: %@",
@@ -318,8 +319,7 @@ std::variant<Unit, PathAndTypeVec> VerifyConfigWatchItemPaths(NSArray<id> *paths
         return Unit{};
       }
 
-      path_list.push_back(
-          {NSStringToUTF8String(((NSString *)path)), kWatchItemPolicyDefaultPathType});
+      path_list.insert({NSStringToUTF8String(((NSString *)path)), kWatchItemPolicyDefaultPathType});
     } else {
       PopulateError(
           err,
@@ -359,9 +359,9 @@ std::variant<Unit, PathAndTypeVec> VerifyConfigWatchItemPaths(NSArray<id> *paths
 ///     <string>EEEE</string>
 ///   </dict>
 /// </array>
-std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary *watch_item,
-                                                                    NSError **err) {
-  __block PolicyProcessVec proc_list;
+std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDictionary *watch_item,
+                                                                       NSError **err) {
+  __block SetWatchItemProcess proc_list;
 
   if (!VerifyConfigKeyArray(
           watch_item, kWatchItemConfigKeyProcesses, [NSDictionary class], err,
@@ -394,7 +394,7 @@ std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary
               return false;
             }
 
-            proc_list.push_back(WatchItemProcess(
+            proc_list.insert(WatchItemProcess(
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesBinaryPath] ?: @""),
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesSigningID] ?: @""),
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesTeamID] ?: @""),
@@ -449,13 +449,13 @@ std::variant<Unit, PolicyProcessVec> VerifyConfigWatchItemProcesses(NSDictionary
 /// </dict>
 bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
                                 NSDictionary *watch_item,
-                                std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
-                                ProcessWatchItemPolicySet &proc_policies, NSError **err) {
+                                SetSharedDataWatchItemPolicy &data_policies,
+                                SetSharedProcessWatchItemPolicy &proc_policies, NSError **err) {
   if (!VerifyConfigKey(watch_item, kWatchItemConfigKeyPaths, [NSArray class], err, true)) {
     return false;
   }
 
-  std::variant<Unit, PathAndTypeVec> path_list =
+  std::variant<Unit, SetPairPathAndType> path_list =
       VerifyConfigWatchItemPaths(watch_item[kWatchItemConfigKeyPaths], err);
 
   if (std::holds_alternative<Unit>(path_list)) {
@@ -513,7 +513,8 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
   bool enable_silent_tty_mode = GetBoolValue(options, kWatchItemConfigKeyOptionsEnableSilentTTYMode,
                                              kWatchItemPolicyDefaultEnableSilentTTYMode);
 
-  std::variant<Unit, PolicyProcessVec> proc_list = VerifyConfigWatchItemProcesses(watch_item, err);
+  std::variant<Unit, SetWatchItemProcess> proc_list =
+      VerifyConfigWatchItemProcesses(watch_item, err);
   if (std::holds_alternative<Unit>(proc_list)) {
     return false;
   }
@@ -534,15 +535,15 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
   switch (rule_type) {
     case WatchItemRuleType::kPathsWithAllowedProcesses: [[fallthrough]];
     case WatchItemRuleType::kPathsWithDeniedProcesses:
-      for (const PathAndTypePair &path_type_pair : std::get<PathAndTypeVec>(path_list)) {
-        data_policies.push_back(std::make_shared<DataWatchItemPolicy>(
+      for (const PairPathAndType &path_type_pair : std::get<SetPairPathAndType>(path_list)) {
+        data_policies.insert(std::make_shared<DataWatchItemPolicy>(
             NSStringToUTF8StringView(name), policy_version, path_type_pair.first,
             path_type_pair.second, allow_read_access, audit_only, rule_type, enable_silent_mode,
             enable_silent_tty_mode,
             NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
             options[kWatchItemConfigKeyOptionsEventDetailURL],
             options[kWatchItemConfigKeyOptionsEventDetailText],
-            std::get<PolicyProcessVec>(proc_list)));
+            std::get<SetWatchItemProcess>(proc_list)));
       }
 
       break;
@@ -550,12 +551,12 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
     case WatchItemRuleType::kProcessesWithAllowedPaths: [[fallthrough]];
     case WatchItemRuleType::kProcessesWithDeniedPaths:
       proc_policies.insert(std::make_shared<ProcessWatchItemPolicy>(
-          NSStringToUTF8StringView(name), policy_version, std::get<PathAndTypeVec>(path_list),
+          NSStringToUTF8StringView(name), policy_version, std::get<SetPairPathAndType>(path_list),
           allow_read_access, audit_only, rule_type, enable_silent_mode, enable_silent_tty_mode,
           NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
           options[kWatchItemConfigKeyOptionsEventDetailURL],
           options[kWatchItemConfigKeyOptionsEventDetailText],
-          std::get<PolicyProcessVec>(proc_list)));
+          std::get<SetWatchItemProcess>(proc_list)));
 
       break;
   }
@@ -591,9 +592,8 @@ bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err) {
   return true;
 }
 
-bool ParseConfig(NSDictionary *config,
-                 std::vector<std::shared_ptr<DataWatchItemPolicy>> &data_policies,
-                 ProcessWatchItemPolicySet &proc_policies, NSError **err) {
+bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy &data_policies,
+                 SetSharedProcessWatchItemPolicy &proc_policies, NSError **err) {
   if (![config[kWatchItemConfigKeyVersion] isKindOfClass:[NSString class]]) {
     PopulateError(err, [NSString stringWithFormat:@"Missing top level string key '%@'",
                                                   kWatchItemConfigKeyVersion]);
@@ -666,15 +666,19 @@ bool ParseConfig(NSDictionary *config,
 
 #pragma mark DataWatchItems
 
-std::vector<std::pair<std::string, WatchItemPathType>> DataWatchItems::operator-(
-    const DataWatchItems &other) const {
-  std::vector<std::pair<std::string, WatchItemPathType>> diff;
-  std::set_difference(paths_.begin(), paths_.end(), other.paths_.begin(), other.paths_.end(),
-                      std::back_inserter(diff));
+SetPairPathAndType DataWatchItems::operator-(const DataWatchItems &other) const {
+  // NB: std::set_difference requires the container is ordered. Use a simple
+  // loop here instead since our data is unordered.
+  SetPairPathAndType diff;
+  for (const auto &p : paths_) {
+    if (other.paths_.find(p) == other.paths_.end()) {
+      diff.insert(p);
+    }
+  }
   return diff;
 }
 
-bool DataWatchItems::Build(std::vector<std::shared_ptr<DataWatchItemPolicy>> data_policies) {
+bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
   glob_t *g = (glob_t *)alloca(sizeof(glob_t));
   for (const std::shared_ptr<DataWatchItemPolicy> &item : data_policies) {
     int err = glob(item->path.c_str(), 0, nullptr, g);
@@ -723,7 +727,7 @@ std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> DataWatchItems:
 
 #pragma mark ProcessWatchItems
 
-bool ProcessWatchItems::Build(ProcessWatchItemPolicySet proc_policies) {
+bool ProcessWatchItems::Build(SetSharedProcessWatchItemPolicy proc_policies) {
   policies_ = std::move(proc_policies);
   return true;
 }
@@ -816,11 +820,9 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
       (data_watch_items_ != new_data_watch_items) ||
       (new_config && ![current_config_ isEqualToDictionary:new_config])) {
     // New paths to watch are those that are in the new set, but not current
-    std::vector<std::pair<std::string, WatchItemPathType>> paths_to_watch =
-        new_data_watch_items - data_watch_items_;
+    SetPairPathAndType paths_to_watch = new_data_watch_items - data_watch_items_;
     // Paths to stop watching are in the current set, but not new
-    std::vector<std::pair<std::string, WatchItemPathType>> paths_to_stop_watching =
-        data_watch_items_ - new_data_watch_items;
+    SetPairPathAndType paths_to_stop_watching = data_watch_items_ - new_data_watch_items;
 
     std::swap(data_watch_items_, new_data_watch_items);
     std::swap(proc_watch_items_, new_proc_watch_items);
@@ -866,8 +868,8 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
   ProcessWatchItems new_proc_watch_items;
 
   if (new_config) {
-    std::vector<std::shared_ptr<DataWatchItemPolicy>> new_data_policies;
-    ProcessWatchItemPolicySet new_proc_policies;
+    SetSharedDataWatchItemPolicy new_data_policies;
+    SetSharedProcessWatchItemPolicy new_proc_policies;
     NSError *err;
     if (!ParseConfig(new_config, new_data_policies, new_proc_policies, &err)) {
       LOGE(@"Failed to parse watch item config: %@",

@@ -33,12 +33,25 @@ namespace santa {
 // Forward declarations
 enum class WatchItemPathType;
 enum class WatchItemRuleType;
+template <typename T>
+struct SharedPtrValueHash;
+template <typename T>
+struct SharedPtrValueEqual;
+struct DataWatchItemPolicy;
+struct ProcessWatchItemPolicy;
 struct WatchItemProcess;
 
 // Helper type aliases
-using PathAndTypePair = std::pair<std::string, WatchItemPathType>;
-using PathAndTypeVec = std::vector<PathAndTypePair>;
-using PolicyProcessVec = std::vector<WatchItemProcess>;
+using PairPathAndType = std::pair<std::string, WatchItemPathType>;
+using SetPairPathAndType = absl::flat_hash_set<PairPathAndType>;
+using SetWatchItemProcess = absl::flat_hash_set<WatchItemProcess>;
+using SetSharedDataWatchItemPolicy = absl::flat_hash_set<std::shared_ptr<DataWatchItemPolicy>,
+                                                         SharedPtrValueHash<DataWatchItemPolicy>,
+                                                         SharedPtrValueEqual<DataWatchItemPolicy>>;
+using SetSharedProcessWatchItemPolicy =
+    absl::flat_hash_set<std::shared_ptr<ProcessWatchItemPolicy>,
+                        SharedPtrValueHash<ProcessWatchItemPolicy>,
+                        SharedPtrValueEqual<ProcessWatchItemPolicy>>;
 
 enum class WatchItemPathType {
   kPrefix,
@@ -126,6 +139,11 @@ struct WatchItemPolicyBase {
 
   virtual bool operator!=(const WatchItemPolicyBase &other) const { return !(*this == other); }
 
+  template <typename H>
+  friend H AbslHashValue(H h, const WatchItemPolicyBase &p) {
+    return H::combine(std::move(h), p.name);
+  }
+
   std::string name;
   std::string version;  // WIP - No current way to control via config
   bool allow_read_access;
@@ -147,7 +165,7 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
                       bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                       std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
-                      std::vector<WatchItemProcess> procs = {})
+                      SetWatchItemProcess procs = {})
       : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt),
         path(p),
         path_type(pt),
@@ -168,28 +186,22 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
 
   std::string path;
   WatchItemPathType path_type;
-  std::vector<WatchItemProcess> processes;
+  SetWatchItemProcess processes;
 };
 
 struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
-  ProcessWatchItemPolicy(std::string_view n, std::string_view v, PathAndTypeVec pt,
+  ProcessWatchItemPolicy(std::string_view n, std::string_view v, SetPairPathAndType pt,
                          bool ara = kWatchItemPolicyDefaultAllowReadAccess,
                          bool ao = kWatchItemPolicyDefaultAuditOnly,
                          WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
                          bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                          bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                          std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
-                         std::vector<WatchItemProcess> procs = {})
+                         SetWatchItemProcess procs = {})
       : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt),
+        path_type_pairs(std::move(pt)),
+        processes(std::move(procs)),
         tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
-    // TODO(mlw): The `pt` and `procs` params should be changed to sets to alleviate these copies
-    for (const auto &item : pt) {
-      path_type_pairs.insert(item);
-    }
-    for (const auto &item : procs) {
-      processes.insert(item);
-    }
-
     // Build tree
     for (const auto &pt_pair : path_type_pairs) {
       if (pt_pair.second == WatchItemPathType::kPrefix) {
@@ -214,21 +226,20 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
 
   bool operator!=(const WatchItemPolicyBase &other) const override { return !(*this == other); }
 
-  absl::flat_hash_set<std::pair<std::string, WatchItemPathType>> path_type_pairs;
-  absl::flat_hash_set<WatchItemProcess> processes;
+  SetPairPathAndType path_type_pairs;
+  SetWatchItemProcess processes;
   std::unique_ptr<santa::PrefixTree<Unit>> tree;
 };
 
-// Hash and equality call operators for sets of shared_ptr types
-struct SharedPtrProcessWatchItemPolicyHash {
-  std::size_t operator()(const std::shared_ptr<ProcessWatchItemPolicy> &ptr) const {
-    return absl::Hash<std::string>()(ptr->name);
-  }
+// Hash and equality call operators for values of shared_ptr types
+template <typename T>
+struct SharedPtrValueHash {
+  std::size_t operator()(const std::shared_ptr<T> &ptr) const { return absl::Hash<T>()(*ptr); }
 };
 
-struct SharedPtrProcessWatchItemPolicyEqual {
-  bool operator()(const std::shared_ptr<ProcessWatchItemPolicy> &a,
-                  const std::shared_ptr<ProcessWatchItemPolicy> &b) const {
+template <typename T>
+struct SharedPtrValueEqual {
+  bool operator()(const std::shared_ptr<T> &a, const std::shared_ptr<T> &b) const {
     // Handle null pointer cases
     if (!a && !b) return true;
     if (!a || !b) return false;

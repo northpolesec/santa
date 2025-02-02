@@ -21,11 +21,12 @@
 
 #include "absl/container/flat_hash_set.h"
 
-using santa::PathAndTypePair;
-using santa::PathAndTypeVec;
+using santa::DataWatchItemPolicy;
+using santa::PairPathAndType;
 using santa::ProcessWatchItemPolicy;
-using santa::SharedPtrProcessWatchItemPolicyEqual;
-using santa::SharedPtrProcessWatchItemPolicyHash;
+using santa::SetPairPathAndType;
+using santa::SetSharedDataWatchItemPolicy;
+using santa::SetSharedProcessWatchItemPolicy;
 using santa::WatchItemPathType;
 using santa::WatchItemProcess;
 using santa::WatchItemRuleType;
@@ -39,10 +40,10 @@ using santa::WatchItemRuleType;
   // Make sure the hash function for a WatchItemProcess covers all members
   WatchItemProcess proc{"proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", std::nullopt};
 
-  ProcessWatchItemPolicy pwip("name", "ver",
-                              PathAndTypeVec{PathAndTypePair{"path1", WatchItemPathType::kLiteral}},
-                              true, true, santa::WatchItemRuleType::kProcessesWithAllowedPaths,
-                              false, false, "", nil, nil, {proc});
+  ProcessWatchItemPolicy pwip(
+      "name", "ver", SetPairPathAndType{PairPathAndType{"path1", WatchItemPathType::kLiteral}},
+      true, true, santa::WatchItemRuleType::kProcessesWithAllowedPaths, false, false, "", nil, nil,
+      {proc});
 
   pwip.processes.insert(proc);
   pwip.processes.insert(proc);
@@ -79,22 +80,60 @@ using santa::WatchItemRuleType;
   XCTAssertEqual(pwip.processes.size(), 7);
 }
 
+- (void)testSetDataWatchItemPolicy {
+  SetSharedDataWatchItemPolicy dataSet;
+
+  auto sharedDataPolicy1 =
+      std::make_shared<DataWatchItemPolicy>("name", "v1", "/foo", WatchItemPathType::kLiteral, true,
+                                            true, WatchItemRuleType::kPathsWithAllowedProcesses);
+
+  auto sharedDataPolicy2 =
+      std::make_shared<DataWatchItemPolicy>("name", "v1", "/foo", WatchItemPathType::kLiteral, true,
+                                            true, WatchItemRuleType::kPathsWithAllowedProcesses);
+
+  auto sharedDataPolicy3 =
+      std::make_shared<DataWatchItemPolicy>("name", "v1", "/bar", WatchItemPathType::kLiteral, true,
+                                            true, WatchItemRuleType::kPathsWithAllowedProcesses);
+
+  // Underlying pointers should be different
+  XCTAssertNotEqual(sharedDataPolicy1, sharedDataPolicy2);
+  XCTAssertNotEqual(sharedDataPolicy1, sharedDataPolicy3);
+  XCTAssertNotEqual(sharedDataPolicy2, sharedDataPolicy3);
+
+  // policies 1 and 2 have the same content, but policy 3 has a different path.
+  // Check for expected equality.
+  XCTAssertTrue(*sharedDataPolicy1 == *sharedDataPolicy2);
+  XCTAssertFalse(*sharedDataPolicy1 == *sharedDataPolicy3);
+
+  // Insert the same item multiple times, it should only be added once
+  dataSet.insert(sharedDataPolicy1);
+  dataSet.insert(sharedDataPolicy1);
+  XCTAssertEqual(dataSet.size(), 1);
+
+  // Adding the second policy should also not increase the
+  // size since it is equal to policy 1.
+  dataSet.insert(sharedDataPolicy2);
+  XCTAssertEqual(dataSet.size(), 1);
+
+  // Adding policy 3 should be allowed since it isn't equal to 1 or 2.
+  dataSet.insert(sharedDataPolicy3);
+  XCTAssertEqual(dataSet.size(), 2);
+}
+
 - (void)testSetSharedProcessWatchItemPolicy {
   // Test that hash/eq functions for set of shared pointers works as expected
-  absl::flat_hash_set<std::shared_ptr<ProcessWatchItemPolicy>, SharedPtrProcessWatchItemPolicyHash,
-                      SharedPtrProcessWatchItemPolicyEqual>
-      procSet;
+  SetSharedProcessWatchItemPolicy procSet;
 
   auto sharedProcPolicy1 = std::make_shared<ProcessWatchItemPolicy>(
-      "name", "v1", PathAndTypeVec{{"/foo", WatchItemPathType::kLiteral}}, true, true,
+      "name", "v1", SetPairPathAndType{{"/foo", WatchItemPathType::kLiteral}}, true, true,
       WatchItemRuleType::kProcessesWithDeniedPaths);
 
   auto sharedProcPolicy2 = std::make_shared<ProcessWatchItemPolicy>(
-      "name", "v1", PathAndTypeVec{{"/foo", WatchItemPathType::kLiteral}}, true, true,
+      "name", "v1", SetPairPathAndType{{"/foo", WatchItemPathType::kLiteral}}, true, true,
       WatchItemRuleType::kProcessesWithDeniedPaths);
 
   auto sharedProcPolicy3 = std::make_shared<ProcessWatchItemPolicy>(
-      "name", "v1", PathAndTypeVec{{"/bar", WatchItemPathType::kLiteral}}, true, true,
+      "name", "v1", SetPairPathAndType{{"/bar", WatchItemPathType::kLiteral}}, true, true,
       WatchItemRuleType::kProcessesWithDeniedPaths);
 
   // Underlying pointers should be different

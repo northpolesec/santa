@@ -227,19 +227,19 @@ using santa::WatchItemPathType;
   return _esApi->InvertTargetPathMuting(_esClient);
 }
 
-- (bool)muteTargetPaths:(const std::vector<std::pair<std::string, WatchItemPathType>> &)paths {
+- (bool)muteTargetPaths:(const santa::SetPairPathAndType &)paths {
   bool result = true;
-  for (const auto &pathAndTypePair : paths) {
+  for (const auto &PairPathAndType : paths) {
     result =
-        _esApi->MuteTargetPath(_esClient, pathAndTypePair.first, pathAndTypePair.second) && result;
+        _esApi->MuteTargetPath(_esClient, PairPathAndType.first, PairPathAndType.second) && result;
   }
   return result;
 }
 
-- (bool)unmuteTargetPaths:(const std::vector<std::pair<std::string, WatchItemPathType>> &)paths {
+- (bool)unmuteTargetPaths:(const santa::SetPairPathAndType &)paths {
   bool result = true;
-  for (const auto &pathAndTypePair : paths) {
-    result = _esApi->UnmuteTargetPath(_esClient, pathAndTypePair.first, pathAndTypePair.second) &&
+  for (const auto &PairPathAndType : paths) {
+    result = _esApi->UnmuteTargetPath(_esClient, PairPathAndType.first, PairPathAndType.second) &&
              result;
   }
   return result;

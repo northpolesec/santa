@@ -629,7 +629,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   }
 
   auto policy = std::make_shared<DataWatchItemPolicy>("foo_policy", "ver", "/foo");
-  policy->processes.push_back(policyProc);
+  policy->processes.insert(policyProc);
   auto optionalPolicy = std::make_optional<std::shared_ptr<DataWatchItemPolicy>>(policy);
 
   // Signed but invalid instigating processes are automatically
