@@ -33,13 +33,14 @@ namespace santa {
 // Forward declarations
 enum class WatchItemPathType;
 enum class WatchItemRuleType;
+struct DataWatchItemPolicy;
+struct ProcessWatchItemPolicy;
+struct WatchItemProcess;
+
 template <typename T>
 struct SharedPtrValueHash;
 template <typename T>
 struct SharedPtrValueEqual;
-struct DataWatchItemPolicy;
-struct ProcessWatchItemPolicy;
-struct WatchItemProcess;
 
 // Helper type aliases
 using PairPathAndType = std::pair<std::string, WatchItemPathType>;
