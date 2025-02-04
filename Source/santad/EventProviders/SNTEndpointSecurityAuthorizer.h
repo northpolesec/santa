@@ -36,4 +36,6 @@
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
 
+- (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher;
+
 @end

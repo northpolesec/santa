@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -97,6 +98,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
                                 (std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
                               forTarget:(const PathTarget &)target
                               toMessage:(const Message &)msg;
+- (void)disable;
 
 @property bool isSubscribed;
 @end

@@ -47,6 +47,10 @@ class EndpointSecurityAPI : public std::enable_shared_from_this<EndpointSecurity
   virtual bool UnmuteTargetPath(const Client &client, std::string_view path,
                                 santa::WatchItemPathType path_type);
 
+  virtual bool IsProcessMutingInverted(const Client &client);
+  virtual bool InvertProcessMuting(const Client &client);
+  virtual bool MuteProcess(const Client &client, const audit_token_t *tok);
+
   virtual void RetainMessage(const es_message_t *msg);
   virtual void ReleaseMessage(const es_message_t *msg);
 
@@ -54,8 +58,6 @@ class EndpointSecurityAPI : public std::enable_shared_from_this<EndpointSecurity
                                  bool cache);
   virtual bool RespondFlagsResult(const Client &client, const Message &msg, uint32_t allowed_flags,
                                   bool cache);
-
-  virtual bool MuteProcess(const Client &client, const audit_token_t *tok);
 
   virtual bool ClearCache(const Client &client);
 

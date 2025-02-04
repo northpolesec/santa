@@ -147,7 +147,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                  enricher:enricher
             decisionCache:[SNTDecisionCache sharedCache]
                 ttyWriter:tty_writer];
-    watch_items->RegisterClient(access_authorizer_client);
+    watch_items->RegisterDataClient(access_authorizer_client);
 
     access_authorizer_client.fileAccessBlockCallback = ^(
         SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {

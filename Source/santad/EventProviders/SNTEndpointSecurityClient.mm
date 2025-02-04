@@ -217,6 +217,9 @@ using santa::WatchItemPathType;
 - (bool)unsubscribeAll {
   return _esApi->UnsubscribeAll(_esClient);
 }
+- (bool)unmuteAllPaths {
+  return _esApi->UnmuteAllPaths(_esClient);
+}
 
 - (bool)unmuteAllTargetPaths {
   return _esApi->UnmuteAllTargetPaths(_esClient);
@@ -225,6 +228,16 @@ using santa::WatchItemPathType;
 - (bool)enableTargetPathWatching {
   [self unmuteAllTargetPaths];
   return _esApi->InvertTargetPathMuting(_esClient);
+}
+
+- (bool)enableProcessWatching {
+  [self unmuteAllPaths];
+  [self unmuteAllTargetPaths];
+  return _esApi->InvertProcessMuting(_esClient);
+}
+
+- (bool)muteProcess:(const audit_token_t *)tok {
+  return _esApi->MuteProcess(_esClient, tok);
 }
 
 - (bool)muteTargetPaths:(const santa::SetPairPathAndType &)paths {

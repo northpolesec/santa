@@ -45,6 +45,7 @@ enum class Processor {
   kRecorder,
   kTamperResistance,
   kFileAccessAuthorizer,
+  kProcessFileAccessAuthorizer,
 };
 
 enum class FileAccessMetricStatus {
