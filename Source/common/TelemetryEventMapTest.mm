@@ -19,6 +19,8 @@
 
 #include <map>
 
+#include "Source/common/Platform.h"
+
 using santa::ESEventToTelemetryEvent;
 using santa::TelemetryConfigToBitmask;
 using santa::TelemetryEvent;
@@ -52,6 +54,7 @@ using santa::TelemetryEvent;
       {"authentication", TelemetryEvent::kAuthentication},
       {"clone", TelemetryEvent::kClone},
       {"copyfile", TelemetryEvent::kCopyfile},
+      {"gatekeeper_override", TelemetryEvent::kGatekeeperOverride},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -103,6 +106,9 @@ using santa::TelemetryEvent;
       {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, TelemetryEvent::kScreenSharing},
       {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN, TelemetryEvent::kOpenSSH},
       {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, TelemetryEvent::kOpenSSH},
+#if HAVE_MACOS_15
+      {ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, TelemetryEvent::kGatekeeperOverride},
+#endif  // HAVE_MACOS_15
   };
 
   // Ensure ESEventToTelemetryEvent returns TelemetryEvent::kNone for

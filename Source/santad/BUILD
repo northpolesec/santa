@@ -565,6 +565,7 @@ objc_library(
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",
         ":SNTDecisionCache",
+        "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -593,6 +594,7 @@ objc_library(
     hdrs = ["Logs/EndpointSecurity/Serializers/Empty.h"],
     deps = [
         ":EndpointSecuritySerializer",
+        "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
     ],
 )

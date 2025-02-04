@@ -16,6 +16,7 @@
 
 #include <string_view>
 
+#include "Source/common/Platform.h"
 #include "Source/common/String.h"
 #include "absl/container/flat_hash_map.h"
 
@@ -43,6 +44,7 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
       {"authentication", TelemetryEvent::kAuthentication},
       {"clone", TelemetryEvent::kClone},
       {"copyfile", TelemetryEvent::kCopyfile},
+      {"gatekeeper_override", TelemetryEvent::kGatekeeperOverride},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -100,6 +102,9 @@ TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event) {
     case ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH: return TelemetryEvent::kScreenSharing;
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN: return TelemetryEvent::kOpenSSH;
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT: return TelemetryEvent::kOpenSSH;
+#if HAVE_MACOS_15
+    case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return TelemetryEvent::kGatekeeperOverride;
+#endif  // HAVE_MACOS_15
     default: return TelemetryEvent::kNone;
   }
 }

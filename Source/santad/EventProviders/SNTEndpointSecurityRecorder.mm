@@ -226,7 +226,13 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
       ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN,
       ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT});
   }
-#endif
+#endif  // HAVE_MACOS_13
+
+#if HAVE_MACOS_15
+  if (@available(macOS 15.0, *)) {
+    events.insert(ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE);
+  }
+#endif  // HAVE_MACOS_15
   // clang-format on
 
   [super subscribe:events];

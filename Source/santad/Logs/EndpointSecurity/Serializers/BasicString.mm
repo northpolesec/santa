@@ -791,6 +791,18 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationA
 
 #endif  // HAVE_MACOS_13
 
+#if HAVE_MACOS_15
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverride &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=GATEKEEPER_OVERRIDE");
+
+  return FinalizeString(str);
+}
+
+#endif  // HAVE_MACOS_15
+
 std::vector<uint8_t> BasicString::SerializeFileAccess(const std::string &policy_version,
                                                       const std::string &policy_name,
                                                       const Message &msg,

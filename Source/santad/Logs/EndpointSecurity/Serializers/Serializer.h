@@ -22,6 +22,7 @@
 #include <memory>
 #include <vector>
 
+#include "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
@@ -56,6 +57,7 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile &) = 0;
+#if HAVE_MACOS_13
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
       const santa::EnrichedLoginWindowSessionLogout &) = 0;
@@ -73,6 +75,10 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
       const santa::EnrichedAuthenticationAutoUnlock &) = 0;
+#endif  // HAVE_MACOS_13
+#if HAVE_MACOS_15
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) = 0;
+#endif  // HAVE_MACOS_15
 
   virtual std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
                                                    const std::string &policy_name,

@@ -70,7 +70,10 @@ static NSString *const kEventTypeNotifyScreensharingAttach = @"NotifyScreenshari
 static NSString *const kEventTypeNotifyScreensharingDetach = @"NotifyScreensharingDetach";
 static NSString *const kEventTypeNotifyOpenSSHLogin = @"NotifyOpenSSHLogin";
 static NSString *const kEventTypeNotifyOpenSSHLogout = @"NotifyOpenSSHLogout";
-#endif
+#endif  // HAVE_MACOS_13
+#if HAVE_MACOS_15
+static NSString *const kEventTypeNotifyGatekeeperOverride = @"NotifyGatekeeperOverride";
+#endif  // HAVE_MACOS_15
 
 static NSString *const kEventDispositionDropped = @"Dropped";
 static NSString *const kEventDispositionProcessed = @"Processed";
@@ -150,7 +153,10 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
     case ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH: return kEventTypeNotifyScreensharingDetach;
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN: return kEventTypeNotifyOpenSSHLogin;
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT: return kEventTypeNotifyOpenSSHLogout;
-#endif
+#endif  // HAVE_MACOS_13
+#if HAVE_MACOS_15
+    case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return kEventTypeNotifyGatekeeperOverride;
+#endif  // HAVE_MACOS_15
     case ES_EVENT_TYPE_LAST: return kPseudoEventTypeGlobal;
     default:
       [NSException raise:@"Invalid event type" format:@"Invalid event type: %d", eventType];

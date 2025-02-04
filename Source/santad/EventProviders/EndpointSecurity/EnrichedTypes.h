@@ -610,6 +610,19 @@ class EnrichedCopyfile : public EnrichedEventType {
   EnrichedFile source_;
 };
 
+class EnrichedGatekeeperOverride : public EnrichedEventType {
+ public:
+  EnrichedGatekeeperOverride(Message &&es_msg, EnrichedProcess &&instigator,
+                             std::optional<EnrichedFile> target)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        target_(std::move(target)){};
+
+  const std::optional<EnrichedFile> &Target() const { return target_; }
+
+ private:
+  std::optional<EnrichedFile> target_;
+};
+
 using EnrichedType = std::variant<
     EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit, EnrichedFork,
     EnrichedLink, EnrichedRename, EnrichedUnlink, EnrichedCSInvalidated,
@@ -619,7 +632,12 @@ using EnrichedType = std::variant<
     EnrichedOpenSSHLogin, EnrichedOpenSSHLogout, EnrichedLoginLogin,
     EnrichedLoginLogout, EnrichedAuthenticationOD,
     EnrichedAuthenticationTouchID, EnrichedAuthenticationToken,
-    EnrichedAuthenticationAutoUnlock, EnrichedClone, EnrichedCopyfile>;
+    EnrichedAuthenticationAutoUnlock, EnrichedClone, EnrichedCopyfile
+#if HAVE_MACOS_15
+    ,
+    EnrichedGatekeeperOverride
+#endif  // HAVE_MACOS_15
+    >;
 
 class EnrichedMessage {
  public:
