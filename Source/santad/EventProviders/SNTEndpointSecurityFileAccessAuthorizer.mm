@@ -863,9 +863,8 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 }
 
 - (void)watchItemsCount:(size_t)count
-               newPaths:(const std::vector<std::pair<std::string, WatchItemPathType>> &)newPaths
-           removedPaths:
-               (const std::vector<std::pair<std::string, WatchItemPathType>> &)removedPaths {
+               newPaths:(const santa::SetPairPathAndType &)newPaths
+           removedPaths:(const santa::SetPairPathAndType &)removedPaths {
   if (count == 0) {
     [self disable];
   } else {

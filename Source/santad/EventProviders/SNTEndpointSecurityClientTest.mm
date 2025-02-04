@@ -42,6 +42,7 @@ using santa::EnrichedMessage;
 using santa::EnrichedProcess;
 using santa::Message;
 using santa::Processor;
+using santa::SetPairPathAndType;
 using santa::WatchItemPathType;
 
 @interface SNTEndpointSecurityClient (Testing)
@@ -338,7 +339,7 @@ using santa::WatchItemPathType;
               MuteTargetPath(testing::_, std::string_view("c"), WatchItemPathType::kPrefix))
       .WillOnce(testing::Return(true));
 
-  std::vector<std::pair<std::string, WatchItemPathType>> paths = {
+  SetPairPathAndType paths = {
       {"a", WatchItemPathType::kLiteral},
       {"b", WatchItemPathType::kLiteral},
       {"c", WatchItemPathType::kPrefix},
@@ -368,7 +369,7 @@ using santa::WatchItemPathType;
               UnmuteTargetPath(testing::_, std::string_view("c"), WatchItemPathType::kPrefix))
       .WillOnce(testing::Return(true));
 
-  std::vector<std::pair<std::string, WatchItemPathType>> paths = {
+  SetPairPathAndType paths = {
       {"a", WatchItemPathType::kLiteral},
       {"b", WatchItemPathType::kLiteral},
       {"c", WatchItemPathType::kPrefix},

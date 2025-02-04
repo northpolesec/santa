@@ -36,6 +36,7 @@ using santa::EndpointSecurityAPI;
 using santa::EventDisposition;
 using santa::Logger;
 using santa::Message;
+using santa::SetPairPathAndType;
 using santa::WatchItemPathType;
 
 // The ES client process (com.northpolesec.santa.daemon) will be the only process allowed to
@@ -231,10 +232,9 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
   [super enableTargetPathWatching];
 
   // Get the set of protected paths
-  std::vector<std::pair<std::string, WatchItemPathType>> protectedPaths =
-      [SNTEndpointSecurityTamperResistance getProtectedPaths];
-  protectedPaths.push_back({"/Library/SystemExtensions", WatchItemPathType::kPrefix});
-  protectedPaths.push_back({"/bin/launchctl", WatchItemPathType::kLiteral});
+  SetPairPathAndType protectedPaths = [SNTEndpointSecurityTamperResistance getProtectedPaths];
+  protectedPaths.insert({"/Library/SystemExtensions", WatchItemPathType::kPrefix});
+  protectedPaths.insert({"/bin/launchctl", WatchItemPathType::kLiteral});
 
   // Begin watching the protected set
   [super muteTargetPaths:protectedPaths];
@@ -248,13 +248,11 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
                                 }];
 }
 
-+ (std::vector<std::pair<std::string, WatchItemPathType>>)getProtectedPaths {
-  std::vector<std::pair<std::string, WatchItemPathType>> protectedPathsCopy(
-      sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]));
++ (SetPairPathAndType)getProtectedPaths {
+  SetPairPathAndType protectedPathsCopy;
 
   for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); ++i) {
-    protectedPathsCopy.emplace_back(std::string(kProtectedFiles[i].first),
-                                    kProtectedFiles[i].second);
+    protectedPathsCopy.insert({std::string(kProtectedFiles[i].first), kProtectedFiles[i].second});
   }
 
   return protectedPathsCopy;

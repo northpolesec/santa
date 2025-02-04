@@ -44,9 +44,7 @@
 - (void)disable;
 
 - (void)watchItemsCount:(size_t)count
-               newPaths:
-                   (const std::vector<std::pair<std::string, santa::WatchItemPathType>> &)newPaths
-           removedPaths:
-               (const std::vector<std::pair<std::string, santa::WatchItemPathType>> &)removedPaths;
+               newPaths:(const santa::SetPairPathAndType &)newPaths
+           removedPaths:(const santa::SetPairPathAndType &)removedPaths;
 
 @end

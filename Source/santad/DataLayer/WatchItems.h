@@ -82,15 +82,14 @@ class DataWatchItems {
 
   bool operator==(const DataWatchItems &other) const { return paths_ == other.paths_; }
   bool operator!=(const DataWatchItems &other) const { return !(*this == other); }
-  std::vector<std::pair<std::string, WatchItemPathType>> operator-(
-      const DataWatchItems &other) const;
+  SetPairPathAndType operator-(const DataWatchItems &other) const;
 
   friend void swap(DataWatchItems &first, DataWatchItems &second) {
     std::swap(first.tree_, second.tree_);
     std::swap(first.paths_, second.paths_);
   }
 
-  bool Build(std::vector<std::shared_ptr<DataWatchItemPolicy>> data_policies);
+  bool Build(SetSharedDataWatchItemPolicy data_policies);
   size_t Count() const { return paths_.size(); }
 
   std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> FindPolcies(
@@ -98,12 +97,9 @@ class DataWatchItems {
 
  private:
   std::unique_ptr<santa::PrefixTree<std::shared_ptr<DataWatchItemPolicy>>> tree_;
-  std::set<std::pair<std::string, WatchItemPathType>> paths_;
+  SetPairPathAndType paths_;
 };
 
-using ProcessWatchItemPolicySet =
-    absl::flat_hash_set<std::shared_ptr<ProcessWatchItemPolicy>,
-                        SharedPtrProcessWatchItemPolicyHash, SharedPtrProcessWatchItemPolicyEqual>;
 class ProcessWatchItems {
  public:
   ProcessWatchItems() = default;
@@ -118,10 +114,10 @@ class ProcessWatchItems {
   bool operator==(const ProcessWatchItems &other) const { return policies_ == other.policies_; }
   bool operator!=(const ProcessWatchItems &other) const { return !(*this == other); }
 
-  bool Build(ProcessWatchItemPolicySet proc_policies);
+  bool Build(SetSharedProcessWatchItemPolicy proc_policies);
 
  private:
-  ProcessWatchItemPolicySet policies_;
+  SetSharedProcessWatchItemPolicy policies_;
 };
 
 class WatchItems : public std::enable_shared_from_this<WatchItems> {
