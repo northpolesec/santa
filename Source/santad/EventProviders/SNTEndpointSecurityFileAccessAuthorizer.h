@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -31,7 +32,7 @@ typedef void (^SNTFileAccessBlockCallback)(SNTFileAccessEvent *event, NSString *
                                            NSString *customURL, NSString *customText);
 
 @interface SNTEndpointSecurityFileAccessAuthorizer
-    : SNTEndpointSecurityClient <SNTEndpointSecurityDynamicEventHandler>
+    : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler, SNTDataFileAccessAuthorizer>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::Metrics>)metrics

@@ -53,6 +53,9 @@
 - (bool)muteTargetPaths:(const santa::SetPairPathAndType &)paths;
 - (bool)unmuteTargetPaths:(const santa::SetPairPathAndType &)paths;
 
+- (bool)enableProcessWatching;
+- (bool)muteProcess:(const audit_token_t *)tok;
+
 /// Responds to the Message with the given auth result
 ///
 /// @param Message The wrapped es_message_t being responded to

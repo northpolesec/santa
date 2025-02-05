@@ -487,6 +487,19 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTEndpointSecurityProcessFileAccessAuthorizer",
+    srcs = ["EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.mm"],
+    hdrs = ["EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"],
+    deps = [
+        ":EndpointSecurityAPI",
+        ":EndpointSecurityMessage",
+        ":Metrics",
+        ":SNTEndpointSecurityClient",
+        ":SNTEndpointSecurityEventHandler",
+    ],
+)
+
+objc_library(
     name = "SNTEndpointSecurityDeviceManager",
     srcs = ["EventProviders/SNTEndpointSecurityDeviceManager.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityDeviceManager.h"],
@@ -1421,6 +1434,20 @@ santa_unit_test(
 )
 
 santa_unit_test(
+    name = "SNTEndpointSecurityProcessFileAccessAuthorizerTest",
+    srcs = ["EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizerTest.mm"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":MockEndpointSecurityAPI",
+        ":SNTEndpointSecurityProcessFileAccessAuthorizer",
+        "//Source/common:TestUtils",
+        "@OCMock",
+    ],
+)
+
+santa_unit_test(
     name = "SNTEndpointSecurityTamperResistanceTest",
     srcs = ["EventProviders/SNTEndpointSecurityTamperResistanceTest.mm"],
     sdk_dylibs = [
@@ -1538,6 +1565,7 @@ test_suite(
         ":SNTEndpointSecurityClientTest",
         ":SNTEndpointSecurityDeviceManagerTest",
         ":SNTEndpointSecurityFileAccessAuthorizerTest",
+        ":SNTEndpointSecurityProcessFileAccessAuthorizerTest",
         ":SNTEndpointSecurityRecorderTest",
         ":SNTEndpointSecurityTamperResistanceTest",
         ":SNTEndpointSecurityTreeAwareClientTest",

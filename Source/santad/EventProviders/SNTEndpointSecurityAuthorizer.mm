@@ -35,6 +35,7 @@ using santa::Message;
 @interface SNTEndpointSecurityAuthorizer ()
 @property SNTCompilerController *compilerController;
 @property SNTExecutionController *execController;
+@property id<SNTEndpointSecurityProbe> procWatcherProbe;
 @end
 
 @implementation SNTEndpointSecurityAuthorizer {
@@ -66,6 +67,27 @@ using santa::Message;
   return @"Authorizer";
 }
 
+- (bool)respondToMessage:(const santa::Message &)msg
+          withAuthResult:(es_auth_result_t)result
+       forcePreventCache:(BOOL)forcePreventCache {
+  // Don't let the ES framework cache DENY results. Santa only flushes ES cache
+  // when a new DENY rule is received. If DENY results were cached and a rule
+  // update made the executable allowable, ES would continue to apply the DENY
+  // cached result. Note however that the local AuthResultCache will cache
+  // DENY results. The caller may also prevent caching if it has reason to so.
+  bool cacheable = (result == ES_AUTH_RESULT_ALLOW) && !forcePreventCache;
+
+  if (self.procWatcherProbe) {
+    santa::ProbeInterest interest = [self.procWatcherProbe probeInterest:msg];
+
+    // Prevent caching if a probe is interested in the process. But don't re-enable
+    // caching if it was already previously disabled.
+    cacheable = cacheable && (interest == santa::ProbeInterest::kUninterested);
+  }
+
+  return [self respondToMessage:msg withAuthResult:result cacheable:cacheable];
+}
+
 - (void)processMessage:(Message)msg {
   if (msg->event_type == ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME) {
     [self.execController
@@ -95,9 +117,8 @@ using santa::Message;
         default: break;
       }
 
-      [self respondToMessage:msg
-              withAuthResult:authResult
-                   cacheable:(authResult == ES_AUTH_RESULT_ALLOW)];
+      [self respondToMessage:msg withAuthResult:authResult forcePreventCache:NO];
+
       return;
     } else if (returnAction == SNTActionRespondHold) {
       _ttyWriter->Write(
@@ -188,15 +209,11 @@ using santa::Message;
   self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, action);
 
   if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
-    // Don't let the ES framework cache DENY results. Santa only flushes ES cache
-    // when a new DENY rule is received. If DENY results were cached and a rule
-    // update made the executable allowable, ES would continue to apply the DENY
-    // cached result. Note however that the local AuthResultCache will cache
-    // DENY results.
-    return [self
-        respondToMessage:esMsg
-          withAuthResult:authResult
-               cacheable:(authResult == ES_AUTH_RESULT_ALLOW && action != SNTActionRespondHold)];
+    // Do not allow caching when the action is SNTActionRespondHold because Santa
+    // also authorizes EXECs that occur while the current authorization is pending.
+    return [self respondToMessage:esMsg
+                   withAuthResult:authResult
+                forcePreventCache:(action == SNTActionRespondHold)];
   } else {
     return true;
   }
@@ -207,6 +224,10 @@ using santa::Message;
                                     ES_EVENT_TYPE_AUTH_EXEC,
                                     ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
                                 }];
+}
+
+- (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher {
+  self.procWatcherProbe = watcher;
 }
 
 @end

@@ -140,7 +140,8 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
 
   void BeginPeriodicTask();
 
-  void RegisterClient(id<SNTEndpointSecurityDynamicEventHandler> client);
+  void RegisterDataClient(id<SNTDataFileAccessAuthorizer> client);
+  void RegisterProcessClient(id<SNTProcessFileAccessAuthorizer> client);
 
   void SetConfigPath(NSString *config_path);
   void SetConfig(NSDictionary *config);
@@ -177,7 +178,8 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   NSDictionary *current_config_ ABSL_GUARDED_BY(lock_);
   NSTimeInterval last_update_time_ ABSL_GUARDED_BY(lock_);
   std::string policy_version_ ABSL_GUARDED_BY(lock_);
-  std::set<id<SNTEndpointSecurityDynamicEventHandler>> registerd_clients_ ABSL_GUARDED_BY(lock_);
+  id<SNTDataFileAccessAuthorizer> registered_data_client_ ABSL_GUARDED_BY(lock_);
+  id<SNTProcessFileAccessAuthorizer> registered_proc_client_ ABSL_GUARDED_BY(lock_);
   bool periodic_task_started_ = false;
   NSString *policy_event_detail_url_ ABSL_GUARDED_BY(lock_);
   NSString *policy_event_detail_text_ ABSL_GUARDED_BY(lock_);

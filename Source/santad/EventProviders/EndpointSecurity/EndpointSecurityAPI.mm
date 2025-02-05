@@ -93,6 +93,34 @@ bool EndpointSecurityAPI::InvertTargetPathMuting(const Client &client) {
   return false;
 }
 
+bool EndpointSecurityAPI::IsProcessMutingInverted(const Client &client) {
+#if HAVE_MACOS_13
+  if (@available(macOS 13.0, *)) {
+    return es_muting_inverted(client.Get(), ES_MUTE_INVERSION_TYPE_PROCESS) == ES_MUTE_INVERTED;
+  }
+#endif
+
+  return false;
+}
+
+bool EndpointSecurityAPI::InvertProcessMuting(const Client &client) {
+#if HAVE_MACOS_13
+  if (@available(macOS 13.0, *)) {
+    if (!IsProcessMutingInverted(client)) {
+      return es_invert_muting(client.Get(), ES_MUTE_INVERSION_TYPE_PROCESS) == ES_RETURN_SUCCESS;
+    } else {
+      return true;
+    }
+  }
+#endif
+
+  return false;
+}
+
+bool EndpointSecurityAPI::MuteProcess(const Client &client, const audit_token_t *tok) {
+  return es_mute_process(client.Get(), tok) == ES_RETURN_SUCCESS;
+}
+
 bool EndpointSecurityAPI::MuteTargetPath(const Client &client, std::string_view path,
                                          WatchItemPathType path_type) {
 #if HAVE_MACOS_13
@@ -129,10 +157,6 @@ bool EndpointSecurityAPI::RespondAuthResult(const Client &client, const Message 
 bool EndpointSecurityAPI::RespondFlagsResult(const Client &client, const Message &msg,
                                              uint32_t allowed_flags, bool cache) {
   return es_respond_flags_result(client.Get(), &(*msg), allowed_flags, cache);
-}
-
-bool EndpointSecurityAPI::MuteProcess(const Client &client, const audit_token_t *tok) {
-  return es_mute_process(client.Get(), tok) == ES_RETURN_SUCCESS;
 }
 
 bool EndpointSecurityAPI::ClearCache(const Client &client) {

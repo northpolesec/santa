@@ -12,4 +12,10 @@ test:
 reload:
 	bazel run //:reload
 
-.PHONY: fmt build test reload
+clean:
+	bazel clean
+
+realclean:
+	bazel clean --expunge
+
+.PHONY: fmt build test reload clean realclean

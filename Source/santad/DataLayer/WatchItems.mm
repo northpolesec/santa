@@ -796,9 +796,18 @@ WatchItems::~WatchItems() {
   }
 }
 
-void WatchItems::RegisterClient(id<SNTEndpointSecurityDynamicEventHandler> client) {
+void WatchItems::RegisterDataClient(id<SNTDataFileAccessAuthorizer> client) {
   absl::MutexLock lock(&lock_);
-  registerd_clients_.insert(client);
+  if (!registered_data_client_) {
+    registered_data_client_ = client;
+  }
+}
+
+void WatchItems::RegisterProcessClient(id<SNTProcessFileAccessAuthorizer> client) {
+  absl::MutexLock lock(&lock_);
+  if (!registered_proc_client_) {
+    registered_proc_client_ = client;
+  }
 }
 
 void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
@@ -847,15 +856,15 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
 
     LOGD(@"Changes to watch items detected, notifying registered clients.");
 
-    for (const id<SNTEndpointSecurityDynamicEventHandler> &client : registerd_clients_) {
+    if (registered_data_client_) {
       // Note: Enable clients on an async queue in case they perform any
       // synchronous work that could trigger ES events. Otherwise they might
       // trigger AUTH ES events that would attempt to re-enter this object and
       // potentially deadlock.
       dispatch_async(q_, ^{
-        [client watchItemsCount:data_watch_items_.Count()
-                       newPaths:paths_to_watch
-                   removedPaths:paths_to_stop_watching];
+        [registered_data_client_ watchItemsCount:data_watch_items_.Count()
+                                        newPaths:paths_to_watch
+                                    removedPaths:paths_to_stop_watching];
       });
     }
   } else {
