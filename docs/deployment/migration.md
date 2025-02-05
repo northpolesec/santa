@@ -1,7 +1,7 @@
 ---
 title: Migration
 parent: Deployment
-nav_order: 7
+nav_order: 8
 ---
 
 # Migrating from Google Santa to North Pole Security Santa

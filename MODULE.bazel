@@ -2,6 +2,7 @@ module(name = "santa")
 
 bazel_dep(name = "apple_support", version = "1.17.1", repo_name = "build_bazel_apple_support")
 bazel_dep(name = "abseil-cpp", version = "20250127.0", repo_name = "com_google_absl")
+bazel_dep(name = "grpc", version = "1.69.0")
 bazel_dep(name = "rules_python", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.0.17")
 bazel_dep(name = "rules_apple", version = "3.16.1", repo_name = "build_bazel_rules_apple")
@@ -15,7 +16,7 @@ bazel_dep(name = "googletest", version = "1.15.2", repo_name = "com_google_googl
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpole_protos")
 git_override(
     module_name = "protos",
-    commit = "a445c82c8aab058bf7fa45ebc4c67c16ffc9a9b5",
+    commit = "01a55a67d389577a7a2c6ed731e611f7384a5137",
     remote = "https://github.com/northpolesec/protos",
 )
 

@@ -14,6 +14,10 @@
 
 #import "Source/common/SNTDropRootPrivs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 BOOL DropRootPrivileges() {
   if (getuid() == 0 || geteuid() == 0 || getgid() == 0 || getegid() == 0) {
     uid_t nobody = (uid_t)-2;
@@ -29,3 +33,7 @@ BOOL DropRootPrivileges() {
 
   return true;
 }
+
+#ifdef __cplusplus
+}
+#endif
