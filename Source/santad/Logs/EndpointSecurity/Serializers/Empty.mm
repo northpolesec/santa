@@ -67,6 +67,8 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedCopyfile &msg) {
   return {};
 }
 
+#if HAVE_MACOS_13
+
 std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLogin &msg) {
   return {};
 }
@@ -122,6 +124,16 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationToken &
 std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationAutoUnlock &) {
   return {};
 }
+
+#endif  // HAVE_MACOS_13
+
+#if HAVE_MACOS_15
+
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedGatekeeperOverride &) {
+  return {};
+}
+
+#endif  // HAVE_MACOS_15
 
 std::vector<uint8_t> Empty::SerializeFileAccess(const std::string &policy_version,
                                                 const std::string &policy_name, const Message &msg,

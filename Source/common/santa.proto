@@ -914,6 +914,18 @@ message Copyfile {
   int32 flags = 6;
 }
 
+// Information captured when a user overrides Gatekeeper decisions
+message GatekeeperOverride {
+  // The process creating the override
+  optional ProcessInfoLight instigator = 1;
+
+  // The target file that had Gatekeeper policy overridden
+  optional FileInfo target = 2;
+
+  // Codesigning information related to the target file
+  optional CodeSignature code_signature = 3;
+}
+
 // A message encapsulating a single event
 message SantaMessage {
   // Machine ID of the host emitting this log
@@ -952,6 +964,7 @@ message SantaMessage {
     Authentication authentication = 27;
     Clone clone = 28;
     Copyfile copyfile = 29;
+    GatekeeperOverride gatekeeper_override = 30;
   };
 }
 

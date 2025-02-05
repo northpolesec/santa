@@ -1013,6 +1013,14 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAuto
 
 #endif  // HAVE_MACOS_13
 
+#if HAVE_MACOS_15
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride &msg) {
+  return {};
+}
+
+#endif  // HAVE_MACOS_15
+
 std::vector<uint8_t> Protobuf::SerializeFileAccess(const std::string &policy_version,
                                                    const std::string &policy_name,
                                                    const Message &msg,

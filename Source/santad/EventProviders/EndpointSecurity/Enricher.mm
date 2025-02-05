@@ -155,7 +155,16 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT:
       return std::make_unique<EnrichedMessage>(
           EnrichedLoginLogout(std::move(es_msg), Enrich(*es_msg->process)));
-#endif
+#endif  // HAVE_MACOS_13
+#if HAVE_MACOS_15
+    case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE:
+      return std::make_unique<EnrichedMessage>(EnrichedGatekeeperOverride(
+          std::move(es_msg), Enrich(*es_msg->process),
+          es_msg->event.gatekeeper_user_override->file_type ==
+                  ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE
+              ? std::make_optional(Enrich(*es_msg->event.gatekeeper_user_override->file.file))
+              : std::nullopt));
+#endif  // HAVE_MACOS_15
     default:
       // This is a programming error
       LOGE(@"Attempting to enrich an unhandled event type: %d", es_msg->event_type);

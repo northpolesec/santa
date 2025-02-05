@@ -216,7 +216,10 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
       {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, @"NotifyScreensharingDetach"},
       {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN, @"NotifyOpenSSHLogin"},
       {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, @"NotifyOpenSSHLogout"},
-#endif
+#endif  // HAVE_MACOS_13
+#if HAVE_MACOS_15
+      {ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, @"NotifyGatekeeperOverride"},
+#endif  // HAVE_MACOS_15
       {ES_EVENT_TYPE_LAST, @"Global"},
   };
 

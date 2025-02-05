@@ -106,7 +106,13 @@ class MockAuthResultCache : public AuthResultCache {
         ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT,
     });
   }
-#endif
+#endif  // HAVE_MACOS_13
+
+#if HAVE_MACOS_15
+  if (@available(macOS 15.0, *)) {
+    expectedEventSubs.insert(ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE);
+  }
+#endif  // HAVE_MACOS_15
 
   return expectedEventSubs;
 }

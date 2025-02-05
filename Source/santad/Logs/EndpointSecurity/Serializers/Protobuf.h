@@ -65,7 +65,10 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationAutoUnlock &) override;
-#endif
+#endif  // HAVE_MACOS_13
+#if HAVE_MACOS_15
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) override;
+#endif  // HAVE_MACOS_15
 
   std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
                                            const std::string &policy_name,

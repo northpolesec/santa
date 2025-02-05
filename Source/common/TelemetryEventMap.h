@@ -43,6 +43,7 @@ enum class TelemetryEvent : uint64_t {
   kAuthentication          = 1 << 17,
   kClone                   = 1 << 18,
   kCopyfile                = 1 << 19,
+  kGatekeeperOverride      = 1 << 20,
   kEverything              = ~0ULL,
 };
 // clang-format on

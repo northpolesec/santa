@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 
+#include "Source/common/Platform.h"
 #include "Source/common/SNTCachedDecision.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 
@@ -42,6 +43,7 @@ class Empty : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile &) override;
+#if HAVE_MACOS_13
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogout &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLock &) override;
@@ -56,6 +58,10 @@ class Empty : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationAutoUnlock &) override;
+#endif  // HAVE_MACOS_13
+#if HAVE_MACOS_15
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) override;
+#endif  // HAVE_MACOS_15
 
   std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
                                            const std::string &policy_name,
