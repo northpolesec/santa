@@ -57,9 +57,13 @@ use_repo(non_module_deps, "FMDB")
 use_repo(non_module_deps, "OCMock")
 
 # Hedron's Compile Commands Extractor
+# Note: Moved to a fork because the original project's maintenance status is in limbo.
+# The maintainer claims to still be around, but nothing is getting merged:
+#   https://github.com/hedronvision/bazel-compile-commands-extractor/issues/232#issuecomment-2512931043
+#   https://github.com/hedronvision/bazel-compile-commands-extractor/issues/240
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(
     module_name = "hedron_compile_commands",
-    commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
+    commit = "f5fbd4cee671d8d908f37c83abaf70fba5928fc7",
+    remote = "https://github.com/mikael-s-persson/bazel-compile-commands-extractor.git",
 )
