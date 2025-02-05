@@ -210,7 +210,7 @@ using santa::Message;
 
   if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
     // Do not allow caching when the action is SNTActionRespondHold because Santa
-    // also authorize EXECs that occur while the current authorization is pending.
+    // also authorizes EXECs that occur while the current authorization is pending.
     return [self respondToMessage:esMsg
                    withAuthResult:authResult
                 forcePreventCache:(action == SNTActionRespondHold)];
