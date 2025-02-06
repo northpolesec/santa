@@ -639,6 +639,7 @@ objc_library(
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
+        "//Source/common:String",
     ],
 )
 

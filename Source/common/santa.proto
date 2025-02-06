@@ -920,6 +920,11 @@ message GatekeeperOverride {
   optional ProcessInfoLight instigator = 1;
 
   // The target file that had Gatekeeper policy overridden
+  // Note: Due to macOS system limitations, the file on disk for which
+  // gatekeeper settings were overridden may have been deleted (or even
+  // entirely replaced) by the time the system attempts to capture data
+  // for the event to send to Santa. This means that ES might only send
+  // path information instead of full path+stat+hash information.
   optional FileInfo target = 2;
 
   // Codesigning information related to the target file

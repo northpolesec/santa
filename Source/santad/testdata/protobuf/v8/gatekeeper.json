@@ -1,0 +1,72 @@
+{
+ "instigator": {
+  "id": {
+   "pid": 12,
+   "pidversion": 34
+  },
+  "parent_id": {
+   "pid": 56,
+   "pidversion": 78
+  },
+  "original_parent_pid": 56,
+  "group_id": 111,
+  "session_id": 222,
+  "effective_user": {
+   "uid": -2,
+   "name": "nobody"
+  },
+  "effective_group": {
+   "gid": -1,
+   "name": "nogroup"
+  },
+  "real_user": {
+   "uid": -2,
+   "name": "nobody"
+  },
+  "real_group": {
+   "gid": -1,
+   "name": "nogroup"
+  },
+  "executable": {
+   "path": "foo",
+   "truncated": false
+  }
+ },
+ "target": {
+  "path": "foo",
+  "truncated": false,
+  "stat": {
+   "dev": 1,
+   "mode": 2,
+   "nlink": 3,
+   "ino": "4",
+   "user": {
+    "uid": -2,
+    "name": "nobody"
+   },
+   "group": {
+    "gid": -1,
+    "name": "nogroup"
+   },
+   "rdev": 5,
+   "access_time": "1970-01-01T00:01:40.000000200Z",
+   "modification_time": "1970-01-01T00:01:41.000000021Z",
+   "change_time": "1970-01-01T00:01:42.000000202Z",
+   "birth_time": "1970-01-01T00:01:43.000000203Z",
+   "size": "6",
+   "blocks": "7",
+   "blksize": 8,
+   "flags": 9,
+   "gen": 10
+  },
+  "hash": {
+   "type": "HASH_ALGO_SHA256",
+   "hash": "4141414141414141414141414141414141414141414141414141414141414141"
+  }
+ },
+ "code_signature": {
+  "cdhash": "QkJCQkJCQkJCQkJCQkJCQkJCQkI=",
+  "signing_id": "com.my.sid",
+  "team_id": "mytid"
+ }
+}

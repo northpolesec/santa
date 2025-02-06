@@ -18,4 +18,7 @@ clean:
 realclean:
 	bazel clean --expunge
 
-.PHONY: fmt build test reload clean realclean
+compile_commands:
+	bazel run @hedron_compile_commands//:refresh_all
+
+.PHONY: fmt build test reload clean realclean compile_commands

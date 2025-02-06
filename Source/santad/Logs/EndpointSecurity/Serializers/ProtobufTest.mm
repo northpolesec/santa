@@ -130,6 +130,9 @@ NSString *ConstructFilename(es_event_type_t eventType, NSString *variant = nil) 
     case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION: name = @"authentication"; break;
     case ES_EVENT_TYPE_NOTIFY_CLONE: name = @"clone"; break;
     case ES_EVENT_TYPE_NOTIFY_COPYFILE: name = @"copyfile"; break;
+#if HAVE_MACOS_15
+    case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: name = @"gatekeeper"; break;
+#endif
     default:
       XCTFail(@"Failed to construct filename: Unhandled event type: %d", eventType);
       return nil;
@@ -192,6 +195,7 @@ const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &s
     case ::pbv1::SantaMessage::kAuthentication: return santaMsg.authentication();
     case ::pbv1::SantaMessage::kClone: return santaMsg.clone();
     case ::pbv1::SantaMessage::kCopyfile: return santaMsg.copyfile();
+    case ::pbv1::SantaMessage::kGatekeeperOverride: return santaMsg.gatekeeper_override();
     case ::pbv1::SantaMessage::EVENT_NOT_SET:
       XCTFail(@"Protobuf message SantaMessage did not set an 'event' field");
       OS_FALLTHROUGH;
@@ -1286,6 +1290,45 @@ void SerializeAndCheckNonESEvents(
 }
 
 #endif  // HAVE_MACOS_13
+
+#if HAVE_MACOS_15
+
+- (void)testSerializeMessageGatekeeperOverride {
+  es_file_t targetFile = MakeESFile("foo");
+  es_sha256_t fileHash;
+  std::fill(std::begin(fileHash), std::end(fileHash), 'A');
+
+  es_signed_file_info_t signingInfo = {
+      .signing_id = MakeESStringToken("com.my.sid"),
+      .team_id = MakeESStringToken("mytid"),
+  };
+  std::fill(std::begin(signingInfo.cdhash), std::end(signingInfo.cdhash), 'B');
+
+  __block es_event_gatekeeper_user_override_t gatekeeper = {
+      .file_type = ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE,
+      .file.file = &targetFile,
+      .sha256 = &fileHash,
+      .signing_info = &signingInfo,
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.gatekeeper_user_override = &gatekeeper;
+                  }];
+
+  gatekeeper.file_type = ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_PATH;
+  gatekeeper.file.file_path = MakeESStringToken("foo_path");
+  gatekeeper.signing_info = NULL;
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.gatekeeper_user_override = &gatekeeper;
+                  }
+                       variant:@"path_only"];
+}
+
+#endif  // HAVE_MACOS_15
 
 - (void)testGetAccessType {
   std::map<es_event_type_t, ::pbv1::FileAccess::AccessType> eventTypeToAccessType = {
