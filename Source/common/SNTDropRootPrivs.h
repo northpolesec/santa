@@ -13,6 +13,9 @@
 ///    limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 ///
 ///  Simple function to check and drop root privileges.
@@ -20,3 +23,5 @@
 ///  @return YES if dropping was successful or unnecessary.
 ///
 BOOL DropRootPrivileges(void);
+
+__END_DECLS

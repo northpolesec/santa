@@ -21,6 +21,7 @@
 #import "Source/common/SNTDropRootPrivs.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/santasyncservice/SNTPolaris.h"
 #import "Source/santasyncservice/SNTSyncBroadcaster.h"
 #import "Source/santasyncservice/SNTSyncManager.h"
 
@@ -28,6 +29,8 @@
 @property(nonatomic, readonly) SNTSyncManager *syncManager;
 @property(nonatomic, readonly) MOLXPCConnection *daemonConn;
 @property(nonatomic, readonly) NSMutableArray *logListeners;
+
+@property(nonatomic) dispatch_source_t statsSubmissionTimer;
 @end
 
 @implementation SNTSyncService
@@ -69,6 +72,10 @@
     // noticed there is sync server configured and established a connection
     // with us. Go ahead and start syncing!
     [_syncManager syncSecondsFromNow:15];
+
+    // Start the stat submission thread, which spins up daily to submit stats to Polaris
+    // IF AND ONLY IF the user has enabled stat collection.
+    [self statSubmissionThread];
   }
   return self;
 }
@@ -117,6 +124,28 @@
 
 - (void)handleAPNSMessage:(NSDictionary *)message {
   [self.syncManager handleAPNSMessage:message];
+}
+
+- (void)statSubmissionThread {
+  self.statsSubmissionTimer = dispatch_source_create(
+      DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+
+  // Submit stats once a day, giving the OS 10 minutes leeway for firing the timer.
+  dispatch_source_set_timer(self.statsSubmissionTimer, DISPATCH_TIME_NOW, 86400 * NSEC_PER_SEC,
+                            600 * NSEC_PER_SEC);
+  dispatch_source_set_event_handler(self.statsSubmissionTimer, ^{
+    // If stats collection is not enabled, skip this submission.
+    if (![[SNTConfigurator configurator] enableStatsCollection]) {
+      LOGI(@"Stats collection is disabled, skipping submission");
+      return;
+    }
+#ifdef DEBUG
+    LOGI(@"Stats collection is disabled in DEBUG builds");
+#else
+    santa::SubmitStats([[SNTConfigurator configurator] statsOrganizationID]);
+#endif
+  });
+  dispatch_resume(self.statsSubmissionTimer);
 }
 
 @end

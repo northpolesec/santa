@@ -83,6 +83,8 @@ static NSString *const kClientAuthCertificateCNKey = @"ClientAuthCertificateCN";
 static NSString *const kClientAuthCertificateIssuerKey = @"ClientAuthCertificateIssuerCN";
 static NSString *const kServerAuthRootsDataKey = @"ServerAuthRootsData";
 static NSString *const kServerAuthRootsFileKey = @"ServerAuthRootsFile";
+static NSString *const kEnableStatsCollectionKey = @"EnableStatsCollection";
+static NSString *const kStatsOrganizationID = @"StatsOrganizationID";
 
 static NSString *const kMachineOwnerKey = @"MachineOwner";
 static NSString *const kMachineIDKey = @"MachineID";
@@ -259,6 +261,8 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kClientContentEncoding : string,
       kServerAuthRootsDataKey : data,
       kServerAuthRootsFileKey : string,
+      kEnableStatsCollectionKey : number,
+      kStatsOrganizationID : string,
       kMachineOwnerKey : string,
       kMachineIDKey : string,
       kMachineOwnerPlistFileKey : string,
@@ -500,6 +504,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingSyncServerAuthRootsFile {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableStatsCollection {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingStatsOrganizationID {
   return [self configStateSet];
 }
 
@@ -921,6 +933,15 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSString *)syncServerAuthRootsFile {
   return self.configState[kServerAuthRootsFileKey];
+}
+
+- (BOOL)enableStatsCollection {
+  NSNumber *e = self.configState[kEnableStatsCollectionKey];
+  return ([e boolValue] || [self statsOrganizationID].length > 0);
+}
+
+- (NSString *)statsOrganizationID {
+  return self.configState[kStatsOrganizationID];
 }
 
 - (NSDate *)fullSyncLastSuccess {

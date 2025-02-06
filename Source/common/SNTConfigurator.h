@@ -494,6 +494,22 @@
 ///
 @property(nonatomic) SNTSyncType syncTypeRequired;
 
+///
+///  Enable statistics uploading to polaris.northpole.security.
+///  See https://northpole.dev/deployment/stats for more info.
+///
+@property(readonly, nonatomic) BOOL enableStatsCollection;
+
+///
+///  Specifies an organization ID to send with collected statistics.
+///  Setting this to anything other than a blank string will enable
+///  statistics collection, regardless of the EnableStatsCollection key.
+///
+///  Only populate this field with a value provided to you by
+///  North Pole Security, Inc.
+///
+@property(nullable, readonly, nonatomic) NSString *statsOrganizationID;
+
 #pragma mark - USB Settings
 
 ///
