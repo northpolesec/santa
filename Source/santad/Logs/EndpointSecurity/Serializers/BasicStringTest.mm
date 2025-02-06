@@ -797,6 +797,57 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 #endif  // HAVE_MACOS_13
 
+#if HAVE_MACOS_15
+
+- (void)testtestSerializeMessageGatekeeperOverride {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, &proc);
+  es_file_t gkFile = MakeESFile("MyAppFile");
+
+  es_sha256_t fileHash;
+  std::fill(std::begin(fileHash), std::end(fileHash), 'A');
+
+  es_signed_file_info_t signingInfo = {
+      .signing_id = MakeESStringToken("com.my.sid"),
+      .team_id = MakeESStringToken("mytid"),
+  };
+  std::fill(std::begin(signingInfo.cdhash), std::end(signingInfo.cdhash), 'B');
+
+  es_event_gatekeeper_user_override_t gatekeeper = {
+      .file_type = ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE,
+      .file.file = &gkFile,
+      .sha256 = &fileHash,
+      .signing_info = &signingInfo,
+  };
+
+  esMsg.event.gatekeeper_user_override = &gatekeeper;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want =
+      "action=GATEKEEPER_OVERRIDE|target=MyAppFile"
+      "|hash=4141414141414141414141414141414141414141414141414141414141414141|team_id=mytid"
+      "|signing_id=com.my.sid|cdhash=4242424242424242424242424242424242424242"
+      "|pid=12|ppid=56|process=foo|processpath=foo"
+      "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  gatekeeper.file_type = ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_PATH;
+  gatekeeper.file.file_path = MakeESStringToken("MyAppPath");
+
+  got = BasicStringSerializeMessage(&esMsg);
+  want = "action=GATEKEEPER_OVERRIDE|target=MyAppPath"
+         "|hash=4141414141414141414141414141414141414141414141414141414141414141|team_id=mytid"
+         "|signing_id=com.my.sid|cdhash=4242424242424242424242424242424242424242"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+#endif  // HAVE_MACOS_15
+
 - (void)testGetAccessTypeString {
   std::map<es_event_type_t, std::string> accessTypeToString = {
       {ES_EVENT_TYPE_AUTH_OPEN, "OPEN"},         {ES_EVENT_TYPE_AUTH_LINK, "LINK"},

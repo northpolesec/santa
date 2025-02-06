@@ -34,6 +34,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/String.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #import "Source/santad/SNTDecisionCache.h"
@@ -795,8 +796,37 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationA
 
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverride &msg) {
   std::string str = CreateDefaultString();
+  es_event_gatekeeper_user_override_t *gk = msg->event.gatekeeper_user_override;
 
-  str.append("action=GATEKEEPER_OVERRIDE");
+  str.append("action=GATEKEEPER_OVERRIDE|target=");
+  switch (gk->file_type) {
+    case ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_PATH:
+      str.append(SanitizableString(gk->file.file_path).Sanitized());
+      break;
+    case ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE:
+      str.append(FilePath(gk->file.file).Sanitized());
+    default: break;
+  }
+
+  if (gk->sha256) {
+    str.append("|hash=");
+    str.append(BufToHexString(*gk->sha256, sizeof(*gk->sha256)));
+  }
+
+  if (gk->signing_info) {
+    if (gk->signing_info->team_id.length > 0) {
+      str.append("|team_id=");
+      str.append(gk->signing_info->team_id.data);
+    }
+    if (gk->signing_info->signing_id.length > 0) {
+      str.append("|signing_id=");
+      str.append(SanitizableString(gk->signing_info->signing_id).Sanitized());
+    }
+    str.append("|cdhash=");
+    str.append(BufToHexString(gk->signing_info->cdhash, sizeof(gk->signing_info->cdhash)));
+  }
+
+  AppendInstigator(str, msg);
 
   return FinalizeString(str);
 }

@@ -191,6 +191,18 @@ static inline void EncodeAnnotations(std::function<::pbv1::process_tree::Annotat
   }
 }
 
+#if !HAVE_MACOS_15
+// Note: This type alias did not exist until the macOS 15 SDK.
+typedef uint8_t es_cdhash_t[20];
+#endif
+
+static inline void EncodeCodeSignature(::pbv1::CodeSignature *pb_code_sig, const es_cdhash_t cdhash,
+                                       es_string_token_t sid, es_string_token_t tid) {
+  pb_code_sig->set_cdhash(cdhash, sizeof(es_cdhash_t));
+  EncodeStringToken([pb_code_sig] { return pb_code_sig->mutable_signing_id(); }, sid);
+  EncodeStringToken([pb_code_sig] { return pb_code_sig->mutable_team_id(); }, tid);
+}
+
 static inline void EncodeProcessInfoLight(::pbv1::ProcessInfoLight *pb_proc_info,
                                           const es_process_t *es_proc,
                                           const EnrichedProcess &enriched_proc) {
@@ -247,15 +259,8 @@ static inline void EncodeProcessInfo(::pbv1::ProcessInfo *pb_proc_info, uint32_t
   pb_proc_info->set_is_es_client(es_proc->is_es_client);
 
   if (es_proc->codesigning_flags & CS_SIGNED) {
-    ::pbv1::CodeSignature *pb_code_sig = pb_proc_info->mutable_code_signature();
-    pb_code_sig->set_cdhash(es_proc->cdhash, sizeof(es_proc->cdhash));
-    if (es_proc->signing_id.length > 0) {
-      pb_code_sig->set_signing_id(es_proc->signing_id.data, es_proc->signing_id.length);
-    }
-
-    if (es_proc->team_id.length > 0) {
-      pb_code_sig->set_team_id(es_proc->team_id.data, es_proc->team_id.length);
-    }
+    EncodeCodeSignature(pb_proc_info->mutable_code_signature(), es_proc->cdhash,
+                        es_proc->signing_id, es_proc->team_id);
   }
 
   pb_proc_info->set_cs_flags(es_proc->codesigning_flags);
@@ -1015,8 +1020,54 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAuto
 
 #if HAVE_MACOS_15
 
+static inline void EncodeFileInfo(::pbv1::FileInfo *pb_file, const es_file_t *es_file,
+                                  const std::optional<EnrichedFile> &enriched_file,
+                                  NSString *sha256 = nil) {
+  EncodePath(pb_file->mutable_path(), es_file);
+  pb_file->set_truncated(es_file->path_truncated);
+  if (enriched_file.has_value()) {
+    EncodeStat(pb_file->mutable_stat(), es_file->stat, enriched_file.value().user(),
+               enriched_file.value().group());
+  }
+  if (sha256) {
+    EncodeHash(pb_file->mutable_hash(), sha256);
+  }
+}
+
+static inline void EncodeFileInfo(::pbv1::FileInfo *pb_file, es_string_token_t path,
+                                  bool truncated) {
+  EncodeStringToken([pb_file] { return pb_file->mutable_path(); }, path);
+  pb_file->set_truncated(truncated);
+}
+
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride &msg) {
-  return {};
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+  ::pbv1::GatekeeperOverride *pb_gk = santa_msg->mutable_gatekeeper_override();
+  es_event_gatekeeper_user_override_t *gk = msg->event.gatekeeper_user_override;
+
+  EncodeProcessInfoLight(pb_gk->mutable_instigator(), msg);
+
+  switch (gk->file_type) {
+    case ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE: {
+      NSString *hashHexStr =
+          gk->sha256 ? @(BufToHexString(*gk->sha256, sizeof(*gk->sha256)).c_str()) : nil;
+      EncodeFileInfo(pb_gk->mutable_target(), gk->file.file, msg.Target(), hashHexStr);
+      break;
+    }
+
+    case ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_PATH: {
+      EncodeFileInfo(pb_gk->mutable_target(), gk->file.file_path, false);
+      break;
+    }
+  }
+
+  if (gk->signing_info) {
+    EncodeCodeSignature(pb_gk->mutable_code_signature(), gk->signing_info->cdhash,
+                        gk->signing_info->signing_id, gk->signing_info->team_id);
+  }
+
+  return FinalizeProto(santa_msg);
 }
 
 #endif  // HAVE_MACOS_15
