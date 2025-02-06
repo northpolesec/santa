@@ -14,9 +14,9 @@
 
 #import "Source/common/SNTDropRootPrivs.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
 
 BOOL DropRootPrivileges() {
   if (getuid() == 0 || geteuid() == 0 || getgid() == 0 || getegid() == 0) {
@@ -34,6 +34,4 @@ BOOL DropRootPrivileges() {
   return true;
 }
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS

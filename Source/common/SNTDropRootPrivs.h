@@ -13,10 +13,9 @@
 ///    limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
 
 ///
 ///  Simple function to check and drop root privileges.
@@ -25,6 +24,4 @@ extern "C" {
 ///
 BOOL DropRootPrivileges(void);
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS

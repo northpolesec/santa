@@ -22,7 +22,18 @@ The set of details collected will always be publicly available in the
 [stats proto](https://github.com/northpolesec/protos/blob/main/stats/v1.proto#L17)
 file.
 
-The comments in that file outline which fields are collected and why.
+* `machine_id_hash`: A SHA-256 of the machine's hardware UUID.
+
+* `santa_version`: The full Santa client version number (e.g. 2025.1.80).
+
+* `macos_version`: The macOS version number (e.g. 15.2).
+
+* `macos_build`: The macOS build ID (e.g. 24C101).
+
+* `mac_model`: The Mac hardware model identifier (e.g. Mac15,7).
+
+* `org_id`: The value of the optional `StatsOrganizationID` config key
+  (see ["What is an organization ID?"](#what-is-an-organization-id)).
 
 Any changes to the collected data will be clearly called out in the release
 notes for future client versions.
@@ -68,14 +79,13 @@ a SHA-256 hash of the Hardware UUID of the machine so while it does uniquely
 identify a machine, we cannot use it to identify anything else about that
 machine.
 
-The other _potentially_ identifying information that we receive is the IP
-address of the submitting machine (by virtue of the requests being sent over
-HTTPS). You can see from the Polaris source code that we are not actively
-collecting this and storing it, nor logging individual requests. However, as a
-user you have no guarantees of that. We are investigating using anonymization
-mechanisms such as [Oblivious HTTP](https://datatracker.ietf.org/doc/rfc9458/)
-to provide stronger guarantees that this data is not available to us but that is
-not currently implemented.
+While, as a gRPC server, Polaris could see the IP address of submitting clients,
+we explicitly do not record this information or log individual requests.
+However, we understand that even though the Polaris code is open and you can see
+that we are not recording the IP address, this is not a strong guarantee. We are
+investigating using anonymization mechanisms such as
+[Oblivious HTTP](https://datatracker.ietf.org/doc/rfc9458) but that is not
+currently implemented.
 
 ### How do I opt-in?
 
