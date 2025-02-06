@@ -15,8 +15,7 @@
 
 #import "Source/santactl/SNTCommandController.h"
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTXPCControlInterface.h"
 
 @implementation SNTCommandController

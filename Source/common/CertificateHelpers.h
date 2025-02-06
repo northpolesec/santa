@@ -14,8 +14,9 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
-#import <MOLCertificate/MOLCertificate.h>
 #include <sys/cdefs.h>
+
+@class MOLCertificate;
 
 __BEGIN_DECLS
 

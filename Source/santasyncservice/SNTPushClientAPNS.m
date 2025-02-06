@@ -13,8 +13,7 @@
 /// limitations under the License.
 #import "Source/santasyncservice/SNTPushClientAPNS.h"
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"

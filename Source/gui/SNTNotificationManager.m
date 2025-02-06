@@ -17,10 +17,10 @@
 #include <Foundation/Foundation.h>
 #include "Source/common/SNTCommonEnums.h"
 
-#import <MOLCertificate/MOLCertificate.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
 #import <UserNotifications/UserNotifications.h>
 
+#import "Source/common/MOLCertificate.h"
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"

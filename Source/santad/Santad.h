@@ -1,4 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,8 +16,7 @@
 #ifndef SANTA__SANTAD_SANTAD_H
 #define SANTA__SANTAD_SANTAD_H
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
+#import "Source/common/MOLXPCConnection.h"
 #include "Source/common/PrefixTree.h"
 #include "Source/common/Unit.h"
 #include "Source/santad/DataLayer/WatchItems.h"

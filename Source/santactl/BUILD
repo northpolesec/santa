@@ -19,8 +19,8 @@ objc_library(
         "SNTCommandController.h",
     ],
     deps = [
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTXPCControlInterface",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -41,9 +41,9 @@ objc_library(
     srcs = ["Commands/SNTCommandInstall.mm"],
     deps = [
         ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -73,6 +73,9 @@ objc_library(
         ":SNTCommandInstall",
         ":SNTCommandPrintLog",
         ":santactl_cmd",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -92,9 +95,6 @@ objc_library(
         "//Source/common:SigningIDHelpers",
         "//Source/santasyncservice:sync_lib",
         "@FMDB",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -130,6 +130,9 @@ santa_unit_test(
         "SNTCommandController.m",
     ],
     deps = [
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
@@ -139,9 +142,6 @@ santa_unit_test(
         "//Source/common:SNTXPCBundleServiceInterface",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SigningIDHelpers",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
         "@OCMock",
     ],
 )
@@ -158,12 +158,12 @@ santa_unit_test(
     visibility = ["//:santa_package_group"],
     deps = [
         ":santactl_lib",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTXPCControlInterface",
         "//Source/santametricservice/Formats:SNTMetricFormatTestHelper",
-        "@MOLXPCConnection",
         "@OCMock",
     ],
 )

@@ -49,9 +49,9 @@ objc_library(
     ],
     deps = [
         ":SNTMetricWriter",
+        "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
-        "@MOLAuthenticatingURLSession",
     ],
 )
 
@@ -62,8 +62,8 @@ santa_unit_test(
     ],
     deps = [
         ":SNTMetricHTTPWriter",
+        "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:SNTConfigurator",
-        "@MOLAuthenticatingURLSession",
         "@OCMock",
     ],
 )

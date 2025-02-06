@@ -15,6 +15,8 @@
 
 #import "Source/common/CertificateHelpers.h"
 
+#import "Source/common/MOLCertificate.h"
+
 #include <Security/SecCertificate.h>
 
 NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID) {

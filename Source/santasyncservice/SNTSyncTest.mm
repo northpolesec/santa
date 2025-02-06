@@ -1,4 +1,5 @@
 /// Copyright 2016 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,9 +16,9 @@
 #include <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
 #import <OCMock/OCMock.h>
 
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"

@@ -101,6 +101,9 @@ objc_library(
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
@@ -113,9 +116,6 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
     ],
 )
 

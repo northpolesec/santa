@@ -14,7 +14,7 @@ objc_library(
     hdrs = ["SNTSyncFCM.h"],
     sdk_frameworks = ["Network"],
     deps = [
-        "@MOLAuthenticatingURLSession",
+        "//Source/common:MOLAuthenticatingURLSession",
     ],
 )
 
@@ -53,6 +53,9 @@ objc_library(
         ":FCM_lib",
         ":broadcaster_lib",
         "//Source/common:EncodeEntitlements",
+        "//Source/common:MOLAuthenticatingURLSession",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTFileInfo",
@@ -65,9 +68,6 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:String",
-        "@MOLAuthenticatingURLSession",
-        "@MOLCertificate",
-        "@MOLXPCConnection",
         "@com_google_protobuf//src/google/protobuf/json",
         "@northpole_protos//sync:v1_cc_proto",
     ],
@@ -113,6 +113,9 @@ santa_unit_test(
         ":FCM_lib",
         ":broadcaster_lib",
         "//Source/common:EncodeEntitlements",
+        "//Source/common:MOLAuthenticatingURLSession",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDropRootPrivs",
@@ -125,9 +128,6 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:String",
-        "@MOLAuthenticatingURLSession",
-        "@MOLCertificate",
-        "@MOLXPCConnection",
         "@OCMock",
         "@com_google_protobuf//src/google/protobuf/json",
         "@northpole_protos//sync:v1_cc_proto",
@@ -150,8 +150,8 @@ objc_library(
     srcs = ["SNTSyncBroadcaster.m"],
     hdrs = ["SNTSyncBroadcaster.h"],
     deps = [
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTXPCSyncServiceInterface",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -165,12 +165,12 @@ objc_library(
     deps = [
         ":broadcaster_lib",
         ":sync_lib",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
     ],
 )
 

@@ -17,11 +17,11 @@
 
 #include <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <Security/SecCode.h>
 #import <Security/Security.h>
 
 #import "Source/common/CertificateHelpers.h"
+#import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeepCopy.h"

@@ -15,10 +15,9 @@
 
 #import "Source/common/SNTStoredEvent.h"
 
-#import <MOLCertificate/MOLCertificate.h>
-
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/CoderMacros.h"
+#import "Source/common/MOLCertificate.h"
 
 @implementation SNTStoredEvent
 

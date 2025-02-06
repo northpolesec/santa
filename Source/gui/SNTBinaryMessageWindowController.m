@@ -18,11 +18,11 @@
 
 #include <AppKit/AppKit.h>
 #import <LocalAuthentication/LocalAuthentication.h>
-#import <MOLCertificate/MOLCertificate.h>
 #import <SecurityInterface/SFCertificatePanel.h>
 #include <dispatch/dispatch.h>
 
 #import "Source/common/CertificateHelpers.h"
+#import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredEvent.h"

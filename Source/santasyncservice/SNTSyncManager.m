@@ -15,10 +15,10 @@
 
 #import "Source/santasyncservice/SNTSyncManager.h"
 
-#import <MOLAuthenticatingURLSession/MOLAuthenticatingURLSession.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
 #import <Network/Network.h>
+#import "Source/common/MOLXPCConnection.h"
 
+#import "Source/common/MOLAuthenticatingURLSession.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"

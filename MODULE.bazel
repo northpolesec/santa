@@ -19,38 +19,6 @@ git_override(
     remote = "https://github.com/northpolesec/protos",
 )
 
-# MOLCertificate
-bazel_dep(name = "molcertificate", version = "2.1", repo_name = "MOLCertificate")
-git_override(
-    module_name = "molcertificate",
-    commit = "34f0ccf68a34a07cc636ada89057c529f90bec3a",
-    remote = "https://github.com/google/macops-molcertificate.git",
-)
-
-# MOLAuthenticatingURLSession
-bazel_dep(name = "molauthenticatingurlsession", version = "3.0", repo_name = "MOLAuthenticatingURLSession")
-git_override(
-    module_name = "molauthenticatingurlsession",
-    commit = "0a50a67f29d635a4012981714c1dedef9ac25fe6",
-    remote = "https://github.com/google/macops-molauthenticatingurlsession.git",
-)
-
-# MOLCodesignChecker
-bazel_dep(name = "molcodesignchecker", version = "3.0", repo_name = "MOLCodesignChecker")
-git_override(
-    module_name = "molcodesignchecker",
-    commit = "5060bcc8baa90bae3b0ca705d14850328bbbec53",
-    remote = "https://github.com/google/macops-molcodesignchecker.git",
-)
-
-# MOLXPCConnection
-bazel_dep(name = "molxpcconnection", version = "2.1", repo_name = "MOLXPCConnection")
-git_override(
-    module_name = "molxpcconnection",
-    commit = "bd75ae9329fe26197f50ceb84bc4932f706df573",
-    remote = "https://github.com/google/macops-molxpcconnection.git",
-)
-
 # FMDB
 non_module_deps = use_extension("//:non_module_deps.bzl", "non_module_deps")
 use_repo(non_module_deps, "FMDB")

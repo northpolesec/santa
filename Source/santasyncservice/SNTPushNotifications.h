@@ -15,7 +15,7 @@
 
 #import <Foundation/Foundation.h>
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
+#import "Source/common/MOLXPCConnection.h"
 
 @protocol SNTPushNotificationsSyncDelegate <NSObject>
 - (void)sync;

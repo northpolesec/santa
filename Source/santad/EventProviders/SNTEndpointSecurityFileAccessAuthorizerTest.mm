@@ -14,8 +14,6 @@
 /// limitations under the License.
 
 #include <EndpointSecurity/EndpointSecurity.h>
-#import <MOLCertificate/MOLCertificate.h>
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
@@ -32,6 +30,8 @@
 #include <optional>
 #include <variant>
 
+#import "Source/common/MOLCertificate.h"
+#import "Source/common/MOLCodesignChecker.h"
 #include "Source/common/Platform.h"
 #include "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"

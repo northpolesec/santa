@@ -19,6 +19,8 @@ objc_library(
         "SNTMetricService.h",
     ],
     deps = [
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTLogging",
@@ -28,8 +30,6 @@ objc_library(
         "//Source/santametricservice/Formats:SNTMetricRawJSONFormat",
         "//Source/santametricservice/Writers:SNTMetricFileWriter",
         "//Source/santametricservice/Writers:SNTMetricHTTPWriter",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -39,11 +39,11 @@ santa_unit_test(
     structured_resources = ["//Source/santametricservice/Formats:testdata"],
     deps = [
         ":SNTMetricServiceLib",
+        "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTMetricSet",
         "//Source/santametricservice/Formats:SNTMetricFormatTestHelper",
-        "@MOLAuthenticatingURLSession",
         "@OCMock",
     ],
 )
