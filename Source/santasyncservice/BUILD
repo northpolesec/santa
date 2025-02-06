@@ -27,6 +27,7 @@ objc_library(
     deps = [
         "//Source/common:SNTLogging",
         "//Source/common:SNTSystemInfo",
+        "//Source/common:String",
         "@grpc//:grpc++",
         "@northpole_protos//stats:v1_cc_grpc",
     ],
