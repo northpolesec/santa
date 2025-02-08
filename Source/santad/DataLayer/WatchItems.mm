@@ -732,6 +732,15 @@ bool ProcessWatchItems::Build(SetSharedProcessWatchItemPolicy proc_policies) {
   return true;
 }
 
+void ProcessWatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
+  for (const auto &p : policies_) {
+    bool stop = checkPolicyBlock(p);
+    if (stop) {
+      break;
+    }
+  }
+}
+
 #pragma mark WatchItems
 
 std::shared_ptr<WatchItems> WatchItems::Create(NSString *config_path,
@@ -867,6 +876,12 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
                                     removedPaths:paths_to_stop_watching];
       });
     }
+
+    if (registered_proc_client_) {
+      dispatch_async(q_, ^{
+        [registered_proc_client_ processWatchItemsCount:proc_watch_items_.Count()];
+      });
+    }
   } else {
     LOGD(@"No changes to set of watched paths.");
   }
@@ -933,6 +948,11 @@ WatchItems::VersionAndPolicies WatchItems::FindPolciesForPaths(
     const std::vector<std::string_view> &paths) {
   absl::ReaderMutexLock lock(&lock_);
   return {policy_version_, data_watch_items_.FindPolcies(paths)};
+}
+
+void WatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
+  absl::ReaderMutexLock lock(&lock_);
+  proc_watch_items_.IterateProcessPolicies(checkPolicyBlock);
 }
 
 void WatchItems::SetConfigPath(NSString *config_path) {

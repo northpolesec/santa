@@ -54,12 +54,15 @@ extern NSString *const kWatchItemConfigKeyProcessesTeamID;
 extern NSString *const kWatchItemConfigKeyProcessesCDHash;
 extern NSString *const kWatchItemConfigKeyProcessesPlatformBinary;
 
-// Forward declarations
 namespace santa {
-class WatchItemsPeer;
-}
 
-namespace santa {
+// Forward declarations
+class ProcessWatchItems;
+class WatchItemsPeer;
+
+// Type aliases
+using CheckPolicyBlock = bool (^)(std::shared_ptr<ProcessWatchItemPolicy>);
+using IterateProcessPoliciesBlock = void (^)(CheckPolicyBlock);
 
 struct WatchItemsState {
   uint64_t rule_count;
@@ -116,6 +119,9 @@ class ProcessWatchItems {
 
   bool Build(SetSharedProcessWatchItemPolicy proc_policies);
 
+  size_t Count() const { return policies_.size(); }
+  void IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock);
+
  private:
   SetSharedProcessWatchItemPolicy policies_;
 };
@@ -147,6 +153,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   void SetConfig(NSDictionary *config);
 
   VersionAndPolicies FindPolciesForPaths(const std::vector<std::string_view> &paths);
+  void IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock);
 
   std::optional<WatchItemsState> State();
 

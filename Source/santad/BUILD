@@ -496,6 +496,8 @@ objc_library(
         ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
+        ":WatchItemPolicy",
+        ":WatchItems",
     ],
 )
 
@@ -837,6 +839,7 @@ objc_library(
         ":SNTEndpointSecurityAuthorizer",
         ":SNTEndpointSecurityDeviceManager",
         ":SNTEndpointSecurityFileAccessAuthorizer",
+        ":SNTEndpointSecurityProcessFileAccessAuthorizer",
         ":SNTEndpointSecurityRecorder",
         ":SNTEndpointSecurityTamperResistance",
         ":SNTExecutionController",

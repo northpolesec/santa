@@ -13,21 +13,29 @@
 /// limitations under the License.
 
 #import "Source/santad/EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"
+#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 
+using santa::IterateProcessPoliciesBlock;
 using santa::Message;
+using santa::ProcessWatchItemPolicy;
 
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
 @property bool isSubscribed;
+@property IterateProcessPoliciesBlock iterateProcessPoliciesBlock;
 @end
 
 @implementation SNTEndpointSecurityProcessFileAccessAuthorizer
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics {
+                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+    iterateProcessPoliciesBlock:(IterateProcessPoliciesBlock)iterateProcessPoliciesBlock {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kProcessFileAccessAuthorizer];
   if (self) {
+    _iterateProcessPoliciesBlock = iterateProcessPoliciesBlock;
+
     [self establishClientOrDie];
     [self enableProcessWatching];
   }
@@ -43,11 +51,19 @@ using santa::Message;
 }
 
 - (santa::ProbeInterest)probeInterest:(const santa::Message &)esMsg {
+  if (!self.isSubscribed) {
+    return santa::ProbeInterest::kUninterested;
+  }
+
+  self.iterateProcessPoliciesBlock(^bool(std::shared_ptr<ProcessWatchItemPolicy> policy) {
+    return true;
+  });
+
   return santa::ProbeInterest::kUninterested;
 }
 
 - (void)enable {
-  std::set<es_event_type_t> events = {
+  static const std::set<es_event_type_t> events = {
       ES_EVENT_TYPE_AUTH_CLONE,        ES_EVENT_TYPE_AUTH_COPYFILE, ES_EVENT_TYPE_AUTH_CREATE,
       ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ES_EVENT_TYPE_AUTH_LINK,     ES_EVENT_TYPE_AUTH_OPEN,
       ES_EVENT_TYPE_AUTH_RENAME,       ES_EVENT_TYPE_AUTH_TRUNCATE, ES_EVENT_TYPE_AUTH_UNLINK,
@@ -56,6 +72,7 @@ using santa::Message;
 
   if (!self.isSubscribed) {
     if ([super subscribe:events]) {
+      LOGD(@"Proc FAA subscribed");
       self.isSubscribed = true;
     }
   }
@@ -67,9 +84,18 @@ using santa::Message;
 - (void)disable {
   if (self.isSubscribed) {
     if ([super unsubscribeAll]) {
+      LOGD(@"Proc FAA unsubscribed");
       self.isSubscribed = false;
     }
     [super unmuteAllTargetPaths];
+  }
+}
+
+- (void)processWatchItemsCount:(size_t)count {
+  if (count > 0) {
+    [self enable];
+  } else {
+    [self disable];
   }
 }
 

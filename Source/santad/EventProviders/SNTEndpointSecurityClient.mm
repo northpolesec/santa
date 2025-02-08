@@ -45,7 +45,6 @@ using santa::EventDisposition;
 using santa::Message;
 using santa::Metrics;
 using santa::Processor;
-using santa::WatchItemPathType;
 
 @interface SNTEndpointSecurityClient ()
 @property(nonatomic) double defaultBudget;
