@@ -11,7 +11,6 @@ xcuserdata
 tulsigen-*
 *.crt
 *.key
-*.pem
 *.p12
 *.keychain
 *.swp
