@@ -2,43 +2,44 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
     - cron: '45 20 * * *'
 
 jobs:
   analyze:
-    name: Analyze (${{ matrix.language }})
+    name: Analyze ObjC++
     runs-on: 'macos-latest'
     permissions:
       security-events: write
       packages: read
       actions: read
       contents: read
-      
+
     strategy:
       fail-fast: false
-      matrix:
-        include:
-        - language: c-cpp
-          build-mode: autobuild
-        - language: python
-          build-mode: none
-        - language: swift
-          build-mode: autobuild
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: ${{ matrix.language }}
-        build-mode: ${{ matrix.build-mode }}
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@9e8d0789d4a0fa9ceb6b1738f7e269594bdd67f0 # ratchet:github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          build-mode: manual
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
-      with:
-        category: "/language:${{matrix.language}}"
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@90b352333885f9fb6bf262d8e659f01b6219cc25 # ratchet:bazel-contrib/setup-bazel@0.9.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+
+      - name: Build Userspace
+        run: bazel build --apple_generate_dsym -c opt //:release --define=SANTA_BUILD_TYPE=adhoc
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@9e8d0789d4a0fa9ceb6b1738f7e269594bdd67f0 # ratchet:github/codeql-action/analyze@v3
+        with:
+          category: "/language:c-cpp"
