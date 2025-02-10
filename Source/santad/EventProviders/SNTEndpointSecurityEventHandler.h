@@ -38,7 +38,7 @@
 
 // Protocol for an object that implements the necessary interfaces
 // for handling updates to Data FAA rules.
-@protocol SNTDataFileAccessAuthorizer
+@protocol SNTDataFileAccessAuthorizer <NSObject>
 
 - (void)watchItemsCount:(size_t)count
                newPaths:(const santa::SetPairPathAndType &)newPaths
@@ -48,9 +48,9 @@
 
 // Protocol for an object that implements the necessary interfaces
 // for handling updates to Data FAA rules.
-@protocol SNTProcessFileAccessAuthorizer
+@protocol SNTProcessFileAccessAuthorizer <NSObject>
 
-// TODO: Currently just a stub
+- (void)processWatchItemsCount:(size_t)count;
 
 @end
 

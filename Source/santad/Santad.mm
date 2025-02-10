@@ -34,6 +34,7 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDeviceManager.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
@@ -138,7 +139,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                           logger:logger];
 
   if (@available(macOS 13.0, *)) {
-    SNTEndpointSecurityFileAccessAuthorizer *access_authorizer_client =
+    SNTEndpointSecurityFileAccessAuthorizer *data_faa_client =
         [[SNTEndpointSecurityFileAccessAuthorizer alloc]
             initWithESAPI:esapi
                   metrics:metrics
@@ -147,10 +148,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                  enricher:enricher
             decisionCache:[SNTDecisionCache sharedCache]
                 ttyWriter:tty_writer];
-    watch_items->RegisterDataClient(access_authorizer_client);
+    watch_items->RegisterDataClient(data_faa_client);
 
-    access_authorizer_client.fileAccessBlockCallback = ^(
-        SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {
+    data_faa_client.fileAccessBlockCallback = ^(SNTFileAccessEvent *event, NSString *customMsg,
+                                                NSString *customURL, NSString *customText) {
       // TODO: The config state should be an argument to the block.
       SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
       [[notifier_queue.notifierConnection remoteObjectProxy]
@@ -160,6 +161,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                customText:customText
                               configState:cs];
     };
+
+    SNTEndpointSecurityProcessFileAccessAuthorizer *proc_faa_client =
+        [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
+                          initWithESAPI:esapi
+                                metrics:metrics
+            iterateProcessPoliciesBlock:^(santa::CheckPolicyBlock checkPolicyBlock) {
+              watch_items->IterateProcessPolicies(checkPolicyBlock);
+            }];
+
+    watch_items->RegisterProcessClient(proc_faa_client);
+    [authorizer_client registerAuthExecProbe:proc_faa_client];
   }
 
   EstablishSyncServiceConnection(syncd_queue);

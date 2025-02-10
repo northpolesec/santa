@@ -19,8 +19,6 @@
 
 #include "Source/common/Platform.h"
 
-using santa::WatchItemPathType;
-
 namespace santa {
 
 Client EndpointSecurityAPI::NewClient(void (^message_handler)(es_client_t *, Message)) {

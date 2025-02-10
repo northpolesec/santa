@@ -65,7 +65,6 @@ using santa::OptionalStringToNSString;
 using santa::RateLimiter;
 using santa::StringToNSString;
 using santa::TTYWriter;
-using santa::WatchItemPathType;
 using santa::WatchItemProcess;
 using santa::WatchItems;
 
