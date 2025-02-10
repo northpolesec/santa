@@ -1,4 +1,5 @@
 /// Copyright 2017 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -18,9 +19,8 @@
 #import <pthread/pthread.h>
 #include <stdatomic.h>
 
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
+#import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"

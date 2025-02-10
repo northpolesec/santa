@@ -15,8 +15,6 @@
 
 #import <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
-#import <MOLCertificate/MOLCertificate.h>
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #import <dispatch/dispatch.h>
@@ -27,6 +25,8 @@
 #include <cctype>
 #include <memory>
 
+#import "Source/common/MOLCertificate.h"
+#import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"

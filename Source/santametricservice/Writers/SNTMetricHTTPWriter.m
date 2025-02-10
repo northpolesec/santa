@@ -1,4 +1,5 @@
 /// Copyright 2021 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -11,9 +12,10 @@
 ///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
-#import <MOLAuthenticatingURLSession/MOLAuthenticatingURLSession.h>
+
 #include <dispatch/dispatch.h>
 
+#import "Source/common/MOLAuthenticatingURLSession.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/santametricservice/Writers/SNTMetricHTTPWriter.h"

@@ -1,4 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -17,13 +18,13 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
 #include <dispatch/dispatch.h>
 
 #include <map>
 #include <memory>
 #include <string>
 
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTMetricSet.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"

@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,9 +13,9 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <XCTest/XCTest.h>
 
+#import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"

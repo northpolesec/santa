@@ -15,10 +15,9 @@
 
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
 
-#import <MOLCertificate/MOLCertificate.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
 #include "Source/common/EncodeEntitlements.h"
+#import "Source/common/MOLCertificate.h"
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"

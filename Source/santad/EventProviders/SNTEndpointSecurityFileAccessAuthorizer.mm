@@ -17,8 +17,6 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Kernel/kern/cs_blobs.h>
-#import <MOLCertificate/MOLCertificate.h>
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
 #include <bsm/libbsm.h>
 #include <pwd.h>
 #include <sys/fcntl.h>
@@ -34,6 +32,8 @@
 #include <utility>
 #include <variant>
 
+#import "Source/common/MOLCertificate.h"
+#import "Source/common/MOLCodesignChecker.h"
 #include "Source/common/Platform.h"
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTCommonEnums.h"

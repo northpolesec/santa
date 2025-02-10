@@ -17,10 +17,10 @@
 #define SANTA__SANTAD__SANTAD_DEPS_H
 
 #import <Foundation/Foundation.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
 
 #include <memory>
 
+#import "Source/common/MOLXPCConnection.h"
 #include "Source/common/PrefixTree.h"
 #include "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTMetricSet.h"

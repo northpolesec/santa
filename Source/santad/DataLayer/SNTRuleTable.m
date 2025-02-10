@@ -17,10 +17,10 @@
 #include "Source/common/SNTCommonEnums.h"
 
 #import <EndpointSecurity/EndpointSecurity.h>
-#import <MOLCertificate/MOLCertificate.h>
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
 
 #import "Source/common/CertificateHelpers.h"
+#import "Source/common/MOLCertificate.h"
+#import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"

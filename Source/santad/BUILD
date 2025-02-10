@@ -28,6 +28,8 @@ objc_library(
     deps = [
         ":SNTDatabaseTable",
         "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
@@ -37,8 +39,6 @@ objc_library(
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
     ],
 )
 
@@ -96,8 +96,8 @@ objc_library(
     hdrs = ["DataLayer/SNTEventTable.h"],
     deps = [
         ":SNTDatabaseTable",
+        "//Source/common:MOLCertificate",
         "//Source/common:SNTStoredEvent",
-        "@MOLCertificate",
     ],
 )
 
@@ -189,13 +189,13 @@ objc_library(
     srcs = ["SNTNotificationQueue.mm"],
     hdrs = ["SNTNotificationQueue.h"],
     deps = [
+        "//Source/common:MOLXPCConnection",
         "//Source/common:RingBuffer",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -204,11 +204,11 @@ santa_unit_test(
     srcs = ["SNTNotificationQueueTest.mm"],
     deps = [
         ":SNTNotificationQueue",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:TestUtils",
-        "@MOLXPCConnection",
         "@OCMock",
     ],
 )
@@ -218,11 +218,11 @@ objc_library(
     srcs = ["SNTSyncdQueue.m"],
     hdrs = ["SNTSyncdQueue.h"],
     deps = [
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTXPCSyncServiceInterface",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -233,6 +233,9 @@ objc_library(
     deps = [
         ":SNTRuleTable",
         "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigState",
@@ -244,9 +247,6 @@ objc_library(
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
         "@FMDB",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
         "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
@@ -300,6 +300,7 @@ objc_library(
         ":SNTSyncdQueue",
         ":TTYWriter",
         "//Source/common:BranchPrediction",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:PrefixTree",
         "//Source/common:SNTBlockMessage",
         "//Source/common:SNTCachedDecision",
@@ -316,7 +317,6 @@ objc_library(
         "//Source/common:SantaVnode",
         "//Source/common:String",
         "//Source/common:Unit",
-        "@MOLCodesignChecker",
         "@com_google_absl//absl/synchronization",
     ],
 )
@@ -469,6 +469,8 @@ objc_library(
         ":TTYWriter",
         ":WatchItemPolicy",
         ":WatchItems",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:Platform",
         "//Source/common:SNTBlockMessage",
         "//Source/common:SNTCommonEnums",
@@ -479,8 +481,6 @@ objc_library(
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
         "//Source/common:String",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
     ],
@@ -789,6 +789,8 @@ objc_library(
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":WatchItems",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -802,8 +804,6 @@ objc_library(
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "@FMDB",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -814,12 +814,12 @@ objc_library(
     deps = [
         ":EndpointSecurityMessage",
         ":SNTApplicationCoreMetrics",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTXPCMetricServiceInterface",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -847,6 +847,7 @@ objc_library(
         ":SNTSyncdQueue",
         ":TTYWriter",
         ":WatchItems",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:PrefixTree",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -858,7 +859,6 @@ objc_library(
         "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
         "//Source/santad/ProcessTree:process_tree",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -883,6 +883,7 @@ objc_library(
         ":SNTSyncdQueue",
         ":TTYWriter",
         ":WatchItems",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:PrefixTree",
         "//Source/common:RingBuffer",
         "//Source/common:SNTConfigurator",
@@ -894,7 +895,6 @@ objc_library(
         "//Source/common:Unit",
         "//Source/santad/ProcessTree:process_tree",
         "//Source/santad/ProcessTree/annotations:originator",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -1001,12 +1001,12 @@ santa_unit_test(
         "DataLayer/SNTEventTableTest.m",
     ],
     deps = [
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "@FMDB",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
     ],
 )
 
@@ -1024,6 +1024,8 @@ santa_unit_test(
     ],
     deps = [
         "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
@@ -1034,8 +1036,6 @@ santa_unit_test(
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
         "@FMDB",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
         "@OCMock",
     ],
 )
@@ -1064,11 +1064,11 @@ santa_unit_test(
         ":SNTEndpointSecurityAuthorizer",
         ":SNTEndpointSecurityClient",
         ":SantadDeps",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
         "//Source/common:TestUtils",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
         "@OCMock",
         "@com_google_googletest//:gtest",
     ],
@@ -1373,6 +1373,8 @@ santa_unit_test(
         ":SNTEventTable",
         ":SNTExecutionController",
         ":SNTRuleTable",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -1381,8 +1383,6 @@ santa_unit_test(
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:TestUtils",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
         "@OCMock",
     ],
 )
@@ -1425,13 +1425,13 @@ santa_unit_test(
         ":SNTEndpointSecurityFileAccessAuthorizer",
         ":WatchItemPolicy",
         ":WatchItems",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:TestUtils",
-        "@MOLCertificate",
-        "@MOLCodesignChecker",
         "@OCMock",
         "@com_google_googletest//:gtest",
     ],

@@ -15,8 +15,7 @@
 
 #import <Foundation/Foundation.h>
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 
 @class SNTStoredEvent;

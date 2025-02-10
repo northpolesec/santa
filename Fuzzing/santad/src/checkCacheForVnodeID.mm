@@ -1,4 +1,5 @@
 /// Copyright 2018 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,12 +16,11 @@
 #include <cstdint>
 #include <iostream>
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
-#import "SNTCommandController.h"
-#import "SNTRule.h"
-#import "SNTXPCControlInterface.h"
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTRule.h"
+#import "Source/common/SNTXPCControlInterface.h"
+#import "Source/santactl/SNTCommandController.h"
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t *data, std::size_t size) {
   if (size > 16) {

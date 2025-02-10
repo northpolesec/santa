@@ -16,7 +16,6 @@
 #import "Source/santad/SNTExecutionController.h"
 
 #import <Foundation/Foundation.h>
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
 
 #include <bsm/libbsm.h>
 #include <copyfile.h>
@@ -31,6 +30,7 @@
 #include <utility>
 
 #include "Source/common/BranchPrediction.h"
+#import "Source/common/MOLCodesignChecker.h"
 #include "Source/common/PrefixTree.h"
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTCachedDecision.h"

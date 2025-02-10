@@ -15,8 +15,7 @@
 
 #import "Source/santasyncservice/SNTSyncService.h"
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDropRootPrivs.h"
 #import "Source/common/SNTLogging.h"

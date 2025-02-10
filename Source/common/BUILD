@@ -144,7 +144,7 @@ objc_library(
     hdrs = ["CertificateHelpers.h"],
     module_name = "santa_common_CertificateHelpers",
     deps = [
-        "@MOLCertificate",
+        ":MOLCertificate",
     ],
 )
 
@@ -170,8 +170,8 @@ objc_library(
     srcs = ["SigningIDHelpers.m"],
     hdrs = ["SigningIDHelpers.h"],
     deps = [
+        ":MOLCodesignChecker",
         ":SNTLogging",
-        "@MOLCodesignChecker",
     ],
 )
 
@@ -327,10 +327,10 @@ objc_library(
     srcs = ["SNTFileInfo.m"],
     hdrs = ["SNTFileInfo.h"],
     deps = [
+        ":MOLCodesignChecker",
         ":SNTLogging",
         ":SantaVnode",
         "@FMDB",
-        "@MOLCodesignChecker",
     ],
 )
 
@@ -401,8 +401,8 @@ objc_library(
     deps = [
         ":CertificateHelpers",
         ":CoderMacros",
+        ":MOLCertificate",
         ":SNTCommonEnums",
-        "@MOLCertificate",
     ],
 )
 
@@ -447,8 +447,8 @@ objc_library(
     srcs = ["SNTXPCBundleServiceInterface.m"],
     hdrs = ["SNTXPCBundleServiceInterface.h"],
     deps = [
+        ":MOLXPCConnection",
         ":SNTStoredEvent",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -457,7 +457,7 @@ objc_library(
     srcs = ["SNTXPCMetricServiceInterface.m"],
     hdrs = ["SNTXPCMetricServiceInterface.h"],
     deps = [
-        "@MOLXPCConnection",
+        ":MOLXPCConnection",
     ],
 )
 
@@ -470,14 +470,14 @@ objc_library(
         "//conditions:default": None,
     }),
     deps = [
+        ":MOLCodesignChecker",
+        ":MOLXPCConnection",
         ":SNTCommonEnums",
         ":SNTConfigurator",
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",
         ":SNTXPCUnprivilegedControlInterface",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -504,9 +504,9 @@ objc_library(
     srcs = ["SNTXPCSyncServiceInterface.m"],
     hdrs = ["SNTXPCSyncServiceInterface.h"],
     deps = [
+        ":MOLXPCConnection",
         ":SNTCommonEnums",
         ":SNTStoredEvent",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -515,14 +515,14 @@ objc_library(
     srcs = ["SNTXPCUnprivilegedControlInterface.m"],
     hdrs = ["SNTXPCUnprivilegedControlInterface.h"],
     deps = [
+        ":MOLCertificate",
+        ":MOLXPCConnection",
         ":SNTCommonEnums",
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",
         ":SNTXPCBundleServiceInterface",
         ":SantaVnode",
-        "@MOLCertificate",
-        "@MOLXPCConnection",
     ],
 )
 
@@ -557,8 +557,8 @@ santa_unit_test(
     name = "SNTCachedDecisionTest",
     srcs = ["SNTCachedDecisionTest.mm"],
     deps = [
-        "//Source/common:SNTCachedDecision",
-        "//Source/common:TestUtils",
+        ":SNTCachedDecision",
+        ":TestUtils",
         "@OCMock",
     ],
 )
@@ -593,6 +593,10 @@ test_suite(
     name = "unit_tests",
     tests = [
         ":EncodeEntitlementsTest",
+        ":MOLAuthenticatingURLSessionTest",
+        ":MOLCertificateTest",
+        ":MOLCodesignCheckerTest",
+        ":MOLXPCConnectionTest",
         ":PrefixTreeTest",
         ":RingBufferTest",
         ":SNTBlockMessageTest",
@@ -636,4 +640,97 @@ genrule(
     local = 1,
     message = "Generating CommitHash.plist",
     stamp = 1,
+)
+
+objc_library(
+    name = "MOLCertificate",
+    srcs = ["MOLCertificate.m"],
+    hdrs = ["MOLCertificate.h"],
+    sdk_frameworks = [
+        "Foundation",
+        "Security",
+    ],
+)
+
+santa_unit_test(
+    name = "MOLCertificateTest",
+    srcs = ["MOLCertificateTest.m"],
+    resources = glob([
+        "testdata/*.pem",
+        "testdata/*.crt",
+    ]),
+    deps = [":MOLCertificate"],
+)
+
+objc_library(
+    name = "MOLCodesignChecker",
+    srcs = ["MOLCodesignChecker.m"],
+    hdrs = ["MOLCodesignChecker.h"],
+    sdk_frameworks = [
+        "Foundation",
+        "Security",
+    ],
+    deps = [":MOLCertificate"],
+)
+
+santa_unit_test(
+    name = "MOLCodesignCheckerTest",
+    srcs = ["MOLCodesignCheckerTest.m"],
+    resources = [
+        "testdata/cal-yikes-universal",
+        "testdata/cal-yikes-universal_adhoc",
+        "testdata/cal-yikes-universal_signed",
+        "testdata/signed-with-teamid",
+        "testdata/yikes-universal",
+        "testdata/yikes-universal_adhoc",
+        "testdata/yikes-universal_signed",
+    ],
+    deps = [":MOLCodesignChecker"],
+)
+
+objc_library(
+    name = "MOLXPCConnection",
+    srcs = ["MOLXPCConnection.m"],
+    hdrs = ["MOLXPCConnection.h"],
+    sdk_frameworks = ["Security"],
+    deps = [":MOLCodesignChecker"],
+)
+
+santa_unit_test(
+    name = "MOLXPCConnectionTest",
+    srcs = ["MOLXPCConnectionTest.m"],
+    deps = [
+        ":MOLXPCConnection",
+        "@OCMock",
+    ],
+)
+
+objc_library(
+    name = "MOLAuthenticatingURLSession",
+    srcs = [
+        "MOLAuthenticatingURLSession.m",
+        "MOLDERDecoder.h",
+        "MOLDERDecoder.m",
+    ],
+    hdrs = ["MOLAuthenticatingURLSession.h"],
+    sdk_frameworks = ["Security"],
+    deps = [":MOLCertificate"],
+)
+
+santa_unit_test(
+    name = "MOLAuthenticatingURLSessionTest",
+    srcs = [
+        "MOLAuthenticatingURLSessionTest.m",
+        "MOLDERDecoder.h",
+        "MOLDERDecoderTest.m",
+    ],
+    resources = [
+        "testdata/dn.plist",
+        "testdata/example_org_client_cert.pem",
+        "testdata/example_org_client_cert_old.pem",
+        "testdata/internet_widgits_client_cert.pem",
+    ],
+    deps = [
+        ":MOLAuthenticatingURLSession",
+    ],
 )

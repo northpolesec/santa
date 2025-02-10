@@ -1,4 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,7 +16,6 @@
 #import "Source/common/SNTFileInfo.h"
 
 #import <CommonCrypto/CommonDigest.h>
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
 #import <fmdb/FMDB.h>
 
 #include <mach-o/arch.h>
@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/xattr.h>
 
+#import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTLogging.h"
 
 // Simple class to hold the data of a mach_header and the offset within the file

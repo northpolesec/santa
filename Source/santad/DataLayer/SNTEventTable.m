@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,8 +15,7 @@
 
 #import "Source/santad/DataLayer/SNTEventTable.h"
 
-#import <MOLCertificate/MOLCertificate.h>
-
+#import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTStoredEvent.h"
 
 static const uint32_t kEventTableCurrentVersion = 3;

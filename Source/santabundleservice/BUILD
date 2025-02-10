@@ -15,6 +15,8 @@ objc_library(
         "main.m",
     ],
     deps = [
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
@@ -22,8 +24,6 @@ objc_library(
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SigningIDHelpers",
         "@FMDB",
-        "@MOLCodesignChecker",
-        "@MOLXPCConnection",
     ],
 )
 

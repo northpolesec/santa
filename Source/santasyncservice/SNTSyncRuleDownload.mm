@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,8 +16,7 @@
 #import "Source/santasyncservice/SNTSyncRuleDownload.h"
 #include "Source/santasyncservice/SNTPushNotificationsTracker.h"
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"

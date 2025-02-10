@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/common/CertificateHelpers.h"
+#import "Source/common/MOLCertificate.h"
 
 #include <Security/SecCertificate.h>
 

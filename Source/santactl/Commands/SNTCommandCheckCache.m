@@ -14,10 +14,10 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
 
 #include <sys/stat.h>
 
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santactl/SNTCommand.h"

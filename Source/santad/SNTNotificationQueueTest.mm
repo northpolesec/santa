@@ -15,12 +15,12 @@
 #import "Source/santad/SNTNotificationQueue.h"
 
 #import <Foundation/Foundation.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
 #include <memory>
 
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"

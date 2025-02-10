@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,8 +16,7 @@
 #import "Source/santasyncservice/SNTSyncPreflight.h"
 #include "Source/common/SNTCommonEnums.h"
 
-#import <MOLXPCConnection/MOLXPCConnection.h>
-
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSyncConstants.h"

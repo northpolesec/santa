@@ -16,11 +16,11 @@
 #import "Source/santad/SNTDaemonControlController.h"
 
 #include <Foundation/Foundation.h>
-#import <MOLCodesignChecker/MOLCodesignChecker.h>
-#import <MOLXPCConnection/MOLXPCConnection.h>
 
 #include <memory>
 
+#import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
