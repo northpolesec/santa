@@ -25,6 +25,7 @@
 #include "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 
+#ifdef SANTA_ENABLE_POLARIS
 #include <google/protobuf/arena.h>
 
 #include <grpc/grpc.h>
@@ -36,6 +37,7 @@
 #include "stats/v1.grpc.pb.h"
 
 namespace pbv1 = ::santa::stats::v1;
+#endif
 
 namespace santa {
 
@@ -48,6 +50,7 @@ std::string machineIdHash(std::string_view machineID) {
 }
 
 void SubmitStats(NSString *orgID) {
+#ifdef SANTA_ENABLE_POLARIS
   google::protobuf::Arena arena;
   auto channel_creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
   auto chan = grpc::CreateChannel(kPolarisHostname, channel_creds);
@@ -85,6 +88,9 @@ void SubmitStats(NSString *orgID) {
     return;
   }
   LOGI(@"Submitted stats to %s", kPolarisHostname);
+#else
+  LOGI(@"Stats submission is disabled in non-release builds");
+#endif  // SANTA_ENABLE_POLARIS
 }
 
 }  // namespace santa
