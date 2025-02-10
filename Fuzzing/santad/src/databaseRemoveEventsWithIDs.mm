@@ -17,10 +17,9 @@
 #include <iostream>
 
 #import "Source/common/MOLXPCConnection.h"
-
-#import "SNTCommandController.h"
-#import "SNTRule.h"
-#import "SNTXPCControlInterface.h"
+#import "Source/common/SNTRule.h"
+#import "Source/common/SNTXPCControlInterface.h"
+#import "Source/santactl/SNTCommandController.h"
 
 #pragma pack(push, 1)
 
