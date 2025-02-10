@@ -16,13 +16,12 @@
 #import <XCTest/XCTest.h>
 #include <unistd.h>
 
+#import <OCMock/OCMock.h>
+
 #import "Source/common/MOLAuthenticatingURLSession.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTMetricSet.h"
-
-#import <OCMock/OCMock.h>
-
 #import "Source/santametricservice/Formats/SNTMetricFormatTestHelper.h"
 #import "Source/santametricservice/SNTMetricService.h"
 
