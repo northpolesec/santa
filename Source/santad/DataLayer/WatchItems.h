@@ -61,6 +61,10 @@ class ProcessWatchItems;
 class WatchItemsPeer;
 
 // Type aliases
+// Implementations that call IterateProcessPoliciesBlock must provide a block
+// of type CheckPolicyBlock. The CheckPolicyBlock should return `true` if the
+// iteration should stop, or `false` if iteration should continue to the next
+// process policy.
 using CheckPolicyBlock = bool (^)(std::shared_ptr<ProcessWatchItemPolicy>);
 using IterateProcessPoliciesBlock = void (^)(CheckPolicyBlock);
 
