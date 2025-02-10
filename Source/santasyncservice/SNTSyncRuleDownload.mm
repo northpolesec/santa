@@ -145,7 +145,10 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   SNTRule *r = [[SNTRule alloc] init];
 
   r.identifier = StringToNSString(rule.identifier());
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (!r.identifier.length) r.identifier = StringToNSString(rule.deprecated_sha256());
+#pragma clang diagnostic pop
   if (!r.identifier.length) return nil;
 
   SNTRuleState state;
