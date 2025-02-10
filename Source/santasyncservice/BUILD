@@ -34,21 +34,6 @@ objc_library(
 )
 
 objc_library(
-    name = "polaris_lib",
-    srcs = [
-        "SNTPolaris.h",
-        "SNTPolaris.mm",
-    ],
-    deps = [
-        "//Source/common:SNTLogging",
-        "//Source/common:SNTSystemInfo",
-        "//Source/common:String",
-        "@grpc//:grpc++",
-        "@northpole_protos//stats:v1_cc_grpc",
-    ],
-)
-
-objc_library(
     name = "sync_lib",
     srcs = [
         "NSData+Zlib.h",
