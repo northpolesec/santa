@@ -14,6 +14,9 @@
 
 #import "MOLAuthenticatingURLSession.h"
 
+#include <Foundation/Foundation.h>
+#include <Security/Security.h>
+
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLDERDecoder.h"
 
@@ -297,9 +300,10 @@
   }
 
   // Print details about the server's leaf certificate.
-  SecCertificateRef firstCert = SecTrustGetCertificateAtIndex(protectionSpace.serverTrust, 0);
-  if (firstCert) {
-    MOLCertificate *cert = [[MOLCertificate alloc] initWithSecCertificateRef:firstCert];
+  NSArray *certChain = CFBridgingRelease(SecTrustCopyCertificateChain(protectionSpace.serverTrust));
+  if (certChain.firstObject) {
+    MOLCertificate *cert = [[MOLCertificate alloc]
+        initWithSecCertificateRef:(__bridge SecCertificateRef)certChain.firstObject];
     [self log:@"Server Trust: %@", cert];
   }
 
@@ -444,14 +448,9 @@
   // SecTrustEvaluateWithError first.
   (void)SecTrustEvaluateWithError(t, NULL);
 
-  NSMutableArray *intermediates = [NSMutableArray array];
-  CFIndex certCount = SecTrustGetCertificateCount(t);
-  for (int i = 1; i < certCount; ++i) {
-    [intermediates addObject:(id)SecTrustGetCertificateAtIndex(t, i)];
-  }
-  CFRelease(t);
-
-  return intermediates;
+  NSMutableArray *certChain = CFBridgingRelease(SecTrustCopyCertificateChain(t));
+  if (certChain.count < 2) return nil;
+  return [certChain subarrayWithRange:NSMakeRange(1, certChain.count - 1)];
 }
 
 - (void)log:(NSString *)format, ... {

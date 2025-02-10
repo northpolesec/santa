@@ -15,11 +15,15 @@
 #import "Source/common/MOLCertificate.h"
 
 #import <CommonCrypto/CommonDigest.h>
+#import <Foundation/Foundation.h>
 #import <Security/Security.h>
 
 @interface MOLCertificate ()
-///  A container for cached property values
+///  A container for cached property values.
 @property NSMutableDictionary *memoizedData;
+
+///  Re-declare the certRef property as readwrite.
+@property(readwrite) SecCertificateRef certRef;
 @end
 
 @implementation MOLCertificate
@@ -47,11 +51,7 @@ static NSString *const kCertDataKey = @"certData";
     // radar://problem/16124651
     // To workaround, check that the certificate serial number can be retrieved. According to
     // RFC5280, the serial number field is required.
-#if __MAC_OS_X_VERSION_MIN_REQUIRED < 10130
-    NSData *ser = CFBridgingRelease(SecCertificateCopySerialNumber(cert, NULL));
-#else
     NSData *ser = CFBridgingRelease(SecCertificateCopySerialNumberData(cert, NULL));
-#endif
 
     if (ser) {
       self = [self initWithSecCertificateRef:cert];
@@ -79,18 +79,11 @@ static NSString *const kCertDataKey = @"certData";
     return nil;
   }
 
-  // Base64-decode the DER
-  SecTransformRef transform = SecDecodeTransformCreate(kSecBase64Encoding, NULL);
-  if (!transform) return nil;
-  NSData *input = [base64der dataUsingEncoding:NSUTF8StringEncoding];
-  NSData *output = nil;
-
-  if (SecTransformSetAttribute(transform, kSecTransformInputAttributeName,
-                               (__bridge CFDataRef)input, NULL)) {
-    output = CFBridgingRelease(SecTransformExecute(transform, NULL));
-  }
-  if (transform) CFRelease(transform);
-
+  // Base64-decode the DER. We have to use NSDataBase64DecodingIgnoreUnknownCharacters
+  // to ignore newline characters.
+  NSData *output =
+      [[NSData alloc] initWithBase64EncodedString:base64der
+                                          options:NSDataBase64DecodingIgnoreUnknownCharacters];
   return [self initWithCertificateDataDER:output];
 }
 
