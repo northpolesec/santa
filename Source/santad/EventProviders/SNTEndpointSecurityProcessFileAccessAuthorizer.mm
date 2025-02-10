@@ -22,7 +22,7 @@ using santa::ProcessWatchItemPolicy;
 
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
 @property bool isSubscribed;
-@property (copy) IterateProcessPoliciesBlock iterateProcessPoliciesBlock;
+@property(copy) IterateProcessPoliciesBlock iterateProcessPoliciesBlock;
 @end
 
 @implementation SNTEndpointSecurityProcessFileAccessAuthorizer
