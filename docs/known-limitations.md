@@ -9,12 +9,11 @@ nav_order: 7
     against dynamic libraries loaded with dlopen, libraries on disk that have
     been replaced, or libraries loaded using `DYLD_INSERT_LIBRARIES`.
 
-*   Scripts: Santa is written to ignore any execution that isn't a binary. After
-    weighing the administrative cost versus the benefit, we found it wasn't
-    worthwhile to manage the execution of scripts. Additionally, several
-    applications make use of temporary scripts, and blocking these could cause
-    problems. We're happy to revisit this (or at least make it an option) if it
-    would be useful to others.
+*   Scripts: By default, Santa will allow script exections. However, it is
+    possible to provide an explicit block rule using the SHA256 hash of the
+    script. An important caveat is that Santa only evaluates scripts when
+    they are directly executed (e.g. `./foo.sh`, not `/bin/sh ./foo.sh`).
+    The `BlockedPathRegex` configuration key may also be used.
 
 *   USB Mass Storage Blocking: Santa's USB Mass Storage blocking feature only
     stops incidental data exfiltration. It is not meant as a hard control. It

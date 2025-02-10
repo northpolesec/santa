@@ -76,6 +76,10 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
 }
 
 - (instancetype)initWithEndpointSecurityFile:(const es_file_t *)esFile error:(NSError **)error {
+  if (!esFile) {
+    return nil;
+  }
+
   return [self initWithResolvedPath:@(esFile->path.data) stat:&esFile->stat error:error];
 }
 

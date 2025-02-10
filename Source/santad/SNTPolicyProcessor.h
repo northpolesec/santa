@@ -48,6 +48,7 @@
 ///  any async processing without extending their lifetimes.
 ///
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                                        scriptInfo:(nonnull SNTFileInfo *)scriptInfo
                                      targetProcess:(nonnull const es_process_t *)targetProc
                                        configState:(nonnull SNTConfigState *)configState
                           preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback
