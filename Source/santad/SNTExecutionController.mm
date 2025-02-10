@@ -258,6 +258,10 @@ static NSString *const kPrinterProxyPostMonterey =
     return;
   }
 
+  SNTFileInfo *scriptInfo =
+      [[SNTFileInfo alloc] initWithEndpointSecurityFile:esMsg->event.exec.script
+                                                  error:&fileInfoError];
+
   // PrinterProxy workaround, see description above the method for more details.
   if ([self printerProxyWorkaround:binInfo]) {
     postAction(SNTActionRespondDeny);
@@ -269,6 +273,7 @@ static NSString *const kPrinterProxyPostMonterey =
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
   SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo
+      scriptInfo:scriptInfo
       targetProcess:targetProc
       configState:configState
       preCodesignCheckCallback:^(void) {

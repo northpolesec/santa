@@ -330,6 +330,7 @@ static void UpdateCachedDecisionSigningInfo(
 }
 
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                                        scriptInfo:(nonnull SNTFileInfo *)scriptInfo
                                      targetProcess:(nonnull const es_process_t *)targetProc
                                        configState:(nonnull SNTConfigState *)configState
                           preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback
@@ -371,6 +372,28 @@ static void UpdateCachedDecisionSigningInfo(
                                                 buf[4], buf[5], buf[6], buf[7], buf[8], buf[9],
                                                 buf[10], buf[11], buf[12], buf[13], buf[14],
                                                 buf[15], buf[16], buf[17], buf[18], buf[19]];
+    }
+  }
+
+  // First check for any policies on the script. If the script is explicitly
+  // blocked, return early. Otherwise, continue on to evaluate the real binary.
+  if (scriptInfo) {
+    SNTCachedDecision *cd = [self decisionForFileInfo:scriptInfo
+                                          configState:configState
+                                               cdhash:nil
+                                           fileSHA256:nil
+                                    certificateSHA256:nil
+                                               teamID:nil
+                                            signingID:nil
+                                  platformBinaryState:PlatformBinaryState::kRuntimeFalse
+                                signingStatusCallback:^SNTSigningStatus(void) {
+                                  return SNTSigningStatus::SNTSigningStatusUnsigned;
+                                }
+                           entitlementsFilterCallback:nil
+                             preCodesignCheckCallback:nil];
+
+    if ((cd.decision & SNTEventStateBlock) != 0) {
+      return cd;
     }
   }
 
