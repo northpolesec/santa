@@ -138,11 +138,7 @@
       LOGI(@"Stats collection is disabled, skipping submission");
       return;
     }
-#ifdef DEBUG
-    LOGI(@"Stats collection is disabled in DEBUG builds");
-#else
     santa::SubmitStats([[SNTConfigurator configurator] statsOrganizationID]);
-#endif
   });
   dispatch_resume(self.statsSubmissionTimer);
 }
