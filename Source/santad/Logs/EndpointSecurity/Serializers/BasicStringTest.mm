@@ -575,7 +575,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_event_authentication_t auth = {
       .success = true,
       .type = ES_AUTHENTICATION_TYPE_OD,
-      .data.od = &od,
+      .data = {.od = &od},
   };
 
   esMsg.event.authentication = &auth;
@@ -635,7 +635,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       .instigator = &instigatorProc,
       .touchid_mode = ES_TOUCHID_MODE_VERIFICATION,
       .has_uid = true,
-      .uid.uid = NOBODY_UID,
+      .uid = {.uid = NOBODY_UID},
 #if HAVE_MACOS_15
       .instigator_token = MakeAuditToken(654, 321),
 #endif
@@ -644,7 +644,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_event_authentication_t auth = {
       .success = true,
       .type = ES_AUTHENTICATION_TYPE_TOUCHID,
-      .data.touchid = &touchid,
+      .data = {.touchid = &touchid},
   };
 
   esMsg.event.authentication = &auth;
@@ -710,7 +710,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_event_authentication_t auth = {
       .success = true,
       .type = ES_AUTHENTICATION_TYPE_TOKEN,
-      .data.token = &token,
+      .data = {.token = &token},
   };
 
   esMsg.event.authentication = &auth;
@@ -781,7 +781,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_event_authentication_t auth = {
       .success = true,
       .type = ES_AUTHENTICATION_TYPE_AUTO_UNLOCK,
-      .data.auto_unlock = &auto_unlock,
+      .data = {.auto_unlock = &auto_unlock},
   };
 
   esMsg.event.authentication = &auth;
