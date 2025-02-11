@@ -1103,7 +1103,7 @@ void SerializeAndCheckNonESEvents(
   __block es_event_authentication_t authenticationEvent = {
       .success = true,
       .type = ES_AUTHENTICATION_TYPE_OD,
-      .data.od = &authenticationOD,
+      .data = {.od = &authenticationOD},
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
@@ -1163,7 +1163,7 @@ void SerializeAndCheckNonESEvents(
   __block es_event_authentication_t authenticationEvent = {
       .success = true,
       .type = ES_AUTHENTICATION_TYPE_TOUCHID,
-      .data.touchid = &authenticationTouchID,
+      .data = {.touchid = &authenticationTouchID},
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
@@ -1218,7 +1218,7 @@ void SerializeAndCheckNonESEvents(
   __block es_event_authentication_t authenticationEvent = {
       .success = true,
       .type = ES_AUTHENTICATION_TYPE_TOKEN,
-      .data.token = &authenticationToken,
+      .data = {.token = &authenticationToken},
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
@@ -1267,7 +1267,7 @@ void SerializeAndCheckNonESEvents(
   __block es_event_authentication_t authenticationEvent = {
       .success = true,
       .type = ES_AUTHENTICATION_TYPE_AUTO_UNLOCK,
-      .data.auto_unlock = &authenticationAutoUnlock,
+      .data = {.auto_unlock = &authenticationAutoUnlock},
   };
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
