@@ -76,7 +76,8 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 ///  @param message The message received from the EndpointSecurity event provider.
 ///  @param postAction The block invoked with the desired response result.
 ///
-- (void)validateExecEvent:(const santa::Message &)esMsg postAction:(bool (^)(SNTAction))postAction;
+- (void)validateExecEvent:(const santa::Message &)esMsg
+               postAction:(bool (^)(SNTAction, BOOL))postAction;
 
 ///
 ///  Handles the logic of deciding whether to allow a pid_suspend/pid_resume through to a binary or

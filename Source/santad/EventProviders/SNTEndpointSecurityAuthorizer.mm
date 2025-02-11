@@ -103,11 +103,21 @@ using santa::Message;
   }
 
   const es_process_t *targetProc = msg->event.exec.target;
+  const es_file_t *targetScript = msg->event.exec.script;
 
   while (true) {
     SNTAction returnAction = self->_authResultCache->CheckCache(targetProc->executable);
-    if (RESPONSE_VALID(returnAction)) {
+    SNTAction scriptAction =
+        targetScript ? self->_authResultCache->CheckCache(targetScript) : SNTActionUnset;
+    if (RESPONSE_VALID(returnAction) &&
+        (!targetScript || RESPONSE_VALID(scriptAction))) {
+      // Here we have a valid cached response for the executable and the target
+      // script either doesn't exists or also has a valid response.
       es_auth_result_t authResult = ES_AUTH_RESULT_DENY;
+
+      if (scriptAction == SNTActionRespondDeny) {
+        [self respondToMessage:msg withAuthResult:ES_AUTH_RESULT_DENY forcePreventCache:NO];
+      }
 
       switch (returnAction) {
         case SNTActionRespondAllowCompiler:
@@ -117,7 +127,7 @@ using santa::Message;
         default: break;
       }
 
-      [self respondToMessage:msg withAuthResult:authResult forcePreventCache:NO];
+      [self respondToMessage:msg withAuthResult:authResult forcePreventCache:(targetScript != NULL)];
 
       return;
     } else if (returnAction == SNTActionRespondHold) {
@@ -135,7 +145,7 @@ using santa::Message;
                                      targetProc->executable->path.data]);
       [self respondToMessage:msg withAuthResult:ES_AUTH_RESULT_DENY cacheable:false];
       return;
-    } else if (returnAction == SNTActionRequestBinary) {
+    } else if (returnAction == SNTActionRequestBinary || scriptAction == SNTActionRequestBinary) {
       // TODO(mlw): Add a metric here to observe how ofthen this happens in practice.
       // TODO(mlw): Look into caching a `Deferred<value>` to better prevent
       // raciness of multiple threads checking the cache simultaneously.
@@ -147,10 +157,15 @@ using santa::Message;
   }
 
   self->_authResultCache->AddToCache(targetProc->executable, SNTActionRequestBinary);
+  if (targetScript) {
+    self->_authResultCache->AddToCache(targetScript, SNTActionRequestBinary);
+  }
 
   [self.execController validateExecEvent:msg
-                              postAction:^bool(SNTAction action) {
-                                return [self postAction:action forMessage:msg];
+                              postAction:^bool(SNTAction action, BOOL shouldCache) {
+                                return [self postAction:action
+                                             forMessage:msg
+                                            shouldCache:(BOOL)shouldCache];
                               }];
 }
 
@@ -159,7 +174,7 @@ using santa::Message;
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:
       if (![self.execController synchronousShouldProcessExecEvent:esMsg]) {
-        [self postAction:SNTActionRespondDeny forMessage:esMsg];
+        [self postAction:SNTActionRespondDeny forMessage:esMsg shouldCache:YES];
         recordEventMetrics(EventDisposition::kDropped);
         return;
       }
@@ -185,12 +200,16 @@ using santa::Message;
                }];
 }
 
-- (bool)postAction:(SNTAction)action forMessage:(const Message &)esMsg {
+- (bool)postAction:(SNTAction)action
+        forMessage:(const Message &)esMsg
+       shouldCache:(BOOL)shouldCache {
+  const es_process_t *targetProc = esMsg->event.exec.target;
+  const es_file_t *targetScript = esMsg->event.exec.script;
   es_auth_result_t authResult;
 
   switch (action) {
     case SNTActionRespondAllowCompiler:
-      [self.compilerController setProcess:esMsg->event.exec.target->audit_token isCompiler:true];
+      [self.compilerController setProcess:targetProc->audit_token isCompiler:true];
       OS_FALLTHROUGH;
     case SNTActionRespondHold: OS_FALLTHROUGH;
     case SNTActionRespondAllow: authResult = ES_AUTH_RESULT_ALLOW; break;
@@ -206,14 +225,27 @@ using santa::Message;
       [NSException raise:@"Invalid post action" format:@"Invalid post action: %ld", action];
   }
 
-  self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, action);
+  if (shouldCache) {
+    self->_authResultCache->AddToCache(targetProc->executable, action);
+    if (targetScript &&
+        (action != SNTActionHoldAllowed && action != SNTActionHoldDenied)) {
+      self->_authResultCache->AddToCache(targetScript, authResult == ES_AUTH_RESULT_DENY
+                                                                       ? SNTActionRespondDeny
+                                                                       : SNTActionRespondAllow);
+    }
+  } else {
+    self->_authResultCache->ResetPending(targetProc->executable);
+    self->_authResultCache->ResetPending(targetScript);
+  }
 
   if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
     // Do not allow caching when the action is SNTActionRespondHold because Santa
     // also authorizes EXECs that occur while the current authorization is pending.
+    // Do not allow caching when there is an associated script with the executable
+    // so that future executions of the executable can have the scripts evaluated.
     return [self respondToMessage:esMsg
                    withAuthResult:authResult
-                forcePreventCache:(action == SNTActionRespondHold)];
+                forcePreventCache:((action == SNTActionRespondHold) || (targetScript != NULL))];
   } else {
     return true;
   }

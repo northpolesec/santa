@@ -146,6 +146,11 @@ void AuthResultCache::RemoveFromCache(const es_file_t *es_file) {
   CacheForVnodeID(vnode_id)->remove(vnode_id);
 }
 
+void AuthResultCache::ResetPending(const es_file_t *es_file) {
+  SantaVnode vnode_id = SantaVnode::VnodeForFile(es_file);
+  CacheForVnodeID(vnode_id)->remove(vnode_id, CacheableAction(SNTActionRequestBinary, 0));
+}
+
 SNTAction AuthResultCache::CheckCache(const es_file_t *es_file) {
   return CheckCache(SantaVnode::VnodeForFile(es_file));
 }

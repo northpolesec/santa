@@ -45,6 +45,7 @@
 @property BOOL entitlementsFiltered;
 @property uint32_t codesigningFlags;
 @property SNTSigningStatus signingStatus;
+@property BOOL scriptExecutionDenied;
 
 @property NSString *quarantineURL;
 

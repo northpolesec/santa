@@ -225,7 +225,7 @@ static NSString *const kPrinterProxyPostMonterey =
   return YES;
 }
 
-- (void)validateExecEvent:(const Message &)esMsg postAction:(bool (^)(SNTAction))postAction {
+- (void)validateExecEvent:(const Message &)esMsg postAction:(bool (^)(SNTAction, BOOL))postAction {
   if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
     // Programming error. Bail.
     LOGE(@"Attempt to validate non-EXEC event. Event type: %d", esMsg->event_type);
@@ -247,12 +247,12 @@ static NSString *const kPrinterProxyPostMonterey =
     if (config.failClosed) {
       LOGE(@"Failed to read file %@: %@ and denying action", @(targetProc->executable->path.data),
            fileInfoError.localizedDescription);
-      postAction(SNTActionRespondDeny);
+      postAction(SNTActionRespondDeny, YES);
       [self.events incrementForFieldValues:@[ (NSString *)kDenyNoFileInfo ]];
     } else {
       LOGE(@"Failed to read file %@: %@ but allowing action", @(targetProc->executable->path.data),
            fileInfoError.localizedDescription);
-      postAction(SNTActionRespondAllow);
+      postAction(SNTActionRespondAllow, YES);
       [self.events incrementForFieldValues:@[ (NSString *)kAllowNoFileInfo ]];
     }
     return;
@@ -264,7 +264,7 @@ static NSString *const kPrinterProxyPostMonterey =
 
   // PrinterProxy workaround, see description above the method for more details.
   if ([self printerProxyWorkaround:binInfo]) {
-    postAction(SNTActionRespondDeny);
+    postAction(SNTActionRespondDeny, YES);
     [self.events incrementForFieldValues:@[ (NSString *)kBlockPrinterWorkaround ]];
     return;
   }
@@ -346,11 +346,11 @@ static NSString *const kPrinterProxyPostMonterey =
     // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
     stoppedProc = self.processControlBlock(newProcPid, ProcessControl::Suspend);
-    postAction(SNTActionRespondHold);
+    postAction(SNTActionRespondHold, YES);
     holdAndAsk = true;
   } else {
     // Respond with the decision.
-    postAction(action);
+    postAction(action, cd.scriptExecutionDenied ? NO : YES);
   }
 
   // Increment metric counters
@@ -483,7 +483,7 @@ static NSString *const kPrinterProxyPostMonterey =
             }
 
             _procSignalCache->remove(pidAndVersion);
-            postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied);
+            postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied, YES);
           };
         }
 

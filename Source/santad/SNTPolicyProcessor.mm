@@ -393,6 +393,7 @@ static void UpdateCachedDecisionSigningInfo(
                              preCodesignCheckCallback:nil];
 
     if ((cd.decision & SNTEventStateBlock) != 0) {
+      cd.scriptExecutionDenied = YES;
       return cd;
     }
   }

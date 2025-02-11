@@ -135,6 +135,13 @@ class SantaCache {
   inline void remove(const KeyT &key) { set(key, zero_); }
 
   /**
+    An alias for `set(key, zero_, previous_value)`
+  */
+  inline bool remove(const KeyT &key, const ValueT &previous_value) {
+    return set(key, zero_, previous_value);
+  }
+
+  /**
     Remove all entries and free bucket memory.
   */
   void clear() {

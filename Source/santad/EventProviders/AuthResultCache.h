@@ -68,6 +68,7 @@ class AuthResultCache {
 
   virtual bool AddToCache(const es_file_t *es_file, SNTAction decision);
   virtual void RemoveFromCache(const es_file_t *es_file);
+  virtual void ResetPending(const es_file_t *es_file);
   virtual SNTAction CheckCache(const es_file_t *es_file);
   virtual SNTAction CheckCache(SantaVnode vnode_id);
 
