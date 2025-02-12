@@ -381,6 +381,7 @@ santa_unit_test(
         ":SNTEndpointSecurityTreeAwareClient",
         "//Source/common:TestUtils",
         "@OCMock",
+        "@com_google_googletest//:gtest"
     ],
 )
 
