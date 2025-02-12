@@ -90,6 +90,8 @@
  * the DER decoding will fail and this method will return nil.
  **/
 - (NSDictionary *)decodeData:(NSData *)data {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   typedef struct {
     SecAsn1Oid oid;
     SecAsn1Item value;
@@ -166,6 +168,7 @@
 
   SecAsn1CoderRelease(coder);
   return dict;
+#pragma clang diagnostic pop
 }
 
 /**
