@@ -487,15 +487,15 @@ The request consists of the following JSON keys:
 |---|---|---|---|---|
 | rules_received    | YES | int | The number of rules the client received from all ruledownlaod requests. | 211 |
 | rules_processed      | YES | int | The number of rules that were processed from all ruledownload requests. | 212 |
-| machine_id | YES | The UUID of the machine that is sending this postflight. | 
-| sync_type | YES | The type of sync that the client just completed. | One of "NORMAL", "CLEAN", "CLEAN_ALL", "CLEAN_STANDALONE" |
+| machine_id | YES | string | The UUID of the machine that is sending this postflight. |
+| sync_type | YES | string | The type of sync that the client just completed. | One of "NORMAL", "CLEAN", "CLEAN_ALL", "CLEAN_STANDALONE" |
 
 #### Example postflight request JSON Payload:
 
 ```json
 {
   "rules_received" : 211,
-  "rules_processed" : 212, 
+  "rules_processed" : 212,
   "machine_id":  "b67df594-2d8e-4f77-9c21-8af65e4cf8df",
   "sync_type": "NORMAL"
 }
