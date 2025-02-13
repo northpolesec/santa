@@ -42,6 +42,9 @@ class MockEndpointSecurityAPI : public santa::EndpointSecurityAPI {
   MOCK_METHOD(bool, IsTargetPathMutingInverted, (const Client &client));
   MOCK_METHOD(bool, InvertTargetPathMuting, (const Client &client));
 
+  MOCK_METHOD(bool, IsProcessMutingInverted, (const Client &client));
+  MOCK_METHOD(bool, InvertProcessMuting, (const Client &client));
+
   MOCK_METHOD(bool, MuteTargetPath,
               (const Client &client, std::string_view path, santa::WatchItemPathType path_type));
   MOCK_METHOD(bool, UnmuteTargetPath,

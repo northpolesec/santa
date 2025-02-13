@@ -1483,8 +1483,11 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
+        ":EndpointSecurityMessage",
         ":MockEndpointSecurityAPI",
+        ":MockFAAPolicyProcessor",
         ":SNTEndpointSecurityProcessFileAccessAuthorizer",
+        ":WatchItemPolicy",
         "//Source/common:TestUtils",
         "@OCMock",
     ],
