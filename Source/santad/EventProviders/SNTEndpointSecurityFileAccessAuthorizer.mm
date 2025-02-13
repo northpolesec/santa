@@ -68,8 +68,6 @@ using santa::TTYWriter;
 using santa::WatchItemProcess;
 using santa::WatchItems;
 
-NSString *kBadCertHash = @"BAD_CERT_HASH";
-
 static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 static constexpr uint16_t kDefaultRateLimitQPS = 50;
 
@@ -381,8 +379,8 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
 @interface SNTEndpointSecurityFileAccessAuthorizer ()
 @property SNTConfigurator *configurator;
-@property SNTDecisionCache *decisionCache;
 @property bool isSubscribed;
+@property std::shared_ptr<santa::FAAPolicyProcessor> faaPolicyProcessor;
 @end
 
 @implementation SNTEndpointSecurityFileAccessAuthorizer {
@@ -402,7 +400,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
                        logger:(std::shared_ptr<santa::Logger>)logger
                    watchItems:(std::shared_ptr<WatchItems>)watchItems
                      enricher:(std::shared_ptr<santa::Enricher>)enricher
-                decisionCache:(SNTDecisionCache *)decisionCache
+           faaPolicyProcessor:(std::shared_ptr<santa::FAAPolicyProcessor>)faaPolicyProcessor
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:metrics
@@ -411,7 +409,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     _watchItems = std::move(watchItems);
     _logger = std::move(logger);
     _enricher = std::move(enricher);
-    _decisionCache = decisionCache;
+    _faaPolicyProcessor = faaPolicyProcessor;
     _ttyWriter = std::move(ttyWriter);
     _metrics = std::move(metrics);
 
@@ -440,40 +438,6 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
 - (NSString *)description {
   return @"FileAccessAuthorizer";
-}
-
-- (NSString *)getCertificateHash:(es_file_t *)esFile {
-  // First see if we've already cached this value
-  SantaVnode vnodeID = SantaVnode::VnodeForFile(esFile);
-  NSString *result = self->_certHashCache.get(vnodeID);
-  if (!result) {
-    // If this wasn't already cached, try finding a cached SNTCachedDecision
-    SNTCachedDecision *cd = [self.decisionCache cachedDecisionForFile:esFile->stat];
-    if (cd) {
-      // There was an existing cached decision, use its cert hash
-      result = cd.certSHA256;
-    } else {
-      // If the cached decision didn't exist, try a manual lookup
-      NSError *e;
-      MOLCodesignChecker *csInfo =
-          [[MOLCodesignChecker alloc] initWithBinaryPath:@(esFile->path.data) error:&e];
-      if (!e) {
-        result = csInfo.leafCertificate.SHA256;
-      }
-    }
-
-    if (!result.length) {
-      // If result is still nil, there isn't much recourse... We will
-      // assume that this error isn't transient and set a terminal value
-      // in the cache to prevent continous attempts to lookup cert hash.
-      result = kBadCertHash;
-    }
-
-    // Finally, add the result to the cache to prevent future lookups
-    self->_certHashCache.set(vnodeID, result);
-  }
-
-  return result;
 }
 
 - (FileAccessPolicyDecision)specialCaseForPolicy:(std::shared_ptr<DataWatchItemPolicy>)policy
@@ -522,67 +486,6 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   return FileAccessPolicyDecision::kNoPolicy;
 }
 
-/// An An `es_process_t` must match all criteria within the given
-/// WatchItemProcess to be considered a match.
-- (bool)policyProcess:(const WatchItemProcess &)policyProc
-     matchesESProcess:(const es_process_t *)esProc {
-  // Note: Intentionally not checking `CS_VALID` here - this check must happen
-  // outside of this method. This method is used to individually check each
-  // configured process exception while the check for a valid code signature
-  // is more broad and applies whether or not process exceptions exist.
-  if (esProc->codesigning_flags & CS_SIGNED) {
-    // Check whether or not the process is a platform binary if specified by the policy.
-    if (policyProc.platform_binary.has_value() &&
-        policyProc.platform_binary.value() != esProc->is_platform_binary) {
-      return false;
-    }
-
-    // If the policy contains a team ID, check that the instigating process
-    // also has a team ID and matches the policy.
-    if (!policyProc.team_id.empty() &&
-        (!esProc->team_id.data || (policyProc.team_id != esProc->team_id.data))) {
-      // We expected a team ID to match against, but the process didn't have one.
-      return false;
-    }
-
-    // If the policy contains a signing ID, check that the instigating process
-    // also has a signing ID and matches the policy.
-    if (!policyProc.signing_id.empty() &&
-        (!esProc->signing_id.data || (policyProc.signing_id != esProc->signing_id.data))) {
-      return false;
-    }
-
-    // Check if the instigating process has an allowed CDHash
-    if (policyProc.cdhash.size() == CS_CDHASH_LEN &&
-        std::memcmp(policyProc.cdhash.data(), esProc->cdhash, CS_CDHASH_LEN) != 0) {
-      return false;
-    }
-
-    // Check if the instigating process has an allowed certificate hash
-    if (!policyProc.certificate_sha256.empty()) {
-      NSString *result = [self getCertificateHash:esProc->executable];
-      if (!result || policyProc.certificate_sha256 != [result UTF8String]) {
-        return false;
-      }
-    }
-  } else {
-    // If the process isn't signed, ensure the policy doesn't contain any
-    // attributes that require a signature
-    if (!policyProc.team_id.empty() || !policyProc.signing_id.empty() ||
-        policyProc.cdhash.size() == CS_CDHASH_LEN || !policyProc.certificate_sha256.empty()) {
-      return false;
-    }
-  }
-
-  // Check if the instigating process path opening the file is allowed
-  if (policyProc.binary_path.length() > 0 &&
-      policyProc.binary_path != esProc->executable->path.data) {
-    return false;
-  }
-
-  return true;
-}
-
 // The operation is allowed when:
 //   - No policy exists
 //   - The policy is write-only, but the operation is read-only
@@ -628,7 +531,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   FileAccessPolicyDecision decision = FileAccessPolicyDecision::kDenied;
 
   for (const WatchItemProcess &process : policy->processes) {
-    if ([self policyProcess:process matchesESProcess:msg->process]) {
+    if (self.faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
       decision = FileAccessPolicyDecision::kAllowed;
       break;
     }
@@ -692,7 +595,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     if (ShouldNotifyUserDecision(policyDecision) &&
         (!policy->silent || (!policy->silent_tty && TTYWriter::CanWrite(msg->process)))) {
       SNTCachedDecision *cd =
-          [self.decisionCache cachedDecisionForFile:msg->process->executable->stat];
+          self.faaPolicyProcessor->GetCachedDecision(msg->process->executable->stat);
 
       SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
 

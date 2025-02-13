@@ -31,6 +31,7 @@
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
+#include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDeviceManager.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
@@ -139,15 +140,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                           logger:logger];
 
   if (@available(macOS 13.0, *)) {
+    auto faaPolicyProcessor =
+        std::make_shared<santa::FAAPolicyProcessor>([SNTDecisionCache sharedCache]);
+
     SNTEndpointSecurityFileAccessAuthorizer *data_faa_client =
-        [[SNTEndpointSecurityFileAccessAuthorizer alloc]
-            initWithESAPI:esapi
-                  metrics:metrics
-                   logger:logger
-               watchItems:watch_items
-                 enricher:enricher
-            decisionCache:[SNTDecisionCache sharedCache]
-                ttyWriter:tty_writer];
+        [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:esapi
+                                                               metrics:metrics
+                                                                logger:logger
+                                                            watchItems:watch_items
+                                                              enricher:enricher
+                                                    faaPolicyProcessor:faaPolicyProcessor
+                                                             ttyWriter:tty_writer];
     watch_items->RegisterDataClient(data_faa_client);
 
     data_faa_client.fileAccessBlockCallback = ^(SNTFileAccessEvent *event, NSString *customMsg,
@@ -166,6 +169,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
                           initWithESAPI:esapi
                                 metrics:metrics
+                     faaPolicyProcessor:faaPolicyProcessor
             iterateProcessPoliciesBlock:^(santa::CheckPolicyBlock checkPolicyBlock) {
               watch_items->IterateProcessPolicies(checkPolicyBlock);
             }];

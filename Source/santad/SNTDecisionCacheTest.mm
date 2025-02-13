@@ -17,7 +17,7 @@
 #import <XCTest/XCTest.h>
 #include <dispatch/dispatch.h>
 #include <sys/stat.h>
-#include "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCachedDecision.h"
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTRule.h"
