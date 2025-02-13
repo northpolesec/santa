@@ -258,7 +258,7 @@ If the binary has entitlements, the entitlements are stored in the `Event` as an
 | Key | Required | Type | Meaning | Example Value |
 |---|---|---|---|---|
 | entitlementsFiltered | Y | boolean | Whether or not Santa filtered some of the reported entitlements based on its configuration. | true |
-| entitlements | Y | list of entitlements see below | See Entitlement |
+| entitlements | Y | List of entitlements see below | See Entitlement |
 
 ##### Entitlement
 
