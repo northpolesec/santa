@@ -72,11 +72,9 @@ using santa::NSStringToUTF8StringView;
   if (self.syncState.syncType == SNTSyncTypeNormal ||
       [[SNTConfigurator configurator] enableCleanSyncEventUpload]) {
     ::pbv1::EventUploadResponse response;
-    NSURLRequest *urlReq = [self requestWithMessage:req];
-#if defined(SANTA_STORE_EVENTUPLOADS) && defined(DEBUG)
-    [self storeEventUploads:urlReq];
-#endif
-    NSError *err = [self performRequest:urlReq intoMessage:&response timeout:30];
+    NSError *err = [self performRequest:[self requestWithMessage:req]
+                            intoMessage:&response
+                                timeout:30];
     if (err) {
       SLOGE(@"Failed to upload events: %@", err);
       return NO;
@@ -213,21 +211,5 @@ using santa::NSStringToUTF8StringView;
 
   return *e;
 }
-
-#if defined(SANTA_STORE_EVENTUPLOADS) && defined(DEBUG)
-// If Santa is built with both SANTA_STORE_EVENTUPLOADS and DEBUG defined,
-// all event upload requests will be stored, in JSON form, to /var/db/santa/eventuploads.
-// As santasyncservice runs as nobody, this directory must already exist and be owned by
-// the nobody user.
-- (void)storeEventUploads:(NSURLRequest *)request {
-  NSError *err;
-  NSString *path = [NSString
-      stringWithFormat:@"/var/db/santa/eventuploads/%f.json", [NSDate date].timeIntervalSince1970];
-  [request.HTTPBody writeToURL:[NSURL fileURLWithPath:path] options:NSDataWritingAtomic error:&err];
-  if (err) {
-    LOGE(@"Failed to write eventupload to file: %@", err);
-  }
-}
-#endif
 
 @end
