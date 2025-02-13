@@ -276,56 +276,49 @@ An entitlement is stored as an object of key- Value pairs
 {
   "events": [
     {
-      "file_sha256": "4fccb870f991fa9bef0631723a2f5a4c79d025499150d5b135d8347ef76f3e59",
-      "file_path": "/Applications/Xcode.app/Contents/MacOS",
-      "file_name": "Xcode",
+      "file_sha256": "afdceb288fe27ad58d9f633f2c8f221d047d7d994b91ac80c6c62ecff6b7fcad",
+      "file_path": "/opt/homebrew/Cellar/tart/2.19.3/libexec/tart.app/Contents/MacOS",
+      "file_name": "tart",
       "executing_user": "appleseed",
-      "execution_time": 1739402627.4096441,
+      "execution_time": 1739402683.02169,
       "logged_in_users": [
         "appleseed"
       ],
       "current_sessions": [
         "appleseed@console",
         "appleseed@ttys000",
-        "appleseed@ttys003",
-        "appleseed@ttys004",
-        "appleseed@ttys002",
-        "appleseed@ttys007",
-        "appleseed@ttys008",
-        "appleseed@ttys009",
-        "appleseed@ttys001"
       ],
       "decision": "BLOCK_SIGNINGID",
-      "file_bundle_id": "com.apple.dt.Xcode",
-      "file_bundle_path": "/Applications/Xcode.app",
-      "file_bundle_executable_rel_path": "Contents/MacOS/Xcode",
-      "file_bundle_name": "Xcode",
-      "file_bundle_version": "23507",
-      "file_bundle_version_string": "16.2",
-      "file_bundle_hash": "bdafdd6585c13465ab5b6fc174c10a1135795045826d80c050b99d90b6b95398",
-      "file_bundle_hash_millis": 25470,
-      "file_bundle_binary_count": 381,
-      "pid": 32899,
-      "ppid": 1,
-      "parent_name": "launchd",
-      "team_id": "59GAB85EFG",
-      "signing_id": "59GAB85EFG:com.apple.dt.Xcode",
-      "cdhash": "68d53a86c79084334c94e96e13c5b7090748f427",
+      "file_bundle_id": "org.cirruslabs.tart",
+      "file_bundle_path": "/opt/homebrew/Cellar/tart/2.19.3/libexec/tart.app",
+      "file_bundle_executable_rel_path": "Contents/MacOS/tart",
+      "file_bundle_name": "Tart",
+      "file_bundle_version_string": "2.19.3",
+      "file_bundle_hash": "71b31a5fd3dde46302b285da133d07c77bb81d978e66377fdf96d7b6e0c873f6",
+      "file_bundle_hash_millis": 51,
+      "file_bundle_binary_count": 1,
+      "pid": 33021,
+      "ppid": 55918,
+      "parent_name": "zsh",
+      "team_id": "9M2P8L4D89",
+      "signing_id": "9M2P8L4D89:tart",
+      "cdhash": "94d442242fae57bc5aa79e109d3adc15f6413419",
       "signing_chain": [
         {
-          "sha256": "27006496b3bd92c2341ed4289f705fe7ef6e7c684fcc4c66cb1a5c7acd98cd3a",
-          "cn": "Apple Mac OS Application Signing",
-          "org": "Apple Inc.",
-          "valid_from": 1720826167,
-          "valid_until": 1786490166
+          "sha256": "11a945ae04224780e250ad7ea0fd53e57c98c4624c2efe516cb808220492d746",
+          "cn": "Developer ID Application: Cirrus Labs, Inc. (9M2P8L4D89)",
+          "org": "Cirrus Labs, Inc.",
+          "ou": "9M2P8L4D89",
+          "valid_from": 1663072980,
+          "valid_until": 1801519935
         },
         {
-          "sha256": "53fd008278e5a595fe1e908ae9c5e5675f26243264a5a6438c023e3ce2870760",
-          "cn": "Apple Worldwide Developer Relations Certification Authority",
+          "sha256": "7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f",
+          "cn": "Developer ID Certification Authority",
           "org": "Apple Inc.",
-          "ou": "G5",
-          "valid_from": 1608147536,
-          "valid_until": 1923091200
+          "ou": "Apple Certification Authority",
+          "valid_from": 1328134335,
+          "valid_until": 1801519935
         },
         {
           "sha256": "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024",
@@ -340,192 +333,16 @@ An entitlement is stored as an object of key- Value pairs
         "entitlementsFiltered": false,
         "entitlements": [
           {
-            "key": "com.apple.private.syspolicy.execution-policy-bypass",
+            "key": "com.apple.vm.networking",
             "value": "true"
           },
           {
-            "key": "com.apple.PerfPowerServices.data-donation",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.PairingManager.RemovePeer",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.coreservices.definesExtensionPoint",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.projectsetdeviced.client",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.developer.aps-environment",
-            "value": "\"production\""
-          },
-          {
-            "key": "com.apple.private.network.system-token-fetch",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.security.storage.MobileAssetGenerativeModels",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.biome.read-write",
-            "value": "[\"GenerativeModels.GenerativeFunctions.Instrumentation\"]"
-          },
-          {
-            "key": "com.apple.private.feedback.drafting",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.MobileContainerManager.lookup",
-            "value": "{\"appData\":true,\"pluginData\":true,\"daemon\":[\"com.apple.testmanagerd\",\"com.apple.dt.testmanagerd\"]}"
-          },
-          {
-            "key": "com.apple.private.dt.xcode.set-responsible-process-for-ui-testing",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.viewbridge.preview",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.PairingManager.Read",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.sysmond.client",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.application-identifier",
-            "value": "\"59GAB85EFG.com.apple.dt.Xcode\""
-          },
-          {
-            "key": "com.apple.private.img4.nonce.cryptex1.simulator",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.security.storage.CoreSimulator",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.osanalytics.canusediagnosticmonitor",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.appintents-bundle-relative-paths",
-            "value": "[\"\\/Contents\\/Frameworks\\/IDEKit.framework\"]"
-          },
-          {
-            "key": "com.apple.private.OAHSoftwareUpdate",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.corespotlight.internal",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.modelcatalog.full-access",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.privatecloudcompute.serverEnvironment",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.assets.change-daemon-config",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.security.AppleImage4.user-client",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.corespotlight.privateindex.unsandboxed",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.runningboard.assertions.previewshost",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.AuthorizationServices",
-            "value": "[\"com.apple.trust-settings.admin\"]"
-          },
-          {
-            "key": "com.apple.private.mobile_storage.remote.allowedSPI",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.assets.accessible-asset-types",
-            "value": "[\"com.apple.MobileAsset.iOSSimulatorRuntime\",\"com.apple.MobileAsset.appleTVOSSimulatorRuntime\",\"com.apple.MobileAsset.watchOSSimulatorRuntime\",\"com.apple.MobileAsset.xrOSSimulatorRuntime\",\"com.apple.MobileAsset.MetalToolchain\",\"com.apple.MobileAsset.SourceEditorAssets\",\"com.apple.MobileAsset.UAF.FM.GenerativeModels\",\"com.apple.MobileAsset.UAF.FM.CodeLM\",\"com.apple.MobileAsset.UAF.FM.Overrides\"]"
-          },
-          {
-            "key": "com.apple.authkit.client.private",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.dt.simulator.client",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.developer.maps",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.PairingManager.Write",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.security.storage.os_eligibility.readonly",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.dt.testmanagerd.control.client",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.dt.previewsd.allowed",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.system_installd.connection",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.tcc.allow",
-            "value": "[\"kTCCServiceAppleEvents\",\"kTCCServicePhotos\",\"kTCCServiceDeveloperTool\"]"
-          },
-          {
-            "key": "com.apple.runningboard.assertions.chronod",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.security.application-groups",
-            "value": "[\"com.apple.dt.XcodeCloud\"]"
-          },
-          {
-            "key": "com.apple.private.coreservices.canaccessanysharedfilelist",
-            "value": "\"read-write\""
-          },
-          {
-            "key": "com.apple.modelmanager.inference",
-            "value": "true"
-          },
-          {
-            "key": "com.apple.private.tcc.allow-prompting",
-            "value": "[\"kTCCServiceAll\"]"
-          },
-          {
-            "key": "com.apple.springboard.debugapplications",
+            "key": "com.apple.security.virtualization",
             "value": "true"
           }
         ]
       },
-      "csFlags": 570522369,
+      "csFlags": 570514193,
       "signingStatus": "SIGNING_STATUS_PRODUCTION"
     }
   ],
