@@ -49,6 +49,7 @@ static NSString *const kUniversalSigningChain = @"Universal Signing Chain";
 static NSString *const kTeamID = @"Team ID";
 static NSString *const kSigningID = @"Signing ID";
 static NSString *const kCDHash = @"CDHash";
+static NSString *const kEntitlements = @"Entitlements";
 
 // signing chain keys
 static NSString *const kCommonName = @"Common Name";
@@ -86,6 +87,7 @@ NSString *formattedStringForKeyArray(NSArray<NSString *> *array) {
 @property(nonatomic) BOOL recursive;
 @property(nonatomic) BOOL jsonOutput;
 @property(nonatomic) BOOL bundleInfo;
+@property(nonatomic) BOOL enableEntitlements;
 @property(nonatomic) BOOL filterInclusive;
 @property(nonatomic) NSNumber *certIndex;
 @property(nonatomic, copy) NSArray<NSString *> *outputKeyList;
@@ -135,6 +137,7 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 @property(readonly, copy, nonatomic) SNTAttributeBlock rule;
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock universalSigningChain;
+@property(readonly, copy, nonatomic) SNTAttributeBlock entitlements;
 
 // Mapping between property string keys and SNTAttributeBlocks
 @property(nonatomic) NSDictionary<NSString *, SNTAttributeBlock> *propertyMap;
@@ -195,6 +198,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           @"              file.\n"
           @"    --filter-inclusive: If multiple filters are specified, they must all match\n"
           @"                        for the file to be displayed.\n"
+          @"    --entitlements: If the file has entitlements, will also display them\n"
           @"    --bundleinfo: If the file is part of a bundle, will also display bundle\n"
           @"                  hash information and hashes of all bundle executables.\n"
           @"                  Incompatible with --recursive and --cert-index.\n"
@@ -212,7 +216,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   return @[
     kPath, kSHA256, kSHA1, kBundleName, kBundleVersion, kBundleVersionStr, kDownloadReferrerURL,
     kDownloadURL, kDownloadTimestamp, kDownloadAgent, kTeamID, kSigningID, kCDHash, kType,
-    kPageZero, kCodeSigned, kRule, kSigningChain, kUniversalSigningChain
+    kPageZero, kCodeSigned, kRule, kEntitlements, kSigningChain, kUniversalSigningChain,
   ];
 }
 
@@ -247,6 +251,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kTeamID : self.teamID,
       kSigningID : self.signingID,
       kCDHash : self.cdhash,
+      kEntitlements : self.entitlements,
     };
 
     _printQueue =
@@ -535,6 +540,14 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   };
 }
 
+- (SNTAttributeBlock)entitlements {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+    if (csc.entitlements.count) return csc.entitlements;
+    return @"No entitlements";
+  };
+}
+
 #pragma mark -
 
 // Entry point for the command.
@@ -795,6 +808,10 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     }
   }
 
+  if (!self.enableEntitlements) {
+    [outputDict removeObjectForKey:kEntitlements];
+  }
+
   // If there's nothing in the outputDict, then don't need to print anything.
   if (!outputDict.count) return;
 
@@ -918,6 +935,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
                   @"\n--bundleinfo is incompatible with --recursive and --cert-index"];
       }
       self.bundleInfo = YES;
+    } else if ([arg caseInsensitiveCompare:@"--entitlements"] == NSOrderedSame) {
+      self.enableEntitlements = YES;
     } else if ([arg caseInsensitiveCompare:@"--filter-inclusive"] == NSOrderedSame) {
       self.filterInclusive = YES;
     } else {
@@ -949,6 +968,11 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       if (![validKeys containsObject:key]) {
         [self
             printErrorUsageAndExit:[NSString stringWithFormat:@"\n\"%@\" is an invalid key", key]];
+      }
+      // If user specifically asked for entitlements, make sure collection is enabled or they'll
+      // get no output even if there are entitlements.
+      if ([key isEqualToString:kEntitlements]) {
+        self.enableEntitlements = YES;
       }
     }
     for (NSString *key in filters) {
