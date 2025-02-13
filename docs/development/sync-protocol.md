@@ -227,7 +227,7 @@ sequenceDiagram
 | file_bundle_binary_count | NO | uint32 | The number of binaries in a bundle | 13 |
 | pid | NO | int | Process id of the executable that was blocked | 1234 |
 | ppid | NO | int | Parent process id of the executable that was blocked | 456 |
-| parent_name | NO | Parent process short command name of the executable that was blocked | "bar" |
+| parent_name | NO | string | Parent process short command name of the executable that was blocked | "bar" |
 | quarantine_data_url | NO | string |  The actual URL of the quarantined item from the quarantine database that this binary was downloaded from | https://dl.google.com/chrome/mac/stable/GGRO/googlechrome.dmg |
 | quarantine_referer_url | NO | string | Referring URL that lead to the binary being downloaded if known  | https://www.google.com/chrome/downloads/ |
 | quarantine_timestamp | NO | float64 | Unix Timestamp of when the binary was downloaded or 0 if not quarantined | 0 |
@@ -236,6 +236,9 @@ sequenceDiagram
 | signing_id | NO | string | Signing ID of the binary that was executed | "EQHXZ8M8AV:com.google.Chrome" |
 | team_id | NO | string | Team ID of the binary that was executed | "EQHXZ8M8AV" |
 | cdhash | NO | string | CDHash of the binary that was executed | "dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a" |
+| entitlementInfo | NO | Entitlement Info Object (see below) | Entitlement information about the target executable | see below |
+| csFlags | NO | int32 | The raw codesigning flags set for the execution |
+| signingStatus | NO | The signing status of the executing binary | **Must be one of the examples** | "SIGNING_STATUS_UNSPECIFIED", "SIGNING_STATUS_UNSIGNED", "SIGNING_STATUS_ADHOC", "SIGNING_STATUS_DEVELOPMENT", "SIGNING_STATUS_PRODUCTION" |
 
 #### Signing Chain Objects
 
@@ -248,65 +251,285 @@ sequenceDiagram
 | valid_from | YES | int | Unix timestamp of when the cert was issued |  1647447514 |
 | valid_until | YES | int | Unix timestamp of when the cert expires |  1678983513 |
 
+#### Entitlement Info
+
+If the binary is signed and has entitlements, they are stored in the Event as an EntitlementInfo object that indicates if the entitlements were filtered followed by a list of entitlements.
+
+| Key | Required | Type | Meaning | Example Value |
+|---|---|---|---|---|
+| entitlements_filtered | Y | boolean | Did Santa filter out some of the entitlements | true |
+| entitlements | Y | list of entitlements see below | See Entitlement |
+
+##### Entitlement
+
+An entitlement is stored as an object of key- Value pairs
+
+| Key | Required | Type | Meaning | Example Value |
+|---|---|---|---|---|
+| key | Y | string | The name of the entitlement | "com.apple.security.hypervisor" |
+| value | Y | string | The value of the entitlement as a string | "true" |
+
 
 #### `eventupload` Request Example Payload
 
 ```json
 {
-  "events": [{
-    "file_path": "\/Applications\/Santa.app\/Contents\/MacOS",
-    "file_bundle_version": "9999.1.1",
-    "parent_name": "launchd",
-    "logged_in_users": [
-      "markowsky"
-    ],
-    "quarantine_timestamp": 0,
-    "signing_chain": [{
-        "cn": "Apple Development: Google Development (EQHXZ8M8AV)",
-        "valid_until": 1678983513,
-        "org": "Google LLC",
-        "valid_from": 1647447514,
-        "ou": "EQHXZ8M8AV",
-        "sha256": "7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258"
+  "events": [
+    {
+      "file_sha256": "4fccb870f991fa9bef0631723a2f5a4c79d025499150d5b135d8347ef76f3e59",
+      "file_path": "/Applications/Xcode.app/Contents/MacOS",
+      "file_name": "Xcode",
+      "executing_user": "appleseed",
+      "execution_time": 1739402627.4096441,
+      "logged_in_users": [
+        "appleseed"
+      ],
+      "current_sessions": [
+        "appleseed@console",
+        "appleseed@ttys000",
+        "appleseed@ttys003",
+        "appleseed@ttys004",
+        "appleseed@ttys002",
+        "appleseed@ttys007",
+        "appleseed@ttys008",
+        "appleseed@ttys009",
+        "appleseed@ttys001"
+      ],
+      "decision": "BLOCK_SIGNINGID",
+      "file_bundle_id": "com.apple.dt.Xcode",
+      "file_bundle_path": "/Applications/Xcode.app",
+      "file_bundle_executable_rel_path": "Contents/MacOS/Xcode",
+      "file_bundle_name": "Xcode",
+      "file_bundle_version": "23507",
+      "file_bundle_version_string": "16.2",
+      "file_bundle_hash": "bdafdd6585c13465ab5b6fc174c10a1135795045826d80c050b99d90b6b95398",
+      "file_bundle_hash_millis": 25470,
+      "file_bundle_binary_count": 381,
+      "pid": 32899,
+      "ppid": 1,
+      "parent_name": "launchd",
+      "team_id": "59GAB85EFG",
+      "signing_id": "59GAB85EFG:com.apple.dt.Xcode",
+      "cdhash": "68d53a86c79084334c94e96e13c5b7090748f427",
+      "signing_chain": [
+        {
+          "sha256": "27006496b3bd92c2341ed4289f705fe7ef6e7c684fcc4c66cb1a5c7acd98cd3a",
+          "cn": "Apple Mac OS Application Signing",
+          "org": "Apple Inc.",
+          "valid_from": 1720826167,
+          "valid_until": 1786490166
+        },
+        {
+          "sha256": "53fd008278e5a595fe1e908ae9c5e5675f26243264a5a6438c023e3ce2870760",
+          "cn": "Apple Worldwide Developer Relations Certification Authority",
+          "org": "Apple Inc.",
+          "ou": "G5",
+          "valid_from": 1608147536,
+          "valid_until": 1923091200
+        },
+        {
+          "sha256": "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024",
+          "cn": "Apple Root CA",
+          "org": "Apple Inc.",
+          "ou": "Apple Certification Authority",
+          "valid_from": 1146001236,
+          "valid_until": 2054670036
+        }
+      ],
+      "entitlementInfo": {
+        "entitlementsFiltered": false,
+        "entitlements": [
+          {
+            "key": "com.apple.private.syspolicy.execution-policy-bypass",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.PerfPowerServices.data-donation",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.PairingManager.RemovePeer",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.coreservices.definesExtensionPoint",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.projectsetdeviced.client",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.developer.aps-environment",
+            "value": "\"production\""
+          },
+          {
+            "key": "com.apple.private.network.system-token-fetch",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.security.storage.MobileAssetGenerativeModels",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.biome.read-write",
+            "value": "[\"GenerativeModels.GenerativeFunctions.Instrumentation\"]"
+          },
+          {
+            "key": "com.apple.private.feedback.drafting",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.MobileContainerManager.lookup",
+            "value": "{\"appData\":true,\"pluginData\":true,\"daemon\":[\"com.apple.testmanagerd\",\"com.apple.dt.testmanagerd\"]}"
+          },
+          {
+            "key": "com.apple.private.dt.xcode.set-responsible-process-for-ui-testing",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.viewbridge.preview",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.PairingManager.Read",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.sysmond.client",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.application-identifier",
+            "value": "\"59GAB85EFG.com.apple.dt.Xcode\""
+          },
+          {
+            "key": "com.apple.private.img4.nonce.cryptex1.simulator",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.security.storage.CoreSimulator",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.osanalytics.canusediagnosticmonitor",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.appintents-bundle-relative-paths",
+            "value": "[\"\\/Contents\\/Frameworks\\/IDEKit.framework\"]"
+          },
+          {
+            "key": "com.apple.private.OAHSoftwareUpdate",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.corespotlight.internal",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.modelcatalog.full-access",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.privatecloudcompute.serverEnvironment",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.assets.change-daemon-config",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.security.AppleImage4.user-client",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.corespotlight.privateindex.unsandboxed",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.runningboard.assertions.previewshost",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.AuthorizationServices",
+            "value": "[\"com.apple.trust-settings.admin\"]"
+          },
+          {
+            "key": "com.apple.private.mobile_storage.remote.allowedSPI",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.assets.accessible-asset-types",
+            "value": "[\"com.apple.MobileAsset.iOSSimulatorRuntime\",\"com.apple.MobileAsset.appleTVOSSimulatorRuntime\",\"com.apple.MobileAsset.watchOSSimulatorRuntime\",\"com.apple.MobileAsset.xrOSSimulatorRuntime\",\"com.apple.MobileAsset.MetalToolchain\",\"com.apple.MobileAsset.SourceEditorAssets\",\"com.apple.MobileAsset.UAF.FM.GenerativeModels\",\"com.apple.MobileAsset.UAF.FM.CodeLM\",\"com.apple.MobileAsset.UAF.FM.Overrides\"]"
+          },
+          {
+            "key": "com.apple.authkit.client.private",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.dt.simulator.client",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.developer.maps",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.PairingManager.Write",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.security.storage.os_eligibility.readonly",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.dt.testmanagerd.control.client",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.dt.previewsd.allowed",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.system_installd.connection",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.tcc.allow",
+            "value": "[\"kTCCServiceAppleEvents\",\"kTCCServicePhotos\",\"kTCCServiceDeveloperTool\"]"
+          },
+          {
+            "key": "com.apple.runningboard.assertions.chronod",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.security.application-groups",
+            "value": "[\"com.apple.dt.XcodeCloud\"]"
+          },
+          {
+            "key": "com.apple.private.coreservices.canaccessanysharedfilelist",
+            "value": "\"read-write\""
+          },
+          {
+            "key": "com.apple.modelmanager.inference",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.private.tcc.allow-prompting",
+            "value": "[\"kTCCServiceAll\"]"
+          },
+          {
+            "key": "com.apple.springboard.debugapplications",
+            "value": "true"
+          }
+        ]
       },
-      {
-        "cn": "Apple Worldwide Developer Relations Certification Authority",
-        "valid_until": 1897776000,
-        "org": "Apple Inc.",
-        "valid_from": 1582136027,
-        "ou": "G3",
-        "sha256": "dcf21878c77f4198e4b4614f03d696d89c66c66008d4244e1b99161aac91601f"
-      },
-      {
-        "cn": "Apple Root CA",
-        "valid_until": 2054670036,
-        "org": "Apple Inc.",
-        "valid_from": 1146001236,
-        "ou": "Apple Certification Authority",
-        "sha256": "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024"
-      }
-    ],
-    "file_bundle_name": "santasyncservice",
-    "executing_user": "root",
-    "ppid": 1,
-    "file_bundle_path": "/Applications/Santa.app",
-    "file_name": "santasyncservice",
-    "execution_time": 1657764366.475035,
-    "file_sha256": "8621d92262aef379d3cfe9e099f287be5b996a281995b5cc64932f7d62f3dc85",
-    "decision": "ALLOW_BINARY",
-    "file_bundle_id": "com.northpolesec.santa.syncservice",
-    "file_bundle_version_string": "9999.1.1",
-    "pid": 2595,
-    "current_sessions": [
-      "markowsky@console",
-      "markowsky@ttys000",
-      "markowsky@ttys001",
-      "markowsky@ttys003"
-    ],
-    "team_id": "EQHXZ8M8AV",
-    "signing_id": "EQHXZ8M8AV:com.northpolesec.santa",
-    "cdhash": "dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a"
-  }]
+      "csFlags": 570522369,
+      "signingStatus": "SIGNING_STATUS_PRODUCTION"
+    }
+  ],
+  "machine_id": "12345678-FEED-FACE-BEEF-123456789ABC"
 }
 ```
 
@@ -447,13 +670,17 @@ The request consists of the following JSON keys:
 |---|---|---|---|---|
 | rules_received    | YES | int | The number of rules the client received from all ruledownlaod requests. | 211 |
 | rules_processed      | YES | int | The number of rules that were processed from all ruledownload requests. | 212 |
+| machine_id | YES | The UUID of the machine that is sending this postflight. | 
+| sync_type | YES | The type of sync that the client just completed. | One of "NORMAL", "CLEAN", "CLEAN_ALL", "CLEAN_STANDALONE" |
 
 #### Example postflight request JSON Payload:
 
 ```json
 {
   "rules_received" : 211,
-  "rules_processed" : 212
+  "rules_processed" : 212, 
+  "machine_id":  "b67df594-2d8e-4f77-9c21-8af65e4cf8df",
+  "sync_type": "NORMAL"
 }
 ```
 
