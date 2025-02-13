@@ -33,7 +33,7 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #include "Source/common/Platform.h"
-#include "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"
@@ -41,15 +41,16 @@
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/santad/EventProviders/FAAPolicyProcessor.h"
+#include "Source/santad/EventProviders/MockFAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
 #include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
 #include "Source/santad/SNTDecisionCache.h"
 
 using santa::DataWatchItemPolicy;
 using santa::Message;
+using santa::MockFAAPolicyProcessor;
 using santa::WatchItemProcess;
-
-extern NSString *kBadCertHash;
 
 // Duplicate definition for test implementation
 struct PathTarget {
@@ -78,22 +79,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
 }
 
-// Helper to reset a policy to an empty state
-void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
-  proc.binary_path = "";
-  proc.signing_id = "";
-  proc.team_id = "";
-  proc.certificate_sha256 = "";
-  proc.cdhash.clear();
-}
-
 @interface SNTEndpointSecurityFileAccessAuthorizer (Testing)
-- (NSString *)getCertificateHash:(es_file_t *)esFile;
 - (FileAccessPolicyDecision)specialCaseForPolicy:(std::shared_ptr<DataWatchItemPolicy>)policy
                                           target:(const PathTarget &)target
                                          message:(const Message &)msg;
-- (bool)policyProcess:(const WatchItemProcess &)policyProc
-     matchesESProcess:(const es_process_t *)esProc;
 - (FileAccessPolicyDecision)applyPolicy:
                                 (std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
                               forTarget:(const PathTarget &)target
@@ -128,96 +117,6 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   [self.dcMock stopMocking];
 
   [super tearDown];
-}
-
-- (void)testGetCertificateHash {
-  es_file_t esFile1 = MakeESFile("foo", MakeStat(100));
-  es_file_t esFile2 = MakeESFile("foo", MakeStat(200));
-  es_file_t esFile3 = MakeESFile("foo", MakeStat(300));
-  NSString *certHash2 = @"abc123";
-  NSString *certHash3 = @"xyz789";
-  NSString *got;
-  NSString *want;
-  id certMock = OCMClassMock([MOLCertificate class]);
-
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  mockESApi->SetExpectationsESNewClient();
-  SetExpectationsForFileAccessAuthorizerInit(mockESApi);
-
-  SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                             metrics:nullptr
-                                                              logger:nullptr
-                                                          watchItems:nullptr
-                                                            enricher:nullptr
-                                                       decisionCache:self.dcMock
-                                                           ttyWriter:nullptr];
-
-  //
-  // Test 1 - Not in local cache or decision cache, and code sig lookup fails
-  //
-  OCMExpect([self.dcMock cachedDecisionForFile:esFile1.stat])
-      .ignoringNonObjectArgs()
-      .andReturn(nil);
-
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSSignatureFailed userInfo:nil];
-  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
-      .andReturn(self.cscMock);
-
-  got = [accessClient getCertificateHash:&esFile1];
-  want = kBadCertHash;
-
-  XCTAssertEqualObjects(got, want);
-
-  // Call again without setting new expectations on dcMock to ensure the
-  // cached value is used
-  got = [accessClient getCertificateHash:&esFile1];
-  XCTAssertEqualObjects(got, want);
-
-  XCTAssertTrue(OCMVerifyAll(self.dcMock));
-
-  //
-  // Test 2 - Not in local cache or decision cache, code sig lookup successful
-  //
-  OCMExpect([self.dcMock cachedDecisionForFile:esFile2.stat])
-      .ignoringNonObjectArgs()
-      .andReturn(nil);
-  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:nil]])
-      .andReturn(self.cscMock);
-
-  OCMExpect([self.cscMock leafCertificate]).andReturn(certMock);
-  OCMExpect([certMock SHA256]).andReturn(certHash2);
-
-  got = [accessClient getCertificateHash:&esFile2];
-  want = certHash2;
-
-  XCTAssertEqualObjects(got, want);
-
-  // Call again without setting new expectations on dcMock to ensure the
-  // cached value is used
-  got = [accessClient getCertificateHash:&esFile2];
-  XCTAssertEqualObjects(got, want);
-
-  XCTAssertTrue(OCMVerifyAll(self.dcMock));
-
-  //
-  // Test 3 - Not in local cache, but is in decision cache
-  //
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
-  cd.certSHA256 = certHash3;
-  OCMExpect([self.dcMock cachedDecisionForFile:esFile3.stat]).ignoringNonObjectArgs().andReturn(cd);
-
-  got = [accessClient getCertificateHash:&esFile3];
-  want = certHash3;
-
-  XCTAssertEqualObjects(got, want);
-
-  // Call again without setting new expectations on dcMock to ensure the
-  // cached value is used
-  got = [accessClient getCertificateHash:&esFile3];
-
-  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
-  [certMock stopMocking];
 }
 
 - (void)testFileAccessPolicyDecisionToESAuthResult {
@@ -359,7 +258,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
                                                               logger:nullptr
                                                           watchItems:nullptr
                                                             enricher:nullptr
-                                                       decisionCache:nil
+                                                  faaPolicyProcessor:nullptr
                                                            ttyWriter:nullptr];
 
   auto policy = std::make_shared<DataWatchItemPolicy>("foo_policy", "ver", "/foo");
@@ -463,130 +362,9 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   }
 }
 
-- (void)testPolicyProcessMatchesESProcess {
-  const char *instigatingCertHash = "abc123";
-  const char *teamId = "myvalidtid";
-  const char *signingId = "com.northpolesec.test";
-  std::vector<uint8_t> cdhashBytes(CS_CDHASH_LEN);
-  std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
-  es_file_t esFile = MakeESFile("foo");
-  es_process_t esProc = MakeESProcess(&esFile);
-  esProc.codesigning_flags = CS_SIGNED;
-  esProc.team_id = MakeESStringToken(teamId);
-  esProc.signing_id = MakeESStringToken(signingId);
-  esProc.is_platform_binary = true;
-  std::memcpy(esProc.cdhash, cdhashBytes.data(), sizeof(esProc.cdhash));
-
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  mockESApi->SetExpectationsESNewClient();
-  mockESApi->SetExpectationsRetainReleaseMessage();
-  SetExpectationsForFileAccessAuthorizerInit(mockESApi);
-
-  SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                             metrics:nullptr
-                                                              logger:nullptr
-                                                          watchItems:nullptr
-                                                            enricher:nullptr
-                                                       decisionCache:nil
-                                                           ttyWriter:nullptr];
-
-  id accessClientMock = OCMPartialMock(accessClient);
-
-  OCMStub([accessClientMock getCertificateHash:&esFile])
-      .ignoringNonObjectArgs()
-      .andReturn(@(instigatingCertHash));
-
-  WatchItemProcess policyProc("", "", "", {}, "", std::nullopt);
-
-  {
-    // Process policy matching single attribute - path
-    ClearWatchItemPolicyProcess(policyProc);
-    policyProc.binary_path = "foo";
-    XCTAssertTrue([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-    policyProc.binary_path = "badpath";
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-  }
-
-  {
-    // Process policy matching single attribute - SigningID
-    ClearWatchItemPolicyProcess(policyProc);
-    policyProc.signing_id = signingId;
-    XCTAssertTrue([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-    policyProc.signing_id = "badid";
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-    es_process_t esProcEmptySigningID = MakeESProcess(&esFile);
-    esProcEmptySigningID.codesigning_flags = CS_SIGNED;
-    esProcEmptySigningID.team_id.data = NULL;
-    esProcEmptySigningID.team_id.length = 0;
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProcEmptySigningID]);
-  }
-
-  {
-    // Process policy matching single attribute - TeamID
-    ClearWatchItemPolicyProcess(policyProc);
-    policyProc.team_id = teamId;
-    XCTAssertTrue([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-    policyProc.team_id = "badid";
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-    es_process_t esProcEmptyTeamID = MakeESProcess(&esFile);
-    esProcEmptyTeamID.codesigning_flags = CS_SIGNED;
-    esProcEmptyTeamID.signing_id.data = NULL;
-    esProcEmptyTeamID.signing_id.length = 0;
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProcEmptyTeamID]);
-  }
-
-  {
-    // Process policy matching single attribute - cert hash
-    ClearWatchItemPolicyProcess(policyProc);
-    policyProc.certificate_sha256 = instigatingCertHash;
-    XCTAssertTrue([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-    policyProc.certificate_sha256 = "badcert";
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-  }
-
-  {
-    // Process policy matching single attribute - cdhash
-    ClearWatchItemPolicyProcess(policyProc);
-    policyProc.cdhash = cdhashBytes;
-    XCTAssertTrue([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-    policyProc.cdhash[0] = 0x0;
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-  }
-
-  {
-    // Process policy matching single attribute - platform binary
-    ClearWatchItemPolicyProcess(policyProc);
-    policyProc.platform_binary = std::make_optional(true);
-    XCTAssertTrue([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-    policyProc.platform_binary = std::make_optional(false);
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-  }
-
-  {
-    // Process policy with only a subset of matching attributes
-    ClearWatchItemPolicyProcess(policyProc);
-    policyProc.binary_path = "foo";
-    policyProc.team_id = "invalidtid";
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-  }
-
-  {
-    // Process policy with codesigning-based attributes, but unsigned ES process
-    ClearWatchItemPolicyProcess(policyProc);
-    esProc.codesigning_flags = 0x0;
-    policyProc.team_id = "myvalidtid";
-    XCTAssertFalse([accessClient policyProcess:policyProc matchesESProcess:&esProc]);
-  }
-
-  [accessClientMock stopMocking];
-  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
-}
-
 - (void)testApplyPolicyToMessage {
   const char *instigatingPath = "/path/to/proc";
   const char *instigatingTeamID = "my_teamid";
-  const char *instigatingCertHash = "abc123";
   WatchItemProcess policyProc(instigatingPath, "", "", {}, "", std::nullopt);
   std::array<uint8_t, 20> instigatingCDHash;
   instigatingCDHash.fill(0x41);
@@ -601,13 +379,15 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   mockESApi->SetExpectationsRetainReleaseMessage();
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
 
+  auto mockFAA = std::make_shared<MockFAAPolicyProcessor>(self.dcMock);
+
   SNTEndpointSecurityFileAccessAuthorizer *accessClient =
       [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
                                                              metrics:nullptr
                                                               logger:nullptr
                                                           watchItems:nullptr
                                                             enricher:nullptr
-                                                       decisionCache:nil
+                                                  faaPolicyProcessor:mockFAA
                                                            ttyWriter:nullptr];
 
   id accessClientMock = OCMPartialMock(accessClient);
@@ -617,10 +397,6 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   OCMStub([accessClientMock specialCaseForPolicy:nullptr target:target message:*(Message *)&fake])
       .ignoringNonObjectArgs()
       .andReturn(FileAccessPolicyDecision::kNoPolicy);
-
-  OCMStub([accessClientMock getCertificateHash:&esFile])
-      .ignoringNonObjectArgs()
-      .andReturn(@(instigatingCertHash));
 
   // If no policy exists, the operation is allowed
   {
@@ -651,9 +427,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   {
     OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
     esMsg.process->codesigning_flags = CS_SIGNED;
-    OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-        .ignoringNonObjectArgs()
-        .andReturn(true);
+    EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(true));
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
                                    toMessage:Message(mockESApi, &esMsg)],
@@ -665,9 +439,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
 
   // If no exceptions, operations are logged and denied
   {
-    OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-        .ignoringNonObjectArgs()
-        .andReturn(false);
+    EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(false));
     policy->audit_only = false;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -677,9 +449,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
 
   // For audit only policies with no exceptions, operations are logged but allowed
   {
-    OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-        .ignoringNonObjectArgs()
-        .andReturn(false);
+    EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(false));
     policy->audit_only = true;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -694,9 +464,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   // If the policy wasn't matched, but the rule type specifies denied processes,
   // then the operation should be allowed.
   {
-    OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-        .ignoringNonObjectArgs()
-        .andReturn(false);
+    EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(false));
     policy->audit_only = false;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -707,9 +475,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   // For audit only policies with no process match and the rule type specifies
   // denied processes, operations are allowed.
   {
-    OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-        .ignoringNonObjectArgs()
-        .andReturn(false);
+    EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(false));
     policy->audit_only = true;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -720,9 +486,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   // For audit only policies with matched process details and the rule type specifies
   // denied processes, operations are allowed audit only.
   {
-    OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-        .ignoringNonObjectArgs()
-        .andReturn(true);
+    EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(true));
     policy->audit_only = true;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -733,9 +497,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   // For policies with matched process details and the rule type specifies
   // denied processes, operations are denied.
   {
-    OCMExpect([accessClientMock policyProcess:policyProc matchesESProcess:&esProc])
-        .ignoringNonObjectArgs()
-        .andReturn(true);
+    EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillOnce(testing::Return(true));
     policy->audit_only = false;
     XCTAssertEqual([accessClient applyPolicy:optionalPolicy
                                    forTarget:target
@@ -785,7 +547,7 @@ void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
                                                               logger:nullptr
                                                           watchItems:nullptr
                                                             enricher:nullptr
-                                                       decisionCache:nil
+                                                  faaPolicyProcessor:nil
                                                            ttyWriter:nullptr];
 
   EXPECT_CALL(*mockESApi, UnsubscribeAll);

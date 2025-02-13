@@ -21,6 +21,7 @@
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
+#include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
@@ -39,7 +40,7 @@ typedef void (^SNTFileAccessBlockCallback)(SNTFileAccessEvent *event, NSString *
                        logger:(std::shared_ptr<santa::Logger>)logger
                    watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
                      enricher:(std::shared_ptr<santa::Enricher>)enricher
-                decisionCache:(SNTDecisionCache *)decisionCache
+           faaPolicyProcessor:(std::shared_ptr<santa::FAAPolicyProcessor>)faaPolicyProcessor
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
 
 @property SNTFileAccessBlockCallback fileAccessBlockCallback;

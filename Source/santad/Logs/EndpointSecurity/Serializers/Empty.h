@@ -22,7 +22,7 @@
 #include <vector>
 
 #include "Source/common/Platform.h"
-#include "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCachedDecision.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 
 namespace santa {

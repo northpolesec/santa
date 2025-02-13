@@ -381,7 +381,7 @@ santa_unit_test(
         ":SNTEndpointSecurityTreeAwareClient",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest"
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -450,6 +450,23 @@ objc_library(
 )
 
 objc_library(
+    name = "FAAPolicyProcessor",
+    srcs = ["EventProviders/FAAPolicyProcessor.mm"],
+    hdrs = ["EventProviders/FAAPolicyProcessor.h"],
+    deps = [
+        ":EndpointSecurityMessage",
+        ":SNTDecisionCache",
+        ":WatchItemPolicy",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SantaCache",
+        "//Source/common:SantaVnode",
+    ],
+)
+
+objc_library(
     name = "SNTEndpointSecurityFileAccessAuthorizer",
     srcs = ["EventProviders/SNTEndpointSecurityFileAccessAuthorizer.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"],
@@ -462,6 +479,7 @@ objc_library(
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
+        ":FAAPolicyProcessor",
         ":Metrics",
         ":RateLimiter",
         ":SNTDecisionCache",
@@ -494,11 +512,13 @@ objc_library(
     deps = [
         ":EndpointSecurityAPI",
         ":EndpointSecurityMessage",
+        ":FAAPolicyProcessor",
         ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         ":WatchItemPolicy",
         ":WatchItems",
+        "//Source/common:SNTLogging",
     ],
 )
 
@@ -833,6 +853,7 @@ objc_library(
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
+        ":FAAPolicyProcessor",
         ":Metrics",
         ":SNTCompilerController",
         ":SNTDaemonControlController",
@@ -975,6 +996,21 @@ objc_library(
         ":EndpointSecurityClient",
         ":EndpointSecurityMessage",
         ":WatchItemPolicy",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+objc_library(
+    name = "MockFAAPolicyProcessor",
+    testonly = 1,
+    hdrs = ["EventProviders/MockFAAPolicyProcessor.h"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":SNTDecisionCache",
+        ":WatchItemPolicy",
+        "//Source/common:SNTCachedDecision",
         "@com_google_googletest//:gtest",
     ],
 )
@@ -1420,7 +1456,9 @@ santa_unit_test(
     deps = [
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
+        ":FAAPolicyProcessor",
         ":MockEndpointSecurityAPI",
+        ":MockFAAPolicyProcessor",
         ":MockLogger",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityFileAccessAuthorizer",
@@ -1445,10 +1483,30 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
+        ":EndpointSecurityMessage",
         ":MockEndpointSecurityAPI",
+        ":MockFAAPolicyProcessor",
         ":SNTEndpointSecurityProcessFileAccessAuthorizer",
+        ":WatchItemPolicy",
         "//Source/common:TestUtils",
         "@OCMock",
+    ],
+)
+
+santa_unit_test(
+    name = "FAAPolicyProcessorTest",
+    srcs = ["EventProviders/FAAPolicyProcessorTest.mm"],
+    deps = [
+        ":FAAPolicyProcessor",
+        ":MockFAAPolicyProcessor",
+        ":SNTDecisionCache",
+        ":WatchItemPolicy",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTCachedDecision",
+        "//Source/common:TestUtils",
+        "@OCMock",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -1561,6 +1619,7 @@ test_suite(
         ":EndpointSecuritySerializerUtilitiesTest",
         ":EndpointSecurityWriterFileTest",
         ":EndpointSecurityWriterSpoolTest",
+        ":FAAPolicyProcessorTest",
         ":MetricsTest",
         ":RateLimiterTest",
         ":SNTApplicationCoreMetricsTest",
