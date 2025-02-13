@@ -253,11 +253,11 @@ sequenceDiagram
 
 #### Entitlement Info
 
-If the binary is signed and has entitlements, they are stored in the Event as an EntitlementInfo object that indicates if the entitlements were filtered followed by a list of entitlements.
+If the binary has entitlements, the entitlements are stored in the `Event` as an `EntitlementInfo` object, that indicates whether or not the set was filtered and includes the set of captured entitlements.
 
 | Key | Required | Type | Meaning | Example Value |
 |---|---|---|---|---|
-| entitlements_filtered | Y | boolean | Did Santa filter out some of the entitlements | true |
+| entitlementsFiltered | Y | boolean | Whether or not Santa filtered some of the reported entitlements based on its configuration. | true |
 | entitlements | Y | list of entitlements see below | See Entitlement |
 
 ##### Entitlement
