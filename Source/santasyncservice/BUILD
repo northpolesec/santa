@@ -41,11 +41,11 @@ objc_library(
     }),
 )
 
-# This setting is used to enable storing all event uploads. See the
-# -storeEventUploads method in SNTSyncEventUpload.mm for more details.
+# This setting is used to enable storing all sync requests as JSON files on disk.
+# This can be useful for debugging purposes.
 config_setting(
-    name = "store_event_uploads",
-    values = {"define": "SANTA_STORE_EVENTUPLOADS=1"},
+    name = "store_json_uploads",
+    values = {"define": "SANTA_STORE_SYNC_JSON=1"},
 )
 
 objc_library(
@@ -78,7 +78,7 @@ objc_library(
     ],
     hdrs = ["SNTSyncManager.h"],
     defines = select({
-        ":store_event_uploads": ["SANTA_STORE_EVENTUPLOADS"],
+        ":store_json_uploads": ["SANTA_STORE_SYNC_JSON"],
         "//conditions:default": [],
     }),
     sdk_dylibs = ["libz"],

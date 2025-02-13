@@ -65,7 +65,7 @@ using santa::NSStringToUTF8String;
 - (NSMutableURLRequest *)requestWithMessage:(google::protobuf::Message *)message {
   if (!message) return [self requestWithData:[NSData data] contentType:nil];
 
-#ifndef SANTA_STORE_EVENTUPLOADS
+#ifndef SANTA_STORE_SYNC_JSON
   if ([[SNTConfigurator configurator] syncEnableProtoTransfer]) {
     std::string data;
     if (!message->SerializeToString(&data)) {
@@ -76,7 +76,7 @@ using santa::NSStringToUTF8String;
     return [self requestWithData:[NSData dataWithBytes:data.data() length:data.size()]
                      contentType:@"application/x-protobuf"];
   }
-#endif
+#endif  // SANTA_STORE_SYNC_JSON
 
   google::protobuf::json::PrintOptions options{};
   std::string json;
@@ -89,8 +89,13 @@ using santa::NSStringToUTF8String;
     return nil;
   }
 
-  return [self requestWithData:[NSData dataWithBytes:json.data() length:json.size()]
-                   contentType:@"application/json"];
+  NSData *data = [NSData dataWithBytes:json.data() length:json.size()];
+
+#ifdef SANTA_STORE_SYNC_JSON
+  [self storeJSON:data withMessageType:santa::StringToNSString(message->GetTypeName())];
+#endif
+
+  return [self requestWithData:data contentType:@"application/json"];
 }
 
 - (NSMutableURLRequest *)requestWithData:(NSData *)requestBody contentType:(NSString *)contentType {
@@ -102,7 +107,6 @@ using santa::NSStringToUTF8String;
   NSString *xsrfHeader = self.syncState.xsrfTokenHeader ?: kDefaultXSRFTokenHeader;
   [req setValue:self.syncState.xsrfToken forHTTPHeaderField:xsrfHeader];
 
-#ifndef SANTA_STORE_EVENTUPLOADS
   NSData *compressed;
   NSString *contentEncodingHeader;
 
@@ -125,7 +129,6 @@ using santa::NSStringToUTF8String;
     requestBody = compressed;
     [req setValue:contentEncodingHeader forHTTPHeaderField:@"Content-Encoding"];
   }
-#endif
 
   [self addExtraRequestHeaders:req];
 
@@ -232,7 +235,7 @@ using santa::NSStringToUTF8String;
     return nil;
   }
 
-#ifndef SANTA_STORE_EVENTUPLOADS
+#ifndef SANTA_STORE_SYNC_JSON
   if ([[SNTConfigurator configurator] syncEnableProtoTransfer]) {
     if (!message->ParseFromString(std::string((const char *)data.bytes, data.length))) {
       NSString *errStr = @"Failed to parse response proto into message";
@@ -243,7 +246,7 @@ using santa::NSStringToUTF8String;
     }
     return nil;
   }
-#endif
+#endif  // SANTA_STORE_SYNC_JSON
 
   google::protobuf::json::ParseOptions options{
       .ignore_unknown_fields = true,
@@ -341,5 +344,21 @@ using santa::NSStringToUTF8String;
   };
   return success;
 }
+
+#if defined(SANTA_STORE_SYNC_JSON) && defined(DEBUG)
+// If Santa is built with both SANTA_STORE_SYNC_JSON and DEBUG defined,
+// all sync requests will be stored, in JSON form, to /var/db/santa/storedsyncs.
+// As santasyncservice runs as nobody, this directory must already exist and be
+// owned by the nobody user.
+- (void)storeJSON:(NSData *)json withMessageType:(NSString *)msgType {
+  NSError *err;
+  NSString *path = [NSString stringWithFormat:@"/var/db/santa/storedsyncs/%@.%f.json", msgType,
+                                              [NSDate date].timeIntervalSince1970];
+  [json writeToURL:[NSURL fileURLWithPath:path] options:NSDataWritingAtomic error:&err];
+  if (err) {
+    LOGE(@"Failed to write %@ to file: %@", msgType, err);
+  }
+}
+#endif
 
 @end
