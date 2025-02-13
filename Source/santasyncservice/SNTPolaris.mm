@@ -25,23 +25,16 @@
 #include "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 
-#ifdef SANTA_ENABLE_POLARIS
 #include <google/protobuf/arena.h>
-
-#include <grpc/grpc.h>
-#include <grpcpp/channel.h>
-#include <grpcpp/client_context.h>
-#include <grpcpp/create_channel.h>
-#include <grpcpp/security/credentials.h>
-
-#include "stats/v1.grpc.pb.h"
+#include "stats/v1.pb.h"
 
 namespace pbv1 = ::santa::stats::v1;
-#endif
 
 namespace santa {
 
-const char *kPolarisHostname = "polaris.northpole.security";
+const char *kPolarisSubmissionURL =
+    "https://polaris.northpole.security/santa.stats.v1.StatsService/SubmitStats";
+const int kRequestTimeoutSeconds = 30;
 
 std::string machineIdHash(std::string_view machineID) {
   unsigned char md[CC_SHA256_DIGEST_LENGTH];
@@ -50,14 +43,7 @@ std::string machineIdHash(std::string_view machineID) {
 }
 
 void SubmitStats(NSString *orgID) {
-#ifdef SANTA_ENABLE_POLARIS
   google::protobuf::Arena arena;
-  auto channel_creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
-  auto chan = grpc::CreateChannel(kPolarisHostname, channel_creds);
-
-  std::unique_ptr<pbv1::StatsService::Stub> stub(pbv1::StatsService::NewStub(chan));
-
-  grpc::ClientContext context;
 
   auto request = google::protobuf::Arena::Create<::pbv1::SubmitStatsRequest>(&arena);
 
@@ -81,16 +67,48 @@ void SubmitStats(NSString *orgID) {
     request->set_org_id(NSStringToUTF8StringView(orgID));
   }
 
-  pbv1::SubmitStatsResponse response;
-  grpc::Status s = stub->SubmitStats(&context, *request, &response);
-  if (!s.ok()) {
-    LOGE(@"Failed to submit stats: %s", s.error_message().c_str());
+  std::string data;
+  if (!request->SerializeToString(&data)) {
+    LOGE(@"Failed to serialize proto");
     return;
   }
-  LOGI(@"Submitted stats to %s", kPolarisHostname);
-#else
+
+  NSURL *u = [NSURL URLWithString:@(kPolarisSubmissionURL)];
+  NSMutableURLRequest *req = [[NSMutableURLRequest alloc] initWithURL:u];
+  [req setHTTPMethod:@"POST"];
+  [req setValue:@"application/proto" forHTTPHeaderField:@"Content-Type"];
+  [req setHTTPBody:[NSData dataWithBytes:data.data() length:data.size()]];
+
+#ifdef DEBUG
   LOGI(@"Stats submission is disabled in non-release builds");
-#endif  // SANTA_ENABLE_POLARIS
+  return;
+}
+#endif
+
+dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+__block NSHTTPURLResponse *_response;
+__block NSError *_error;
+NSURLSessionDataTask *task = [[NSURLSession sharedSession]
+    dataTaskWithRequest:req
+      completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+          _response = (NSHTTPURLResponse *)response;
+        }
+        _error = error;
+        dispatch_semaphore_signal(sema);
+      }];
+[task resume];
+
+if (dispatch_semaphore_wait(
+        sema, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC *kRequestTimeoutSeconds))) {
+  [task cancel];
+}
+
+if (_error) {
+  LOGE(@"Failed to submit stats: %@", _error);
+  return;
+}
+LOGI(@"Submitted stats to %@", u.host);
 }
 
 }  // namespace santa
