@@ -65,6 +65,7 @@ using santa::NSStringToUTF8String;
 - (NSMutableURLRequest *)requestWithMessage:(google::protobuf::Message *)message {
   if (!message) return [self requestWithData:[NSData data] contentType:nil];
 
+#ifndef SANTA_STORE_EVENTUPLOADS
   if ([[SNTConfigurator configurator] syncEnableProtoTransfer]) {
     std::string data;
     if (!message->SerializeToString(&data)) {
@@ -75,6 +76,7 @@ using santa::NSStringToUTF8String;
     return [self requestWithData:[NSData dataWithBytes:data.data() length:data.size()]
                      contentType:@"application/x-protobuf"];
   }
+#endif
 
   google::protobuf::json::PrintOptions options{};
   std::string json;
@@ -100,6 +102,7 @@ using santa::NSStringToUTF8String;
   NSString *xsrfHeader = self.syncState.xsrfTokenHeader ?: kDefaultXSRFTokenHeader;
   [req setValue:self.syncState.xsrfToken forHTTPHeaderField:xsrfHeader];
 
+#ifndef SANTA_STORE_EVENTUPLOADS
   NSData *compressed;
   NSString *contentEncodingHeader;
 
@@ -122,6 +125,7 @@ using santa::NSStringToUTF8String;
     requestBody = compressed;
     [req setValue:contentEncodingHeader forHTTPHeaderField:@"Content-Encoding"];
   }
+#endif
 
   [self addExtraRequestHeaders:req];
 
@@ -228,6 +232,7 @@ using santa::NSStringToUTF8String;
     return nil;
   }
 
+#ifndef SANTA_STORE_EVENTUPLOADS
   if ([[SNTConfigurator configurator] syncEnableProtoTransfer]) {
     if (!message->ParseFromString(std::string((const char *)data.bytes, data.length))) {
       NSString *errStr = @"Failed to parse response proto into message";
@@ -238,6 +243,7 @@ using santa::NSStringToUTF8String;
     }
     return nil;
   }
+#endif
 
   google::protobuf::json::ParseOptions options{
       .ignore_unknown_fields = true,

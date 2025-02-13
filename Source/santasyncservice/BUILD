@@ -41,6 +41,13 @@ objc_library(
     }),
 )
 
+# This setting is used to enable storing all event uploads. See the
+# -storeEventUploads method in SNTSyncEventUpload.mm for more details.
+config_setting(
+    name = "store_event_uploads",
+    values = {"define": "SANTA_STORE_EVENTUPLOADS=1"},
+)
+
 objc_library(
     name = "sync_lib",
     srcs = [
@@ -70,6 +77,10 @@ objc_library(
         "SNTSyncState.m",
     ],
     hdrs = ["SNTSyncManager.h"],
+    defines = select({
+        ":store_event_uploads": ["SANTA_STORE_EVENTUPLOADS"],
+        "//conditions:default": [],
+    }),
     sdk_dylibs = ["libz"],
     sdk_frameworks = ["Network"],
     deps = [
