@@ -380,7 +380,6 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 @interface SNTEndpointSecurityFileAccessAuthorizer ()
 @property SNTConfigurator *configurator;
 @property bool isSubscribed;
-@property std::shared_ptr<santa::FAAPolicyProcessor> faaPolicyProcessor;
 @end
 
 @implementation SNTEndpointSecurityFileAccessAuthorizer {
@@ -393,6 +392,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   ProcessSet<std::pair<dev_t, ino_t>> _readsCache;
   ProcessSet<std::pair<std::string, std::string>> _ttyMessageCache;
   std::shared_ptr<Metrics> _metrics;
+  std::shared_ptr<santa::FAAPolicyProcessor> _faaPolicyProcessor;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
@@ -409,7 +409,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     _watchItems = std::move(watchItems);
     _logger = std::move(logger);
     _enricher = std::move(enricher);
-    _faaPolicyProcessor = faaPolicyProcessor;
+    _faaPolicyProcessor = std::move(faaPolicyProcessor);
     _ttyWriter = std::move(ttyWriter);
     _metrics = std::move(metrics);
 
@@ -531,7 +531,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   FileAccessPolicyDecision decision = FileAccessPolicyDecision::kDenied;
 
   for (const WatchItemProcess &process : policy->processes) {
-    if (self.faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
+    if (_faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
       decision = FileAccessPolicyDecision::kAllowed;
       break;
     }
@@ -595,7 +595,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     if (ShouldNotifyUserDecision(policyDecision) &&
         (!policy->silent || (!policy->silent_tty && TTYWriter::CanWrite(msg->process)))) {
       SNTCachedDecision *cd =
-          self.faaPolicyProcessor->GetCachedDecision(msg->process->executable->stat);
+          _faaPolicyProcessor->GetCachedDecision(msg->process->executable->stat);
 
       SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
 
