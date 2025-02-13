@@ -42,9 +42,8 @@ std::string machineIdHash(std::string_view machineID) {
   return BufToHexString(md, CC_SHA256_DIGEST_LENGTH);
 }
 
-void SubmitStats(NSString *orgID) {
+::pbv1::SubmitStatsRequest *createRequestProto(NSString *orgID) {
   google::protobuf::Arena arena;
-
   auto request = google::protobuf::Arena::Create<::pbv1::SubmitStatsRequest>(&arena);
 
   if ([SNTSystemInfo hardwareUUID].length) {
@@ -66,9 +65,42 @@ void SubmitStats(NSString *orgID) {
   if (orgID) {
     request->set_org_id(NSStringToUTF8StringView(orgID));
   }
+  return request;
+}
 
+NSError *makeRequest(NSURLRequest *req) {
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block NSHTTPURLResponse *_response;
+  __block NSError *_error;
+  NSURLSessionDataTask *task = [[NSURLSession sharedSession]
+      dataTaskWithRequest:req
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+          if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+            _response = (NSHTTPURLResponse *)response;
+          }
+          _error = error;
+          dispatch_semaphore_signal(sema);
+        }];
+  [task resume];
+
+  if (dispatch_semaphore_wait(
+          sema, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * kRequestTimeoutSeconds))) {
+    [task cancel];
+  }
+
+  if (_error) {
+    return _error;
+  }
+  if (_response.statusCode != 200) {
+    return [NSError errorWithDomain:NSURLErrorDomain code:_response.statusCode userInfo:nil];
+  }
+  return nil;
+}
+
+void SubmitStats(NSString *orgID) {
+  auto pb = createRequestProto(orgID);
   std::string data;
-  if (!request->SerializeToString(&data)) {
+  if (!pb->SerializeToString(&data)) {
     LOGE(@"Failed to serialize proto");
     return;
   }
@@ -82,33 +114,14 @@ void SubmitStats(NSString *orgID) {
 #ifdef DEBUG
   LOGI(@"Stats submission is disabled in non-release builds");
   return;
-}
+#else
+  NSError *error = makeRequest(req);
+  if (error) {
+    LOGE(@"Failed to submit stats: %@", error);
+    return;
+  }
+  LOGI(@"Submitted stats to %@", u.host);
 #endif
-
-dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-__block NSHTTPURLResponse *_response;
-__block NSError *_error;
-NSURLSessionDataTask *task = [[NSURLSession sharedSession]
-    dataTaskWithRequest:req
-      completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-          _response = (NSHTTPURLResponse *)response;
-        }
-        _error = error;
-        dispatch_semaphore_signal(sema);
-      }];
-[task resume];
-
-if (dispatch_semaphore_wait(
-        sema, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC *kRequestTimeoutSeconds))) {
-  [task cancel];
-}
-
-if (_error) {
-  LOGE(@"Failed to submit stats: %@", _error);
-  return;
-}
-LOGI(@"Submitted stats to %@", u.host);
 }
 
 }  // namespace santa
