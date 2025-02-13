@@ -88,9 +88,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
       .ignoringNonObjectArgs()
       .andReturn(nil);
 
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSSignatureFailed userInfo:nil];
-  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
-      .andReturn(self.cscMock);
+  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY]).andReturn(nil);
 
   got = faaPolicyProcessor.GetCertificateHash(&esFile1);
   want = kBadCertHash;
@@ -110,8 +108,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   OCMExpect([self.dcMock cachedDecisionForFile:esFile2.stat])
       .ignoringNonObjectArgs()
       .andReturn(nil);
-  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:nil]])
-      .andReturn(self.cscMock);
+  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY]).andReturn(self.cscMock);
 
   OCMExpect([self.cscMock leafCertificate]).andReturn(certMock);
   OCMExpect([certMock SHA256]).andReturn(certHash2);
@@ -175,9 +172,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
       .WillRepeatedly(testing::Return(@(instigatingCertHash)));
 
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSSignatureFailed userInfo:nil];
-  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
-      .andReturn(self.cscMock);
+  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY]).andReturn(nil);
 
   WatchItemProcess policyProc("", "", "", {}, "", std::nullopt);
 

@@ -27,40 +27,36 @@ FAAPolicyProcessor::FAAPolicyProcessor(SNTDecisionCache *decision_cache)
 
 NSString *FAAPolicyProcessor::GetCertificateHash(const es_file_t *es_file) {
   // First see if we've already cached this value
-  NSLog(@"GetCertificateHash ENTER");
   SantaVnode vnodeID = SantaVnode::VnodeForFile(es_file);
   NSString *result = cert_hash_cache_.get(vnodeID);
-  if (!result) {
-    // If this wasn't already cached, try finding a cached SNTCachedDecision
-    SNTCachedDecision *cd = [decision_cache_ cachedDecisionForFile:es_file->stat];
-    if (cd) {
-      // There was an existing cached decision, use its cert hash
-      result = cd.certSHA256;
-    } else {
-      // If the cached decision didn't exist, try a manual lookup
-      NSError *e;
-      MOLCodesignChecker *csInfo =
-          [[MOLCodesignChecker alloc] initWithBinaryPath:@(es_file->path.data) error:&e];
-      if (!e) {
-        result = csInfo.leafCertificate.SHA256;
-      }
-    }
-
-    if (!result.length) {
-      // If result is still nil, there isn't much recourse... We will
-      // assume that this error isn't transient and set a terminal value
-      // in the cache to prevent continous attempts to lookup cert hash.
-      result = kBadCertHash;
-    }
-
-    // Finally, add the result to the cache to prevent future lookups
-    cert_hash_cache_.set(vnodeID, result);
+  if (result) {
+    return result;
   }
+
+  // If this wasn't already cached, try finding a cached SNTCachedDecision
+  SNTCachedDecision *cd = [decision_cache_ cachedDecisionForFile:es_file->stat];
+  if (cd) {
+    // There was an existing cached decision, use its cert hash
+    result = cd.certSHA256;
+  } else {
+    // If the cached decision didn't exist, try a manual lookup
+    MOLCodesignChecker *csInfo =
+        [[MOLCodesignChecker alloc] initWithBinaryPath:@(es_file->path.data)];
+    result = csInfo.leafCertificate.SHA256;
+  }
+  if (!result.length) {
+    // If result is still nil, there isn't much recourse... We will
+    // assume that this error isn't transient and set a terminal value
+    // in the cache to prevent continuous attempts to lookup cert hash.
+    result = kBadCertHash;
+  }
+  // Finally, add the result to the cache to prevent future lookups
+  cert_hash_cache_.set(vnodeID, result);
 
   return result;
 }
 
-/// An An `es_process_t` must match all criteria within the given
+/// An `es_process_t` must match all criteria within the given
 /// WatchItemProcess to be considered a match.
 bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_proc,
                                               const es_process_t *es_proc) {

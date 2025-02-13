@@ -84,7 +84,8 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
 
     case ES_EVENT_TYPE_NOTIFY_FORK: {
       // Clone the policy from the parent to the child.
-      // NB: This is safe since as long as we process the fork synchronously
+      // NB: This is safe to do as two steps (get+set) since we process the
+      // fork synchronously which will occur before any EXIT event.
       std::shared_ptr<ProcessWatchItemPolicy> policy =
           _procRuleCache->get(PidPidver(esMsg->process));
       if (policy) {
