@@ -214,9 +214,26 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 
 + (NSArray<NSString *> *)fileInfoKeys {
   return @[
-    kPath, kSHA256, kSHA1, kBundleName, kBundleVersion, kBundleVersionStr, kDownloadReferrerURL,
-    kDownloadURL, kDownloadTimestamp, kDownloadAgent, kTeamID, kSigningID, kCDHash, kType,
-    kPageZero, kCodeSigned, kRule, kEntitlements, kSigningChain, kUniversalSigningChain,
+    kPath,
+    kSHA256,
+    kSHA1,
+    kBundleName,
+    kBundleVersion,
+    kBundleVersionStr,
+    kDownloadReferrerURL,
+    kDownloadURL,
+    kDownloadTimestamp,
+    kDownloadAgent,
+    kTeamID,
+    kSigningID,
+    kCDHash,
+    kType,
+    kPageZero,
+    kCodeSigned,
+    kRule,
+    kEntitlements,
+    kSigningChain,
+    kUniversalSigningChain,
   ];
 }
 
