@@ -135,9 +135,18 @@ REGISTER_COMMAND_NAME(@"status")
 
   __block BOOL pushNotifications = NO;
   if ([[SNTConfigurator configurator] syncBaseURL]) {
-    [rop pushNotifications:^(BOOL response) {
-      pushNotifications = response;
-    }];
+    // The request to santad to discover whether push notifications are enabled
+    // makes a call to santasyncservice. If it's unavailable the call can hang
+    // so we run the request asynchronously with a semaphore timer; if we have
+    // no response within 2s, give up and move on.
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+      [rop pushNotifications:^(BOOL response) {
+        pushNotifications = response;
+        dispatch_semaphore_signal(sema);
+      }];
+    });
+    dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC));
   }
 
   __block BOOL enableBundles = NO;

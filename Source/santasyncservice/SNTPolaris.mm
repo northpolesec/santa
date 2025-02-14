@@ -43,8 +43,7 @@ std::string machineIdHash(std::string_view machineID) {
   return BufToHexString(md, CC_SHA256_DIGEST_LENGTH);
 }
 
-::pbv1::SubmitStatsRequest *createRequestProto(NSString *orgID) {
-  google::protobuf::Arena arena;
+::pbv1::SubmitStatsRequest *createRequestProto(google::protobuf::Arena &arena, NSString *orgID) {
   auto request = google::protobuf::Arena::Create<::pbv1::SubmitStatsRequest>(&arena);
 
   if ([SNTSystemInfo hardwareUUID].length) {
@@ -63,7 +62,7 @@ std::string machineIdHash(std::string_view machineID) {
   if ([SNTSystemInfo modelIdentifier].length) {
     request->set_mac_model(NSStringToUTF8StringView([SNTSystemInfo modelIdentifier]));
   }
-  if (orgID) {
+  if (orgID.length) {
     request->set_org_id(NSStringToUTF8StringView(orgID));
   }
   return request;
@@ -99,7 +98,8 @@ NSError *makeRequest(NSURLRequest *req) {
 }
 
 void SubmitStats(NSString *orgID) {
-  auto pb = createRequestProto(orgID);
+  google::protobuf::Arena arena;
+  auto pb = createRequestProto(arena, orgID);
   std::string data;
   if (!pb->SerializeToString(&data)) {
     LOGE(@"Failed to serialize proto");
