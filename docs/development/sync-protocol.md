@@ -227,7 +227,7 @@ sequenceDiagram
 | file_bundle_binary_count | NO | uint32 | The number of binaries in a bundle | 13 |
 | pid | NO | int | Process id of the executable that was blocked | 1234 |
 | ppid | NO | int | Parent process id of the executable that was blocked | 456 |
-| parent_name | NO | Parent process short command name of the executable that was blocked | "bar" |
+| parent_name | NO | string | Parent process short command name of the executable that was blocked | "bar" |
 | quarantine_data_url | NO | string |  The actual URL of the quarantined item from the quarantine database that this binary was downloaded from | https://dl.google.com/chrome/mac/stable/GGRO/googlechrome.dmg |
 | quarantine_referer_url | NO | string | Referring URL that lead to the binary being downloaded if known  | https://www.google.com/chrome/downloads/ |
 | quarantine_timestamp | NO | float64 | Unix Timestamp of when the binary was downloaded or 0 if not quarantined | 0 |
@@ -236,6 +236,9 @@ sequenceDiagram
 | signing_id | NO | string | Signing ID of the binary that was executed | "EQHXZ8M8AV:com.google.Chrome" |
 | team_id | NO | string | Team ID of the binary that was executed | "EQHXZ8M8AV" |
 | cdhash | NO | string | CDHash of the binary that was executed | "dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a" |
+| entitlementInfo | NO | Entitlement Info Object (see below) | Entitlement information about the target executable | see below |
+| csFlags | NO | int32 | The raw codesigning flags set for the execution |
+| signingStatus | NO | The signing status of the executing binary | **Must be one of the examples** | "SIGNING_STATUS_UNSPECIFIED", "SIGNING_STATUS_UNSIGNED", "SIGNING_STATUS_ADHOC", "SIGNING_STATUS_DEVELOPMENT", "SIGNING_STATUS_PRODUCTION" |
 
 #### Signing Chain Objects
 
@@ -248,65 +251,102 @@ sequenceDiagram
 | valid_from | YES | int | Unix timestamp of when the cert was issued |  1647447514 |
 | valid_until | YES | int | Unix timestamp of when the cert expires |  1678983513 |
 
+#### Entitlement Info
+
+If the binary has entitlements, the entitlements are stored in the `Event` as an `EntitlementInfo` object, that indicates whether or not the set was filtered and includes the set of captured entitlements.
+
+| Key | Required | Type | Meaning | Example Value |
+|---|---|---|---|---|
+| entitlementsFiltered | Y | boolean | Whether or not Santa filtered some of the reported entitlements based on its configuration. | true |
+| entitlements | Y | List of entitlements see below | See Entitlement |
+
+##### Entitlement
+
+An entitlement is stored as an object of key- Value pairs
+
+| Key | Required | Type | Meaning | Example Value |
+|---|---|---|---|---|
+| key | Y | string | The name of the entitlement | "com.apple.security.hypervisor" |
+| value | Y | string | The value of the entitlement as a string | "true" |
+
 
 #### `eventupload` Request Example Payload
 
 ```json
 {
-  "events": [{
-    "file_path": "\/Applications\/Santa.app\/Contents\/MacOS",
-    "file_bundle_version": "9999.1.1",
-    "parent_name": "launchd",
-    "logged_in_users": [
-      "markowsky"
-    ],
-    "quarantine_timestamp": 0,
-    "signing_chain": [{
-        "cn": "Apple Development: Google Development (EQHXZ8M8AV)",
-        "valid_until": 1678983513,
-        "org": "Google LLC",
-        "valid_from": 1647447514,
-        "ou": "EQHXZ8M8AV",
-        "sha256": "7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258"
+  "events": [
+    {
+      "file_sha256": "afdceb288fe27ad58d9f633f2c8f221d047d7d994b91ac80c6c62ecff6b7fcad",
+      "file_path": "/opt/homebrew/Cellar/tart/2.19.3/libexec/tart.app/Contents/MacOS",
+      "file_name": "tart",
+      "executing_user": "appleseed",
+      "execution_time": 1739402683.02169,
+      "logged_in_users": [
+        "appleseed"
+      ],
+      "current_sessions": [
+        "appleseed@console",
+        "appleseed@ttys000",
+      ],
+      "decision": "BLOCK_SIGNINGID",
+      "file_bundle_id": "org.cirruslabs.tart",
+      "file_bundle_path": "/opt/homebrew/Cellar/tart/2.19.3/libexec/tart.app",
+      "file_bundle_executable_rel_path": "Contents/MacOS/tart",
+      "file_bundle_name": "Tart",
+      "file_bundle_version_string": "2.19.3",
+      "file_bundle_hash": "71b31a5fd3dde46302b285da133d07c77bb81d978e66377fdf96d7b6e0c873f6",
+      "file_bundle_hash_millis": 51,
+      "file_bundle_binary_count": 1,
+      "pid": 33021,
+      "ppid": 55918,
+      "parent_name": "zsh",
+      "team_id": "9M2P8L4D89",
+      "signing_id": "9M2P8L4D89:tart",
+      "cdhash": "94d442242fae57bc5aa79e109d3adc15f6413419",
+      "signing_chain": [
+        {
+          "sha256": "11a945ae04224780e250ad7ea0fd53e57c98c4624c2efe516cb808220492d746",
+          "cn": "Developer ID Application: Cirrus Labs, Inc. (9M2P8L4D89)",
+          "org": "Cirrus Labs, Inc.",
+          "ou": "9M2P8L4D89",
+          "valid_from": 1663072980,
+          "valid_until": 1801519935
+        },
+        {
+          "sha256": "7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f",
+          "cn": "Developer ID Certification Authority",
+          "org": "Apple Inc.",
+          "ou": "Apple Certification Authority",
+          "valid_from": 1328134335,
+          "valid_until": 1801519935
+        },
+        {
+          "sha256": "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024",
+          "cn": "Apple Root CA",
+          "org": "Apple Inc.",
+          "ou": "Apple Certification Authority",
+          "valid_from": 1146001236,
+          "valid_until": 2054670036
+        }
+      ],
+      "entitlementInfo": {
+        "entitlementsFiltered": false,
+        "entitlements": [
+          {
+            "key": "com.apple.vm.networking",
+            "value": "true"
+          },
+          {
+            "key": "com.apple.security.virtualization",
+            "value": "true"
+          }
+        ]
       },
-      {
-        "cn": "Apple Worldwide Developer Relations Certification Authority",
-        "valid_until": 1897776000,
-        "org": "Apple Inc.",
-        "valid_from": 1582136027,
-        "ou": "G3",
-        "sha256": "dcf21878c77f4198e4b4614f03d696d89c66c66008d4244e1b99161aac91601f"
-      },
-      {
-        "cn": "Apple Root CA",
-        "valid_until": 2054670036,
-        "org": "Apple Inc.",
-        "valid_from": 1146001236,
-        "ou": "Apple Certification Authority",
-        "sha256": "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024"
-      }
-    ],
-    "file_bundle_name": "santasyncservice",
-    "executing_user": "root",
-    "ppid": 1,
-    "file_bundle_path": "/Applications/Santa.app",
-    "file_name": "santasyncservice",
-    "execution_time": 1657764366.475035,
-    "file_sha256": "8621d92262aef379d3cfe9e099f287be5b996a281995b5cc64932f7d62f3dc85",
-    "decision": "ALLOW_BINARY",
-    "file_bundle_id": "com.northpolesec.santa.syncservice",
-    "file_bundle_version_string": "9999.1.1",
-    "pid": 2595,
-    "current_sessions": [
-      "markowsky@console",
-      "markowsky@ttys000",
-      "markowsky@ttys001",
-      "markowsky@ttys003"
-    ],
-    "team_id": "EQHXZ8M8AV",
-    "signing_id": "EQHXZ8M8AV:com.northpolesec.santa",
-    "cdhash": "dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a"
-  }]
+      "csFlags": 570514193,
+      "signingStatus": "SIGNING_STATUS_PRODUCTION"
+    }
+  ],
+  "machine_id": "12345678-FEED-FACE-BEEF-123456789ABC"
 }
 ```
 
@@ -447,13 +487,17 @@ The request consists of the following JSON keys:
 |---|---|---|---|---|
 | rules_received    | YES | int | The number of rules the client received from all ruledownlaod requests. | 211 |
 | rules_processed      | YES | int | The number of rules that were processed from all ruledownload requests. | 212 |
+| machine_id | YES | string | The UUID of the machine that is sending this postflight. |
+| sync_type | YES | string | The type of sync that the client just completed. | One of "NORMAL", "CLEAN", "CLEAN_ALL", "CLEAN_STANDALONE" |
 
 #### Example postflight request JSON Payload:
 
 ```json
 {
   "rules_received" : 211,
-  "rules_processed" : 212
+  "rules_processed" : 212,
+  "machine_id":  "b67df594-2d8e-4f77-9c21-8af65e4cf8df",
+  "sync_type": "NORMAL"
 }
 ```
 
