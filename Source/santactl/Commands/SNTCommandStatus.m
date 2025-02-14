@@ -140,7 +140,7 @@ REGISTER_COMMAND_NAME(@"status")
     // so we run the request asynchronously with a semaphore timer; if we have
     // no response within 2s, give up and move on.
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
       [rop pushNotifications:^(BOOL response) {
         pushNotifications = response;
         dispatch_semaphore_signal(sema);
