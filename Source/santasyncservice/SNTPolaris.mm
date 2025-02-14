@@ -26,6 +26,7 @@
 #include "Source/common/String.h"
 
 #include <google/protobuf/arena.h>
+
 #include "stats/v1.pb.h"
 
 namespace pbv1 = ::santa::stats::v1;
