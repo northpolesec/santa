@@ -19,13 +19,13 @@
 #include <string>
 
 #import <CommonCrypto/CommonCrypto.h>
-#include <CommonCrypto/CommonDigest.h>
+#import <CommonCrypto/CommonDigest.h>
+
+#include <google/protobuf/arena.h>
 
 #include "Source/common/SNTLogging.h"
 #include "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
-
-#include <google/protobuf/arena.h>
 
 #include "stats/v1.pb.h"
 
