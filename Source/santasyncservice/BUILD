@@ -24,21 +24,12 @@ objc_library(
         "SNTPolaris.h",
         "SNTPolaris.mm",
     ],
-    defines = select({
-        "//:release_build": ["SANTA_ENABLE_POLARIS"],
-        "//conditions:default": [],
-    }),
     deps = [
         "//Source/common:SNTLogging",
         "//Source/common:SNTSystemInfo",
         "//Source/common:String",
-    ] + select({
-        "//:release_build": [
-            "@grpc//:grpc++",
-            "@northpole_protos//stats:v1_cc_grpc",
-        ],
-        "//conditions:default": None,
-    }),
+        "@northpole_protos//stats:v1_cc_proto",
+    ],
 )
 
 # This setting is used to enable storing all sync requests as JSON files on disk.
