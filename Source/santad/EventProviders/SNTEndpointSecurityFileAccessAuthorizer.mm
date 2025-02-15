@@ -57,6 +57,7 @@ using santa::EndpointSecurityAPI;
 using santa::Enricher;
 using santa::EnrichOptions;
 using santa::EventDisposition;
+using santa::FAAPolicyProcessor;
 using santa::FileAccessMetricStatus;
 using santa::Logger;
 using santa::Message;
@@ -70,15 +71,6 @@ using santa::WatchItems;
 
 static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 static constexpr uint16_t kDefaultRateLimitQPS = 50;
-
-// Small structure to hold a complete event path target being operated upon and
-// a bool indicating whether the path is a readable target (e.g. a file being
-// opened or cloned)
-struct PathTarget {
-  std::string path;
-  bool isReadable;
-  std::optional<std::pair<dev_t, ino_t>> devnoIno;
-};
 
 // This is a bespoke cache for mapping processes to a set of values. It has
 // similar semantics to SantaCache in terms of clearing the cache keys and
@@ -195,32 +187,6 @@ class ProcessSet {
   static constexpr size_t kMaxCacheEntrySize = 8192;
 };
 
-static inline std::string Path(const es_file_t *esFile) {
-  return std::string(esFile->path.data, esFile->path.length);
-}
-
-static inline std::string Path(const es_string_token_t &tok) {
-  return std::string(tok.data, tok.length);
-}
-
-static inline void PushBackIfNotTruncated(std::vector<PathTarget> &vec, const es_file_t *esFile,
-                                          bool isReadable = false) {
-  if (!esFile->path_truncated) {
-    vec.push_back({Path(esFile), isReadable,
-                   isReadable ? std::make_optional<std::pair<dev_t, ino_t>>(
-                                    {esFile->stat.st_dev, esFile->stat.st_ino})
-                              : std::nullopt});
-  }
-}
-
-// Note: This variant of PushBackIfNotTruncated can never be marked "isReadable"
-static inline void PushBackIfNotTruncated(std::vector<PathTarget> &vec, const es_file_t *dir,
-                                          const es_string_token_t &name) {
-  if (!dir->path_truncated) {
-    vec.push_back({Path(dir) + "/" + Path(name), false, std::nullopt});
-  }
-}
-
 es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision) {
   switch (decision) {
     case FileAccessPolicyDecision::kNoPolicy: return ES_AUTH_RESULT_ALLOW;
@@ -289,77 +255,6 @@ es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t
   return ((result1 == ES_AUTH_RESULT_DENY || result2 == ES_AUTH_RESULT_DENY)
               ? ES_AUTH_RESULT_DENY
               : ES_AUTH_RESULT_ALLOW);
-}
-
-void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets) {
-  switch (msg->event_type) {
-    case ES_EVENT_TYPE_AUTH_CLONE:
-      PushBackIfNotTruncated(targets, msg->event.clone.source, true);
-      PushBackIfNotTruncated(targets, msg->event.clone.target_dir, msg->event.clone.target_name);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_CREATE:
-      // AUTH CREATE events should always be ES_DESTINATION_TYPE_NEW_PATH
-      if (msg->event.create.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
-        PushBackIfNotTruncated(targets, msg->event.create.destination.new_path.dir,
-                               msg->event.create.destination.new_path.filename);
-      } else {
-        LOGW(@"Unexpected destination type for create event: %d. Ignoring target.",
-             msg->event.create.destination_type);
-      }
-      break;
-
-    case ES_EVENT_TYPE_AUTH_COPYFILE:
-      PushBackIfNotTruncated(targets, msg->event.copyfile.source, true);
-      if (msg->event.copyfile.target_file) {
-        PushBackIfNotTruncated(targets, msg->event.copyfile.target_file);
-      } else {
-        PushBackIfNotTruncated(targets, msg->event.copyfile.target_dir,
-                               msg->event.copyfile.target_name);
-      }
-      break;
-
-    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
-      PushBackIfNotTruncated(targets, msg->event.exchangedata.file1);
-      PushBackIfNotTruncated(targets, msg->event.exchangedata.file2);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_LINK:
-      PushBackIfNotTruncated(targets, msg->event.link.source);
-      PushBackIfNotTruncated(targets, msg->event.link.target_dir, msg->event.link.target_filename);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_OPEN:
-      PushBackIfNotTruncated(targets, msg->event.open.file, true);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_RENAME:
-      PushBackIfNotTruncated(targets, msg->event.rename.source);
-      if (msg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
-        PushBackIfNotTruncated(targets, msg->event.rename.destination.existing_file);
-      } else if (msg->event.rename.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
-        PushBackIfNotTruncated(targets, msg->event.rename.destination.new_path.dir,
-                               msg->event.rename.destination.new_path.filename);
-      } else {
-        LOGW(@"Unexpected destination type for rename event: %d. Ignoring destination.",
-             msg->event.rename.destination_type);
-      }
-      break;
-
-    case ES_EVENT_TYPE_AUTH_TRUNCATE:
-      PushBackIfNotTruncated(targets, msg->event.truncate.target);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_UNLINK:
-      PushBackIfNotTruncated(targets, msg->event.unlink.target);
-      break;
-
-    default:
-      [NSException
-           raise:@"Unexpected event type"
-          format:@"File Access Authorizer client does not handle event: %d", msg->event_type];
-      exit(EXIT_FAILURE);
-  }
 }
 
 bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const Message &msg,
@@ -441,7 +336,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 }
 
 - (FileAccessPolicyDecision)specialCaseForPolicy:(std::shared_ptr<DataWatchItemPolicy>)policy
-                                          target:(const PathTarget &)target
+                                          target:(const FAAPolicyProcessor::PathTarget &)target
                                          message:(const Message &)msg {
   switch (msg->event_type) {
     case ES_EVENT_TYPE_AUTH_OPEN:
@@ -453,7 +348,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
     case ES_EVENT_TYPE_AUTH_CLONE:
       // If policy is write-only, readable targets are allowed (e.g. source file)
-      if (policy->allow_read_access && target.isReadable) {
+      if (policy->allow_read_access && target.is_readable) {
         return FileAccessPolicyDecision::kAllowedReadAccess;
       }
       break;
@@ -462,7 +357,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
       // Note: Flags for the copyfile event represent the kernel view, not the usersapce
       // copyfile(3) implementation. This means if a `copyfile(3)` flag like `COPYFILE_MOVE`
       // is specified, it will come as a separate `unlink(2)` event, not a flag here.
-      if (policy->allow_read_access && target.isReadable) {
+      if (policy->allow_read_access && target.is_readable) {
         return FileAccessPolicyDecision::kAllowedReadAccess;
       }
       break;
@@ -494,7 +389,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 // Otherwise the operation is denied.
 - (FileAccessPolicyDecision)applyPolicy:
                                 (std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
-                              forTarget:(const PathTarget &)target
+                              forTarget:(const FAAPolicyProcessor::PathTarget &)target
                               toMessage:(const Message &)msg {
   // If no policy exists, everything is allowed
   if (!optionalPolicy.has_value()) {
@@ -513,9 +408,9 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   std::shared_ptr<DataWatchItemPolicy> policy = optionalPolicy.value();
 
   // If policy allows reading, add target to the cache
-  if (policy->allow_read_access && target.devnoIno.has_value()) {
+  if (policy->allow_read_access && target.devno_ino.has_value()) {
     self->_readsCache.Set(msg->process, ^{
-      return *target.devnoIno;
+      return *target.devno_ino;
     });
   }
 
@@ -558,7 +453,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
 - (FileAccessPolicyDecision)
      handleMessage:(const Message &)msg
-            target:(const PathTarget &)target
+            target:(const FAAPolicyProcessor::PathTarget &)target
             policy:(std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
      policyVersion:(const std::string &)policyVersion
     overrideAction:(SNTOverrideFileAccessAction)overrideAction {
@@ -657,15 +552,15 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 }
 
 - (void)processMessage:(Message)msg overrideAction:(SNTOverrideFileAccessAction)overrideAction {
-  std::vector<PathTarget> targets;
+  std::vector<FAAPolicyProcessor::PathTarget> targets;
   targets.reserve(2);
-  PopulatePathTargets(msg, targets);
+  _faaPolicyProcessor->PopulatePathTargets(msg, targets);
 
   // Extract the paths from the vector of PathTargets in order to lookup policies
   // Note: There should only ever be 1 or 2 items in the vector
   std::vector<std::string_view> paths;
   paths.reserve(2);
-  for (const PathTarget &target : targets) {
+  for (const FAAPolicyProcessor::PathTarget &target : targets) {
     paths.push_back(std::string_view(target.path));
   }
 

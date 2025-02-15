@@ -121,4 +121,102 @@ SNTCachedDecision *FAAPolicyProcessor::GetCachedDecision(const struct stat &stat
   return [decision_cache_ cachedDecisionForFile:stat_buf];
 }
 
+static inline std::string Path(const es_file_t *esFile) {
+  return std::string(esFile->path.data, esFile->path.length);
+}
+
+static inline std::string Path(const es_string_token_t &tok) {
+  return std::string(tok.data, tok.length);
+}
+
+static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
+                                          const es_file_t *esFile, bool isReadable = false) {
+  if (!esFile->path_truncated) {
+    vec.push_back({Path(esFile), isReadable,
+                   isReadable ? std::make_optional<std::pair<dev_t, ino_t>>(
+                                    {esFile->stat.st_dev, esFile->stat.st_ino})
+                              : std::nullopt});
+  }
+}
+
+// Note: This variant of PushBackIfNotTruncated can never be marked "isReadable"
+static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
+                                          const es_file_t *dir, const es_string_token_t &name) {
+  if (!dir->path_truncated) {
+    vec.push_back({Path(dir) + "/" + Path(name), false, std::nullopt});
+  }
+}
+
+void FAAPolicyProcessor::PopulatePathTargets(const Message &msg,
+                                             std::vector<FAAPolicyProcessor::PathTarget> &targets) {
+  switch (msg->event_type) {
+    case ES_EVENT_TYPE_AUTH_CLONE:
+      PushBackIfNotTruncated(targets, msg->event.clone.source, true);
+      PushBackIfNotTruncated(targets, msg->event.clone.target_dir, msg->event.clone.target_name);
+      break;
+
+    case ES_EVENT_TYPE_AUTH_CREATE:
+      // AUTH CREATE events should always be ES_DESTINATION_TYPE_NEW_PATH
+      if (msg->event.create.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
+        PushBackIfNotTruncated(targets, msg->event.create.destination.new_path.dir,
+                               msg->event.create.destination.new_path.filename);
+      } else {
+        LOGW(@"Unexpected destination type for create event: %d. Ignoring target.",
+             msg->event.create.destination_type);
+      }
+      break;
+
+    case ES_EVENT_TYPE_AUTH_COPYFILE:
+      PushBackIfNotTruncated(targets, msg->event.copyfile.source, true);
+      if (msg->event.copyfile.target_file) {
+        PushBackIfNotTruncated(targets, msg->event.copyfile.target_file);
+      } else {
+        PushBackIfNotTruncated(targets, msg->event.copyfile.target_dir,
+                               msg->event.copyfile.target_name);
+      }
+      break;
+
+    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
+      PushBackIfNotTruncated(targets, msg->event.exchangedata.file1);
+      PushBackIfNotTruncated(targets, msg->event.exchangedata.file2);
+      break;
+
+    case ES_EVENT_TYPE_AUTH_LINK:
+      PushBackIfNotTruncated(targets, msg->event.link.source);
+      PushBackIfNotTruncated(targets, msg->event.link.target_dir, msg->event.link.target_filename);
+      break;
+
+    case ES_EVENT_TYPE_AUTH_OPEN:
+      PushBackIfNotTruncated(targets, msg->event.open.file, true);
+      break;
+
+    case ES_EVENT_TYPE_AUTH_RENAME:
+      PushBackIfNotTruncated(targets, msg->event.rename.source);
+      if (msg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
+        PushBackIfNotTruncated(targets, msg->event.rename.destination.existing_file);
+      } else if (msg->event.rename.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
+        PushBackIfNotTruncated(targets, msg->event.rename.destination.new_path.dir,
+                               msg->event.rename.destination.new_path.filename);
+      } else {
+        LOGW(@"Unexpected destination type for rename event: %d. Ignoring destination.",
+             msg->event.rename.destination_type);
+      }
+      break;
+
+    case ES_EVENT_TYPE_AUTH_TRUNCATE:
+      PushBackIfNotTruncated(targets, msg->event.truncate.target);
+      break;
+
+    case ES_EVENT_TYPE_AUTH_UNLINK:
+      PushBackIfNotTruncated(targets, msg->event.unlink.target);
+      break;
+
+    default:
+      [NSException
+           raise:@"Unexpected event type"
+          format:@"File Access Authorizer client does not handle event: %d", msg->event_type];
+      exit(EXIT_FAILURE);
+  }
+}
+
 }  // namespace santa

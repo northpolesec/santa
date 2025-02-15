@@ -40,6 +40,17 @@ namespace santa {
 
 class FAAPolicyProcessor {
  public:
+  // Small structure to hold a complete event path target being operated upon and
+  // a bool indicating whether the path is a readable target (e.g. a file being
+  // opened or cloned)
+  struct PathTarget {
+    std::string path;
+    bool is_readable;
+    std::optional<std::pair<dev_t, ino_t>> devno_ino;
+  };
+
+  friend class MockFAAPolicyProcessor;
+
   FAAPolicyProcessor(SNTDecisionCache *decision_cache);
 
   virtual ~FAAPolicyProcessor() = default;
@@ -49,7 +60,7 @@ class FAAPolicyProcessor {
 
   virtual SNTCachedDecision *__strong GetCachedDecision(const struct stat &stat_buf);
 
-  friend class MockFAAPolicyProcessor;
+  static void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets);
 
  private:
   SNTDecisionCache *decision_cache_;
