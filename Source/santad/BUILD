@@ -1497,7 +1497,9 @@ santa_unit_test(
     name = "FAAPolicyProcessorTest",
     srcs = ["EventProviders/FAAPolicyProcessorTest.mm"],
     deps = [
+        ":EndpointSecurityMessage",
         ":FAAPolicyProcessor",
+        ":MockEndpointSecurityAPI",
         ":MockFAAPolicyProcessor",
         ":SNTDecisionCache",
         ":WatchItemPolicy",
