@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -65,6 +66,17 @@ class PrefixTree {
 
     absl::ReaderMutexLock lock(&lock_);
     return LookupLongestMatchingPrefixLocked(input);
+  }
+
+  /// Returns true if the tree contains any prefix or literal
+  /// string that matches the input, otherwise false.
+  bool Contains(const char *input) {
+    if (!input) {
+      return false;
+    }
+
+    absl::ReaderMutexLock lock(&lock_);
+    return ContainsLocked(input);
   }
 
   void Reset() {
@@ -199,6 +211,27 @@ class PrefixTree {
     }
 
     return match ? std::make_optional<ValueT>(match->value_) : std::nullopt;
+  }
+
+  ABSL_SHARED_LOCKS_REQUIRED(lock_)
+  bool ContainsLocked(const char *input) {
+    TreeNode *node = root_;
+    const char *p = input;
+
+    while (*p) {
+      node = node->children_[(uint8_t)*p++];
+
+      if (!node) {
+        break;
+      }
+
+      if (node->node_type_ == NodeType::kPrefix ||
+          (*p == '\0' && node->node_type_ == NodeType::kLiteral)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_)
