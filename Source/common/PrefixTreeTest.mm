@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,12 +13,15 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <XCTest/XCTest.h>
-
 #define SANTA_PREFIX_TREE_DEBUG 1
 #include "Source/common/PrefixTree.h"
 
+#import <XCTest/XCTest.h>
+
+#include "Source/common/Unit.h"
+
 using santa::PrefixTree;
+using santa::Unit;
 
 @interface PrefixTreeTest : XCTestCase
 @end
@@ -110,6 +114,27 @@ using santa::PrefixTree;
   // No matching prefix
   value = tree.LookupLongestMatchingPrefix("/asdf");
   XCTAssertEqual(value.value_or(0), 0);
+}
+
+- (void)testContains {
+  PrefixTree<Unit> tree;
+
+  XCTAssertTrue(tree.InsertPrefix("/foo", {}));
+  XCTAssertTrue(tree.InsertPrefix("/bar", {}));
+  XCTAssertTrue(tree.InsertLiteral("/foo/bar.txt", {}));
+  XCTAssertTrue(tree.InsertLiteral("/baz", {}));
+
+  XCTAssertTrue(tree.Contains("/foo"));
+  XCTAssertTrue(tree.Contains("/foo/bar"));
+  XCTAssertTrue(tree.Contains("/foo/bar/baz"));
+  XCTAssertTrue(tree.Contains("/bar"));
+  XCTAssertTrue(tree.Contains("/bar/foo"));
+  XCTAssertTrue(tree.Contains("/foo/bar.txtxt"));
+  XCTAssertTrue(tree.Contains("/baz"));
+
+  XCTAssertFalse(tree.Contains("/baz1"));
+  XCTAssertFalse(tree.Contains("/"));
+  XCTAssertFalse(tree.Contains("/f00"));
 }
 
 - (void)testNodeCounts {

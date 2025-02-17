@@ -544,7 +544,10 @@ santa_unit_test(
 santa_unit_test(
     name = "PrefixTreeTest",
     srcs = ["PrefixTreeTest.mm"],
-    deps = [":PrefixTree"],
+    deps = [
+        ":PrefixTree",
+        ":Unit",
+    ],
 )
 
 santa_unit_test(
