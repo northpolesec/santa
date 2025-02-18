@@ -846,6 +846,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       if (![outputDict objectForKey:key]) continue;
       if ([key isEqual:kSigningChain] || [key isEqual:kUniversalSigningChain]) {
         [output appendString:[self stringForSigningChain:outputDict[key] key:key]];
+      } else if ([key isEqual:kEntitlements]) {
+        [output appendString:[self stringForEntitlements:outputDict[key] key:key]];
       } else {
         if (singleKey) {
           [output appendFormat:@"%@\n", outputDict[key]];
@@ -1069,6 +1071,25 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       [result appendFormat:@"       %-20s: %@\n", key.UTF8String, cert[key]];
     }
   }
+  return result.copy;
+}
+
+- (NSString *)stringForEntitlements:(NSDictionary *)entitlements key:(NSString *)key {
+  if (!entitlements.count) return @"none";
+
+  NSMutableString *result = [NSMutableString string];
+  [result appendFormat:@"%@:\n", key];
+  __block int i = 0;
+  [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
+    if ([obj isKindOfClass:[NSNumber class]]) {
+      NSNumber *objNumber = (NSNumber *)obj;
+      BOOL val = [objNumber boolValue];
+      if (!val) return;
+      [result appendFormat:@"   %2d. %@\n", ++i, key];
+      return;
+    }
+    [result appendFormat:@"   %2d. %@: %@\n", ++i, key, obj];
+  }];
   return result.copy;
 }
 
