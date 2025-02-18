@@ -49,6 +49,7 @@ static NSString *const kUniversalSigningChain = @"Universal Signing Chain";
 static NSString *const kTeamID = @"Team ID";
 static NSString *const kSigningID = @"Signing ID";
 static NSString *const kCDHash = @"CDHash";
+static NSString *const kEntitlements = @"Entitlements";
 
 // signing chain keys
 static NSString *const kCommonName = @"Common Name";
@@ -86,6 +87,7 @@ NSString *formattedStringForKeyArray(NSArray<NSString *> *array) {
 @property(nonatomic) BOOL recursive;
 @property(nonatomic) BOOL jsonOutput;
 @property(nonatomic) BOOL bundleInfo;
+@property(nonatomic) BOOL enableEntitlements;
 @property(nonatomic) BOOL filterInclusive;
 @property(nonatomic) NSNumber *certIndex;
 @property(nonatomic, copy) NSArray<NSString *> *outputKeyList;
@@ -135,6 +137,7 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 @property(readonly, copy, nonatomic) SNTAttributeBlock rule;
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock universalSigningChain;
+@property(readonly, copy, nonatomic) SNTAttributeBlock entitlements;
 
 // Mapping between property string keys and SNTAttributeBlocks
 @property(nonatomic) NSDictionary<NSString *, SNTAttributeBlock> *propertyMap;
@@ -195,6 +198,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           @"              file.\n"
           @"    --filter-inclusive: If multiple filters are specified, they must all match\n"
           @"                        for the file to be displayed.\n"
+          @"    --entitlements: If the file has entitlements, will also display them\n"
           @"    --bundleinfo: If the file is part of a bundle, will also display bundle\n"
           @"                  hash information and hashes of all bundle executables.\n"
           @"                  Incompatible with --recursive and --cert-index.\n"
@@ -210,9 +214,26 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 
 + (NSArray<NSString *> *)fileInfoKeys {
   return @[
-    kPath, kSHA256, kSHA1, kBundleName, kBundleVersion, kBundleVersionStr, kDownloadReferrerURL,
-    kDownloadURL, kDownloadTimestamp, kDownloadAgent, kTeamID, kSigningID, kCDHash, kType,
-    kPageZero, kCodeSigned, kRule, kSigningChain, kUniversalSigningChain
+    kPath,
+    kSHA256,
+    kSHA1,
+    kBundleName,
+    kBundleVersion,
+    kBundleVersionStr,
+    kDownloadReferrerURL,
+    kDownloadURL,
+    kDownloadTimestamp,
+    kDownloadAgent,
+    kTeamID,
+    kSigningID,
+    kCDHash,
+    kType,
+    kPageZero,
+    kCodeSigned,
+    kRule,
+    kEntitlements,
+    kSigningChain,
+    kUniversalSigningChain,
   ];
 }
 
@@ -247,6 +268,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kTeamID : self.teamID,
       kSigningID : self.signingID,
       kCDHash : self.cdhash,
+      kEntitlements : self.entitlements,
     };
 
     _printQueue =
@@ -535,6 +557,14 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   };
 }
 
+- (SNTAttributeBlock)entitlements {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+    if (csc.entitlements.count) return csc.entitlements;
+    return @"No entitlements";
+  };
+}
+
 #pragma mark -
 
 // Entry point for the command.
@@ -795,6 +825,10 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     }
   }
 
+  if (!self.enableEntitlements) {
+    [outputDict removeObjectForKey:kEntitlements];
+  }
+
   // If there's nothing in the outputDict, then don't need to print anything.
   if (!outputDict.count) return;
 
@@ -812,6 +846,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       if (![outputDict objectForKey:key]) continue;
       if ([key isEqual:kSigningChain] || [key isEqual:kUniversalSigningChain]) {
         [output appendString:[self stringForSigningChain:outputDict[key] key:key]];
+      } else if ([key isEqual:kEntitlements]) {
+        [output appendString:[self stringForEntitlements:outputDict[key] key:key]];
       } else {
         if (singleKey) {
           [output appendFormat:@"%@\n", outputDict[key]];
@@ -918,6 +954,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
                   @"\n--bundleinfo is incompatible with --recursive and --cert-index"];
       }
       self.bundleInfo = YES;
+    } else if ([arg caseInsensitiveCompare:@"--entitlements"] == NSOrderedSame) {
+      self.enableEntitlements = YES;
     } else if ([arg caseInsensitiveCompare:@"--filter-inclusive"] == NSOrderedSame) {
       self.filterInclusive = YES;
     } else {
@@ -949,6 +987,11 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       if (![validKeys containsObject:key]) {
         [self
             printErrorUsageAndExit:[NSString stringWithFormat:@"\n\"%@\" is an invalid key", key]];
+      }
+      // If user specifically asked for entitlements, make sure collection is enabled or they'll
+      // get no output even if there are entitlements.
+      if ([key isEqualToString:kEntitlements]) {
+        self.enableEntitlements = YES;
       }
     }
     for (NSString *key in filters) {
@@ -1000,22 +1043,6 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   return result.copy;
 }
 
-- (NSString *)stringForBundleInfo:(NSDictionary *)bundleInfo key:(NSString *)key {
-  NSMutableString *result = [NSMutableString string];
-
-  [result appendFormat:@"%@:\n", key];
-
-  [result appendFormat:@"       %-20s: %@\n", kBundlePath.UTF8String, bundleInfo[kBundlePath]];
-  [result appendFormat:@"       %-20s: %@\n", kBundleID.UTF8String, bundleInfo[kBundleID]];
-  [result appendFormat:@"       %-20s: %@\n", kBundleHash.UTF8String, bundleInfo[kBundleHash]];
-
-  for (NSDictionary *hashPath in bundleInfo[kBundleHashes]) {
-    [result appendFormat:@"              %@  %@\n", hashPath[kSHA256], hashPath[kPath]];
-  }
-
-  return [result copy];
-}
-
 - (NSString *)stringForCertificate:(NSDictionary *)cert withKeys:(NSArray *)keys index:(int)index {
   if (!cert) return @"";
   NSMutableString *result = [NSMutableString string];
@@ -1028,6 +1055,49 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       [result appendFormat:@"       %-20s: %@\n", key.UTF8String, cert[key]];
     }
   }
+  return result.copy;
+}
+
+- (NSString *)stringForBundleInfo:(NSDictionary *)bundleInfo key:(NSString *)key {
+  NSMutableString *result = [NSMutableString string];
+
+  [result appendFormat:@"%@:\n", key];
+
+  [result appendFormat:@"       %-20s: %@\n", kBundlePath.UTF8String, bundleInfo[kBundlePath]];
+  [result appendFormat:@"       %-20s: %@\n", kBundleID.UTF8String, bundleInfo[kBundleID]];
+  [result appendFormat:@"       %-20s: %@\n", kBundleHash.UTF8String, bundleInfo[kBundleHash]];
+
+  int i = 0;
+  for (NSDictionary *hashPath in bundleInfo[kBundleHashes]) {
+    [result appendFormat:@"          %3d. %@  %@\n", ++i, hashPath[kSHA256], hashPath[kPath]];
+  }
+
+  return [result copy];
+}
+
+- (NSString *)stringForEntitlements:(NSDictionary *)entitlements key:(NSString *)key {
+  if (!entitlements.count) return @"none";
+
+  NSMutableString *result = [NSMutableString string];
+  [result appendFormat:@"%@:\n", key];
+  __block int i = 0;
+  [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
+    if ([obj isKindOfClass:[NSNumber class]]) {
+      NSNumber *objNumber = (NSNumber *)obj;
+      BOOL val = [objNumber boolValue];
+      // If the value of the entitlement is false the app is not claiming it,
+      // so don't print it.
+      if (!val) return;
+
+      // If hte value of the entitlement is true, don't bother printing the
+      // 'value', just print the entitlement name.
+      [result appendFormat:@"   %2d. %@\n", ++i, key];
+      return;
+    }
+
+    // This entitlement has a more complex value, so print it as-is.
+    [result appendFormat:@"   %2d. %@: %@\n", ++i, key, obj];
+  }];
   return result.copy;
 }
 
