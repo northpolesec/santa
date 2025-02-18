@@ -1043,22 +1043,6 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   return result.copy;
 }
 
-- (NSString *)stringForBundleInfo:(NSDictionary *)bundleInfo key:(NSString *)key {
-  NSMutableString *result = [NSMutableString string];
-
-  [result appendFormat:@"%@:\n", key];
-
-  [result appendFormat:@"       %-20s: %@\n", kBundlePath.UTF8String, bundleInfo[kBundlePath]];
-  [result appendFormat:@"       %-20s: %@\n", kBundleID.UTF8String, bundleInfo[kBundleID]];
-  [result appendFormat:@"       %-20s: %@\n", kBundleHash.UTF8String, bundleInfo[kBundleHash]];
-
-  for (NSDictionary *hashPath in bundleInfo[kBundleHashes]) {
-    [result appendFormat:@"              %@  %@\n", hashPath[kSHA256], hashPath[kPath]];
-  }
-
-  return [result copy];
-}
-
 - (NSString *)stringForCertificate:(NSDictionary *)cert withKeys:(NSArray *)keys index:(int)index {
   if (!cert) return @"";
   NSMutableString *result = [NSMutableString string];
@@ -1074,6 +1058,23 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   return result.copy;
 }
 
+- (NSString *)stringForBundleInfo:(NSDictionary *)bundleInfo key:(NSString *)key {
+  NSMutableString *result = [NSMutableString string];
+
+  [result appendFormat:@"%@:\n", key];
+
+  [result appendFormat:@"       %-20s: %@\n", kBundlePath.UTF8String, bundleInfo[kBundlePath]];
+  [result appendFormat:@"       %-20s: %@\n", kBundleID.UTF8String, bundleInfo[kBundleID]];
+  [result appendFormat:@"       %-20s: %@\n", kBundleHash.UTF8String, bundleInfo[kBundleHash]];
+
+  int i = 0;
+  for (NSDictionary *hashPath in bundleInfo[kBundleHashes]) {
+    [result appendFormat:@"          %3d. %@  %@\n", ++i, hashPath[kSHA256], hashPath[kPath]];
+  }
+
+  return [result copy];
+}
+
 - (NSString *)stringForEntitlements:(NSDictionary *)entitlements key:(NSString *)key {
   if (!entitlements.count) return @"none";
 
@@ -1084,10 +1085,17 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     if ([obj isKindOfClass:[NSNumber class]]) {
       NSNumber *objNumber = (NSNumber *)obj;
       BOOL val = [objNumber boolValue];
+      // If the value of the entitlement is false the app is not claiming it,
+      // so don't print it.
       if (!val) return;
+
+      // If hte value of the entitlement is true, don't bother printing the
+      // 'value', just print the entitlement name.
       [result appendFormat:@"   %2d. %@\n", ++i, key];
       return;
     }
+
+    // This entitlement has a more complex value, so print it as-is.
     [result appendFormat:@"   %2d. %@: %@\n", ++i, key, obj];
   }];
   return result.copy;
