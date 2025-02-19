@@ -272,7 +272,6 @@ static NSString *const kPrinterProxyPostMonterey =
              decisionForFileInfo:binInfo
                    targetProcess:targetProc
                      configState:configState
-        preCodesignCheckCallback:nil
       entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
         if (!entitlements) {
           return nil;
