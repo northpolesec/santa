@@ -88,6 +88,23 @@ class FAAPolicyProcessor {
 
   virtual SNTCachedDecision *__strong GetCachedDecision(const struct stat &stat_buf);
 
+  /// General flow of processing an ES message for FAA violations:
+  /// 1. Client presents a vector of pairs of target paths being accessed and associated policies
+  /// 2. Iterate each pair and compute a FileAccessPolicyDecision (ProcessTargetAndPolicy())
+  ///     1. Compute the FileAccessPolicyDecision (ApplyPolicy())
+  ///         1. Ensure a policy exists
+  ///         2. Ensure the process is valid or EnableBadSignatureProtection is false
+  ///         3. Check if policy allows for reading the target (PolicyAllowsReadsForTarget())
+  ///             1. For the current event type, ensure the policy allows reads and the current
+  ///                target being evaluated is readable
+  ///         4. Check if the policy applies to the current ES message (CheckIfPolicyMatchesBlock())
+  ///         5. Invert results and/or set audit-only based on configured options
+  ///     2. Apply override if configured
+  ///     3. Log telemetry if denied/audit-only and not rate-limited (LogTelemetry())
+  ///     4. Notify the user if configured (SNTFileAccessDeniedBlock(), LogTTY())
+  /// 3. Let caller know if appropriate to update their "reads cache" (ReadsCacheUpdateBlock())
+  /// 4. Combine results of each target into an ES decision
+  /// 5. Return the final ES decision
   es_auth_result_t ProcessMessage(const Message &msg,
                                   std::vector<TargetPolicyPair> target_policy_pairs,
                                   ReadsCacheUpdateBlock reads_cache_update_block,
