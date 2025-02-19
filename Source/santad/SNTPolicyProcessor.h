@@ -50,7 +50,6 @@
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                                      targetProcess:(nonnull const es_process_t *)targetProc
                                        configState:(nonnull SNTConfigState *)configState
-                          preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback
                         entitlementsFilterCallback:
                             (NSDictionary *_Nullable (^_Nonnull)(
                                 const char *_Nullable teamID,

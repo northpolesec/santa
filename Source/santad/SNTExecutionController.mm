@@ -268,12 +268,11 @@ static NSString *const kPrinterProxyPostMonterey =
   // TODO(markowsky): Maybe add a metric here for how many large executables we're seeing.
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
-  SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo
-      targetProcess:targetProc
-      configState:configState
-      preCodesignCheckCallback:^(void) {
-        esMsg.UpdateStatState(StatChangeStep::kCodesignValidation);
-      }
+  SNTCachedDecision *cd = [self.policyProcessor
+             decisionForFileInfo:binInfo
+                   targetProcess:targetProc
+                     configState:configState
+        preCodesignCheckCallback:nil
       entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
         if (!entitlements) {
           return nil;

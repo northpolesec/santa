@@ -214,18 +214,6 @@ enum class FileAccessPolicyDecision {
   kAllowedAuditOnly,
 };
 
-enum class StatChangeStep {
-  kNoChange = 0,
-  kMessageCreate,
-  kCodesignValidation,
-};
-
-enum class StatResult {
-  kOK = 0,
-  kStatError,
-  kDevnoInodeMismatch,
-};
-
 #endif
 
 static const char *kSantaDPath =
