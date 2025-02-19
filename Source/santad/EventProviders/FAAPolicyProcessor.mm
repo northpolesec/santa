@@ -300,7 +300,7 @@ bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
 FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
     const Message &msg, const PathTarget &target,
     const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
-    CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock) {
+    CheckIfPolicyMatchesBlock check_if_policy_matches_block) {
   if (!optional_policy.has_value()) {
     return FileAccessPolicyDecision::kNoPolicy;
   }
@@ -322,7 +322,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
     return FileAccessPolicyDecision::kAllowedReadAccess;
   }
 
-  FileAccessPolicyDecision decision = checkIfPolicyMatchesBlock(*policy, msg)
+  FileAccessPolicyDecision decision = check_if_policy_matches_block(*policy, msg)
                                           ? FileAccessPolicyDecision::kAllowed
                                           : FileAccessPolicyDecision::kDenied;
 
@@ -393,11 +393,11 @@ void FAAPolicyProcessor::LogTTY(SNTFileAccessEvent *event, URLTextPair link_info
 FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     const Message &msg, const PathTarget &target,
     const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
-    CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
-    SNTFileAccessBlockCallback fileAccessBlockCallback,
+    CheckIfPolicyMatchesBlock check_if_policy_matches_block,
+    SNTFileAccessDeniedBlock file_access_denied_block,
     SNTOverrideFileAccessAction override_action) {
   FileAccessPolicyDecision decision = ApplyOverrideToDecision(
-      ApplyPolicy(msg, target, optional_policy, checkIfPolicyMatchesBlock), override_action);
+      ApplyPolicy(msg, target, optional_policy, check_if_policy_matches_block), override_action);
 
   // Note: If ShouldLogDecision, it shouldn't be possible for optionalPolicy
   // to not have a value. Performing the check just in case to prevent a crash.
@@ -434,8 +434,8 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
       }
 
       if (ShouldShowUI(policy)) {
-        fileAccessBlockCallback(event, OptionalStringToNSString(policy->custom_message),
-                                link_info.first, link_info.second);
+        file_access_denied_block(event, OptionalStringToNSString(policy->custom_message),
+                                 link_info.first, link_info.second);
       }
 
       // TODO: TTY message cache
@@ -450,16 +450,15 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
 
 es_auth_result_t FAAPolicyProcessor::ProcessMessage(
     const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
-    ReadsCacheUpdateBlock readsCacheUpdateBlock,
-    CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
-    SNTFileAccessBlockCallback fileAccessBlockCallback,
-    SNTOverrideFileAccessAction overrideAction) {
+    ReadsCacheUpdateBlock reads_cache_update_block,
+    CheckIfPolicyMatchesBlock check_if_policy_matches_block,
+    SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction) {
   es_auth_result_t policy_result = ES_AUTH_RESULT_ALLOW;
 
   for (const TargetPolicyPair &target_policy_pair : target_policy_pairs) {
-    FileAccessPolicyDecision decision =
-        ProcessTargetAndPolicy(msg, target_policy_pair.first, target_policy_pair.second,
-                               checkIfPolicyMatchesBlock, fileAccessBlockCallback, overrideAction);
+    FileAccessPolicyDecision decision = ProcessTargetAndPolicy(
+        msg, target_policy_pair.first, target_policy_pair.second, check_if_policy_matches_block,
+        file_access_denied_block, overrideAction);
     // Trigger the caller's ReadsCacheUpdateBlock if:
     //   1. The policy applied
     //   2. The process wasn't invalid
@@ -471,7 +470,7 @@ es_auth_result_t FAAPolicyProcessor::ProcessMessage(
         decision != FileAccessPolicyDecision::kDeniedInvalidSignature &&
         target_policy_pair.first.devno_ino.has_value() && target_policy_pair.second.has_value() &&
         (*target_policy_pair.second)->allow_read_access) {
-      readsCacheUpdateBlock(msg->process, *target_policy_pair.first.devno_ino);
+      reads_cache_update_block(msg->process, *target_policy_pair.first.devno_ino);
     }
 
     policy_result =

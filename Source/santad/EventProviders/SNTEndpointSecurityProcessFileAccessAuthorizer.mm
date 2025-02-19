@@ -93,7 +93,7 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
         // the process and no additional work is required.
         return true;
       },
-      self.fileAccessBlockCallback, overrideAction);
+      self.fileAccessDeniedBlock, overrideAction);
 
   [self respondToMessage:msg withAuthResult:authResult cacheable:false];
 }
