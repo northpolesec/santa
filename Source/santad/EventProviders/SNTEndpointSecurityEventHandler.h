@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#import "Source/common/SNTFileAccessEvent.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Metrics.h"
@@ -36,9 +37,19 @@
 
 @end
 
+/// Base protocol for FAA-related clients
+@protocol SNTFileAccessAuthorizer <NSObject>
+
+typedef void (^SNTFileAccessBlockCallback)(SNTFileAccessEvent *event, NSString *customMsg,
+                                           NSString *customURL, NSString *customText);
+
+@property SNTFileAccessBlockCallback fileAccessBlockCallback;
+
+@end
+
 // Protocol for an object that implements the necessary interfaces
 // for handling updates to Data FAA rules.
-@protocol SNTDataFileAccessAuthorizer <NSObject>
+@protocol SNTDataFileAccessAuthorizer <SNTFileAccessAuthorizer>
 
 - (void)watchItemsCount:(size_t)count
                newPaths:(const santa::SetPairPathAndType &)newPaths
@@ -48,7 +59,7 @@
 
 // Protocol for an object that implements the necessary interfaces
 // for handling updates to Data FAA rules.
-@protocol SNTProcessFileAccessAuthorizer <NSObject>
+@protocol SNTProcessFileAccessAuthorizer <SNTFileAccessAuthorizer>
 
 - (void)processWatchItemsCount:(size_t)count;
 

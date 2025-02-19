@@ -375,7 +375,8 @@ void SetExpectationsForFileAccessAuthorizerInit(
   mockESApi->SetExpectationsRetainReleaseMessage();
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
 
-  auto mockFAA = std::make_shared<MockFAAPolicyProcessor>(self.dcMock);
+  auto mockFAA =
+      std::make_shared<MockFAAPolicyProcessor>(self.dcMock, nullptr, nullptr, nullptr, nil);
 
   SNTEndpointSecurityFileAccessAuthorizer *accessClient =
       [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi

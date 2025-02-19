@@ -27,6 +27,7 @@
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
+#include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
@@ -140,8 +141,12 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                           logger:logger];
 
   if (@available(macOS 13.0, *)) {
-    auto faaPolicyProcessor =
-        std::make_shared<santa::FAAPolicyProcessor>([SNTDecisionCache sharedCache]);
+    auto faaPolicyProcessor = std::make_shared<santa::FAAPolicyProcessor>(
+        [SNTDecisionCache sharedCache], enricher, logger, tty_writer,
+        ^santa::FAAPolicyProcessor::URLTextPair(
+            const std::shared_ptr<santa::WatchItemPolicyBase> &policy) {
+          return watch_items->EventDetailLinkInfo(policy);
+        });
 
     SNTEndpointSecurityFileAccessAuthorizer *data_faa_client =
         [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:esapi
@@ -175,6 +180,19 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             }];
 
     watch_items->RegisterProcessClient(proc_faa_client);
+
+    proc_faa_client.fileAccessBlockCallback = ^(SNTFileAccessEvent *event, NSString *customMsg,
+                                                NSString *customURL, NSString *customText) {
+      // TODO: The config state should be an argument to the block.
+      SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+      [[notifier_queue.notifierConnection remoteObjectProxy]
+          postFileAccessBlockNotification:event
+                            customMessage:customMsg
+                                customURL:customURL
+                               customText:customText
+                              configState:cs];
+    };
+
     [authorizer_client registerAuthExecProbe:proc_faa_client];
   }
 
