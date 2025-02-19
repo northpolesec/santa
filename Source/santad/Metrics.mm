@@ -203,30 +203,6 @@ NSString *const FileAccessPolicyDecisionToString(FileAccessPolicyDecision decisi
   }
 }
 
-NSString *const StatChangeStepToString(StatChangeStep step) {
-  switch (step) {
-    case StatChangeStep::kNoChange: return kStatChangeStepNoChange;
-    case StatChangeStep::kMessageCreate: return kStatChangeStepMessageCreate;
-    case StatChangeStep::kCodesignValidation: return kStatChangeStepCodesignValidation;
-    default:
-      [NSException raise:@"Invalid stat change step"
-                  format:@"Unknown stat change step value: %d", static_cast<int>(step)];
-      return nil;
-  }
-}
-
-NSString *const StatResultToString(StatResult result) {
-  switch (result) {
-    case StatResult::kOK: return kStatResultOK;
-    case StatResult::kStatError: return kStatResultStatError;
-    case StatResult::kDevnoInodeMismatch: return kStatResultDevnoInodeMismatch;
-    default:
-      [NSException raise:@"Invalid stat result"
-                  format:@"Unknown stat result value: %d", static_cast<int>(result)];
-      return nil;
-  }
-}
-
 std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t interval) {
   dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.santametricsservice.q",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
@@ -260,14 +236,9 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
                        fieldNames:@[ @"Processor", @"Event" ]
                          helpText:@"Count of the number of drops for each event"];
 
-  SNTMetricCounter *stat_change_counts = [metric_set
-      counterWithName:@"/santa/event_stat_change_count"
-           fieldNames:@[ @"step", @"error" ]
-             helpText:@"Count of times a stat info changed for a binary being evalauted"];
-
   std::shared_ptr<Metrics> metrics = std::make_shared<Metrics>(
       q, timer_source, interval, event_processing_times, event_counts, rate_limit_counts,
-      faa_event_counts, drop_counts, stat_change_counts, metric_set, ^(Metrics *metrics) {
+      faa_event_counts, drop_counts, metric_set, ^(Metrics *metrics) {
         SNTRegisterCoreMetrics();
         metrics->EstablishConnection();
       });
@@ -288,8 +259,8 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
 Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t interval,
                  SNTMetricInt64Gauge *event_processing_times, SNTMetricCounter *event_counts,
                  SNTMetricCounter *rate_limit_counts, SNTMetricCounter *faa_event_counts,
-                 SNTMetricCounter *drop_counts, SNTMetricCounter *stat_change_counts,
-                 SNTMetricSet *metric_set, void (^run_on_first_start)(Metrics *))
+                 SNTMetricCounter *drop_counts, SNTMetricSet *metric_set,
+                 void (^run_on_first_start)(Metrics *))
     : q_(q),
       timer_source_(timer_source),
       interval_(interval),
@@ -298,7 +269,6 @@ Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t in
       rate_limit_counts_(rate_limit_counts),
       faa_event_counts_(faa_event_counts),
       drop_counts_(drop_counts),
-      stat_change_counts_(stat_change_counts),
       metric_set_(metric_set),
       run_on_first_start_(run_on_first_start) {
   SetInterval(interval_);
@@ -392,15 +362,6 @@ void Metrics::FlushMetrics() {
       }
     }
 
-    for (const auto &[key, count] : stat_change_cache_) {
-      if (count > 0) {
-        NSString *stepName = StatChangeStepToString(std::get<StatChangeStep>(key));
-        NSString *error = StatResultToString(std::get<StatResult>(key));
-
-        [stat_change_counts_ incrementBy:count forFieldValues:@[ stepName, error ]];
-      }
-    }
-
     // Reset the maps so the next cycle begins with a clean state
     // IMPORTANT: Do not reset drop_cache_, the sequence numbers must persist
     // for accurate accounting
@@ -408,7 +369,6 @@ void Metrics::FlushMetrics() {
     event_times_cache_ = {};
     rate_limit_counts_cache_ = {};
     faa_event_counts_cache_ = {};
-    stat_change_cache_ = {};
   });
 }
 
@@ -455,11 +415,6 @@ void Metrics::SetEventMetrics(Processor processor, EventDisposition event_dispos
   dispatch_sync(events_q_, ^{
     event_counts_cache_[EventCountTuple{processor, msg->event_type, event_disposition}]++;
     event_times_cache_[EventTimesTuple{processor, msg->event_type}] = nanos;
-
-    // Stat changes are only tracked for AUTH EXEC events
-    if (msg->event_type == ES_EVENT_TYPE_AUTH_EXEC) {
-      stat_change_cache_[EventStatChangeTuple{msg.StatChangeStep(), msg.StatResult()}]++;
-    }
   });
 }
 

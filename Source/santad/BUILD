@@ -771,7 +771,6 @@ objc_library(
     deps = [
         ":EndpointSecurityClient",
         ":WatchItemPolicy",
-        "//Source/common:SNTCommonEnums",
         "//Source/santad/ProcessTree:process_tree",
     ],
 )

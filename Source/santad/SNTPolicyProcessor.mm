@@ -238,9 +238,9 @@ static void UpdateCachedDecisionSigningInfo(
                      signingID:(nullable NSString *)signingID
            platformBinaryState:(PlatformBinaryState)platformBinaryState
          signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
-    entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nullable)(
-                                   NSDictionary *_Nullable entitlements))entitlementsFilterCallback
-      preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback {
+    entitlementsFilterCallback:
+        (NSDictionary *_Nullable (^_Nullable)(NSDictionary *_Nullable entitlements))
+            entitlementsFilterCallback {
   // Check the hash before allocating a SNTCachedDecision.
   NSString *fileHash = fileSHA256 ?: fileInfo.SHA256;
   SNTClientMode mode = configState.clientMode;
@@ -268,10 +268,6 @@ static void UpdateCachedDecisionSigningInfo(
   if (certificateSHA256.length) {
     cd.certSHA256 = certificateSHA256;
   } else {
-    if (preCodesignCheckCallback) {
-      preCodesignCheckCallback();
-    }
-
     // Grab the code signature, if there's an error don't try to capture
     // any of the signature details.
     // TODO(mlw): MOLCodesignChecker should be updated to still grab signing information
@@ -332,7 +328,6 @@ static void UpdateCachedDecisionSigningInfo(
 - (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                                      targetProcess:(nonnull const es_process_t *)targetProc
                                        configState:(nonnull SNTConfigState *)configState
-                          preCodesignCheckCallback:(void (^_Nullable)(void))preCodesignCheckCallback
                         entitlementsFilterCallback:
                             (NSDictionary *_Nullable (^_Nonnull)(
                                 const char *_Nullable teamID,
@@ -399,8 +394,7 @@ static void UpdateCachedDecisionSigningInfo(
       }
       entitlementsFilterCallback:^NSDictionary *(NSDictionary *entitlements) {
         return entitlementsFilterCallback(entitlementsFilterTeamID, entitlements);
-      }
-      preCodesignCheckCallback:preCodesignCheckCallback];
+      }];
 }
 
 // Used by `$ santactl fileinfo`.
@@ -445,8 +439,7 @@ static void UpdateCachedDecisionSigningInfo(
                  }
                }
              }
-        entitlementsFilterCallback:nil
-          preCodesignCheckCallback:nil];
+        entitlementsFilterCallback:nil];
 }
 
 ///
