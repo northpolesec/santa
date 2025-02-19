@@ -412,7 +412,9 @@ using santa::WatchItemPathType;
 }
 
 - (void)testProcessEnrichedMessageHandler {
-  es_message_t esMsg;
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
