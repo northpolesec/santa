@@ -162,7 +162,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   std::optional<WatchItemsState> State();
 
   std::pair<NSString *, NSString *> EventDetailLinkInfo(
-      const std::shared_ptr<DataWatchItemPolicy> &watch_item);
+      const std::shared_ptr<WatchItemPolicyBase> &watch_item);
 
   friend class santa::WatchItemsPeer;
 

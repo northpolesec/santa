@@ -83,7 +83,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   NSString *want;
   id certMock = OCMClassMock([MOLCertificate class]);
 
-  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock);
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nil);
 
   EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
       .WillRepeatedly([&faaPolicyProcessor](const es_file_t *es_file) {
@@ -170,7 +170,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.certSHA256 = @(instigatingCertHash);
 
-  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock);
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nil);
 
   EXPECT_CALL(faaPolicyProcessor, PolicyMatchesProcess)
       .WillRepeatedly([&faaPolicyProcessor](const WatchItemProcess &policy_proc,

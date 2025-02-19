@@ -17,7 +17,6 @@
 
 #include <memory>
 
-#import "Source/common/SNTFileAccessEvent.h"
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
@@ -28,9 +27,6 @@
 #include "Source/santad/Metrics.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
-
-typedef void (^SNTFileAccessBlockCallback)(SNTFileAccessEvent *event, NSString *customMsg,
-                                           NSString *customURL, NSString *customText);
 
 @interface SNTEndpointSecurityFileAccessAuthorizer
     : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler, SNTDataFileAccessAuthorizer>
@@ -43,6 +39,6 @@ typedef void (^SNTFileAccessBlockCallback)(SNTFileAccessEvent *event, NSString *
            faaPolicyProcessor:(std::shared_ptr<santa::FAAPolicyProcessor>)faaPolicyProcessor
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
 
-@property SNTFileAccessBlockCallback fileAccessBlockCallback;
+@property SNTFileAccessDeniedBlock fileAccessDeniedBlock;
 
 @end
