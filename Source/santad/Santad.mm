@@ -158,8 +158,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                              ttyWriter:tty_writer];
     watch_items->RegisterDataClient(data_faa_client);
 
-    data_faa_client.fileAccessBlockCallback = ^(SNTFileAccessEvent *event, NSString *customMsg,
-                                                NSString *customURL, NSString *customText) {
+    data_faa_client.fileAccessDeniedBlock = ^(SNTFileAccessEvent *event, NSString *customMsg,
+                                              NSString *customURL, NSString *customText) {
       // TODO: The config state should be an argument to the block.
       SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
       [[notifier_queue.notifierConnection remoteObjectProxy]
@@ -181,8 +181,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
     watch_items->RegisterProcessClient(proc_faa_client);
 
-    proc_faa_client.fileAccessBlockCallback = ^(SNTFileAccessEvent *event, NSString *customMsg,
-                                                NSString *customURL, NSString *customText) {
+    proc_faa_client.fileAccessDeniedBlock = ^(SNTFileAccessEvent *event, NSString *customMsg,
+                                              NSString *customURL, NSString *customText) {
       // TODO: The config state should be an argument to the block.
       SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
       [[notifier_queue.notifierConnection remoteObjectProxy]

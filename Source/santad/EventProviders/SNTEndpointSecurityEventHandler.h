@@ -40,10 +40,10 @@
 /// Base protocol for FAA-related clients
 @protocol SNTFileAccessAuthorizer <NSObject>
 
-typedef void (^SNTFileAccessBlockCallback)(SNTFileAccessEvent *event, NSString *customMsg,
-                                           NSString *customURL, NSString *customText);
+typedef void (^SNTFileAccessDeniedBlock)(SNTFileAccessEvent *event, NSString *customMsg,
+                                         NSString *customURL, NSString *customText);
 
-@property SNTFileAccessBlockCallback fileAccessBlockCallback;
+@property SNTFileAccessDeniedBlock fileAccessDeniedBlock;
 
 @end
 

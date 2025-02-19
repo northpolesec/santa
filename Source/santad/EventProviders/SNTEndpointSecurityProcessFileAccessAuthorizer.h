@@ -33,6 +33,6 @@
              faaPolicyProcessor:(std::shared_ptr<santa::FAAPolicyProcessor>)faaPolicyProcessor
     iterateProcessPoliciesBlock:(santa::IterateProcessPoliciesBlock)findProcessPoliciesBlock;
 
-@property SNTFileAccessBlockCallback fileAccessBlockCallback;
+@property SNTFileAccessDeniedBlock fileAccessDeniedBlock;
 
 @end

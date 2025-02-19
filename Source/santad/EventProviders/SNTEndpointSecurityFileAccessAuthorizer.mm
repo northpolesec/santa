@@ -513,9 +513,9 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
       std::pair<NSString *, NSString *> linkInfo = self->_watchItems->EventDetailLinkInfo(policy);
 
-      if (!policy->silent && self.fileAccessBlockCallback) {
-        self.fileAccessBlockCallback(event, OptionalStringToNSString(policy->custom_message),
-                                     linkInfo.first, linkInfo.second);
+      if (!policy->silent && self.fileAccessDeniedBlock) {
+        self.fileAccessDeniedBlock(event, OptionalStringToNSString(policy->custom_message),
+                                   linkInfo.first, linkInfo.second);
       }
 
       if (ShouldMessageTTY(policy, msg, self->_ttyMessageCache)) {

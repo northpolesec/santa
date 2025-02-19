@@ -90,9 +90,9 @@ class FAAPolicyProcessor {
 
   es_auth_result_t ProcessMessage(const Message &msg,
                                   std::vector<TargetPolicyPair> target_policy_pairs,
-                                  ReadsCacheUpdateBlock readsCacheUpdateBlock,
-                                  CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
-                                  SNTFileAccessBlockCallback fileAccessBlockCallback,
+                                  ReadsCacheUpdateBlock reads_cache_update_block,
+                                  CheckIfPolicyMatchesBlock check_if_policy_matches_block,
+                                  SNTFileAccessDeniedBlock file_access_denied_block,
                                   SNTOverrideFileAccessAction overrideAction);
 
   // TODO: PathTargets will replace PopulatePathTargets
@@ -115,7 +115,7 @@ class FAAPolicyProcessor {
       const Message &msg, const PathTarget &target,
       const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
       CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
-      SNTFileAccessBlockCallback fileAccessBlockCallback,
+      SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction override_action);
 
   FileAccessPolicyDecision ApplyPolicy(
