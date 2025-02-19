@@ -82,8 +82,6 @@ static FileAccessPolicyDecision ApplyOverrideToDecision(
 
     default:
       // This is a programming error. Bail.
-      LOGE(@"Invalid override file access action encountered: %d",
-           static_cast<int>(overrideAction));
       [NSException
            raise:@"Invalid SNTOverrideFileAccessAction"
           format:@"Invalid SNTOverrideFileAccessAction: %d", static_cast<int>(overrideAction)];
@@ -126,7 +124,6 @@ static es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyD
     case FileAccessPolicyDecision::kAllowedAuditOnly: return ES_AUTH_RESULT_ALLOW;
     default:
       // This is a programming error. Bail.
-      LOGE(@"Invalid file access decision encountered: %d", static_cast<int>(decision));
       [NSException raise:@"Invalid FileAccessPolicyDecision"
                   format:@"Invalid FileAccessPolicyDecision: %d", static_cast<int>(decision)];
   }
@@ -152,7 +149,6 @@ FAAPolicyProcessor::FAAPolicyProcessor(
       generate_event_detail_link_block_(generate_event_detail_link_block) {
   configurator_ = [SNTConfigurator configurator];
   queue_ = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
-  LOGE(@"Got queue: %p", queue_);
 }
 
 NSString *FAAPolicyProcessor::GetCertificateHash(const es_file_t *es_file) {
@@ -283,14 +279,8 @@ bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
       }
       break;
 
-    case ES_EVENT_TYPE_AUTH_CREATE:
-    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
-    case ES_EVENT_TYPE_AUTH_LINK:
-    case ES_EVENT_TYPE_AUTH_RENAME:
-    case ES_EVENT_TYPE_AUTH_TRUNCATE:
-    case ES_EVENT_TYPE_AUTH_UNLINK:
     default:
-      // These event types have no special case
+      // No other event types have special cases
       break;
   }
 

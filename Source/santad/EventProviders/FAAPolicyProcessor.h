@@ -25,7 +25,7 @@
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
-#include "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileAccessEvent.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
