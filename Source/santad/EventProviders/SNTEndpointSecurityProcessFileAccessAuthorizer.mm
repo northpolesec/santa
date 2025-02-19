@@ -14,6 +14,7 @@
 
 #import "Source/santad/EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"
 #include <EndpointSecurity/ESTypes.h>
+#include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 
 #include <bsm/libbsm.h>
 
@@ -21,6 +22,7 @@
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 
+using santa::FAAPolicyProcessor;
 using santa::IterateProcessPoliciesBlock;
 using santa::Message;
 using santa::ProcessWatchItemPolicy;
@@ -35,7 +37,8 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
 @property bool isSubscribed;
 @property(copy) IterateProcessPoliciesBlock iterateProcessPoliciesBlock;
-@property std::shared_ptr<santa::FAAPolicyProcessor> faaPolicyProcessor;
+@property std::shared_ptr<FAAPolicyProcessor> faaPolicyProcessor;
+@property SNTConfigurator *configurator;
 @end
 
 @implementation SNTEndpointSecurityProcessFileAccessAuthorizer {
@@ -44,7 +47,7 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                         metrics:(std::shared_ptr<santa::Metrics>)metrics
-             faaPolicyProcessor:(std::shared_ptr<santa::FAAPolicyProcessor>)faaPolicyProcessor
+             faaPolicyProcessor:(std::shared_ptr<FAAPolicyProcessor>)faaPolicyProcessor
     iterateProcessPoliciesBlock:(IterateProcessPoliciesBlock)iterateProcessPoliciesBlock {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
@@ -54,6 +57,7 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
     _iterateProcessPoliciesBlock = iterateProcessPoliciesBlock;
 
     _procRuleCache = std::make_unique<ProcessRuleCache>(2000);
+    _configurator = [SNTConfigurator configurator];
 
     [self establishClientOrDie];
     [self enableProcessWatching];
@@ -63,6 +67,35 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
 
 - (NSString *)description {
   return @"ProcessFileAccessAuthorizer";
+}
+
+- (void)processMessage:(Message)msg
+                policy:(std::shared_ptr<ProcessWatchItemPolicy>)policy
+        overrideAction:(SNTOverrideFileAccessAction)overrideAction {
+  if (msg->action_type != ES_ACTION_TYPE_AUTH) {
+    return;
+  }
+
+  std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
+  for (const FAAPolicyProcessor::PathTarget &target : FAAPolicyProcessor::PathTargets(msg)) {
+    if (policy->tree->Contains(target.path.c_str())) {
+      targetPolicyPairs.push_back({target, policy});
+    }
+  }
+
+  es_auth_result_t authResult = _faaPolicyProcessor->ProcessMessage(
+      msg, targetPolicyPairs,
+      ^(const es_process_t *, std::pair<dev_t, ino_t>){
+          // TODO: reads cache updates
+      },
+      ^bool(const santa::WatchItemPolicyBase &, const Message &msg) {
+        // Note: Proc FAA, unlike Data FAA, already has policy match for
+        // the process and no additional work is required.
+        return true;
+      },
+      self.fileAccessBlockCallback, overrideAction);
+
+  [self respondToMessage:msg withAuthResult:authResult cacheable:false];
 }
 
 - (void)handleMessage:(Message &&)esMsg
@@ -102,9 +135,26 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
     default: break;
   }
 
-  if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
-    [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
+  std::shared_ptr<ProcessWatchItemPolicy> policy = _procRuleCache->get(PidPidver(esMsg->process));
+  if (!policy) {
+    auto [pid, pidver] = PidPidver(esMsg->process);
+    LOGW(@"Policy unexpectedly missing for process: %d/%d: %s", pid, pidver,
+         esMsg->process->executable->path.data);
+
+    if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
+      [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
+    }
+
+    return;
   }
+
+  SNTOverrideFileAccessAction overrideAction = [self.configurator overrideFileAccessAction];
+
+  [self processMessage:std::move(esMsg)
+               handler:^(Message msg) {
+                 [self processMessage:std::move(msg) policy:policy overrideAction:overrideAction];
+                 recordEventMetrics(santa::EventDisposition::kProcessed);
+               }];
 }
 
 - (santa::ProbeInterest)probeInterest:(const santa::Message &)esMsg {

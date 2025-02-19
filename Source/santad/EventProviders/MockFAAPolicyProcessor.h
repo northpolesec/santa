@@ -24,13 +24,20 @@
 
 #import "Source/common/SNTCachedDecision.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
+#include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/TTYWriter.h"
 
 namespace santa {
 
 class MockFAAPolicyProcessor : public FAAPolicyProcessor {
  public:
-  MockFAAPolicyProcessor(SNTDecisionCache *dc) : FAAPolicyProcessor(dc) {}
+  MockFAAPolicyProcessor(SNTDecisionCache *dc, std::shared_ptr<Enricher> enricher,
+                         std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
+                         GenerateEventDetailLinkBlock generate_event_detail_link_block)
+      : FAAPolicyProcessor(dc, std::move(enricher), std::move(logger), std::move(tty_writer),
+                           std::move(generate_event_detail_link_block)) {}
   virtual ~MockFAAPolicyProcessor() {}
 
   // Wraps the call into the private GetCertificateHash method

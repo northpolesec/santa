@@ -14,16 +14,146 @@
 
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 
+#include <bsm/libbsm.h>
+#include <pwd.h>
+
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/SNTBlockMessage.h"
+#include "Source/common/String.h"
+#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 
 // Terminal value that will never match a valid cert hash.
 NSString *const kBadCertHash = @"BAD_CERT_HASH";
 
 namespace santa {
 
-FAAPolicyProcessor::FAAPolicyProcessor(SNTDecisionCache *decision_cache)
-    : decision_cache_(decision_cache) {}
+constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
+
+static inline std::string Path(const es_file_t *esFile) {
+  return std::string(esFile->path.data, esFile->path.length);
+}
+
+static inline std::string Path(const es_string_token_t &tok) {
+  return std::string(tok.data, tok.length);
+}
+
+static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
+                                          const es_file_t *esFile, bool isReadable = false) {
+  if (!esFile->path_truncated) {
+    vec.push_back({Path(esFile), isReadable,
+                   isReadable ? std::make_optional<std::pair<dev_t, ino_t>>(
+                                    {esFile->stat.st_dev, esFile->stat.st_ino})
+                              : std::nullopt});
+  }
+}
+
+// Note: This variant of PushBackIfNotTruncated can never be marked "is_readable"
+static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
+                                          const es_file_t *dir, const es_string_token_t &name) {
+  if (!dir->path_truncated) {
+    vec.push_back({Path(dir) + "/" + Path(name), false, std::nullopt});
+  }
+}
+
+static bool IsBlockDecision(FileAccessPolicyDecision decision) {
+  return decision == FileAccessPolicyDecision::kDenied ||
+         decision == FileAccessPolicyDecision::kDeniedInvalidSignature;
+}
+
+static FileAccessPolicyDecision ApplyOverrideToDecision(
+    FileAccessPolicyDecision decision, SNTOverrideFileAccessAction overrideAction) {
+  switch (overrideAction) {
+    // When no override should be applied, return the decision unmodified
+    case SNTOverrideFileAccessActionNone: return decision;
+
+    // When the decision should be overridden to be audit only, only change the
+    // decision if it was going to deny the operation.
+    case SNTOverrideFileAccessActionAuditOnly:
+      if (IsBlockDecision(decision)) {
+        return FileAccessPolicyDecision::kAllowedAuditOnly;
+      } else {
+        return decision;
+      }
+
+    // If the override action is to disable policy, return a decision that will
+    // be treated as if no policy applied to the operation.
+    case SNTOverrideFileAccessActionDiable: return FileAccessPolicyDecision::kNoPolicy;
+
+    default:
+      // This is a programming error. Bail.
+      LOGE(@"Invalid override file access action encountered: %d",
+           static_cast<int>(overrideAction));
+      [NSException
+           raise:@"Invalid SNTOverrideFileAccessAction"
+          format:@"Invalid SNTOverrideFileAccessAction: %d", static_cast<int>(overrideAction)];
+  }
+}
+
+static bool ShouldLogDecision(FileAccessPolicyDecision decision) {
+  switch (decision) {
+    case FileAccessPolicyDecision::kDenied: return true;
+    case FileAccessPolicyDecision::kDeniedInvalidSignature: return true;
+    case FileAccessPolicyDecision::kAllowedAuditOnly: return true;
+    default: return false;
+  }
+}
+
+/// The user should be notified whenever the policy will be logged (as long as it's not audit only)
+static bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision) {
+  return ShouldLogDecision(decision) && decision != FileAccessPolicyDecision::kAllowedAuditOnly;
+}
+
+static bool ShouldShowUI(const std::shared_ptr<WatchItemPolicyBase> &policy) {
+  return !policy->silent;
+}
+
+static bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicyBase> &policy,
+                             const Message &msg) {
+  if (policy->silent_tty || !TTYWriter::CanWrite(msg->process)) {
+    return false;
+  }
+  return true;
+}
+
+static es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision) {
+  switch (decision) {
+    case FileAccessPolicyDecision::kNoPolicy: return ES_AUTH_RESULT_ALLOW;
+    case FileAccessPolicyDecision::kDenied: return ES_AUTH_RESULT_DENY;
+    case FileAccessPolicyDecision::kDeniedInvalidSignature: return ES_AUTH_RESULT_DENY;
+    case FileAccessPolicyDecision::kAllowed: return ES_AUTH_RESULT_ALLOW;
+    case FileAccessPolicyDecision::kAllowedReadAccess: return ES_AUTH_RESULT_ALLOW;
+    case FileAccessPolicyDecision::kAllowedAuditOnly: return ES_AUTH_RESULT_ALLOW;
+    default:
+      // This is a programming error. Bail.
+      LOGE(@"Invalid file access decision encountered: %d", static_cast<int>(decision));
+      [NSException raise:@"Invalid FileAccessPolicyDecision"
+                  format:@"Invalid FileAccessPolicyDecision: %d", static_cast<int>(decision)];
+  }
+}
+
+/// Combine two AUTH results such that the most strict policy wins - that is, if
+/// either policy denied the operation, the operation is denied
+static es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t result2) {
+  // If either policy denied the operation, the operation is denied
+  return ((result1 == ES_AUTH_RESULT_DENY || result2 == ES_AUTH_RESULT_DENY)
+              ? ES_AUTH_RESULT_DENY
+              : ES_AUTH_RESULT_ALLOW);
+}
+
+FAAPolicyProcessor::FAAPolicyProcessor(
+    SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
+    std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
+    GenerateEventDetailLinkBlock generate_event_detail_link_block)
+    : decision_cache_(decision_cache),
+      enricher_(std::move(enricher)),
+      logger_(std::move(logger)),
+      tty_writer_(std::move(tty_writer)),
+      generate_event_detail_link_block_(generate_event_detail_link_block) {
+  configurator_ = [SNTConfigurator configurator];
+  queue_ = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
+  LOGE(@"Got queue: %p", queue_);
+}
 
 NSString *FAAPolicyProcessor::GetCertificateHash(const es_file_t *es_file) {
   // First see if we've already cached this value
@@ -121,30 +251,245 @@ SNTCachedDecision *FAAPolicyProcessor::GetCachedDecision(const struct stat &stat
   return [decision_cache_ cachedDecisionForFile:stat_buf];
 }
 
-static inline std::string Path(const es_file_t *esFile) {
-  return std::string(esFile->path.data, esFile->path.length);
-}
-
-static inline std::string Path(const es_string_token_t &tok) {
-  return std::string(tok.data, tok.length);
-}
-
-static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
-                                          const es_file_t *esFile, bool isReadable = false) {
-  if (!esFile->path_truncated) {
-    vec.push_back({Path(esFile), isReadable,
-                   isReadable ? std::make_optional<std::pair<dev_t, ino_t>>(
-                                    {esFile->stat.st_dev, esFile->stat.st_ino})
-                              : std::nullopt});
+bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
+    const Message &msg, const PathTarget &target,
+    const std::shared_ptr<WatchItemPolicyBase> policy) {
+  // All special cases currently require the option "allow_read_access" is set
+  if (!policy->allow_read_access) {
+    return false;
   }
+
+  switch (msg->event_type) {
+    case ES_EVENT_TYPE_AUTH_OPEN:
+      // If the policy is write-only, but the operation isn't a write action, it's allowed
+      if (!(msg->event.open.fflag & kOpenFlagsIndicatingWrite)) {
+        return true;
+      }
+      break;
+
+    case ES_EVENT_TYPE_AUTH_CLONE:
+      // If policy is write-only, readable targets are allowed (e.g. source file)
+      if (target.is_readable) {
+        return true;
+      }
+      break;
+
+    case ES_EVENT_TYPE_AUTH_COPYFILE:
+      // Note: Flags for the copyfile event represent the kernel view, not the usersapce
+      // copyfile(3) implementation. This means if a `copyfile(3)` flag like `COPYFILE_MOVE`
+      // is specified, it will come as a separate `unlink(2)` event, not a flag here.
+      if (target.is_readable) {
+        return true;
+      }
+      break;
+
+    case ES_EVENT_TYPE_AUTH_CREATE:
+    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
+    case ES_EVENT_TYPE_AUTH_LINK:
+    case ES_EVENT_TYPE_AUTH_RENAME:
+    case ES_EVENT_TYPE_AUTH_TRUNCATE:
+    case ES_EVENT_TYPE_AUTH_UNLINK:
+    default:
+      // These event types have no special case
+      break;
+  }
+
+  return false;
 }
 
-// Note: This variant of PushBackIfNotTruncated can never be marked "isReadable"
-static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
-                                          const es_file_t *dir, const es_string_token_t &name) {
-  if (!dir->path_truncated) {
-    vec.push_back({Path(dir) + "/" + Path(name), false, std::nullopt});
+FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
+    const Message &msg, const PathTarget &target,
+    const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
+    CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock) {
+  if (!optional_policy.has_value()) {
+    return FileAccessPolicyDecision::kNoPolicy;
   }
+
+  // If the process is signed but has an invalid signature, it is denied
+  if (((msg->process->codesigning_flags & (CS_SIGNED | CS_VALID)) == CS_SIGNED) &&
+      [configurator_ enableBadSignatureProtection]) {
+    // TODO(mlw): Think about how to make stronger guarantees here to handle
+    // programs becoming invalid after first being granted access. Maybe we
+    // should only allow things that have hardened runtime flags set?
+    return FileAccessPolicyDecision::kDeniedInvalidSignature;
+  }
+
+  std::shared_ptr<WatchItemPolicyBase> policy = *optional_policy;
+
+  // If the policy allows read access and the target is readable, produce
+  // an immediate result.
+  if (PolicyAllowsReadsForTarget(msg, target, policy)) {
+    return FileAccessPolicyDecision::kAllowedReadAccess;
+  }
+
+  FileAccessPolicyDecision decision = checkIfPolicyMatchesBlock(*policy, msg)
+                                          ? FileAccessPolicyDecision::kAllowed
+                                          : FileAccessPolicyDecision::kDenied;
+
+  // If the RuleType option was configured to contain a list of denied
+  // processes or denied paths, the decision should be inverted from allowed
+  // to denied or vice versa. Note that this inversion must be made prior to
+  // checking the policy's audit-only flag.
+  if (policy->rule_type == WatchItemRuleType::kPathsWithDeniedProcesses ||
+      policy->rule_type == WatchItemRuleType::kProcessesWithDeniedPaths) {
+    if (decision == FileAccessPolicyDecision::kAllowed) {
+      decision = FileAccessPolicyDecision::kDenied;
+    } else {
+      decision = FileAccessPolicyDecision::kAllowed;
+    }
+  }
+
+  if (decision == FileAccessPolicyDecision::kDenied && policy->audit_only) {
+    decision = FileAccessPolicyDecision::kAllowedAuditOnly;
+  }
+
+  return decision;
+}
+
+void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const PathTarget &target,
+                                      const Message &msg, FileAccessPolicyDecision decision) {
+  // Ensure copies of necessary components are made before going async so
+  // they have proper lifetimes.
+  std::string policy_name_copy = policy.name;
+  std::string policy_version_copy = policy.version;
+  std::string target_path_copy = target.path;
+  __block Message msg_copy(msg);
+
+  dispatch_async(queue_, ^{
+    EnrichedProcess enriched_proc = enricher_->Enrich(*msg_copy->process);
+    logger_->LogFileAccess(policy_version_copy, policy_name_copy, std::move(msg_copy),
+                           std::move(enriched_proc), target_path_copy, decision);
+  });
+}
+
+void FAAPolicyProcessor::LogTTY(SNTFileAccessEvent *event, URLTextPair link_info,
+                                const Message &msg, const WatchItemPolicyBase &policy) {
+  NSAttributedString *attrStr = [SNTBlockMessage
+      attributedBlockMessageForFileAccessEvent:event
+                                 customMessage:OptionalStringToNSString(policy.custom_message)];
+
+  NSMutableString *blockMsg = [NSMutableString stringWithCapacity:1024];
+  // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
+  [blockMsg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", attrStr.string];
+  [blockMsg appendFormat:@"\033[1mAccessed Path:\033[0m %@\n"
+                         @"\033[1mRule Version: \033[0m %@\n"
+                         @"\033[1mRule Name:    \033[0m %@\n"
+                         @"\n"
+                         @"\033[1mProcess Path: \033[0m %@\n"
+                         @"\033[1mIdentifier:   \033[0m %@\n"
+                         @"\033[1mParent:       \033[0m %@\n\n",
+                         event.accessedPath, event.ruleVersion, event.ruleName, event.filePath,
+                         event.fileSHA256, event.parentName];
+
+  NSURL *detailURL = [SNTBlockMessage eventDetailURLForFileAccessEvent:event
+                                                             customURL:link_info.first];
+  if (detailURL) {
+    [blockMsg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
+  }
+
+  tty_writer_->Write(msg->process, blockMsg);
+}
+
+FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
+    const Message &msg, const PathTarget &target,
+    const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
+    CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
+    SNTFileAccessBlockCallback fileAccessBlockCallback,
+    SNTOverrideFileAccessAction override_action) {
+  FileAccessPolicyDecision decision = ApplyOverrideToDecision(
+      ApplyPolicy(msg, target, optional_policy, checkIfPolicyMatchesBlock), override_action);
+
+  // Note: If ShouldLogDecision, it shouldn't be possible for optionalPolicy
+  // to not have a value. Performing the check just in case to prevent a crash.
+  if (ShouldLogDecision(decision) && optional_policy.has_value()) {
+    std::shared_ptr<WatchItemPolicyBase> policy = *optional_policy;
+
+    // TODO: Rate limiting
+    LogTelemetry(*policy, target, msg, decision);
+
+    if (ShouldNotifyUserDecision(decision) &&
+        (ShouldShowUI(policy) || ShouldMessageTTY(policy, msg))) {
+      SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
+      SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
+
+      event.accessedPath = StringToNSString(target.path);
+      event.ruleVersion = StringToNSString(policy->version);
+      event.ruleName = StringToNSString(policy->name);
+      event.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
+      event.filePath = StringToNSString(msg->process->executable->path.data);
+      event.teamID = cd.teamID ?: @"<unknown team id>";
+      event.signingID = cd.signingID ?: @"<unknown signing id>";
+      event.cdhash = cd.cdhash ?: @"<unknown CDHash>";
+      event.pid = @(audit_token_to_pid(msg->process->audit_token));
+      event.ppid = @(audit_token_to_pid(msg->process->parent_audit_token));
+      event.parentName = StringToNSString(msg.ParentProcessName());
+      event.signingChain = cd.certChain;
+
+      struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
+      if (user) event.executingUser = @(user->pw_name);
+
+      URLTextPair link_info;
+      if (generate_event_detail_link_block_) {
+        link_info = generate_event_detail_link_block_(policy);
+      }
+
+      if (ShouldShowUI(policy)) {
+        fileAccessBlockCallback(event, OptionalStringToNSString(policy->custom_message),
+                                link_info.first, link_info.second);
+      }
+
+      // TODO: TTY message cache
+      if (ShouldMessageTTY(policy, msg)) {
+        LogTTY(event, link_info, msg, *policy);
+      }
+    }
+  }
+
+  return decision;
+}
+
+es_auth_result_t FAAPolicyProcessor::ProcessMessage(
+    const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
+    ReadsCacheUpdateBlock readsCacheUpdateBlock,
+    CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
+    SNTFileAccessBlockCallback fileAccessBlockCallback,
+    SNTOverrideFileAccessAction overrideAction) {
+  es_auth_result_t policy_result = ES_AUTH_RESULT_ALLOW;
+
+  for (const TargetPolicyPair &target_policy_pair : target_policy_pairs) {
+    FileAccessPolicyDecision decision =
+        ProcessTargetAndPolicy(msg, target_policy_pair.first, target_policy_pair.second,
+                               checkIfPolicyMatchesBlock, fileAccessBlockCallback, overrideAction);
+    // Trigger the caller's ReadsCacheUpdateBlock if:
+    //   1. The policy applied
+    //   2. The process wasn't invalid
+    //   3. A devno/ino pair existed for the target
+    //   4. The policy allowed read access
+    // Note: As long as a policy allows read access, the caller's read cache can be updated
+    // regardless of the RuleType of the policy.
+    if (decision != FileAccessPolicyDecision::kNoPolicy &&
+        decision != FileAccessPolicyDecision::kDeniedInvalidSignature &&
+        target_policy_pair.first.devno_ino.has_value() && target_policy_pair.second.has_value() &&
+        (*target_policy_pair.second)->allow_read_access) {
+      readsCacheUpdateBlock(msg->process, *target_policy_pair.first.devno_ino);
+    }
+
+    policy_result =
+        CombinePolicyResults(policy_result, FileAccessPolicyDecisionToESAuthResult(decision));
+  }
+
+  // TODO: Need to surface whether or not the response can be cached
+  return policy_result;
+}
+
+std::vector<FAAPolicyProcessor::PathTarget> FAAPolicyProcessor::PathTargets(const Message &msg) {
+  // TODO: This will replace the older PopulatePathTargets interface
+  std::vector<FAAPolicyProcessor::PathTarget> targets;
+  targets.reserve(2);
+
+  PopulatePathTargets(msg, targets);
+
+  return targets;
 }
 
 void FAAPolicyProcessor::PopulatePathTargets(const Message &msg,
