@@ -381,8 +381,12 @@ using santa::WatchItemPathType;
 }
 
 - (void)testRespondToMessageWithAuthResultCacheable {
-  es_message_t esMsg;
-  esMsg.event_type = ES_EVENT_TYPE_AUTH_EXEC;
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("target");
+  es_process_t procExec = MakeESProcess(&fileExec);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -408,7 +412,9 @@ using santa::WatchItemPathType;
 }
 
 - (void)testProcessEnrichedMessageHandler {
-  es_message_t esMsg;
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
@@ -481,6 +487,7 @@ using santa::WatchItemPathType;
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
+  ::testing::Mock::AllowLeak(mockESApi.get());
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
@@ -557,8 +564,11 @@ using santa::WatchItemPathType;
   //    deadlineSema is signaled (or a timeout waiting on deadlineSema)
   es_file_t proc_file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&proc_file);
+  es_file_t fileExec = MakeESFile("target");
+  es_process_t procExec = MakeESProcess(&fileExec);
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth,
                                      750);  // 750ms timeout
+  esMsg.event.exec.target = &procExec;
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
