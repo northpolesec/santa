@@ -17,6 +17,7 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
+#include <dispatch/dispatch.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -84,6 +85,24 @@ class MockEndpointSecurityAPI : public santa::EndpointSecurityAPI {
   void SetExpectationsRetainReleaseMessage() {
     EXPECT_CALL(*this, ReleaseMessage).Times(testing::AnyNumber());
     EXPECT_CALL(*this, RetainMessage).Times(testing::AnyNumber());
+  }
+
+  /// This method should be used for tests that must wait for retain counts to drop
+  /// to 0 (e.g. due to async processing) in order to ensure tests don't exit early.
+  void SetExpectationsRetainCountTracking(dispatch_semaphore_t sema) {
+    __block int retainCount = 0;
+    EXPECT_CALL(*this, ReleaseMessage).WillRepeatedly(^{
+      if (retainCount == 0) {
+        [NSException raise:@"Over Release" format:@"The ES message has been over-released."];
+      }
+      retainCount--;
+      if (retainCount == 0) {
+        dispatch_semaphore_signal(sema);
+      }
+    });
+    EXPECT_CALL(*this, RetainMessage).WillRepeatedly(^{
+      retainCount++;
+    });
   }
 };
 

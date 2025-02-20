@@ -206,23 +206,8 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   // The test must wait for the ES client async message processing to complete.
   // Otherwise, the `es_message_t` stack variable will go out of scope and will
   // result in undefined behavior in the async dispatch queue block.
-  // To do this, track the `Message` retain counts, and only allow the test
-  // to continue once the retain count drops to 0 indicating the client is
-  // no longer using the message.
-  __block int retainCount = 0;
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  EXPECT_CALL(*mockESApi, ReleaseMessage).WillRepeatedly(^{
-    if (retainCount == 0) {
-      XCTFail("Under retain!");
-    }
-    retainCount--;
-    if (retainCount == 0) {
-      dispatch_semaphore_signal(sema);
-    }
-  });
-  EXPECT_CALL(*mockESApi, RetainMessage).WillRepeatedly(^{
-    retainCount++;
-  });
+  mockESApi->SetExpectationsRetainCountTracking(sema);
 
   [authClient handleMessage:Message(mockESApi, &esMsg)
          recordEventMetrics:^(santa::EventDisposition d){
