@@ -473,21 +473,15 @@ using santa::WatchItemPathType;
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
-// Note: This test triggers a leak warning on the mock object, however it is
-// benign. The dispatch block to handle deadline expiration in
-// `processMessage:handler:` will retain the mock object an extra time.
-// But since this test sets a long deadline in order to ensure the handler block
-// runs first, the deadline handler block will not have finished executing by
-// the time the test exits, making GMock think the object was leaked.
 - (void)testProcessMessageHandler {
   es_file_t proc_file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&proc_file);
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &proc, ActionType::Auth,
-                                     45 * 1000);  // Long deadline to not hit
+                                     5 * MSEC_PER_SEC);  // Long deadline to not hit first
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  mockESApi->SetExpectationsRetainReleaseMessage();
-  ::testing::Mock::AllowLeak(mockESApi.get());
+  dispatch_semaphore_t semaRetainCount = dispatch_semaphore_create(0);
+  mockESApi->SetExpectationsRetainCountTracking(semaRetainCount);
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
@@ -506,6 +500,9 @@ using santa::WatchItemPathType;
         0, dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
         "Handler block not called within expected time window");
   }
+
+  // The timeout here must be longer than the deadline time set in the ES message
+  XCTAssertSemaTrue(semaRetainCount, 8, "Retain count never dropped to 0");
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
