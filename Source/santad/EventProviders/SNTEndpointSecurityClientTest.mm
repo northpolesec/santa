@@ -487,6 +487,7 @@ using santa::WatchItemPathType;
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
+  ::testing::Mock::AllowLeak(mockESApi.get());
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
