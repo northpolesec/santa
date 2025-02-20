@@ -995,7 +995,7 @@ std::optional<WatchItemsState> WatchItems::State() {
 }
 
 std::pair<NSString *, NSString *> WatchItems::EventDetailLinkInfo(
-    const std::shared_ptr<DataWatchItemPolicy> &watch_item) {
+    const std::shared_ptr<WatchItemPolicyBase> &watch_item) {
   absl::ReaderMutexLock lock(&lock_);
   if (!watch_item) {
     return {policy_event_detail_url_, policy_event_detail_text_};

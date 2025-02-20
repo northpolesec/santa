@@ -120,6 +120,7 @@ objc_library(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":WatchItemPolicy",
+        "//Source/common:SNTFileAccessEvent",
     ],
 )
 
@@ -454,15 +455,23 @@ objc_library(
     srcs = ["EventProviders/FAAPolicyProcessor.mm"],
     hdrs = ["EventProviders/FAAPolicyProcessor.h"],
     deps = [
+        ":EndpointSecurityEnricher",
+        ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":SNTDecisionCache",
+        ":SNTEndpointSecurityEventHandler",
+        ":TTYWriter",
         ":WatchItemPolicy",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTBlockMessage",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTFileAccessEvent",
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
+        "//Source/common:String",
     ],
 )
 
@@ -867,6 +876,7 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTSyncdQueue",
         ":TTYWriter",
+        ":WatchItemPolicy",
         ":WatchItems",
         "//Source/common:MOLXPCConnection",
         "//Source/common:PrefixTree",
@@ -1007,7 +1017,10 @@ objc_library(
         "EndpointSecurity",
     ],
     deps = [
+        ":EndpointSecurityEnricher",
+        ":EndpointSecurityLogger",
         ":SNTDecisionCache",
+        ":TTYWriter",
         ":WatchItemPolicy",
         "//Source/common:SNTCachedDecision",
         "@com_google_googletest//:gtest",

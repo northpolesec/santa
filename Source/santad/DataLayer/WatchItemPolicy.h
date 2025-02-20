@@ -114,7 +114,8 @@ struct WatchItemPolicyBase {
                       WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
                       bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
-                      std::string_view cm = "", NSString *edu = nil, NSString *edt = nil)
+                      std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
+                      SetWatchItemProcess procs = {})
       : name(n),
         version(v),
         allow_read_access(ara),
@@ -126,7 +127,8 @@ struct WatchItemPolicyBase {
         // Note: Empty string considered valid for event_detail_url to allow rules
         // overriding global setting in order to hide the button.
         event_detail_url(edu == nil ? std::nullopt : std::make_optional<NSString *>(edu)),
-        event_detail_text(edt.length == 0 ? std::nullopt : std::make_optional<NSString *>(edt)) {}
+        event_detail_text(edt.length == 0 ? std::nullopt : std::make_optional<NSString *>(edt)),
+        processes(std::move(procs)) {}
 
   virtual ~WatchItemPolicyBase() = default;
 
@@ -135,7 +137,8 @@ struct WatchItemPolicyBase {
     // for equality purposes
     return name == other.name && version == other.version &&
            allow_read_access == other.allow_read_access && audit_only == other.audit_only &&
-           rule_type == other.rule_type && silent == other.silent && silent_tty == other.silent_tty;
+           rule_type == other.rule_type && silent == other.silent &&
+           silent_tty == other.silent_tty && processes == other.processes;
   }
 
   virtual bool operator!=(const WatchItemPolicyBase &other) const { return !(*this == other); }
@@ -155,6 +158,7 @@ struct WatchItemPolicyBase {
   std::optional<std::string> custom_message;
   std::optional<NSString *> event_detail_url;
   std::optional<NSString *> event_detail_text;
+  SetWatchItemProcess processes;
 };
 
 struct DataWatchItemPolicy : public WatchItemPolicyBase {
@@ -167,10 +171,9 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                       std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
                       SetWatchItemProcess procs = {})
-      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt),
+      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs)),
         path(p),
-        path_type(pt),
-        processes(std::move(procs)) {}
+        path_type(pt) {}
 
   bool operator==(const WatchItemPolicyBase &other) const override {
     const DataWatchItemPolicy *otherPolicy = dynamic_cast<const DataWatchItemPolicy *>(&other);
@@ -180,14 +183,13 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
 
     // Now compare base and derived class attributes
     return WatchItemPolicyBase::operator==(*otherPolicy) && path_type == otherPolicy->path_type &&
-           path == otherPolicy->path && processes == otherPolicy->processes;
+           path == otherPolicy->path;
   }
 
   bool operator!=(const WatchItemPolicyBase &other) const override { return !(*this == other); }
 
   std::string path;
   WatchItemPathType path_type;
-  SetWatchItemProcess processes;
 };
 
 struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
@@ -199,9 +201,8 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
                          bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                          std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
                          SetWatchItemProcess procs = {})
-      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt),
+      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs)),
         path_type_pairs(std::move(pt)),
-        processes(std::move(procs)),
         tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
     // Build tree
     for (const auto &pt_pair : path_type_pairs) {
@@ -221,14 +222,13 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
     }
 
     // Now compare base and derived class attributes
-    return WatchItemPolicyBase::operator==(*otherPolicy) && processes == otherPolicy->processes &&
+    return WatchItemPolicyBase::operator==(*otherPolicy) &&
            path_type_pairs == otherPolicy->path_type_pairs;
   }
 
   bool operator!=(const WatchItemPolicyBase &other) const override { return !(*this == other); }
 
   SetPairPathAndType path_type_pairs;
-  SetWatchItemProcess processes;
   std::unique_ptr<santa::PrefixTree<Unit>> tree;
 };
 
