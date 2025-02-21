@@ -68,7 +68,8 @@ class FAAPolicyProcessor {
   using ReadsCacheUpdateBlock = void (^)(const es_process_t *, std::pair<dev_t, ino_t>);
   /// When this block is called, the policy enforcement client must determine
   /// whether or not the given policy applies to the given ES message.
-  using CheckIfPolicyMatchesBlock = bool (^)(const WatchItemPolicyBase &, const Message &msg);
+  using CheckIfPolicyMatchesBlock = bool (^)(const WatchItemPolicyBase &, PathTarget target,
+                                             const Message &msg);
   using URLTextPair = std::pair<NSString *, NSString *>;
   /// A block that generates custom URL and Text pairs from a given policy.
   using GenerateEventDetailLinkBlock =
@@ -112,9 +113,7 @@ class FAAPolicyProcessor {
                                   SNTFileAccessDeniedBlock file_access_denied_block,
                                   SNTOverrideFileAccessAction overrideAction);
 
-  // TODO: PathTargets will replace PopulatePathTargets
   static std::vector<FAAPolicyProcessor::PathTarget> PathTargets(const Message &msg);
-  static void PopulatePathTargets(const Message &msg, std::vector<PathTarget> &targets);
 
  private:
   SNTDecisionCache *decision_cache_;
@@ -135,13 +134,13 @@ class FAAPolicyProcessor {
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction override_action);
 
-  FileAccessPolicyDecision ApplyPolicy(
+  virtual FileAccessPolicyDecision ApplyPolicy(
       const Message &msg, const PathTarget &target,
       const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
       CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock);
 
-  bool PolicyAllowsReadsForTarget(const Message &msg, const PathTarget &target,
-                                  std::shared_ptr<WatchItemPolicyBase> policy);
+  virtual bool PolicyAllowsReadsForTarget(const Message &msg, const PathTarget &target,
+                                          std::shared_ptr<WatchItemPolicyBase> policy);
 
   void LogTelemetry(const WatchItemPolicyBase &policy, const PathTarget &target, const Message &msg,
                     FileAccessPolicyDecision decision);

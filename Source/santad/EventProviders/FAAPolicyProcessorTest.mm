@@ -35,7 +35,18 @@
 using santa::FAAPolicyProcessor;
 using santa::Message;
 using santa::MockFAAPolicyProcessor;
+using santa::WatchItemPolicyBase;
 using santa::WatchItemProcess;
+
+namespace santa {
+extern FileAccessPolicyDecision ApplyOverrideToDecision(FileAccessPolicyDecision decision,
+                                                        SNTOverrideFileAccessAction overrideAction);
+extern es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t result2);
+extern es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision);
+extern bool IsBlockDecision(FileAccessPolicyDecision decision);
+extern bool ShouldLogDecision(FileAccessPolicyDecision decision);
+extern bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision);
+}  // namespace santa
 
 // Helper to reset a policy to an empty state
 static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
@@ -52,6 +63,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
 }
 
 @interface FAAPolicyProcessorTest : XCTestCase
+@property id mockConfigurator;
 @property id cscMock;
 @property id dcMock;
 @end
@@ -61,6 +73,9 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
 - (void)setUp {
   [super setUp];
 
+  self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+
   self.cscMock = OCMClassMock([MOLCodesignChecker class]);
   OCMStub([self.cscMock alloc]).andReturn(self.cscMock);
 
@@ -69,8 +84,418 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
 
 - (void)tearDown {
   [self.dcMock stopMocking];
+  [self.dcMock stopMocking];
 
   [super tearDown];
+}
+
+- (void)testFileAccessPolicyDecisionToESAuthResult {
+  std::map<FileAccessPolicyDecision, es_auth_result_t> policyDecisionToAuthResult = {
+      {FileAccessPolicyDecision::kNoPolicy, ES_AUTH_RESULT_ALLOW},
+      {FileAccessPolicyDecision::kDenied, ES_AUTH_RESULT_DENY},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, ES_AUTH_RESULT_DENY},
+      {FileAccessPolicyDecision::kAllowed, ES_AUTH_RESULT_ALLOW},
+      {FileAccessPolicyDecision::kAllowedReadAccess, ES_AUTH_RESULT_ALLOW},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, ES_AUTH_RESULT_ALLOW},
+  };
+
+  for (const auto &kv : policyDecisionToAuthResult) {
+    XCTAssertEqual(santa::FileAccessPolicyDecisionToESAuthResult(kv.first), kv.second);
+  }
+
+  XCTAssertThrows(santa::FileAccessPolicyDecisionToESAuthResult((FileAccessPolicyDecision)123));
+}
+
+- (void)testShouldLogDecision {
+  std::map<FileAccessPolicyDecision, bool> policyDecisionToShouldLog = {
+      {FileAccessPolicyDecision::kNoPolicy, false},
+      {FileAccessPolicyDecision::kDenied, true},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
+      {FileAccessPolicyDecision::kAllowed, false},
+      {FileAccessPolicyDecision::kAllowedReadAccess, false},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, true},
+      {(FileAccessPolicyDecision)123, false},
+  };
+
+  for (const auto &kv : policyDecisionToShouldLog) {
+    XCTAssertEqual(santa::ShouldLogDecision(kv.first), kv.second);
+  }
+}
+
+- (void)testShouldNotifyUserDecision {
+  std::map<FileAccessPolicyDecision, bool> policyDecisionToShouldLog = {
+      {FileAccessPolicyDecision::kNoPolicy, false},
+      {FileAccessPolicyDecision::kDenied, true},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
+      {FileAccessPolicyDecision::kAllowed, false},
+      {FileAccessPolicyDecision::kAllowedReadAccess, false},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, false},
+      {(FileAccessPolicyDecision)123, false},
+  };
+
+  for (const auto &kv : policyDecisionToShouldLog) {
+    XCTAssertEqual(santa::ShouldNotifyUserDecision(kv.first), kv.second);
+  }
+}
+
+- (void)testIsBlockDecision {
+  std::map<FileAccessPolicyDecision, bool> policyDecisionToIsBlockDecision = {
+      {FileAccessPolicyDecision::kNoPolicy, false},
+      {FileAccessPolicyDecision::kDenied, true},
+      {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
+      {FileAccessPolicyDecision::kAllowed, false},
+      {FileAccessPolicyDecision::kAllowedReadAccess, false},
+      {FileAccessPolicyDecision::kAllowedAuditOnly, false},
+      {(FileAccessPolicyDecision)123, false},
+  };
+
+  for (const auto &kv : policyDecisionToIsBlockDecision) {
+    XCTAssertEqual(santa::IsBlockDecision(kv.first), kv.second);
+  }
+}
+
+- (void)testApplyOverrideToDecision {
+  std::map<std::pair<FileAccessPolicyDecision, SNTOverrideFileAccessAction>,
+           FileAccessPolicyDecision>
+      decisionAndOverrideToDecision = {
+          // Override action: None - Policy shouldn't be changed
+          {{FileAccessPolicyDecision::kNoPolicy, SNTOverrideFileAccessActionNone},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionNone},
+           FileAccessPolicyDecision::kDenied},
+
+          // Override action: AuditOnly - Policy should be changed only on blocked decisions
+          {{FileAccessPolicyDecision::kNoPolicy, SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kAllowedAuditOnly},
+          {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kAllowedReadAccess},
+          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kAllowedAuditOnly},
+          {{FileAccessPolicyDecision::kDeniedInvalidSignature,
+            SNTOverrideFileAccessActionAuditOnly},
+           FileAccessPolicyDecision::kAllowedAuditOnly},
+
+          // Override action: Disable - Always changes the decision to be no policy applied
+          {{FileAccessPolicyDecision::kAllowed, SNTOverrideFileAccessActionDiable},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionDiable},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionDiable},
+           FileAccessPolicyDecision::kNoPolicy},
+          {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionDiable},
+           FileAccessPolicyDecision::kNoPolicy},
+  };
+
+  for (const auto &kv : decisionAndOverrideToDecision) {
+    XCTAssertEqual(santa::ApplyOverrideToDecision(kv.first.first, kv.first.second), kv.second);
+  }
+
+  XCTAssertThrows(santa::ApplyOverrideToDecision(FileAccessPolicyDecision::kAllowed,
+                                                 (SNTOverrideFileAccessAction)123));
+}
+
+- (void)testCombinePolicyResults {
+  // Ensure that the combined result is ES_AUTH_RESULT_DENY if both or either
+  // input result is ES_AUTH_RESULT_DENY.
+  XCTAssertEqual(santa::CombinePolicyResults(ES_AUTH_RESULT_DENY, ES_AUTH_RESULT_DENY),
+                 ES_AUTH_RESULT_DENY);
+
+  XCTAssertEqual(santa::CombinePolicyResults(ES_AUTH_RESULT_DENY, ES_AUTH_RESULT_ALLOW),
+                 ES_AUTH_RESULT_DENY);
+
+  XCTAssertEqual(santa::CombinePolicyResults(ES_AUTH_RESULT_ALLOW, ES_AUTH_RESULT_DENY),
+                 ES_AUTH_RESULT_DENY);
+
+  XCTAssertEqual(santa::CombinePolicyResults(ES_AUTH_RESULT_ALLOW, ES_AUTH_RESULT_ALLOW),
+                 ES_AUTH_RESULT_ALLOW);
+}
+
+- (void)testSpecialCaseForPolicyMessage {
+  es_file_t esFile = MakeESFile("foo");
+  es_process_t esProc = MakeESProcess(&esFile);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  auto policy = std::make_shared<santa::WatchItemPolicyBase>("foo_policy", "ver", "/foo");
+  FAAPolicyProcessor::PathTarget target = {.path = "/some/random/path", .is_readable = true};
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nil);
+
+  EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
+      .WillRepeatedly([&faaPolicyProcessor](const Message &msg,
+                                            const FAAPolicyProcessor::PathTarget &target,
+                                            std::shared_ptr<santa::WatchItemPolicyBase> policy) {
+        return faaPolicyProcessor.PolicyAllowsReadsForTargetWrapper(msg, target, policy);
+      });
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
+
+    // Write-only policy, Write operation
+    {
+      policy->allow_read_access = true;
+      esMsg.event.open.fflag = FWRITE | FREAD;
+      Message msg(mockESApi, &esMsg);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+    }
+
+    // Write-only policy, Read operation
+    {
+      policy->allow_read_access = true;
+      esMsg.event.open.fflag = FREAD;
+      Message msg(mockESApi, &esMsg);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), true);
+    }
+
+    // Read/Write policy, Read operation
+    {
+      policy->allow_read_access = false;
+      esMsg.event.open.fflag = FREAD;
+      Message msg(mockESApi, &esMsg);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+    }
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CLONE;
+
+    // Write-only policy, target readable
+    {
+      policy->allow_read_access = true;
+      target.is_readable = true;
+      Message msg(mockESApi, &esMsg);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), true);
+    }
+
+    // Write-only policy, target not readable
+    {
+      policy->allow_read_access = true;
+      target.is_readable = false;
+      Message msg(mockESApi, &esMsg);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+    }
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_COPYFILE;
+
+    // Write-only policy, target readable
+    {
+      policy->allow_read_access = true;
+      target.is_readable = true;
+      Message msg(mockESApi, &esMsg);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), true);
+    }
+
+    // Write-only policy, target not readable
+    {
+      policy->allow_read_access = true;
+      target.is_readable = false;
+      Message msg(mockESApi, &esMsg);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+    }
+  }
+
+  // Ensure other event types do not have a special case
+  std::set<es_event_type_t> eventTypes = {
+      ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ES_EVENT_TYPE_AUTH_LINK,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_TRUNCATE,     ES_EVENT_TYPE_AUTH_UNLINK,
+  };
+
+  for (const auto &event : eventTypes) {
+    esMsg.event_type = event;
+    Message msg(mockESApi, &esMsg);
+    XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+  }
+}
+
+- (void)testApplyPolicy {
+  const char *instigatingPath = "/path/to/proc";
+  WatchItemProcess policyProc(instigatingPath, "", "", {}, "", std::nullopt);
+  es_file_t esFile = MakeESFile(instigatingPath);
+  es_process_t esProc = MakeESProcess(&esFile);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nil);
+  EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
+      .WillRepeatedly(testing::Return(false));
+
+  FAAPolicyProcessor::PathTarget target = {.path = "/some/random/path", .is_readable = true};
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  // If no policy exists, the operation is allowed
+  {
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, std::nullopt,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return false;
+                       }),
+                   FileAccessPolicyDecision::kNoPolicy);
+    XCTAssertSemaFalse(sema, "Semaphore should never have been signaled");
+  }
+
+  auto policy = std::make_shared<WatchItemPolicyBase>("foo_policy", "ver", "/foo");
+  policy->processes.insert(policyProc);
+  auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicyBase>>(policy);
+
+  // Signed but invalid instigating processes are automatically
+  // denied when `EnableBadSignatureProtection` is true
+  {
+    OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(YES);
+    esMsg.process->codesigning_flags = CS_SIGNED;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return false;
+                       }),
+                   FileAccessPolicyDecision::kDeniedInvalidSignature);
+    XCTAssertSemaFalse(sema, "Semaphore should never have been signaled");
+  }
+
+  // Signed but invalid instigating processes are not automatically
+  // denied when `EnableBadSignatureProtection` is false. Policy
+  // evaluation should continue normally.
+  {
+    OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
+    esMsg.process->codesigning_flags = CS_SIGNED;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return true;
+                       }),
+                   FileAccessPolicyDecision::kAllowed);
+    XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
+  }
+
+  // Set the codesign flags to be signed and valid for the remaining tests
+  esMsg.process->codesigning_flags = CS_SIGNED | CS_VALID;
+
+  // If no exceptions, operations are logged and denied
+  {
+    policy->audit_only = false;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return false;
+                       }),
+                   FileAccessPolicyDecision::kDenied);
+    XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
+  }
+
+  // For audit only policies with no exceptions, operations are logged but allowed
+  {
+    policy->audit_only = true;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return false;
+                       }),
+                   FileAccessPolicyDecision::kAllowedAuditOnly);
+    XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
+  }
+
+  // The remainder of the tests set the policy's `rule_type` option to
+  // invert process exceptions
+  policy->rule_type = santa::WatchItemRuleType::kPathsWithDeniedProcesses;
+
+  // If the policy wasn't matched, but the rule type specifies denied processes,
+  // then the operation should be allowed.
+  {
+    policy->audit_only = false;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return false;
+                       }),
+                   FileAccessPolicyDecision::kAllowed);
+    XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
+  }
+
+  // The remainder of the tests set the policy's `rule_type` option to
+  // invert process exceptions
+  policy->rule_type = santa::WatchItemRuleType::kProcessesWithDeniedPaths;
+
+  // If the policy wasn't matched, but the rule type specifies denied processes/paths,
+  // then the operation should be allowed.
+  {
+    policy->audit_only = false;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return false;
+                       }),
+                   FileAccessPolicyDecision::kAllowed);
+    XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
+  }
+
+  // For audit only policies with no process match and the rule type specifies
+  // denied processes/paths, operations are allowed.
+  {
+    policy->audit_only = true;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return false;
+                       }),
+                   FileAccessPolicyDecision::kAllowed);
+    XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
+  }
+
+  // For audit only policies with matched process details and the rule type specifies
+  // denied processes/paths, operations are allowed audit only.
+  {
+    policy->audit_only = true;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return true;
+                       }),
+                   FileAccessPolicyDecision::kAllowedAuditOnly);
+    XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
+  }
+
+  // For policies with matched process details and the rule type specifies
+  // denied processes/paths, operations are denied.
+  {
+    policy->audit_only = false;
+    XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
+                       Message(mockESApi, &esMsg), target, optionalPolicy,
+                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
+                             const Message &) {
+                         dispatch_semaphore_signal(sema);
+                         return true;
+                       }),
+                   FileAccessPolicyDecision::kDenied);
+    XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
 - (void)testGetCertificateHash {
@@ -266,7 +691,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   }
 }
 
-- (void)testPopulatePathTargets {
+- (void)testPathTargets {
   // This test ensures that the `GetPathTargets` functions returns the
   // expected combination of targets for each handled event variant
   es_file_t testFile1 = MakeESFile("test_file_1", MakeStat(100));
@@ -286,8 +711,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
     esMsg.event.open.file = &testFile1;
 
-    std::vector<FAAPolicyProcessor::PathTarget> targets;
-    FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+    std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
     XCTAssertEqual(targets.size(), 1);
     XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -301,8 +725,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.event.link.target_dir = &testDir;
     esMsg.event.link.target_filename = testTok;
 
-    std::vector<FAAPolicyProcessor::PathTarget> targets;
-    FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+    std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
     XCTAssertEqual(targets.size(), 2);
     XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -321,8 +744,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
       esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
       esMsg.event.rename.destination.existing_file = &testFile2;
 
-      std::vector<FAAPolicyProcessor::PathTarget> targets;
-      FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+      std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
       XCTAssertEqual(targets.size(), 2);
       XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -338,8 +760,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
       esMsg.event.rename.destination.new_path.dir = &testDir;
       esMsg.event.rename.destination.new_path.filename = testTok;
 
-      std::vector<FAAPolicyProcessor::PathTarget> targets;
-      FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+      std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
       XCTAssertEqual(targets.size(), 2);
       XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -355,8 +776,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_UNLINK;
     esMsg.event.unlink.target = &testFile1;
 
-    std::vector<FAAPolicyProcessor::PathTarget> targets;
-    FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+    std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
     XCTAssertEqual(targets.size(), 1);
     XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -370,8 +790,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.event.clone.target_dir = &testDir;
     esMsg.event.clone.target_name = testTok;
 
-    std::vector<FAAPolicyProcessor::PathTarget> targets;
-    FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+    std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
     XCTAssertEqual(targets.size(), 2);
     XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -387,8 +806,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.event.exchangedata.file1 = &testFile1;
     esMsg.event.exchangedata.file2 = &testFile2;
 
-    std::vector<FAAPolicyProcessor::PathTarget> targets;
-    FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+    std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
     XCTAssertEqual(targets.size(), 2);
     XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -405,8 +823,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.event.create.destination.new_path.dir = &testDir;
     esMsg.event.create.destination.new_path.filename = testTok;
 
-    std::vector<FAAPolicyProcessor::PathTarget> targets;
-    FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+    std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
     XCTAssertEqual(targets.size(), 1);
     XCTAssertCppStringEqual(targets[0].path, dirTok);
@@ -418,8 +835,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_TRUNCATE;
     esMsg.event.truncate.target = &testFile1;
 
-    std::vector<FAAPolicyProcessor::PathTarget> targets;
-    FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+    std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
     XCTAssertEqual(targets.size(), 1);
     XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -436,8 +852,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     {
       esMsg.event.copyfile.target_file = nullptr;
 
-      std::vector<FAAPolicyProcessor::PathTarget> targets;
-      FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+      std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
       XCTAssertEqual(targets.size(), 2);
       XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
@@ -451,8 +866,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     {
       esMsg.event.copyfile.target_file = &testFile2;
 
-      std::vector<FAAPolicyProcessor::PathTarget> targets;
-      FAAPolicyProcessor::PopulatePathTargets(msg, targets);
+      std::vector<FAAPolicyProcessor::PathTarget> targets = FAAPolicyProcessor::PathTargets(msg);
 
       XCTAssertEqual(targets.size(), 2);
       XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
