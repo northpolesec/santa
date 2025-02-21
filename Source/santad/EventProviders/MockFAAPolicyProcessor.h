@@ -40,15 +40,38 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
                            std::move(generate_event_detail_link_block)) {}
   virtual ~MockFAAPolicyProcessor() {}
 
-  // Wraps the call into the private GetCertificateHash method
-  NSString *GetCertificateHashWrapper(const es_file_t *es_file) {
-    return FAAPolicyProcessor::GetCertificateHash(es_file);
-  }
-
   MOCK_METHOD(bool, PolicyMatchesProcess,
               (const WatchItemProcess &policy_proc, const es_process_t *es_proc), (override));
   MOCK_METHOD(SNTCachedDecision *, GetCachedDecision, (const struct stat &stat_buf), (override));
   MOCK_METHOD(NSString *, GetCertificateHash, (const es_file_t *es_file), (override));
+  MOCK_METHOD(bool, PolicyAllowsReadsForTarget,
+              (const Message &msg, const PathTarget &target,
+               std::shared_ptr<WatchItemPolicyBase> policy),
+              (override));
+  MOCK_METHOD(FileAccessPolicyDecision, ApplyPolicy,
+              (const Message &msg, const PathTarget &target,
+               const std::optional<std::shared_ptr<santa::WatchItemPolicyBase>> optional_policy,
+               CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock),
+              (override));
+
+  //
+  // Wrappers for calling into private methods
+  //
+  NSString *GetCertificateHashWrapper(const es_file_t *es_file) {
+    return FAAPolicyProcessor::GetCertificateHash(es_file);
+  }
+
+  bool PolicyAllowsReadsForTargetWrapper(const Message &msg, const PathTarget &target,
+                                         std::shared_ptr<WatchItemPolicyBase> policy) {
+    return FAAPolicyProcessor::PolicyAllowsReadsForTarget(msg, target, policy);
+  }
+
+  FileAccessPolicyDecision ApplyPolicyWrapper(
+      const Message &msg, const PathTarget &target,
+      const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
+      CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock) {
+    return FAAPolicyProcessor::ApplyPolicy(msg, target, optional_policy, checkIfPolicyMatchesBlock);
+  }
 };
 
 }  // namespace santa

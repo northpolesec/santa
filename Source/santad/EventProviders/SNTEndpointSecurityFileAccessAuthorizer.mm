@@ -552,9 +552,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 }
 
 - (void)processMessage:(Message)msg overrideAction:(SNTOverrideFileAccessAction)overrideAction {
-  std::vector<FAAPolicyProcessor::PathTarget> targets;
-  targets.reserve(2);
-  _faaPolicyProcessor->PopulatePathTargets(msg, targets);
+  std::vector<FAAPolicyProcessor::PathTarget> targets = _faaPolicyProcessor->PathTargets(msg);
 
   // Extract the paths from the vector of PathTargets in order to lookup policies
   // Note: There should only ever be 1 or 2 items in the vector

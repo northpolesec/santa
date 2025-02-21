@@ -49,6 +49,10 @@
 #define XCTAssertSemaTrue(s, sec, m) \
   XCTAssertEqual(                    \
     0, dispatch_semaphore_wait((s), dispatch_time(DISPATCH_TIME_NOW, (sec) * NSEC_PER_SEC)), m)
+
+#define XCTAssertSemaFalse(s, m) \
+  XCTAssertNotEqual(             \
+    0, dispatch_semaphore_wait((s), DISPATCH_TIME_NOW), m)
 // clang-format on
 
 // Helper to ensure at least `ms` milliseconds are slept, even if the sleep

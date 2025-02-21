@@ -56,12 +56,12 @@ static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTa
   }
 }
 
-static bool IsBlockDecision(FileAccessPolicyDecision decision) {
+inline bool IsBlockDecision(FileAccessPolicyDecision decision) {
   return decision == FileAccessPolicyDecision::kDenied ||
          decision == FileAccessPolicyDecision::kDeniedInvalidSignature;
 }
 
-static FileAccessPolicyDecision ApplyOverrideToDecision(
+inline FileAccessPolicyDecision ApplyOverrideToDecision(
     FileAccessPolicyDecision decision, SNTOverrideFileAccessAction overrideAction) {
   switch (overrideAction) {
     // When no override should be applied, return the decision unmodified
@@ -88,7 +88,7 @@ static FileAccessPolicyDecision ApplyOverrideToDecision(
   }
 }
 
-static bool ShouldLogDecision(FileAccessPolicyDecision decision) {
+inline bool ShouldLogDecision(FileAccessPolicyDecision decision) {
   switch (decision) {
     case FileAccessPolicyDecision::kDenied: return true;
     case FileAccessPolicyDecision::kDeniedInvalidSignature: return true;
@@ -98,8 +98,8 @@ static bool ShouldLogDecision(FileAccessPolicyDecision decision) {
 }
 
 /// The user should be notified whenever the policy will be logged (as long as it's not audit only)
-static bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision) {
-  return ShouldLogDecision(decision) && decision != FileAccessPolicyDecision::kAllowedAuditOnly;
+inline bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision) {
+  return IsBlockDecision(decision);
 }
 
 static bool ShouldShowUI(const std::shared_ptr<WatchItemPolicyBase> &policy) {
@@ -114,7 +114,7 @@ static bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicyBase> &policy,
   return true;
 }
 
-static es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision) {
+inline es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision) {
   switch (decision) {
     case FileAccessPolicyDecision::kNoPolicy: return ES_AUTH_RESULT_ALLOW;
     case FileAccessPolicyDecision::kDenied: return ES_AUTH_RESULT_DENY;
@@ -131,7 +131,7 @@ static es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyD
 
 /// Combine two AUTH results such that the most strict policy wins - that is, if
 /// either policy denied the operation, the operation is denied
-static es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t result2) {
+inline es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t result2) {
   // If either policy denied the operation, the operation is denied
   return ((result1 == ES_AUTH_RESULT_DENY || result2 == ES_AUTH_RESULT_DENY)
               ? ES_AUTH_RESULT_DENY
@@ -312,7 +312,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
     return FileAccessPolicyDecision::kAllowedReadAccess;
   }
 
-  FileAccessPolicyDecision decision = check_if_policy_matches_block(*policy, msg)
+  FileAccessPolicyDecision decision = check_if_policy_matches_block(*policy, target, msg)
                                           ? FileAccessPolicyDecision::kAllowed
                                           : FileAccessPolicyDecision::kDenied;
 
@@ -472,17 +472,9 @@ es_auth_result_t FAAPolicyProcessor::ProcessMessage(
 }
 
 std::vector<FAAPolicyProcessor::PathTarget> FAAPolicyProcessor::PathTargets(const Message &msg) {
-  // TODO: This will replace the older PopulatePathTargets interface
   std::vector<FAAPolicyProcessor::PathTarget> targets;
   targets.reserve(2);
 
-  PopulatePathTargets(msg, targets);
-
-  return targets;
-}
-
-void FAAPolicyProcessor::PopulatePathTargets(const Message &msg,
-                                             std::vector<FAAPolicyProcessor::PathTarget> &targets) {
   switch (msg->event_type) {
     case ES_EVENT_TYPE_AUTH_CLONE:
       PushBackIfNotTruncated(targets, msg->event.clone.source, true);
@@ -551,6 +543,8 @@ void FAAPolicyProcessor::PopulatePathTargets(const Message &msg,
           format:@"File Access Authorizer client does not handle event: %d", msg->event_type];
       exit(EXIT_FAILURE);
   }
+
+  return targets;
 }
 
 }  // namespace santa

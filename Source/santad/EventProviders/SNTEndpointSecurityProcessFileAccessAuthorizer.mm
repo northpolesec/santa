@@ -88,7 +88,8 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
       ^(const es_process_t *, std::pair<dev_t, ino_t>){
           // TODO: reads cache updates
       },
-      ^bool(const santa::WatchItemPolicyBase &, const Message &msg) {
+      ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget target,
+            const Message &msg) {
         // Note: Proc FAA, unlike Data FAA, already has policy match for
         // the process and no additional work is required.
         return true;
