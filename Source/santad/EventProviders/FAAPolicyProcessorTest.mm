@@ -335,8 +335,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   {
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, std::nullopt,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return false;
                        }),
@@ -355,8 +355,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.process->codesigning_flags = CS_SIGNED;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return false;
                        }),
@@ -372,8 +372,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esMsg.process->codesigning_flags = CS_SIGNED;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return true;
                        }),
@@ -389,8 +389,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     policy->audit_only = false;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return false;
                        }),
@@ -403,8 +403,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     policy->audit_only = true;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return false;
                        }),
@@ -422,8 +422,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     policy->audit_only = false;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return false;
                        }),
@@ -441,8 +441,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     policy->audit_only = false;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return false;
                        }),
@@ -456,8 +456,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     policy->audit_only = true;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return false;
                        }),
@@ -471,8 +471,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     policy->audit_only = true;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return true;
                        }),
@@ -486,8 +486,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     policy->audit_only = false;
     XCTAssertEqual(faaPolicyProcessor.ApplyPolicyWrapper(
                        Message(mockESApi, &esMsg), target, optionalPolicy,
-                       ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget,
-                             const Message &) {
+                       ^bool(const santa::WatchItemPolicyBase &,
+                             const FAAPolicyProcessor::PathTarget &, const Message &) {
                          dispatch_semaphore_signal(sema);
                          return true;
                        }),

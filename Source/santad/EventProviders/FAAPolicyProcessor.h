@@ -60,6 +60,11 @@ class FAAPolicyProcessor {
     std::optional<std::pair<dev_t, ino_t>> devno_ino;
   };
 
+  struct ESResult {
+    es_auth_result_t auth_result;
+    bool cacheable;
+  };
+
   using TargetPolicyPair =
       std::pair<PathTarget, std::optional<std::shared_ptr<WatchItemPolicyBase>>>;
 
@@ -68,7 +73,7 @@ class FAAPolicyProcessor {
   using ReadsCacheUpdateBlock = void (^)(const es_process_t *, std::pair<dev_t, ino_t>);
   /// When this block is called, the policy enforcement client must determine
   /// whether or not the given policy applies to the given ES message.
-  using CheckIfPolicyMatchesBlock = bool (^)(const WatchItemPolicyBase &, PathTarget target,
+  using CheckIfPolicyMatchesBlock = bool (^)(const WatchItemPolicyBase &, const PathTarget &target,
                                              const Message &msg);
   using URLTextPair = std::pair<NSString *, NSString *>;
   /// A block that generates custom URL and Text pairs from a given policy.
@@ -106,12 +111,12 @@ class FAAPolicyProcessor {
   /// 3. Let caller know if appropriate to update their "reads cache" (ReadsCacheUpdateBlock())
   /// 4. Combine results of each target into an ES decision
   /// 5. Return the final ES decision
-  es_auth_result_t ProcessMessage(const Message &msg,
-                                  std::vector<TargetPolicyPair> target_policy_pairs,
-                                  ReadsCacheUpdateBlock reads_cache_update_block,
-                                  CheckIfPolicyMatchesBlock check_if_policy_matches_block,
-                                  SNTFileAccessDeniedBlock file_access_denied_block,
-                                  SNTOverrideFileAccessAction overrideAction);
+  FAAPolicyProcessor::ESResult ProcessMessage(
+      const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
+      ReadsCacheUpdateBlock reads_cache_update_block,
+      CheckIfPolicyMatchesBlock check_if_policy_matches_block,
+      SNTFileAccessDeniedBlock file_access_denied_block,
+      SNTOverrideFileAccessAction overrideAction);
 
   static std::vector<FAAPolicyProcessor::PathTarget> PathTargets(const Message &msg);
 

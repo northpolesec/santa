@@ -70,7 +70,7 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
 }
 
 - (void)processMessage:(Message)msg
-                policy:(std::shared_ptr<ProcessWatchItemPolicy>)policy
+                policy:(std::shared_ptr<ProcessWatchItemPolicy>)procPolicy
         overrideAction:(SNTOverrideFileAccessAction)overrideAction {
   if (msg->action_type != ES_ACTION_TYPE_AUTH) {
     return;
@@ -78,25 +78,32 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
 
   std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
   for (const FAAPolicyProcessor::PathTarget &target : FAAPolicyProcessor::PathTargets(msg)) {
-    if (policy->tree->Contains(target.path.c_str())) {
-      targetPolicyPairs.push_back({target, policy});
-    }
+    targetPolicyPairs.push_back({target, procPolicy});
   }
 
-  es_auth_result_t authResult = _faaPolicyProcessor->ProcessMessage(
+  FAAPolicyProcessor::ESResult result = _faaPolicyProcessor->ProcessMessage(
       msg, targetPolicyPairs,
       ^(const es_process_t *, std::pair<dev_t, ino_t>){
           // TODO: reads cache updates
       },
-      ^bool(const santa::WatchItemPolicyBase &, FAAPolicyProcessor::PathTarget target,
-            const Message &msg) {
-        // Note: Proc FAA, unlike Data FAA, already has policy match for
-        // the process and no additional work is required.
-        return true;
+      ^bool(const santa::WatchItemPolicyBase &base_policy,
+            const FAAPolicyProcessor::PathTarget &target, const Message &msg) {
+        const ProcessWatchItemPolicy *policy =
+            dynamic_cast<const ProcessWatchItemPolicy *>(&base_policy);
+        if (!policy) {
+          LOGW(@"Failed to cast process policy");
+          return false;
+        }
+
+        if (policy->tree->Contains(target.path.c_str())) {
+          return true;
+        } else {
+          return false;
+        }
       },
       self.fileAccessDeniedBlock, overrideAction);
 
-  [self respondToMessage:msg withAuthResult:authResult cacheable:false];
+  [self respondToMessage:msg withAuthResult:result.auth_result cacheable:result.cacheable];
 }
 
 - (void)handleMessage:(Message &&)esMsg
