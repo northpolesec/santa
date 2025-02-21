@@ -308,6 +308,11 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
 
   // If the policy allows read access and the target is readable, produce
   // an immediate result.
+  // TODO(mlw): It might be beneficial to evaluate the full policy since the
+  // kAllowedReadAccess result means that we cannot utilize the ES cache
+  // layer. If the policy would generally allow access to the resource,
+  // producing the full kAllow result would potentially result in better
+  // system performance.
   if (PolicyAllowsReadsForTarget(msg, target, policy)) {
     return FileAccessPolicyDecision::kAllowedReadAccess;
   }
@@ -438,12 +443,13 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
   return decision;
 }
 
-es_auth_result_t FAAPolicyProcessor::ProcessMessage(
+FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
     ReadsCacheUpdateBlock reads_cache_update_block,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
     SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction) {
   es_auth_result_t policy_result = ES_AUTH_RESULT_ALLOW;
+  bool allow_read_access = false;
 
   for (const TargetPolicyPair &target_policy_pair : target_policy_pairs) {
     FileAccessPolicyDecision decision = ProcessTargetAndPolicy(
@@ -465,10 +471,16 @@ es_auth_result_t FAAPolicyProcessor::ProcessMessage(
 
     policy_result =
         CombinePolicyResults(policy_result, FileAccessPolicyDecisionToESAuthResult(decision));
+
+    if (decision == FileAccessPolicyDecision::kAllowedReadAccess) {
+      allow_read_access = true;
+    }
   }
 
-  // TODO: Need to surface whether or not the response can be cached
-  return policy_result;
+  // A result is cacheable at the ES layer if:
+  // 1. The overall policy_result isn't a DENY
+  // 2. No policy for a target allowed access due to the "AllowReadAccess" option
+  return {policy_result, policy_result != ES_AUTH_RESULT_DENY && !allow_read_access};
 }
 
 std::vector<FAAPolicyProcessor::PathTarget> FAAPolicyProcessor::PathTargets(const Message &msg) {
