@@ -12,8 +12,7 @@ This page shows you the process to get started with your deployment of Santa.
 
 1. (Optional) Set up a [sync server](../introduction/syncing-overview.md). For a list of open-source sync servers, see [Sync Servers](sync-servers.md). Without a sync server, [`santactl`](../binaries/santactl.md) can configure rules locally.
 
-1. Create and install your Santa configuration profile to customize your deployment of Santa. See [Configuration](configuration.md) for a reference list of the available options and an [example profile](https://github.com/northpolesec/santa/blob/main/docs/deployment). TODO: update link to point at com.northpolesec.santa.example.mobileconfig.
-
+1. Create and install your Santa configuration profile to customize your deployment of Santa. See [Configuration](configuration.md) for a reference list of the available options and an [example profile](https://northpole.dev/deployment/com.northpolesec.santa.example.mobileconfig).
 1. Install the TCC and system extension configuration profiles:
 
     - The TCC profile provides Santa the access it requires to read files anywhere on disk. See an [example TCC profile](https://github.com/northpolesec/santa/blob/main/docs/deployment/tcc.configuration-profile-policy.santa.example.mobileconfig).
