@@ -204,6 +204,8 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
   if (!self.isSubscribed) {
     if ([super subscribe:events]) {
       LOGD(@"Proc FAA subscribed");
+      LOGW(@"Process-centric FAA rule types are currently in beta. Please report any issue to: "
+           @"https://github.com/northpolesec/santa");
       self.isSubscribed = true;
     }
   }

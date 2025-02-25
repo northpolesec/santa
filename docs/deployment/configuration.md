@@ -81,8 +81,8 @@ also known as mobileconfig files, which are in an Apple-specific XML format.
 | OnStartUSBOptions                  | String     | If set, defines the action that should be taken on existing USB mounts when Santa starts up. Supported values are "Unmount", "ForceUnmount", "Remount", and "ForceRemount" (note: "remounts" are implemented by first unmounting and then mounting the device again). Existing mounts with mount flags that are a superset of RemountUSBMode are unaffected and left mounted. |
 | BannedUSBBlockMessage              | String     | Message to display when a USB device is prevented from being mounted. |
 | RemountUSBBlockMessage             | String     | Message to display when a USB device is allowed to be mounted with a subset of the requested flags as defined by `RemountUSBMode`. |
-| FileAccessPolicyPlist              | String     | Path to a file access configuration plist. This is ignored if `FileAccessPolicy` is also set. |
-| FileAccessPolicy                   | Dictionary | A complete file access configuration policy embedded in the main Santa config. If set, `FileAccessPolicyPlist` will be ignored. |
+| FileAccessPolicyPlist              | String     | Path to a file access configuration plist. This is ignored if `FileAccessPolicy` is also set. See [File Access Authorization](file-access-auth.md) for configuration details. |
+| FileAccessPolicy                   | Dictionary | A complete file access configuration policy embedded in the main Santa config. If set, `FileAccessPolicyPlist` will be ignored. See [File Access Authorization](file-access-auth.md) for configuration details. |
 | FileAccessPolicyUpdateIntervalSec  | Integer    | Number of seconds between re-reading the file access policy config and policies/monitored paths updated. |
 | FileAccessBlockMessage             | String     | This is the message shown to the user when a access to a file is blocked because of a rule defined by `FileAccessPolicy` if that rule doesn't provide a custom message. If this is not configured a reasonable default is provided. |
 | OverrideFileAccessAction           | String     | Defines a global override policy that applies to the enforcement of all `FileAccessPolicy` rules. Allowed values are: `AUDIT_ONLY` (no access will be blocked, only logged), `DISABLE` (no access will be blocked or logged), `none` (enforce policy as defined in each rule). Defaults to `NONE`. Note: `AUDITONLY` without an underscore is deprecated. |
@@ -142,7 +142,7 @@ types as they are for traditional rules.
 
 The allowed keys/values for defining static rules are the same as for rules that
 are sent via the sync server. Details on this structure are defined in the
-[Sync Protocol](https://santa.dev/development/sync-protocol.html#rules-objects)
+[Sync Protocol](https://northpole.dev/development/sync-protocol.html#rules-objects)
 documentation.
 
 Additionally, the

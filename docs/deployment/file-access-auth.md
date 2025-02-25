@@ -30,7 +30,7 @@ To enable this feature, the `FileAccessPolicyPlist` key in the main [Santa confi
 | `AllowReadAccess`             | `Options`    | Boolean    | No       | v2023.1+      | If true, indicates the rule will **not** be applied to actions that are read-only access (e.g., opening a watched path for reading, or cloning a watched path). If false, the rule will apply both to read-only access and access that could modify the watched path. (Default = `false`) |
 | `AuditOnly`                   | `Options`    | Boolean    | No       | v2023.1+      | If true, operations violating the rule will only be logged. If false, operations violating the rule will be denied and logged. (Default = `true`) |
 | ~~`InvertProcessExceptions`~~ | `Options`    | Boolean    | No       | v2023.5+      | DEPRECATED. Please use `RuleType` instead. If false, behaves like `RuleType` `PathsWithAllowedProcesses`. If true, behaves like `RuleType` `PathsWithDeniedProcesses`. This setting is overriden if `RuleType` is set. |
-| `RuleType`                    | `Options`    | String     | No       | v2024.11      | Defines how `Paths` and `Processes` are interpreted.<br />`PathsWithAllowedProcesses`: Default. Access to the defined `Paths` will be denied (or audited) for all processes that **don't match** items in the `Processes` array.<br />`PathsWithDeniedProcesses`: Access to the defined `Paths` will be denied (or audited) for all processes that **match** items in the `Processes` array. |
+| `RuleType`                    | `Options`    | String     | No       | v2024.11      | Defines how `Paths` and `Processes` are interpreted.<br />`PathsWithAllowedProcesses`: Default. Access to the defined `Paths` will be denied (or audited) for all processes that **don't match** items in the `Processes` array.<br />`PathsWithDeniedProcesses`: Access to the defined `Paths` will be denied (or audited) for all processes that **match** items in the `Processes` array.<br />`ProcessesWithAllowedPaths` (BETA): The defined processes will have access denied (or audited) to all paths that **don't match** items in the `Paths` array.<br />`ProcessesWithDeniedPaths` (BETA): The defined processes will have access denied (or audited) to all paths that **match** items in the `Paths` array. |
 | `EnableSilentMode`            | `Options`    | Boolean    | No       | v2023.7+      | If true, Santa will not display a GUI dialog when this rule is violated. |
 | `EnableSilentTTYMode`         | `Options`    | Boolean    | No       | v2023.7+      | If true, Santa will not post a message to the controlling TTY when this rule is violated. |
 | `EventDetailURL`              | `Options`    | String     | No       | v2023.8+      | Rule-specific URL that overrides the top-level `EventDetailURL`. |
@@ -42,6 +42,18 @@ To enable this feature, the `FileAccessPolicyPlist` key in the main [Santa confi
 | `CDHash`                      | `Processes`  | String     | No       | v2023.1+      | CDHash of the instigating process. |
 | `SigningID`                   | `Processes`  | String     | No       | v2023.1+      | Signing ID of the instigating process. Note that unlike in binary authorization, the Signing ID for file access authorization is specified separately from the Team ID; see the example below. |
 | `PlatformBinary`              | `Processes`  | Boolean    | No       | v2023.2+      | Whether or not the instigating process is a platform binary. |
+
+## Data-centric vs. Process-centric FAA Rules
+
+Data-centric FAA rules are defined by the `RuleType` configuration key values
+`PathsWithAllowedProcesses` and `PathsWithDeniedProcesses`. Rules configured with one of these
+rule types are centered around the set of paths that should have access prevented except for the
+explicitly listed processes (or only by the list of processes depending on the `RuleType`).
+
+Process-centric FAA rules are defined by the `RuleType` configuration key values
+`ProcessesWithAllowedPaths` and `ProcessesWithDeniedPaths`. Rules configured with one of these
+rules types are centered around the set of defined processes that should only have access to the
+set of explicitly listed paths (or any path except those listed depending on the `RuleType`).
 
 ### EventDetailURL
 When the user gets a file access block notification, a button can be displayed
@@ -95,8 +107,8 @@ This is an example configuration conforming to the specification outlined above:
 				<false/>
 				<key>AuditOnly</key>
 				<true/>
-				<key>InvertProcessExceptions</key>
-				<false/>
+				<key>RuleType</key>
+				<string>PathsWithAllowedProcesses</string>
 			</dict>
 			<key>Processes</key>
 			<array>
@@ -137,6 +149,8 @@ This is an example configuration conforming to the specification outlined above:
 
 ### Rule Matching
 
+#### Data-centric Rules
+
 When an operation occurs on a path that matches multiple configured path globs, the rule containing the "most specific" matching path glob is applied (i.e., the longest matching path).
 
 For example, consider the configured rules and paths:
@@ -156,7 +170,24 @@ The following table demonstrates which rule will be applied for operations on a 
 | /tmp/foo.txt.tmp | `RULE_1`     | Matches prefix, more specific than `RULE_3`, literal match doesn't apply |
 | /foo             | N/A          | No rules match operations on this path |
 
-> **IMPORTANT:** If a configuration contains multiple rules with duplicate configured paths, only one rule will be applied to the path. It is undefined which configured rule will be used. Administrators should take care not to define configurations that may have duplicate paths.
+> **IMPORTANT:** If a configuration contains multiple rules with duplicate configured paths, only
+one rule will be applied to the path. It is undefined which configured rule will be used.
+Administrators should take care not to define configurations with multiple Data-centric FAA rules
+that may have duplicate paths.
+
+#### Process-centric Rules
+
+When a new process executes, the set of process-centric rules are scanned for the first rule that
+contains a matching entry in the `Processes` array. The same matched rule that initially matches
+will be used for all file access operations for the lifetime of the process.
+
+> **IMPORTANT:** If a configuration contains multiple rules that would match a given process, only
+one rule will be applied. It is undefined which configured rule will be used. Administrators
+should take care not to define configurations with multiple Process-centric FAA rules that may
+have duplicate process match criteria.
+
+> **IMPORTANT:** Process-centric rules are currently in beta. Please report any issues at:
+https://github.com/northpolesec/santa/issues
 
 ### Path Globs
 
@@ -199,7 +230,7 @@ All configured paths are case sensitive (i.e., paths specified in both the `Path
 
 ### Hard Links
 
-Due to platform limitations, it is not feasible for Santa to know all links for a given path. To help mitigate bypasses to this feature, Santa will not allow hard links to be created for monitored paths. If hard links previously existed to monitored paths, Santa cannot guarantee that access to watched resources via these other links will be monitored.
+Due to system limitations, it is not feasible for Santa to know all links for a given path. To help mitigate bypasses to this feature, Santa will not allow hard links to be created for monitored paths. If hard links previously existed to monitored paths, Santa cannot guarantee that access to watched resources via these other links will be monitored.
 
 ### Symbolic Links
 
@@ -225,4 +256,10 @@ When the `EventLogType` configuration key is set to `protobuf`, a log is emitted
 
 ### Default Mute Set
 
-The EndpointSecurity framework maintains a set of paths dubbed the "default mute set" that are particularly difficult for ES clients to handle. Additionally, AUTH events from some of these paths have ES response deadline times set very low. In order to help increase stability of this feature, file accesses from binaries in the default mute set are not currently logged. A list of binaries that will not have operations logged can be found in [SNTRuleTable.m](https://github.com/google/santa/blob/2023.4/Source/santad/DataLayer/SNTRuleTable.m#L90-L105). This could be addressed in the future (see [Github Issue #1096](https://github.com/google/santa/issues/1096)).
+Apple's EndpointSecurity framework maintains a set of paths dubbed the "default mute set" that are
+particularly difficult for ES clients (like Santa) to handle. Additionally, AUTH events from some
+of these paths have ES response deadline times set very low. In order to help increase stability
+of this feature, file accesses from binaries in the default mute set are not currently logged.
+This applies to FAA rules with a configured `RuleType` type of `PathsWithAllowedProcesses` or
+`PathsWithDeniedProcesses`. A list of binaries that will not have operations logged can be found
+in [SNTRuleTable.m](https://github.com/northpolesec/santa/blob/2025.1/Source/santad/DataLayer/SNTRuleTable.m#L92-L104).

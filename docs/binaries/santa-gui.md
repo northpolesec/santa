@@ -25,7 +25,7 @@ If the rule was configured as `silent`, it will not display a dialog when Santa 
 
 ## Blocked File Access
 
-[File Access Authorization](https://santa.dev/deployment/file-access-auth.html)
+[File Access Authorization](https://northpole.dev/deployment/file-access-auth.html)
 allows admins to configure Santa to monitor filesystem paths for potentially
 unwanted access and optionally deny the operation. The message presented to the
 user, and the text of the **Open** button, are configurable on both a global and
@@ -45,7 +45,7 @@ options to be applied when mounting, such as mounting read-only.
 
 User notifications display for the following reasons:
 
-*   The [client mode](https://santa.dev/concepts/mode.html) changes
+*   The [client mode](https://northpole.dev/concepts/mode.html) changes
 *   Specific rules arrive when using FCM for push notifications
 
 ![Notification](push.png)
