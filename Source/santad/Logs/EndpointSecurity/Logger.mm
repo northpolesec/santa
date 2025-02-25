@@ -58,8 +58,6 @@ std::unique_ptr<Logger> Logger::Create(std::shared_ptr<EndpointSecurityAPI> esap
     case SNTEventLogTypeNull:
       return std::make_unique<Logger>(telemetry_mask, Empty::Create(), Null::Create());
     case SNTEventLogTypeProtobuf:
-      LOGW(@"The EventLogType value protobuf is currently in beta. The protobuf schema is subject "
-           @"to change.");
       return std::make_unique<Logger>(
           telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache)),
           Spool::Create([spool_log_path UTF8String], spool_dir_size_threshold,

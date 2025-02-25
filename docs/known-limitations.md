@@ -24,7 +24,7 @@ nav_order: 7
 
 *   Metrics reported by Santa are not currently in a format that is friendly to
     open source solutions
-    ([Issue #563](https://github.com/google/santa/issues/563))
+    ([Issue #73](https://github.com/northpolesec/santa/issues/73))
 
 *   Standalone Mode
     *   Users will not be notified of processes that were blocked while a user
