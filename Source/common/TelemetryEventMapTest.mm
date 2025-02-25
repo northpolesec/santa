@@ -54,7 +54,7 @@ using santa::TelemetryEvent;
       {"authentication", TelemetryEvent::kAuthentication},
       {"clone", TelemetryEvent::kClone},
       {"copyfile", TelemetryEvent::kCopyfile},
-      {"gatekeeper_override", TelemetryEvent::kGatekeeperOverride},
+      {"gatekeeperoverride", TelemetryEvent::kGatekeeperOverride},
 
       // special cases
       {"none", TelemetryEvent::kNone},

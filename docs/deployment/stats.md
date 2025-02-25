@@ -43,7 +43,7 @@ notes for future client versions.
 Stats are submitted to `polaris.northpole.security`, which is running a gRPC
 service receiving SubmitStats requests. The data is immediately submitted to a
 BigQuery table. The source code for Polaris is at
-https://github.com/northpolesec/polaris
+[https://github.com/northpolesec/polaris](https://github.com/northpolesec/polaris)
 
 ### Why are you collecting this data?
 
@@ -106,4 +106,3 @@ machines each supported company has using Santa and on which Santa versions.
 
 You should not populate the `StatsOrganizationID` key unless given a unique ID
 by North Pole Security, Inc.
-
