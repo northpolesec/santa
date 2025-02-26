@@ -449,7 +449,7 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
     SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction) {
   es_auth_result_t policy_result = ES_AUTH_RESULT_ALLOW;
-  bool allow_read_access = false;
+  bool cacheable = true;
 
   for (const TargetPolicyPair &target_policy_pair : target_policy_pairs) {
     FileAccessPolicyDecision decision = ProcessTargetAndPolicy(
@@ -472,15 +472,16 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     policy_result =
         CombinePolicyResults(policy_result, FileAccessPolicyDecisionToESAuthResult(decision));
 
-    if (decision == FileAccessPolicyDecision::kAllowedReadAccess) {
-      allow_read_access = true;
+    // Only if all decisions are explicitly allowed should a decision be
+    // cacheable. If something was denied or audit-only or allowed only
+    // because of read access then future executions should also be evaluated
+    // so they may also emit additional telemetry.
+    if (decision != FileAccessPolicyDecision::kAllowed) {
+      cacheable = false;
     }
   }
 
-  // A result is cacheable at the ES layer if:
-  // 1. The overall policy_result isn't a DENY
-  // 2. No policy for a target allowed access due to the "AllowReadAccess" option
-  return {policy_result, policy_result != ES_AUTH_RESULT_DENY && !allow_read_access};
+  return {policy_result, cacheable};
 }
 
 std::vector<FAAPolicyProcessor::PathTarget> FAAPolicyProcessor::PathTargets(const Message &msg) {

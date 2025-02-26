@@ -565,7 +565,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   WatchItems::VersionAndPolicies versionAndPolicies = self->_watchItems->FindPolciesForPaths(paths);
 
   es_auth_result_t policyResult = ES_AUTH_RESULT_ALLOW;
-  bool allow_read_access = false;
+  bool cacheable = true;
 
   for (size_t i = 0; i < targets.size(); i++) {
     FileAccessPolicyDecision curDecision = [self handleMessage:msg
@@ -577,22 +577,16 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     policyResult =
         CombinePolicyResults(policyResult, FileAccessPolicyDecisionToESAuthResult(curDecision));
 
-    // If the overall policy result is deny, then reset allow_read_access.
-    // Otherwise if the current decision would allow read access, set the flag.
-    if (policyResult == ES_AUTH_RESULT_DENY) {
-      allow_read_access = false;
-    } else if (curDecision == FileAccessPolicyDecision::kAllowedReadAccess) {
-      allow_read_access = true;
+    // Only if all decisions are explicitly allowed should a decision be
+    // cacheable. If something was denied or audit-only or allowed only
+    // because of read access then future executions should also be evaluated
+    // so they may also emit additional telemetry.
+    if (curDecision != FileAccessPolicyDecision::kAllowed) {
+      cacheable = false;
     }
   }
 
-  // IMPORTANT: A response is only cacheable if the policy result was explicitly
-  // allowed. An "allow read access" result must not be cached to ensure a future
-  // non-read accesss can be evaluated. Similarly, denied results must never be
-  // cached so access attempts can be logged.
-  [self respondToMessage:msg
-          withAuthResult:policyResult
-               cacheable:(policyResult == ES_AUTH_RESULT_ALLOW && !allow_read_access)];
+  [self respondToMessage:msg withAuthResult:policyResult cacheable:cacheable];
 }
 
 - (void)handleMessage:(santa::Message &&)esMsg
