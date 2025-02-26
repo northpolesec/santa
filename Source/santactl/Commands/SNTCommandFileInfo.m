@@ -560,8 +560,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 - (SNTAttributeBlock)entitlements {
   return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
     MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
-    if (csc.entitlements.count) return csc.entitlements;
-    return @"No entitlements";
+    return csc.entitlements ?: @{};
   };
 }
 
@@ -1076,7 +1075,9 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 }
 
 - (NSString *)stringForEntitlements:(NSDictionary *)entitlements key:(NSString *)key {
-  if (!entitlements.count) return @"none";
+  if (!entitlements.count) {
+    return [NSString stringWithFormat:@"%-*s: None\n", (int)self.maxKeyWidth, key.UTF8String];
+  }
 
   NSMutableString *result = [NSMutableString string];
   [result appendFormat:@"%@:\n", key];
@@ -1089,7 +1090,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       // so don't print it.
       if (!val) return;
 
-      // If hte value of the entitlement is true, don't bother printing the
+      // If the value of the entitlement is true, don't bother printing the
       // 'value', just print the entitlement name.
       [result appendFormat:@"   %2d. %@\n", ++i, key];
       return;
