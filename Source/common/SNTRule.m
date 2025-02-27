@@ -35,6 +35,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
                          customMsg:(NSString *)customMsg
+                         customURL:(NSString *)customURL
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString *)comment {
   self = [super init];
@@ -125,6 +126,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     _state = state;
     _type = type;
     _customMsg = customMsg;
+    _customURL = customURL;
     _timestamp = timestamp;
     _comment = comment;
   }
@@ -134,11 +136,13 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 - (instancetype)initWithIdentifier:(NSString *)identifier
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
-                         customMsg:(NSString *)customMsg {
+                         customMsg:(NSString *)customMsg
+                         customURL:(NSString *)customURL {
   self = [self initWithIdentifier:identifier
                             state:state
                              type:type
                         customMsg:customMsg
+                        customURL:customURL
                         timestamp:0
                           comment:nil];
   // Initialize timestamp to current time if rule is transitive.
@@ -146,6 +150,12 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     [self resetTimestamp];
   }
   return self;
+}
+
+- (instancetype)initWithIdentifier:(NSString *)identifier
+                             state:(SNTRuleState)state
+                              type:(SNTRuleType)type {
+  return [self initWithIdentifier:identifier state:state type:type customMsg:nil customURL:nil];
 }
 
 // lowercase policy keys and upper case the policy decision.
@@ -232,9 +242,11 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     customURL = nil;
   }
 
-  SNTRule *r = [self initWithIdentifier:identifier state:state type:type customMsg:customMsg];
-  r.customURL = customURL;
-  return r;
+  return [self initWithIdentifier:identifier
+                            state:state
+                             type:type
+                        customMsg:customMsg
+                        customURL:customURL];
 }
 
 #pragma mark NSSecureCoding

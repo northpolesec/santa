@@ -601,7 +601,8 @@ static NSString *const kPrinterProxyPostMonterey =
   SNTRule *newRule = [[SNTRule alloc] initWithIdentifier:ruleIdentifier
                                                    state:newRuleState
                                                     type:ruleType
-                                               customMsg:@""
+                                               customMsg:nil
+                                               customURL:nil
                                                timestamp:[[NSDate now] timeIntervalSince1970]
                                                  comment:commentStr];
   NSError *err;
