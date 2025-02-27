@@ -805,6 +805,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverr
       break;
     case ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE:
       str.append(FilePath(gk->file.file).Sanitized());
+      break;
     default: break;
   }
 
