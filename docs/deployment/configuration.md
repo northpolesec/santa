@@ -93,6 +93,7 @@ also known as mobileconfig files, which are in an Apple-specific XML format.
 | EntitlementsTeamIDFilter           | Array      | Array of TeamID strings. Entitlements from processes with a matching TeamID in the code signature will not be logged. Use the value `platform` to filter entitlements from platform binaries. No default. |
 | [StaticRules](#static-rules)       | Array      | Array of rule dictionaries. The rules defined in this key take precedence over any rules in the rules database. |
 | EnableStatsCollection              | Bool       | If true, Santa will periodically collect and send basic, non-identifying stats to the maintainers at North Pole Security to help better support Santa. See [Stats documentation](https://northpole.dev/deployment/stats.html) for complete details. Defaults to false. |
+| StatsOrganizationID                | String     | This key should only be set for organizations that have a contract with North Pole Security. See [Stats documentation](https://northpole.dev/deployment/stats.html#what-is-an-organization-id) for complete details. No default. |
 
 
 \*overridable by the sync server: run `santactl status` to check the current
