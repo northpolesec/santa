@@ -143,8 +143,8 @@ NSString *DiskImageForDevice(NSString *devPath) {
       result = [[NSURL URLWithString:result] path];
     }
   } else if ([properties[@"Protocol Characteristics"] isKindOfClass:[NSDictionary class]] &&
-              [properties[@"Protocol Characteristics"][@"Virtual Interface Location Path"]
-                  isKindOfClass:[NSData class]]) {
+             [properties[@"Protocol Characteristics"][@"Virtual Interface Location Path"]
+                 isKindOfClass:[NSData class]]) {
     result = [[NSString alloc]
         initWithData:properties[@"Protocol Characteristics"][@"Virtual Interface Location Path"]
             encoding:NSUTF8StringEncoding];
@@ -156,7 +156,7 @@ NSString *DiskImageForDevice(NSString *devPath) {
     properties = PropertiesForDevice([devPath stringByDeletingLastPathComponent]);
     if (properties[@"image-path"]) {
       result = [[NSString alloc] initWithData:properties[@"image-path"]
-                                      encoding:NSUTF8StringEncoding];
+                                     encoding:NSUTF8StringEncoding];
     }
   }
 
