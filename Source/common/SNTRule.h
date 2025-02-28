@@ -64,6 +64,7 @@
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
                          customMsg:(NSString *)customMsg
+                         customURL:(NSString *)customURL
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString *)comment;
 
@@ -73,7 +74,15 @@
 - (instancetype)initWithIdentifier:(NSString *)identifier
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
-                         customMsg:(NSString *)customMsg;
+                         customMsg:(NSString *)customMsg
+                         customURL:(NSString *)customURL;
+
+///
+///  Initialize with a default timestamp: current time if rule state is transitive, 0 otherwise.
+///
+- (instancetype)initWithIdentifier:(NSString *)identifier
+                             state:(SNTRuleState)state
+                              type:(SNTRuleType)type;
 
 ///
 ///  Initialize with a dictionary received from a sync server.

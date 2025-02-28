@@ -142,14 +142,15 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 }
 
 - (SNTRule *)ruleFromProtoRule:(::pbv1::Rule)rule {
-  SNTRule *r = [[SNTRule alloc] init];
-
-  r.identifier = StringToNSString(rule.identifier());
+  NSString *identifier = StringToNSString(rule.identifier());
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (!r.identifier.length) r.identifier = StringToNSString(rule.deprecated_sha256());
+  if (!identifier.length) identifier = StringToNSString(rule.deprecated_sha256());
 #pragma clang diagnostic pop
-  if (!r.identifier.length) return nil;
+  if (!identifier.length) {
+    LOGE(@"Failed to process rule with no identifier");
+    return nil;
+  }
 
   SNTRuleState state;
   switch (rule.policy()) {
@@ -160,7 +161,6 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
     case ::pbv1::REMOVE: state = SNTRuleStateRemove; break;
     default: LOGE(@"Failed to process rule with unknown policy: %d", rule.policy()); return nil;
   }
-  r.state = state;
 
   SNTRuleType type;
   switch (rule.rule_type()) {
@@ -171,15 +171,18 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
     case ::pbv1::CDHASH: type = SNTRuleTypeCDHash; break;
     default: LOGE(@"Failed to process rule with unknown type: %d", rule.rule_type()); return nil;
   }
-  r.type = type;
 
   const std::string &custom_msg = rule.custom_msg();
-  if (!custom_msg.empty()) r.customMsg = StringToNSString(custom_msg);
+  NSString *customMsg = (!custom_msg.empty()) ? StringToNSString(custom_msg) : nil;
 
   const std::string &custom_url = rule.custom_url();
-  if (!custom_url.empty()) r.customURL = StringToNSString(custom_url);
+  NSString *customURL = (!custom_url.empty()) ? StringToNSString(custom_url) : nil;
 
-  return r;
+  return [[SNTRule alloc] initWithIdentifier:identifier
+                                       state:state
+                                        type:type
+                                   customMsg:customMsg
+                                   customURL:customURL];
 }
 
 // Send out push notifications for allowed bundles/binaries whose rule download was preceded by
