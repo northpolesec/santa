@@ -113,8 +113,7 @@ NSString *MountFromName(NSString *path) {
   return mntFromName.length > 0 ? mntFromName : nil;
 }
 
-NSString *DiskImageForDevice(NSString *devPath) {
-  devPath = [devPath stringByDeletingLastPathComponent];
+static NSDictionary *PropertiesForDevice(NSString *devPath) {
   if (!devPath.length) {
     return nil;
   }
@@ -125,14 +124,44 @@ NSString *DiskImageForDevice(NSString *devPath) {
   IORegistryEntryCreateCFProperties(device, &device_properties, kCFAllocatorDefault, kNilOptions);
   NSDictionary *properties = CFBridgingRelease(device_properties);
   IOObjectRelease(device);
+  return properties;
+}
+
+NSString *DiskImageForDevice(NSString *devPath) {
+  NSString *result;
+
+  // First try getting the image-path property of the parent path of
+  // the given device path. Since at least macOS 13, this mainly works
+  // for `hdiutl attach` only.
+  NSDictionary *properties = PropertiesForDevice([devPath stringByDeletingLastPathComponent]);
 
   if (properties[@"image-path"]) {
-    NSString *result = [[NSString alloc] initWithData:properties[@"image-path"]
-                                             encoding:NSUTF8StringEncoding];
-    return [result stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    result = [[NSString alloc] initWithData:properties[@"image-path"]
+                                   encoding:NSUTF8StringEncoding];
   } else {
-    return nil;
+    // As a fallback, lookup properties of the full given path then look
+    // for either DiskImageURL or Virtual Interface Location Path.
+    // Since at least macOS 13, these keys work for both DiskImageMounter
+    // and `hdiutil attach`.
+    properties = PropertiesForDevice(devPath);
+
+    if ([properties[@"DiskImageURL"] isKindOfClass:[NSString class]]) {
+      // Note: This is often a file URL. Check and convert to a path to have
+      // consistent output compared to the other properties.
+      result = properties[@"DiskImageURL"];
+      if ([result hasPrefix:@"file://"]) {
+        result = [[NSURL URLWithString:result] path];
+      }
+    } else if ([properties[@"Protocol Characteristics"] isKindOfClass:[NSDictionary class]] &&
+               [properties[@"Protocol Characteristics"][@"Virtual Interface Location Path"]
+                   isKindOfClass:[NSData class]]) {
+      result = [[NSString alloc]
+          initWithData:properties[@"Protocol Characteristics"][@"Virtual Interface Location Path"]
+              encoding:NSUTF8StringEncoding];
+    }
   }
+
+  return [result stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 }
 
 es_file_t *GetAllowListTargetFile(const Message &msg) {
