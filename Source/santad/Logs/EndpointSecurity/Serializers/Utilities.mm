@@ -113,8 +113,7 @@ NSString *MountFromName(NSString *path) {
   return mntFromName.length > 0 ? mntFromName : nil;
 }
 
-NSString *DiskImageForDevice(NSString *devPath) {
-  devPath = [devPath stringByDeletingLastPathComponent];
+static NSDictionary *PropertiesForDevice(NSString *devPath) {
   if (!devPath.length) {
     return nil;
   }
@@ -125,14 +124,43 @@ NSString *DiskImageForDevice(NSString *devPath) {
   IORegistryEntryCreateCFProperties(device, &device_properties, kCFAllocatorDefault, kNilOptions);
   NSDictionary *properties = CFBridgingRelease(device_properties);
   IOObjectRelease(device);
+  return properties;
+}
 
-  if (properties[@"image-path"]) {
-    NSString *result = [[NSString alloc] initWithData:properties[@"image-path"]
-                                             encoding:NSUTF8StringEncoding];
-    return [result stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+NSString *DiskImageForDevice(NSString *devPath) {
+  NSString *result;
+
+  // First, lookup properties of the full given path then look for either the
+  // DiskImageURL or Virtual Interface Location Path keys. Since at least
+  // macOS 13, these keys work for both DiskImageMounter and `hdiutil attach`.
+  NSDictionary *properties = PropertiesForDevice(devPath);
+
+  if ([properties[@"DiskImageURL"] isKindOfClass:[NSString class]]) {
+    // Note: This is often a file URL. Check and convert to a path to have
+    // consistent output compared to the other properties.
+    result = properties[@"DiskImageURL"];
+    if ([result hasPrefix:@"file://"]) {
+      result = [[NSURL URLWithString:result] path];
+    }
+  } else if ([properties[@"Protocol Characteristics"] isKindOfClass:[NSDictionary class]] &&
+             [properties[@"Protocol Characteristics"][@"Virtual Interface Location Path"]
+                 isKindOfClass:[NSData class]]) {
+    result = [[NSString alloc]
+        initWithData:properties[@"Protocol Characteristics"][@"Virtual Interface Location Path"]
+            encoding:NSUTF8StringEncoding];
   } else {
-    return nil;
+    // Fallback to the old Santa method which used to more broadly work on older
+    // macOS versions (<v13), but still works on macOS 13+ when mounting via
+    // `hdiutil attach` only. This method tries to get the image-path property
+    // of the parent device of the given device path.
+    properties = PropertiesForDevice([devPath stringByDeletingLastPathComponent]);
+    if (properties[@"image-path"]) {
+      result = [[NSString alloc] initWithData:properties[@"image-path"]
+                                     encoding:NSUTF8StringEncoding];
+    }
   }
+
+  return [result stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 }
 
 es_file_t *GetAllowListTargetFile(const Message &msg) {
