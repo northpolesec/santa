@@ -300,10 +300,9 @@
   }
 
   // Print details about the server's leaf certificate.
-  NSArray *certChain = CFBridgingRelease(SecTrustCopyCertificateChain(protectionSpace.serverTrust));
-  if (certChain.firstObject) {
-    MOLCertificate *cert = [[MOLCertificate alloc]
-        initWithSecCertificateRef:(__bridge SecCertificateRef)certChain.firstObject];
+  SecCertificateRef firstCert = SecTrustGetCertificateAtIndex(protectionSpace.serverTrust, 0);
+  if (firstCert) {
+    MOLCertificate *cert = [[MOLCertificate alloc] initWithSecCertificateRef:firstCert];
     [self log:@"Server Trust: %@", cert];
   }
 
@@ -448,9 +447,14 @@
   // SecTrustEvaluateWithError first.
   (void)SecTrustEvaluateWithError(t, NULL);
 
-  NSMutableArray *certChain = CFBridgingRelease(SecTrustCopyCertificateChain(t));
-  if (certChain.count < 2) return nil;
-  return [certChain subarrayWithRange:NSMakeRange(1, certChain.count - 1)];
+  NSMutableArray *intermediates = [NSMutableArray array];
+  CFIndex certCount = SecTrustGetCertificateCount(t);
+  for (int i = 1; i < certCount; ++i) {
+    [intermediates addObject:(id)SecTrustGetCertificateAtIndex(t, i)];
+  }
+  CFRelease(t);
+
+  return intermediates;
 }
 
 - (void)log:(NSString *)format, ... {
