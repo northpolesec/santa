@@ -167,8 +167,7 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
       // Construct a new transitive allowlist rule for the executable.
       SNTRule *rule = [[SNTRule alloc] initWithIdentifier:targetFile.SHA256
                                                     state:SNTRuleStateAllowTransitive
-                                                     type:SNTRuleTypeBinary
-                                                customMsg:@""];
+                                                     type:SNTRuleTypeBinary];
 
       // Add the new rule to the rules database.
       NSError *err;

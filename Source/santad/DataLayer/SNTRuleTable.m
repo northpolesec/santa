@@ -329,14 +329,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 }
 
 - (SNTRule *)ruleFromResultSet:(FMResultSet *)rs {
-  SNTRule *r = [[SNTRule alloc] initWithIdentifier:[rs stringForColumn:@"identifier"]
-                                             state:[rs intForColumn:@"state"]
-                                              type:[rs intForColumn:@"type"]
-                                         customMsg:[rs stringForColumn:@"custommsg"]
-                                         timestamp:[rs intForColumn:@"timestamp"]
-                                           comment:[rs stringForColumn:@"comment"]];
-  r.customURL = [rs stringForColumn:@"customurl"];
-  return r;
+  return [[SNTRule alloc] initWithIdentifier:[rs stringForColumn:@"identifier"]
+                                       state:[rs intForColumn:@"state"]
+                                        type:[rs intForColumn:@"type"]
+                                   customMsg:[rs stringForColumn:@"custommsg"]
+                                   customURL:[rs stringForColumn:@"customurl"]
+                                   timestamp:[rs intForColumn:@"timestamp"]
+                                     comment:[rs stringForColumn:@"comment"]];
 }
 
 - (SNTRule *)ruleForIdentifiers:(struct RuleIdentifiers)identifiers {
@@ -413,10 +412,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   if (!rule && [identifiers.certificateSHA256 isEqual:self.launchdCSInfo.leafCertificate.SHA256]) {
     rule = [[SNTRule alloc] initWithIdentifier:identifiers.certificateSHA256
                                          state:SNTRuleStateAllow
-                                          type:SNTRuleTypeCertificate
-                                     customMsg:nil
-                                     timestamp:0
-                                       comment:nil];
+                                          type:SNTRuleTypeCertificate];
   }
 
   return rule;
