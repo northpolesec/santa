@@ -1,24 +1,25 @@
 /// Copyright 2016 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
+#include "Source/common/SantaCache.h"
 
 #import <XCTest/XCTest.h>
 
 #include <numeric>
 #include <string>
 #include <vector>
-
-#include "Source/common/SantaCache.h"
 
 @interface SantaCacheTest : XCTestCase
 @end
@@ -112,26 +113,26 @@
 
 - (void)testDistributionRandomKeys {
   const int bucket_ratio = 5;
-  auto sut = new SantaCache<uint64_t, uint64_t>(5000, bucket_ratio);
+  SantaCache<uint64_t, uint64_t> sut(5000, bucket_ratio);
 
   // Fill the cache with random keys, all set to 1.
   for (int i = 0; i < 4000; ++i) {
-    sut->set((uint64_t)arc4random() << 32 | arc4random(), 1);
+    sut.set((uint64_t)arc4random() << 32 | arc4random(), 1);
   }
 
-  [self distributionTestHelper:sut bucketRatio:bucket_ratio];
+  [self distributionTestHelper:&sut bucketRatio:bucket_ratio];
 }
 
 - (void)testDistributionMontonicKeys {
   const int bucket_ratio = 5;
-  auto sut = new SantaCache<uint64_t, uint64_t>(5000, bucket_ratio);
+  SantaCache<uint64_t, uint64_t> sut(5000, bucket_ratio);
 
   // Fill the cache with monotonic keys, all set to 1.
   for (int i = 0; i < 4000; ++i) {
-    sut->set(i, 1);
+    sut.set(i, 1);
   }
 
-  [self distributionTestHelper:sut bucketRatio:bucket_ratio];
+  [self distributionTestHelper:&sut bucketRatio:bucket_ratio];
 }
 
 - (void)testThreading {
@@ -266,7 +267,7 @@ struct S {
 }
 
 - (void)testBucketCounts {
-  auto sut = new SantaCache<uint64_t, uint64_t>(UINT16_MAX, 1);
+  SantaCache<uint64_t, uint64_t> sut(UINT16_MAX, 1);
 
   // These tests verify that the bucket_counts() function can't be abused
   // with integer {over,under}flow issues in the input or going out-of-bounds
@@ -274,13 +275,160 @@ struct S {
   uint16_t size = 2048;
   uint64_t start = (UINT64_MAX - 2047);
   uint16_t per_bucket_counts[2048];
-  sut->bucket_counts(per_bucket_counts, &size, &start);
+  sut.bucket_counts(per_bucket_counts, &size, &start);
   XCTAssertEqual(start, 0, @"Check a high start can't overflow");
 
   size = UINT16_MAX;
   start = UINT16_MAX - 1;
-  sut->bucket_counts(per_bucket_counts, &size, &start);
+  sut.bucket_counts(per_bucket_counts, &size, &start);
   XCTAssertEqual(start, 0, @"Check a large size can't overflow");
+}
+
+- (void)testUpdateScalarExisting {
+  SantaCache<uint64_t, uint64_t> sut;
+
+  XCTAssertTrue(sut.set(12, 34));
+  XCTAssertEqual(sut.get(12), 34);
+
+  sut.update(12, ^(uint64_t &val) {
+    XCTAssertEqual(val, 34);
+    val = 56;
+  });
+
+  XCTAssertEqual(sut.get(12), 56);
+}
+
+- (void)testUpdateScalarNew {
+  SantaCache<uint64_t, uint64_t> sut;
+
+  sut.update(12, ^(uint64_t &val) {
+    XCTAssertEqual(val, 0);
+    val = 56;
+  });
+
+  XCTAssertEqual(sut.get(12), 56);
+}
+
+- (void)testUpdateObjectExisting {
+  SantaCache<uint64_t, std::set<int>> sut;
+  XCTAssertEqual(sut.get(12).size(), 0);
+
+  XCTAssertTrue(sut.set(12, std::set<int>{11, 22, 33}));
+
+  auto res = sut.get(12);
+  XCTAssertEqual(res.size(), 3);
+  XCTAssertEqual(res.count(11), 1);
+  XCTAssertEqual(res.count(22), 1);
+  XCTAssertEqual(res.count(33), 1);
+  XCTAssertEqual(res.count(44), 0);
+
+  sut.update(12, ^(std::set<int> &val) {
+    XCTAssertEqual(val.size(), 3);
+    val.insert(44);
+  });
+
+  res = sut.get(12);
+  XCTAssertEqual(res.size(), 4);
+  XCTAssertEqual(res.count(11), 1);
+  XCTAssertEqual(res.count(22), 1);
+  XCTAssertEqual(res.count(33), 1);
+  XCTAssertEqual(res.count(44), 1);
+}
+
+- (void)testUpdateObjectNew {
+  SantaCache<uint64_t, std::set<int>> sut;
+
+  sut.update(12, ^(std::set<int> &val) {
+    XCTAssertEqual(val.size(), 0);
+    val = {11, 22, 33, 44};
+  });
+
+  auto res = sut.get(12);
+  XCTAssertEqual(res.size(), 4);
+  XCTAssertEqual(res.count(11), 1);
+  XCTAssertEqual(res.count(22), 1);
+  XCTAssertEqual(res.count(33), 1);
+  XCTAssertEqual(res.count(44), 1);
+}
+
+- (void)testUpdateSharedObjectExisting {
+  using IntSet = std::set<int>;
+  SantaCache<uint64_t, std::shared_ptr<IntSet>> sut;
+
+  XCTAssertEqual(sut.get(12), nullptr);
+  XCTAssertTrue(sut.set(12, std::make_shared<IntSet>(IntSet{11, 22, 33})));
+
+  auto res = sut.get(12);
+  XCTAssertNotEqual(res, nullptr);
+  XCTAssertEqual(res->size(), 3);
+  XCTAssertEqual(res->count(11), 1);
+  XCTAssertEqual(res->count(22), 1);
+  XCTAssertEqual(res->count(33), 1);
+  XCTAssertEqual(res->count(44), 0);
+
+  sut.update(12, ^(std::shared_ptr<IntSet> &val) {
+    XCTAssertNotEqual(val, nullptr);
+    XCTAssertEqual(val->size(), 3);
+    val->insert(44);
+  });
+
+  res = sut.get(12);
+  XCTAssertEqual(res->size(), 4);
+  XCTAssertEqual(res->count(11), 1);
+  XCTAssertEqual(res->count(22), 1);
+  XCTAssertEqual(res->count(33), 1);
+  XCTAssertEqual(res->count(44), 1);
+}
+
+- (void)testUpdateSharedObjectNew {
+  using IntSet = std::set<int>;
+  SantaCache<uint64_t, std::shared_ptr<IntSet>> sut;
+
+  sut.update(12, ^(std::shared_ptr<IntSet> &val) {
+    // shared_ptr is initially null
+    XCTAssertEqual(val, nullptr);
+    val = std::make_shared<IntSet>(IntSet{11, 22, 33});
+  });
+
+  auto res = sut.get(12);
+  XCTAssertEqual(res->size(), 3);
+  XCTAssertEqual(res->count(11), 1);
+  XCTAssertEqual(res->count(22), 1);
+  XCTAssertEqual(res->count(33), 1);
+  XCTAssertEqual(res->count(44), 0);
+}
+
+- (void)testUpdateSharedObjectMaxCapacity {
+  using IntSet = std::set<int>;
+  SantaCache<uint64_t, std::shared_ptr<IntSet>> sut(3);
+
+  sut.update(12, ^(std::shared_ptr<IntSet> &val) {
+    XCTAssertEqual(val, nullptr);
+    val = std::make_shared<IntSet>(IntSet{11, 22});
+  });
+
+  sut.update(34, ^(std::shared_ptr<IntSet> &val) {
+    XCTAssertEqual(val, nullptr);
+    val = std::make_shared<IntSet>(IntSet{33, 44});
+  });
+
+  sut.update(56, ^(std::shared_ptr<IntSet> &val) {
+    XCTAssertEqual(val, nullptr);
+    val = std::make_shared<IntSet>(IntSet{55, 66});
+  });
+
+  XCTAssertEqual(sut.count(), 3);
+
+  sut.update(78, ^(std::shared_ptr<IntSet> &val) {
+    XCTAssertEqual(val, nullptr);
+    val = std::make_shared<IntSet>(IntSet{77, 88});
+  });
+
+  XCTAssertEqual(sut.count(), 1);
+
+  sut.clear();
+
+  XCTAssertEqual(sut.count(), 0);
 }
 
 @end
