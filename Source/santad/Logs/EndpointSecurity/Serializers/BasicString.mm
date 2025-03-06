@@ -31,6 +31,7 @@
 #include <optional>
 #include <string>
 
+#include "Source/common/AuditUtilities.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"

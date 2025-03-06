@@ -152,6 +152,41 @@ class SantaCache {
   inline void remove(const KeyT &key) { set(key, zero_); }
 
   /**
+    Check if a given key exists in the cache. If a contains_block
+        is provided, it allows the caller to further filter for
+        specific values while under lock.
+
+    @param key The key.
+    @param contains_block Block to be called with the value at the
+        given key while under lock.
+
+    @return If the key exists, return true if the contains_block
+        is NOT provided, otherwise return the result of the call to
+        the contains_block.
+  */
+  bool contains(const KeyT &key,
+                std::function<bool(const ValueT &)> contains_block) {
+    struct bucket *bucket = &buckets_[hash(key)];
+    lock(bucket);
+    struct entry *entry = (struct entry *)((uintptr_t)bucket->head - 1);
+    while (entry != nullptr) {
+      if (entry->key == key) {
+        bool result = contains_block ? contains_block(entry->value) : true;
+        unlock(bucket);
+        return result;
+      }
+      entry = entry->next;
+    }
+    unlock(bucket);
+    return false;
+  }
+
+  /**
+    An alias for `contains(key, nullptr)`
+  */
+  bool contains(const KeyT &key) { return contains(key, nullptr); }
+
+  /**
     Remove all entries and free bucket memory.
   */
   void clear() {
