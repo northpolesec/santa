@@ -1,16 +1,17 @@
 /// Copyright 2016-2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #ifndef SANTA__SANTA_DRIVER__SANTACACHE_H
 #define SANTA__SANTA_DRIVER__SANTACACHE_H
@@ -108,7 +109,7 @@ class SantaCache {
     @return true if the value was set.
   */
   bool set(const KeyT &key, const ValueT &value) {
-    return set(key, value, {}, false);
+    return set(key, value, nullptr, {}, false);
   }
 
   /**
@@ -126,7 +127,23 @@ class SantaCache {
     @return true if the value was set
   */
   bool set(const KeyT &key, const ValueT &value, const ValueT &previous_value) {
-    return set(key, value, previous_value, true);
+    return set(key, value, nullptr, previous_value, true);
+  }
+
+  /**
+    Update an element in the cache under lock. If the element
+        doesn't yet exist, it will be first created and value
+        initialized before the update_block is called.
+
+    @note If the cache is full when this is called, this will
+        empty the cache before inserting the new value.
+
+    @param key The key.
+    @param update_block The block that will be called to give
+        the caller the opportunity to update the value.
+  */
+  bool update(const KeyT &key, std::function<void(ValueT &)> update_block) {
+    return set(key, zero_, update_block, {}, false);
   }
 
   /**
@@ -149,7 +166,7 @@ class SantaCache {
       struct entry *entry = (struct entry *)((uintptr_t)bucket->head - 1);
       while (entry != nullptr) {
         struct entry *next_entry = entry->next;
-        free(entry);
+        delete entry;
         entry = next_entry;
       }
     }
@@ -211,9 +228,11 @@ class SantaCache {
 
  private:
   struct entry {
+    entry(KeyT k) : key(std::move(k)) {}
+
     KeyT key;
-    ValueT value;
-    struct entry *next;
+    ValueT value = {};
+    struct entry *next = nullptr;
   };
 
   struct bucket {
@@ -230,6 +249,8 @@ class SantaCache {
 
     @param key The key
     @param value The value with parameterized type
+    @param update_block The block that will be called to give
+        the caller the opportunity to update the value.
     @param previous_value If has_prev_value is true, the new value will only
         be set if this parameter is equal to the existing value in the cache.
         This allows set to become a CAS operation.
@@ -237,30 +258,39 @@ class SantaCache {
 
     @return true if the entry was set, false if it was not
   */
-  bool set(const KeyT &key, const ValueT &value, const ValueT &previous_value,
-           bool has_prev_value) {
+  bool set(const KeyT &key, const ValueT &value,
+           std::function<void(ValueT &)> update_block,
+           const ValueT &previous_value, bool has_prev_value) {
+    // Only either value or update block can be set
+    assert(!(value != zero_ && update_block != nullptr));
+    bool update_only = (update_block != nullptr);
+
     struct bucket *bucket = &buckets_[hash(key)];
     lock(bucket);
     struct entry *entry = (struct entry *)((uintptr_t)bucket->head - 1);
     struct entry *previous_entry = nullptr;
     while (entry != nullptr) {
       if (entry->key == key) {
-        ValueT existing_value = entry->value;
+        if (update_only) {
+          update_block(entry->value);
+        } else {
+          ValueT existing_value = entry->value;
 
-        if (has_prev_value && previous_value != existing_value) {
-          unlock(bucket);
-          return false;
+          if (has_prev_value && previous_value != existing_value) {
+            unlock(bucket);
+            return false;
+          }
+
+          entry->value = value;
         }
 
-        entry->value = value;
-
-        if (value == zero_) {
+        if (!update_only && value == zero_) {
           if (previous_entry != nullptr) {
             previous_entry->next = entry->next;
           } else {
             bucket->head = (struct entry *)((uintptr_t)entry->next + 1);
           }
-          free(entry);
+          delete entry;
           OSAtomicDecrement64((volatile int64_t *)&count_);
         }
 
@@ -274,7 +304,8 @@ class SantaCache {
     // If value is zero_, we're clearing but there's nothing to clear
     // so we don't need to do anything else. Alternatively, if has_prev_value
     // is true and is not zero_ we don't want to set a value.
-    if (value == zero_ || (has_prev_value && previous_value != zero_)) {
+    if (!update_only &&
+        (value == zero_ || (has_prev_value && previous_value != zero_))) {
       unlock(bucket);
       return false;
     }
@@ -294,10 +325,12 @@ class SantaCache {
 
     // Allocate a new entry, set the key and value, then put this new entry at
     // the head of this bucket's linked list.
-    struct entry *new_entry = (struct entry *)malloc(sizeof(struct entry));
-    bzero(new_entry, sizeof(struct entry));
-    new_entry->key = key;
-    new_entry->value = value;
+    struct entry *new_entry = new struct entry(std::move(key));
+    if (update_block) {
+      update_block(new_entry->value);
+    } else {
+      new_entry->value = value;
+    }
     new_entry->next = (struct entry *)((uintptr_t)bucket->head - 1);
     bucket->head = (struct entry *)((uintptr_t)new_entry + 1);
     OSAtomicIncrement64((volatile int64_t *)&count_);
