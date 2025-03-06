@@ -325,7 +325,6 @@ class SantaCache {
 
     // Allocate a new entry, set the key and value, then put this new entry at
     // the head of this bucket's linked list.
-    // struct entry *new_entry = (struct entry *)malloc(sizeof(struct entry));
     struct entry *new_entry = new struct entry(std::move(key));
     if (update_block) {
       update_block(new_entry->value);
