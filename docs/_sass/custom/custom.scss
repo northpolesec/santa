@@ -14,7 +14,7 @@
 }
 
 .side-bar {
-  background-color: #FF0000; /* Pure red */
+  background-color: #ff4d48;
 }
 
 .side-bar,
@@ -41,6 +41,9 @@
 }
 
 /* Rest of the CSS remains the same */
+.side-bar .nav-list .nav-list-item .nav-list-link {
+  border-left: 4px solid transparent;
+}
 .side-bar .nav-list .nav-list-item .nav-list-link.active {
   border-left: 4px solid white;
 }
@@ -60,6 +63,11 @@
 
 .site-header {
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.site-footer {
+  color: white;
+  opacity: 0.75;
 }
 
 .search {
