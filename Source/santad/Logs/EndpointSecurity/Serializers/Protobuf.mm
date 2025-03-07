@@ -29,6 +29,7 @@
 #include <optional>
 #include <string_view>
 
+#include "Source/common/AuditUtilities.h"
 #include "Source/common/EncodeEntitlements.h"
 #import "Source/common/SNTCachedDecision.h"
 #include "Source/common/SNTCommonEnums.h"
