@@ -81,7 +81,7 @@ class SantaCache {
   /**
     Get an element from the cache. Returns zero_ if item doesn't exist.
   */
-  ValueT get(KeyT key) {
+  ValueT get(KeyT key) const {
     struct bucket *bucket = &buckets_[hash(key)];
     lock(bucket);
     struct entry *entry = (struct entry *)((uintptr_t)bucket->head - 1);
@@ -165,7 +165,7 @@ class SantaCache {
         the contains_block.
   */
   bool contains(const KeyT &key,
-                std::function<bool(const ValueT &)> contains_block) {
+                std::function<bool(const ValueT &)> contains_block) const {
     struct bucket *bucket = &buckets_[hash(key)];
     lock(bucket);
     struct entry *entry = (struct entry *)((uintptr_t)bucket->head - 1);
@@ -184,7 +184,7 @@ class SantaCache {
   /**
     An alias for `contains(key, nullptr)`
   */
-  bool contains(const KeyT &key) { return contains(key, nullptr); }
+  bool contains(const KeyT &key) const { return contains(key, nullptr); }
 
   /**
     Remove all entries and free bucket memory.

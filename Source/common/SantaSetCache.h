@@ -53,7 +53,7 @@ class SantaSetCache {
   SantaSetCache &operator=(SantaSetCache &&rhs) = delete;
 
   /// Check if the set at the given key contained the given value.
-  bool Contains(const KeyT &key, const ValueT &val) {
+  bool Contains(const KeyT &key, const ValueT &val) const {
     return cache_.contains(key, ^bool(const SharedValueSet &set) {
       return set && set->count(val) > 0;
     });
@@ -105,13 +105,13 @@ class SantaSetCache {
   /// Return a shared_ptr of the const set contained at the given key
   /// IMPORTANT: This method should never be called from multithreaded
   /// environments. The returned value can be mutated by other threads.
-  SharedConstValueSet UnsafeGet(const KeyT &key) { return cache_.get(key); }
+  SharedConstValueSet UnsafeGet(const KeyT &key) const { return cache_.get(key); }
 
   /// Size of the cache
-  size_t Size() { return cache_.count(); }
+  size_t Size() const { return cache_.count(); }
 
   /// Size of the underlying set in the cache at the given key
-  size_t Size(const KeyT &key) {
+  size_t Size(const KeyT &key) const {
     SharedValueSet set = cache_.get(key);
     if (set) {
       return set->size();
