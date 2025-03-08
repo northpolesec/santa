@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CONSTRAINEDELEMENTCACHE_H
-#define SANTA__COMMON__CONSTRAINEDELEMENTCACHE_H
+#ifndef SANTA__COMMON__SANTASETCACHE_H
+#define SANTA__COMMON__SANTASETCACHE_H
 
 #include <dispatch/dispatch.h>
 
@@ -128,4 +128,4 @@ class SantaSetCache {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__CONSTRAINEDELEMENTCACHE_H
+#endif  // SANTA__COMMON__SANTASETCACHE_H
