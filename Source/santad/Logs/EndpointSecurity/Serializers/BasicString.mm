@@ -148,11 +148,11 @@ static inline void AppendUserGroup(std::string &str, const audit_token_t &tok,
                                    const std::optional<std::shared_ptr<std::string>> &group,
                                    const std::string prefix = "") {
   str.append("|" + prefix + "uid=");
-  str.append(std::to_string(RealUser(tok)));
+  str.append(std::to_string((int)RealUser(tok)));
   str.append("|" + prefix + "user=");
   str.append(user.has_value() ? user->get()->c_str() : "(null)");
   str.append("|" + prefix + "gid=");
-  str.append(std::to_string(RealGroup(tok)));
+  str.append(std::to_string((int)RealGroup(tok)));
   str.append("|" + prefix + "group=");
   str.append(group.has_value() ? group->get()->c_str() : "(null)");
 }
@@ -166,7 +166,7 @@ static inline void AppendEventUser(std::string &str, const es_string_token_t &us
 
   if (uid.has_value()) {
     str.append("|event_uid=");
-    str.append(std::to_string(uid.value()));
+    str.append(std::to_string((int)uid.value()));
   }
 }
 
@@ -390,9 +390,9 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExit &msg) {
   str.append("|ppid=");
   str.append(std::to_string(msg->process->original_ppid));
   str.append("|uid=");
-  str.append(std::to_string(RealUser(msg->process->audit_token)));
+  str.append(std::to_string((int)RealUser(msg->process->audit_token)));
   str.append("|gid=");
-  str.append(std::to_string(RealGroup(msg->process->audit_token)));
+  str.append(std::to_string((int)RealGroup(msg->process->audit_token)));
 
   return FinalizeString(str);
 }
@@ -407,9 +407,9 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedFork &msg) {
   str.append("|ppid=");
   str.append(std::to_string(msg->event.fork.child->original_ppid));
   str.append("|uid=");
-  str.append(std::to_string(RealUser(msg->event.fork.child->audit_token)));
+  str.append(std::to_string((int)RealUser(msg->event.fork.child->audit_token)));
   str.append("|gid=");
-  str.append(std::to_string(RealGroup(msg->event.fork.child->audit_token)));
+  str.append(std::to_string((int)RealGroup(msg->event.fork.child->audit_token)));
 
   return FinalizeString(str);
 }
