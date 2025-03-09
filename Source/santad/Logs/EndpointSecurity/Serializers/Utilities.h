@@ -17,35 +17,12 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
+#include <IOKit/IOKitLib.h>
 #include <bsm/libbsm.h>
 
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 
 namespace santa {
-
-static inline pid_t Pid(const audit_token_t &tok) {
-  return audit_token_to_pid(tok);
-}
-
-static inline pid_t Pidversion(const audit_token_t &tok) {
-  return audit_token_to_pidversion(tok);
-}
-
-static inline pid_t RealUser(const audit_token_t &tok) {
-  return audit_token_to_ruid(tok);
-}
-
-static inline pid_t RealGroup(const audit_token_t &tok) {
-  return audit_token_to_rgid(tok);
-}
-
-static inline pid_t EffectiveUser(const audit_token_t &tok) {
-  return audit_token_to_euid(tok);
-}
-
-static inline pid_t EffectiveGroup(const audit_token_t &tok) {
-  return audit_token_to_egid(tok);
-}
 
 static inline NSString *NonNull(NSString *str) {
   return str ?: @"";
@@ -58,7 +35,9 @@ NSString *MountFromName(NSString *path);
 
 es_file_t *GetAllowListTargetFile(const santa::Message &msg);
 
-const mach_port_t GetDefaultIOKitCommsPort();
+static inline const mach_port_t GetDefaultIOKitCommsPort() {
+  return kIOMainPortDefault;
+}
 
 }  // namespace santa
 

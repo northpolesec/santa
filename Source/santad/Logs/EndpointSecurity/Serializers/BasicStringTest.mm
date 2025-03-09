@@ -655,7 +655,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
       "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=21|auth_ppid=65|auth_process=foo"
       "|auth_processpath=foo|auth_uid=-2|auth_user=nobody|auth_gid=-1|auth_group=nogroup"
-      "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+      "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=-2|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
 
@@ -666,11 +666,11 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 #if HAVE_MACOS_15
   want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
          "|uid=-2|user=nobody|gid=-1|group=nogroup|auth_pid=654|auth_pidver=321"
-         "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=4294967294|machineid=my_id\n";
+         "|touchid_mode=VERIFICATION|event_user=nobody|event_uid=-2|machineid=my_id\n";
 #else
   want = "action=AUTHENTICATION_TOUCHID|success=true|pid=12|ppid=56|process=foo|processpath=foo"
          "|uid=-2|user=nobody|gid=-1|group=nogroup|touchid_mode=VERIFICATION|event_user=nobody"
-         "|event_uid=4294967294|machineid=my_id\n";
+         "|event_uid=-2|machineid=my_id\n";
 #endif
 
   XCTAssertCppStringEqual(got, want);
