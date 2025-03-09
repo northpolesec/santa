@@ -32,6 +32,7 @@
 #include <utility>
 #include <variant>
 
+#include "Source/common/AuditUtilities.h"
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #include "Source/common/Platform.h"
@@ -41,7 +42,7 @@
 #include "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTStrengthify.h"
-#include "Source/common/SantaCache.h"
+#include "Source/common/SantaSetCache.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/String.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
@@ -63,6 +64,7 @@ using santa::Logger;
 using santa::Message;
 using santa::Metrics;
 using santa::OptionalStringToNSString;
+using santa::PidPidversion;
 using santa::RateLimiter;
 using santa::StringToNSString;
 using santa::TTYWriter;
@@ -71,121 +73,12 @@ using santa::WatchItems;
 
 static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 static constexpr uint16_t kDefaultRateLimitQPS = 50;
+static constexpr size_t kMaxCacheSize = 512;
+static constexpr size_t kMaxCacheEntrySize = 8192;
 
-// This is a bespoke cache for mapping processes to a set of values. It has
-// similar semantics to SantaCache in terms of clearing the cache keys and
-// values when max sizes are reached.
-//
-// TODO: We need a proper LRU cache
-//
-// NB: This exists instead of using SantaCache for two main reasons:
-//     1.) SantaCache doesn't efficiently support non-primitive value types.
-//         Since the value of each key needs to be a set, we want to refrain
-//         from having to unnecessarily copy the value.
-//     2.) SantaCache doesn't support size limits on value types
+// Helper type alias for tracking process-related information
 template <typename ValueT>
-class ProcessSet {
-  using FileSet = absl::flat_hash_set<ValueT>;
-
- public:
-  ProcessSet() {
-    q_ = dispatch_queue_create(
-        "com.northpolesec.santa.daemon.faa",
-        dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
-                                                QOS_CLASS_USER_INTERACTIVE, 0));
-  };
-
-  // Add the given target to the set of files a process can read
-  void Set(const es_process_t *proc, std::function<ValueT()> valueBlock) {
-    if (!valueBlock) {
-      return;
-    }
-
-    dispatch_sync(q_, ^{
-      std::pair<pid_t, pid_t> pidPidver = {audit_token_to_pid(proc->audit_token),
-                                           audit_token_to_pidversion(proc->audit_token)};
-      SetSerialized(pidPidver, valueBlock());
-    });
-  }
-
-  // Remove the given process from the cache
-  void Remove(const es_process_t *proc) {
-    std::pair<pid_t, pid_t> pidPidver = {audit_token_to_pid(proc->audit_token),
-                                         audit_token_to_pidversion(proc->audit_token)};
-    dispatch_sync(q_, ^{
-      cache_.erase(pidPidver);
-    });
-  }
-
-  // Check if the set of files for a given process contains the given file
-  bool Exists(const es_process_t *proc, std::function<ValueT()> valueBlock) {
-    return ExistsOrSet(proc, valueBlock, false);
-  }
-
-  // Check if the ValueT set for a given process contains the given file, and
-  // if not, set it. Both steps are done atomically.
-  bool ExistsOrSet(const es_process_t *proc, std::function<ValueT()> valueBlock) {
-    return ExistsOrSet(proc, valueBlock, true);
-  }
-
-  // Clear all cache entries
-  void Clear() {
-    dispatch_sync(q_, ^{
-      ClearSerialized();
-    });
-  }
-
- private:
-  // Remove everything in the cache.
-  void ClearSerialized() { cache_.clear(); }
-
-  void SetSerialized(std::pair<pid_t, pid_t> pidPidver, ValueT value) {
-    // If we hit the size limit, clear the cache to prevent unbounded growth
-    if (cache_.size() >= kMaxCacheSize) {
-      ClearSerialized();
-    }
-
-    FileSet &fs = cache_[std::move(pidPidver)];
-
-    // If we hit the per-entry size limit, clear the entry to prevent unbounded growth
-    if (fs.size() >= kMaxCacheEntrySize) {
-      fs.clear();
-    }
-
-    fs.insert(value);
-  }
-
-  bool ExistsOrSet(const es_process_t *proc, std::function<ValueT()> valueBlock, bool shouldSet) {
-    std::pair<pid_t, pid_t> pidPidver = {audit_token_to_pid(proc->audit_token),
-                                         audit_token_to_pidversion(proc->audit_token)};
-
-    __block bool exists = false;
-
-    dispatch_sync(q_, ^{
-      ValueT value = valueBlock();
-      const auto &iter = cache_.find(pidPidver);
-
-      if (iter != cache_.end() && iter->second.count(value) > 0) {
-        exists = true;
-      } else if (shouldSet) {
-        SetSerialized(pidPidver, value);
-      }
-    });
-
-    return exists;
-  }
-
-  dispatch_queue_t q_;
-  absl::flat_hash_map<std::pair<pid_t, pid_t>, FileSet> cache_;
-
-  // Cache limits are merely meant to protect against unbounded growth. In practice,
-  // the observed cache size is typically small for normal WatchItems rules (those
-  // that do not target high-volume paths). The per entry size was observed to vary
-  // quite dramatically based on the type of process (e.g. large, complex applications
-  // were observed to frequently have several thousands of entries).
-  static constexpr size_t kMaxCacheSize = 512;
-  static constexpr size_t kMaxCacheEntrySize = 8192;
-};
+using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, pid_t>, ValueT>;
 
 es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision) {
   switch (decision) {
@@ -258,18 +151,15 @@ es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t
 }
 
 bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const Message &msg,
-                      ProcessSet<std::pair<std::string, std::string>> &ttyMessageCache) {
+                      ProcessSetCache<std::pair<std::string, std::string>> *ttyMessageCache) {
   if (policy->silent_tty || !TTYWriter::CanWrite(msg->process)) {
     return false;
   }
 
-  // ExistsOrSet returns `true` if the item existed. However we want to invert
-  // this result as the return value for this function since we want to message
-  // the TTY only when `ExistsOrSet` was a "set" operation, meaning it was the
-  // first time this value was added.
-  return !ttyMessageCache.ExistsOrSet(msg->process, ^std::pair<std::string, std::string>() {
-    return {policy->version, policy->name};
-  });
+  // If `Set` returns `true`, it means this is the first time the item is
+  // being added to the cache and we should message the TTY in this case.
+  return ttyMessageCache->Set(PidPidversion(msg->process->audit_token),
+                              {policy->version, policy->name});
 }
 
 @interface SNTEndpointSecurityFileAccessAuthorizer ()
@@ -282,10 +172,9 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<Enricher> _enricher;
   std::shared_ptr<RateLimiter> _rateLimiter;
-  SantaCache<SantaVnode, NSString *> _certHashCache;
   std::shared_ptr<TTYWriter> _ttyWriter;
-  ProcessSet<std::pair<dev_t, ino_t>> _readsCache;
-  ProcessSet<std::pair<std::string, std::string>> _ttyMessageCache;
+  std::unique_ptr<ProcessSetCache<std::pair<dev_t, ino_t>>> _readsCache;
+  std::unique_ptr<ProcessSetCache<std::pair<std::string, std::string>>> _ttyMessageCache;
   std::shared_ptr<Metrics> _metrics;
   std::shared_ptr<santa::FAAPolicyProcessor> _faaPolicyProcessor;
 }
@@ -307,6 +196,11 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     _faaPolicyProcessor = std::move(faaPolicyProcessor);
     _ttyWriter = std::move(ttyWriter);
     _metrics = std::move(metrics);
+
+    _readsCache =
+        ProcessSetCache<std::pair<dev_t, ino_t>>::Create(kMaxCacheSize, kMaxCacheEntrySize);
+    _ttyMessageCache = ProcessSetCache<std::pair<std::string, std::string>>::Create(
+        kMaxCacheSize, kMaxCacheEntrySize);
 
     _configurator = [SNTConfigurator configurator];
 
@@ -409,9 +303,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
   // If policy allows reading, add target to the cache
   if (policy->allow_read_access && target.devno_ino.has_value()) {
-    self->_readsCache.Set(msg->process, ^{
-      return *target.devno_ino;
-    });
+    _readsCache->Set(PidPidversion(msg->process->audit_token), *target.devno_ino);
   }
 
   // Check if this action contains any special case that would produce
@@ -518,7 +410,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
                                    linkInfo.first, linkInfo.second);
       }
 
-      if (ShouldMessageTTY(policy, msg, self->_ttyMessageCache)) {
+      if (ShouldMessageTTY(policy, msg, _ttyMessageCache.get())) {
         NSAttributedString *attrStr =
             [SNTBlockMessage attributedBlockMessageForFileAccessEvent:event
                                                         customMessage:OptionalStringToNSString(
@@ -603,17 +495,16 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 
   if (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN &&
       !(esMsg->event.open.fflag & kOpenFlagsIndicatingWrite)) {
-    if (self->_readsCache.Exists(esMsg->process, ^std::pair<pid_t, pid_t> {
-          return std::pair<dev_t, ino_t>{esMsg->event.open.file->stat.st_dev,
-                                         esMsg->event.open.file->stat.st_ino};
-        })) {
+    if (_readsCache->Contains(PidPidversion(esMsg->process->audit_token),
+                              std::pair<dev_t, ino_t>{esMsg->event.open.file->stat.st_dev,
+                                                      esMsg->event.open.file->stat.st_ino})) {
       [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:false];
       return;
     }
   } else if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXIT) {
     // On process exit, remove the cache entry
-    self->_readsCache.Remove(esMsg->process);
-    self->_ttyMessageCache.Remove(esMsg->process);
+    _readsCache->Remove(PidPidversion(esMsg->process->audit_token));
+    _ttyMessageCache->Remove(PidPidversion(esMsg->process->audit_token));
     return;
   }
 
@@ -667,7 +558,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     [self enable];
   }
 
-  self->_readsCache.Clear();
+  _readsCache->Clear();
 }
 
 @end

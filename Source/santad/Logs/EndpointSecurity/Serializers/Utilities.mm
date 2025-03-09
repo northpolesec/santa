@@ -27,8 +27,6 @@ extern "C" Boolean SecTranslocateIsTranslocatedURL(CFURLRef path, bool *isTransl
 extern "C" CFURLRef __nullable SecTranslocateCreateOriginalPathForURL(CFURLRef translocatedPath,
                                                                       CFErrorRef *__nullable error);
 
-using santa::Message;
-
 namespace santa {
 
 NSString *OriginalPathForTranslocation(const es_process_t *es_proc) {
@@ -57,13 +55,6 @@ NSString *OriginalPathForTranslocation(const es_process_t *es_proc) {
   }
 
   return [origURL path];
-}
-
-const mach_port_t GetDefaultIOKitCommsPort() {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  return kIOMasterPortDefault;
-#pragma clang diagnostic pop
 }
 
 NSString *SerialForDevice(NSString *devPath) {

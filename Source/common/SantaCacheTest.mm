@@ -431,4 +431,28 @@ struct S {
   XCTAssertEqual(sut.count(), 0);
 }
 
+- (void)testContains {
+  SantaCache<uint64_t, uint64_t> sut;
+
+  XCTAssertEqual(sut.count(), 0);
+
+  XCTAssertFalse(sut.contains(1));
+  XCTAssertFalse(sut.contains(1, ^(const uint64_t &) {
+    return true;
+  }));
+
+  XCTAssertTrue(sut.set(1, 2));
+  XCTAssertEqual(sut.count(), 1);
+  XCTAssertTrue(sut.contains(1));
+  XCTAssertFalse(sut.contains(1, ^(const uint64_t &) {
+    return false;
+  }));
+  XCTAssertTrue(sut.contains(1, ^(const uint64_t &x) {
+    return x == 2;
+  }));
+  XCTAssertFalse(sut.contains(1, ^(const uint64_t &x) {
+    return x == 3;
+  }));
+}
+
 @end

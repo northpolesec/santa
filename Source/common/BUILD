@@ -57,11 +57,36 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "SantaSetCache",
+    hdrs = ["SantaSetCache.h"],
+    deps = [
+        ":SantaCache",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+cc_library(
+    name = "AuditUtilities",
+    hdrs = ["AuditUtilities.h"],
+)
+
 santa_unit_test(
     name = "SantaCacheTest",
     srcs = ["SantaCacheTest.mm"],
     deps = [
         ":SantaCache",
+    ],
+)
+
+santa_unit_test(
+    name = "SantaSetCacheTest",
+    srcs = ["SantaSetCacheTest.mm"],
+    deps = [
+        ":SantaSetCache",
     ],
 )
 
@@ -610,6 +635,7 @@ test_suite(
         ":SNTMetricSetTest",
         ":SNTRuleTest",
         ":SantaCacheTest",
+        ":SantaSetCacheTest",
         ":ScopedCFTypeRefTest",
         ":ScopedIOObjectRefTest",
         ":TelemetryEventMapTest",
