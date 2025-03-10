@@ -88,9 +88,6 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
 
   FAAPolicyProcessor::ESResult result = self.faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
-      ^(const es_process_t *, std::pair<dev_t, ino_t>){
-          // TODO: reads cache updates
-      },
       ^bool(const santa::WatchItemPolicyBase &base_policy,
             const FAAPolicyProcessor::PathTarget &target, const Message &msg) {
         const ProcessWatchItemPolicy *policy =

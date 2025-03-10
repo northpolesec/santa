@@ -78,9 +78,6 @@ class FAAPolicyProcessor {
   using TargetPolicyPair =
       std::pair<PathTarget, std::optional<std::shared_ptr<WatchItemPolicyBase>>>;
 
-  /// Block called when a policy enforcement client can cache actions on
-  /// future reads of the given file by the given process.
-  using ReadsCacheUpdateBlock = void (^)(const es_process_t *, std::pair<dev_t, ino_t>);
   /// When this block is called, the policy enforcement client must determine
   /// whether or not the given policy applies to the given ES message.
   using CheckIfPolicyMatchesBlock = bool (^)(const WatchItemPolicyBase &, const PathTarget &target,
@@ -141,12 +138,10 @@ class FAAPolicyProcessor {
   ///     2. Apply override if configured
   ///     3. Log telemetry if denied/audit-only and not rate-limited (LogTelemetry())
   ///     4. Notify the user if configured (SNTFileAccessDeniedBlock(), LogTTY())
-  /// 3. Let caller know if appropriate to update their "reads cache" (ReadsCacheUpdateBlock())
-  /// 4. Combine results of each target into an ES decision
-  /// 5. Return the final ES decision
+  /// 3. Combine results of each target into an ES decision
+  /// 4. Return the final ES decision
   FAAPolicyProcessor::ESResult ProcessMessage(
       const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
-      ReadsCacheUpdateBlock reads_cache_update_block,
       CheckIfPolicyMatchesBlock check_if_policy_matches_block,
       SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction,
       FAAClientType client_type);
@@ -197,12 +192,11 @@ class ProcessFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
       : FAAPolicyProcessorProxy(std::move(policy_processor)) {}
   FAAPolicyProcessor::ESResult ProcessMessage(
       const Message &msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
-      FAAPolicyProcessor::ReadsCacheUpdateBlock reads_cache_update_block,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock check_if_policy_matches_block,
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction overrideAction) {
     return policy_processor_->ProcessMessage(
-        msg, std::move(target_policy_pairs), reads_cache_update_block,
+        msg, std::move(target_policy_pairs),
         check_if_policy_matches_block, file_access_denied_block, overrideAction,
         FAAClientType::kProcess);
   }
@@ -223,12 +217,11 @@ class DataFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
 
   FAAPolicyProcessor::ESResult ProcessMessage(
       const Message &msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
-      FAAPolicyProcessor::ReadsCacheUpdateBlock reads_cache_update_block,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock check_if_policy_matches_block,
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction overrideAction) {
     return policy_processor_->ProcessMessage(
-        msg, std::move(target_policy_pairs), reads_cache_update_block,
+        msg, std::move(target_policy_pairs),
         check_if_policy_matches_block, file_access_denied_block, overrideAction,
         FAAClientType::kData);
   }

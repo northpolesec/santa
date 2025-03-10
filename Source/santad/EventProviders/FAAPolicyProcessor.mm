@@ -452,7 +452,6 @@ static inline FAAPolicyProcessor::ReadsCacheKey MakeReadsCacheKey(const Message 
 
 FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
-    ReadsCacheUpdateBlock reads_cache_update_block,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
     SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction,
     FAAClientType client_type) {
@@ -463,7 +462,7 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     FileAccessPolicyDecision decision = ProcessTargetAndPolicy(
         msg, target_policy_pair.first, target_policy_pair.second, check_if_policy_matches_block,
         file_access_denied_block, overrideAction);
-    // Trigger the caller's ReadsCacheUpdateBlock if:
+    // Populate the reads_cache_ if:
     //   1. The policy applied
     //   2. The process wasn't invalid
     //   3. A devno/ino pair existed for the target
