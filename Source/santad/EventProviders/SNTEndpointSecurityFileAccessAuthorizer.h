@@ -36,7 +36,8 @@
                        logger:(std::shared_ptr<santa::Logger>)logger
                    watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
                      enricher:(std::shared_ptr<santa::Enricher>)enricher
-           faaPolicyProcessor:(std::shared_ptr<santa::FAAPolicyProcessor>)faaPolicyProcessor
+           faaPolicyProcessor:
+               (std::shared_ptr<santa::DataFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
 
 @property SNTFileAccessDeniedBlock fileAccessDeniedBlock;

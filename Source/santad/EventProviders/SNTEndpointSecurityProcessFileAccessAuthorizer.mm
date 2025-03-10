@@ -139,6 +139,7 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
 
     case ES_EVENT_TYPE_NOTIFY_EXIT: {
       _procRuleCache->remove(PidPidversion(esMsg->process->audit_token));
+      self.faaPolicyProcessorProxy->NotifyExit(esMsg);
       return;
     };
 

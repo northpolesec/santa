@@ -51,9 +51,6 @@ extern NSString *const kBadCertHash;
 
 namespace santa {
 
-// Forward declaration
-class MockFAAPolicyProcessor;
-
 enum class FAAClientType {
   kData,
   kProcess,
@@ -174,6 +171,8 @@ class FAAPolicyProcessor {
               const WatchItemPolicyBase &policy);
 };
 
+/// The proxy classes are used to wrap calls into the FAAPolicyProcessor and not expose
+/// the FAAClientType to FAAPolicyProcessor users.
 class FAAPolicyProcessorProxy {
  public:
   FAAPolicyProcessorProxy(std::shared_ptr<FAAPolicyProcessor> policy_processor)
@@ -196,9 +195,8 @@ class ProcessFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction overrideAction) {
     return policy_processor_->ProcessMessage(
-        msg, std::move(target_policy_pairs),
-        check_if_policy_matches_block, file_access_denied_block, overrideAction,
-        FAAClientType::kProcess);
+        msg, std::move(target_policy_pairs), check_if_policy_matches_block,
+        file_access_denied_block, overrideAction, FAAClientType::kProcess);
   }
 
   std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message &msg) {
@@ -221,9 +219,8 @@ class DataFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction overrideAction) {
     return policy_processor_->ProcessMessage(
-        msg, std::move(target_policy_pairs),
-        check_if_policy_matches_block, file_access_denied_block, overrideAction,
-        FAAClientType::kData);
+        msg, std::move(target_policy_pairs), check_if_policy_matches_block,
+        file_access_denied_block, overrideAction, FAAClientType::kData);
   }
 
   std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message &msg) {
