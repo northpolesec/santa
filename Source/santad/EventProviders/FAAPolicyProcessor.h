@@ -21,6 +21,7 @@
 
 #include <memory>
 #include <optional>
+#include <tuple>
 #include <vector>
 
 #import "Source/common/SNTCachedDecision.h"
@@ -28,6 +29,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileAccessEvent.h"
 #include "Source/common/SantaCache.h"
+#include "Source/common/SantaSetCache.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
@@ -48,6 +50,14 @@ extern NSString *const kBadCertHash;
 #pragma clang diagnostic ignored "-Wignored-qualifiers"
 
 namespace santa {
+
+// Forward declaration
+class MockFAAPolicyProcessor;
+
+enum class FAAClientType {
+  kData,
+  kProcess,
+};
 
 class FAAPolicyProcessor {
  public:
@@ -80,6 +90,14 @@ class FAAPolicyProcessor {
   using GenerateEventDetailLinkBlock =
       URLTextPair (^)(const std::shared_ptr<WatchItemPolicyBase> &watch_item);
 
+  using ReadsCacheKey = std::tuple<pid_t, int, FAAClientType>;
+  template <typename ValueT>
+  using ProcessSetCache = santa::SantaSetCache<ReadsCacheKey, ValueT>;
+
+  // Friend classes that can call private methods requiring FAAClientType parameters
+  friend class DataFAAPolicyProcessorProxy;
+  friend class ProcessFAAPolicyProcessorProxy;
+
   // Friend class used for tests
   friend class MockFAAPolicyProcessor;
 
@@ -93,6 +111,21 @@ class FAAPolicyProcessor {
                                     const es_process_t *es_proc);
 
   virtual SNTCachedDecision *__strong GetCachedDecision(const struct stat &stat_buf);
+
+  static std::vector<FAAPolicyProcessor::PathTarget> PathTargets(const Message &msg);
+
+ private:
+  SNTDecisionCache *decision_cache_;
+  std::shared_ptr<Enricher> enricher_;
+  std::shared_ptr<Logger> logger_;
+  std::shared_ptr<TTYWriter> tty_writer_;
+  GenerateEventDetailLinkBlock generate_event_detail_link_block_;
+  ProcessSetCache<std::pair<dev_t, ino_t>> reads_cache_;
+  SantaCache<SantaVnode, NSString *> cert_hash_cache_;
+  SNTConfigurator *configurator_;
+  dispatch_queue_t queue_;
+
+  virtual NSString *__strong GetCertificateHash(const es_file_t *es_file);
 
   /// General flow of processing an ES message for FAA violations:
   /// 1. Client presents a vector of pairs of target paths being accessed and associated policies
@@ -115,22 +148,15 @@ class FAAPolicyProcessor {
       const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
       ReadsCacheUpdateBlock reads_cache_update_block,
       CheckIfPolicyMatchesBlock check_if_policy_matches_block,
-      SNTFileAccessDeniedBlock file_access_denied_block,
-      SNTOverrideFileAccessAction overrideAction);
+      SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction,
+      FAAClientType client_type);
 
-  static std::vector<FAAPolicyProcessor::PathTarget> PathTargets(const Message &msg);
+  /// Checks if an immediate result can be returned without full policy evaluation.
+  std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message &msg,
+                                                                FAAClientType client_type);
 
- private:
-  SNTDecisionCache *decision_cache_;
-  std::shared_ptr<Enricher> enricher_;
-  std::shared_ptr<Logger> logger_;
-  std::shared_ptr<TTYWriter> tty_writer_;
-  GenerateEventDetailLinkBlock generate_event_detail_link_block_;
-  SantaCache<SantaVnode, NSString *> cert_hash_cache_;
-  SNTConfigurator *configurator_;
-  dispatch_queue_t queue_;
-
-  virtual NSString *__strong GetCertificateHash(const es_file_t *es_file);
+  /// Used by callers to inform when a process has exited and will no longer process events.
+  void NotifyExit(const Message &msg, FAAClientType client_type);
 
   FileAccessPolicyDecision ProcessTargetAndPolicy(
       const Message &msg, const PathTarget &target,
@@ -151,6 +177,69 @@ class FAAPolicyProcessor {
                     FileAccessPolicyDecision decision);
   void LogTTY(SNTFileAccessEvent *event, URLTextPair link_info, const Message &msg,
               const WatchItemPolicyBase &policy);
+};
+
+class FAAPolicyProcessorProxy {
+ public:
+  FAAPolicyProcessorProxy(std::shared_ptr<FAAPolicyProcessor> policy_processor)
+      : policy_processor_(std::move(policy_processor)) {}
+
+  FAAPolicyProcessor *operator->() { return policy_processor_.get(); }
+  FAAPolicyProcessor &operator*() { return *policy_processor_; }
+
+ protected:
+  std::shared_ptr<FAAPolicyProcessor> policy_processor_;
+};
+
+class ProcessFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
+ public:
+  ProcessFAAPolicyProcessorProxy(std::shared_ptr<FAAPolicyProcessor> policy_processor)
+      : FAAPolicyProcessorProxy(std::move(policy_processor)) {}
+  FAAPolicyProcessor::ESResult ProcessMessage(
+      const Message &msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
+      FAAPolicyProcessor::ReadsCacheUpdateBlock reads_cache_update_block,
+      FAAPolicyProcessor::CheckIfPolicyMatchesBlock check_if_policy_matches_block,
+      SNTFileAccessDeniedBlock file_access_denied_block,
+      SNTOverrideFileAccessAction overrideAction) {
+    return policy_processor_->ProcessMessage(
+        msg, std::move(target_policy_pairs), reads_cache_update_block,
+        check_if_policy_matches_block, file_access_denied_block, overrideAction,
+        FAAClientType::kProcess);
+  }
+
+  std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message &msg) {
+    return policy_processor_->ImmediateResponse(msg, FAAClientType::kProcess);
+  }
+
+  void NotifyExit(const Message &msg) {
+    return policy_processor_->NotifyExit(msg, FAAClientType::kProcess);
+  }
+};
+
+class DataFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
+ public:
+  DataFAAPolicyProcessorProxy(std::shared_ptr<FAAPolicyProcessor> policy_processor)
+      : FAAPolicyProcessorProxy(std::move(policy_processor)) {}
+
+  FAAPolicyProcessor::ESResult ProcessMessage(
+      const Message &msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
+      FAAPolicyProcessor::ReadsCacheUpdateBlock reads_cache_update_block,
+      FAAPolicyProcessor::CheckIfPolicyMatchesBlock check_if_policy_matches_block,
+      SNTFileAccessDeniedBlock file_access_denied_block,
+      SNTOverrideFileAccessAction overrideAction) {
+    return policy_processor_->ProcessMessage(
+        msg, std::move(target_policy_pairs), reads_cache_update_block,
+        check_if_policy_matches_block, file_access_denied_block, overrideAction,
+        FAAClientType::kData);
+  }
+
+  std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message &msg) {
+    return policy_processor_->ImmediateResponse(msg, FAAClientType::kData);
+  }
+
+  void NotifyExit(const Message &msg) {
+    return policy_processor_->NotifyExit(msg, FAAClientType::kData);
+  }
 };
 
 }  // namespace santa

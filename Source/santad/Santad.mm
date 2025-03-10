@@ -174,7 +174,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
                           initWithESAPI:esapi
                                 metrics:metrics
-                     faaPolicyProcessor:faaPolicyProcessor
+                     faaPolicyProcessor:std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(
+                                            faaPolicyProcessor)
             iterateProcessPoliciesBlock:^(santa::CheckPolicyBlock checkPolicyBlock) {
               watch_items->IterateProcessPolicies(checkPolicyBlock);
             }];

@@ -18,26 +18,30 @@
 
 #include <bsm/libbsm.h>
 
+#include <memory>
+
+#include "Source/common/AuditUtilities.h"
 #import "Source/common/SNTLogging.h"
+#include "Source/common/SantaCache.h"
+#include "Source/common/SantaSetCache.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 
 using santa::FAAPolicyProcessor;
 using santa::IterateProcessPoliciesBlock;
 using santa::Message;
+using santa::PidPidversion;
 using santa::ProcessWatchItemPolicy;
 
 using PidPidverPair = std::pair<pid_t, int>;
 using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchItemPolicy>>;
-
-static inline PidPidverPair PidPidver(const es_process_t *proc) {
-  return {audit_token_to_pid(proc->audit_token), audit_token_to_pidversion(proc->audit_token)};
-}
+template <typename ValueT>
+using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
 
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
 @property bool isSubscribed;
 @property(copy) IterateProcessPoliciesBlock iterateProcessPoliciesBlock;
-@property std::shared_ptr<FAAPolicyProcessor> faaPolicyProcessor;
+@property(nonatomic) std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy> faaPolicyProcessorProxy;
 @property SNTConfigurator *configurator;
 @end
 
@@ -47,13 +51,14 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                         metrics:(std::shared_ptr<santa::Metrics>)metrics
-             faaPolicyProcessor:(std::shared_ptr<FAAPolicyProcessor>)faaPolicyProcessor
+             faaPolicyProcessor:
+                 (std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
     iterateProcessPoliciesBlock:(IterateProcessPoliciesBlock)iterateProcessPoliciesBlock {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kProcessFileAccessAuthorizer];
   if (self) {
-    _faaPolicyProcessor = faaPolicyProcessor;
+    _faaPolicyProcessorProxy = std::move(faaPolicyProcessorProxy);
     _iterateProcessPoliciesBlock = iterateProcessPoliciesBlock;
 
     _procRuleCache = std::make_unique<ProcessRuleCache>(2000);
@@ -81,7 +86,7 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
     targetPolicyPairs.push_back({target, procPolicy});
   }
 
-  FAAPolicyProcessor::ESResult result = _faaPolicyProcessor->ProcessMessage(
+  FAAPolicyProcessor::ESResult result = self.faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
       ^(const es_process_t *, std::pair<dev_t, ino_t>){
           // TODO: reads cache updates
@@ -115,9 +120,9 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
       // was added optimistically in the probe. The EXIT event will take care
       // of the original entry later on.
       if (esMsg->action.notify.result.auth == ES_AUTH_RESULT_ALLOW) {
-        _procRuleCache->remove(PidPidver(esMsg->process));
+        _procRuleCache->remove(PidPidversion(esMsg->process->audit_token));
       } else {
-        _procRuleCache->remove(PidPidver(esMsg->event.exec.target));
+        _procRuleCache->remove(PidPidversion(esMsg->event.exec.target->audit_token));
       }
 
       return;
@@ -128,24 +133,31 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
       // NB: This is safe to do as two steps (get+set) since we process the
       // fork synchronously which will occur before any EXIT event.
       std::shared_ptr<ProcessWatchItemPolicy> policy =
-          _procRuleCache->get(PidPidver(esMsg->process));
+          _procRuleCache->get(PidPidversion(esMsg->process->audit_token));
       if (policy) {
-        _procRuleCache->set(PidPidver(esMsg->event.fork.child), policy);
+        _procRuleCache->set(PidPidversion(esMsg->event.fork.child->audit_token), policy);
       }
       return;
     }
 
     case ES_EVENT_TYPE_NOTIFY_EXIT: {
-      _procRuleCache->remove(PidPidver(esMsg->process));
+      _procRuleCache->remove(PidPidversion(esMsg->process->audit_token));
       return;
     };
 
     default: break;
   }
 
-  std::shared_ptr<ProcessWatchItemPolicy> policy = _procRuleCache->get(PidPidver(esMsg->process));
+  if (std::optional<FAAPolicyProcessor::ESResult> result =
+          self.faaPolicyProcessorProxy->ImmediateResponse(esMsg)) {
+    [self respondToMessage:esMsg withAuthResult:result->auth_result cacheable:result->cacheable];
+    return;
+  }
+
+  std::shared_ptr<ProcessWatchItemPolicy> policy =
+      _procRuleCache->get(PidPidversion(esMsg->process->audit_token));
   if (!policy) {
-    auto [pid, pidver] = PidPidver(esMsg->process);
+    auto [pid, pidver] = PidPidversion(esMsg->process->audit_token);
     LOGW(@"Policy unexpectedly missing for process: %d/%d: %s", pid, pidver,
          esMsg->process->executable->path.data);
 
@@ -175,10 +187,11 @@ static inline PidPidverPair PidPidver(const es_process_t *proc) {
   self.iterateProcessPoliciesBlock(^bool(std::shared_ptr<ProcessWatchItemPolicy> policy) {
     ProcessRuleCache *cache = _procRuleCache.get();
     for (const santa::WatchItemProcess &policyProcess : policy->processes) {
-      if (_faaPolicyProcessor->PolicyMatchesProcess(policyProcess, esMsg->event.exec.target)) {
+      if ((*self.faaPolicyProcessorProxy)
+              ->PolicyMatchesProcess(policyProcess, esMsg->event.exec.target)) {
         // Map the new process to the matched policy and begin
         // watching the new process
-        cache->set(PidPidver(esMsg->event.exec.target), policy);
+        cache->set(PidPidversion(esMsg->event.exec.target->audit_token), policy);
         [self muteProcess:&esMsg->event.exec.target->audit_token];
 
         interest = santa::ProbeInterest::kInterested;

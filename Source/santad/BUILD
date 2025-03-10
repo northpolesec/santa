@@ -462,6 +462,7 @@ objc_library(
         ":SNTEndpointSecurityEventHandler",
         ":TTYWriter",
         ":WatchItemPolicy",
+        "//Source/common:AuditUtilities",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTBlockMessage",
@@ -470,6 +471,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTFileAccessEvent",
         "//Source/common:SantaCache",
+        "//Source/common:SantaSetCache",
         "//Source/common:SantaVnode",
         "//Source/common:String",
     ],
@@ -497,6 +499,7 @@ objc_library(
         ":TTYWriter",
         ":WatchItemPolicy",
         ":WatchItems",
+        "//Source/common:AuditUtilities",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:Platform",
@@ -506,12 +509,8 @@ objc_library(
         "//Source/common:SNTFileAccessEvent",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTStrengthify",
-        "//Source/common:SantaCache",
         "//Source/common:SantaSetCache",
-        "//Source/common:SantaVnode",
         "//Source/common:String",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -530,6 +529,8 @@ objc_library(
         ":WatchItems",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTLogging",
+        "//Source/common:SantaCache",
+        "//Source/common:SantaSetCache",
     ],
 )
 

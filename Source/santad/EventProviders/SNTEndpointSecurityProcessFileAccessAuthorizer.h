@@ -30,7 +30,8 @@
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                         metrics:(std::shared_ptr<santa::Metrics>)metrics
-             faaPolicyProcessor:(std::shared_ptr<santa::FAAPolicyProcessor>)faaPolicyProcessor
+             faaPolicyProcessor:
+                 (std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
     iterateProcessPoliciesBlock:(santa::IterateProcessPoliciesBlock)findProcessPoliciesBlock;
 
 @property SNTFileAccessDeniedBlock fileAccessDeniedBlock;

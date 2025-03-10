@@ -12,6 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 #include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"
 
@@ -99,6 +100,7 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   EXPECT_CALL(*mockFAA, PolicyMatchesProcess)
       .WillOnce(testing::Return(false))
       .WillOnce(testing::Return(true));
+  auto mockFAAProxy = std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(mockFAA);
 
   // Test object to provide to the CheckPolicyBlock
   WatchItemProcess proc{"proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", std::nullopt};
@@ -116,7 +118,7 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   SNTEndpointSecurityProcessFileAccessAuthorizer *procFAAClient =
       [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc] initWithESAPI:mockESApi
                                                                     metrics:nullptr
-                                                         faaPolicyProcessor:mockFAA
+                                                         faaPolicyProcessor:mockFAAProxy
                                                 iterateProcessPoliciesBlock:iterPoliciesBlock];
   id mockProcFAAClient = OCMPartialMock(procFAAClient);
 

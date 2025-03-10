@@ -43,15 +43,12 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTStrengthify.h"
 #include "Source/common/SantaSetCache.h"
-#include "Source/common/SantaVnode.h"
 #include "Source/common/String.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/RateLimiter.h"
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
 
 using santa::DataWatchItemPolicy;
 using santa::EndpointSecurityAPI;
