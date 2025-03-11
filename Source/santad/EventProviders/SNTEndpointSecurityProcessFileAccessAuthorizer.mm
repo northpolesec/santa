@@ -41,12 +41,12 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
 @property bool isSubscribed;
 @property(copy) IterateProcessPoliciesBlock iterateProcessPoliciesBlock;
-@property(nonatomic) std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy> faaPolicyProcessorProxy;
 @property SNTConfigurator *configurator;
 @end
 
 @implementation SNTEndpointSecurityProcessFileAccessAuthorizer {
   std::unique_ptr<ProcessRuleCache> _procRuleCache;
+  std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy> _faaPolicyProcessorProxy;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
@@ -86,7 +86,7 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
     targetPolicyPairs.push_back({target, procPolicy});
   }
 
-  FAAPolicyProcessor::ESResult result = self.faaPolicyProcessorProxy->ProcessMessage(
+  FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
       ^bool(const santa::WatchItemPolicyBase &base_policy,
             const FAAPolicyProcessor::PathTarget &target, const Message &msg) {
@@ -139,7 +139,7 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
 
     case ES_EVENT_TYPE_NOTIFY_EXIT: {
       _procRuleCache->remove(PidPidversion(esMsg->process->audit_token));
-      self.faaPolicyProcessorProxy->NotifyExit(esMsg);
+      _faaPolicyProcessorProxy->NotifyExit(esMsg);
       return;
     };
 
@@ -147,7 +147,7 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
   }
 
   if (std::optional<FAAPolicyProcessor::ESResult> result =
-          self.faaPolicyProcessorProxy->ImmediateResponse(esMsg)) {
+          _faaPolicyProcessorProxy->ImmediateResponse(esMsg)) {
     [self respondToMessage:esMsg withAuthResult:result->auth_result cacheable:result->cacheable];
     return;
   }
@@ -185,7 +185,7 @@ using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
   self.iterateProcessPoliciesBlock(^bool(std::shared_ptr<ProcessWatchItemPolicy> policy) {
     ProcessRuleCache *cache = _procRuleCache.get();
     for (const santa::WatchItemProcess &policyProcess : policy->processes) {
-      if ((*self.faaPolicyProcessorProxy)
+      if ((*_faaPolicyProcessorProxy)
               ->PolicyMatchesProcess(policyProcess, esMsg->event.exec.target)) {
         // Map the new process to the matched policy and begin
         // watching the new process
