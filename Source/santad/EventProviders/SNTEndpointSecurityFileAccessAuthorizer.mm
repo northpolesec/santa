@@ -43,15 +43,12 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTStrengthify.h"
 #include "Source/common/SantaSetCache.h"
-#include "Source/common/SantaVnode.h"
 #include "Source/common/String.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/RateLimiter.h"
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
 
 using santa::DataWatchItemPolicy;
 using santa::EndpointSecurityAPI;
@@ -165,6 +162,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 @interface SNTEndpointSecurityFileAccessAuthorizer ()
 @property SNTConfigurator *configurator;
 @property bool isSubscribed;
+@property(nonatomic) std::shared_ptr<santa::DataFAAPolicyProcessorProxy> faaPolicyProcessorProxy;
 @end
 
 @implementation SNTEndpointSecurityFileAccessAuthorizer {
@@ -176,7 +174,6 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   std::unique_ptr<ProcessSetCache<std::pair<dev_t, ino_t>>> _readsCache;
   std::unique_ptr<ProcessSetCache<std::pair<std::string, std::string>>> _ttyMessageCache;
   std::shared_ptr<Metrics> _metrics;
-  std::shared_ptr<santa::FAAPolicyProcessor> _faaPolicyProcessor;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
@@ -184,7 +181,8 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
                        logger:(std::shared_ptr<santa::Logger>)logger
                    watchItems:(std::shared_ptr<WatchItems>)watchItems
                      enricher:(std::shared_ptr<santa::Enricher>)enricher
-           faaPolicyProcessor:(std::shared_ptr<santa::FAAPolicyProcessor>)faaPolicyProcessor
+           faaPolicyProcessor:
+               (std::shared_ptr<santa::DataFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:metrics
@@ -193,7 +191,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     _watchItems = std::move(watchItems);
     _logger = std::move(logger);
     _enricher = std::move(enricher);
-    _faaPolicyProcessor = std::move(faaPolicyProcessor);
+    _faaPolicyProcessorProxy = std::move(faaPolicyProcessorProxy);
     _ttyWriter = std::move(ttyWriter);
     _metrics = std::move(metrics);
 
@@ -318,7 +316,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
   FileAccessPolicyDecision decision = FileAccessPolicyDecision::kDenied;
 
   for (const WatchItemProcess &process : policy->processes) {
-    if (_faaPolicyProcessor->PolicyMatchesProcess(process, msg->process)) {
+    if ((*self.faaPolicyProcessorProxy)->PolicyMatchesProcess(process, msg->process)) {
       decision = FileAccessPolicyDecision::kAllowed;
       break;
     }
@@ -382,7 +380,7 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
     if (ShouldNotifyUserDecision(policyDecision) &&
         (!policy->silent || (!policy->silent_tty && TTYWriter::CanWrite(msg->process)))) {
       SNTCachedDecision *cd =
-          _faaPolicyProcessor->GetCachedDecision(msg->process->executable->stat);
+          (*self.faaPolicyProcessorProxy)->GetCachedDecision(msg->process->executable->stat);
 
       SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
 
@@ -444,7 +442,8 @@ bool ShouldMessageTTY(const std::shared_ptr<DataWatchItemPolicy> &policy, const 
 }
 
 - (void)processMessage:(Message)msg overrideAction:(SNTOverrideFileAccessAction)overrideAction {
-  std::vector<FAAPolicyProcessor::PathTarget> targets = _faaPolicyProcessor->PathTargets(msg);
+  std::vector<FAAPolicyProcessor::PathTarget> targets =
+      (*self.faaPolicyProcessorProxy)->PathTargets(msg);
 
   // Extract the paths from the vector of PathTargets in order to lookup policies
   // Note: There should only ever be 1 or 2 items in the vector

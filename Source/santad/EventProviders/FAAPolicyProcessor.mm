@@ -17,6 +17,7 @@
 #include <bsm/libbsm.h>
 #include <pwd.h>
 
+#include "Source/common/AuditUtilities.h"
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTBlockMessage.h"
@@ -28,7 +29,15 @@ NSString *const kBadCertHash = @"BAD_CERT_HASH";
 
 namespace santa {
 
-constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
+// Semi-arbitrary values for the reads_cache_ and tty_message SantaSetCache
+// objects. The number of processes should be large enough to have room for
+// simultaneously running processes that might match FAA rules. The
+// per-process capacity should be large enough to help speed up consecutive
+// reads or deduplicate TTY messages.
+static constexpr size_t kNumProcesses = 2048;
+static constexpr size_t kPerProcessSetCapacity = 128;
+
+static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 
 static inline std::string Path(const es_file_t *esFile) {
   return std::string(esFile->path.data, esFile->path.length);
@@ -102,12 +111,12 @@ inline bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision) {
   return IsBlockDecision(decision);
 }
 
-static bool ShouldShowUI(const std::shared_ptr<WatchItemPolicyBase> &policy) {
+static inline bool ShouldShowUIForPolicy(const std::shared_ptr<WatchItemPolicyBase> &policy) {
   return !policy->silent;
 }
 
-static bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicyBase> &policy,
-                             const Message &msg) {
+static inline bool ShouldMessageTTYForPolicy(const std::shared_ptr<WatchItemPolicyBase> &policy,
+                                             const Message &msg) {
   if (policy->silent_tty || !TTYWriter::CanWrite(msg->process)) {
     return false;
   }
@@ -146,7 +155,9 @@ FAAPolicyProcessor::FAAPolicyProcessor(
       enricher_(std::move(enricher)),
       logger_(std::move(logger)),
       tty_writer_(std::move(tty_writer)),
-      generate_event_detail_link_block_(generate_event_detail_link_block) {
+      generate_event_detail_link_block_(generate_event_detail_link_block),
+      reads_cache_(kNumProcesses, kPerProcessSetCapacity),
+      tty_message_cache_(kNumProcesses, kPerProcessSetCapacity) {
   configurator_ = [SNTConfigurator configurator];
   queue_ = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
 }
@@ -357,8 +368,18 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const P
   });
 }
 
+bool FAAPolicyProcessor::HaveMessagedTTYForPolicy(const WatchItemPolicyBase &policy,
+                                                  const Message &msg) {
+  return !tty_message_cache_.Set(PidPidversion(msg->process->audit_token),
+                                 {policy.version, policy.name});
+}
+
 void FAAPolicyProcessor::LogTTY(SNTFileAccessEvent *event, URLTextPair link_info,
                                 const Message &msg, const WatchItemPolicyBase &policy) {
+  if (HaveMessagedTTYForPolicy(policy, msg)) {
+    return;
+  }
+
   NSAttributedString *attrStr = [SNTBlockMessage
       attributedBlockMessageForFileAccessEvent:event
                                  customMessage:OptionalStringToNSString(policy.custom_message)];
@@ -403,7 +424,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     LogTelemetry(*policy, target, msg, decision);
 
     if (ShouldNotifyUserDecision(decision) &&
-        (ShouldShowUI(policy) || ShouldMessageTTY(policy, msg))) {
+        (ShouldShowUIForPolicy(policy) || ShouldMessageTTYForPolicy(policy, msg))) {
       SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
       SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
 
@@ -428,13 +449,13 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
         link_info = generate_event_detail_link_block_(policy);
       }
 
-      if (ShouldShowUI(policy)) {
+      if (ShouldShowUIForPolicy(policy)) {
         file_access_denied_block(event, OptionalStringToNSString(policy->custom_message),
                                  link_info.first, link_info.second);
       }
 
       // TODO: TTY message cache
-      if (ShouldMessageTTY(policy, msg)) {
+      if (ShouldMessageTTYForPolicy(policy, msg)) {
         LogTTY(event, link_info, msg, *policy);
       }
     }
@@ -443,11 +464,16 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
   return decision;
 }
 
+static inline FAAPolicyProcessor::ReadsCacheKey MakeReadsCacheKey(const Message &msg,
+                                                                  FAAClientType client_type) {
+  return {Pid(msg->process->audit_token), Pidversion(msg->process->audit_token), client_type};
+}
+
 FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
-    ReadsCacheUpdateBlock reads_cache_update_block,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
-    SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction) {
+    SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction,
+    FAAClientType client_type) {
   es_auth_result_t policy_result = ES_AUTH_RESULT_ALLOW;
   bool cacheable = true;
 
@@ -455,7 +481,7 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     FileAccessPolicyDecision decision = ProcessTargetAndPolicy(
         msg, target_policy_pair.first, target_policy_pair.second, check_if_policy_matches_block,
         file_access_denied_block, overrideAction);
-    // Trigger the caller's ReadsCacheUpdateBlock if:
+    // Populate the reads_cache_ if:
     //   1. The policy applied
     //   2. The process wasn't invalid
     //   3. A devno/ino pair existed for the target
@@ -466,7 +492,7 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
         decision != FileAccessPolicyDecision::kDeniedInvalidSignature &&
         target_policy_pair.first.devno_ino.has_value() && target_policy_pair.second.has_value() &&
         (*target_policy_pair.second)->allow_read_access) {
-      reads_cache_update_block(msg->process, *target_policy_pair.first.devno_ino);
+      reads_cache_.Set(MakeReadsCacheKey(msg, client_type), *target_policy_pair.first.devno_ino);
     }
 
     policy_result =
@@ -482,6 +508,27 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
   }
 
   return {policy_result, cacheable};
+}
+
+std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateResponse(
+    const Message &msg, FAAClientType client_type) {
+  // Note: Some other events have readable targets, but only events where all
+  // targets can be determined to be readable can be considered. E.g., for
+  // clone, the destination must still be evaluated so the reads_cache_ is not
+  // consulted.
+  if (msg->event_type == ES_EVENT_TYPE_AUTH_OPEN &&
+      !(msg->event.open.fflag & kOpenFlagsIndicatingWrite) &&
+      reads_cache_.Contains(MakeReadsCacheKey(msg, client_type),
+                            std::pair<dev_t, ino_t>{msg->event.open.file->stat.st_dev,
+                                                    msg->event.open.file->stat.st_ino})) {
+    return std::make_optional<FAAPolicyProcessor::ESResult>({ES_AUTH_RESULT_ALLOW, false});
+  }
+  return std::nullopt;
+}
+
+void FAAPolicyProcessor::NotifyExit(const Message &msg, FAAClientType client_type) {
+  reads_cache_.Remove(MakeReadsCacheKey(msg, client_type));
+  tty_message_cache_.Remove(PidPidversion(msg->process->audit_token));
 }
 
 std::vector<FAAPolicyProcessor::PathTarget> FAAPolicyProcessor::PathTargets(const Message &msg) {

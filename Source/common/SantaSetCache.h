@@ -64,8 +64,9 @@ class SantaSetCache {
   /// the key causes the cache capacity to overflow, the cache
   /// is cleared. If adding the value to the set causes it to
   /// overflow, it is first cleared.
-  /// Return true if the set at the given key contained the
-  /// given value. Otherwise false.
+  /// Return true if the new value was inserted into the inner
+  /// set. Otherwise returns false if the inner set already
+  /// contained the value.
   bool Set(const KeyT &key, ValueT val) {
     __block bool did_set = false;
     __block ValueT tmp_val = std::move(val);
