@@ -75,5 +75,6 @@
  "policy_version": "policy_version",
  "policy_name": "policy_name",
  "access_type": "ACCESS_TYPE_OPEN",
- "policy_decision": "POLICY_DECISION_DENIED"
+ "policy_decision": "POLICY_DECISION_DENIED",
+ "fingerprint": "abc123"
 }

@@ -890,13 +890,12 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       BasicString::Create(nullptr, nil, false)
           ->SerializeFileAccess("v1.0", "pol_name", Message(mockESApi, &esMsg),
                                 Enricher().Enrich(*esMsg.process), "file_target",
-                                FileAccessPolicyDecision::kAllowedAuditOnly);
+                                FileAccessPolicyDecision::kAllowedAuditOnly, "abc123");
   std::string got(ret.begin(), ret.end());
   std::string want =
-      "action=FILE_ACCESS|policy_version=v1.0|policy_name=pol_name|path=file_target|access_type="
-      "OPEN|"
-      "decision=AUDIT_ONLY|pid=12|ppid=56|"
-      "process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+      "action=FILE_ACCESS|policy_version=v1.0|policy_name=pol_name|path=file_target"
+      "|access_type=OPEN|decision=AUDIT_ONLY|fingerprint=abc123|pid=12|ppid=56"
+      "|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
   XCTAssertCppStringEqual(got, want);
 }
 

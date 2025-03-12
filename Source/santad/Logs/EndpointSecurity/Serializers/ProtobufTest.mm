@@ -1379,7 +1379,7 @@ void SerializeAndCheckNonESEvents(
       ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
         return serializer->SerializeFileAccess("policy_version", "policy_name", msg,
                                                Enricher().Enrich(*msg->process), "target",
-                                               FileAccessPolicyDecision::kDenied);
+                                               FileAccessPolicyDecision::kDenied, "abc123");
       });
 }
 
