@@ -29,7 +29,15 @@ NSString *const kBadCertHash = @"BAD_CERT_HASH";
 
 namespace santa {
 
-constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
+// Semi-arbitrary values for the reads_cache_ and tty_message SantaSetCache
+// objects. The number of processes should be large enough to have room for
+// simultaneously running processes that might match FAA rules. The
+// per-process capacity should be large enough to help speed up consecutive
+// reads or deduplicate TTY messages.
+static constexpr size_t kNumProcesses = 2048;
+static constexpr size_t kPerProcessSetCapacity = 128;
+
+static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 
 static inline std::string Path(const es_file_t *esFile) {
   return std::string(esFile->path.data, esFile->path.length);
@@ -103,12 +111,12 @@ inline bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision) {
   return IsBlockDecision(decision);
 }
 
-static bool ShouldShowUI(const std::shared_ptr<WatchItemPolicyBase> &policy) {
+static inline bool ShouldShowUIForPolicy(const std::shared_ptr<WatchItemPolicyBase> &policy) {
   return !policy->silent;
 }
 
-static bool ShouldMessageTTY(const std::shared_ptr<WatchItemPolicyBase> &policy,
-                             const Message &msg) {
+static inline bool ShouldMessageTTYForPolicy(const std::shared_ptr<WatchItemPolicyBase> &policy,
+                                             const Message &msg) {
   if (policy->silent_tty || !TTYWriter::CanWrite(msg->process)) {
     return false;
   }
@@ -148,7 +156,8 @@ FAAPolicyProcessor::FAAPolicyProcessor(
       logger_(std::move(logger)),
       tty_writer_(std::move(tty_writer)),
       generate_event_detail_link_block_(generate_event_detail_link_block),
-      reads_cache_(1024, 8192) {
+      reads_cache_(kNumProcesses, kPerProcessSetCapacity),
+      tty_message_cache_(kNumProcesses, kPerProcessSetCapacity) {
   configurator_ = [SNTConfigurator configurator];
   queue_ = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
 }
@@ -359,8 +368,18 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const P
   });
 }
 
+bool FAAPolicyProcessor::HaveMessagedTTYForPolicy(const WatchItemPolicyBase &policy,
+                                                  const Message &msg) {
+  return !tty_message_cache_.Set(PidPidversion(msg->process->audit_token),
+                                 {policy.version, policy.name});
+}
+
 void FAAPolicyProcessor::LogTTY(SNTFileAccessEvent *event, URLTextPair link_info,
                                 const Message &msg, const WatchItemPolicyBase &policy) {
+  if (HaveMessagedTTYForPolicy(policy, msg)) {
+    return;
+  }
+
   NSAttributedString *attrStr = [SNTBlockMessage
       attributedBlockMessageForFileAccessEvent:event
                                  customMessage:OptionalStringToNSString(policy.custom_message)];
@@ -405,7 +424,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     LogTelemetry(*policy, target, msg, decision);
 
     if (ShouldNotifyUserDecision(decision) &&
-        (ShouldShowUI(policy) || ShouldMessageTTY(policy, msg))) {
+        (ShouldShowUIForPolicy(policy) || ShouldMessageTTYForPolicy(policy, msg))) {
       SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
       SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
 
@@ -430,13 +449,13 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
         link_info = generate_event_detail_link_block_(policy);
       }
 
-      if (ShouldShowUI(policy)) {
+      if (ShouldShowUIForPolicy(policy)) {
         file_access_denied_block(event, OptionalStringToNSString(policy->custom_message),
                                  link_info.first, link_info.second);
       }
 
       // TODO: TTY message cache
-      if (ShouldMessageTTY(policy, msg)) {
+      if (ShouldMessageTTYForPolicy(policy, msg)) {
         LogTTY(event, link_info, msg, *policy);
       }
     }
@@ -509,6 +528,7 @@ std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateRespons
 
 void FAAPolicyProcessor::NotifyExit(const Message &msg, FAAClientType client_type) {
   reads_cache_.Remove(MakeReadsCacheKey(msg, client_type));
+  tty_message_cache_.Remove(PidPidversion(msg->process->audit_token));
 }
 
 std::vector<FAAPolicyProcessor::PathTarget> FAAPolicyProcessor::PathTargets(const Message &msg) {

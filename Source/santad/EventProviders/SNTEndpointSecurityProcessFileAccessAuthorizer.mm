@@ -35,8 +35,6 @@ using santa::ProcessWatchItemPolicy;
 
 using PidPidverPair = std::pair<pid_t, int>;
 using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchItemPolicy>>;
-template <typename ValueT>
-using ProcessSetCache = santa::SantaSetCache<std::pair<pid_t, int>, ValueT>;
 
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
 @property bool isSubscribed;

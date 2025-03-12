@@ -85,8 +85,6 @@ class FAAPolicyProcessor {
       URLTextPair (^)(const std::shared_ptr<WatchItemPolicyBase> &watch_item);
 
   using ReadsCacheKey = std::tuple<pid_t, int, FAAClientType>;
-  template <typename ValueT>
-  using ProcessSetCache = santa::SantaSetCache<ReadsCacheKey, ValueT>;
 
   // Friend classes that can call private methods requiring FAAClientType parameters
   friend class DataFAAPolicyProcessorProxy;
@@ -114,7 +112,9 @@ class FAAPolicyProcessor {
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<TTYWriter> tty_writer_;
   GenerateEventDetailLinkBlock generate_event_detail_link_block_;
-  ProcessSetCache<std::pair<dev_t, ino_t>> reads_cache_;
+  santa::SantaSetCache<ReadsCacheKey, std::pair<dev_t, ino_t>> reads_cache_;
+  santa::SantaSetCache<std::pair<pid_t, int>, std::pair<std::string, std::string>>
+      tty_message_cache_;
   SantaCache<SantaVnode, NSString *> cert_hash_cache_;
   SNTConfigurator *configurator_;
   dispatch_queue_t queue_;
@@ -164,6 +164,10 @@ class FAAPolicyProcessor {
 
   virtual bool PolicyAllowsReadsForTarget(const Message &msg, const PathTarget &target,
                                           std::shared_ptr<WatchItemPolicyBase> policy);
+
+  /// Return true if the TTY was previously messaged for the given
+  /// process/policy pair. Otherwise false.
+  bool HaveMessagedTTYForPolicy(const WatchItemPolicyBase &policy, const Message &msg);
 
   void LogTelemetry(const WatchItemPolicyBase &policy, const PathTarget &target, const Message &msg,
                     FileAccessPolicyDecision decision);
