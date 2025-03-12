@@ -552,6 +552,11 @@ message FileAccess {
     POLICY_DECISION_ALLOWED_AUDIT_ONLY = 3;
   }
   optional PolicyDecision policy_decision = 6;
+
+  // Used to link a single operation emitting multiple FileAccess messages.
+  // This can happen, for example, when a single operation violates both Data
+  // and Process File Access Authorization rules
+  optional string fingerprint = 7;
 }
 
 // Session identifier for a graphical session

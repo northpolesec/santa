@@ -20,6 +20,7 @@
 
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include "Source/common/Platform.h"
@@ -28,6 +29,10 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #import "Source/santad/SNTDecisionCache.h"
 
+// Forward declaration of XXH3 types
+struct XXH3_state_s;
+typedef XXH3_state_s XXH3_state_t;
+
 @class SNTStoredEvent;
 
 namespace santa {
@@ -35,7 +40,7 @@ namespace santa {
 class Serializer {
  public:
   Serializer(SNTDecisionCache *decision_cache);
-  virtual ~Serializer() = default;
+  virtual ~Serializer();
 
   std::vector<uint8_t> SerializeMessage(std::unique_ptr<santa::EnrichedMessage> msg) {
     return std::visit([this](const auto &arg) { return this->SerializeMessageTemplate(arg); },
@@ -80,12 +85,17 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) = 0;
 #endif  // HAVE_MACOS_15
 
-  virtual std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
-                                                   const std::string &policy_name,
-                                                   const santa::Message &msg,
-                                                   const santa::EnrichedProcess &enriched_process,
-                                                   const std::string &target,
-                                                   FileAccessPolicyDecision decision) = 0;
+  virtual std::vector<uint8_t> SerializeFileAccess(
+      const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
+      const santa::EnrichedProcess &enriched_process, const std::string &target,
+      FileAccessPolicyDecision decision, std::string_view fingerprint) = 0;
+
+  std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
+                                           const std::string &policy_name,
+                                           const santa::Message &msg,
+                                           const santa::EnrichedProcess &enriched_process,
+                                           const std::string &target,
+                                           FileAccessPolicyDecision decision);
 
   virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message &,
                                                   const std::string_view) = 0;
@@ -110,6 +120,7 @@ class Serializer {
   bool enabled_machine_id_ = false;
   std::string machine_id_;
   SNTDecisionCache *decision_cache_;
+  XXH3_state_t *common_hash_state_;
 };
 
 }  // namespace santa

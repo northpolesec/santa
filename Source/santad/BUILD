@@ -613,10 +613,14 @@ objc_library(
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",
         ":SNTDecisionCache",
+        "//Source/common:AuditUtilities",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:String",
+        "@xxhash",
     ],
 )
 

@@ -70,12 +70,10 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) override;
 #endif  // HAVE_MACOS_15
 
-  std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
-                                           const std::string &policy_name,
-                                           const santa::Message &msg,
-                                           const santa::EnrichedProcess &enriched_process,
-                                           const std::string &target,
-                                           FileAccessPolicyDecision decision) override;
+  std::vector<uint8_t> SerializeFileAccess(
+      const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
+      const santa::EnrichedProcess &enriched_process, const std::string &target,
+      FileAccessPolicyDecision decision, std::string_view fingerprint) override;
 
   std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view) override;
 

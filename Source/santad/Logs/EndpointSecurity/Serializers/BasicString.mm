@@ -835,12 +835,10 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverr
 
 #endif  // HAVE_MACOS_15
 
-std::vector<uint8_t> BasicString::SerializeFileAccess(const std::string &policy_version,
-                                                      const std::string &policy_name,
-                                                      const Message &msg,
-                                                      const EnrichedProcess &enriched_process,
-                                                      const std::string &target,
-                                                      FileAccessPolicyDecision decision) {
+std::vector<uint8_t> BasicString::SerializeFileAccess(
+    const std::string &policy_version, const std::string &policy_name, const Message &msg,
+    const EnrichedProcess &enriched_process, const std::string &target,
+    FileAccessPolicyDecision decision, std::string_view fingerprint) {
   std::string str = CreateDefaultString();
 
   str.append("action=FILE_ACCESS|policy_version=");
@@ -853,6 +851,8 @@ std::vector<uint8_t> BasicString::SerializeFileAccess(const std::string &policy_
   str.append(GetAccessTypeString(msg->event_type));
   str.append("|decision=");
   str.append(GetFileAccessPolicyDecisionString(decision));
+  str.append("|fingerprint=");
+  str.append(fingerprint);
 
   AppendProcess(str, msg->process);
   AppendUserGroup(str, msg->process->audit_token, enriched_process.real_user(),
