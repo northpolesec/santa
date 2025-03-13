@@ -95,6 +95,12 @@ struct BinaryView: View {
             Button(action: { unknownBlockMessage = "You may not run this thing" }) {
               Text(verbatim: "Populate (1-line)").font(Font.subheadline)
             }
+            Button(action: {
+              unknownBlockMessage =
+                "That the choice for mankind lay between freedom and happiness, and that, for the great bulk of mankind, happiness was better. All work and no play makes Jack a dull boy. Draw your chair up and hand me my violin, for the only problem we have still to solve is how to while away these bleak autumnal evenings."
+            }) {
+              Text(verbatim: "Populate (multiline)").font(Font.subheadline)
+            }
             Button(action: { unknownBlockMessage = "" }) { Text("Clear").font(Font.subheadline) }
           }
 

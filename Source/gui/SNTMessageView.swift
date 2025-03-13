@@ -60,7 +60,7 @@ public struct SNTMessageView<Content: View>: View {
       AttributedText(blockMessage)
         .multilineTextAlignment(.center)
         .padding([.leading, .trailing], 15.0)
-        .fixedSize()
+        .fixedSize(horizontal: false, vertical: true)
 
       Spacer()
 
@@ -255,5 +255,8 @@ struct AttributedText: NSViewRepresentable {
     NSTextField(labelWithAttributedString: self.attributedString)
   }
 
-  func updateNSView(_ textField: NSTextField, context: Context) {}
+  func updateNSView(_ textView: NSTextField, context: Context) {
+    textView.maximumNumberOfLines = 15
+    textView.translatesAutoresizingMaskIntoConstraints = false
+  }
 }
