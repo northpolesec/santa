@@ -136,6 +136,8 @@ absolute path of the binary file. Symlinks in the path will have already been
 followed by the time Santa processes the execution and matches against the
 regex.
 
+For more details see the [Scopes page](../concepts/scopes.md).
+
 ### Static Rules
 
 Static rules are rules that are defined inline in the Santa configuration. These
