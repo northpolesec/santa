@@ -35,6 +35,6 @@ Not a Mach-O       | No
 The paths covered by the allowed path and blocked path regex patterns are not
 tracked. If an execution is allowed initially, then moved into a blocked
 directory, Santa has no knowledge of that move. Since Santa caches decisions,
-the recently moved file will continue to be allowed to execution even though
+the recently moved file will continue to be allowed to execute even though
 it is now within a blocked path. Going from a blocked path to an allowed path
 is not largely affected.
