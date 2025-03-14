@@ -151,6 +151,10 @@ macos_application(
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",
     }),
+    resources = [
+        "Resources/SantaLicense.txt",
+        "Resources/ThirdPartyLicenses.txt",
+    ],
     strings = glob(["Resources/**/*.strings"]),
     version = "//:version",
     visibility = ["//:santa_package_group"],
