@@ -84,6 +84,7 @@ class WatchItemsPeer : public WatchItems {
 
 }  // namespace santa
 
+using santa::FAAPolicyProcessor;
 using santa::GetRuleType;
 using santa::IsWatchItemNameValid;
 using santa::ParseConfig;
@@ -91,7 +92,6 @@ using santa::ParseConfigSingleWatchItem;
 using santa::VerifyConfigWatchItemPaths;
 using santa::VerifyConfigWatchItemProcesses;
 using santa::WatchItemsPeer;
-using santa::FAAPolicyProcessor;
 
 static constexpr std::string_view kBadPolicyName("__BAD_NAME__");
 static constexpr std::string_view kBadPolicyPath("__BAD_PATH__");
@@ -99,9 +99,9 @@ static constexpr std::string_view kVersion("v0.1");
 
 static santa::FAAPolicyProcessor::PathTarget MakePathTarget(std::string path) {
   return {
-    .path = std::move(path),
-    .is_readable = true,
-    .devno_ino = std::nullopt,
+      .path = std::move(path),
+      .is_readable = true,
+      .devno_ino = std::nullopt,
   };
 }
 
@@ -403,14 +403,17 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
     for (const auto &kv : pathToPolicyName) {
       targetPolicies = watchItems.FindPoliciesForTargets({MakePathTarget(kv.first)});
-      XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->version.data(), kVersion.data());
+      XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->version.data(),
+                            kVersion.data());
       XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(),
                             kv.second.data());
     }
 
     // Test multiple lookup
-    targetPolicies = watchItems.FindPoliciesForTargets({MakePathTarget("./foo"), MakePathTarget("./does/not/exist")});
-    XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(), "foo_subdir");
+    targetPolicies = watchItems.FindPoliciesForTargets(
+        {MakePathTarget("./foo"), MakePathTarget("./does/not/exist")});
+    XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(),
+                          "foo_subdir");
     XCTAssertFalse(targetPolicies[1].second.has_value());
   }
 
@@ -1061,7 +1064,8 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   watchItems.ReloadConfig(config);
 
   // Ensure that non-glob patterns are watched
-  std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicies = watchItems.FindPoliciesForTargets({MakePathTarget("abc")});
+  std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicies =
+      watchItems.FindPoliciesForTargets({MakePathTarget("abc")});
   XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(), "rule1");
 
   // Check that patterns with globs are not returned

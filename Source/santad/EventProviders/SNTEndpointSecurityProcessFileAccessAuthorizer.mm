@@ -110,8 +110,8 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
     recordEventMetrics:(void (^)(santa::EventDisposition))recordEventMetrics {
   SNTOverrideFileAccessAction overrideAction = [self.configurator overrideFileAccessAction];
 
-  // TODO: Hook up KVO watcher to unsubscribe the ES client when FAA is disabled via override action.
-  // If the override action is set to Disable, return immediately.
+  // TODO: Hook up KVO watcher to unsubscribe the ES client when FAA is disabled via override
+  // action. If the override action is set to Disable, return immediately.
   if (overrideAction == SNTOverrideFileAccessActionDiable) {
     if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
       [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:false];

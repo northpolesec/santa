@@ -35,15 +35,6 @@
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
 
-// Duplicate definition for test implementation
-struct PathTarget {
-  std::string path;
-  bool isReadable;
-  std::optional<std::pair<dev_t, ino_t>> devnoIno;
-};
-
-using PathTargetsPair = std::pair<std::optional<std::string>, std::optional<std::string>>;
-
 void SetExpectationsForFileAccessAuthorizerInit(
     std::shared_ptr<MockEndpointSecurityAPI> mockESApi) {
   EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
