@@ -77,7 +77,8 @@ class FAAPolicyProcessor {
 
   /// When this block is called, the policy enforcement client must determine
   /// whether or not the given policy applies to the given ES message.
-  using CheckIfPolicyMatchesBlock = bool (^)(const WatchItemPolicyBase &, const PathTarget &target,
+  using CheckIfPolicyMatchesBlock = bool (^)(const santa::WatchItemPolicyBase &base_policy,
+                                             const FAAPolicyProcessor::PathTarget &target,
                                              const Message &msg);
   using URLTextPair = std::pair<NSString *, NSString *>;
   /// A block that generates custom URL and Text pairs from a given policy.

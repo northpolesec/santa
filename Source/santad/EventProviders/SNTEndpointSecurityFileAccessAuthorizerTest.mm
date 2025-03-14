@@ -30,36 +30,10 @@
 #include <optional>
 #include <variant>
 
-#import "Source/common/MOLCertificate.h"
-#import "Source/common/MOLCodesignChecker.h"
-#include "Source/common/Platform.h"
-#import "Source/common/SNTCachedDecision.h"
-#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
-#include "Source/santad/DataLayer/WatchItems.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/FAAPolicyProcessor.h"
-#include "Source/santad/EventProviders/MockFAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
-#include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
-#include "Source/santad/SNTDecisionCache.h"
-
-using santa::DataWatchItemPolicy;
-using santa::Message;
-using santa::MockFAAPolicyProcessor;
-using santa::WatchItemProcess;
-
-// Duplicate definition for test implementation
-struct PathTarget {
-  std::string path;
-  bool isReadable;
-  std::optional<std::pair<dev_t, ino_t>> devnoIno;
-};
-
-using PathTargetsPair = std::pair<std::optional<std::string>, std::optional<std::string>>;
 
 void SetExpectationsForFileAccessAuthorizerInit(
     std::shared_ptr<MockEndpointSecurityAPI> mockESApi) {
@@ -68,13 +42,6 @@ void SetExpectationsForFileAccessAuthorizerInit(
 }
 
 @interface SNTEndpointSecurityFileAccessAuthorizer (Testing)
-- (FileAccessPolicyDecision)specialCaseForPolicy:(std::shared_ptr<DataWatchItemPolicy>)policy
-                                          target:(const PathTarget &)target
-                                         message:(const Message &)msg;
-- (FileAccessPolicyDecision)applyPolicy:
-                                (std::optional<std::shared_ptr<DataWatchItemPolicy>>)optionalPolicy
-                              forTarget:(const PathTarget &)target
-                              toMessage:(const Message &)msg;
 - (void)disable;
 
 @property bool isSubscribed;
@@ -82,8 +49,6 @@ void SetExpectationsForFileAccessAuthorizerInit(
 
 @interface SNTEndpointSecurityFileAccessAuthorizerTest : XCTestCase
 @property id mockConfigurator;
-@property id cscMock;
-@property id dcMock;
 @end
 
 @implementation SNTEndpointSecurityFileAccessAuthorizerTest
@@ -93,17 +58,9 @@ void SetExpectationsForFileAccessAuthorizerInit(
 
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
-
-  self.cscMock = OCMClassMock([MOLCodesignChecker class]);
-  OCMStub([self.cscMock alloc]).andReturn(self.cscMock);
-
-  self.dcMock = OCMStrictClassMock([SNTDecisionCache class]);
 }
 
 - (void)tearDown {
-  [self.cscMock stopMocking];
-  [self.dcMock stopMocking];
-
   [super tearDown];
 }
 
