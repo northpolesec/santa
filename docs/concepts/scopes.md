@@ -38,7 +38,7 @@ Mach-O `execve()`s since they are evaluated before the allow scope.
 
 The paths covered by the allowed path and blocked path regex patterns are not
 tracked. If an `execve()` is allowed initially, then moved into a blocked
-directory, Santa has no knowledge of that move. Since santa caches decisions,
+directory, Santa has no knowledge of that move. Since Santa caches decisions,
 the recently moved file will continue to be allowed to `execve()` even though
 it is now within a blocked path. Going from a blocked path to an allowed path
 is not largely affected.
