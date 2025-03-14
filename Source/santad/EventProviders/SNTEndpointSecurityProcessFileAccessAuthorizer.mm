@@ -108,6 +108,17 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
 - (void)handleMessage:(Message &&)esMsg
     recordEventMetrics:(void (^)(santa::EventDisposition))recordEventMetrics {
+  SNTOverrideFileAccessAction overrideAction = [self.configurator overrideFileAccessAction];
+
+  // TODO: Hook up KVO watcher to unsubscribe the ES client when FAA is disabled via override action.
+  // If the override action is set to Disable, return immediately.
+  if (overrideAction == SNTOverrideFileAccessActionDiable) {
+    if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
+      [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:false];
+    }
+    return;
+  }
+
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_EXEC: {
       // If the exec was allowed, remove the pid/pidver of the process that
@@ -153,6 +164,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   std::shared_ptr<ProcessWatchItemPolicy> policy =
       _procRuleCache->get(PidPidversion(esMsg->process->audit_token));
   if (!policy) {
+    // TODO: We should attempt to re-find the policy here
     auto [pid, pidver] = PidPidversion(esMsg->process->audit_token);
     LOGW(@"Policy unexpectedly missing for process: %d/%d: %s", pid, pidver,
          esMsg->process->executable->path.data);
@@ -163,8 +175,6 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
     return;
   }
-
-  SNTOverrideFileAccessAction overrideAction = [self.configurator overrideFileAccessAction];
 
   [self processMessage:std::move(esMsg)
                handler:^(Message msg) {

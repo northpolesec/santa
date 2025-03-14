@@ -714,15 +714,16 @@ bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
   return true;
 }
 
-std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> DataWatchItems::FindPolcies(
-    const std::vector<std::string_view> &paths) const {
-  std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> policies;
+std::vector<FAAPolicyProcessor::TargetPolicyPair> DataWatchItems::FindPolicies(
+    const std::vector<FAAPolicyProcessor::PathTarget> &targets) const {
+  std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs;
 
-  for (const auto &path : paths) {
-    policies.push_back(tree_->LookupLongestMatchingPrefix(path.data()));
+  for (const auto &target : targets) {
+    target_policy_pairs.push_back(
+        {target, tree_->LookupLongestMatchingPrefix(target.path.c_str())});
   }
 
-  return policies;
+  return target_policy_pairs;
 }
 
 #pragma mark ProcessWatchItems
@@ -944,10 +945,10 @@ void WatchItems::BeginPeriodicTask() {
   periodic_task_started_ = true;
 }
 
-WatchItems::VersionAndPolicies WatchItems::FindPolciesForPaths(
-    const std::vector<std::string_view> &paths) {
+std::vector<FAAPolicyProcessor::TargetPolicyPair> WatchItems::FindPoliciesForTargets(
+    const std::vector<FAAPolicyProcessor::PathTarget> &targets) {
   absl::ReaderMutexLock lock(&lock_);
-  return {policy_version_, data_watch_items_.FindPolcies(paths)};
+  return data_watch_items_.FindPolicies(targets);
 }
 
 void WatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
