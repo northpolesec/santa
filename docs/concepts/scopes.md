@@ -8,7 +8,7 @@ In addition to rules, Santa can allow or block based on scopes. Currently, only
 a few scopes are implemented. Scopes are evaluated after rules, with block
 evaluation preceding allow.
 
-Scopes are a broader way of allowing or blocking `execve()`s.
+Scopes are a broader way of allowing or blocking executions.
 
 {: .warning }
 We strongly discourage the use of this as it can be relatively trivial to bypass but there are some circumstances where it is the only option.
