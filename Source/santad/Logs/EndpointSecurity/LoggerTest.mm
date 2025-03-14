@@ -88,7 +88,15 @@ class MockSerializer : public Empty {
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
               (const std::string &policy_version, const std::string &policy_name,
                const santa::Message &msg, const santa::EnrichedProcess &enriched_process,
-               const std::string &target, FileAccessPolicyDecision decision));
+               const std::string &target, FileAccessPolicyDecision decision,
+               std::string_view operation_id),
+              (override));
+
+  MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
+              (const std::string &policy_version, const std::string &policy_name,
+               const santa::Message &msg, const santa::EnrichedProcess &enriched_process,
+               const std::string &target, FileAccessPolicyDecision decision),
+              (override));
 };
 
 class MockWriter : public Null {
@@ -234,7 +242,8 @@ class MockWriter : public Null {
   es_message_t msg;
 
   mockESApi->SetExpectationsRetainReleaseMessage();
-  EXPECT_CALL(*mockSerializer, SerializeFileAccess);
+  using testing::_;
+  EXPECT_CALL(*mockSerializer, SerializeFileAccess(_, _, _, _, _, _));
   EXPECT_CALL(*mockWriter, Write);
 
   Logger(TelemetryEvent::kEverything, mockSerializer, mockWriter)

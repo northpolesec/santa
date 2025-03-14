@@ -9,6 +9,7 @@ bazel_dep(name = "rules_swift", version = "2.7.0", repo_name = "build_bazel_rule
 bazel_dep(name = "rules_fuzzing", version = "0.5.2")
 bazel_dep(name = "protobuf", version = "30.0", repo_name = "com_google_protobuf")
 bazel_dep(name = "googletest", version = "1.16.0", repo_name = "com_google_googletest")
+bazel_dep(name = "xxhash", version = "0.8.2")
 
 # North Pole Protos
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpole_protos")

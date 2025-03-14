@@ -139,7 +139,8 @@ std::vector<uint8_t> Empty::SerializeFileAccess(const std::string &policy_versio
                                                 const std::string &policy_name, const Message &msg,
                                                 const EnrichedProcess &enriched_process,
                                                 const std::string &target,
-                                                FileAccessPolicyDecision decision) {
+                                                FileAccessPolicyDecision decision,
+                                                std::string_view operation_id) {
   return {};
 }
 
