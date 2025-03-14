@@ -556,7 +556,7 @@ message FileAccess {
   // Used to link a single operation emitting multiple FileAccess messages.
   // This can happen, for example, when a single operation violates both Data
   // and Process File Access Authorization rules.
-  optional string fingerprint = 7;
+  optional string operation_id = 7;
 }
 
 // Session identifier for a graphical session

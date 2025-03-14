@@ -114,14 +114,18 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(const std::string &policy_v
                                                      const santa::EnrichedProcess &enriched_process,
                                                      const std::string &target,
                                                      FileAccessPolicyDecision decision) {
-  // Combine fingerprint data into a small, contigious struct to minimize the
+  // Operations are identified by:
+  //   Boot Session UUID + Pid + Pidversion + Mach Time + Thread Id
+  // Together, these attributes allow the same Operation ID to be computed by
+  // an operation that generated events across multiple ES clients.
+  // Combine variant operation id data into a small, contigious struct to minimize the
   // number of hash updates necessary.
   struct {
     pid_t pid;
     int pidver;
     uint64_t mach_time;
     uint64_t thread_id;
-  } fingerprint_data = {
+  } operation_id_data = {
       .pid = Pid(msg->process->audit_token),
       .pidver = Pidversion(msg->process->audit_token),
       .mach_time = msg->mach_time,
@@ -133,7 +137,7 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(const std::string &policy_v
   XXH3_copyState(&state, common_hash_state_);
 
   // Consume the variant data and create a digest
-  XXH3_128bits_update(&state, &fingerprint_data, sizeof(fingerprint_data));
+  XXH3_128bits_update(&state, &operation_id_data, sizeof(operation_id_data));
   XXH128_hash_t hash = XXH3_128bits_digest(&state);
 
   // Convert to canonical representation
@@ -142,11 +146,11 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(const std::string &policy_v
 
   // Hex encode
   static_assert(sizeof(XXH128_canonical_t) == 16);
-  char fingerprint[sizeof(XXH128_canonical_t) * 2 + 1];
-  CanonicalHashToHex(&canonical_hash, fingerprint);
+  char operation_id[sizeof(XXH128_canonical_t) * 2 + 1];
+  CanonicalHashToHex(&canonical_hash, operation_id);
 
   return SerializeFileAccess(policy_version, policy_name, msg, enriched_process, target, decision,
-                             std::string_view(fingerprint, sizeof(XXH128_canonical_t) * 2));
+                             std::string_view(operation_id, sizeof(XXH128_canonical_t) * 2));
 }
 
 };  // namespace santa

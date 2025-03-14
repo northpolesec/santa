@@ -89,7 +89,7 @@ class MockSerializer : public Empty {
               (const std::string &policy_version, const std::string &policy_name,
                const santa::Message &msg, const santa::EnrichedProcess &enriched_process,
                const std::string &target, FileAccessPolicyDecision decision,
-               std::string_view fingerprint),
+               std::string_view operation_id),
               (override));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,

@@ -1076,7 +1076,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride
 std::vector<uint8_t> Protobuf::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
     const EnrichedProcess &enriched_process, const std::string &target,
-    FileAccessPolicyDecision decision, std::string_view fingerprint) {
+    FileAccessPolicyDecision decision, std::string_view operation_id) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
 
@@ -1090,7 +1090,7 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
 
   file_access->set_access_type(GetAccessType(msg->event_type));
   file_access->set_policy_decision(GetPolicyDecision(decision));
-  file_access->set_fingerprint(fingerprint);
+  file_access->set_operation_id(operation_id);
 
   return FinalizeProto(santa_msg);
 }

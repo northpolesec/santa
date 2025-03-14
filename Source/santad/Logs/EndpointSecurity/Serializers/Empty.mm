@@ -140,7 +140,7 @@ std::vector<uint8_t> Empty::SerializeFileAccess(const std::string &policy_versio
                                                 const EnrichedProcess &enriched_process,
                                                 const std::string &target,
                                                 FileAccessPolicyDecision decision,
-                                                std::string_view fingerprint) {
+                                                std::string_view operation_id) {
   return {};
 }
 
