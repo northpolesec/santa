@@ -11,7 +11,7 @@ evaluation preceding allow.
 Scopes are a broader way of allowing or blocking executions.
 
 {: .warning }
-We strongly discourage the use of this as it can be relatively trivial to bypass but there are some circumstances where it is the only option.
+We strongly discourage the use of scopes as they can be relatively trivial to bypass but there are some circumstances where it is the only option.
 
 For configuration of scopes see
 [configuration.md](../deployment/configuration.md).
