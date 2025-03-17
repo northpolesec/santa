@@ -30,6 +30,7 @@
 
 #include "Source/common/PrefixTree.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "absl/container/flat_hash_set.h"
 
@@ -99,8 +100,8 @@ class DataWatchItems {
   bool Build(SetSharedDataWatchItemPolicy data_policies);
   size_t Count() const { return paths_.size(); }
 
-  std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>> FindPolcies(
-      const std::vector<std::string_view> &paths) const;
+  std::vector<FAAPolicyProcessor::TargetPolicyPair> FindPolicies(
+      const std::vector<FAAPolicyProcessor::PathTarget> &targets) const;
 
  private:
   std::unique_ptr<santa::PrefixTree<std::shared_ptr<DataWatchItemPolicy>>> tree_;
@@ -132,9 +133,6 @@ class ProcessWatchItems {
 
 class WatchItems : public std::enable_shared_from_this<WatchItems> {
  public:
-  using VersionAndPolicies =
-      std::pair<std::string, std::vector<std::optional<std::shared_ptr<DataWatchItemPolicy>>>>;
-
   // Factory methods
   static std::shared_ptr<WatchItems> Create(NSString *config_path,
                                             uint64_t reapply_config_frequency_secs);
@@ -156,7 +154,9 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   void SetConfigPath(NSString *config_path);
   void SetConfig(NSDictionary *config);
 
-  VersionAndPolicies FindPolciesForPaths(const std::vector<std::string_view> &paths);
+  std::vector<FAAPolicyProcessor::TargetPolicyPair> FindPoliciesForTargets(
+      const std::vector<FAAPolicyProcessor::PathTarget> &targets);
+
   void IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock);
 
   std::optional<WatchItemsState> State();
