@@ -22,16 +22,14 @@ using santa::Processor;
 
 namespace santa {
 
-std::shared_ptr<RateLimiter> RateLimiter::Create(std::shared_ptr<Metrics> metrics,
-                                                 Processor processor, uint16_t max_qps,
-                                                 NSTimeInterval reset_duration) {
-  return std::make_shared<RateLimiter>(std::move(metrics), processor, max_qps, reset_duration);
+RateLimiter RateLimiter::Create(std::shared_ptr<Metrics> metrics, uint16_t max_qps,
+                                NSTimeInterval reset_duration) {
+  return RateLimiter(std::move(metrics), max_qps, reset_duration);
 }
 
-RateLimiter::RateLimiter(std::shared_ptr<Metrics> metrics, Processor processor, uint16_t max_qps,
+RateLimiter::RateLimiter(std::shared_ptr<Metrics> metrics, uint16_t max_qps,
                          NSTimeInterval reset_duration)
     : metrics_(std::move(metrics)),
-      processor_(processor),
       max_log_count_total_(reset_duration * max_qps),
       reset_mach_time_(0),
       reset_duration_ns_(reset_duration * NSEC_PER_SEC) {
@@ -56,7 +54,7 @@ size_t RateLimiter::EventsRateLimitedSerialized() {
 void RateLimiter::TryResetSerialized(uint64_t cur_mach_time) {
   if (cur_mach_time > reset_mach_time_) {
     if (metrics_) {
-      metrics_->SetRateLimitingMetrics(processor_, EventsRateLimitedSerialized());
+      metrics_->AddRateLimitingMetrics(EventsRateLimitedSerialized());
     }
 
     log_count_total_ = 0;

@@ -26,6 +26,7 @@
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/Metrics.h"
 #include "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -35,10 +36,10 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
  public:
   MockFAAPolicyProcessor(
       SNTDecisionCache *dc, std::shared_ptr<Enricher> enricher, std::shared_ptr<Logger> logger,
-      std::shared_ptr<TTYWriter> tty_writer,
+      std::shared_ptr<TTYWriter> tty_writer, std::shared_ptr<Metrics> metrics,
       FAAPolicyProcessor::GenerateEventDetailLinkBlock generate_event_detail_link_block)
       : FAAPolicyProcessor(dc, std::move(enricher), std::move(logger), std::move(tty_writer),
-                           std::move(generate_event_detail_link_block)) {}
+                           std::move(metrics), std::move(generate_event_detail_link_block)) {}
   virtual ~MockFAAPolicyProcessor() {}
 
   MOCK_METHOD(bool, PolicyMatchesProcess,

@@ -37,6 +37,8 @@ namespace santa {
 static constexpr size_t kNumProcesses = 2048;
 static constexpr size_t kPerProcessSetCapacity = 128;
 
+static constexpr uint16_t kDefaultRateLimitQPS = 60;
+
 static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 
 static inline std::string Path(const es_file_t *esFile) {
@@ -150,14 +152,16 @@ inline es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_r
 FAAPolicyProcessor::FAAPolicyProcessor(
     SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
     std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
-    GenerateEventDetailLinkBlock generate_event_detail_link_block)
+    std::shared_ptr<Metrics> metrics, GenerateEventDetailLinkBlock generate_event_detail_link_block)
     : decision_cache_(decision_cache),
       enricher_(std::move(enricher)),
       logger_(std::move(logger)),
       tty_writer_(std::move(tty_writer)),
+      metrics_(std::move(metrics)),
       generate_event_detail_link_block_(generate_event_detail_link_block),
       reads_cache_(kNumProcesses, kPerProcessSetCapacity),
-      tty_message_cache_(kNumProcesses, kPerProcessSetCapacity) {
+      tty_message_cache_(kNumProcesses, kPerProcessSetCapacity),
+      rate_limiter_(RateLimiter::Create(metrics_, kDefaultRateLimitQPS)) {
   configurator_ = [SNTConfigurator configurator];
   queue_ = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
 }
@@ -354,6 +358,17 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
 
 void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const PathTarget &target,
                                       const Message &msg, FileAccessPolicyDecision decision) {
+  RateLimiter::Decision rate_limit_decision = rate_limiter_.Decide(msg->mach_time);
+  metrics_->SetFileAccessEventMetrics(policy.version, policy.name,
+                                      (rate_limit_decision == RateLimiter::Decision::kAllowed)
+                                          ? FileAccessMetricStatus::kOK
+                                          : FileAccessMetricStatus::kBlockedUser,
+                                      msg->event_type, decision);
+
+  if (rate_limit_decision != RateLimiter::Decision::kAllowed) {
+    return;
+  }
+
   // Ensure copies of necessary components are made before going async so
   // they have proper lifetimes.
   std::string policy_name_copy = policy.name;
@@ -421,7 +436,6 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
   if (ShouldLogDecision(decision) && optional_policy.has_value()) {
     std::shared_ptr<WatchItemPolicyBase> policy = *optional_policy;
 
-    // TODO: Rate limiting
     LogTelemetry(*policy, target, msg, decision);
 
     if (ShouldNotifyUserDecision(decision) &&

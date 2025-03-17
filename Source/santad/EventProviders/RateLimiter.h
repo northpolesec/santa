@@ -38,12 +38,11 @@ namespace santa {
 class RateLimiter {
  public:
   // Factory
-  static std::shared_ptr<RateLimiter> Create(
-      std::shared_ptr<santa::Metrics> metrics, santa::Processor processor,
-      uint16_t max_qps, NSTimeInterval reset_duration = kDefaultResetDuration);
+  static RateLimiter Create(
+      std::shared_ptr<santa::Metrics> metrics, uint16_t max_qps,
+      NSTimeInterval reset_duration = kDefaultResetDuration);
 
-  RateLimiter(std::shared_ptr<santa::Metrics> metrics,
-              santa::Processor processor, uint16_t max_qps,
+  RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint16_t max_qps,
               NSTimeInterval reset_duration);
 
   enum class Decision {
@@ -63,7 +62,6 @@ class RateLimiter {
   static constexpr NSTimeInterval kDefaultResetDuration = 15.0;
 
   std::shared_ptr<santa::Metrics> metrics_;
-  santa::Processor processor_;
   size_t log_count_total_ = 0;
   size_t max_log_count_total_;
   uint64_t reset_mach_time_;

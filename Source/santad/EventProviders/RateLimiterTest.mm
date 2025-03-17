@@ -22,8 +22,6 @@
 
 using santa::RateLimiter;
 
-static const santa::Processor kDefaultProcessor = santa::Processor::kFileAccessAuthorizer;
-
 namespace santa {
 
 class RateLimiterPeer : public RateLimiter {
@@ -51,7 +49,7 @@ using santa::RateLimiterPeer;
   // Create an object supporting 1 QPS, and a reset duration of 2s
   uint16_t maxQps = 1;
   NSTimeInterval resetDuration = 2;
-  RateLimiterPeer rlp(nullptr, kDefaultProcessor, maxQps, resetDuration);
+  RateLimiterPeer rlp(nullptr, maxQps, resetDuration);
 
   // Check the current reset_mach_time_ is 0 so that it gets
   // set when the first decision is made
@@ -89,7 +87,7 @@ using santa::RateLimiterPeer;
   uint16_t maxQps = 2;
   NSTimeInterval resetDuration = 4;
   uint64_t allowedLogsPerDuration = maxQps * resetDuration;
-  RateLimiterPeer rlp(nullptr, kDefaultProcessor, maxQps, resetDuration);
+  RateLimiterPeer rlp(nullptr, maxQps, resetDuration);
 
   // Check the current log count is initially 0
   XCTAssertEqual(rlp.log_count_total_, 0);
@@ -126,7 +124,7 @@ using santa::RateLimiterPeer;
   NSTimeInterval resetDuration = 4;
   uint64_t allowedLogsPerDuration = maxQps * resetDuration;
   uint64_t logsOverQPS = 5;
-  RateLimiterPeer rlp(nullptr, kDefaultProcessor, maxQps, resetDuration);
+  RateLimiterPeer rlp(nullptr, maxQps, resetDuration);
 
   // Initially no rate limiting should apply
   XCTAssertFalse(rlp.ShouldRateLimitSerialized());

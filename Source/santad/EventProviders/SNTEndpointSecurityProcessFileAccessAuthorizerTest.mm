@@ -96,7 +96,8 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   SetExpectationsForProcessFileAccessAuthorizerInit(mockESApi);
 
   // First call will not match, second call will match
-  auto mockFAA = std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nil);
+  auto mockFAA =
+      std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nullptr, nil);
   EXPECT_CALL(*mockFAA, PolicyMatchesProcess)
       .WillOnce(testing::Return(false))
       .WillOnce(testing::Return(true));

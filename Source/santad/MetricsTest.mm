@@ -308,27 +308,23 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   XCTAssertEqual(metrics->event_times_cache_[etOpen], nanos * 2);
 }
 
-- (void)testSetRateLimitingMetrics {
+- (void)testAddRateLimitingMetrics {
   std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *){
                                                                 });
 
-  // Initial map is empty
-  XCTAssertEqual(metrics->rate_limit_counts_cache_.size(), 0);
+  // Initial count is zero
+  XCTAssertEqual(metrics->rate_limit_counts_cache_.load(), 0);
 
-  metrics->SetRateLimitingMetrics(Processor::kFileAccessAuthorizer, 123);
-
-  // Check sizes after setting metrics once
-  XCTAssertEqual(metrics->rate_limit_counts_cache_.size(), 1);
-
-  metrics->SetRateLimitingMetrics(Processor::kFileAccessAuthorizer, 456);
-  metrics->SetRateLimitingMetrics(Processor::kAuthorizer, 789);
+  // Check counts after setting metrics once
+  metrics->AddRateLimitingMetrics(123);
+  XCTAssertEqual(metrics->rate_limit_counts_cache_.load(), 123);
 
   // Re-check expected counts. One was an update, so should only be 2 items
-  XCTAssertEqual(metrics->rate_limit_counts_cache_.size(), 2);
+  metrics->AddRateLimitingMetrics(100);
+  metrics->AddRateLimitingMetrics(200);
 
-  // Check map values
-  XCTAssertEqual(metrics->rate_limit_counts_cache_[Processor::kFileAccessAuthorizer], 123 + 456);
-  XCTAssertEqual(metrics->rate_limit_counts_cache_[Processor::kAuthorizer], 789);
+  // Check final value
+  XCTAssertEqual(metrics->rate_limit_counts_cache_.load(), 423);
 }
 
 - (void)testSetFileAccessEventMetrics {
@@ -455,14 +451,14 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
                              openMsg);
   }
   metrics->UpdateEventStats(Processor::kRecorder, &esMsgWithDrops);
-  metrics->SetRateLimitingMetrics(Processor::kFileAccessAuthorizer, 123);
+  metrics->AddRateLimitingMetrics(123);
   metrics->SetFileAccessEventMetrics("v1.0", "rule_abc", FileAccessMetricStatus::kOK,
                                      ES_EVENT_TYPE_AUTH_OPEN, FileAccessPolicyDecision::kDenied);
 
   // First ensure we have the expected map sizes
   XCTAssertEqual(metrics->event_counts_cache_.size(), 2);
   XCTAssertEqual(metrics->event_times_cache_.size(), 2);
-  XCTAssertEqual(metrics->rate_limit_counts_cache_.size(), 1);
+  XCTAssertEqual(metrics->rate_limit_counts_cache_.load(), 123);
   XCTAssertEqual(metrics->faa_event_counts_cache_.size(), 1);
   XCTAssertEqual(metrics->drop_cache_.size(), 2);
 
@@ -489,7 +485,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   // After a flush, map sizes should be reset to 0
   XCTAssertEqual(metrics->event_counts_cache_.size(), 0);
   XCTAssertEqual(metrics->event_times_cache_.size(), 0);
-  XCTAssertEqual(metrics->rate_limit_counts_cache_.size(), 0);
+  XCTAssertEqual(metrics->rate_limit_counts_cache_.load(), 0);
   XCTAssertEqual(metrics->faa_event_counts_cache_.size(), 0);
   // Note: The drop_cache_ should not be reset back to size 0. Instead, each
   // entry has the sequence number left intact, but drop counts reset to 0.
