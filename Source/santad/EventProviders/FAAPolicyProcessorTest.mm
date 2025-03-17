@@ -606,8 +606,6 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
       .WillRepeatedly(testing::Return(@(instigatingCertHash)));
 
-  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY]).andReturn(nil);
-
   WatchItemProcess policyProc("", "", "", {}, "", std::nullopt);
 
   {
