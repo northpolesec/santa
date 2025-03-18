@@ -13,7 +13,7 @@ The project and the latest release is available on [**GitHub**](https://github.c
 
 ## Features
 
-* [**Multiple modes:**](concepts/mode.md) In the default `MONITOR` mode, all binaries except those marked as blocked will be allowed to run, while logged and recorded in the events database. In `LOCKDOWN` mode, only listed binaries are allowed to run.
+* [**Multiple modes:**](concepts/mode.md) In the default `MONITOR` mode, all binaries except those marked as blocked will be allowed to run, while logged and recorded in the events database. In `LOCKDOWN` mode, only listed binaries are allowed to run. `STANDALONE` mode is similar to `LOCKDOWN`, but allows users authorize executions locally via Touch ID.
 * [**Event logging:**](concepts/events.md) All binary launches are logged. When in either mode, all unknown or denied binaries are stored in the database to enable later aggregation.
 * [**Several supported rule types:**](concepts/rules.md) Executions can be allowed or denied by specifying rules based on several attributes. The supported rule types, in order of highest to lowest precedence are: CDHash, binary hash, Signing ID, certificate hash, or Team ID. Since multiple rules can apply to a given binary, Santa will apply the rule with the highest precedence (i.e. you could use a Team ID rule to allow all binaries from some organization, but also add a Signing ID rule to deny a specific binary). Rules based on code signature properties (Signing ID, certificate hash, and Team ID) only apply if a binary's signature validates correctly.
 * **Path-based rules (via NSRegularExpression/ICU):** Binaries can be allowed/blocked based on the path they are launched from by matching against a configurable regex.
