@@ -34,8 +34,10 @@
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/santad/EventProviders/RateLimiter.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/Metrics.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -96,6 +98,7 @@ class FAAPolicyProcessor {
 
   FAAPolicyProcessor(SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
                      std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
+                     std::shared_ptr<Metrics> metrics,
                      GenerateEventDetailLinkBlock generate_event_detail_link_block);
 
   virtual ~FAAPolicyProcessor() = default;
@@ -112,6 +115,7 @@ class FAAPolicyProcessor {
   std::shared_ptr<Enricher> enricher_;
   std::shared_ptr<Logger> logger_;
   std::shared_ptr<TTYWriter> tty_writer_;
+  std::shared_ptr<Metrics> metrics_;
   GenerateEventDetailLinkBlock generate_event_detail_link_block_;
   santa::SantaSetCache<ReadsCacheKey, std::pair<dev_t, ino_t>> reads_cache_;
   santa::SantaSetCache<std::pair<pid_t, int>, std::pair<std::string, std::string>>
@@ -119,6 +123,7 @@ class FAAPolicyProcessor {
   SantaCache<SantaVnode, NSString *> cert_hash_cache_;
   SNTConfigurator *configurator_;
   dispatch_queue_t queue_;
+  RateLimiter rate_limiter_;
 
   virtual NSString *__strong GetCertificateHash(const es_file_t *es_file);
 

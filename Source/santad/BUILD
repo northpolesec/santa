@@ -460,6 +460,8 @@ objc_library(
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
+        ":Metrics",
+        ":RateLimiter",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityEventHandler",
         ":TTYWriter",
@@ -1017,6 +1019,7 @@ objc_library(
     deps = [
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
+        ":Metrics",
         ":SNTDecisionCache",
         ":TTYWriter",
         ":WatchItemPolicy",

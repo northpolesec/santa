@@ -221,8 +221,8 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
 
   SNTMetricCounter *rate_limit_counts =
       [metric_set counterWithName:@"/santa/rate_limit_count"
-                       fieldNames:@[ @"Processor" ]
-                         helpText:@"Events rate limited by each processor"];
+                       fieldNames:@[]
+                         helpText:@"Number of FAA events rate limited"];
 
   SNTMetricCounter *faa_event_counts = [metric_set
       counterWithName:@"/santa/file_access_authorizer/log/count"
@@ -328,11 +328,10 @@ void Metrics::FlushMetrics() {
       [event_processing_times_ set:kv.second forFieldValues:@[ processorName, eventName ]];
     }
 
-    for (const auto &kv : rate_limit_counts_cache_) {
-      NSString *processorName = ProcessorToString(kv.first);
-
-      [rate_limit_counts_ incrementBy:kv.second forFieldValues:@[ processorName ]];
-    }
+    // NB: Must use exchange here to atomically fetch the old value and reset the count. Doing
+    // both operations atomically means a dispatch queue is not needed in AddRateLimitingMetrics().
+    [rate_limit_counts_ incrementBy:rate_limit_counts_cache_.exchange(0, std::memory_order_relaxed)
+                     forFieldValues:@[]];
 
     for (const auto &kv : faa_event_counts_cache_) {
       NSString *policyVersion = @(std::get<0>(kv.first).c_str());  // FileAccessMetricsPolicyVersion
@@ -367,7 +366,6 @@ void Metrics::FlushMetrics() {
     // for accurate accounting
     event_counts_cache_ = {};
     event_times_cache_ = {};
-    rate_limit_counts_cache_ = {};
     faa_event_counts_cache_ = {};
   });
 }
@@ -454,10 +452,8 @@ void Metrics::UpdateEventStats(Processor processor, const es_message_t *msg) {
   });
 }
 
-void Metrics::SetRateLimitingMetrics(Processor processor, int64_t events_rate_limited_count) {
-  dispatch_sync(events_q_, ^{
-    rate_limit_counts_cache_[processor] += events_rate_limited_count;
-  });
+void Metrics::AddRateLimitingMetrics(int64_t events_rate_limited_count) {
+  rate_limit_counts_cache_.fetch_add(events_rate_limited_count, std::memory_order_relaxed);
 }
 
 void Metrics::SetFileAccessEventMetrics(std::string policy_version, std::string rule_name,

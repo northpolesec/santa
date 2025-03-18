@@ -142,7 +142,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   if (@available(macOS 13.0, *)) {
     auto faaPolicyProcessor = std::make_shared<santa::FAAPolicyProcessor>(
-        [SNTDecisionCache sharedCache], enricher, logger, tty_writer,
+        [SNTDecisionCache sharedCache], enricher, logger, tty_writer, metrics,
         ^santa::FAAPolicyProcessor::URLTextPair(
             const std::shared_ptr<santa::WatchItemPolicyBase> &policy) {
           return watch_items->EventDetailLinkInfo(policy);
