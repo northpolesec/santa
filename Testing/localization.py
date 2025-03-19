@@ -4,16 +4,19 @@
 import os
 import pathlib
 import plistlib
+import shutil
 import subprocess
+import sys
 
 
-def base_localization():
+def base_localization(write_out=False):
   """Re-generate the set of localization keys from the code."""
   files_to_localize = [
       f.as_posix() for f in pathlib.Path('Source/gui').glob('*.swift')
       if f.name not in ['SNTTestGUI.swift']
   ]
   files_to_localize.append('Source/common/SNTBlockMessage.m')
+  files_to_localize.append('Source/gui/SNTNotificationManager.m')
 
   subprocess.check_call(
       ['/usr/bin/genstrings', '-SwiftUI', '-u'] + files_to_localize
@@ -32,6 +35,10 @@ def base_localization():
         stdout=f,
     )
   os.unlink('Localizable.strings')
+
+  if write_out:
+    shutil.copyfile('Localizable.strings.utf8',
+                    'Source/gui/Resources/en.lproj/Localizable.strings')
 
   try:
     p = plist_from_file('Localizable.strings.utf8').keys()
@@ -78,7 +85,7 @@ def plist_from_file(filename):
 def main():
   """Entry point."""
   # Generate base localization keys
-  base_loc_keys = base_localization()
+  base_loc_keys = base_localization('-w' in sys.argv)
   if not base_loc_keys:
     raise UserWarning('Failed to parse base localization')
 

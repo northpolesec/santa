@@ -76,6 +76,15 @@
 /* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
 
+/* Client mode change: LOCKDOWN */
+"Switching into Lockdown mode" = "Переход в режим блокировки";
+
+/* Client mode change: MONITOR */
+"Switching into Monitor mode" = "Переход в режим монитора";
+
+/* Client mode change: STANDALONE */
+"Switching into Standalone mode" = "Переход в автономный режим";
+
 /* The default message to show the user when a banned application is blocked */
 "The following application has been blocked from<br />executing because it has been deemed malicious" = "Следующее приложение было заблокировано для выполнения,<br />поскольку оно было признано вредоносным";
 

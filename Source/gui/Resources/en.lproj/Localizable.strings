@@ -76,6 +76,15 @@
 /* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
 
+/* Client mode change: LOCKDOWN */
+"Switching into Lockdown mode" = "Switching into Lockdown mode";
+
+/* Client mode change: MONITOR */
+"Switching into Monitor mode" = "Switching into Monitor mode";
+
+/* Client mode change: STANDALONE */
+"Switching into Standalone mode" = "Switching into Standalone mode";
+
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";
 
