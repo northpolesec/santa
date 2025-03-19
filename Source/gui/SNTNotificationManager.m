@@ -305,7 +305,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
   switch (clientmode) {
     case SNTClientModeMonitor: {
-      content.body = NSLocalizedString(@"Switching into Monitor mode", @"Client mode change: MONITOR");
+      content.body =
+          NSLocalizedString(@"Switching into Monitor mode", @"Client mode change: MONITOR");
       NSString *customMsg = [[SNTConfigurator configurator] modeNotificationMonitor];
       if (!customMsg) break;
       // If a custom message is added but as an empty string, disable notifications.
@@ -315,7 +316,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
       break;
     }
     case SNTClientModeLockdown: {
-      content.body = NSLocalizedString(@"Switching into Lockdown mode", @"Client mode change: LOCKDOWN");
+      content.body =
+          NSLocalizedString(@"Switching into Lockdown mode", @"Client mode change: LOCKDOWN");
       NSString *customMsg = [[SNTConfigurator configurator] modeNotificationLockdown];
       if (!customMsg) break;
       // If a custom message is added but as an empty string, disable notifications.
@@ -325,7 +327,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
       break;
     }
     case SNTClientModeStandalone: {
-      content.body = NSLocalizedString(@"Switching into Standalone mode", @"Client mode change: STANDALONE");
+      content.body =
+          NSLocalizedString(@"Switching into Standalone mode", @"Client mode change: STANDALONE");
       NSString *customMsg = [[SNTConfigurator configurator] modeNotificationStandalone];
       if (!customMsg) break;
       // If a custom message is added but as an empty string, disable notifications.
