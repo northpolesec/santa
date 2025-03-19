@@ -18,6 +18,7 @@
 #import <XCTest/XCTest.h>
 
 #include <numeric>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -453,6 +454,83 @@ struct S {
   XCTAssertFalse(sut.contains(1, ^(const uint64_t &x) {
     return x == 3;
   }));
+}
+
+- (void)testForeach {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 11);
+  sut.set(2, 22);
+  sut.set(3, 33);
+  sut.set(4, 44);
+  sut.set(5, 55);
+
+  sut.set(6, 66);
+  sut.remove(6);
+
+  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33), @(4) : @(44), @(5) : @(55)};
+  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
+
+  sut.foreach(^(uint64_t k, uint64_t v) {
+    [got setObject:@(v) forKey:@(k)];
+  });
+
+  XCTAssertEqualObjects(got, want);
+}
+
+- (void)testForeachSharedObject {
+  SantaCache<uint64_t, std::shared_ptr<uint64_t>> sut;
+  sut.set(1, std::make_shared<uint64_t>(11));
+  sut.set(2, std::make_shared<uint64_t>(22));
+  sut.set(3, std::make_shared<uint64_t>(33));
+
+  sut.set(4, std::make_shared<uint64_t>(44));
+  sut.remove(4);
+
+  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33)};
+  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
+
+  sut.foreach(^(uint64_t k, std::shared_ptr<uint64_t> v) {
+    [got setObject:@(*v) forKey:@(k)];
+  });
+
+  XCTAssertEqualObjects(got, want);
+}
+
+- (void)testClear {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 11);
+  sut.set(2, 22);
+  sut.set(3, 33);
+  sut.set(4, 44);
+
+  XCTAssertEqual(sut.count(), 4);
+  XCTAssertEqual(sut.get(3), 33);
+
+  sut.clear();
+
+  XCTAssertEqual(sut.count(), 0);
+  XCTAssertEqual(sut.get(3), 0);
+}
+- (void)testClearCallback {
+  SantaCache<uint64_t, std::shared_ptr<uint64_t>> sut;
+  sut.set(1, std::make_shared<uint64_t>(11));
+  sut.set(2, std::make_shared<uint64_t>(22));
+  sut.set(3, std::make_shared<uint64_t>(33));
+
+  XCTAssertEqual(sut.count(), 3);
+  XCTAssertEqual(*sut.get(2), 22);
+
+  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33)};
+  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
+
+  sut.clear(^(uint64_t k, std::shared_ptr<uint64_t> v) {
+    [got setObject:@(*v) forKey:@(k)];
+  });
+
+  XCTAssertEqualObjects(got, want);
+
+  XCTAssertEqual(sut.count(), 0);
+  XCTAssertEqual(sut.get(2), nullptr);
 }
 
 @end

@@ -147,6 +147,36 @@ class SantaCache {
   }
 
   /**
+    Iterate all key and value pairs in the cache.
+
+    @param foreach_block Called for all key and value pairs.
+  */
+  void foreach(std::function<void(KeyT &, ValueT &)> foreach_block) {
+    assert(foreach_block != nullptr);
+
+    // Lock all buckets
+    // NB: The clear_bucket_ lock isn't necessary since both foreach and
+    // clear methods lock all buckets sequentially from index 0.
+    for (uint32_t i = 0; i < bucket_count_; ++i) {
+      lock(&buckets_[i]);
+    }
+
+    // Operate on all k/v pairs
+    for (uint32_t i = 0; i < bucket_count_; ++i) {
+      struct entry *entry = (struct entry *)((uintptr_t)buckets_[i].head - 1);
+      while (entry != nullptr) {
+        foreach_block(entry->key, entry->value);
+        entry = entry->next;
+      }
+    }
+
+    // Unlock all buckets
+    for (uint32_t i = 0; i < bucket_count_; ++i) {
+      unlock(&buckets_[i]);
+    }
+  }
+
+  /**
     An alias for `set(key, zero_)`
   */
   inline void remove(const KeyT &key) { set(key, zero_); }
@@ -188,8 +218,11 @@ class SantaCache {
 
   /**
     Remove all entries and free bucket memory.
+
+    @param clear_block If not NULL, will be called for all key
+        and value pairs just prior to deletion.
   */
-  void clear() {
+  void clear(std::function<void(KeyT &, ValueT &)> clear_block) {
     for (uint32_t i = 0; i < bucket_count_; ++i) {
       struct bucket *bucket = &buckets_[i];
       // We grab the lock so nothing can use this bucket while we're erasing it
@@ -200,6 +233,9 @@ class SantaCache {
       // Free the bucket's entries, if there are any.
       struct entry *entry = (struct entry *)((uintptr_t)bucket->head - 1);
       while (entry != nullptr) {
+        if (clear_block) {
+          clear_block(entry->key, entry->value);
+        }
         struct entry *next_entry = entry->next;
         delete entry;
         entry = next_entry;
@@ -214,6 +250,11 @@ class SantaCache {
     // before the lock is released as the lock is the last thing in a bucket.
     bzero(buckets_, bucket_count_ * sizeof(struct bucket));
   }
+
+  /**
+    An alias for `clear(nullptr)`
+  */
+  void clear() { clear(nullptr); }
 
   /**
     Return number of entries currently in cache.
