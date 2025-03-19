@@ -1,3 +1,6 @@
+/* Notification message shown when a known app has been unblocked */
+"%@ can now be run" = "%@ тепер можна запускати";
+
 /* No comment provided by engineer. */
 "Approve" = "Затвердити";
 
@@ -60,6 +63,9 @@
 
 /* No comment provided by engineer. */
 "Remount Mode" = "Режим перевстановлення";
+
+/* Notification message shown when an unknown app has been unblocked */
+"Requested application can now be run" = "Запит тепер можна виконати";
 
 /* No comment provided by engineer. */
 "Rule Name" = "Назва правила";

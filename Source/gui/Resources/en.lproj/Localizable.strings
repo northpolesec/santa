@@ -1,3 +1,6 @@
+/* Notification message shown when a known app has been unblocked */
+"%@ can now be run" = "%@ can now be run";
+
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "Access to a file has been denied";
 
@@ -60,6 +63,9 @@
 
 /* No comment provided by engineer. */
 "Remount Mode" = "Remount Mode";
+
+/* Notification message shown when an unknown app has been unblocked */
+"Requested application can now be run" = "Requested application can now be run";
 
 /* No comment provided by engineer. */
 "Rule Name" = "Rule Name";

@@ -348,14 +348,21 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [un addNotificationRequest:req withCompletionHandler:nil];
 }
 
-- (void)postRuleSyncNotificationWithCustomMessage:(NSString *)message {
+- (void)postRuleSyncNotificationForApplication:(NSString *)app {
   if ([SNTConfigurator configurator].enableSilentMode) return;
 
   UNUserNotificationCenter *un = [UNUserNotificationCenter currentNotificationCenter];
 
   UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
   content.title = @"Santa";
-  content.body = message ?: @"Requested application can now be run";
+  content.body =
+      app ? [NSString stringWithFormat:
+                          NSLocalizedString(
+                              @"%@ can now be run",
+                              @"Notification message shown when a known app has been unblocked"),
+                          app]
+          : NSLocalizedString(@"Requested application can now be run",
+                              @"Notification message shown when an unknown app has been unblocked");
 
   NSString *identifier = [NSString stringWithFormat:@"ruleSyncNotification_%@", content.body];
 

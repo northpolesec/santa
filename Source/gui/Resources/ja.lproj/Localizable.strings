@@ -1,3 +1,6 @@
+/* Notification message shown when a known app has been unblocked */
+"%@ can now be run" = "%@が実行できるようになった";
+
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "ファイルへのアクセスが拒否されました";
 
@@ -61,6 +64,9 @@
 
 /* No comment provided by engineer. */
 "Remount Mode" = "再マウントモード";
+
+/* Notification message shown when an unknown app has been unblocked */
+"Requested application can now be run" = "リクエストされたアプリケーションが実行できるようになりました。";
 
 /* No comment provided by engineer. */
 "Rule Name" = "ルール名";

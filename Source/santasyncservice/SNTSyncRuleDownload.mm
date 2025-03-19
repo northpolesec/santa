@@ -199,10 +199,10 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         NSNumber *remaining = notifier[kFileBundleBinaryCount];
         if (remaining && [remaining intValue] == 0) {
           [processed addObject:key];
-          NSString *message = [NSString stringWithFormat:@"%@ can now be run", notifier[kFileName]];
-          [[self.daemonConn remoteObjectProxy] postRuleSyncNotificationWithCustomMessage:message
-                                                                                   reply:^{
-                                                                                   }];
+          NSString *app = notifier[kFileName];
+          [[self.daemonConn remoteObjectProxy] postRuleSyncNotificationForApplication:message
+                                                                                reply:^{
+                                                                                }];
         }
       }];
 

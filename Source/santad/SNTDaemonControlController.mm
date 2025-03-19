@@ -368,9 +368,8 @@ double watchdogRAMPeak = 0;
   }];
 }
 
-- (void)postRuleSyncNotificationWithCustomMessage:(NSString *)message reply:(void (^)(void))reply {
-  [[self.notQueue.notifierConnection remoteObjectProxy]
-      postRuleSyncNotificationWithCustomMessage:message];
+- (void)postRuleSyncNotificationForApplication:(NSString *)app reply:(void (^)(void))reply {
+  [[self.notQueue.notifierConnection remoteObjectProxy] postRuleSyncNotificationForApplication:app];
   reply();
 }
 
