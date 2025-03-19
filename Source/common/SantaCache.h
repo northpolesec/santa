@@ -151,7 +151,7 @@ class SantaCache {
 
     @param foreach_block Called for all key and value pairs.
   */
-  void foreach (std::function<void(KeyT &, ValueT &)> foreach_block) {
+  void foreach(std::function<void(KeyT &, ValueT &)> foreach_block) {
     assert(foreach_block != nullptr);
 
     // Prevent the cache from being cleared while iterating

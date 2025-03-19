@@ -471,7 +471,7 @@ struct S {
   __block NSMutableSet *gotKeys = [[NSMutableSet alloc] init];
   __block NSMutableSet *gotVals = [[NSMutableSet alloc] init];
 
-  sut.foreach (^(uint64_t k, uint64_t v) {
+  sut.foreach(^(uint64_t k, uint64_t v) {
     [gotKeys addObject:@(k)];
     [gotVals addObject:@(v)];
   });
@@ -494,7 +494,7 @@ struct S {
   __block NSMutableSet *gotKeys = [[NSMutableSet alloc] init];
   __block NSMutableSet *gotVals = [[NSMutableSet alloc] init];
 
-  sut.foreach (^(uint64_t k, std::shared_ptr<uint64_t> v) {
+  sut.foreach(^(uint64_t k, std::shared_ptr<uint64_t> v) {
     [gotKeys addObject:@(k)];
     [gotVals addObject:@(*v)];
   });

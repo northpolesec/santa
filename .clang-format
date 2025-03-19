@@ -20,6 +20,9 @@ SpacesInContainerLiterals: true
 DerivePointerAlignment: false
 PointerAlignment: Right
 
+SpaceBeforeParens: Custom
+SpaceBeforeParensOptions:
+  AfterForeachMacros: false
 
 ---
 Language: Cpp
@@ -29,3 +32,7 @@ BasedOnStyle: Google
 
 # For C++, the line limit is 80
 ColumnLimit: 80
+
+SpaceBeforeParens: Custom
+SpaceBeforeParensOptions:
+  AfterForeachMacros: false
