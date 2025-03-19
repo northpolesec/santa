@@ -455,4 +455,93 @@ struct S {
   }));
 }
 
+- (void)testForeach {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 11);
+  sut.set(2, 22);
+  sut.set(3, 33);
+  sut.set(4, 44);
+  sut.set(5, 55);
+
+  sut.set(6, 66);
+  sut.remove(6);
+
+  NSSet *wantKeys = [[NSSet alloc] initWithArray:@[ @(1), @(2), @(3), @(4), @(5) ]];
+  NSSet *wantVals = [[NSSet alloc] initWithArray:@[ @(11), @(22), @(33), @(44), @(55) ]];
+  __block NSMutableSet *gotKeys = [[NSMutableSet alloc] init];
+  __block NSMutableSet *gotVals = [[NSMutableSet alloc] init];
+
+  sut.foreach (^(uint64_t k, uint64_t v) {
+    [gotKeys addObject:@(k)];
+    [gotVals addObject:@(v)];
+  });
+
+  XCTAssertEqualObjects(gotKeys, wantKeys);
+  XCTAssertEqualObjects(gotVals, wantVals);
+}
+
+- (void)testForeachSharedObject {
+  SantaCache<uint64_t, std::shared_ptr<uint64_t>> sut;
+  sut.set(1, std::make_shared<uint64_t>(11));
+  sut.set(2, std::make_shared<uint64_t>(22));
+  sut.set(3, std::make_shared<uint64_t>(33));
+
+  sut.set(4, std::make_shared<uint64_t>(44));
+  sut.remove(4);
+
+  NSSet *wantKeys = [[NSSet alloc] initWithArray:@[ @(1), @(2), @(3) ]];
+  NSSet *wantVals = [[NSSet alloc] initWithArray:@[ @(11), @(22), @(33) ]];
+  __block NSMutableSet *gotKeys = [[NSMutableSet alloc] init];
+  __block NSMutableSet *gotVals = [[NSMutableSet alloc] init];
+
+  sut.foreach (^(uint64_t k, std::shared_ptr<uint64_t> v) {
+    [gotKeys addObject:@(k)];
+    [gotVals addObject:@(*v)];
+  });
+
+  XCTAssertEqualObjects(gotKeys, wantKeys);
+  XCTAssertEqualObjects(gotVals, wantVals);
+}
+
+- (void)testClear {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 11);
+  sut.set(2, 22);
+  sut.set(3, 33);
+  sut.set(4, 44);
+
+  XCTAssertEqual(sut.count(), 4);
+  XCTAssertEqual(sut.get(3), 33);
+
+  sut.clear();
+
+  XCTAssertEqual(sut.count(), 0);
+  XCTAssertEqual(sut.get(3), 0);
+}
+- (void)testClearCallback {
+  SantaCache<uint64_t, std::shared_ptr<uint64_t>> sut;
+  sut.set(1, std::make_shared<uint64_t>(11));
+  sut.set(2, std::make_shared<uint64_t>(22));
+  sut.set(3, std::make_shared<uint64_t>(33));
+
+  XCTAssertEqual(sut.count(), 3);
+  XCTAssertEqual(*sut.get(2), 22);
+
+  NSSet *wantKeys = [[NSSet alloc] initWithArray:@[ @(1), @(2), @(3) ]];
+  NSSet *wantVals = [[NSSet alloc] initWithArray:@[ @(11), @(22), @(33) ]];
+  __block NSMutableSet *gotKeys = [[NSMutableSet alloc] init];
+  __block NSMutableSet *gotVals = [[NSMutableSet alloc] init];
+
+  sut.clear(^(uint64_t k, std::shared_ptr<uint64_t> v) {
+    [gotKeys addObject:@(k)];
+    [gotVals addObject:@(*v)];
+  });
+
+  XCTAssertEqualObjects(gotKeys, wantKeys);
+  XCTAssertEqualObjects(gotVals, wantVals);
+
+  XCTAssertEqual(sut.count(), 0);
+  XCTAssertEqual(sut.get(2), nullptr);
+}
+
 @end
