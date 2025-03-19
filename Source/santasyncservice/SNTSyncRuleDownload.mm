@@ -200,7 +200,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         if (remaining && [remaining intValue] == 0) {
           [processed addObject:key];
           NSString *app = notifier[kFileName];
-          [[self.daemonConn remoteObjectProxy] postRuleSyncNotificationForApplication:message
+          [[self.daemonConn remoteObjectProxy] postRuleSyncNotificationForApplication:app
                                                                                 reply:^{
                                                                                 }];
         }
