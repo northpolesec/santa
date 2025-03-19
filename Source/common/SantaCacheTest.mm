@@ -18,6 +18,7 @@
 #import <XCTest/XCTest.h>
 
 #include <numeric>
+#include <set>
 #include <string>
 #include <vector>
 
