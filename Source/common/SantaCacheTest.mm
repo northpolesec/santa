@@ -466,18 +466,14 @@ struct S {
   sut.set(6, 66);
   sut.remove(6);
 
-  NSSet *wantKeys = [[NSSet alloc] initWithArray:@[ @(1), @(2), @(3), @(4), @(5) ]];
-  NSSet *wantVals = [[NSSet alloc] initWithArray:@[ @(11), @(22), @(33), @(44), @(55) ]];
-  __block NSMutableSet *gotKeys = [[NSMutableSet alloc] init];
-  __block NSMutableSet *gotVals = [[NSMutableSet alloc] init];
+  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33), @(4) : @(44), @(5) : @(55)};
+  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
 
   sut.foreach(^(uint64_t k, uint64_t v) {
-    [gotKeys addObject:@(k)];
-    [gotVals addObject:@(v)];
+    [got setObject:@(v) forKey:@(k)];
   });
 
-  XCTAssertEqualObjects(gotKeys, wantKeys);
-  XCTAssertEqualObjects(gotVals, wantVals);
+  XCTAssertEqualObjects(got, want);
 }
 
 - (void)testForeachSharedObject {
@@ -489,18 +485,14 @@ struct S {
   sut.set(4, std::make_shared<uint64_t>(44));
   sut.remove(4);
 
-  NSSet *wantKeys = [[NSSet alloc] initWithArray:@[ @(1), @(2), @(3) ]];
-  NSSet *wantVals = [[NSSet alloc] initWithArray:@[ @(11), @(22), @(33) ]];
-  __block NSMutableSet *gotKeys = [[NSMutableSet alloc] init];
-  __block NSMutableSet *gotVals = [[NSMutableSet alloc] init];
+  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33)};
+  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
 
   sut.foreach(^(uint64_t k, std::shared_ptr<uint64_t> v) {
-    [gotKeys addObject:@(k)];
-    [gotVals addObject:@(*v)];
+    [got setObject:@(*v) forKey:@(k)];
   });
 
-  XCTAssertEqualObjects(gotKeys, wantKeys);
-  XCTAssertEqualObjects(gotVals, wantVals);
+  XCTAssertEqualObjects(got, want);
 }
 
 - (void)testClear {
@@ -527,18 +519,14 @@ struct S {
   XCTAssertEqual(sut.count(), 3);
   XCTAssertEqual(*sut.get(2), 22);
 
-  NSSet *wantKeys = [[NSSet alloc] initWithArray:@[ @(1), @(2), @(3) ]];
-  NSSet *wantVals = [[NSSet alloc] initWithArray:@[ @(11), @(22), @(33) ]];
-  __block NSMutableSet *gotKeys = [[NSMutableSet alloc] init];
-  __block NSMutableSet *gotVals = [[NSMutableSet alloc] init];
+  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33)};
+  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
 
   sut.clear(^(uint64_t k, std::shared_ptr<uint64_t> v) {
-    [gotKeys addObject:@(k)];
-    [gotVals addObject:@(*v)];
+    [got setObject:@(*v) forKey:@(k)];
   });
 
-  XCTAssertEqualObjects(gotKeys, wantKeys);
-  XCTAssertEqualObjects(gotVals, wantVals);
+  XCTAssertEqualObjects(got, want);
 
   XCTAssertEqual(sut.count(), 0);
   XCTAssertEqual(sut.get(2), nullptr);

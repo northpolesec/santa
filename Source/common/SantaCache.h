@@ -154,10 +154,9 @@ class SantaCache {
   void foreach(std::function<void(KeyT &, ValueT &)> foreach_block) {
     assert(foreach_block != nullptr);
 
-    // Prevent the cache from being cleared while iterating
-    lock(&clear_bucket_);
-
     // Lock all buckets
+    // NB: The clear_bucket_ lock isn't necessary since both foreach and
+    // clear methods lock all buckets sequentially from index 0.
     for (uint32_t i = 0; i < bucket_count_; ++i) {
       lock(&buckets_[i]);
     }
@@ -175,8 +174,6 @@ class SantaCache {
     for (uint32_t i = 0; i < bucket_count_; ++i) {
       unlock(&buckets_[i]);
     }
-
-    unlock(&clear_bucket_);
   }
 
   /**
