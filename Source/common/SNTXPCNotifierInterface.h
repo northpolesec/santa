@@ -37,7 +37,7 @@
                              customText:(NSString *)text
                             configState:(SNTConfigState *)configState API_AVAILABLE(macos(13.0));
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
-- (void)postRuleSyncNotificationWithCustomMessage:(NSString *)message;
+- (void)postRuleSyncNotificationForApplication:(NSString *)app;
 - (void)updateCountsForEvent:(SNTStoredEvent *)event
                  binaryCount:(uint64_t)binaryCount
                    fileCount:(uint64_t)fileCount
