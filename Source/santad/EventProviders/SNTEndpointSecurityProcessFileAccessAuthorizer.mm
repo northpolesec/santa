@@ -26,7 +26,6 @@
 #include "Source/common/SantaSetCache.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
-#include "absl/container/flat_hash_set.h"
 
 using santa::FAAPolicyProcessor;
 using santa::IterateProcessPoliciesBlock;
