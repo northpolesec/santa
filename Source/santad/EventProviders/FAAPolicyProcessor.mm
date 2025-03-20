@@ -479,9 +479,9 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
   return decision;
 }
 
-static inline FAAPolicyProcessor::ReadsCacheKey MakeReadsCacheKey(const Message &msg,
+static inline FAAPolicyProcessor::ReadsCacheKey MakeReadsCacheKey(const audit_token_t &tok,
                                                                   FAAClientType client_type) {
-  return {Pid(msg->process->audit_token), Pidversion(msg->process->audit_token), client_type};
+  return {Pid(tok), Pidversion(tok), client_type};
 }
 
 FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
@@ -507,7 +507,8 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
         decision != FileAccessPolicyDecision::kDeniedInvalidSignature &&
         target_policy_pair.first.devno_ino.has_value() && target_policy_pair.second.has_value() &&
         (*target_policy_pair.second)->allow_read_access) {
-      reads_cache_.Set(MakeReadsCacheKey(msg, client_type), *target_policy_pair.first.devno_ino);
+      reads_cache_.Set(MakeReadsCacheKey(msg->process->audit_token, client_type),
+                       *target_policy_pair.first.devno_ino);
     }
 
     policy_result =
@@ -533,7 +534,7 @@ std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateRespons
   // consulted.
   if (msg->event_type == ES_EVENT_TYPE_AUTH_OPEN &&
       !(msg->event.open.fflag & kOpenFlagsIndicatingWrite) &&
-      reads_cache_.Contains(MakeReadsCacheKey(msg, client_type),
+      reads_cache_.Contains(MakeReadsCacheKey(msg->process->audit_token, client_type),
                             std::pair<dev_t, ino_t>{msg->event.open.file->stat.st_dev,
                                                     msg->event.open.file->stat.st_ino})) {
     return std::make_optional<FAAPolicyProcessor::ESResult>({ES_AUTH_RESULT_ALLOW, false});
@@ -541,9 +542,9 @@ std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateRespons
   return std::nullopt;
 }
 
-void FAAPolicyProcessor::NotifyExit(const Message &msg, FAAClientType client_type) {
-  reads_cache_.Remove(MakeReadsCacheKey(msg, client_type));
-  tty_message_cache_.Remove(PidPidversion(msg->process->audit_token));
+void FAAPolicyProcessor::NotifyExit(const audit_token_t &tok, FAAClientType client_type) {
+  reads_cache_.Remove(MakeReadsCacheKey(tok, client_type));
+  tty_message_cache_.Remove(PidPidversion(tok));
 }
 
 std::vector<FAAPolicyProcessor::PathTarget> FAAPolicyProcessor::PathTargets(const Message &msg) {

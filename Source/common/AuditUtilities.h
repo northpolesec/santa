@@ -49,6 +49,22 @@ static inline std::pair<pid_t, int> PidPidversion(const audit_token_t &tok) {
   return {Pid(tok), Pidversion(tok)};
 }
 
+static inline audit_token_t MakeStubAuditToken(pid_t pid, int pidver) {
+  return audit_token_t{
+      .val =
+          {
+              0,
+              0,
+              0,
+              0,
+              0,
+              (unsigned int)pid,
+              0,
+              (unsigned int)pidver,
+          },
+  };
+}
+
 }  // namespace santa
 
 #endif  // SANTA__COMMON__AUDITUTILITIES_H

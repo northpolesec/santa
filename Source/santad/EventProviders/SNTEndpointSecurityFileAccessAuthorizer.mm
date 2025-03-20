@@ -134,7 +134,7 @@ using santa::WatchItems;
   }
 
   if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXIT) {
-    _faaPolicyProcessorProxy->NotifyExit(esMsg);
+    _faaPolicyProcessorProxy->NotifyExit(esMsg->process->audit_token);
     return;
   }
 
