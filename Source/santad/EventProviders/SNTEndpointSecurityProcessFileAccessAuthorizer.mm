@@ -215,6 +215,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
 - (void)stopWatching:(const std::pair<pid_t, int> &)pidPidver {
   audit_token_t stubToken = santa::MakeStubAuditToken(pidPidver.first, pidPidver.second);
+  // Note: Process muting is inverted, unmuting here means to stop watching.
   [self unmuteProcess:&stubToken];
   _faaPolicyProcessorProxy->NotifyExit(stubToken);
 }
