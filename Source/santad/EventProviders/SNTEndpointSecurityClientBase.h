@@ -55,6 +55,7 @@
 
 - (bool)enableProcessWatching;
 - (bool)muteProcess:(const audit_token_t *)tok;
+- (bool)unmuteProcess:(const audit_token_t *)tok;
 
 /// Responds to the Message with the given auth result
 ///

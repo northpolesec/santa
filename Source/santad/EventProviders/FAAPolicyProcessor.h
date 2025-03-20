@@ -154,7 +154,7 @@ class FAAPolicyProcessor {
                                                                 FAAClientType client_type);
 
   /// Used by callers to inform when a process has exited and will no longer process events.
-  void NotifyExit(const Message &msg, FAAClientType client_type);
+  void NotifyExit(const audit_token_t &tok, FAAClientType client_type);
 
   FileAccessPolicyDecision ProcessTargetAndPolicy(
       const Message &msg, const PathTarget &target,
@@ -213,8 +213,8 @@ class ProcessFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
     return policy_processor_->ImmediateResponse(msg, FAAClientType::kProcess);
   }
 
-  void NotifyExit(const Message &msg) {
-    return policy_processor_->NotifyExit(msg, FAAClientType::kProcess);
+  void NotifyExit(const audit_token_t &tok) {
+    return policy_processor_->NotifyExit(tok, FAAClientType::kProcess);
   }
 };
 
@@ -237,8 +237,8 @@ class DataFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
     return policy_processor_->ImmediateResponse(msg, FAAClientType::kData);
   }
 
-  void NotifyExit(const Message &msg) {
-    return policy_processor_->NotifyExit(msg, FAAClientType::kData);
+  void NotifyExit(const audit_token_t &tok) {
+    return policy_processor_->NotifyExit(tok, FAAClientType::kData);
   }
 };
 
