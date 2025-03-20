@@ -67,12 +67,12 @@ static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTa
   }
 }
 
-inline bool IsBlockDecision(FileAccessPolicyDecision decision) {
+bool IsBlockDecision(FileAccessPolicyDecision decision) {
   return decision == FileAccessPolicyDecision::kDenied ||
          decision == FileAccessPolicyDecision::kDeniedInvalidSignature;
 }
 
-inline FileAccessPolicyDecision ApplyOverrideToDecision(
+FileAccessPolicyDecision ApplyOverrideToDecision(
     FileAccessPolicyDecision decision, SNTOverrideFileAccessAction overrideAction) {
   switch (overrideAction) {
     // When no override should be applied, return the decision unmodified
@@ -99,7 +99,7 @@ inline FileAccessPolicyDecision ApplyOverrideToDecision(
   }
 }
 
-inline bool ShouldLogDecision(FileAccessPolicyDecision decision) {
+bool ShouldLogDecision(FileAccessPolicyDecision decision) {
   switch (decision) {
     case FileAccessPolicyDecision::kDenied: return true;
     case FileAccessPolicyDecision::kDeniedInvalidSignature: return true;
@@ -109,7 +109,7 @@ inline bool ShouldLogDecision(FileAccessPolicyDecision decision) {
 }
 
 /// The user should be notified whenever the policy will be logged (as long as it's not audit only)
-inline bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision) {
+bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision) {
   return IsBlockDecision(decision);
 }
 
@@ -125,7 +125,7 @@ static inline bool ShouldMessageTTYForPolicy(const std::shared_ptr<WatchItemPoli
   return true;
 }
 
-inline es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision) {
+es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision) {
   switch (decision) {
     case FileAccessPolicyDecision::kNoPolicy: return ES_AUTH_RESULT_ALLOW;
     case FileAccessPolicyDecision::kDenied: return ES_AUTH_RESULT_DENY;
@@ -142,7 +142,7 @@ inline es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyD
 
 /// Combine two AUTH results such that the most strict policy wins - that is, if
 /// either policy denied the operation, the operation is denied
-inline es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t result2) {
+es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t result2) {
   // If either policy denied the operation, the operation is denied
   return ((result1 == ES_AUTH_RESULT_DENY || result2 == ES_AUTH_RESULT_DENY)
               ? ES_AUTH_RESULT_DENY
