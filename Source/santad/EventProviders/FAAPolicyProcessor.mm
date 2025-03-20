@@ -72,8 +72,8 @@ bool IsBlockDecision(FileAccessPolicyDecision decision) {
          decision == FileAccessPolicyDecision::kDeniedInvalidSignature;
 }
 
-FileAccessPolicyDecision ApplyOverrideToDecision(
-    FileAccessPolicyDecision decision, SNTOverrideFileAccessAction overrideAction) {
+FileAccessPolicyDecision ApplyOverrideToDecision(FileAccessPolicyDecision decision,
+                                                 SNTOverrideFileAccessAction overrideAction) {
   switch (overrideAction) {
     // When no override should be applied, return the decision unmodified
     case SNTOverrideFileAccessActionNone: return decision;
