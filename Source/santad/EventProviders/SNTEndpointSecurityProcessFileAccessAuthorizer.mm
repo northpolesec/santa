@@ -121,28 +121,23 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_EXEC: {
-      // If the exec was allowed, remove the pid/pidver of the process that
-      // was just replaced. If the exec was denied, cleanup the entry that
-      // was added optimistically in the probe. The EXIT event will take care
-      // of the original entry later on.
-      if (esMsg->action.notify.result.auth == ES_AUTH_RESULT_ALLOW) {
-        _procRuleCache->remove(PidPidversion(esMsg->process->audit_token));
-      } else {
-        _procRuleCache->remove(PidPidversion(esMsg->event.exec.target->audit_token));
-      }
+      // On EXEC, the previous process was replaced with the new one. The old
+      // process must be cleaned up since there will be no EXIT event for it.
+      // There will be a corresponding EXIT for the newly executed process
+      // regardless of whether or not it was allowed or denied.
+      auto pidPidver = PidPidversion(esMsg->process->audit_token);
+      _procRuleCache->remove(pidPidver);
+      [self stopWatching:pidPidver];
 
       return;
     }
 
     case ES_EVENT_TYPE_NOTIFY_FORK: {
-      // Clone the policy from the parent to the child.
+      // Clone the policy from the parent to the child and also start watching the child.
       // NB: This is safe to do as two steps (get+set) since we process the
       // fork synchronously which will occur before any EXIT event.
-      std::shared_ptr<ProcessWatchItemPolicy> policy =
-          _procRuleCache->get(PidPidversion(esMsg->process->audit_token));
-      if (policy) {
-        _procRuleCache->set(PidPidversion(esMsg->event.fork.child->audit_token), policy);
-      }
+      [self startWatching:esMsg->event.fork.child->audit_token
+                   policy:_procRuleCache->get(PidPidversion(esMsg->process->audit_token))];
       return;
     }
 
@@ -164,16 +159,24 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   std::shared_ptr<ProcessWatchItemPolicy> policy =
       _procRuleCache->get(PidPidversion(esMsg->process->audit_token));
   if (!policy) {
-    // TODO: We should attempt to re-find the policy here
-    auto [pid, pidver] = PidPidversion(esMsg->process->audit_token);
-    LOGW(@"Policy unexpectedly missing for process: %d/%d: %s", pid, pidver,
-         esMsg->process->executable->path.data);
+    auto pidPidver = PidPidversion(esMsg->process->audit_token);
+    policy = [self findPolicyForProcess:esMsg->process];
+    if (policy) {
+      // Found match, add to the cache. The process is already being watched.
+      _procRuleCache->set(pidPidver, policy);
+    } else {
+      // Still no match, time to give up.
+      [self stopWatching:pidPidver];
 
-    if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
-      [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
+      LOGI(@"Policy no longer exists for process: %d/%d: %s", pidPidver.first, pidPidver.second,
+           esMsg->process->executable->path.data);
+
+      if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
+        [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
+      }
+
+      return;
     }
-
-    return;
   }
 
   [self processMessage:std::move(esMsg)
@@ -183,24 +186,15 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
                }];
 }
 
-- (santa::ProbeInterest)probeInterest:(const santa::Message &)esMsg {
-  if (!self.isSubscribed) {
-    return santa::ProbeInterest::kUninterested;
-  }
-
-  __block santa::ProbeInterest interest = santa::ProbeInterest::kUninterested;
-
+- (std::shared_ptr<ProcessWatchItemPolicy>)findPolicyForProcess:(const es_process_t *)esProc {
+  __block std::shared_ptr<ProcessWatchItemPolicy> foundPolicy;
   self.iterateProcessPoliciesBlock(^bool(std::shared_ptr<ProcessWatchItemPolicy> policy) {
-    ProcessRuleCache *cache = _procRuleCache.get();
+    // ProcessRuleCache *cache = _procRuleCache.get();
     for (const santa::WatchItemProcess &policyProcess : policy->processes) {
-      if ((*_faaPolicyProcessorProxy)
-              ->PolicyMatchesProcess(policyProcess, esMsg->event.exec.target)) {
+      if ((*_faaPolicyProcessorProxy)->PolicyMatchesProcess(policyProcess, esProc)) {
         // Map the new process to the matched policy and begin
         // watching the new process
-        cache->set(PidPidversion(esMsg->event.exec.target->audit_token), policy);
-        [self muteProcess:&esMsg->event.exec.target->audit_token];
-
-        interest = santa::ProbeInterest::kInterested;
+        foundPolicy = policy;
 
         // Stop iteration, no need to continue once a match is found
         return true;
@@ -210,7 +204,36 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
     return false;
   });
 
-  return interest;
+  return foundPolicy;
+}
+
+- (santa::ProbeInterest)probeInterest:(const santa::Message &)esMsg {
+  if (!self.isSubscribed) {
+    return santa::ProbeInterest::kUninterested;
+  }
+
+  std::shared_ptr<ProcessWatchItemPolicy> policy =
+      [self findPolicyForProcess:esMsg->event.exec.target];
+
+  if (policy) {
+    [self startWatching:esMsg->event.exec.target->audit_token policy:policy];
+
+    return santa::ProbeInterest::kInterested;
+  } else {
+    return santa::ProbeInterest::kUninterested;
+  }
+}
+
+- (void)startWatching:(const audit_token_t)tok
+               policy:(std::shared_ptr<ProcessWatchItemPolicy>)policy {
+  if (policy) {
+    _procRuleCache->set(PidPidversion(tok), policy);
+  }
+
+  // Note: Always start watching the process, even if no policy currently exists.
+  // This is to protect against a race where some lookup might've failed due to
+  // cache eviction. The next event from the process will re-trigger policy lookup.
+  [self muteProcess:&tok];
 }
 
 - (void)stopWatching:(const std::pair<pid_t, int> &)pidPidver {
@@ -235,6 +258,16 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
       self.isSubscribed = true;
     }
   }
+
+  // This method is called any time the config changes. Clear the cache but don't stop
+  // watching any of the processes. The next time the process emits some event, it will
+  // be reevaluated against the latest config. However we still notifi the FAAPolicyProcessor
+  // as if the process exited so that caches may be cleaned up.
+  _procRuleCache->clear(
+      ^(std::pair<pid_t, int> &pidPidver, std::shared_ptr<ProcessWatchItemPolicy> &) {
+        _faaPolicyProcessorProxy->NotifyExit(
+            santa::MakeStubAuditToken(pidPidver.first, pidPidver.second));
+      });
 
   // Always clear cache to ensure operations that were previously allowed are re-evaluated.
   [super clearCache];
