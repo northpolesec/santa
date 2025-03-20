@@ -119,6 +119,10 @@ bool EndpointSecurityAPI::MuteProcess(const Client &client, const audit_token_t 
   return es_mute_process(client.Get(), tok) == ES_RETURN_SUCCESS;
 }
 
+bool EndpointSecurityAPI::UnmuteProcess(const Client &client, const audit_token_t *tok) {
+  return es_unmute_process(client.Get(), tok) == ES_RETURN_SUCCESS;
+}
+
 bool EndpointSecurityAPI::MuteTargetPath(const Client &client, std::string_view path,
                                          WatchItemPathType path_type) {
 #if HAVE_MACOS_13

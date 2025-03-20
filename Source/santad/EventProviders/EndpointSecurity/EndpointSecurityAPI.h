@@ -50,6 +50,7 @@ class EndpointSecurityAPI : public std::enable_shared_from_this<EndpointSecurity
   virtual bool IsProcessMutingInverted(const Client &client);
   virtual bool InvertProcessMuting(const Client &client);
   virtual bool MuteProcess(const Client &client, const audit_token_t *tok);
+  virtual bool UnmuteProcess(const Client &client, const audit_token_t *tok);
 
   virtual void RetainMessage(const es_message_t *msg);
   virtual void ReleaseMessage(const es_message_t *msg);

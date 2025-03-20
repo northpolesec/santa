@@ -26,6 +26,7 @@
 #include "Source/common/SantaSetCache.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
+#include "absl/container/flat_hash_set.h"
 
 using santa::FAAPolicyProcessor;
 using santa::IterateProcessPoliciesBlock;
@@ -148,7 +149,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
     case ES_EVENT_TYPE_NOTIFY_EXIT: {
       _procRuleCache->remove(PidPidversion(esMsg->process->audit_token));
-      _faaPolicyProcessorProxy->NotifyExit(esMsg);
+      _faaPolicyProcessorProxy->NotifyExit(esMsg->process->audit_token);
       return;
     };
 
@@ -213,6 +214,12 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   return interest;
 }
 
+- (void)stopWatching:(const std::pair<pid_t, int> &)pidPidver {
+  audit_token_t stubToken = santa::MakeStubAuditToken(pidPidver.first, pidPidver.second);
+  [self unmuteProcess:&stubToken];
+  _faaPolicyProcessorProxy->NotifyExit(stubToken);
+}
+
 - (void)enable {
   static const std::set<es_event_type_t> events = {
       ES_EVENT_TYPE_AUTH_CLONE,        ES_EVENT_TYPE_AUTH_COPYFILE, ES_EVENT_TYPE_AUTH_CREATE,
@@ -239,7 +246,11 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
       LOGD(@"Proc FAA unsubscribed");
       self.isSubscribed = false;
     }
-    [super unmuteAllTargetPaths];
+
+    _procRuleCache->clear(
+        ^(std::pair<pid_t, int> &pidPidver, std::shared_ptr<ProcessWatchItemPolicy> &) {
+          [self stopWatching:pidPidver];
+        });
   }
 }
 

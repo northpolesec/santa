@@ -522,6 +522,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SantaCache",
         "//Source/common:SantaSetCache",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 

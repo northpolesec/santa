@@ -224,6 +224,10 @@ using santa::Processor;
   return _esApi->UnmuteAllTargetPaths(_esClient);
 }
 
+- (bool)unmuteProcess:(const audit_token_t *)tok {
+  return _esApi->UnmuteProcess(_esClient, tok);
+}
+
 - (bool)enableTargetPathWatching {
   [self unmuteAllTargetPaths];
   return _esApi->InvertTargetPathMuting(_esClient);
