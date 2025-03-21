@@ -150,14 +150,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
     SNTEndpointSecurityDataFileAccessAuthorizer *data_faa_client =
         [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
-                 initWithESAPI:esapi
-                       metrics:metrics
-                        logger:logger
-                    watchItems:watch_items
-                      enricher:enricher
-            faaPolicyProcessor:std::make_shared<santa::DataFAAPolicyProcessorProxy>(
-                                   faaPolicyProcessor)
-                     ttyWriter:tty_writer];
+                          initWithESAPI:esapi
+                                metrics:metrics
+                                 logger:logger
+                               enricher:enricher
+                     faaPolicyProcessor:std::make_shared<santa::DataFAAPolicyProcessorProxy>(
+                                            faaPolicyProcessor)
+                              ttyWriter:tty_writer
+            findPoliciesForTargetsBlock:^std::vector<santa::FAAPolicyProcessor::TargetPolicyPair>(
+                const std::vector<santa::FAAPolicyProcessor::PathTarget> &targets) {
+              return watch_items->FindPoliciesForTargets(targets);
+            }];
     watch_items->RegisterDataClient(data_faa_client);
 
     data_faa_client.fileAccessDeniedBlock = ^(SNTFileAccessEvent *event, NSString *customMsg,

@@ -37,39 +37,38 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTStrengthify.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
-#include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 
 using santa::EndpointSecurityAPI;
 using santa::FAAPolicyProcessor;
+using santa::FindPoliciesForTargetsBlock;
 using santa::Message;
-using santa::WatchItems;
 
 @interface SNTEndpointSecurityDataFileAccessAuthorizer ()
 @property SNTConfigurator *configurator;
 @property bool isSubscribed;
+@property(copy) FindPoliciesForTargetsBlock findPoliciesForTargetsBlock;
 @end
 
 @implementation SNTEndpointSecurityDataFileAccessAuthorizer {
-  std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<santa::DataFAAPolicyProcessorProxy> _faaPolicyProcessorProxy;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
-                       logger:(std::shared_ptr<santa::Logger>)logger
-                   watchItems:(std::shared_ptr<WatchItems>)watchItems
-                     enricher:(std::shared_ptr<santa::Enricher>)enricher
-           faaPolicyProcessor:
-               (std::shared_ptr<santa::DataFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
-                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
+                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+                         logger:(std::shared_ptr<santa::Logger>)logger
+                       enricher:(std::shared_ptr<santa::Enricher>)enricher
+             faaPolicyProcessor:
+                 (std::shared_ptr<santa::DataFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
+                      ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
+    findPoliciesForTargetsBlock:(FindPoliciesForTargetsBlock)findPoliciesForTargetsBlock {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:metrics
                     processor:santa::Processor::kDataFileAccessAuthorizer];
   if (self) {
-    _watchItems = std::move(watchItems);
     _faaPolicyProcessorProxy = std::move(faaPolicyProcessorProxy);
+    _findPoliciesForTargetsBlock = findPoliciesForTargetsBlock;
 
     _configurator = [SNTConfigurator configurator];
 
@@ -101,7 +100,7 @@ using santa::WatchItems;
   }
 
   std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs =
-      _watchItems->FindPoliciesForTargets(FAAPolicyProcessor::PathTargets(msg));
+      self.findPoliciesForTargetsBlock(FAAPolicyProcessor::PathTargets(msg));
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
