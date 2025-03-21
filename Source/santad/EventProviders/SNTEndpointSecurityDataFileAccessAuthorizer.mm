@@ -46,12 +46,12 @@ using santa::FAAPolicyProcessor;
 using santa::Message;
 using santa::WatchItems;
 
-@interface SNTEndpointSecurityFileAccessAuthorizer ()
+@interface SNTEndpointSecurityDataFileAccessAuthorizer ()
 @property SNTConfigurator *configurator;
 @property bool isSubscribed;
 @end
 
-@implementation SNTEndpointSecurityFileAccessAuthorizer {
+@implementation SNTEndpointSecurityDataFileAccessAuthorizer {
   std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<santa::DataFAAPolicyProcessorProxy> _faaPolicyProcessorProxy;
 }

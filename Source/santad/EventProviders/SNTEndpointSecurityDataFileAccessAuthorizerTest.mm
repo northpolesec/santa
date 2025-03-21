@@ -41,17 +41,17 @@ void SetExpectationsForFileAccessAuthorizerInit(
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
 }
 
-@interface SNTEndpointSecurityFileAccessAuthorizer (Testing)
+@interface SNTEndpointSecurityDataFileAccessAuthorizer (Testing)
 - (void)disable;
 
 @property bool isSubscribed;
 @end
 
-@interface SNTEndpointSecurityFileAccessAuthorizerTest : XCTestCase
+@interface SNTEndpointSecurityDataFileAccessAuthorizerTest : XCTestCase
 @property id mockConfigurator;
 @end
 
-@implementation SNTEndpointSecurityFileAccessAuthorizerTest
+@implementation SNTEndpointSecurityDataFileAccessAuthorizerTest
 
 - (void)setUp {
   [super setUp];
@@ -78,7 +78,7 @@ void SetExpectationsForFileAccessAuthorizerInit(
                  .WillOnce(testing::Return(true)))
       .WillOnce(testing::Return(true));
 
-  id fileAccessClient = [[SNTEndpointSecurityFileAccessAuthorizer alloc]
+  id fileAccessClient = [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
       initWithESAPI:mockESApi
             metrics:nullptr
           processor:santa::Processor::kFileAccessAuthorizer];
@@ -97,14 +97,14 @@ void SetExpectationsForFileAccessAuthorizerInit(
   mockESApi->SetExpectationsESNewClient();
   SetExpectationsForFileAccessAuthorizerInit(mockESApi);
 
-  SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                             metrics:nullptr
-                                                              logger:nullptr
-                                                          watchItems:nullptr
-                                                            enricher:nullptr
-                                                  faaPolicyProcessor:nil
-                                                           ttyWriter:nullptr];
+  SNTEndpointSecurityDataFileAccessAuthorizer *accessClient =
+      [[SNTEndpointSecurityDataFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                                 metrics:nullptr
+                                                                  logger:nullptr
+                                                              watchItems:nullptr
+                                                                enricher:nullptr
+                                                      faaPolicyProcessor:nil
+                                                               ttyWriter:nullptr];
 
   EXPECT_CALL(*mockESApi, UnsubscribeAll);
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
