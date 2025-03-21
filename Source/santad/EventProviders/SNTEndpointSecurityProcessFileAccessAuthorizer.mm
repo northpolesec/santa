@@ -125,10 +125,8 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
       // process must be cleaned up since there will be no EXIT event for it.
       // There will be a corresponding EXIT for the newly executed process
       // regardless of whether or not it was allowed or denied.
-      auto pidPidver = PidPidversion(esMsg->process->audit_token);
-      _procRuleCache->remove(pidPidver);
-      [self stopWatching:pidPidver];
-
+      _procRuleCache->remove(PidPidversion(esMsg->process->audit_token));
+      _faaPolicyProcessorProxy->NotifyExit(esMsg->process->audit_token);
       return;
     }
 
@@ -189,7 +187,6 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 - (std::shared_ptr<ProcessWatchItemPolicy>)findPolicyForProcess:(const es_process_t *)esProc {
   __block std::shared_ptr<ProcessWatchItemPolicy> foundPolicy;
   self.iterateProcessPoliciesBlock(^bool(std::shared_ptr<ProcessWatchItemPolicy> policy) {
-    // ProcessRuleCache *cache = _procRuleCache.get();
     for (const santa::WatchItemProcess &policyProcess : policy->processes) {
       if ((*_faaPolicyProcessorProxy)->PolicyMatchesProcess(policyProcess, esProc)) {
         // Map the new process to the matched policy and begin
@@ -261,7 +258,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
   // This method is called any time the config changes. Clear the cache but don't stop
   // watching any of the processes. The next time the process emits some event, it will
-  // be reevaluated against the latest config. However we still notifi the FAAPolicyProcessor
+  // be reevaluated against the latest config. However we still notify the FAAPolicyProcessor
   // as if the process exited so that caches may be cleaned up.
   _procRuleCache->clear(
       ^(std::pair<pid_t, int> &pidPidver, std::shared_ptr<ProcessWatchItemPolicy> &) {
