@@ -32,13 +32,13 @@
     : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler, SNTDataFileAccessAuthorizer>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
-                       logger:(std::shared_ptr<santa::Logger>)logger
-                   watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
-                     enricher:(std::shared_ptr<santa::Enricher>)enricher
-           faaPolicyProcessor:
-               (std::shared_ptr<santa::DataFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
-                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
+                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+                         logger:(std::shared_ptr<santa::Logger>)logger
+                       enricher:(std::shared_ptr<santa::Enricher>)enricher
+             faaPolicyProcessor:
+                 (std::shared_ptr<santa::DataFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
+                      ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
+    findPoliciesForTargetsBlock:(santa::FindPoliciesForTargetsBlock)findPoliciesForTargetsBlock;
 
 @property SNTFileAccessDeniedBlock fileAccessDeniedBlock;
 

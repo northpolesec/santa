@@ -68,6 +68,8 @@ class WatchItemsPeer;
 // process policy.
 using CheckPolicyBlock = bool (^)(std::shared_ptr<ProcessWatchItemPolicy>);
 using IterateProcessPoliciesBlock = void (^)(CheckPolicyBlock);
+using FindPoliciesForTargetsBlock = std::vector<FAAPolicyProcessor::TargetPolicyPair> (^)(
+    const std::vector<FAAPolicyProcessor::PathTarget> &targets);
 
 struct WatchItemsState {
   uint64_t rule_count;

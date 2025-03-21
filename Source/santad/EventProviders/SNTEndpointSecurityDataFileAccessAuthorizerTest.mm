@@ -101,10 +101,10 @@ void SetExpectationsForDataFileAccessAuthorizerInit(
       [[SNTEndpointSecurityDataFileAccessAuthorizer alloc] initWithESAPI:mockESApi
                                                                  metrics:nullptr
                                                                   logger:nullptr
-                                                              watchItems:nullptr
                                                                 enricher:nullptr
                                                       faaPolicyProcessor:nil
-                                                               ttyWriter:nullptr];
+                                                               ttyWriter:nullptr
+                                             findPoliciesForTargetsBlock:nil];
 
   EXPECT_CALL(*mockESApi, UnsubscribeAll);
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
