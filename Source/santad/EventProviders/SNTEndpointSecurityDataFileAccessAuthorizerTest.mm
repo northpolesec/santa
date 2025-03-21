@@ -35,7 +35,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"
 
-void SetExpectationsForFileAccessAuthorizerInit(
+void SetExpectationsForDataFileAccessAuthorizerInit(
     std::shared_ptr<MockEndpointSecurityAPI> mockESApi) {
   EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
@@ -81,7 +81,7 @@ void SetExpectationsForFileAccessAuthorizerInit(
   id fileAccessClient = [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
       initWithESAPI:mockESApi
             metrics:nullptr
-          processor:santa::Processor::kFileAccessAuthorizer];
+          processor:santa::Processor::kDataFileAccessAuthorizer];
 
   [fileAccessClient enable];
 
@@ -95,7 +95,7 @@ void SetExpectationsForFileAccessAuthorizerInit(
 - (void)testDisable {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
-  SetExpectationsForFileAccessAuthorizerInit(mockESApi);
+  SetExpectationsForDataFileAccessAuthorizerInit(mockESApi);
 
   SNTEndpointSecurityDataFileAccessAuthorizer *accessClient =
       [[SNTEndpointSecurityDataFileAccessAuthorizer alloc] initWithESAPI:mockESApi

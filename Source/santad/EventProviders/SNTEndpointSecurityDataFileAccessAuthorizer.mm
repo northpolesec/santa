@@ -66,7 +66,7 @@ using santa::WatchItems;
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:metrics
-                    processor:santa::Processor::kFileAccessAuthorizer];
+                    processor:santa::Processor::kDataFileAccessAuthorizer];
   if (self) {
     _watchItems = std::move(watchItems);
     _faaPolicyProcessorProxy = std::move(faaPolicyProcessorProxy);
@@ -92,7 +92,7 @@ using santa::WatchItems;
 }
 
 - (NSString *)description {
-  return @"FileAccessAuthorizer";
+  return @"DataFileAccessAuthorizer";
 }
 
 - (void)processMessage:(Message)msg overrideAction:(SNTOverrideFileAccessAction)overrideAction {

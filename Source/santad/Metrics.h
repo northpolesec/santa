@@ -46,7 +46,7 @@ enum class Processor {
   kDeviceManager,
   kRecorder,
   kTamperResistance,
-  kFileAccessAuthorizer,
+  kDataFileAccessAuthorizer,
   kProcessFileAccessAuthorizer,
 };
 

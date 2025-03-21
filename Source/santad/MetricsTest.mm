@@ -147,7 +147,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
       {Processor::kDeviceManager, @"DeviceManager"},
       {Processor::kRecorder, @"Recorder"},
       {Processor::kTamperResistance, @"TamperResistance"},
-      {Processor::kFileAccessAuthorizer, @"FileAccessAuthorizer"},
+      {Processor::kDataFileAccessAuthorizer, @"DataFileAccessAuthorizer"},
       {Processor::kProcessFileAccessAuthorizer, @"ProcessFileAccessAuthorizer"},
   };
 

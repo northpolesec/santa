@@ -28,7 +28,7 @@ static NSString *const kProcessorAuthorizer = @"Authorizer";
 static NSString *const kProcessorDeviceManager = @"DeviceManager";
 static NSString *const kProcessorRecorder = @"Recorder";
 static NSString *const kProcessorTamperResistance = @"TamperResistance";
-static NSString *const kProcessorFileAccessAuthorizer = @"FileAccessAuthorizer";
+static NSString *const kProcessorDataFileAccessAuthorizer = @"DataFileAccessAuthorizer";
 static NSString *const kProcessorProcessFileAccessAuthorizer = @"ProcessFileAccessAuthorizer";
 
 static NSString *const kEventTypeAuthClone = @"AuthClone";
@@ -105,7 +105,7 @@ NSString *const ProcessorToString(Processor processor) {
     case Processor::kDeviceManager: return kProcessorDeviceManager;
     case Processor::kRecorder: return kProcessorRecorder;
     case Processor::kTamperResistance: return kProcessorTamperResistance;
-    case Processor::kFileAccessAuthorizer: return kProcessorFileAccessAuthorizer;
+    case Processor::kDataFileAccessAuthorizer: return kProcessorDataFileAccessAuthorizer;
     case Processor::kProcessFileAccessAuthorizer: return kProcessorProcessFileAccessAuthorizer;
     default:
       [NSException raise:@"Invalid processor"
