@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Kernel/kern/cs_blobs.h>
@@ -46,12 +46,12 @@ using santa::FAAPolicyProcessor;
 using santa::Message;
 using santa::WatchItems;
 
-@interface SNTEndpointSecurityFileAccessAuthorizer ()
+@interface SNTEndpointSecurityDataFileAccessAuthorizer ()
 @property SNTConfigurator *configurator;
 @property bool isSubscribed;
 @end
 
-@implementation SNTEndpointSecurityFileAccessAuthorizer {
+@implementation SNTEndpointSecurityDataFileAccessAuthorizer {
   std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<santa::DataFAAPolicyProcessorProxy> _faaPolicyProcessorProxy;
 }
@@ -66,7 +66,7 @@ using santa::WatchItems;
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:metrics
-                    processor:santa::Processor::kFileAccessAuthorizer];
+                    processor:santa::Processor::kDataFileAccessAuthorizer];
   if (self) {
     _watchItems = std::move(watchItems);
     _faaPolicyProcessorProxy = std::move(faaPolicyProcessorProxy);
@@ -92,7 +92,7 @@ using santa::WatchItems;
 }
 
 - (NSString *)description {
-  return @"FileAccessAuthorizer";
+  return @"DataFileAccessAuthorizer";
 }
 
 - (void)processMessage:(Message)msg overrideAction:(SNTOverrideFileAccessAction)overrideAction {

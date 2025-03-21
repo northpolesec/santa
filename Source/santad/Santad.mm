@@ -34,8 +34,8 @@
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDeviceManager.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
@@ -148,8 +148,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
           return watch_items->EventDetailLinkInfo(policy);
         });
 
-    SNTEndpointSecurityFileAccessAuthorizer *data_faa_client =
-        [[SNTEndpointSecurityFileAccessAuthorizer alloc]
+    SNTEndpointSecurityDataFileAccessAuthorizer *data_faa_client =
+        [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
                  initWithESAPI:esapi
                        metrics:metrics
                         logger:logger

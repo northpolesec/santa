@@ -28,7 +28,7 @@
 #import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
-@interface SNTEndpointSecurityFileAccessAuthorizer
+@interface SNTEndpointSecurityDataFileAccessAuthorizer
     : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler, SNTDataFileAccessAuthorizer>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi

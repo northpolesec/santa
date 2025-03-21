@@ -33,25 +33,25 @@
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"
 
-void SetExpectationsForFileAccessAuthorizerInit(
+void SetExpectationsForDataFileAccessAuthorizerInit(
     std::shared_ptr<MockEndpointSecurityAPI> mockESApi) {
   EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
 }
 
-@interface SNTEndpointSecurityFileAccessAuthorizer (Testing)
+@interface SNTEndpointSecurityDataFileAccessAuthorizer (Testing)
 - (void)disable;
 
 @property bool isSubscribed;
 @end
 
-@interface SNTEndpointSecurityFileAccessAuthorizerTest : XCTestCase
+@interface SNTEndpointSecurityDataFileAccessAuthorizerTest : XCTestCase
 @property id mockConfigurator;
 @end
 
-@implementation SNTEndpointSecurityFileAccessAuthorizerTest
+@implementation SNTEndpointSecurityDataFileAccessAuthorizerTest
 
 - (void)setUp {
   [super setUp];
@@ -78,10 +78,10 @@ void SetExpectationsForFileAccessAuthorizerInit(
                  .WillOnce(testing::Return(true)))
       .WillOnce(testing::Return(true));
 
-  id fileAccessClient = [[SNTEndpointSecurityFileAccessAuthorizer alloc]
+  id fileAccessClient = [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
       initWithESAPI:mockESApi
             metrics:nullptr
-          processor:santa::Processor::kFileAccessAuthorizer];
+          processor:santa::Processor::kDataFileAccessAuthorizer];
 
   [fileAccessClient enable];
 
@@ -95,16 +95,16 @@ void SetExpectationsForFileAccessAuthorizerInit(
 - (void)testDisable {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
-  SetExpectationsForFileAccessAuthorizerInit(mockESApi);
+  SetExpectationsForDataFileAccessAuthorizerInit(mockESApi);
 
-  SNTEndpointSecurityFileAccessAuthorizer *accessClient =
-      [[SNTEndpointSecurityFileAccessAuthorizer alloc] initWithESAPI:mockESApi
-                                                             metrics:nullptr
-                                                              logger:nullptr
-                                                          watchItems:nullptr
-                                                            enricher:nullptr
-                                                  faaPolicyProcessor:nil
-                                                           ttyWriter:nullptr];
+  SNTEndpointSecurityDataFileAccessAuthorizer *accessClient =
+      [[SNTEndpointSecurityDataFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                                 metrics:nullptr
+                                                                  logger:nullptr
+                                                              watchItems:nullptr
+                                                                enricher:nullptr
+                                                      faaPolicyProcessor:nil
+                                                               ttyWriter:nullptr];
 
   EXPECT_CALL(*mockESApi, UnsubscribeAll);
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
