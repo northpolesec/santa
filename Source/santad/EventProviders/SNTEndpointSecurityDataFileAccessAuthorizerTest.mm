@@ -33,7 +33,7 @@
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"
 
 void SetExpectationsForFileAccessAuthorizerInit(
     std::shared_ptr<MockEndpointSecurityAPI> mockESApi) {

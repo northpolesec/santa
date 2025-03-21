@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "Source/santad/EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Kernel/kern/cs_blobs.h>

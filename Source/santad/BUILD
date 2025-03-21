@@ -482,9 +482,9 @@ objc_library(
 )
 
 objc_library(
-    name = "SNTEndpointSecurityFileAccessAuthorizer",
-    srcs = ["EventProviders/SNTEndpointSecurityFileAccessAuthorizer.mm"],
-    hdrs = ["EventProviders/SNTEndpointSecurityFileAccessAuthorizer.h"],
+    name = "SNTEndpointSecurityDataFileAccessAuthorizer",
+    srcs = ["EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.mm"],
+    hdrs = ["EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"],
     sdk_dylibs = [
         "bsm",
     ],
@@ -868,7 +868,7 @@ objc_library(
         ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTEndpointSecurityDeviceManager",
-        ":SNTEndpointSecurityFileAccessAuthorizer",
+        ":SNTEndpointSecurityDataFileAccessAuthorizer",
         ":SNTEndpointSecurityProcessFileAccessAuthorizer",
         ":SNTEndpointSecurityRecorder",
         ":SNTEndpointSecurityTamperResistance",
@@ -1461,14 +1461,14 @@ santa_unit_test(
 )
 
 santa_unit_test(
-    name = "SNTEndpointSecurityFileAccessAuthorizerTest",
-    srcs = ["EventProviders/SNTEndpointSecurityFileAccessAuthorizerTest.mm"],
+    name = "SNTEndpointSecurityDataFileAccessAuthorizerTest",
+    srcs = ["EventProviders/SNTEndpointSecurityDataFileAccessAuthorizerTest.mm"],
     sdk_dylibs = [
         "EndpointSecurity",
     ],
     deps = [
         ":MockEndpointSecurityAPI",
-        ":SNTEndpointSecurityFileAccessAuthorizer",
+        ":SNTEndpointSecurityDataFileAccessAuthorizer",
         "//Source/common:SNTConfigurator",
         "//Source/common:TestUtils",
         "@OCMock",
@@ -1630,7 +1630,7 @@ test_suite(
         ":SNTEndpointSecurityAuthorizerTest",
         ":SNTEndpointSecurityClientTest",
         ":SNTEndpointSecurityDeviceManagerTest",
-        ":SNTEndpointSecurityFileAccessAuthorizerTest",
+        ":SNTEndpointSecurityDataFileAccessAuthorizerTest",
         ":SNTEndpointSecurityProcessFileAccessAuthorizerTest",
         ":SNTEndpointSecurityRecorderTest",
         ":SNTEndpointSecurityTamperResistanceTest",
