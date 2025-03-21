@@ -121,8 +121,9 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_EXEC: {
-      // On EXEC, the previous process was replaced with the new one. The old
-      // process must be cleaned up since there will be no EXIT event for it.
+      // On EXEC, the previously executing process image is replaced with a new
+      // image and the pidversion is incremented. The old pid+pidversion pair
+      // must be cleaned up since there will be no EXIT event for it.
       // There will be a corresponding EXIT for the newly executed process
       // regardless of whether or not it was allowed or denied.
       _procRuleCache->remove(PidPidversion(esMsg->process->audit_token));
