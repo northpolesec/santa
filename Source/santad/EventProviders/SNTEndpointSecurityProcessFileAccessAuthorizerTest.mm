@@ -63,15 +63,24 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  SetExpectationsForProcessFileAccessAuthorizerInit(mockESApi);
+
   EXPECT_CALL(*mockESApi, ClearCache)
       .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
                  .WillOnce(testing::Return(true)))
       .WillOnce(testing::Return(true));
 
-  id procFAAClient = [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
-      initWithESAPI:mockESApi
-            metrics:nullptr
-          processor:santa::Processor::kProcessFileAccessAuthorizer];
+  auto mockFAA =
+      std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nullptr, nil);
+  auto mockFAAProxy = std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(mockFAA);
+
+  SNTEndpointSecurityProcessFileAccessAuthorizer *procFAAClient =
+      [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                                    metrics:nullptr
+                                                         faaPolicyProcessor:mockFAAProxy
+                                                iterateProcessPoliciesBlock:nil];
 
   [procFAAClient enable];
 
@@ -121,7 +130,6 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
                                                                     metrics:nullptr
                                                          faaPolicyProcessor:mockFAAProxy
                                                 iterateProcessPoliciesBlock:iterPoliciesBlock];
-  id mockProcFAAClient = OCMPartialMock(procFAAClient);
 
   // Fake being conected so the probe runs
   procFAAClient.isSubscribed = true;
@@ -136,12 +144,10 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
 
     // Next check a mtching policy. The probe should return interested, the
     // process should be muted, and CheckPolicyBlock should return true.
-    OCMExpect([mockProcFAAClient muteProcess:&execProc.audit_token]).andReturn(true);
+    EXPECT_CALL(*mockESApi, MuteProcess).WillOnce(testing::Return(true));
 
     XCTAssertEqual([procFAAClient probeInterest:msg], santa::ProbeInterest::kInterested);
     XCTAssertTrue(checkPolicyBlockResult);
-
-    XCTAssertTrue(OCMVerifyAll(mockProcFAAClient));
   }
 }
 
