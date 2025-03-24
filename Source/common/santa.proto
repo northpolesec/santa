@@ -961,7 +961,6 @@ message LaunchItem {
     ACTION_ADD = 1;
     ACTION_REMOVE = 2;
   };
-
   Action action = 2;
 
   // The process that triggered the BTM operation. One will always be set.
@@ -992,7 +991,6 @@ message LaunchItem {
     ITEM_TYPE_AGENT = 4;
     ITEM_TYPE_DAEMON = 5;
   }
-
   ItemType item_type = 7;
 
   // Whether or not the launch item is a legacy plist
