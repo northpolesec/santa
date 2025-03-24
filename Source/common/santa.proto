@@ -948,6 +948,72 @@ message GatekeeperOverride {
   optional CodeSignature code_signature = 3;
 }
 
+// Information captured when Background Task Management (BTM) becomes aware
+// of a launch item being added or removed. This includes launch agents and
+// daemons as well as login items added by the user, via MDM or by an app.
+message LaunchItem {
+  // The process that emitted the event
+  optional ProcessInfoLight instigator = 1;
+
+  // Whether or not the launch item is being added or removed
+  enum Action {
+    ACTION_UNKNOWN = 0;
+    ACTION_ADD = 1;
+    ACTION_REMOVE = 2;
+  };
+
+  Action action = 2;
+
+  // The process that triggered the BTM operation. One will always be set.
+  // Note: Due to macOS system limitations, the process that triggered the
+  // event may have already exited before the event could be generated. This
+  // results in only a small subset of the information from the triggering
+  // process to be reported.
+  oneof btm_instigator {
+    ProcessInfoLight trigger_process = 3;
+    ProcessID trigger_id = 4;
+  }
+
+  // The app the registered the launch item. This field is optional and it is
+  // possible that neither case is set.
+  // Note: If the registering app has exited, only process id information will
+  // exist.
+  oneof app {
+    ProcessInfoLight registrant_process = 5;
+    ProcessID registrant_id = 6;
+  }
+
+  // The type of launch item corresponding to this event
+  enum ItemType {
+    ITEM_TYPE_UNKNOWN = 0;
+    ITEM_TYPE_USER_ITEM = 1;
+    ITEM_TYPE_APP = 2;
+    ITEM_TYPE_LOGIN_ITEM = 3;
+    ITEM_TYPE_AGENT = 4;
+    ITEM_TYPE_DAEMON = 5;
+  }
+
+  ItemType item_type = 7;
+
+  // Whether or not the launch item is a legacy plist
+  optional bool legacy = 8;
+
+  // Whether or not the launch item is managed by MDM
+  optional bool managed = 9;
+
+  // User information related to the launch item
+  optional UserInfo item_user = 10;
+
+  // Location of the launch item
+  optional string item_url = 11;
+
+  // URL of the app the launch item is attributed to
+  optional string app_url = 12;
+
+  // If available, associated executable path from a launch item's plist
+  optional string executable_path = 13;
+}
+
 // A message encapsulating a single event
 message SantaMessage {
   // Machine ID of the host emitting this log
@@ -987,6 +1053,7 @@ message SantaMessage {
     Clone clone = 28;
     Copyfile copyfile = 29;
     GatekeeperOverride gatekeeper_override = 30;
+    LaunchItem launch_item = 31;
   }
 }
 
