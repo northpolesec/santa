@@ -318,6 +318,7 @@ objc_library(
     ],
     deps = [
         ":SNTCommonEnums",
+        ":SNTMdmConfigSource",
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
@@ -609,10 +610,12 @@ santa_unit_test(
 
 santa_unit_test(
     name = "SNTConfiguratorTest",
+    size = "small",
     srcs = ["SNTConfiguratorTest.m"],
     deps = [
         ":SNTCommonEnums",
         ":SNTConfigurator",
+        ":SNTMdmConfigSource",
         "@OCMock",
     ],
 )
@@ -744,6 +747,13 @@ objc_library(
     hdrs = ["MOLAuthenticatingURLSession.h"],
     sdk_frameworks = ["Security"],
     deps = [":MOLCertificate"],
+)
+
+objc_library(
+    name = "SNTMdmConfigSource",
+    srcs = ["SNTMdmConfigSource.m"],
+    hdrs = ["SNTMdmConfigSource.h"],
+    sdk_frameworks = ["Foundation"],
 )
 
 santa_unit_test(

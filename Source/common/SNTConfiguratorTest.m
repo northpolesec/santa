@@ -13,14 +13,17 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTMdmConfigSource.h"
 
 @interface SNTConfigurator (Testing)
 - (instancetype)initWithSyncStateFile:(NSString *)syncStateFilePath
-            syncStateAccessAuthorizer:(BOOL (^)(void))syncStateAccessAuthorizer;
+            syncStateAccessAuthorizer:(BOOL (^)(void))syncStateAccessAuthorizer
+                      mdmConfigSource:(SNTMdmConfigSource *)mdmConfigSource;
 
 @property NSDictionary *syncState;
 @end
@@ -51,6 +54,7 @@
                               verifier:(void (^)(SNTConfigurator *))verifierBlock {
   NSString *syncStatePlistPath =
       [NSString stringWithFormat:@"%@/test-sync-state.plist", self.testDir];
+  SNTMdmConfigSource *mdmConfigSource = [[SNTMdmConfigSource alloc] init];
 
   XCTAssertTrue([syncStatePlist writeToFile:syncStatePlistPath atomically:YES]);
 
@@ -58,7 +62,8 @@
                                               syncStateAccessAuthorizer:^{
                                                 // Allow all access to the test plist
                                                 return YES;
-                                              }];
+                                              }
+                                                        mdmConfigSource:mdmConfigSource];
 
   NSLog(@"sync state: %@", cfg.syncState);
 
@@ -97,6 +102,23 @@
                                 XCTAssertNil(cfg.syncState[@"SyncCleanRequired"]);
                                 XCTAssertNil(cfg.syncState[@"SyncTypeRequired"]);
                               }];
+}
+
+- (void)testMock {
+  NSString *syncStatePlistPath =
+      [NSString stringWithFormat:@"%@/test-sync-state.plist", self.testDir];
+  SNTMdmConfigSource *mdmConfigSource = OCMPartialMock([[SNTMdmConfigSource alloc] init]);
+  OCMStub([mdmConfigSource appValueIsForced:[OCMArg isEqual:@"MetricExportTimeout"]]).andReturn(1);
+  OCMStub([mdmConfigSource copyAppValue:[OCMArg isEqual:@"MetricExportTimeout"]]).andReturn(@(222));
+
+  SNTConfigurator *configurator = [[SNTConfigurator alloc] initWithSyncStateFile:syncStatePlistPath
+                                                       syncStateAccessAuthorizer:^{
+                                                         // Allow all access to the test plist
+                                                         return YES;
+                                                       }
+                                                                 mdmConfigSource:mdmConfigSource];
+
+  XCTAssertEqual([configurator metricExportTimeout], 222);
 }
 
 @end

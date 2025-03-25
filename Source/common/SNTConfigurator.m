@@ -17,6 +17,7 @@
 
 #include <sys/stat.h>
 
+#import "Source/common/SNTMdmConfigSource.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -66,9 +67,6 @@ NSString *const kSyncStateFilePath = @"/var/db/santa/sync-state.plist";
 #ifdef DEBUG
 NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist";
 #endif
-
-/// The domain used by mobileconfig.
-static const CFStringRef kMobileConfigDomain = CFSTR("com.northpolesec.santa");
 
 /// The keys managed by a mobileconfig.
 static NSString *const kStaticRules = @"StaticRules";
@@ -179,18 +177,24 @@ static NSString *const kRuleSyncLastSuccess = @"RuleSyncLastSuccess";
 static NSString *const kSyncCleanRequiredDeprecated = @"SyncCleanRequired";
 static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 
+SNTMdmConfigSource *_mdmConfigSource;
+
 - (instancetype)init {
+  SNTMdmConfigSource *mdmConfigSource = [[SNTMdmConfigSource alloc] init];
   return [self initWithSyncStateFile:kSyncStateFilePath
            syncStateAccessAuthorizer:^BOOL() {
              // Only access the sync state if a sync server is configured and running as root
              return self.syncBaseURL != nil && geteuid() == 0;
-           }];
+           }
+                     mdmConfigSource:mdmConfigSource];
 }
 
 - (instancetype)initWithSyncStateFile:(NSString *)syncStateFilePath
-            syncStateAccessAuthorizer:(BOOL (^)(void))syncStateAccessAuthorizer {
+            syncStateAccessAuthorizer:(BOOL (^)(void))syncStateAccessAuthorizer
+                      mdmConfigSource:(SNTMdmConfigSource *)mdmConfigSource {
   self = [super init];
   if (self) {
+    _mdmConfigSource = mdmConfigSource;
     Class number = [NSNumber class];
     Class re = [NSRegularExpression class];
     Class date = [NSDate class];
@@ -1414,9 +1418,8 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (id)forcedConfigValueForKey:(NSString *)key {
-  CFStringRef keyRef = (__bridge CFStringRef)key;
-  if (CFPreferencesAppValueIsForced(keyRef, kMobileConfigDomain)) {
-    return CFBridgingRelease(CFPreferencesCopyAppValue(keyRef, kMobileConfigDomain));
+  if ([_mdmConfigSource appValueIsForced:key]) {
+    return [_mdmConfigSource copyAppValue:key];
   }
   return nil;
 }
