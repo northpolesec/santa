@@ -104,7 +104,7 @@
                               }];
 }
 
-- (void)testMock {
+- (void)testForcedMetricExportTimeoutReturnsForcedValue {
   NSString *syncStatePlistPath =
       [NSString stringWithFormat:@"%@/test-sync-state.plist", self.testDir];
   SNTMdmConfigSource *mdmConfigSource = OCMPartialMock([[SNTMdmConfigSource alloc] init]);
