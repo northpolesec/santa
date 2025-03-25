@@ -65,6 +65,7 @@ class BasicString : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationAutoUnlock &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLaunchItem &) override;
 #endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) override;

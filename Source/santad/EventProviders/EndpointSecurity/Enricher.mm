@@ -155,6 +155,18 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT:
       return std::make_unique<EnrichedMessage>(
           EnrichedLoginLogout(std::move(es_msg), Enrich(*es_msg->process)));
+    case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD:
+      return std::make_unique<EnrichedMessage>(
+          EnrichedLaunchItem(std::move(es_msg), Enrich(*es_msg->process),
+                             Enrich(es_msg->event.btm_launch_item_add->instigator),
+                             Enrich(es_msg->event.btm_launch_item_add->app),
+                             UsernameForUID(es_msg->event.btm_launch_item_add->item->uid)));
+    case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE:
+      return std::make_unique<EnrichedMessage>(
+          EnrichedLaunchItem(std::move(es_msg), Enrich(*es_msg->process),
+                             Enrich(es_msg->event.btm_launch_item_remove->instigator),
+                             Enrich(es_msg->event.btm_launch_item_remove->app),
+                             UsernameForUID(es_msg->event.btm_launch_item_remove->item->uid)));
 #endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE:

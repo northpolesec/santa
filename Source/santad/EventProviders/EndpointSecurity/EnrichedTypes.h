@@ -580,6 +580,35 @@ class EnrichedAuthenticationAutoUnlock : public EnrichedEventType {
   std::optional<uid_t> uid_;
 };
 
+class EnrichedLaunchItem : public EnrichedEventType {
+ public:
+  EnrichedLaunchItem(Message &&es_msg, EnrichedProcess instigator,
+                     std::optional<EnrichedProcess> enriched_btm_instigator,
+                     std::optional<EnrichedProcess> enriched_app_registrant,
+                     std::optional<std::shared_ptr<std::string>> username)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        enriched_btm_instigator_(std::move(enriched_btm_instigator)),
+        enriched_app_registrant_(std::move(enriched_app_registrant)),
+        username_(std::move(username)) {}
+
+  const std::optional<EnrichedProcess> &EnrichedBTMInstigator() const {
+    return enriched_btm_instigator_;
+  }
+
+  const std::optional<EnrichedProcess> &EnrichedAppRegistrant() const {
+    return enriched_app_registrant_;
+  }
+
+  const std::optional<std::shared_ptr<std::string>> &Username() const {
+    return username_;
+  }
+
+ private:
+  std::optional<EnrichedProcess> enriched_btm_instigator_;
+  std::optional<EnrichedProcess> enriched_app_registrant_;
+  std::optional<std::shared_ptr<std::string>> username_;
+};
+
 class EnrichedClone : public EnrichedEventType {
  public:
   EnrichedClone(Message &&es_msg, EnrichedProcess &&instigator,
@@ -623,21 +652,23 @@ class EnrichedGatekeeperOverride : public EnrichedEventType {
   std::optional<EnrichedFile> target_;
 };
 
-using EnrichedType = std::variant<
-    EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit, EnrichedFork,
-    EnrichedLink, EnrichedRename, EnrichedUnlink, EnrichedCSInvalidated,
-    EnrichedLoginWindowSessionLogin, EnrichedLoginWindowSessionLogout,
-    EnrichedLoginWindowSessionLock, EnrichedLoginWindowSessionUnlock,
-    EnrichedScreenSharingAttach, EnrichedScreenSharingDetach,
-    EnrichedOpenSSHLogin, EnrichedOpenSSHLogout, EnrichedLoginLogin,
-    EnrichedLoginLogout, EnrichedAuthenticationOD,
-    EnrichedAuthenticationTouchID, EnrichedAuthenticationToken,
-    EnrichedAuthenticationAutoUnlock, EnrichedClone, EnrichedCopyfile
+using EnrichedType =
+    std::variant<EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit,
+                 EnrichedFork, EnrichedLink, EnrichedRename, EnrichedUnlink,
+                 EnrichedCSInvalidated, EnrichedLoginWindowSessionLogin,
+                 EnrichedLoginWindowSessionLogout,
+                 EnrichedLoginWindowSessionLock,
+                 EnrichedLoginWindowSessionUnlock, EnrichedScreenSharingAttach,
+                 EnrichedScreenSharingDetach, EnrichedOpenSSHLogin,
+                 EnrichedOpenSSHLogout, EnrichedLoginLogin, EnrichedLoginLogout,
+                 EnrichedAuthenticationOD, EnrichedAuthenticationTouchID,
+                 EnrichedAuthenticationToken, EnrichedAuthenticationAutoUnlock,
+                 EnrichedClone, EnrichedCopyfile, EnrichedLaunchItem
 #if HAVE_MACOS_15
-    ,
-    EnrichedGatekeeperOverride
+                 ,
+                 EnrichedGatekeeperOverride
 #endif  // HAVE_MACOS_15
-    >;
+                 >;
 
 class EnrichedMessage {
  public:

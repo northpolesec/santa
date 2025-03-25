@@ -80,6 +80,7 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
       const santa::EnrichedAuthenticationAutoUnlock &) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLaunchItem &) = 0;
 #endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) = 0;

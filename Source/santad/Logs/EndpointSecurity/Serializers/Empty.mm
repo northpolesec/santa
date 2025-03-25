@@ -125,6 +125,10 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationAutoUnl
   return {};
 }
 
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLaunchItem &) {
+  return {};
+}
+
 #endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15

@@ -14,6 +14,8 @@
 
 #include "Source/common/TelemetryEventMap.h"
 
+#include <EndpointSecurity/ESTypes.h>
+
 #include <string_view>
 
 #include "Source/common/Platform.h"
@@ -45,6 +47,7 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
       {"clone", TelemetryEvent::kClone},
       {"copyfile", TelemetryEvent::kCopyfile},
       {"gatekeeperoverride", TelemetryEvent::kGatekeeperOverride},
+      {"launchitem", TelemetryEvent::kLaunchItem},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -102,6 +105,8 @@ TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event) {
     case ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH: return TelemetryEvent::kScreenSharing;
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN: return TelemetryEvent::kOpenSSH;
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT: return TelemetryEvent::kOpenSSH;
+    case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD: return TelemetryEvent::kLaunchItem;
+    case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: return TelemetryEvent::kLaunchItem;
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return TelemetryEvent::kGatekeeperOverride;
 #endif  // HAVE_MACOS_15
