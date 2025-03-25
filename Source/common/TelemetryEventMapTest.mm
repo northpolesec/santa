@@ -14,6 +14,7 @@
 
 #include "Source/common/TelemetryEventMap.h"
 
+#include <EndpointSecurity/ESTypes.h>
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
@@ -55,6 +56,7 @@ using santa::TelemetryEvent;
       {"clone", TelemetryEvent::kClone},
       {"copyfile", TelemetryEvent::kCopyfile},
       {"gatekeeperoverride", TelemetryEvent::kGatekeeperOverride},
+      {"LaunchItem", TelemetryEvent::kLaunchItem},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -106,6 +108,8 @@ using santa::TelemetryEvent;
       {ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, TelemetryEvent::kScreenSharing},
       {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN, TelemetryEvent::kOpenSSH},
       {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, TelemetryEvent::kOpenSSH},
+      {ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD, TelemetryEvent::kLaunchItem},
+      {ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE, TelemetryEvent::kLaunchItem},
 #if HAVE_MACOS_15
       {ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, TelemetryEvent::kGatekeeperOverride},
 #endif  // HAVE_MACOS_15

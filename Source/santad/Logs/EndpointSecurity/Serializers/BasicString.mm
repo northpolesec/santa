@@ -791,6 +791,22 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationA
   return FinalizeString(str);
 }
 
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLaunchItem &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=");
+  if (msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD) {
+    str.append("LAUNCH_ITEM_ADD");
+  } else if (msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE) {
+    str.append("LAUNCH_ITEM_REMOVE");
+  } else {
+    LOGE(@"Unexpected event type for EnrichedLaunchItem: %d", msg->event_type);
+    std::abort();
+  }
+
+  return FinalizeString(str);
+}
+
 #endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15

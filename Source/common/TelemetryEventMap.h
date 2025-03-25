@@ -18,6 +18,8 @@
 #import <EndpointSecurity/ESTypes.h>
 #import <Foundation/Foundation.h>
 
+#include <type_traits>
+
 namespace santa {
 
 // clang-format off
@@ -44,6 +46,7 @@ enum class TelemetryEvent : uint64_t {
   kClone                   = 1 << 18,
   kCopyfile                = 1 << 19,
   kGatekeeperOverride      = 1 << 20,
+  kLaunchItem              = 1 << 21,
   kEverything              = ~0ULL,
 };
 // clang-format on
