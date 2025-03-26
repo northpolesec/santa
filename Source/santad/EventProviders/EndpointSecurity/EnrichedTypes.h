@@ -440,42 +440,40 @@ class EnrichedLoginLogout : public EnrichedEventType {
   EnrichedLoginLogout(EnrichedLoginLogout &&) = default;
 };
 
-// Base class for authentication event types that contain instigator
-// information. Note that beginning in macOS 15 instigator information
-// is optional. If complete process info is missing, the audit token
-// of the instigator is still made available.
-class EnrichedAuthenticationWithInstigator : public EnrichedEventType {
+// Base class for event types that contain instigator information. Note that
+// beginning in macOS 15 instigator information is optional. If complete
+// process info is missing, the audit token of the instigator is still made
+// available.
+class EnrichedEventWithInstigator : public EnrichedEventType {
  public:
-  EnrichedAuthenticationWithInstigator(
+  EnrichedEventWithInstigator(
       Message &&es_msg, EnrichedProcess instigator,
-      std::optional<EnrichedProcess> enriched_auth_instigator)
+      std::optional<EnrichedProcess> enriched_event_instigator)
       : EnrichedEventType(std::move(es_msg), std::move(instigator)),
-        enriched_auth_instigator_(std::move(enriched_auth_instigator)) {}
+        enriched_event_instigator_(std::move(enriched_event_instigator)) {}
 
-  virtual ~EnrichedAuthenticationWithInstigator() = default;
+  virtual ~EnrichedEventWithInstigator() = default;
 
-  EnrichedAuthenticationWithInstigator(
-      EnrichedAuthenticationWithInstigator &&) = default;
+  EnrichedEventWithInstigator(EnrichedEventWithInstigator &&) = default;
 
-  virtual const es_process_t *AuthInstigator() const = 0;
-  virtual std::optional<audit_token_t> AuthInstigatorToken() const = 0;
+  virtual const es_process_t *EventInstigator() const = 0;
+  virtual std::optional<audit_token_t> EventInstigatorToken() const = 0;
 
-  const std::optional<EnrichedProcess> &EnrichedAuthInstigator() const {
-    return enriched_auth_instigator_;
+  const std::optional<EnrichedProcess> &EnrichedEventInstigator() const {
+    return enriched_event_instigator_;
   }
 
  private:
-  std::optional<EnrichedProcess> enriched_auth_instigator_;
+  std::optional<EnrichedProcess> enriched_event_instigator_;
 };
 
-class EnrichedAuthenticationOD : public EnrichedAuthenticationWithInstigator {
+class EnrichedAuthenticationOD : public EnrichedEventWithInstigator {
  public:
-  using EnrichedAuthenticationWithInstigator::
-      EnrichedAuthenticationWithInstigator;
+  using EnrichedEventWithInstigator::EnrichedEventWithInstigator;
 
   EnrichedAuthenticationOD(EnrichedAuthenticationOD &&) = default;
 
-  const es_process_t *AuthInstigator() const override {
+  const es_process_t *EventInstigator() const override {
 #if HAVE_MACOS_13
     return es_msg_->event.authentication->data.od->instigator;
 #else
@@ -483,7 +481,7 @@ class EnrichedAuthenticationOD : public EnrichedAuthenticationWithInstigator {
 #endif
   }
 
-  std::optional<audit_token_t> AuthInstigatorToken() const override {
+  std::optional<audit_token_t> EventInstigatorToken() const override {
 #if HAVE_MACOS_15
     return es_msg_->version >= 8
                ? std::make_optional<audit_token_t>(
@@ -495,21 +493,19 @@ class EnrichedAuthenticationOD : public EnrichedAuthenticationWithInstigator {
   }
 };
 
-class EnrichedAuthenticationTouchID
-    : public EnrichedAuthenticationWithInstigator {
+class EnrichedAuthenticationTouchID : public EnrichedEventWithInstigator {
  public:
   EnrichedAuthenticationTouchID(
       Message &&es_msg, EnrichedProcess instigator,
       std::optional<EnrichedProcess> auth_instigator,
       std::optional<std::shared_ptr<std::string>> username)
-      : EnrichedAuthenticationWithInstigator(std::move(es_msg),
-                                             std::move(instigator),
-                                             std::move(auth_instigator)),
+      : EnrichedEventWithInstigator(std::move(es_msg), std::move(instigator),
+                                    std::move(auth_instigator)),
         username_(std::move(username)) {}
 
   EnrichedAuthenticationTouchID(EnrichedAuthenticationTouchID &&) = default;
 
-  const es_process_t *AuthInstigator() const override {
+  const es_process_t *EventInstigator() const override {
 #if HAVE_MACOS_13
     return es_msg_->event.authentication->data.touchid->instigator;
 #else
@@ -517,7 +513,7 @@ class EnrichedAuthenticationTouchID
 #endif
   }
 
-  std::optional<audit_token_t> AuthInstigatorToken() const override {
+  std::optional<audit_token_t> EventInstigatorToken() const override {
 #if HAVE_MACOS_15
     return es_msg_->version >= 8 ? std::make_optional<audit_token_t>(
                                        es_msg_->event.authentication->data
@@ -536,15 +532,13 @@ class EnrichedAuthenticationTouchID
   std::optional<std::shared_ptr<std::string>> username_;
 };
 
-class EnrichedAuthenticationToken
-    : public EnrichedAuthenticationWithInstigator {
+class EnrichedAuthenticationToken : public EnrichedEventWithInstigator {
  public:
-  using EnrichedAuthenticationWithInstigator::
-      EnrichedAuthenticationWithInstigator;
+  using EnrichedEventWithInstigator::EnrichedEventWithInstigator;
 
   EnrichedAuthenticationToken(EnrichedAuthenticationToken &&) = default;
 
-  const es_process_t *AuthInstigator() const override {
+  const es_process_t *EventInstigator() const override {
 #if HAVE_MACOS_13
     return es_msg_->event.authentication->data.token->instigator;
 #else
@@ -552,7 +546,7 @@ class EnrichedAuthenticationToken
 #endif
   }
 
-  std::optional<audit_token_t> AuthInstigatorToken() const override {
+  std::optional<audit_token_t> EventInstigatorToken() const override {
 #if HAVE_MACOS_15
     return es_msg_->version >= 8 ? std::make_optional<audit_token_t>(
                                        es_msg_->event.authentication->data
@@ -580,19 +574,37 @@ class EnrichedAuthenticationAutoUnlock : public EnrichedEventType {
   std::optional<uid_t> uid_;
 };
 
-class EnrichedLaunchItem : public EnrichedEventType {
+class EnrichedLaunchItem : public EnrichedEventWithInstigator {
  public:
   EnrichedLaunchItem(Message &&es_msg, EnrichedProcess instigator,
                      std::optional<EnrichedProcess> enriched_btm_instigator,
                      std::optional<EnrichedProcess> enriched_app_registrant,
                      std::optional<std::shared_ptr<std::string>> username)
-      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
-        enriched_btm_instigator_(std::move(enriched_btm_instigator)),
+      : EnrichedEventWithInstigator(std::move(es_msg), std::move(instigator),
+                                    std::move(enriched_btm_instigator)),
         enriched_app_registrant_(std::move(enriched_app_registrant)),
         username_(std::move(username)) {}
 
-  const std::optional<EnrichedProcess> &EnrichedBTMInstigator() const {
-    return enriched_btm_instigator_;
+  EnrichedLaunchItem(EnrichedLaunchItem &&) = default;
+
+  const es_process_t *EventInstigator() const override {
+#if HAVE_MACOS_13
+    return es_msg_->event.btm_launch_item_add->instigator;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> EventInstigatorToken() const override {
+#if HAVE_MACOS_15
+    return (es_msg_->version >= 8 &&
+            es_msg_->event.btm_launch_item_add->instigator_token)
+               ? std::make_optional<audit_token_t>(
+                     *es_msg_->event.btm_launch_item_add->instigator_token)
+               : std::nullopt;
+#else
+    return std::nullopt;
+#endif
   }
 
   const std::optional<EnrichedProcess> &EnrichedAppRegistrant() const {
@@ -604,7 +616,6 @@ class EnrichedLaunchItem : public EnrichedEventType {
   }
 
  private:
-  std::optional<EnrichedProcess> enriched_btm_instigator_;
   std::optional<EnrichedProcess> enriched_app_registrant_;
   std::optional<std::shared_ptr<std::string>> username_;
 };

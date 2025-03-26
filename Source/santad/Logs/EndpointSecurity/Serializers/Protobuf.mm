@@ -894,16 +894,16 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogout &msg) 
   return FinalizeProto(santa_msg);
 }
 
-void EncodeAuthInstigatorOrFallback(
-    const EnrichedAuthenticationWithInstigator &auth_event,
+void EncodeEventInstigatorOrFallback(
+    const EnrichedEventWithInstigator &event,
     std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
     std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
-  if (auth_event.AuthInstigator() && auth_event.EnrichedAuthInstigator().has_value()) {
-    EncodeProcessInfoLight(lazy_auth_instigator_f(), auth_event.AuthInstigator(),
-                           auth_event.EnrichedAuthInstigator().value());
-  } else if (auth_event.AuthInstigatorToken().has_value()) {
+  if (event.EventInstigator() && event.EnrichedEventInstigator().has_value()) {
+    EncodeProcessInfoLight(lazy_auth_instigator_f(), event.EventInstigator(),
+                           event.EnrichedEventInstigator().value());
+  } else if (event.EventInstigatorToken().has_value()) {
     ::pbv1::ProcessID *pb_proc_id = lazy_auth_instigator_fallback_f();
-    audit_token_t fallback_tok = auth_event.AuthInstigatorToken().value();
+    audit_token_t fallback_tok = event.EventInstigatorToken().value();
     pb_proc_id->set_pid(Pid(fallback_tok));
     pb_proc_id->set_pidversion(Pidversion(fallback_tok));
   }
@@ -920,7 +920,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD &
   es_event_authentication_od_t *es_od_event = msg->event.authentication->data.od;
 
   EncodeProcessInfoLight(pb_od->mutable_instigator(), msg);
-  EncodeAuthInstigatorOrFallback(
+  EncodeEventInstigatorOrFallback(
       msg, [pb_od] { return pb_od->mutable_trigger_process(); },
       [pb_od] { return pb_od->mutable_trigger_id(); });
 
@@ -951,7 +951,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouc
   es_event_authentication_touchid_t *es_touchid_event = msg->event.authentication->data.touchid;
 
   EncodeProcessInfoLight(pb_touchid->mutable_instigator(), msg);
-  EncodeAuthInstigatorOrFallback(
+  EncodeEventInstigatorOrFallback(
       msg, [pb_touchid] { return pb_touchid->mutable_trigger_process(); },
       [pb_touchid] { return pb_touchid->mutable_trigger_id(); });
 
@@ -974,7 +974,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToke
   es_event_authentication_token_t *es_token_event = msg->event.authentication->data.token;
 
   EncodeProcessInfoLight(pb_token->mutable_instigator(), msg);
-  EncodeAuthInstigatorOrFallback(
+  EncodeEventInstigatorOrFallback(
       msg, [pb_token] { return pb_token->mutable_trigger_process(); },
       [pb_token] { return pb_token->mutable_trigger_id(); });
 
