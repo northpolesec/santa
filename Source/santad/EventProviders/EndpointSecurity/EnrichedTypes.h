@@ -20,6 +20,7 @@
 #ifndef SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_ENRICHEDTYPES_H
 #define SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_ENRICHEDTYPES_H
 
+#include <EndpointSecurity/EndpointSecurity.h>
 #include <time.h>
 
 #include <optional>
@@ -583,13 +584,21 @@ class EnrichedLaunchItem : public EnrichedEventWithInstigator {
       : EnrichedEventWithInstigator(std::move(es_msg), std::move(instigator),
                                     std::move(enriched_btm_instigator)),
         enriched_app_registrant_(std::move(enriched_app_registrant)),
-        username_(std::move(username)) {}
+        username_(std::move(username)) {
+    assert(es_msg_->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD ||
+           es_msg_->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE);
+  }
 
   EnrichedLaunchItem(EnrichedLaunchItem &&) = default;
 
   const es_process_t *EventInstigator() const override {
 #if HAVE_MACOS_13
-    return es_msg_->event.btm_launch_item_add->instigator;
+    if (es_msg_->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD) {
+      return es_msg_->event.btm_launch_item_add->instigator;
+    } else {
+      return es_msg_->event.btm_launch_item_remove->instigator;
+    }
+
 #else
     return nullptr;
 #endif
@@ -597,11 +606,58 @@ class EnrichedLaunchItem : public EnrichedEventWithInstigator {
 
   std::optional<audit_token_t> EventInstigatorToken() const override {
 #if HAVE_MACOS_15
-    return (es_msg_->version >= 8 &&
-            es_msg_->event.btm_launch_item_add->instigator_token)
-               ? std::make_optional<audit_token_t>(
-                     *es_msg_->event.btm_launch_item_add->instigator_token)
-               : std::nullopt;
+    if (es_msg_->version < 8) {
+      return std::nullopt;
+    }
+
+    if (es_msg_->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD &&
+        es_msg_->event.btm_launch_item_add->instigator_token) {
+      return std::make_optional<audit_token_t>(
+          *es_msg_->event.btm_launch_item_add->instigator_token);
+    } else if (es_msg_->event_type ==
+                   ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE &&
+               es_msg_->event.btm_launch_item_remove->instigator_token) {
+      return std::make_optional<audit_token_t>(
+          *es_msg_->event.btm_launch_item_remove->instigator_token);
+    } else {
+      return std::nullopt;
+    }
+#else
+    return std::nullopt;
+#endif
+  }
+
+  const es_process_t *AppRegistrant() const {
+#if HAVE_MACOS_13
+    if (es_msg_->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD) {
+      return es_msg_->event.btm_launch_item_add->app;
+    } else {
+      return es_msg_->event.btm_launch_item_remove->app;
+    }
+
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> AppRegistrantToken() const {
+#if HAVE_MACOS_15
+    if (es_msg_->version < 8) {
+      return std::nullopt;
+    }
+
+    if (es_msg_->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD &&
+        es_msg_->event.btm_launch_item_add->app_token) {
+      return std::make_optional<audit_token_t>(
+          *es_msg_->event.btm_launch_item_add->app_token);
+    } else if (es_msg_->event_type ==
+                   ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE &&
+               es_msg_->event.btm_launch_item_remove->app_token) {
+      return std::make_optional<audit_token_t>(
+          *es_msg_->event.btm_launch_item_remove->app_token);
+    } else {
+      return std::nullopt;
+    }
 #else
     return std::nullopt;
 #endif

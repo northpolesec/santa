@@ -51,10 +51,7 @@ extern std::string GetAccessTypeString(es_event_type_t event_type);
 extern std::string GetFileAccessPolicyDecisionString(FileAccessPolicyDecision decision);
 extern std::string GetAuthenticationTouchIDModeString(es_touchid_mode_t mode);
 extern std::string GetAuthenticationAutoUnlockTypeString(es_auto_unlock_type_t mode);
-extern std::string GetBTMLaunchItemType(es_btm_item_type_t item_type);
-extern NSString *NormalizePath(es_string_token_t path);
-extern void ConcatPrefixIfRelativePath(std::string &str, std::string label, es_string_token_t path,
-                                       es_string_token_t prefix);
+extern std::string GetBTMLaunchItemTypeString(es_btm_item_type_t item_type);
 }  // namespace santa
 
 std::string BasicStringSerializeMessage(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
@@ -799,7 +796,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   XCTAssertCppStringEqual(got, want);
 }
 
-- (void)testGetBTMLaunchItemType {
+- (void)testGetBTMLaunchItemTypeString {
   std::map<es_btm_item_type_t, std::string> launchItemTypeToString{
       {ES_BTM_ITEM_TYPE_USER_ITEM, "USER_ITEM"},   {ES_BTM_ITEM_TYPE_APP, "APP"},
       {ES_BTM_ITEM_TYPE_LOGIN_ITEM, "LOGIN_ITEM"}, {ES_BTM_ITEM_TYPE_AGENT, "AGENT"},
@@ -807,41 +804,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   };
 
   for (const auto &kv : launchItemTypeToString) {
-    XCTAssertCppStringEqual(santa::GetBTMLaunchItemType(kv.first), kv.second);
+    XCTAssertCppStringEqual(santa::GetBTMLaunchItemTypeString(kv.first), kv.second);
   }
-}
-
-- (void)testNormalizePath {
-  using santa::NormalizePath;
-  XCTAssertEqualObjects(NormalizePath(MakeESStringToken("foo")), @"foo");
-  XCTAssertEqualObjects(NormalizePath(MakeESStringToken("/foo")), @"/foo");
-  XCTAssertEqualObjects(NormalizePath(MakeESStringToken("file:///foo")), @"/foo");
-}
-
-- (void)testConcatPrefixIfRelativePath {
-  std::string s;
-
-  using santa::ConcatPrefixIfRelativePath;
-
-  ConcatPrefixIfRelativePath(s, "lbl", MakeESStringToken(NULL), MakeESStringToken("foo"));
-  XCTAssertCppStringEqual(s, std::string(""));
-
-  s.clear();
-  ConcatPrefixIfRelativePath(s, "lbl", MakeESStringToken("hi"), MakeESStringToken("foo"));
-  XCTAssertCppStringEqual(s, std::string("|lbl=foo/hi"));
-
-  s.clear();
-  ConcatPrefixIfRelativePath(s, "lbl", MakeESStringToken("/hi"), MakeESStringToken("foo"));
-  XCTAssertCppStringEqual(s, std::string("|lbl=/hi"));
-
-  s.clear();
-  ConcatPrefixIfRelativePath(s, "lbl", MakeESStringToken("file:///hi"),
-                             MakeESStringToken("file:///foo"));
-  XCTAssertCppStringEqual(s, std::string("|lbl=/hi"));
-
-  s.clear();
-  ConcatPrefixIfRelativePath(s, "lbl", MakeESStringToken("hi"), MakeESStringToken("file:///foo"));
-  XCTAssertCppStringEqual(s, std::string("|lbl=/foo/hi"));
 }
 
 - (void)testSerializeMessageLaunchItemAdd {
@@ -947,7 +911,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       .app_url = MakeESStringToken("/absolute/path/app"),
   };
 
-  es_event_btm_launch_item_add_t launchItem = {
+  es_event_btm_launch_item_remove_t launchItem = {
       .instigator = &instigatorProc,
       .app = &instigatorApp,
       .item = &item,
@@ -957,7 +921,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 #endif
   };
 
-  esMsg.event.btm_launch_item_add = &launchItem;
+  esMsg.event.btm_launch_item_remove = &launchItem;
   esMsg.version = 8;
 
   std::string got = BasicStringSerializeMessage(&esMsg);

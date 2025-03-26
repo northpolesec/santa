@@ -71,4 +71,33 @@ using santa::MountFromName;
   XCTAssertCppStringBeginsWith(std::string(MountFromName(@"/").UTF8String), std::string("/"));
 }
 
+- (void)testNormalizePath {
+  using santa::NormalizePath;
+
+  XCTAssertNil(NormalizePath(MakeESStringToken(NULL)));
+
+  XCTAssertEqualObjects(NormalizePath(MakeESStringToken("foo")), @"foo");
+  XCTAssertEqualObjects(NormalizePath(MakeESStringToken("/foo")), @"/foo");
+  XCTAssertEqualObjects(NormalizePath(MakeESStringToken("file:///foo")), @"/foo");
+}
+
+- (void)testConcatPrefixIfRelativePath {
+  using santa::ConcatPrefixIfRelativePath;
+
+  XCTAssertNil(ConcatPrefixIfRelativePath(MakeESStringToken(NULL), MakeESStringToken("foo")));
+
+  XCTAssertEqualObjects(
+      ConcatPrefixIfRelativePath(MakeESStringToken("hi"), MakeESStringToken("foo")), @"foo/hi");
+  XCTAssertEqualObjects(
+      ConcatPrefixIfRelativePath(MakeESStringToken("hi"), MakeESStringToken(NULL)), @"hi");
+  XCTAssertEqualObjects(
+      ConcatPrefixIfRelativePath(MakeESStringToken("/hi"), MakeESStringToken("foo")), @"/hi");
+  XCTAssertEqualObjects(
+      ConcatPrefixIfRelativePath(MakeESStringToken("file:///hi"), MakeESStringToken("file:///foo")),
+      @"/hi");
+  XCTAssertEqualObjects(
+      ConcatPrefixIfRelativePath(MakeESStringToken("hi"), MakeESStringToken("file:///foo")),
+      @"/foo/hi");
+}
+
 @end

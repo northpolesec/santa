@@ -166,4 +166,26 @@ es_file_t *GetAllowListTargetFile(const Message &msg) {
   }
 }
 
+NSString *NormalizePath(es_string_token_t path) {
+  if (path.length == 0) {
+    return nil;
+  }
+
+  return [NSURL URLWithString:[NSString stringWithUTF8String:path.data]].path;
+}
+
+NSString *ConcatPrefixIfRelativePath(es_string_token_t path, es_string_token_t prefix) {
+  if (path.length == 0) {
+    return nil;
+  }
+
+  NSString *normalizedPath = NormalizePath(path);
+
+  if (![normalizedPath hasPrefix:@"/"] && prefix.length > 0) {
+    return [NSString stringWithFormat:@"%@/%@", NormalizePath(prefix), normalizedPath];
+  } else {
+    return normalizedPath;
+  }
+}
+
 }  // namespace santa

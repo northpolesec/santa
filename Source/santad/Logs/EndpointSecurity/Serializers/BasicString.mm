@@ -26,13 +26,13 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-#include "Source/common/SNTCommonEnums.h"
 
 #include <optional>
 #include <string>
 
 #include "Source/common/AuditUtilities.h"
 #import "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/String.h"
@@ -795,7 +795,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationA
   return FinalizeString(str);
 }
 
-std::string GetBTMLaunchItemType(es_btm_item_type_t item_type) {
+std::string GetBTMLaunchItemTypeString(es_btm_item_type_t item_type) {
   switch (item_type) {
     case ES_BTM_ITEM_TYPE_USER_ITEM: return "USER_ITEM";
     case ES_BTM_ITEM_TYPE_APP: return "APP";
@@ -806,32 +806,6 @@ std::string GetBTMLaunchItemType(es_btm_item_type_t item_type) {
   }
 }
 
-NSString *NormalizePath(es_string_token_t path) {
-  if (path.length == 0) {
-    return nil;
-  }
-
-  return [NSURL URLWithString:[NSString stringWithUTF8String:path.data]].path;
-}
-
-void ConcatPrefixIfRelativePath(std::string &str, std::string label, es_string_token_t path,
-                                es_string_token_t prefix) {
-  if (path.length == 0) {
-    return;
-  }
-
-  str.append("|" + label + "=");
-
-  NSString *normalizedPath = NormalizePath(path);
-
-  if (![normalizedPath hasPrefix:@"/"] && prefix.length > 0) {
-    str.append(NSStringToUTF8StringView(NormalizePath(prefix)));
-    str.append("/");
-  }
-
-  str.append(NSStringToUTF8StringView(normalizedPath));
-}
-
 std::vector<uint8_t> BasicString::SerializeMessageLaunchItemAdd(const EnrichedLaunchItem &msg) {
   assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD);
   const es_event_btm_launch_item_add_t *btm = msg->event.btm_launch_item_add;
@@ -839,15 +813,25 @@ std::vector<uint8_t> BasicString::SerializeMessageLaunchItemAdd(const EnrichedLa
   std::string str = CreateDefaultString();
 
   str.append("action=LAUNCH_ITEM_ADD|item_type=");
-  str.append(GetBTMLaunchItemType(btm->item->item_type));
+  str.append(GetBTMLaunchItemTypeString(btm->item->item_type));
   str.append("|legacy=");
   str.append(GetBoolString(btm->item->legacy));
   str.append("|managed=");
   str.append(GetBoolString(btm->item->managed));
   AppendEventUser(str, msg.Username(), btm->item->uid, "item_");
 
-  ConcatPrefixIfRelativePath(str, "exec_path", btm->executable_path, btm->item->app_url);
-  ConcatPrefixIfRelativePath(str, "item_path", btm->item->item_url, btm->item->app_url);
+  NSString *path = ConcatPrefixIfRelativePath(btm->executable_path, btm->item->app_url);
+  if (path) {
+    str.append("|exec_path=");
+    str.append(NSStringToUTF8StringView(path));
+  }
+
+  path = ConcatPrefixIfRelativePath(btm->item->item_url, btm->item->app_url);
+  if (path) {
+    str.append("|item_path=");
+    str.append(NSStringToUTF8StringView(path));
+  }
+
   if (btm->item->app_url.length > 0) {
     str.append("|app_path=");
     str.append(NSStringToUTF8StringView(NormalizePath(btm->item->app_url)));
@@ -868,14 +852,19 @@ std::vector<uint8_t> BasicString::SerializeMessageLaunchItemRemove(const Enriche
   std::string str = CreateDefaultString();
 
   str.append("action=LAUNCH_ITEM_REMOVE|item_type=");
-  str.append(GetBTMLaunchItemType(btm->item->item_type));
+  str.append(GetBTMLaunchItemTypeString(btm->item->item_type));
   str.append("|legacy=");
   str.append(GetBoolString(btm->item->legacy));
   str.append("|managed=");
   str.append(GetBoolString(btm->item->managed));
   AppendEventUser(str, msg.Username(), btm->item->uid, "item_");
 
-  ConcatPrefixIfRelativePath(str, "item_path", btm->item->item_url, btm->item->app_url);
+  NSString *path = ConcatPrefixIfRelativePath(btm->item->item_url, btm->item->app_url);
+  if (path) {
+    str.append("|item_path=");
+    str.append(NSStringToUTF8StringView(path));
+  }
+
   if (btm->item->app_url.length > 0) {
     str.append("|app_path=");
     str.append(NSStringToUTF8StringView(NormalizePath(btm->item->app_url)));
