@@ -598,7 +598,6 @@ class EnrichedLaunchItem : public EnrichedEventWithInstigator {
     } else {
       return es_msg_->event.btm_launch_item_remove->instigator;
     }
-
 #else
     return nullptr;
 #endif
@@ -634,7 +633,6 @@ class EnrichedLaunchItem : public EnrichedEventWithInstigator {
     } else {
       return es_msg_->event.btm_launch_item_remove->app;
     }
-
 #else
     return nullptr;
 #endif

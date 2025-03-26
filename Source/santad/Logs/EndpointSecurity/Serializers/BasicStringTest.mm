@@ -865,11 +865,19 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   item.item_type = ES_BTM_ITEM_TYPE_DAEMON;
 
   got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
   want = "action=LAUNCH_ITEM_ADD|item_type=DAEMON|legacy=true|managed=false"
          "|item_user=nobody|item_uid=-2|exec_path=/path/url/exec_path"
          "|item_path=/path/url/relative/path|app_path=/path/url"
          "|event_pid=654|event_pidver=321|pid=12|ppid=56|process=foo|processpath=foo"
          "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#else
+  want = "action=LAUNCH_ITEM_ADD|item_type=DAEMON|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|exec_path=/path/url/exec_path"
+         "|item_path=/path/url/relative/path|app_path=/path/url"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#endif
 
   XCTAssertCppStringEqual(got, want);
 
@@ -877,10 +885,17 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   item.item_type = ES_BTM_ITEM_TYPE_AGENT;
 
   got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
   want = "action=LAUNCH_ITEM_ADD|item_type=AGENT|legacy=true|managed=false"
          "|item_user=nobody|item_uid=-2|exec_path=exec_path"
          "|item_path=relative/path|event_pid=654|event_pidver=321|pid=12|ppid=56"
          "|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#else
+  want = "action=LAUNCH_ITEM_ADD|item_type=AGENT|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|exec_path=exec_path"
+         "|item_path=relative/path|pid=12|ppid=56"
+         "|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#endif
 
   XCTAssertCppStringEqual(got, want);
 }
@@ -940,10 +955,17 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   item.item_type = ES_BTM_ITEM_TYPE_LOGIN_ITEM;
 
   got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
   want = "action=LAUNCH_ITEM_REMOVE|item_type=LOGIN_ITEM|legacy=true|managed=false"
          "|item_user=nobody|item_uid=-2|item_path=/path/url/relative/path|app_path=/path/url"
          "|event_pid=654|event_pidver=321|pid=12|ppid=56|process=foo|processpath=foo"
          "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#else
+  want = "action=LAUNCH_ITEM_REMOVE|item_type=LOGIN_ITEM|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|item_path=/path/url/relative/path|app_path=/path/url"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#endif
 
   XCTAssertCppStringEqual(got, want);
 
@@ -951,10 +973,17 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   item.item_type = ES_BTM_ITEM_TYPE_AGENT;
 
   got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
   want = "action=LAUNCH_ITEM_REMOVE|item_type=AGENT|legacy=true|managed=false"
          "|item_user=nobody|item_uid=-2|item_path=relative/path|event_pid=654"
          "|event_pidver=321|pid=12|ppid=56|process=foo|processpath=foo"
          "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#else
+  want = "action=LAUNCH_ITEM_REMOVE|item_type=AGENT|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|item_path=relative/path"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#endif
 
   XCTAssertCppStringEqual(got, want);
 }
