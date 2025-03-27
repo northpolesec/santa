@@ -179,7 +179,9 @@ static NSString *const kPrinterProxyPostMonterey =
     case SNTEventStateAllowScope: eventTypeStr = kAllowScope; break;
     case SNTEventStateBlockUnknown: eventTypeStr = kBlockUnknown; break;
     case SNTEventStateAllowUnknown: eventTypeStr = kAllowUnknown; break;
-    case SNTEventStateAllowCompiler: eventTypeStr = kAllowCompiler; break;
+    case SNTEventStateAllowCompilerBinary: eventTypeStr = kAllowCompilerBinary; break;
+    case SNTEventStateAllowCompilerCDHash: eventTypeStr = kAllowCompilerCDHash; break;
+    case SNTEventStateAllowCompilerSigningID: eventTypeStr = kAllowCompilerSigningID; break;
     case SNTEventStateAllowTransitive: eventTypeStr = kAllowTransitive; break;
     case SNTEventStateBlockLongPath: eventTypeStr = kBlockLongPath; break;
     default: eventTypeStr = kUnknownEventState; break;
@@ -319,7 +321,9 @@ static NSString *const kPrinterProxyPostMonterey =
 
   // Upgrade the action to SNTActionRespondAllowCompiler when appropriate, because we want the
   // kernel to track this information in its decision cache.
-  if (cd.decision == SNTEventStateAllowCompiler) {
+  if (cd.decision == SNTEventStateAllowCompilerBinary ||
+      cd.decision == SNTEventStateAllowCompilerSigningID ||
+      cd.decision == SNTEventStateAllowCompilerCDHash) {
     action = SNTActionRespondAllowCompiler;
   }
 

@@ -458,7 +458,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  final:YES
                matches:YES
                 silent:NO
-      expectedDecision:SNTEventStateAllowCompiler];
+      expectedDecision:SNTEventStateAllowCompilerCDHash];
   // Ensure disabling transitive rules results in a binary allow
   [self testRule:rule
        transitiveRules:NO
@@ -482,7 +482,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  final:YES
                matches:YES
                 silent:NO
-      expectedDecision:SNTEventStateAllowCompiler];
+      expectedDecision:SNTEventStateAllowCompilerBinary];
   // Ensure disabling transitive rules results in a binary allow
   [self testRule:rule
        transitiveRules:NO
@@ -506,7 +506,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  final:YES
                matches:YES
                 silent:NO
-      expectedDecision:SNTEventStateAllowCompiler];
+      expectedDecision:SNTEventStateAllowCompilerSigningID];
   // Ensure disabling transitive rules results in a Signing ID allow
   [self testRule:rule
        transitiveRules:NO

@@ -452,7 +452,11 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         case SNTEventStateBlockCDHash: [output appendString:@" (CDHash)"]; break;
         case SNTEventStateAllowScope:
         case SNTEventStateBlockScope: [output appendString:@" (Scope)"]; break;
-        case SNTEventStateAllowCompiler: [output appendString:@" (Compiler)"]; break;
+        case SNTEventStateAllowCompilerBinary: [output appendString:@" (Compiler, Binary)"]; break;
+        case SNTEventStateAllowCompilerCDHash: [output appendString:@" (Compiler, CDHash)"]; break;
+        case SNTEventStateAllowCompilerSigningID:
+          [output appendString:@" (Compiler, SigningID)"];
+          break;
         case SNTEventStateAllowTransitive: [output appendString:@" (Transitive)"]; break;
         case SNTEventStateBlockLongPath: [output appendString:@" (Long Path)"]; break;
 

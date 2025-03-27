@@ -356,7 +356,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
              }];
 
-  [self checkMetricCounters:kAllowCompiler expected:@1];
+  [self checkMetricCounters:kAllowCompilerCDHash expected:@1];
 }
 
 - (void)testCDHashAllowCompilerRuleTransitiveRuleDisabled {
@@ -493,7 +493,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
 
   [self validateExecEvent:SNTActionRespondAllowCompiler];
-  [self checkMetricCounters:kAllowCompiler expected:@1];
+  [self checkMetricCounters:kAllowCompilerBinary expected:@1];
 }
 
 - (void)testBinaryAllowCompilerRuleDisabled {
@@ -568,7 +568,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
              }];
 
-  [self checkMetricCounters:kAllowCompiler expected:@1];
+  [self checkMetricCounters:kAllowCompilerSigningID expected:@1];
 }
 
 - (void)testSigningIDAllowTransitiveRuleDisabled {

@@ -301,7 +301,11 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
 }
 
 ::pbv1::Execution::Decision GetDecisionEnum(SNTEventState event_state) {
-  if (event_state & SNTEventStateAllow) {
+  if (event_state & SNTEventStateAllowCompilerBinary ||
+      event_state & SNTEventStateAllowCompilerCDHash ||
+      event_state & SNTEventStateAllowCompilerSigningID) {
+    return ::pbv1::Execution::DECISION_ALLOW_COMPILER;
+  } else if (event_state & SNTEventStateAllow) {
     return ::pbv1::Execution::DECISION_ALLOW;
   } else if (event_state & SNTEventStateBlock) {
     return ::pbv1::Execution::DECISION_DENY;
@@ -313,14 +317,16 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
 ::pbv1::Execution::Reason GetReasonEnum(SNTEventState event_state) {
   switch (event_state) {
     case SNTEventStateAllowBinary: return ::pbv1::Execution::REASON_BINARY;
-    case SNTEventStateAllowCompiler: return ::pbv1::Execution::REASON_COMPILER;
+    case SNTEventStateAllowCompilerBinary: return ::pbv1::Execution::REASON_BINARY;
     case SNTEventStateAllowTransitive: return ::pbv1::Execution::REASON_TRANSITIVE;
     case SNTEventStateAllowPendingTransitive: return ::pbv1::Execution::REASON_PENDING_TRANSITIVE;
     case SNTEventStateAllowCertificate: return ::pbv1::Execution::REASON_CERT;
     case SNTEventStateAllowScope: return ::pbv1::Execution::REASON_SCOPE;
     case SNTEventStateAllowTeamID: return ::pbv1::Execution::REASON_TEAM_ID;
     case SNTEventStateAllowSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
+    case SNTEventStateAllowCompilerSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
     case SNTEventStateAllowCDHash: return ::pbv1::Execution::REASON_CDHASH;
+    case SNTEventStateAllowCompilerCDHash: return ::pbv1::Execution::REASON_CDHASH;
     case SNTEventStateAllowUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
     case SNTEventStateBlockBinary: return ::pbv1::Execution::REASON_BINARY;
     case SNTEventStateBlockCertificate: return ::pbv1::Execution::REASON_CERT;
