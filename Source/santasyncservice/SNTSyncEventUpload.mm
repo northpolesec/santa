@@ -64,7 +64,7 @@ using santa::NSStringToUTF8StringView;
 
   NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
   for (SNTStoredEvent *event in events) {
-    std::optional<::pbv1::Event> e = [self messageForEvent:event];
+    std::optional<::pbv1::Event> e = [self messageForEvent:event withArena:arena];
     if (!e.has_value()) continue;
     uploadEvents->Add(*std::move(e));
     if (event.idx) [eventIds addObject:event.idx];
@@ -108,8 +108,8 @@ using santa::NSStringToUTF8StringView;
   return YES;
 }
 
-- (std::optional<::pbv1::Event>)messageForEvent:(SNTStoredEvent *)event {
-  google::protobuf::Arena arena;
+- (std::optional<::pbv1::Event>)messageForEvent:(SNTStoredEvent *)event
+                                      withArena:(google::protobuf::Arena &)arena {
   auto e = google::protobuf::Arena::Create<::pbv1::Event>(&arena);
 
   e->set_file_sha256(NSStringToUTF8String(event.fileSHA256));
