@@ -40,7 +40,7 @@ To enable this feature, the `FileAccessPolicyPlist` key in the main [Santa confi
 | `TeamID`                      | `Processes`  | String     | No       | v2023.1+      | Team ID of the instigating process. |
 | `CertificateSha256`           | `Processes`  | String     | No       | v2023.1+      | SHA256 of the leaf certificate of the instigating process. |
 | `CDHash`                      | `Processes`  | String     | No       | v2023.1+      | CDHash of the instigating process. |
-| `SigningID`                   | `Processes`  | String     | No       | v2023.1+      | Signing ID of the instigating process. If the value ends with an asterisk (`*`), it is treated as a prefix. However when a prefix SigningID value is used, either `PlatformBinary` must be true or `TeamID` must be set.<br/>Note that unlike in binary authorization, the Signing ID for file access authorization is specified separately from the Team ID; see the example below. |
+| `SigningID`                   | `Processes`  | String     | No       | v2023.1+      | Signing ID of the instigating process. The first asterisk (`*`) character in the value will be treated as a wildcard character and can appear at any index in the string. For example, `com.northpolesec.*` and `com.northpolesec.*.daemon` are both allowed. When the SigningID contains a wildcard character, either `PlatformBinary` must be true or `TeamID` must also be set.<br/>Note that unlike in binary authorization, the Signing ID for file access authorization is specified separately from the Team ID; see the example below. |
 | `PlatformBinary`              | `Processes`  | Boolean    | No       | v2023.2+      | Whether or not the instigating process is a platform binary. |
 
 ## Data-centric vs. Process-centric FAA Rules
