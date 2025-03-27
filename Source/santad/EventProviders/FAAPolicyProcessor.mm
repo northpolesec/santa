@@ -223,13 +223,15 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
     // SigningID checks
     if (!policy_proc.signing_id.empty()) {
       if (!es_proc->signing_id.data) {
-        // Policy has SID is set, but process has no SID
+        // Policy has SID set, but process has no SID
         return false;
       }
 
       if (policy_proc.signing_id.back() == '*') {
         if (!policy_proc.platform_binary.value_or(false) && policy_proc.team_id.empty()) {
           // Policy SID is a prefix but neither Platform Binary nor Team ID were set
+          // Note: Config parsing should have ensured this isn't possible, but the runtime check here
+          // is meant as a fallback.
           return false;
         }
         if (strncmp(policy_proc.signing_id.c_str(), es_proc->signing_id.data,
