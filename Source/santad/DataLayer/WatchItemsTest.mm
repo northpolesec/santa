@@ -602,6 +602,42 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
                  WatchItemProcess("", "com.northpolesec.test", "", {}, "", std::nullopt));
 
+  // Test SigningID prefix but PlatformBinary or TeamID are not set
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses : @[ @{
+      kWatchItemConfigKeyProcessesPlatformBinary : @(NO),
+      kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.*"
+    } ]
+  },
+                                             &err);
+  XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
+
+  // Test SigningID prefix with PlatformBinary set
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses : @[ @{
+      kWatchItemConfigKeyProcessesPlatformBinary : @(YES),
+      kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.*"
+    } ]
+  },
+                                             &err);
+  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
+  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+                 WatchItemProcess("", "com.northpolesec.*", "", {}, "", std::make_optional(true)));
+
+  // Test SigningID prefix with TeamID set
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses : @[ @{
+      kWatchItemConfigKeyProcessesTeamID : @"myvalidtid",
+      kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.*"
+    } ]
+  },
+                                             &err);
+  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
+  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+                 WatchItemProcess("", "com.northpolesec.*", "myvalidtid", {}, "", std::nullopt));
+
   // Test TeamID length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
