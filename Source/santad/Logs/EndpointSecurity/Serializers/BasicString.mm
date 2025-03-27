@@ -61,7 +61,11 @@ static NSDateFormatter *GetDateFormatter() {
 }
 
 std::string GetDecisionString(SNTEventState event_state) {
-  if (event_state & SNTEventStateAllow) {
+  if (event_state & SNTEventStateAllowCompilerBinary ||
+      event_state & SNTEventStateAllowCompilerCDHash ||
+      event_state & SNTEventStateAllowCompilerSigningID) {
+    return "ALLOW_COMPILER";
+  } else if (event_state & SNTEventStateAllow) {
     return "ALLOW";
   } else if (event_state & SNTEventStateBlock) {
     return "DENY";
@@ -73,14 +77,16 @@ std::string GetDecisionString(SNTEventState event_state) {
 std::string GetReasonString(SNTEventState event_state) {
   switch (event_state) {
     case SNTEventStateAllowBinary: return "BINARY";
-    case SNTEventStateAllowCompiler: return "COMPILER";
+    case SNTEventStateAllowCompilerBinary: return "BINARY";
     case SNTEventStateAllowTransitive: return "TRANSITIVE";
     case SNTEventStateAllowPendingTransitive: return "PENDING_TRANSITIVE";
     case SNTEventStateAllowCertificate: return "CERT";
     case SNTEventStateAllowScope: return "SCOPE";
     case SNTEventStateAllowTeamID: return "TEAMID";
     case SNTEventStateAllowSigningID: return "SIGNINGID";
+    case SNTEventStateAllowCompilerSigningID: return "SIGNINGID";
     case SNTEventStateAllowCDHash: return "CDHASH";
+    case SNTEventStateAllowCompilerCDHash: return "CDHASH";
     case SNTEventStateAllowUnknown: return "UNKNOWN";
     case SNTEventStateBlockBinary: return "BINARY";
     case SNTEventStateBlockCertificate: return "CERT";

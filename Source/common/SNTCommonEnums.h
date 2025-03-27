@@ -104,7 +104,7 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateAllowBinary = 1ULL << 41,
   SNTEventStateAllowCertificate = 1ULL << 42,
   SNTEventStateAllowScope = 1ULL << 43,
-  SNTEventStateAllowCompiler = 1ULL << 44,
+  SNTEventStateAllowCompilerBinary = 1ULL << 44,
   SNTEventStateAllowTransitive = 1ULL << 45,
   SNTEventStateAllowPendingTransitive = 1ULL << 46,
   SNTEventStateAllowTeamID = 1ULL << 47,
@@ -112,6 +112,8 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateAllowCDHash = 1ULL << 49,
   SNTEventStateAllowLocalBinary = 1ULL << 50,
   SNTEventStateAllowLocalSigningID = 1ULL << 51,
+  SNTEventStateAllowCompilerSigningID = 1ULL << 52,
+  SNTEventStateAllowCompilerCDHash = 1ULL << 53,
 
   // Block and Allow masks
   SNTEventStateBlock = 0xFFFFFFULL << 16,

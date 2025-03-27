@@ -64,7 +64,9 @@ using santa::NSStringToUTF8StringView;
 
   NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
   for (SNTStoredEvent *event in events) {
-    uploadEvents->Add([self messageForEvent:event]);
+    std::optional<::pbv1::Event> e = [self messageForEvent:event];
+    if (!e.has_value()) continue;
+    uploadEvents->Add(*std::move(e));
     if (event.idx) [eventIds addObject:event.idx];
     if (uploadEvents->size() >= self.syncState.eventBatchSize) break;
   }
@@ -106,7 +108,7 @@ using santa::NSStringToUTF8StringView;
   return YES;
 }
 
-- (::pbv1::Event)messageForEvent:(SNTStoredEvent *)event {
+- (std::optional<::pbv1::Event>)messageForEvent:(SNTStoredEvent *)event {
   google::protobuf::Arena arena;
   auto e = google::protobuf::Arena::Create<::pbv1::Event>(&arena);
 
@@ -126,11 +128,14 @@ using santa::NSStringToUTF8StringView;
   switch (event.decision) {
     case SNTEventStateAllowUnknown: e->set_decision(::pbv1::ALLOW_UNKNOWN); break;
     case SNTEventStateAllowBinary: e->set_decision(::pbv1::ALLOW_BINARY); break;
+    case SNTEventStateAllowCompilerBinary: e->set_decision(::pbv1::ALLOW_BINARY); break;
     case SNTEventStateAllowCertificate: e->set_decision(::pbv1::ALLOW_CERTIFICATE); break;
     case SNTEventStateAllowScope: e->set_decision(::pbv1::ALLOW_SCOPE); break;
     case SNTEventStateAllowTeamID: e->set_decision(::pbv1::ALLOW_TEAMID); break;
     case SNTEventStateAllowSigningID: e->set_decision(::pbv1::ALLOW_SIGNINGID); break;
+    case SNTEventStateAllowCompilerSigningID: e->set_decision(::pbv1::ALLOW_SIGNINGID); break;
     case SNTEventStateAllowCDHash: e->set_decision(::pbv1::ALLOW_CDHASH); break;
+    case SNTEventStateAllowCompilerCDHash: e->set_decision(::pbv1::ALLOW_CDHASH); break;
     case SNTEventStateBlockUnknown: e->set_decision(::pbv1::BLOCK_UNKNOWN); break;
     case SNTEventStateBlockBinary: e->set_decision(::pbv1::BLOCK_BINARY); break;
     case SNTEventStateBlockCertificate: e->set_decision(::pbv1::BLOCK_CERTIFICATE); break;
@@ -138,11 +143,18 @@ using santa::NSStringToUTF8StringView;
     case SNTEventStateBlockTeamID: e->set_decision(::pbv1::BLOCK_TEAMID); break;
     case SNTEventStateBlockSigningID: e->set_decision(::pbv1::BLOCK_SIGNINGID); break;
     case SNTEventStateBlockCDHash: e->set_decision(::pbv1::BLOCK_CDHASH); break;
+    case SNTEventStateAllowTransitive: return std::nullopt;
+    case SNTEventStateAllowLocalBinary: return std::nullopt;
+    case SNTEventStateAllowLocalSigningID: return std::nullopt;
+    case SNTEventStateAllowPendingTransitive: return std::nullopt;
+    case SNTEventStateBlockLongPath: return std::nullopt;
+    case SNTEventStateAllow: return std::nullopt;
+    case SNTEventStateBlock: return std::nullopt;
+    case SNTEventStateUnknown: return std::nullopt;
     case SNTEventStateBundleBinary:
       e->set_decision(::pbv1::BUNDLE_BINARY);
       e->clear_execution_time();
       break;
-    default: e->set_decision(::pbv1::DECISION_UNKNOWN);
   }
 
   e->set_file_bundle_id(NSStringToUTF8String(event.fileBundleID));
@@ -209,7 +221,7 @@ using santa::NSStringToUTF8StringView;
   // TODO: Add support the for Standalone Approval field so that a sync service
   // can be notified that a user self approved a binary.
 
-  return *e;
+  return std::make_optional(*e);
 }
 
 @end

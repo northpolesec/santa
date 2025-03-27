@@ -288,6 +288,7 @@ message Execution {
     DECISION_UNKNOWN = 0;
     DECISION_ALLOW = 1;
     DECISION_DENY = 2;
+    DECISION_ALLOW_COMPILER = 3;
   }
   optional Decision decision = 9;
 
@@ -296,7 +297,6 @@ message Execution {
     REASON_UNKNOWN = 0;
     REASON_BINARY = 1;
     REASON_CERT = 2;
-    REASON_COMPILER = 3;
     REASON_PENDING_TRANSITIVE = 5;
     REASON_SCOPE = 6;
     REASON_TEAM_ID = 7;
