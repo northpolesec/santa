@@ -82,7 +82,9 @@ struct WatchItemProcess {
         team_id(ti),
         cdhash(std::move(cdh)),
         certificate_sha256(ch),
-        platform_binary(pb) {}
+        platform_binary(pb) {
+    signing_id_wildcard_pos = signing_id.find('*');
+  }
 
   bool operator==(const WatchItemProcess &other) const {
     return binary_path == other.binary_path && signing_id == other.signing_id &&
@@ -94,17 +96,25 @@ struct WatchItemProcess {
 
   bool operator!=(const WatchItemProcess &other) const { return !(*this == other); }
 
+  /// This interface should only be used for testing
+  void UnsafeUpdateSigningId(std::string new_signing_id) {
+    const std::string &ref_sid = signing_id;
+    const_cast<std::string &>(ref_sid) = new_signing_id;
+    signing_id_wildcard_pos = signing_id.find('*');
+  }
+
   template <typename H>
   friend H AbslHashValue(H h, const WatchItemProcess &p) {
     return H::combine(std::move(h), p.binary_path, p.signing_id, p.team_id, p.cdhash,
                       p.certificate_sha256, p.platform_binary);
   }
   std::string binary_path;
-  std::string signing_id;
+  const std::string signing_id;
   std::string team_id;
   std::vector<uint8_t> cdhash;
   std::string certificate_sha256;
   std::optional<bool> platform_binary;
+  size_t signing_id_wildcard_pos;
 };
 
 struct WatchItemPolicyBase {
