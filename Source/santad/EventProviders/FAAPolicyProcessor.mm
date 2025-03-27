@@ -220,11 +220,27 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
       return false;
     }
 
-    // If the policy contains a signing ID, check that the instigating process
-    // also has a signing ID and matches the policy.
-    if (!policy_proc.signing_id.empty() &&
-        (!es_proc->signing_id.data || (policy_proc.signing_id != es_proc->signing_id.data))) {
-      return false;
+    // SigningID checks
+    if (!policy_proc.signing_id.empty()) {
+      if (!es_proc->signing_id.data) {
+        // Policy has SID is set, but process has no SID
+        return false;
+      }
+
+      if (policy_proc.signing_id.back() == '*') {
+        if (!policy_proc.platform_binary.value_or(false) && policy_proc.team_id.empty()) {
+          // Policy SID is a prefix but neither Platform Binary nor Team ID were set
+          return false;
+        }
+        if (strncmp(policy_proc.signing_id.c_str(), es_proc->signing_id.data,
+                    policy_proc.signing_id.length() - 1) != 0) {
+          // Policy SID Prefix didn't match process
+          return false;
+        }
+      } else if (policy_proc.signing_id != es_proc->signing_id.data) {
+        // Policy SID didn't match process
+        return false;
+      }
     }
 
     // Check if the instigating process has an allowed CDHash

@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <optional>
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -55,6 +56,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   proc.team_id = "";
   proc.certificate_sha256 = "";
   proc.cdhash.clear();
+  proc.platform_binary = std::nullopt;
 }
 
 // Helper to create a devno/ino pair from an es_file_t
@@ -578,10 +580,11 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   [certMock stopMocking];
 }
 
-- (void)testPolicyProcessMatchesESProcess {
+- (void)testPolicyMatchesProcess {
   const char *instigatingCertHash = "abc123";
   const char *teamId = "myvalidtid";
   const char *signingId = "com.northpolesec.test";
+  const char *signingIdPrefix = "com.northpolesec.*";
   std::vector<uint8_t> cdhashBytes(CS_CDHASH_LEN);
   std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
   es_file_t esFile = MakeESFile("foo");
@@ -629,6 +632,35 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     esProcEmptySigningID.team_id.data = NULL;
     esProcEmptySigningID.team_id.length = 0;
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProcEmptySigningID));
+  }
+
+  {
+    // Process policy matching single attribute - SigningID prefix
+    // This section tests various data permutations with an SID prefix
+    // set including: platform binary being true/false/unset and TID being set/unset.
+    ClearWatchItemPolicyProcess(policyProc);
+
+    policyProc.signing_id = signingIdPrefix;
+    XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    esProc.is_platform_binary = false;
+    policyProc.platform_binary = std::make_optional(false);
+    XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    esProc.is_platform_binary = true;
+    policyProc.platform_binary = std::make_optional(true);
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    esProc.is_platform_binary = false;
+    policyProc.platform_binary = std::make_optional(false);
+    policyProc.team_id = teamId;
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.signing_id = "badid*";
+    XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    // Reset to expected value for the remainding tests
+    esProc.is_platform_binary = true;
   }
 
   {
