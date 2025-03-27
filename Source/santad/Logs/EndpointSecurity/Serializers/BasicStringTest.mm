@@ -51,6 +51,7 @@ extern std::string GetAccessTypeString(es_event_type_t event_type);
 extern std::string GetFileAccessPolicyDecisionString(FileAccessPolicyDecision decision);
 extern std::string GetAuthenticationTouchIDModeString(es_touchid_mode_t mode);
 extern std::string GetAuthenticationAutoUnlockTypeString(es_auto_unlock_type_t mode);
+extern std::string GetBTMLaunchItemTypeString(es_btm_item_type_t item_type);
 }  // namespace santa
 
 std::string BasicStringSerializeMessage(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
@@ -791,6 +792,198 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   std::string want = "action=AUTHENTICATION_AUTO_UNLOCK|success=true|pid=12|ppid=56|process=foo"
                      "|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|event_user=daemon"
                      "|event_uid=1|type=MACHINE_UNLOCK|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+- (void)testGetBTMLaunchItemTypeString {
+  std::map<es_btm_item_type_t, std::string> launchItemTypeToString{
+      {ES_BTM_ITEM_TYPE_USER_ITEM, "USER_ITEM"},   {ES_BTM_ITEM_TYPE_APP, "APP"},
+      {ES_BTM_ITEM_TYPE_LOGIN_ITEM, "LOGIN_ITEM"}, {ES_BTM_ITEM_TYPE_AGENT, "AGENT"},
+      {ES_BTM_ITEM_TYPE_DAEMON, "DAEMON"},         {(es_btm_item_type_t)1234, "UNKNOWN"},
+  };
+
+  for (const auto &kv : launchItemTypeToString) {
+    XCTAssertCppStringEqual(santa::GetBTMLaunchItemTypeString(kv.first), kv.second);
+  }
+}
+
+- (void)testSerializeMessageLaunchItemAdd {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD, &proc);
+
+  es_file_t instigatorProcFile = MakeESFile("fooInst");
+  es_process_t instigatorProc =
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_file_t instigatorAppFile = MakeESFile("fooApp");
+  es_process_t instigatorApp =
+      MakeESProcess(&instigatorAppFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+#if HAVE_MACOS_15
+  audit_token_t tokInst = MakeAuditToken(654, 321);
+  audit_token_t tokApp = MakeAuditToken(111, 222);
+#endif
+
+  es_btm_launch_item_t item = {
+      .item_type = ES_BTM_ITEM_TYPE_USER_ITEM,
+      .legacy = true,
+      .managed = false,
+      .uid = (uid_t)-2,
+      .item_url = MakeESStringToken("/absolute/path/item"),
+      .app_url = MakeESStringToken("/absolute/path/app"),
+  };
+
+  es_event_btm_launch_item_add_t launchItem = {
+      .instigator = &instigatorProc,
+      .app = &instigatorApp,
+      .executable_path = MakeESStringToken("exec_path"),
+      .item = &item,
+#if HAVE_MACOS_15
+      .instigator_token = &tokInst,
+      .app_token = &tokApp,
+#endif
+  };
+
+  esMsg.event.btm_launch_item_add = &launchItem;
+  esMsg.version = 8;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want =
+      "action=LAUNCH_ITEM_ADD|item_type=USER_ITEM|legacy=true|managed=false"
+      "|item_user=nobody|item_uid=-2|exec_path=/absolute/path/app/exec_path"
+      "|item_path=/absolute/path/item|app_path=/absolute/path/app"
+      "|event_pid=21|event_ppid=65|event_process=fooInst|event_processpath=fooInst"
+      "|event_uid=-2|event_user=nobody|event_gid=-1|event_group=nogroup|pid=12|ppid=56"
+      "|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  launchItem.instigator = NULL;
+  item.item_url = MakeESStringToken("relative/path");
+  item.app_url = MakeESStringToken("file:///path/url");
+  item.item_type = ES_BTM_ITEM_TYPE_DAEMON;
+
+  got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
+  want = "action=LAUNCH_ITEM_ADD|item_type=DAEMON|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|exec_path=/path/url/exec_path"
+         "|item_path=/path/url/relative/path|app_path=/path/url"
+         "|event_pid=654|event_pidver=321|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#else
+  want = "action=LAUNCH_ITEM_ADD|item_type=DAEMON|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|exec_path=/path/url/exec_path"
+         "|item_path=/path/url/relative/path|app_path=/path/url"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#endif
+
+  XCTAssertCppStringEqual(got, want);
+
+  item.app_url = MakeESStringToken(NULL);
+  item.item_type = ES_BTM_ITEM_TYPE_AGENT;
+
+  got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
+  want = "action=LAUNCH_ITEM_ADD|item_type=AGENT|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|exec_path=exec_path"
+         "|item_path=relative/path|event_pid=654|event_pidver=321|pid=12|ppid=56"
+         "|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#else
+  want = "action=LAUNCH_ITEM_ADD|item_type=AGENT|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|exec_path=exec_path"
+         "|item_path=relative/path|pid=12|ppid=56"
+         "|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#endif
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+- (void)testSerializeMessageLaunchItemRemove {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE, &proc);
+
+  es_file_t instigatorProcFile = MakeESFile("fooInst");
+  es_process_t instigatorProc =
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_file_t instigatorAppFile = MakeESFile("fooApp");
+  es_process_t instigatorApp =
+      MakeESProcess(&instigatorAppFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+#if HAVE_MACOS_15
+  audit_token_t tokInst = MakeAuditToken(654, 321);
+  audit_token_t tokApp = MakeAuditToken(111, 222);
+#endif
+
+  es_btm_launch_item_t item = {
+      .item_type = ES_BTM_ITEM_TYPE_APP,
+      .legacy = true,
+      .managed = false,
+      .uid = (uid_t)-2,
+      .item_url = MakeESStringToken("/absolute/path/item"),
+      .app_url = MakeESStringToken("/absolute/path/app"),
+  };
+
+  es_event_btm_launch_item_remove_t launchItem = {
+      .instigator = &instigatorProc,
+      .app = &instigatorApp,
+      .item = &item,
+#if HAVE_MACOS_15
+      .instigator_token = &tokInst,
+      .app_token = &tokApp,
+#endif
+  };
+
+  esMsg.event.btm_launch_item_remove = &launchItem;
+  esMsg.version = 8;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want = "action=LAUNCH_ITEM_REMOVE|item_type=APP|legacy=true|managed=false"
+                     "|item_user=nobody|item_uid=-2|item_path=/absolute/path/item"
+                     "|app_path=/absolute/path/app|event_pid=21|event_ppid=65|event_process=fooInst"
+                     "|event_processpath=fooInst|event_uid=-2|event_user=nobody|event_gid=-1"
+                     "|event_group=nogroup|pid=12|ppid=56|process=foo|processpath=foo"
+                     "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  launchItem.instigator = NULL;
+  item.item_url = MakeESStringToken("relative/path");
+  item.app_url = MakeESStringToken("file:///path/url");
+  item.item_type = ES_BTM_ITEM_TYPE_LOGIN_ITEM;
+
+  got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
+  want = "action=LAUNCH_ITEM_REMOVE|item_type=LOGIN_ITEM|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|item_path=/path/url/relative/path|app_path=/path/url"
+         "|event_pid=654|event_pidver=321|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#else
+  want = "action=LAUNCH_ITEM_REMOVE|item_type=LOGIN_ITEM|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|item_path=/path/url/relative/path|app_path=/path/url"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#endif
+
+  XCTAssertCppStringEqual(got, want);
+
+  item.app_url = MakeESStringToken(NULL);
+  item.item_type = ES_BTM_ITEM_TYPE_AGENT;
+
+  got = BasicStringSerializeMessage(&esMsg);
+#if HAVE_MACOS_15
+  want = "action=LAUNCH_ITEM_REMOVE|item_type=AGENT|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|item_path=relative/path|event_pid=654"
+         "|event_pidver=321|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#else
+  want = "action=LAUNCH_ITEM_REMOVE|item_type=AGENT|legacy=true|managed=false"
+         "|item_user=nobody|item_uid=-2|item_path=relative/path"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+#endif
 
   XCTAssertCppStringEqual(got, want);
 }

@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -34,6 +35,11 @@ NSString *DiskImageForDevice(NSString *devPath);
 NSString *MountFromName(NSString *path);
 
 es_file_t *GetAllowListTargetFile(const santa::Message &msg);
+
+/// Convert the given string token, which might be a URL, to a path
+NSString *NormalizePath(es_string_token_t path);
+/// Concat `path` onto `prefix` if `path` is relative
+NSString *ConcatPrefixIfRelativePath(es_string_token_t path, es_string_token_t prefix);
 
 static inline const mach_port_t GetDefaultIOKitCommsPort() {
   return kIOMainPortDefault;

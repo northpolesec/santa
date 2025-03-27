@@ -87,6 +87,9 @@ class BasicString : public Serializer {
   std::string CreateDefaultString(size_t reserved_size = 512);
   std::vector<uint8_t> FinalizeString(std::string &str);
 
+  std::vector<uint8_t> SerializeMessageLaunchItemAdd(const santa::EnrichedLaunchItem &);
+  std::vector<uint8_t> SerializeMessageLaunchItemRemove(const santa::EnrichedLaunchItem &);
+
   std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
   bool prefix_time_name_;
 };

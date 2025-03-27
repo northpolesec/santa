@@ -26,6 +26,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <uuid/uuid.h>
+#include <cstddef>
 #include <cstring>
 
 #include "Source/common/Platform.h"
@@ -75,21 +76,12 @@ extern ::pbv1::OpenSSHLogin::Result GetOpenSSHLoginResultType(es_openssh_login_r
 extern ::pbv1::AuthenticationTouchID::Mode GetAuthenticationTouchIDMode(es_touchid_mode_t mode);
 extern ::pbv1::AuthenticationAutoUnlock::Type GetAuthenticationAutoUnlockType(
     es_auto_unlock_type_t type);
+extern ::pbv1::LaunchItem::ItemType GetBTMLaunchItemType(es_btm_item_type_t item_type);
 #endif  // HAVE_MACOS_13
 }  // namespace santa
 
 using santa::EncodeEntitlements;
 using santa::EncodeExitStatus;
-using santa::GetAccessType;
-using santa::GetDecisionEnum;
-using santa::GetFileDescriptorType;
-using santa::GetModeEnum;
-using santa::GetPolicyDecision;
-using santa::GetReasonEnum;
-#if HAVE_MACOS_13
-using santa::GetOpenSSHLoginResultType;
-using santa::GetSocketAddressType;
-#endif  // HAVE_MACOS_13
 
 @interface ProtobufTest : XCTestCase
 @property id mockConfigurator;
@@ -130,6 +122,8 @@ NSString *ConstructFilename(es_event_type_t eventType, NSString *variant = nil) 
     case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION: name = @"authentication"; break;
     case ES_EVENT_TYPE_NOTIFY_CLONE: name = @"clone"; break;
     case ES_EVENT_TYPE_NOTIFY_COPYFILE: name = @"copyfile"; break;
+    case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD: name = @"launch_item_add"; break;
+    case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: name = @"launch_item_remove"; break;
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: name = @"gatekeeper"; break;
 #endif
@@ -196,6 +190,7 @@ const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &s
     case ::pbv1::SantaMessage::kClone: return santaMsg.clone();
     case ::pbv1::SantaMessage::kCopyfile: return santaMsg.copyfile();
     case ::pbv1::SantaMessage::kGatekeeperOverride: return santaMsg.gatekeeper_override();
+    case ::pbv1::SantaMessage::kLaunchItem: return santaMsg.launch_item();
     case ::pbv1::SantaMessage::EVENT_NOT_SET:
       XCTFail(@"Protobuf message SantaMessage did not set an 'event' field");
       OS_FALLTHROUGH;
@@ -325,7 +320,9 @@ void SerializeAndCheck(es_event_type_t eventType,
 
     XCTAssertNil(FindDelta(wantJSONDict, gotJSONDict));
     // Note: Uncomment this line to help create testfile JSON when the assert above fails
-    // XCTAssertEqualObjects([NSString stringWithUTF8String:gotData.c_str()], wantData);
+    // XCTAssertEqualObjects([NSString stringWithUTF8String:gotData.c_str()], wantData,
+    //                       @"Result does not match expectations. Version: %d, Filename: %@",
+    //                       cur_version, ConstructFilename(esMsg.event_type, variant));
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -501,7 +498,8 @@ void SerializeAndCheckNonESEvents(
   };
 
   for (const auto &kv : stateToDecision) {
-    XCTAssertEqual(GetDecisionEnum(kv.first), kv.second, @"Bad decision for state: %llu", kv.first);
+    XCTAssertEqual(santa::GetDecisionEnum(kv.first), kv.second, @"Bad decision for state: %llu",
+                   kv.first);
   }
 }
 
@@ -530,7 +528,8 @@ void SerializeAndCheckNonESEvents(
   };
 
   for (const auto &kv : stateToReason) {
-    XCTAssertEqual(GetReasonEnum(kv.first), kv.second, @"Bad reason for state: %llu", kv.first);
+    XCTAssertEqual(santa::GetReasonEnum(kv.first), kv.second, @"Bad reason for state: %llu",
+                   kv.first);
   }
 }
 
@@ -544,7 +543,8 @@ void SerializeAndCheckNonESEvents(
   };
 
   for (const auto &kv : clientModeToExecMode) {
-    XCTAssertEqual(GetModeEnum(kv.first), kv.second, @"Bad mode for client mode: %ld", kv.first);
+    XCTAssertEqual(santa::GetModeEnum(kv.first), kv.second, @"Bad mode for client mode: %ld",
+                   kv.first);
   }
 }
 
@@ -564,8 +564,8 @@ void SerializeAndCheckNonESEvents(
   };
 
   for (const auto &kv : fdtypeToEnumType) {
-    XCTAssertEqual(GetFileDescriptorType(kv.first), kv.second, @"Bad fd type name for fdtype: %u",
-                   kv.first);
+    XCTAssertEqual(santa::GetFileDescriptorType(kv.first), kv.second,
+                   @"Bad fd type name for fdtype: %u", kv.first);
   }
 }
 
@@ -1061,7 +1061,7 @@ void SerializeAndCheckNonESEvents(
   };
 
   for (const auto &kv : esToSantaAddrType) {
-    XCTAssertEqual(GetSocketAddressType(kv.first), kv.second);
+    XCTAssertEqual(santa::GetSocketAddressType(kv.first), kv.second);
   }
 }
 
@@ -1081,7 +1081,7 @@ void SerializeAndCheckNonESEvents(
   };
 
   for (const auto &kv : esToSantaOpenSSHResultType) {
-    XCTAssertEqual(GetOpenSSHLoginResultType(kv.first), kv.second);
+    XCTAssertEqual(santa::GetOpenSSHLoginResultType(kv.first), kv.second);
   }
 }
 
@@ -1289,6 +1289,143 @@ void SerializeAndCheckNonESEvents(
       }];
 }
 
+- (void)testGetBTMLaunchItemType {
+  std::map<es_btm_item_type_t, ::pbv1::LaunchItem::ItemType> launchItemTypeToEnum{
+      {ES_BTM_ITEM_TYPE_USER_ITEM, ::pbv1::LaunchItem::ITEM_TYPE_USER_ITEM},
+      {ES_BTM_ITEM_TYPE_APP, ::pbv1::LaunchItem::ITEM_TYPE_APP},
+      {ES_BTM_ITEM_TYPE_LOGIN_ITEM, ::pbv1::LaunchItem::ITEM_TYPE_LOGIN_ITEM},
+      {ES_BTM_ITEM_TYPE_AGENT, ::pbv1::LaunchItem::ITEM_TYPE_AGENT},
+      {ES_BTM_ITEM_TYPE_DAEMON, ::pbv1::LaunchItem::ITEM_TYPE_DAEMON},
+      {(es_btm_item_type_t)1234, ::pbv1::LaunchItem::ITEM_TYPE_UNKNOWN},
+  };
+
+  for (const auto &kv : launchItemTypeToEnum) {
+    XCTAssertEqual(santa::GetBTMLaunchItemType(kv.first), kv.second);
+  }
+}
+
+- (void)testSerializeMessageLaunchItemAdd {
+  es_file_t instigatorProcFile = MakeESFile("fooInst");
+  es_process_t instigatorProc =
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_file_t instigatorAppFile = MakeESFile("fooApp");
+  es_process_t instigatorApp =
+      MakeESProcess(&instigatorAppFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+#if HAVE_MACOS_15
+  audit_token_t tokInst = MakeAuditToken(654, 321);
+  audit_token_t tokApp = MakeAuditToken(111, 222);
+#endif
+
+  es_btm_launch_item_t item = {
+      .item_type = ES_BTM_ITEM_TYPE_USER_ITEM,
+      .legacy = true,
+      .managed = false,
+      .uid = (uid_t)-2,
+      .item_url = MakeESStringToken("/absolute/path/item"),
+      .app_url = MakeESStringToken("/absolute/path/app"),
+  };
+
+  __block es_event_btm_launch_item_add_t launchItem = {
+      .instigator = &instigatorProc,
+      .app = &instigatorApp,
+      .executable_path = MakeESStringToken("exec_path"),
+      .item = &item,
+#if HAVE_MACOS_15
+      .instigator_token = &tokInst,
+      .app_token = &tokApp,
+#endif
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.btm_launch_item_add = &launchItem;
+                  }];
+
+  launchItem.instigator = NULL;
+  item.item_url = MakeESStringToken("relative/path");
+  item.app_url = MakeESStringToken("file:///path/url");
+  item.item_type = ES_BTM_ITEM_TYPE_DAEMON;
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.btm_launch_item_add = &launchItem;
+                  }
+                       variant:@"relative"];
+
+  item.app_url = MakeESStringToken(NULL);
+  item.item_type = ES_BTM_ITEM_TYPE_AGENT;
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.btm_launch_item_add = &launchItem;
+                  }
+                       variant:@"relative_null_app"];
+}
+
+- (void)testSerializeMessageLaunchItemRemove {
+  es_file_t instigatorProcFile = MakeESFile("fooInst");
+  es_process_t instigatorProc =
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_file_t instigatorAppFile = MakeESFile("fooApp");
+  es_process_t instigatorApp =
+      MakeESProcess(&instigatorAppFile, MakeAuditToken(22, 33), MakeAuditToken(66, 77));
+#if HAVE_MACOS_15
+  audit_token_t tokInst = MakeAuditToken(654, 321);
+  audit_token_t tokApp = MakeAuditToken(111, 222);
+#endif
+
+  es_btm_launch_item_t item = {
+      .item_type = ES_BTM_ITEM_TYPE_USER_ITEM,
+      .legacy = true,
+      .managed = false,
+      .uid = (uid_t)-2,
+      .item_url = MakeESStringToken("/absolute/path/item"),
+      .app_url = MakeESStringToken("/absolute/path/app"),
+  };
+
+  __block es_event_btm_launch_item_remove_t launchItem = {
+      .instigator = &instigatorProc,
+      .app = &instigatorApp,
+      .item = &item,
+#if HAVE_MACOS_15
+      .instigator_token = &tokInst,
+      .app_token = &tokApp,
+#endif
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.btm_launch_item_remove = &launchItem;
+                  }];
+
+  launchItem.instigator = NULL;
+  item.item_url = MakeESStringToken("relative/path");
+  item.app_url = MakeESStringToken("file:///path/url");
+  item.item_type = ES_BTM_ITEM_TYPE_DAEMON;
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.btm_launch_item_remove = &launchItem;
+                  }
+                       variant:@"relative"];
+
+  launchItem.app = NULL;
+  item.app_url = MakeESStringToken(NULL);
+  item.item_type = ES_BTM_ITEM_TYPE_AGENT;
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.btm_launch_item_remove = &launchItem;
+                  }
+                       variant:@"relative_null_app"];
+}
+
 #endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15
@@ -1345,7 +1482,7 @@ void SerializeAndCheckNonESEvents(
   };
 
   for (const auto &kv : eventTypeToAccessType) {
-    XCTAssertEqual(GetAccessType(kv.first), kv.second);
+    XCTAssertEqual(santa::GetAccessType(kv.first), kv.second);
   }
 }
 
@@ -1365,7 +1502,7 @@ void SerializeAndCheckNonESEvents(
   };
 
   for (const auto &kv : policyDecisionEnumToProto) {
-    XCTAssertEqual(GetPolicyDecision(kv.first), kv.second);
+    XCTAssertEqual(santa::GetPolicyDecision(kv.first), kv.second);
   }
 }
 

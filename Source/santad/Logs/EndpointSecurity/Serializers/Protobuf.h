@@ -95,6 +95,9 @@ class Protobuf : public Serializer {
 
   std::vector<uint8_t> FinalizeProto(::santa::pb::v1::SantaMessage *santa_msg);
 
+  std::vector<uint8_t> SerializeMessageLaunchItemAdd(const santa::EnrichedLaunchItem &);
+  std::vector<uint8_t> SerializeMessageLaunchItemRemove(const santa::EnrichedLaunchItem &);
+
   std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
   // Toggle for transforming protobuf output to its JSON form.
   // See https://protobuf.dev/programming-guides/proto3/#json

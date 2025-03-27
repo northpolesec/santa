@@ -26,13 +26,13 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-#include "Source/common/SNTCommonEnums.h"
 
 #include <optional>
 #include <string>
 
 #include "Source/common/AuditUtilities.h"
 #import "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/String.h"
@@ -118,6 +118,10 @@ std::string GetAccessTypeString(es_event_type_t event_type) {
   }
 }
 
+static inline std::string GetBoolString(bool val) {
+  return (val ? "true" : "false");
+}
+
 std::string GetFileAccessPolicyDecisionString(FileAccessPolicyDecision decision) {
   switch (decision) {
     case FileAccessPolicyDecision::kNoPolicy: return "NO_POLICY";
@@ -158,14 +162,14 @@ static inline void AppendUserGroup(std::string &str, const audit_token_t &tok,
 }
 
 static inline void AppendEventUser(std::string &str, const es_string_token_t &user,
-                                   std::optional<uid_t> uid) {
+                                   std::optional<uid_t> uid, const std::string prefix = "event_") {
   if (user.length > 0) {
-    str.append("|event_user=");
+    str.append("|" + prefix + "user=");
     str.append(user.data);
   }
 
   if (uid.has_value()) {
-    str.append("|event_uid=");
+    str.append("|" + prefix + "uid=");
     str.append(std::to_string((int)uid.value()));
   }
 }
@@ -187,11 +191,11 @@ static inline void AppendInstigator(std::string &str, const EnrichedEventType &e
 
 static inline void AppendEventUser(std::string &str,
                                    const std::optional<std::shared_ptr<std::string>> &user,
-                                   uid_t uid) {
+                                   uid_t uid, const std::string prefix = "event_") {
   es_string_token_t user_token = {.length = user.has_value() ? user.value()->length() : 0,
                                   .data = user.has_value() ? user.value()->c_str() : NULL};
 
-  AppendEventUser(str, user_token, std::make_optional<uid_t>(uid));
+  AppendEventUser(str, user_token, std::make_optional<uid_t>(uid), prefix);
 }
 
 static inline void AppendGraphicalSession(std::string &str, es_graphical_session_id_t session_id) {
@@ -670,19 +674,19 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogout &ms
   return FinalizeString(str);
 }
 
-static void AppendAuthInstigatorOrFallback(std::string &str,
-                                           const EnrichedAuthenticationWithInstigator &auth_event) {
-  if (auth_event.AuthInstigator() && auth_event.EnrichedAuthInstigator().has_value()) {
-    AppendInstigator(str, auth_event.AuthInstigator(), auth_event.EnrichedAuthInstigator().value(),
-                     "auth_");
-  } else if (auth_event->version >= 8) {
-    if (auth_event.AuthInstigatorToken().has_value()) {
-      str.append("|auth_pid=");
-      str.append(std::to_string(Pid(auth_event.AuthInstigatorToken().value())));
+static void AppendEventInstigatorOrFallback(std::string &str,
+                                            const EnrichedEventWithInstigator &event,
+                                            std::string prefix = "auth_") {
+  if (event.EventInstigator() && event.EnrichedEventInstigator().has_value()) {
+    AppendInstigator(str, event.EventInstigator(), event.EnrichedEventInstigator().value(), prefix);
+  } else if (event->version >= 8) {
+    if (event.EventInstigatorToken().has_value()) {
+      str.append("|" + prefix + "pid=");
+      str.append(std::to_string(Pid(event.EventInstigatorToken().value())));
     }
-    if (auth_event.AuthInstigatorToken().has_value()) {
-      str.append("|auth_pidver=");
-      str.append(std::to_string(Pidversion(auth_event.AuthInstigatorToken().value())));
+    if (event.EventInstigatorToken().has_value()) {
+      str.append("|" + prefix + "pidver=");
+      str.append(std::to_string(Pidversion(event.EventInstigatorToken().value())));
     }
   }
 }
@@ -695,7 +699,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationO
   str.append(msg->event.authentication->success ? "true" : "false");
 
   AppendInstigator(str, msg);
-  AppendAuthInstigatorOrFallback(str, msg);
+  AppendEventInstigatorOrFallback(str, msg);
 
   str.append("|record_type=");
   str.append(msg->event.authentication->data.od->record_type.data);
@@ -729,7 +733,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
   str.append(msg->event.authentication->success ? "true" : "false");
 
   AppendInstigator(str, msg);
-  AppendAuthInstigatorOrFallback(str, msg);
+  AppendEventInstigatorOrFallback(str, msg);
 
   str.append("|touchid_mode=");
   str.append(
@@ -750,7 +754,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
   str.append(msg->event.authentication->success ? "true" : "false");
 
   AppendInstigator(str, msg);
-  AppendAuthInstigatorOrFallback(str, msg);
+  AppendEventInstigatorOrFallback(str, msg);
 
   str.append("|pubkey_hash=");
   str.append(msg->event.authentication->data.token->pubkey_hash.data);
@@ -791,20 +795,98 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationA
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLaunchItem &msg) {
+std::string GetBTMLaunchItemTypeString(es_btm_item_type_t item_type) {
+  switch (item_type) {
+    case ES_BTM_ITEM_TYPE_USER_ITEM: return "USER_ITEM";
+    case ES_BTM_ITEM_TYPE_APP: return "APP";
+    case ES_BTM_ITEM_TYPE_LOGIN_ITEM: return "LOGIN_ITEM";
+    case ES_BTM_ITEM_TYPE_AGENT: return "AGENT";
+    case ES_BTM_ITEM_TYPE_DAEMON: return "DAEMON";
+    default: return "UNKNOWN";
+  }
+}
+
+std::vector<uint8_t> BasicString::SerializeMessageLaunchItemAdd(const EnrichedLaunchItem &msg) {
+  assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD);
+  const es_event_btm_launch_item_add_t *btm = msg->event.btm_launch_item_add;
+
   std::string str = CreateDefaultString();
 
-  str.append("action=");
+  str.append("action=LAUNCH_ITEM_ADD|item_type=");
+  str.append(GetBTMLaunchItemTypeString(btm->item->item_type));
+  str.append("|legacy=");
+  str.append(GetBoolString(btm->item->legacy));
+  str.append("|managed=");
+  str.append(GetBoolString(btm->item->managed));
+  AppendEventUser(str, msg.Username(), btm->item->uid, "item_");
+
+  NSString *path = ConcatPrefixIfRelativePath(btm->executable_path, btm->item->app_url);
+  if (path) {
+    str.append("|exec_path=");
+    str.append(NSStringToUTF8StringView(path));
+  }
+
+  path = ConcatPrefixIfRelativePath(btm->item->item_url, btm->item->app_url);
+  if (path) {
+    str.append("|item_path=");
+    str.append(NSStringToUTF8StringView(path));
+  }
+
+  if (btm->item->app_url.length > 0) {
+    str.append("|app_path=");
+    str.append(NSStringToUTF8StringView(NormalizePath(btm->item->app_url)));
+  }
+
+  // Note: The string for this event is already very long. Choosing for now to not
+  // serialize potential app info. If desired, users should use the proto log type.
+  AppendEventInstigatorOrFallback(str, msg, "event_");
+  AppendInstigator(str, msg);
+
+  return FinalizeString(str);
+}
+
+std::vector<uint8_t> BasicString::SerializeMessageLaunchItemRemove(const EnrichedLaunchItem &msg) {
+  assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE);
+  const es_event_btm_launch_item_remove_t *btm = msg->event.btm_launch_item_remove;
+
+  std::string str = CreateDefaultString();
+
+  str.append("action=LAUNCH_ITEM_REMOVE|item_type=");
+  str.append(GetBTMLaunchItemTypeString(btm->item->item_type));
+  str.append("|legacy=");
+  str.append(GetBoolString(btm->item->legacy));
+  str.append("|managed=");
+  str.append(GetBoolString(btm->item->managed));
+  AppendEventUser(str, msg.Username(), btm->item->uid, "item_");
+
+  NSString *path = ConcatPrefixIfRelativePath(btm->item->item_url, btm->item->app_url);
+  if (path) {
+    str.append("|item_path=");
+    str.append(NSStringToUTF8StringView(path));
+  }
+
+  if (btm->item->app_url.length > 0) {
+    str.append("|app_path=");
+    str.append(NSStringToUTF8StringView(NormalizePath(btm->item->app_url)));
+  }
+
+  // Note: The string for this event is already very long. Choosing for now to not
+  // serialize potential app info. If desired, users should use the proto log type.
+  AppendEventInstigatorOrFallback(str, msg, "event_");
+  AppendInstigator(str, msg);
+
+  return FinalizeString(str);
+}
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLaunchItem &msg) {
   if (msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD) {
-    str.append("LAUNCH_ITEM_ADD");
+    return SerializeMessageLaunchItemAdd(msg);
   } else if (msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE) {
-    str.append("LAUNCH_ITEM_REMOVE");
+    return SerializeMessageLaunchItemRemove(msg);
   } else {
     LOGE(@"Unexpected event type for EnrichedLaunchItem: %d", msg->event_type);
     std::abort();
   }
-
-  return FinalizeString(str);
 }
 
 #endif  // HAVE_MACOS_13

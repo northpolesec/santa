@@ -894,19 +894,28 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogout &msg) 
   return FinalizeProto(santa_msg);
 }
 
-void EncodeAuthInstigatorOrFallback(
-    const EnrichedAuthenticationWithInstigator &auth_event,
+void EncodeEventProcessOrFallback(
+    const EnrichedEventType &event, const es_process_t *eventProcess,
+    std::optional<audit_token_t> eventProcessToken,
+    const std::optional<EnrichedProcess> &enrichedEventProcess,
     std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
     std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
-  if (auth_event.AuthInstigator() && auth_event.EnrichedAuthInstigator().has_value()) {
-    EncodeProcessInfoLight(lazy_auth_instigator_f(), auth_event.AuthInstigator(),
-                           auth_event.EnrichedAuthInstigator().value());
-  } else if (auth_event.AuthInstigatorToken().has_value()) {
+  if (eventProcess && enrichedEventProcess.has_value()) {
+    EncodeProcessInfoLight(lazy_auth_instigator_f(), eventProcess, *enrichedEventProcess);
+  } else if (eventProcessToken.has_value()) {
     ::pbv1::ProcessID *pb_proc_id = lazy_auth_instigator_fallback_f();
-    audit_token_t fallback_tok = auth_event.AuthInstigatorToken().value();
-    pb_proc_id->set_pid(Pid(fallback_tok));
-    pb_proc_id->set_pidversion(Pidversion(fallback_tok));
+    pb_proc_id->set_pid(Pid(*eventProcessToken));
+    pb_proc_id->set_pidversion(Pidversion(*eventProcessToken));
   }
+}
+
+void EncodeEventInstigatorOrFallback(
+    const EnrichedEventWithInstigator &event,
+    std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
+    std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
+  return EncodeEventProcessOrFallback(event, event.EventInstigator(), event.EventInstigatorToken(),
+                                      event.EnrichedEventInstigator(), lazy_auth_instigator_f,
+                                      lazy_auth_instigator_fallback_f);
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD &msg) {
@@ -920,7 +929,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD &
   es_event_authentication_od_t *es_od_event = msg->event.authentication->data.od;
 
   EncodeProcessInfoLight(pb_od->mutable_instigator(), msg);
-  EncodeAuthInstigatorOrFallback(
+  EncodeEventInstigatorOrFallback(
       msg, [pb_od] { return pb_od->mutable_trigger_process(); },
       [pb_od] { return pb_od->mutable_trigger_id(); });
 
@@ -951,7 +960,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouc
   es_event_authentication_touchid_t *es_touchid_event = msg->event.authentication->data.touchid;
 
   EncodeProcessInfoLight(pb_touchid->mutable_instigator(), msg);
-  EncodeAuthInstigatorOrFallback(
+  EncodeEventInstigatorOrFallback(
       msg, [pb_touchid] { return pb_touchid->mutable_trigger_process(); },
       [pb_touchid] { return pb_touchid->mutable_trigger_id(); });
 
@@ -974,7 +983,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToke
   es_event_authentication_token_t *es_token_event = msg->event.authentication->data.token;
 
   EncodeProcessInfoLight(pb_token->mutable_instigator(), msg);
-  EncodeAuthInstigatorOrFallback(
+  EncodeEventInstigatorOrFallback(
       msg, [pb_token] { return pb_token->mutable_trigger_process(); },
       [pb_token] { return pb_token->mutable_trigger_id(); });
 
@@ -1017,8 +1026,101 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAuto
   return FinalizeProto(santa_msg);
 }
 
+::pbv1::LaunchItem::ItemType GetBTMLaunchItemType(es_btm_item_type_t item_type) {
+  switch (item_type) {
+    case ES_BTM_ITEM_TYPE_USER_ITEM: return ::pbv1::LaunchItem::ITEM_TYPE_USER_ITEM;
+    case ES_BTM_ITEM_TYPE_APP: return ::pbv1::LaunchItem::ITEM_TYPE_APP;
+    case ES_BTM_ITEM_TYPE_LOGIN_ITEM: return ::pbv1::LaunchItem::ITEM_TYPE_LOGIN_ITEM;
+    case ES_BTM_ITEM_TYPE_AGENT: return ::pbv1::LaunchItem::ITEM_TYPE_AGENT;
+    case ES_BTM_ITEM_TYPE_DAEMON: return ::pbv1::LaunchItem::ITEM_TYPE_DAEMON;
+    default: return ::pbv1::LaunchItem::ITEM_TYPE_UNKNOWN;
+  }
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemAdd(const EnrichedLaunchItem &msg) {
+  assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD);
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  const es_event_btm_launch_item_add_t *btm = msg->event.btm_launch_item_add;
+
+  ::pbv1::LaunchItem *pb_launch_item = santa_msg->mutable_launch_item();
+
+  EncodeProcessInfoLight(pb_launch_item->mutable_instigator(), msg);
+
+  pb_launch_item->set_action(::pbv1::LaunchItem::ACTION_ADD);
+
+  EncodeEventInstigatorOrFallback(
+      msg, [pb_launch_item] { return pb_launch_item->mutable_trigger_process(); },
+      [pb_launch_item] { return pb_launch_item->mutable_trigger_id(); });
+  EncodeEventInstigatorOrFallback(
+      msg, [pb_launch_item] { return pb_launch_item->mutable_registrant_process(); },
+      [pb_launch_item] { return pb_launch_item->mutable_registrant_id(); });
+
+  pb_launch_item->set_item_type(GetBTMLaunchItemType(btm->item->item_type));
+  pb_launch_item->set_legacy(btm->item->legacy);
+  pb_launch_item->set_managed(btm->item->managed);
+
+  EncodeUserInfo(pb_launch_item->mutable_item_user(), btm->item->uid, msg.Username());
+
+  pb_launch_item->set_item_path(NSStringToUTF8StringView(
+      ConcatPrefixIfRelativePath(btm->item->item_url, btm->item->app_url)));
+  pb_launch_item->set_executable_path(NSStringToUTF8StringView(
+      ConcatPrefixIfRelativePath(btm->executable_path, btm->item->app_url)));
+  if (btm->item->app_url.length > 0) {
+    pb_launch_item->set_app_path(NSStringToUTF8StringView(NormalizePath(btm->item->app_url)));
+  }
+
+  return FinalizeProto(santa_msg);
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemRemove(const EnrichedLaunchItem &msg) {
+  assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE);
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  const es_event_btm_launch_item_remove_t *btm = msg->event.btm_launch_item_remove;
+
+  ::pbv1::LaunchItem *pb_launch_item = santa_msg->mutable_launch_item();
+
+  EncodeProcessInfoLight(pb_launch_item->mutable_instigator(), msg);
+
+  pb_launch_item->set_action(::pbv1::LaunchItem::ACTION_REMOVE);
+
+  EncodeEventInstigatorOrFallback(
+      msg, [pb_launch_item] { return pb_launch_item->mutable_trigger_process(); },
+      [pb_launch_item] { return pb_launch_item->mutable_trigger_id(); });
+  EncodeEventProcessOrFallback(
+      msg, msg.AppRegistrant(), msg.AppRegistrantToken(), msg.EnrichedAppRegistrant(),
+      [pb_launch_item] { return pb_launch_item->mutable_registrant_process(); },
+      [pb_launch_item] { return pb_launch_item->mutable_registrant_id(); });
+
+  pb_launch_item->set_item_type(GetBTMLaunchItemType(btm->item->item_type));
+  pb_launch_item->set_legacy(btm->item->legacy);
+  pb_launch_item->set_managed(btm->item->managed);
+
+  EncodeUserInfo(pb_launch_item->mutable_item_user(), btm->item->uid, msg.Username());
+
+  pb_launch_item->set_item_path(NSStringToUTF8StringView(
+      ConcatPrefixIfRelativePath(btm->item->item_url, btm->item->app_url)));
+  if (btm->item->app_url.length > 0) {
+    pb_launch_item->set_app_path(NSStringToUTF8StringView(NormalizePath(btm->item->app_url)));
+  }
+
+  pb_launch_item->set_item_type(GetBTMLaunchItemType(btm->item->item_type));
+
+  return FinalizeProto(santa_msg);
+}
+
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLaunchItem &msg) {
-  return {};
+  if (msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD) {
+    return SerializeMessageLaunchItemAdd(msg);
+  } else if (msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE) {
+    return SerializeMessageLaunchItemRemove(msg);
+  } else {
+    LOGE(@"Unexpected event type for EnrichedLaunchItem: %d", msg->event_type);
+    std::abort();
+  }
 }
 
 #endif  // HAVE_MACOS_13
