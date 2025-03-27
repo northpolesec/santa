@@ -227,16 +227,27 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
         return false;
       }
 
-      if (policy_proc.signing_id.back() == '*') {
+      if (policy_proc.signing_id_wildcard_pos != std::string::npos) {
         if (!policy_proc.platform_binary.value_or(false) && policy_proc.team_id.empty()) {
           // Policy SID is a prefix but neither Platform Binary nor Team ID were set
-          // Note: Config parsing should have ensured this isn't possible, but the runtime check here
-          // is meant as a fallback.
+          // Note: Config parsing should have ensured this isn't possible, but the runtime check
+          // here is meant as a fallback.
           return false;
         }
-        if (strncmp(policy_proc.signing_id.c_str(), es_proc->signing_id.data,
-                    policy_proc.signing_id.length() - 1) != 0) {
-          // Policy SID Prefix didn't match process
+
+        std::string_view sid_view = std::string_view(policy_proc.signing_id);
+        std::string_view prefix = sid_view.substr(0, policy_proc.signing_id_wildcard_pos);
+        std::string_view suffix = sid_view.substr(policy_proc.signing_id_wildcard_pos + 1);
+
+        // Skip comparison if the proc SID isn't long enough
+        if (es_proc->signing_id.length < (prefix.length() + suffix.length())) {
+          return false;
+        }
+
+        // Check the proc SID matches the policy SID prefix/suffix parts
+        if (strncmp(es_proc->signing_id.data, prefix.data(), prefix.length()) != 0 ||
+            strncmp(es_proc->signing_id.data + (es_proc->signing_id.length - suffix.length()),
+                    suffix.data(), suffix.length()) != 0) {
           return false;
         }
       } else if (policy_proc.signing_id != es_proc->signing_id.data) {

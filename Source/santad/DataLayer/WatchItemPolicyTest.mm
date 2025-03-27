@@ -49,7 +49,7 @@ using santa::WatchItemRuleType;
   pwip.processes.insert(proc);
   XCTAssertEqual(pwip.processes.size(), 1);
 
-  proc.signing_id = "abc";
+  proc.UnsafeUpdateSigningId("abc");
   pwip.processes.insert(proc);
   pwip.processes.insert(proc);
   XCTAssertEqual(pwip.processes.size(), 2);

@@ -52,7 +52,7 @@ extern bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision);
 // Helper to reset a policy to an empty state
 static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   proc.binary_path = "";
-  proc.signing_id = "";
+  proc.UnsafeUpdateSigningId("");
   proc.team_id = "";
   proc.certificate_sha256 = "";
   proc.cdhash.clear();
@@ -584,7 +584,6 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   const char *instigatingCertHash = "abc123";
   const char *teamId = "myvalidtid";
   const char *signingId = "com.northpolesec.test";
-  const char *signingIdPrefix = "com.northpolesec.*";
   std::vector<uint8_t> cdhashBytes(CS_CDHASH_LEN);
   std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
   es_file_t esFile = MakeESFile("foo");
@@ -623,9 +622,9 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   {
     // Process policy matching single attribute - SigningID
     ClearWatchItemPolicyProcess(policyProc);
-    policyProc.signing_id = signingId;
+    policyProc.UnsafeUpdateSigningId(signingId);
     XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
-    policyProc.signing_id = "badid";
+    policyProc.UnsafeUpdateSigningId("badid");
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
     es_process_t esProcEmptySigningID = MakeESProcess(&esFile);
     esProcEmptySigningID.codesigning_flags = CS_SIGNED;
@@ -640,7 +639,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     // set including: platform binary being true/false/unset and TID being set/unset.
     ClearWatchItemPolicyProcess(policyProc);
 
-    policyProc.signing_id = signingIdPrefix;
+    policyProc.UnsafeUpdateSigningId("com.northpolesec.*");
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
 
     esProc.is_platform_binary = false;
@@ -656,8 +655,44 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     policyProc.team_id = teamId;
     XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
 
-    policyProc.signing_id = "badid*";
+    policyProc.UnsafeUpdateSigningId("badtid*");
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("com.*.test");
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("*.northpolesec.test");
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("*com.northpolesec.test");
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("com.northpolesec.test");
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("com.northpolesec.test*");
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("*southpolesec.test");
+    XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("this.is.very.long.*.com.northpolesec.test");
+    XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("com.*.*");
+    XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    es_string_token_t savedTok = esProc.signing_id;
+
+    esProc.signing_id = MakeESStringToken("com.northpolesec.*");
+    // Able to match on asterisks
+    policyProc.UnsafeUpdateSigningId("com.*.*");
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    policyProc.UnsafeUpdateSigningId("com.northpolesec.*");
+    XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    esProc.signing_id = savedTok;
 
     // Reset to expected value for the remainding tests
     esProc.is_platform_binary = true;

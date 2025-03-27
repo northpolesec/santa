@@ -601,12 +601,24 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
                  WatchItemProcess("", "com.northpolesec.test", "", {}, "", std::nullopt));
+  XCTAssertEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+                 std::string::npos);
 
   // Test SigningID prefix but PlatformBinary or TeamID are not set
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses : @[ @{
       kWatchItemConfigKeyProcessesPlatformBinary : @(NO),
       kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.*"
+    } ]
+  },
+                                             &err);
+  XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
+
+  // Test SigningID wildcard but PlatformBinary or TeamID are not set
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses : @[ @{
+      kWatchItemConfigKeyProcessesPlatformBinary : @(NO),
+      kWatchItemConfigKeyProcessesSigningID : @"com.*.test"
     } ]
   },
                                              &err);
@@ -624,19 +636,23 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
                  WatchItemProcess("", "com.northpolesec.*", "", {}, "", std::make_optional(true)));
+  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+                    std::string::npos);
 
   // Test SigningID prefix with TeamID set
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses : @[ @{
       kWatchItemConfigKeyProcessesTeamID : @"myvalidtid",
-      kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.*"
+      kWatchItemConfigKeyProcessesSigningID : @"com.*.test"
     } ]
   },
                                              &err);
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "com.northpolesec.*", "myvalidtid", {}, "", std::nullopt));
+                 WatchItemProcess("", "com.*.test", "myvalidtid", {}, "", std::nullopt));
+  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+                    std::string::npos);
 
   // Test TeamID length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
