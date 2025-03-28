@@ -1333,8 +1333,8 @@ void SerializeAndCheckNonESEvents(
   __block es_event_btm_launch_item_add_t launchItem = {
       .instigator = &instigatorProc,
       .app = &instigatorApp,
-      .executable_path = MakeESStringToken("exec_path"),
       .item = &item,
+      .executable_path = MakeESStringToken("exec_path"),
 #if HAVE_MACOS_15
       .instigator_token = &tokInst,
       .app_token = &tokApp,
