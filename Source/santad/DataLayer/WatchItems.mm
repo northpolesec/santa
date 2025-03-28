@@ -394,6 +394,21 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
               return false;
             }
 
+            // Ensure that if the SigningID is a prefix, either PlatformBinary or TeamID is set
+            if (process[kWatchItemConfigKeyProcessesSigningID]) {
+              std::string sid([process[kWatchItemConfigKeyProcessesSigningID] UTF8String]);
+              if (sid.find('*') != std::string::npos &&
+                  (([process[kWatchItemConfigKeyProcessesPlatformBinary] boolValue] == false &&
+                    process[kWatchItemConfigKeyProcessesTeamID] == nil))) {
+                PopulateError(
+                    err,
+                    [NSString stringWithFormat:@"A SigningID prefix (%@) requires either the "
+                                               @"PlatformBinary or TeamID keys be set",
+                                               process[kWatchItemConfigKeyProcessesSigningID]]);
+                return false;
+              }
+            }
+
             proc_list.insert(WatchItemProcess(
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesBinaryPath] ?: @""),
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesSigningID] ?: @""),

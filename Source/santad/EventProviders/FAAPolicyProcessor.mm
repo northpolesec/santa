@@ -220,11 +220,40 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
       return false;
     }
 
-    // If the policy contains a signing ID, check that the instigating process
-    // also has a signing ID and matches the policy.
-    if (!policy_proc.signing_id.empty() &&
-        (!es_proc->signing_id.data || (policy_proc.signing_id != es_proc->signing_id.data))) {
-      return false;
+    // SigningID checks
+    if (!policy_proc.signing_id.empty()) {
+      if (!es_proc->signing_id.data) {
+        // Policy has SID set, but process has no SID
+        return false;
+      }
+
+      if (policy_proc.signing_id_wildcard_pos != std::string::npos) {
+        if (!policy_proc.platform_binary.value_or(false) && policy_proc.team_id.empty()) {
+          // Policy SID is a prefix but neither Platform Binary nor Team ID were set
+          // Note: Config parsing should have ensured this isn't possible, but the runtime check
+          // here is meant as a fallback.
+          return false;
+        }
+
+        std::string_view sid_view = std::string_view(policy_proc.signing_id);
+        std::string_view prefix = sid_view.substr(0, policy_proc.signing_id_wildcard_pos);
+        std::string_view suffix = sid_view.substr(policy_proc.signing_id_wildcard_pos + 1);
+
+        // Skip comparison if the proc SID isn't long enough
+        if (es_proc->signing_id.length < (prefix.length() + suffix.length())) {
+          return false;
+        }
+
+        // Check the proc SID matches the policy SID prefix/suffix parts
+        if (strncmp(es_proc->signing_id.data, prefix.data(), prefix.length()) != 0 ||
+            strncmp(es_proc->signing_id.data + (es_proc->signing_id.length - suffix.length()),
+                    suffix.data(), suffix.length()) != 0) {
+          return false;
+        }
+      } else if (policy_proc.signing_id != es_proc->signing_id.data) {
+        // Policy SID didn't match process
+        return false;
+      }
     }
 
     // Check if the instigating process has an allowed CDHash
