@@ -1009,7 +1009,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   es_event_gatekeeper_user_override_t gatekeeper = {
       .file_type = ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE,
-      .file.file = &gkFile,
+      .file = {.file = &gkFile},
       .sha256 = &fileHash,
       .signing_info = &signingInfo,
   };

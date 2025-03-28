@@ -1447,7 +1447,7 @@ void SerializeAndCheckNonESEvents(
 
   __block es_event_gatekeeper_user_override_t gatekeeper = {
       .file_type = ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE,
-      .file.file = &targetFile,
+      .file = {.file = &targetFile},
       .sha256 = &fileHash,
       .signing_info = &signingInfo,
   };
