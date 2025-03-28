@@ -96,12 +96,14 @@ struct WatchItemProcess {
 
   bool operator!=(const WatchItemProcess &other) const { return !(*this == other); }
 
+#ifdef DEBUG
   /// This interface should only be used for testing
   void UnsafeUpdateSigningId(std::string new_signing_id) {
     const std::string &ref_sid = signing_id;
     const_cast<std::string &>(ref_sid) = new_signing_id;
     signing_id_wildcard_pos = signing_id.find('*');
   }
+#endif
 
   template <typename H>
   friend H AbslHashValue(H h, const WatchItemProcess &p) {
