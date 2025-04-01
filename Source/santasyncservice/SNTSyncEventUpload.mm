@@ -95,7 +95,7 @@ using santa::NSStringToUTF8StringView;
   __block BOOL success = YES;
   NSUInteger finalIdx = (events.count - 1);
 
-  [events enumerateObjectsUsingBlock:^(SNTStoredEvent * event, NSUInteger idx, BOOL *stop){
+  [events enumerateObjectsUsingBlock:^(SNTStoredEvent *event, NSUInteger idx, BOOL *stop) {
     // Track the idx as processed immediately so that it will always be removed
     // from the database, even if not uploaded.
     if (event.idx) [eventIds addObject:event.idx];
