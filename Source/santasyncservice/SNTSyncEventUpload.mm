@@ -55,20 +55,9 @@ using santa::NSStringToUTF8StringView;
   return (dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER) == 0);
 }
 
-- (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events {
-  google::protobuf::Arena arena;
-  auto req = google::protobuf::Arena::Create<::pbv1::EventUploadRequest>(&arena);
-  req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
-
-  google::protobuf::RepeatedPtrField<::pbv1::Event> *uploadEvents = req->mutable_events();
-
-  NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
-  for (SNTStoredEvent *event in events) {
-    std::optional<::pbv1::Event> e = [self messageForEvent:event withArena:arena];
-    if (!e.has_value()) continue;
-    uploadEvents->Add(*std::move(e));
-    if (event.idx) [eventIds addObject:event.idx];
-    if (uploadEvents->size() >= self.syncState.eventBatchSize) break;
+- (BOOL)performRequest:(::pbv1::EventUploadRequest *)req {
+  if (req->events_size() == 0) {
+    return YES;
   }
 
   if (self.syncState.syncType == SNTSyncTypeNormal ||
@@ -91,18 +80,40 @@ using santa::NSStringToUTF8StringView;
             addObject:santa::StringToNSString(bundle_binary)];
       }
     }
-    SLOGI(@"Uploaded %d events", uploadEvents->size());
+    SLOGI(@"Uploaded %d events", req->events_size());
   }
+  return YES;
+}
 
-  // Remove event IDs. For Bundle Events the ID is 0 so nothing happens.
-  [[self.daemonConn remoteObjectProxy] databaseRemoveEventsWithIDs:[eventIds allObjects]];
+- (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events {
+  google::protobuf::Arena arena;
+  NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
+  auto req = google::protobuf::Arena::Create<::pbv1::EventUploadRequest>(&arena);
+  req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
+  google::protobuf::RepeatedPtrField<::pbv1::Event> *uploadEvents = req->mutable_events();
 
-  // See if there are any events remaining to upload
-  if (uploadEvents->size() < events.count) {
-    NSRange nextEventsRange =
-        NSMakeRange(uploadEvents->size(), events.count - uploadEvents->size());
-    NSArray *nextEvents = [events subarrayWithRange:nextEventsRange];
-    return [self uploadEvents:nextEvents];
+  NSUInteger i = 0;
+  while (i < events.count) {
+    SNTStoredEvent *event = events[i++];
+
+    // Track the idx as processed immediately so that it will always be removed
+    // from the database, even if not uploaded.
+    if (event.idx) [eventIds addObject:event.idx];
+
+    std::optional<::pbv1::Event> e = [self messageForEvent:event withArena:arena];
+    if (!e.has_value()) continue;
+    uploadEvents->Add(*std::move(e));
+
+    if (uploadEvents->size() >= self.syncState.eventBatchSize || i == events.count) {
+      if (![self performRequest:req]) {
+        return NO;
+      }
+
+      // Remove event IDs. For Bundle Events the ID is 0 so nothing happens.
+      [[self.daemonConn remoteObjectProxy] databaseRemoveEventsWithIDs:[eventIds allObjects]];
+
+      req->clear_events();
+    }
   }
 
   return YES;
