@@ -187,10 +187,10 @@ static const uint32_t kEventTableCurrentVersion = 3;
 }
 
 - (void)deleteEventsWithIds:(NSArray *)indexes {
-  for (NSNumber *index in indexes) {
-    [self deleteEventWithId:index];
-  }
   [self inDatabase:^(FMDatabase *db) {
+    for (NSNumber *index in indexes) {
+      [db executeUpdate:@"DELETE FROM events WHERE idx=?", index];
+    }
     [db executeUpdate:@"VACUUM"];
   }];
 }
