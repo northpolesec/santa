@@ -107,4 +107,10 @@
   [self.dbQ inTransaction:block];
 }
 
+- (void)vacuum {
+  [self.dbQ inDatabase:^(FMDatabase *db) {
+    [db executeUpdate:@"VACUUM"];
+  }];
+}
+
 @end

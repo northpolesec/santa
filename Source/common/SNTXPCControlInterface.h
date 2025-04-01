@@ -39,6 +39,7 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                        reply:(void (^)(NSError *error))reply;
 - (void)databaseEventsPending:(void (^)(NSArray *events))reply;
 - (void)databaseRemoveEventsWithIDs:(NSArray *)ids;
+- (void)vacuumDatabases;
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
                              reply:(void (^)(SNTRule *))reply;
 - (void)retrieveAllRules:(void (^)(NSArray<SNTRule *> *rules, NSError *error))reply;

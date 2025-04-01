@@ -169,6 +169,11 @@ double watchdogRAMPeak = 0;
   [[SNTDatabaseController eventTable] deleteEventsWithIds:ids];
 }
 
+- (void)vacuumDatabases {
+  [[SNTDatabaseController ruleTable] vacuum];
+  [[SNTDatabaseController eventTable] vacuum];
+}
+
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
                              reply:(void (^)(SNTRule *))reply {
   reply([[SNTDatabaseController ruleTable] ruleForIdentifiers:[identifiers toStruct]]);

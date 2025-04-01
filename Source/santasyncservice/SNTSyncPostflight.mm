@@ -124,6 +124,9 @@ using santa::NSStringToUTF8String;
                         reply:^{
                         }];
 
+  // Vacuum all databases
+  [rop vacuumDatabases];
+
   return YES;
 }
 
