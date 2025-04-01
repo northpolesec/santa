@@ -120,7 +120,8 @@ using santa::NSStringToUTF8StringView;
   }];
 
   // Handle the case where no events generated messages to send (e.g. all transitive)
-  if (eventIds.count > 0) {
+  // Note: Check for success in case there are events in the set that failed to upload.
+  if (success && eventIds.count > 0) {
     [[self.daemonConn remoteObjectProxy] databaseRemoveEventsWithIDs:[eventIds allObjects]];
   }
 
