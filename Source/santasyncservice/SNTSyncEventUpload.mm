@@ -87,41 +87,49 @@ using santa::NSStringToUTF8StringView;
 
 - (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events {
   google::protobuf::Arena arena;
+  google::protobuf::Arena *pArena = &arena;
   NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
   auto req = google::protobuf::Arena::Create<::pbv1::EventUploadRequest>(&arena);
   req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
   google::protobuf::RepeatedPtrField<::pbv1::Event> *uploadEvents = req->mutable_events();
+  __block BOOL success = YES;
+  NSUInteger finalIdx = (events.count - 1);
 
-  NSUInteger i = 0;
-  while (i < events.count) {
-    SNTStoredEvent *event = events[i++];
-
+  [events enumerateObjectsUsingBlock:^(SNTStoredEvent * event, NSUInteger idx, BOOL *stop){
     // Track the idx as processed immediately so that it will always be removed
     // from the database, even if not uploaded.
     if (event.idx) [eventIds addObject:event.idx];
 
-    std::optional<::pbv1::Event> e = [self messageForEvent:event withArena:arena];
-    if (!e.has_value()) continue;
+    std::optional<::pbv1::Event> e = [self messageForEvent:event withArena:pArena];
+    if (!e.has_value()) return;
     uploadEvents->Add(*std::move(e));
 
-    if (uploadEvents->size() >= self.syncState.eventBatchSize || i == events.count) {
+    if (uploadEvents->size() >= self.syncState.eventBatchSize || idx == finalIdx) {
       if (![self performRequest:req]) {
-        return NO;
+        success = NO;
+        *stop = YES;
+        return;
       }
 
       // Remove event IDs. For Bundle Events the ID is 0 so nothing happens.
       [[self.daemonConn remoteObjectProxy] databaseRemoveEventsWithIDs:[eventIds allObjects]];
 
+      [eventIds removeAllObjects];
       req->clear_events();
     }
+  }];
+
+  // Handle the case where no events generated messages to send (e.g. all transitive)
+  if (eventIds.count > 0) {
+    [[self.daemonConn remoteObjectProxy] databaseRemoveEventsWithIDs:[eventIds allObjects]];
   }
 
-  return YES;
+  return success;
 }
 
 - (std::optional<::pbv1::Event>)messageForEvent:(SNTStoredEvent *)event
-                                      withArena:(google::protobuf::Arena &)arena {
-  auto e = google::protobuf::Arena::Create<::pbv1::Event>(&arena);
+                                      withArena:(google::protobuf::Arena *)arena {
+  auto e = google::protobuf::Arena::Create<::pbv1::Event>(arena);
 
   e->set_file_sha256(NSStringToUTF8String(event.fileSHA256));
   e->set_file_path(NSStringToUTF8String([event.filePath stringByDeletingLastPathComponent]));
