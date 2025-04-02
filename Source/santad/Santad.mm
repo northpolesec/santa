@@ -563,7 +563,12 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   // means that the AUTH EXEC event is subscribed first and Santa can apply
   // execution policy appropriately.
   [authorizer_client enable];
+
+  // Tamper protection is not enabled on debug builds.
+#ifndef DEBUG
   [tamper_client enable];
+#endif  // DEBUG
+
   if (@available(macOS 13.0, *)) {
     // Start monitoring any watched items
     // Note: This feature is only enabled on macOS 13.0+
