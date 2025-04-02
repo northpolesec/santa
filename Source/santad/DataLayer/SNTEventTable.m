@@ -18,7 +18,7 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTStoredEvent.h"
 
-static const uint32_t kEventTableCurrentVersion = 3;
+static const uint32_t kEventTableCurrentVersion = 4;
 
 @implementation SNTEventTable
 
@@ -85,6 +85,20 @@ static const uint32_t kEventTableCurrentVersion = 3;
     [db executeUpdate:@"DROP TABLE events"];
     [db executeUpdate:@"ALTER TABLE events_tmp RENAME TO events"];
     newVersion = 3;
+  }
+
+  if (version < 4) {
+    // Add a unique index on the filesha256 column. This will be used to
+    // deduplicate similar events between event uploads. Before adding the
+    // unique index, first remove rows with duplicate filesha256 values.
+    [db executeUpdate:@"DELETE FROM events "
+                      @"WHERE idx NOT IN ("
+                      @"  SELECT MIN(idx)"
+                      @"  FROM events"
+                      @"  GROUP BY filesha256"
+                      @");"];
+    [db executeUpdate:@"CREATE UNIQUE INDEX filesha256 ON events (filesha256);"];
+    newVersion = 4;
   }
 
   return newVersion;
