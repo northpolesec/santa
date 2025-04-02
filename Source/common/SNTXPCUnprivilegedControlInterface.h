@@ -91,7 +91,7 @@ struct RuleCounts {
 ///
 ///  Syncd Ops
 ///
-- (void)pushNotifications:(void (^)(BOOL))reply;
+- (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 
 ///
 ///  Bundle Ops

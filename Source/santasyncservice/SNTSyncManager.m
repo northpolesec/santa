@@ -152,8 +152,14 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   self.xsrfTokenHeader = syncState.xsrfTokenHeader;
 }
 
-- (void)isPushConnected:(void (^)(BOOL))reply {
-  reply(self.pushNotifications ? self.pushNotifications.isConnected : NO);
+- (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply {
+  if (!self.pushNotifications) {
+    reply(SNTPushNotificationStatusDisabled);
+  }
+  if (!self.pushNotifications.isConnected) {
+    reply(SNTPushNotificationStatusDisconnected);
+  }
+  reply(SNTPushNotificationStatusConnected);
 }
 
 - (void)APNSTokenChanged {

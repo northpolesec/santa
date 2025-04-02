@@ -70,7 +70,7 @@
 - (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events fromBundle:(BOOL)isFromBundle;
 - (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
-- (void)isPushConnected:(void (^)(BOOL))reply;
+- (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 - (void)APNSTokenChanged;
 - (void)handleAPNSMessage:(NSDictionary *)message;
 

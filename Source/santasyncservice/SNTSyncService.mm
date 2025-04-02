@@ -88,8 +88,8 @@
   [self.syncManager postBundleEventToSyncServer:event reply:reply];
 }
 
-- (void)isPushConnected:(void (^)(BOOL))reply {
-  [self.syncManager isPushConnected:reply];
+- (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply {
+  [self.syncManager pushNotificationStatus:reply];
 }
 
 // TODO(bur): Add support for santactl sync --debug to enable debug logging for that sync.
