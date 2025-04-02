@@ -227,8 +227,6 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 }
 
 - (void)enable {
-  // Tamper protection is not enabled on debug builds.
-#ifndef DEBUG
   [super enableTargetPathWatching];
 
   // Get the set of protected paths
@@ -246,7 +244,6 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,
                                 }];
-#endif  // DEBUG
 }
 
 + (SetPairPathAndType)getProtectedPaths {
