@@ -105,13 +105,11 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 
   for (int i = 2; i < argCount; i++) {
     es_string_token_t arg = esApi->ExecArg(&esMsg->event.exec, i);
-#ifndef DEBUG
-    // Allow launchctl actions on the daemon in debug builds
+
     if (strnstr(arg.data, "com.northpolesec.santa.daemon", arg.length) != NULL) {
       LOGW(@"Preventing attempt to kill Santa daemon");
       return {ES_AUTH_RESULT_DENY, false};
     }
-#endif
 
     // If legacy plists paths are found, assume a load is being attempted. Block the exec and
     // delete all of the plists.
@@ -229,6 +227,8 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 }
 
 - (void)enable {
+  // Tamper protection is not enabled on debug builds.
+#ifndef DEBUG
   [super enableTargetPathWatching];
 
   // Get the set of protected paths
@@ -246,6 +246,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,
                                 }];
+#endif  // DEBUG
 }
 
 + (SetPairPathAndType)getProtectedPaths {
