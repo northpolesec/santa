@@ -205,6 +205,13 @@ typedef NS_ENUM(NSInteger, SNTSigningStatus) {
   SNTSigningStatusProduction,
 };
 
+typedef NS_ENUM(NSInteger, SNTPushNotificationStatus) {
+  SNTPushNotificationStatusUnknown,
+  SNTPushNotificationStatusDisabled,
+  SNTPushNotificationStatusDisconnected,
+  SNTPushNotificationStatusConnected,
+};
+
 #ifdef __cplusplus
 
 enum class FileAccessPolicyDecision {

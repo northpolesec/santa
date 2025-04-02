@@ -356,14 +356,14 @@ double watchdogRAMPeak = 0;
 
 #pragma mark syncd Ops
 
-- (void)pushNotifications:(void (^)(BOOL))reply {
+- (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply {
   // This message should be handled in a timely manner, santactl status waits for the response.
   // Instead of reusing the existing connection, create a new connection to the sync service.
   // Otherwise, the isFCMListening message would potentially be queued behind various long lived
   // sync operations.
   MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
   [conn resume];
-  [conn.remoteObjectProxy isPushConnected:^(BOOL response) {
+  [conn.remoteObjectProxy pushNotificationStatus:^(SNTPushNotificationStatus response) {
     reply(response);
   }];
 }

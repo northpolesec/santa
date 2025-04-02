@@ -133,7 +133,7 @@ REGISTER_COMMAND_NAME(@"status")
     syncCleanReqd = (syncType == SNTSyncTypeClean || syncType == SNTSyncTypeCleanAll);
   }];
 
-  __block BOOL pushNotifications = NO;
+  __block NSString *pushNotifications = @"Unknown";
   if ([[SNTConfigurator configurator] syncBaseURL]) {
     // The request to santad to discover whether push notifications are enabled
     // makes a call to santasyncservice. If it's unavailable the call can hang
@@ -141,8 +141,13 @@ REGISTER_COMMAND_NAME(@"status")
     // no response within 2s, give up and move on.
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-      [rop pushNotifications:^(BOOL response) {
-        pushNotifications = response;
+      [rop pushNotificationStatus:^(SNTPushNotificationStatus response) {
+        switch (response) {
+          case SNTPushNotificationStatusDisabled: pushNotifications = @"Disabled"; break;
+          case SNTPushNotificationStatusDisconnected: pushNotifications = @"Disconnected"; break;
+          case SNTPushNotificationStatusConnected: pushNotifications = @"Connected"; break;
+          default: break;
+        }
         dispatch_semaphore_signal(sema);
       }];
     });
@@ -239,7 +244,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"clean_required" : @(syncCleanReqd),
         @"last_successful_full" : fullSyncLastSuccessStr ?: @"null",
         @"last_successful_rule" : ruleSyncLastSuccessStr ?: @"null",
-        @"push_notifications" : pushNotifications ? @"Connected" : @"Disconnected",
+        @"push_notifications" : pushNotifications,
         @"bundle_scanning" : @(enableBundles),
       },
     } mutableCopy];
@@ -324,8 +329,7 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
       printf("  %-25s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
       printf("  %-25s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
-      printf("  %-25s | %s\n", "Push Notifications",
-             (pushNotifications ? "Connected" : "Disconnected"));
+      printf("  %-25s | %s\n", "Push Notifications", [pushNotifications UTF8String]);
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
     }
 
