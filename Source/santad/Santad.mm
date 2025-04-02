@@ -567,6 +567,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   // Tamper protection is not enabled on debug builds.
 #ifndef DEBUG
   [tamper_client enable];
+#else
+  (void)tamper_client;  // Prevent unused variable issues in debug builds
 #endif  // DEBUG
 
   if (@available(macOS 13.0, *)) {
