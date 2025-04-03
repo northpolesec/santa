@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#include "Source/common/SNTPostflightResult.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 
@@ -53,12 +54,14 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)setAllowedPathRegex:(NSString *)pattern reply:(void (^)(void))reply;
 - (void)setBlockedPathRegex:(NSString *)pattern reply:(void (^)(void))reply;
 - (void)setBlockUSBMount:(BOOL)enabled reply:(void (^)(void))reply;
-- (void)setRemountUSBMode:(NSArray *)remountUSBMode reply:(void (^)(void))reply;
-- (void)setEnableBundles:(BOOL)bundlesEnabled reply:(void (^)(void))reply;
-- (void)setEnableTransitiveRules:(BOOL)enabled reply:(void (^)(void))reply;
-- (void)setEnableAllEventUpload:(BOOL)enabled reply:(void (^)(void))reply;
-- (void)setDisableUnknownEventUpload:(BOOL)enabled reply:(void (^)(void))reply;
-- (void)setOverrideFileAccessAction:(NSString *)action reply:(void (^)(void))reply;
+// - (void)setRemountUSBMode:(NSArray *)remountUSBMode reply:(void (^)(void))reply;
+// - (void)setEnableBundles:(BOOL)bundlesEnabled reply:(void (^)(void))reply;
+// - (void)setEnableTransitiveRules:(BOOL)enabled reply:(void (^)(void))reply;
+// - (void)setEnableAllEventUpload:(BOOL)enabled reply:(void (^)(void))reply;
+// - (void)setDisableUnknownEventUpload:(BOOL)enabled reply:(void (^)(void))reply;
+// - (void)setOverrideFileAccessAction:(NSString *)action reply:(void (^)(void))reply;
+
+- (void)postflightResult:(SNTPostflightResult *)result reply:(void (^)(void))reply;
 
 ///
 ///  Syncd Ops

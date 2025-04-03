@@ -16,6 +16,7 @@
 #import "Source/santasyncservice/SNTSyncPostflight.h"
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTPostflightResult.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
@@ -50,79 +51,10 @@ using santa::NSStringToUTF8String;
   ::pbv1::PostflightResponse response;
   [self performRequest:[self requestWithMessage:req] intoMessage:&response timeout:30];
 
-  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-
-  // Set client mode if it changed
-  if (self.syncState.clientMode) {
-    [rop setClientMode:self.syncState.clientMode
+  [[self.daemonConn synchronousRemoteObjectProxy]
+      postflightResult:[[SNTPostflightResult alloc] initWithSyncState:self.syncState]
                  reply:^{
                  }];
-  }
-
-  // Remove clean sync flag if we did a clean or clean all sync
-  if (self.syncState.syncType != SNTSyncTypeNormal) {
-    [rop setSyncTypeRequired:SNTSyncTypeNormal
-                       reply:^{
-                       }];
-  }
-
-  // Update allowlist/blocklist regexes
-  if (self.syncState.allowlistRegex) {
-    [rop setAllowedPathRegex:self.syncState.allowlistRegex
-                       reply:^{
-                       }];
-  }
-  if (self.syncState.blocklistRegex) {
-    [rop setBlockedPathRegex:self.syncState.blocklistRegex
-                       reply:^{
-                       }];
-  }
-
-  if (self.syncState.blockUSBMount != nil) {
-    [rop setBlockUSBMount:[self.syncState.blockUSBMount boolValue]
-                    reply:^{
-                    }];
-  }
-  if (self.syncState.remountUSBMode) {
-    [rop setRemountUSBMode:self.syncState.remountUSBMode
-                     reply:^{
-                     }];
-  }
-
-  if (self.syncState.enableBundles) {
-    [rop setEnableBundles:[self.syncState.enableBundles boolValue]
-                    reply:^{
-                    }];
-  }
-
-  if (self.syncState.enableTransitiveRules) {
-    [rop setEnableTransitiveRules:[self.syncState.enableTransitiveRules boolValue]
-                            reply:^{
-                            }];
-  }
-
-  if (self.syncState.enableAllEventUpload) {
-    [rop setEnableAllEventUpload:[self.syncState.enableAllEventUpload boolValue]
-                           reply:^{
-                           }];
-  }
-
-  if (self.syncState.disableUnknownEventUpload) {
-    [rop setDisableUnknownEventUpload:[self.syncState.disableUnknownEventUpload boolValue]
-                                reply:^{
-                                }];
-  }
-
-  if (self.syncState.overrideFileAccessAction) {
-    [rop setOverrideFileAccessAction:self.syncState.overrideFileAccessAction
-                               reply:^{
-                               }];
-  }
-
-  // Update last sync success
-  [rop setFullSyncLastSuccess:[NSDate date]
-                        reply:^{
-                        }];
 
   return YES;
 }

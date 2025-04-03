@@ -333,6 +333,17 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SNTPostflightResult",
+    srcs = ["SNTPostflightResult.mm"],
+    hdrs = ["SNTPostflightResult.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTCommonEnums",
+        "//Source/santasyncservice:SNTSyncState",
+    ],
+)
+
 santa_unit_test(
     name = "SNTKVOManagerTest",
     srcs = ["SNTKVOManagerTest.mm"],
@@ -499,6 +510,7 @@ objc_library(
         ":MOLXPCConnection",
         ":SNTCommonEnums",
         ":SNTConfigurator",
+        ":SNTPostflightResult",
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",

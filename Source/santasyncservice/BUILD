@@ -9,6 +9,15 @@ package(
 )
 
 objc_library(
+    name = "SNTSyncState",
+    srcs = ["SNTSyncState.m"],
+    hdrs = ["SNTSyncState.h"],
+    deps = [
+        "//Source/common:SNTCommonEnums",
+    ],
+)
+
+objc_library(
     name = "FCM_lib",
     srcs = ["SNTSyncFCM.m"],
     hdrs = ["SNTSyncFCM.h"],
@@ -64,8 +73,6 @@ objc_library(
         "SNTSyncRuleDownload.mm",
         "SNTSyncStage.h",
         "SNTSyncStage.mm",
-        "SNTSyncState.h",
-        "SNTSyncState.m",
     ],
     hdrs = ["SNTSyncManager.h"],
     defines = select({
@@ -76,6 +83,7 @@ objc_library(
     sdk_frameworks = ["Network"],
     deps = [
         ":FCM_lib",
+        ":SNTSyncState",
         ":broadcaster_lib",
         ":polaris_lib",
         "//Source/common:EncodeEntitlements",
@@ -86,6 +94,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTPostflightResult",
         "//Source/common:SNTRule",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStrengthify",
@@ -126,8 +135,6 @@ santa_unit_test(
         "SNTSyncRuleDownload.mm",
         "SNTSyncStage.h",
         "SNTSyncStage.mm",
-        "SNTSyncState.h",
-        "SNTSyncState.m",
         "SNTSyncTest.mm",
     ],
     resources = glob([
@@ -137,6 +144,7 @@ santa_unit_test(
     sdk_dylibs = ["libz"],
     deps = [
         ":FCM_lib",
+        ":SNTSyncState",
         ":broadcaster_lib",
         "//Source/common:EncodeEntitlements",
         "//Source/common:MOLAuthenticatingURLSession",
@@ -147,6 +155,7 @@ santa_unit_test(
         "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTPostflightResult",
         "//Source/common:SNTRule",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStrengthify",

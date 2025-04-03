@@ -825,6 +825,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
+        "//Source/common:SNTPostflightResult",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SNTStoredEvent",
