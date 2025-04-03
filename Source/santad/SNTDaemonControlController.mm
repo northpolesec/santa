@@ -24,6 +24,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
@@ -123,13 +124,9 @@ double watchdogRAMPeak = 0;
 #ifndef DEBUG
   SNTConfigurator *config = [SNTConfigurator configurator];
   if (source == SNTRuleAddSourceSantactl && (config.syncBaseURL || config.staticRules.count > 0)) {
-    NSError *error =
-        [NSError errorWithDomain:@"com.northpolesec.santad.ruletable"
-                            code:42
-                        userInfo:@{
-                          NSLocalizedDescriptionKey : @"Rejected by the Santa daemon",
-                          NSLocalizedFailureReasonErrorKey : @"SyncBaseURL or StaticRules are set",
-                        }];
+    NSError *error = [SNTError errorWithCode:SNTErrorCodeManualRulesDisabled
+                                     message:@"Rejected by the Santa daemon"
+                                      detail:@"SyncBaseURL or StaticRules are set"];
     reply(error);
   }
 #endif
@@ -182,10 +179,9 @@ double watchdogRAMPeak = 0;
   SNTConfigurator *config = [SNTConfigurator configurator];
 
   // Do not return any rules if syncBaseURL is set and return an error.
-  if (config.syncBaseURL) {
-    reply(@[], [NSError errorWithDomain:@"com.northpolesec.santad"
-                                   code:403  // (TODO) define error code
-                               userInfo:@{NSLocalizedDescriptionKey : @"SyncBaseURL is set"}]);
+  if (config.syncBaseURL || config.staticRules.count) {
+    reply(@[], [SNTError errorWithCode:SNTErrorCodeManualRulesDisabled
+                               message:@"SyncBaseURL is set"]);
     return;
   }
 

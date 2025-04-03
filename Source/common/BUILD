@@ -353,6 +353,7 @@ objc_library(
     hdrs = ["SNTFileInfo.h"],
     deps = [
         ":MOLCodesignChecker",
+        ":SNTError",
         ":SNTLogging",
         ":SantaVnode",
         "@FMDB",
@@ -390,6 +391,7 @@ objc_library(
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
+        ":SNTError",
         ":SNTSyncConstants",
     ],
 )
@@ -399,6 +401,7 @@ santa_unit_test(
     srcs = ["SNTRuleTest.m"],
     deps = [
         ":SNTCommonEnums",
+        ":SNTError",
         ":SNTRule",
         ":SNTSyncConstants",
     ],
@@ -549,6 +552,12 @@ objc_library(
         ":SNTXPCBundleServiceInterface",
         ":SantaVnode",
     ],
+)
+
+objc_library(
+    name = "SNTError",
+    srcs = ["SNTError.m"],
+    hdrs = ["SNTError.h"],
 )
 
 santa_unit_test(

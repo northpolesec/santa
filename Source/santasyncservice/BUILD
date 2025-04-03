@@ -84,6 +84,7 @@ objc_library(
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",

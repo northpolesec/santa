@@ -1259,7 +1259,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   return annotations;
 }
 
-#pragma mark Private
+#pragma mark - Private
 
 ///
 ///  Update the syncState. Triggers a KVO event for all dependents.
@@ -1355,7 +1355,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   return EnsureArrayOfStrings(self.configState[kEntitlementsTeamIDFilterKey]);
 }
 
-#pragma mark Private Defaults Methods
+#pragma mark - Private Defaults Methods
 
 - (NSRegularExpression *)expressionForPattern:(NSString *)pattern {
   if (!pattern) return nil;
@@ -1497,7 +1497,7 @@ static SNTConfigurator *sharedConfigurator = nil;
       [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
   for (id rule in staticRules) {
     if (![rule isKindOfClass:[NSDictionary class]]) continue;
-    SNTRule *r = [[SNTRule alloc] initWithDictionarySlow:rule];
+    SNTRule *r = [[SNTRule alloc] initWithDictionary:rule error:nil];
     if (!r) continue;
     rules[r.identifier] = r;
   }

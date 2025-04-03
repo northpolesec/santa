@@ -602,14 +602,21 @@ static NSString *const kPrinterProxyPostMonterey =
   NSString *commentStr = [NSString stringWithFormat:@"%@", se.filePath];
 
   // Add rule to allow binary same as santactl rule.
+  NSError *err;
   SNTRule *newRule = [[SNTRule alloc] initWithIdentifier:ruleIdentifier
                                                    state:newRuleState
                                                     type:ruleType
                                                customMsg:nil
                                                customURL:nil
                                                timestamp:[[NSDate now] timeIntervalSince1970]
-                                                 comment:commentStr];
-  NSError *err;
+                                                 comment:commentStr
+                                                   error:&err];
+  if (err) {
+    LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
+         err.localizedDescription);
+    return;
+  }
+
   [self.ruleTable addRules:@[ newRule ] ruleCleanup:SNTRuleCleanupNone error:&err];
   if (err) {
     LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,

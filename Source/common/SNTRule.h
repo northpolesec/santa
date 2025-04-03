@@ -66,7 +66,8 @@
                          customMsg:(NSString *)customMsg
                          customURL:(NSString *)customURL
                          timestamp:(NSUInteger)timestamp
-                           comment:(NSString *)comment;
+                           comment:(NSString *)comment
+                             error:(NSError **)error;
 
 ///
 ///  Initialize with a default timestamp: current time if rule state is transitive, 0 otherwise.
@@ -85,9 +86,11 @@
                               type:(SNTRuleType)type;
 
 ///
-///  Initialize with a dictionary received from a sync server.
+///  Initialize with a dictionary received from a static rule or santactl.
+///  If the passed dict cannot be parsed as a rule nil will be returned. Additionally, if the error
+///  parameter is a non-nil pointer then it will be populated with an appropriate error object.
 ///
-- (instancetype)initWithDictionarySlow:(NSDictionary *)dict;
+- (instancetype)initWithDictionary:(NSDictionary *)rawDict error:(NSError **)error;
 
 ///
 ///  Sets timestamp of rule to the current time.

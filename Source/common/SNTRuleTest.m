@@ -15,6 +15,7 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTSyncConstants.h"
 
 #import "Source/common/SNTRule.h"
@@ -27,22 +28,24 @@
 - (void)testInitWithDictionaryValid {
   SNTRule *sut;
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
     @"policy" : @"ALLOWLIST",
     @"rule_type" : @"BINARY",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier,
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
   XCTAssertEqual(sut.type, SNTRuleTypeBinary);
   XCTAssertEqual(sut.state, SNTRuleStateAllow);
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"sha256" : @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
     @"policy" : @"BLOCKLIST",
     @"rule_type" : @"CERTIFICATE",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier,
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
@@ -51,54 +54,59 @@
 
   // Ensure a Binary and Certificate rules properly convert identifiers to lowercase.
   for (NSString *ruleType in @[ @"BINARY", @"CERTIFICATE" ]) {
-    sut = [[SNTRule alloc] initWithDictionarySlow:@{
+    sut = [[SNTRule alloc] initWithDictionary:@{
       @"identifier" : @"B7C1E3FD640C5F211C89B02C2C6122F78CE322AA5C56EB0BB54BC422A8F8B670",
       @"policy" : @"BLOCKLIST",
       @"rule_type" : ruleType,
-    }];
+    }
+                                        error:nil];
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects(sut.identifier,
                           @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
   }
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"ABCDEFGHIJ",
     @"policy" : @"SILENT_BLOCKLIST",
     @"rule_type" : @"TEAMID",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ");
   XCTAssertEqual(sut.type, SNTRuleTypeTeamID);
   XCTAssertEqual(sut.state, SNTRuleStateSilentBlock);
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
     @"policy" : @"ALLOWLIST_COMPILER",
     @"rule_type" : @"BINARY",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier,
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
   XCTAssertEqual(sut.type, SNTRuleTypeBinary);
   XCTAssertEqual(sut.state, SNTRuleStateAllowCompiler);
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"ABCDEFGHIJ",
     @"policy" : @"REMOVE",
     @"rule_type" : @"TEAMID",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ");
   XCTAssertEqual(sut.type, SNTRuleTypeTeamID);
   XCTAssertEqual(sut.state, SNTRuleStateRemove);
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"ABCDEFGHIJ",
     @"policy" : @"ALLOWLIST",
     @"rule_type" : @"TEAMID",
     @"custom_msg" : @"A custom block message",
     @"custom_url" : @"https://example.com",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ");
   XCTAssertEqual(sut.type, SNTRuleTypeTeamID);
@@ -107,36 +115,40 @@
   XCTAssertEqualObjects(sut.customURL, @"https://example.com");
 
   // TeamIDs must be 10 chars in length
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"A",
     @"policy" : @"ALLOWLIST",
     @"rule_type" : @"TEAMID",
-  }];
+  }
+                                      error:nil];
   XCTAssertNil(sut);
 
   // TeamIDs must be only alphanumeric chars
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"ßßßßßßßßßß",
     @"policy" : @"ALLOWLIST",
     @"rule_type" : @"TEAMID",
-  }];
+  }
+                                      error:nil];
   XCTAssertNil(sut);
 
   // TeamIDs are converted to uppercase
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"abcdefghij",
     @"policy" : @"REMOVE",
     @"rule_type" : @"TEAMID",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ");
 
   // SigningID tests
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"ABCDEFGHIJ:com.example",
     @"policy" : @"REMOVE",
     @"rule_type" : @"SIGNINGID",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ:com.example");
   XCTAssertEqual(sut.type, SNTRuleTypeSigningID);
@@ -150,29 +162,34 @@
          @":",                // missing team and signing IDs
          @"",                 // empty string
        ]) {
-    sut = [[SNTRule alloc] initWithDictionarySlow:@{
+    NSError *error;
+    sut = [[SNTRule alloc] initWithDictionary:@{
       @"identifier" : ident,
       @"policy" : @"REMOVE",
       @"rule_type" : @"SIGNINGID",
-    }];
+    }
+                                        error:&error];
     XCTAssertNil(sut);
+    XCTAssertNotNil(error);
   }
 
   // Signing ID with lower team ID has case fixed up
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"abcdefghij:com.example",
     @"policy" : @"REMOVE",
     @"rule_type" : @"SIGNINGID",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ:com.example");
 
   // Signing ID with lower platform team ID is left alone
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"platform:com.example",
     @"policy" : @"REMOVE",
     @"rule_type" : @"SIGNINGID",
-  }];
+  }
+                                      error:nil];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier, @"platform:com.example");
 
@@ -183,47 +200,63 @@
          @"ABCDEFGHIJ::",
          @"ABCDEFGHIJ:com:example:with:more:components:",
        ]) {
-    sut = [[SNTRule alloc] initWithDictionarySlow:@{
+    sut = [[SNTRule alloc] initWithDictionary:@{
       @"identifier" : ident,
       @"policy" : @"ALLOWLIST",
       @"rule_type" : @"SIGNINGID",
-    }];
+    }
+                                        error:nil];
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects(sut.identifier, ident);
   }
 }
 
 - (void)testInitWithDictionaryInvalid {
+  NSError *error;
   SNTRule *sut;
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{}];
+  sut = [[SNTRule alloc] initWithDictionary:@{} error:&error];
   XCTAssertNil(sut);
+  XCTAssertNotNil(error);
+  XCTAssertEqual(error.code, SNTErrorCodeRuleMissingIdentifier);
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
-  }];
+  }
+                                      error:&error];
   XCTAssertNil(sut);
+  XCTAssertNotNil(error);
+  XCTAssertEqual(error.code, SNTErrorCodeRuleMissingPolicy);
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"an-identifier",
     @"policy" : @"ALLOWLIST",
     @"rule_type" : @"BINARY",
-  }];
+  }
+                                      error:&error];
   XCTAssertNil(sut);
+  XCTAssertNotNil(error);
+  XCTAssertEqual(error.code, SNTErrorCodeRuleInvalidIdentifier);
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
     @"policy" : @"OTHERPOLICY",
     @"rule_type" : @"BINARY",
-  }];
+  }
+                                      error:&error];
   XCTAssertNil(sut);
+  XCTAssertNotNil(error);
+  XCTAssertEqual(error.code, SNTErrorCodeRuleInvalidPolicy);
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:@{
+  sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"an-identifier",
     @"policy" : @"ALLOWLIST",
     @"rule_type" : @"OTHER_RULE_TYPE",
-  }];
+  }
+                                      error:&error];
   XCTAssertNil(sut);
+  XCTAssertNotNil(error);
+  XCTAssertEqual(error.code, SNTErrorCodeRuleInvalidRuleType);
 }
 
 - (void)testRuleDictionaryRepresentation {
@@ -236,7 +269,7 @@
     @"comment" : @"",
   };
 
-  SNTRule *sut = [[SNTRule alloc] initWithDictionarySlow:expectedTeamID];
+  SNTRule *sut = [[SNTRule alloc] initWithDictionary:expectedTeamID error:nil];
   NSDictionary *dict = [sut dictionaryRepresentation];
   XCTAssertEqualObjects(expectedTeamID, dict);
 
@@ -249,7 +282,7 @@
     @"comment" : @"",
   };
 
-  sut = [[SNTRule alloc] initWithDictionarySlow:expectedBinary];
+  sut = [[SNTRule alloc] initWithDictionary:expectedBinary error:nil];
   dict = [sut dictionaryRepresentation];
 
   XCTAssertEqualObjects(expectedBinary, dict);
@@ -264,7 +297,7 @@
     @"custom_url" : @"https://example.com",
   };
 
-  SNTRule *sut = [[SNTRule alloc] initWithDictionarySlow:expected];
+  SNTRule *sut = [[SNTRule alloc] initWithDictionary:expected error:nil];
   sut.state = SNTRuleStateBlock;
   XCTAssertEqualObjects(kRulePolicyBlocklist, [sut dictionaryRepresentation][kRulePolicy]);
   sut.state = SNTRuleStateSilentBlock;
@@ -296,19 +329,10 @@
     dict[[key uppercaseString]] = dict[key];
     [dict removeObjectForKey:key];
 
-    SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:dict];
+    SNTRule *rule = [[SNTRule alloc] initWithDictionary:dict error:nil];
     NSDictionary *final = [rule dictionaryRepresentation];
     XCTAssertEqualObjects(expected, final);
   }
 }
-
-/*
-- (void)testRuleTypeToString {
-  SNTRule *sut = [[SNTRule alloc] init];
-  XCTAssertEqual(kRuleTypeBinary, [sut ruleTypeToString:@""]);//SNTRuleTypeBinary]);
-  XCTAssertEqual(kRuleTypeCertificate,[sut ruleTypeToString:SNTRuleTypeCertificate]);
-  XCTAssertEqual(kRuleTypeTeamID, [sut ruleTypeToString:SNTRuleTypeTeamID]);
-  XCTAssertEqual(kRuleTypeSigningID,[sut ruleTypeToString:SNTRuleTypeSigningID]);
-}*/
 
 @end

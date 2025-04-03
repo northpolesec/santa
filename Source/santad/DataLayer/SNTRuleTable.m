@@ -14,7 +14,6 @@
 /// limitations under the License.
 
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-#include "Source/common/SNTCommonEnums.h"
 
 #import <EndpointSecurity/EndpointSecurity.h>
 
@@ -23,7 +22,9 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
@@ -335,7 +336,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                                    customMsg:[rs stringForColumn:@"custommsg"]
                                    customURL:[rs stringForColumn:@"customurl"]
                                    timestamp:[rs intForColumn:@"timestamp"]
-                                     comment:[rs stringForColumn:@"comment"]];
+                                     comment:[rs stringForColumn:@"comment"]
+                                       error:nil];
 }
 
 - (SNTRule *)ruleForIdentifiers:(struct RuleIdentifiers)identifiers {
@@ -422,9 +424,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (BOOL)addRules:(NSArray *)rules
      ruleCleanup:(SNTRuleCleanup)cleanupType
-           error:(NSError *__autoreleasing *)error {
+           error:(__strong NSError **)error {
   if (!rules || rules.count < 1) {
-    [self fillError:error code:SNTRuleTableErrorEmptyRuleArray message:nil];
+    if (error) {
+      *error = [SNTError errorWithCode:SNTErrorCodeEmptyRuleArray message:@"Empty rule array"];
+    }
     return NO;
   }
 
@@ -440,7 +444,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     for (SNTRule *rule in rules) {
       if (![rule isKindOfClass:[SNTRule class]] || rule.identifier.length == 0 ||
           rule.state == SNTRuleStateUnknown || rule.type == SNTRuleTypeUnknown) {
-        [self fillError:error code:SNTRuleTableErrorInvalidRule message:rule.description];
+        if (error) {
+          *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalid
+                                   message:@"Rule array contained invalid entry"
+                                    detail:rule.description];
+        }
         *rollback = failed = YES;
         return;
       }
@@ -448,7 +456,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       if (rule.state == SNTRuleStateRemove) {
         if (![db executeUpdate:@"DELETE FROM rules WHERE identifier=? AND type=?", rule.identifier,
                                @(rule.type)]) {
-          [self fillError:error code:SNTRuleTableErrorRemoveFailed message:[db lastErrorMessage]];
+          if (error) {
+            *error = [SNTError errorWithCode:SNTErrorCodeRemoveRuleFailed
+                                     message:@"A database error occurred while deleting a rule"
+                                      detail:[db lastErrorMessage]];
+          }
           *rollback = failed = YES;
           return;
         }
@@ -459,9 +471,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                      @"VALUES (?, ?, ?, ?, ?, ?, ?);",
                      rule.identifier, @(rule.state), @(rule.type), rule.customMsg, rule.customURL,
                      @(rule.timestamp), rule.comment]) {
-          [self fillError:error
-                     code:SNTRuleTableErrorInsertOrReplaceFailed
-                  message:[db lastErrorMessage]];
+          if (error) {
+            *error = [SNTError
+                errorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                      message:@"A database error occurred while inserting/replacing a rule"
+                       detail:[db lastErrorMessage]];
+          }
           *rollback = failed = YES;
           return;
         }
@@ -568,31 +583,6 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   self.lastTransitiveRuleCulling = [NSDate date];
 }
 
-//  Helper to create an NSError where necessary.
-//  The return value is irrelevant but the static analyzer complains if it's not a BOOL.
-- (BOOL)fillError:(NSError **)error code:(SNTRuleTableError)code message:(NSString *)message {
-  if (!error) return NO;
-
-  NSMutableDictionary *d = [NSMutableDictionary dictionary];
-  switch (code) {
-    case SNTRuleTableErrorEmptyRuleArray: d[NSLocalizedDescriptionKey] = @"Empty rule array"; break;
-    case SNTRuleTableErrorInvalidRule:
-      d[NSLocalizedDescriptionKey] =
-          [NSString stringWithFormat:@"Rule array contained invalid entry: %@", message];
-      break;
-    case SNTRuleTableErrorInsertOrReplaceFailed:
-      d[NSLocalizedDescriptionKey] = @"A database error occurred while inserting/replacing a rule";
-      break;
-    case SNTRuleTableErrorRemoveFailed:
-      d[NSLocalizedDescriptionKey] = @"A database error occurred while deleting a rule";
-      break;
-  }
-
-  if (message) d[NSLocalizedFailureReasonErrorKey] = message;
-
-  *error = [NSError errorWithDomain:@"com.northpolesec.santad.ruletable" code:code userInfo:d];
-  return YES;
-}
 #pragma mark Querying
 
 // Retrieve all rules from the Database

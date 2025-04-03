@@ -34,6 +34,7 @@
 #include <vector>
 
 #import "Source/common/PrefixTree.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/String.h"
 #import "Source/common/Unit.h"
@@ -100,9 +101,7 @@ using ValidatorBlock = bool (^)(id, NSError **);
 
 static void PopulateError(NSError **err, NSString *msg) {
   if (err) {
-    *err = [NSError errorWithDomain:@"com.northpolesec.santa.watchitems"
-                               code:0
-                           userInfo:@{NSLocalizedDescriptionKey : msg}];
+    *err = [SNTError errorWithMessage:msg];
   }
 }
 

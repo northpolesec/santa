@@ -26,6 +26,7 @@
 #include <sys/xattr.h>
 
 #import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 
 // Simple class to hold the data of a mach_header and the offset within the file
@@ -94,9 +95,7 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
     if (!_path.length) {
       if (error) {
         NSString *errStr = @"Unable to use empty path";
-        *error = [NSError errorWithDomain:@"com.northpolesec.santa.fileinfo"
-                                     code:270
-                                 userInfo:@{NSLocalizedDescriptionKey : errStr}];
+        *error = [SNTError errorWithCode:SNTErrorCodeEmptyPath message:errStr];
       }
       return nil;
     }
@@ -104,9 +103,7 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
     if (!((S_IFMT & fileStat->st_mode) == S_IFREG)) {
       if (error) {
         NSString *errStr = [NSString stringWithFormat:@"Non regular file: %s", strerror(errno)];
-        *error = [NSError errorWithDomain:@"com.northpolesec.santa.fileinfo"
-                                     code:290
-                                 userInfo:@{NSLocalizedDescriptionKey : errStr}];
+        *error = [SNTError errorWithCode:SNTErrorCodeNonRegularFile message:errStr];
       }
       return nil;
     }
@@ -127,9 +124,7 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
     if (fd < 0) {
       if (error) {
         NSString *errStr = [NSString stringWithFormat:@"Unable to open file: %s", strerror(errno)];
-        *error = [NSError errorWithDomain:@"com.northpolesec.santa.fileinfo"
-                                     code:280
-                                 userInfo:@{NSLocalizedDescriptionKey : errStr}];
+        *error = [SNTError errorWithCode:SNTErrorCodeFailedToOpen message:errStr];
       }
       return nil;
     }
@@ -146,9 +141,7 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
     if (error) {
       NSString *errStr = @"Unable to resolve empty path";
       if (path) errStr = [@"Unable to resolve path: " stringByAppendingString:path];
-      *error = [NSError errorWithDomain:@"com.northpolesec.santa.fileinfo"
-                                   code:260
-                               userInfo:@{NSLocalizedDescriptionKey : errStr}];
+      *error = [SNTError errorWithCode:SNTErrorCodeFailedToResolvePath message:errStr];
     }
     return nil;
   }

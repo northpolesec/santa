@@ -20,6 +20,7 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -213,9 +214,7 @@ using santa::NSStringToUTF8String;
     }
     LOGE(@"HTTP Response: %ld %@", code, errStr);
     if (error != NULL) {
-      *error = [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                   code:code
-                               userInfo:@{NSLocalizedDescriptionKey : errStr ?: @""}];
+      *error = [SNTError errorWithCode:SNTErrorCodeFailedToHTTP message:errStr ?: @""];
     }
     return nil;
   }
@@ -240,9 +239,7 @@ using santa::NSStringToUTF8String;
     if (!message->ParseFromString(std::string((const char *)data.bytes, data.length))) {
       NSString *errStr = @"Failed to parse response proto into message";
       SLOGE(@"%@", errStr);
-      return [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                 code:4
-                             userInfo:@{NSLocalizedDescriptionKey : errStr}];
+      return [SNTError errorWithCode:SNTErrorCodeFailedToParseProto message:errStr];
     }
     return nil;
   }
@@ -259,9 +256,7 @@ using santa::NSStringToUTF8String;
     NSString *errStr = [NSString stringWithFormat:@"Failed to parse response JSON into message: %s",
                                                   status.ToString().c_str()];
     SLOGE(@"%@", errStr);
-    return [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                               code:3
-                           userInfo:@{NSLocalizedDescriptionKey : errStr}];
+    return [SNTError errorWithCode:SNTErrorCodeFailedToParseJSON message:errStr];
   }
 
   return nil;
