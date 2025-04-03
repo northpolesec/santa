@@ -68,4 +68,3 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
 + (nonnull NSError *)errorWithMessage:(nonnull NSString *)msg;
 
 @end
-

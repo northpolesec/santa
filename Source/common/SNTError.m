@@ -44,4 +44,3 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
 }
 
 @end
-
