@@ -327,6 +327,25 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTConfigBundle",
+    srcs = ["SNTConfigBundle.mm"],
+    hdrs = ["SNTConfigBundle.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTCommonEnums",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTConfigBundleTest",
+    srcs = ["SNTConfigBundleTest.mm"],
+    deps = [
+        ":SNTCommonEnums",
+        ":SNTConfigBundle",
+    ],
+)
+
+objc_library(
     name = "SNTKVOManager",
     srcs = ["SNTKVOManager.mm"],
     hdrs = ["SNTKVOManager.h"],
@@ -503,6 +522,7 @@ objc_library(
         ":MOLCodesignChecker",
         ":MOLXPCConnection",
         ":SNTCommonEnums",
+        ":SNTConfigBundle",
         ":SNTConfigurator",
         ":SNTRule",
         ":SNTRuleIdentifiers",
@@ -640,6 +660,7 @@ test_suite(
         ":RingBufferTest",
         ":SNTBlockMessageTest",
         ":SNTCachedDecisionTest",
+        ":SNTConfigBundleTest",
         ":SNTConfiguratorTest",
         ":SNTFileInfoTest",
         ":SNTKVOManagerTest",

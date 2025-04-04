@@ -205,7 +205,6 @@ static const uint32_t kEventTableCurrentVersion = 4;
     for (NSNumber *index in indexes) {
       [db executeUpdate:@"DELETE FROM events WHERE idx=?", index];
     }
-    [db executeUpdate:@"VACUUM"];
   }];
 }
 
