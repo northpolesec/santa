@@ -35,7 +35,7 @@ void print(NSString *format, ...) {
       format = [NSString stringWithFormat:@"\033[31m%@\033[0m\n", format];
     } else if ([format hasPrefix:@"[+]"]) {
       format = [NSString stringWithFormat:@"\033[32m%@\033[0m\n", format];
-    } else if {
+    } else {
       format = [NSString stringWithFormat:@"%@\n", format];
     }
   }
