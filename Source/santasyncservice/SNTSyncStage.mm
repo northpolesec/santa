@@ -20,6 +20,7 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -212,11 +213,7 @@ using santa::NSStringToUTF8String;
       errStr = requestError.localizedDescription;
     }
     LOGE(@"HTTP Response: %ld %@", code, errStr);
-    if (error != NULL) {
-      *error = [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                   code:code
-                               userInfo:@{NSLocalizedDescriptionKey : errStr ?: @""}];
-    }
+    [SNTError populateError:error withCode:SNTErrorCodeFailedToHTTP format:@"%@", errStr ?: @""];
     return nil;
   }
   return data;
@@ -240,9 +237,8 @@ using santa::NSStringToUTF8String;
     if (!message->ParseFromString(std::string((const char *)data.bytes, data.length))) {
       NSString *errStr = @"Failed to parse response proto into message";
       SLOGE(@"%@", errStr);
-      return [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                 code:4
-                             userInfo:@{NSLocalizedDescriptionKey : errStr}];
+      [SNTError populateError:&error withCode:SNTErrorCodeFailedToParseProto format:@"%@", errStr];
+      return error;
     }
     return nil;
   }
@@ -259,9 +255,9 @@ using santa::NSStringToUTF8String;
     NSString *errStr = [NSString stringWithFormat:@"Failed to parse response JSON into message: %s",
                                                   status.ToString().c_str()];
     SLOGE(@"%@", errStr);
-    return [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                               code:3
-                           userInfo:@{NSLocalizedDescriptionKey : errStr}];
+    NSError *error;
+    [SNTError populateError:&error withCode:SNTErrorCodeFailedToParseJSON format:@"%@", errStr];
+    return error;
   }
 
   return nil;

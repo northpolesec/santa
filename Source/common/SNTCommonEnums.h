@@ -120,13 +120,6 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateAllow = 0xFFFFFFULL << 40,
 };
 
-typedef NS_ENUM(NSInteger, SNTRuleTableError) {
-  SNTRuleTableErrorEmptyRuleArray,
-  SNTRuleTableErrorInsertOrReplaceFailed,
-  SNTRuleTableErrorInvalidRule,
-  SNTRuleTableErrorRemoveFailed
-};
-
 // This enum type is used to indicate what should be done with the related bundle events that are
 // generated when an initiating blocked bundle event occurs.
 typedef NS_ENUM(NSInteger, SNTBundleEventAction) {

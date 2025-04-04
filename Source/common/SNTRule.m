@@ -20,6 +20,7 @@
 #include <os/base.h>
 
 #import "Source/common/CoderMacros.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTSyncConstants.h"
 
 // https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/
@@ -37,7 +38,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                          customMsg:(NSString *)customMsg
                          customURL:(NSString *)customURL
                          timestamp:(NSUInteger)timestamp
-                           comment:(NSString *)comment {
+                           comment:(NSString *)comment
+                             error:(NSError **)error {
   self = [super init];
   if (self) {
     if (identifier.length == 0) {
@@ -57,6 +59,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
         identifier = [identifier stringByTrimmingCharactersInSet:nonHex];
         if (identifier.length != (CC_SHA256_DIGEST_LENGTH * 2)) {
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -68,6 +73,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         identifier =
             [[identifier uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
         if (identifier.length != kExpectedTeamIDLength) {
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -82,6 +90,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         // as is.
         NSArray *sidComponents = [identifier componentsSeparatedByString:@":"];
         if (!sidComponents || sidComponents.count < 2) {
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -92,6 +103,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
           teamID =
               [[teamID uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
           if (teamID.length != kExpectedTeamIDLength) {
+            [SNTError populateError:error
+                           withCode:SNTErrorCodeRuleInvalidIdentifier
+                             format:@"Rule received with invalid identifier for its type"];
             return nil;
           }
         }
@@ -102,6 +116,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
             [[sidComponents subarrayWithRange:NSMakeRange(1, sidComponents.count - 1)]
                 componentsJoinedByString:@":"];
         if (signingID.length == 0) {
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -112,6 +129,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       case SNTRuleTypeCDHash: {
         identifier = [[identifier lowercaseString] stringByTrimmingCharactersInSet:nonHex];
         if (identifier.length != CS_CDHASH_LEN * 2) {
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
         break;
@@ -144,7 +164,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         customMsg:customMsg
                         customURL:customURL
                         timestamp:0
-                          comment:nil];
+                          comment:nil
+                            error:nil];
   // Initialize timestamp to current time if rule is transitive.
   if (self && state == SNTRuleStateAllowTransitive) {
     [self resetTimestamp];
@@ -176,11 +197,13 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 }
 
 // Converts rule information from santactl or static rules into a SNTRule.
-// Because any information not recorded by SNTRule is thrown away here, this
-// method is also responsible for dealing with the extra bundle rule information
-// (bundle_hash & rule_count).
-- (instancetype)initWithDictionarySlow:(NSDictionary *)rawDict {
-  if (![rawDict isKindOfClass:[NSDictionary class]]) return nil;
+- (instancetype)initWithDictionary:(NSDictionary *)rawDict error:(NSError **)error {
+  if (![rawDict isKindOfClass:[NSDictionary class]]) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidType
+                     format:@"Rule received with invalid type %@", [rawDict class]];
+    return nil;
+  }
 
   NSDictionary *dict = [self normalizeRuleDictionary:rawDict];
 
@@ -188,11 +211,21 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   if (![identifier isKindOfClass:[NSString class]] || !identifier.length) {
     identifier = dict[kRuleSHA256];
   }
-  if (![identifier isKindOfClass:[NSString class]] || !identifier.length) return nil;
+  if (![identifier isKindOfClass:[NSString class]] || !identifier.length) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleMissingIdentifier
+                     format:@"Rule received with missing/invalid identifier '%@'", identifier];
+    return nil;
+  }
 
   NSString *policyString = dict[kRulePolicy];
   SNTRuleState state;
-  if (![policyString isKindOfClass:[NSString class]]) return nil;
+  if (![policyString isKindOfClass:[NSString class]]) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleMissingPolicy
+                     format:@"Rule received with missing/invalid policy '%@'", policyString];
+    return nil;
+  }
   if ([policyString isEqual:kRulePolicyAllowlist] ||
       [policyString isEqual:kRulePolicyAllowlistDeprecated]) {
     state = SNTRuleStateAllow;
@@ -212,12 +245,20 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   } else if ([policyString isEqual:kRulePolicyRemove]) {
     state = SNTRuleStateRemove;
   } else {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleInvalidPolicy
+                     format:@"Rule received with invalid policy '%@'", policyString];
     return nil;
   }
 
   NSString *ruleTypeString = dict[kRuleType];
   SNTRuleType type;
-  if (![ruleTypeString isKindOfClass:[NSString class]]) return nil;
+  if (![ruleTypeString isKindOfClass:[NSString class]]) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleMissingRuleType
+                     format:@"Rule received with missing/invalid rule type '%@'", ruleTypeString];
+    return nil;
+  }
   if ([ruleTypeString isEqual:kRuleTypeBinary]) {
     type = SNTRuleTypeBinary;
   } else if ([ruleTypeString isEqual:kRuleTypeCertificate]) {
@@ -229,6 +270,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   } else if ([ruleTypeString isEqual:kRuleTypeCDHash]) {
     type = SNTRuleTypeCDHash;
   } else {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleInvalidRuleType
+                     format:@"Rule received with invalid rule type '%@'", ruleTypeString];
     return nil;
   }
 
@@ -246,7 +290,10 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                             state:state
                              type:type
                         customMsg:customMsg
-                        customURL:customURL];
+                        customURL:customURL
+                        timestamp:0
+                          comment:nil
+                            error:error];
 }
 
 #pragma mark NSSecureCoding

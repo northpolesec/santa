@@ -95,11 +95,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForBlockByCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -117,11 +118,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForSilentBlockByCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"SILENT_BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -140,11 +142,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForAllowbyCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"ALLOWLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -163,11 +166,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForBlockBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
 
@@ -187,11 +191,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForSilenBlockBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"SILENT_BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
 
@@ -211,11 +216,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForAllowBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -234,11 +240,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForSigningIDBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"ABCDEFGHIJ:ABCDEFGHIJ",
     @"policy" : @"BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -258,11 +265,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // Signing ID rules
 - (void)testDecisionForSigningIDSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"SILENT_BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -281,11 +289,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForSigningIDAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"ALLOWLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -305,11 +314,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 //  Certificate rules
 - (void)testDecisionForCertificateBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -328,11 +338,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForCertificateSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"SILENT_BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -351,11 +362,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForCertificateAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -375,11 +387,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // Team ID rules
 - (void)testDecisionForTeamIDBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -398,11 +411,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForTeamIDSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"SILENT_BLOCKLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -421,11 +435,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForTeamIDAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"ALLOWLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -446,11 +461,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 // Compiler rules
 // CDHash
 - (void)testDecisionForCDHashCompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"ALLOWLIST_COMPILER"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -470,11 +486,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // SHA256
 - (void)testDecisionForSHA256CompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST_COMPILER"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -494,11 +511,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // SigningID
 - (void)testDecisionForSigningIDCompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"ALLOWLIST_COMPILER"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
   [self testRule:rule
@@ -518,11 +536,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // Transitive allowlist rules
 - (void)testDecisionForTransitiveAllowlistRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
 
@@ -545,11 +564,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testEnsureANonMatchingRuleResultsInUnknown {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
 
@@ -571,13 +591,14 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testEnsureCustomURLAndMessageAreSet {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionarySlow:@{
+  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST",
     @"custom_msg" : @"Custom Message",
     @"custom_url" : @"https://example.com"
-  }];
+  }
+                                                error:nil];
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
 

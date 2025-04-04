@@ -16,6 +16,7 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <stdint.h>
+#include "Source/common/SNTError.h"
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -173,13 +174,13 @@
 - (void)testAddRulesEmptyArray {
   NSError *error;
   XCTAssertFalse([self.sut addRules:@[] ruleCleanup:SNTRuleCleanupAll error:&error]);
-  XCTAssertEqual(error.code, SNTRuleTableErrorEmptyRuleArray);
+  XCTAssertEqual(error.code, SNTErrorCodeEmptyRuleArray);
 }
 
 - (void)testAddRulesNilArray {
   NSError *error;
   XCTAssertFalse([self.sut addRules:nil ruleCleanup:SNTRuleCleanupAll error:&error]);
-  XCTAssertEqual(error.code, SNTRuleTableErrorEmptyRuleArray);
+  XCTAssertEqual(error.code, SNTErrorCodeEmptyRuleArray);
 }
 
 - (void)testAddInvalidRule {
@@ -189,7 +190,7 @@
 
   NSError *error;
   XCTAssertFalse([self.sut addRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error]);
-  XCTAssertEqual(error.code, SNTRuleTableErrorInvalidRule);
+  XCTAssertEqual(error.code, SNTErrorCodeRuleInvalid);
 }
 
 - (void)testFetchBinaryRule {
