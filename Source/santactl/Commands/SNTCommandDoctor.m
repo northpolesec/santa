@@ -16,7 +16,6 @@
 #include <unistd.h>
 
 #include <libproc.h>
-#include <sys/sysctl.h>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
