@@ -87,6 +87,11 @@
 
 ///
 ///  Initialize with a dictionary received from a static rule or santactl.
+///
+///  As these methods could potentially pass in a "manually-crafted" dictionary this method
+///  will normalize casing of the passed dictionary before trying to parse it. This is
+///  potentially a little slow, so this method should not be used in any hot paths.
+///
 ///  If the passed dict cannot be parsed as a rule nil will be returned. Additionally, if the error
 ///  parameter is a non-nil pointer then it will be populated with an appropriate error object.
 ///

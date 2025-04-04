@@ -422,17 +422,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 #pragma mark Adding
 
-- (BOOL)addRules:(NSArray *)rules
-     ruleCleanup:(SNTRuleCleanup)cleanupType
-           error:(__strong NSError **)error {
+- (BOOL)addRules:(NSArray *)rules ruleCleanup:(SNTRuleCleanup)cleanupType error:(NSError **)error {
   if (!rules || rules.count < 1) {
-    if (error) {
-      *error = [SNTError errorWithCode:SNTErrorCodeEmptyRuleArray message:@"Empty rule array"];
-    }
+    [SNTError populateError:error withCode:SNTErrorCodeEmptyRuleArray format:@"Empty rule array"];
     return NO;
   }
 
   __block BOOL failed = NO;
+  __block NSError *blockErr;
 
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
     if (cleanupType == SNTRuleCleanupAll) {
@@ -444,11 +441,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     for (SNTRule *rule in rules) {
       if (![rule isKindOfClass:[SNTRule class]] || rule.identifier.length == 0 ||
           rule.state == SNTRuleStateUnknown || rule.type == SNTRuleTypeUnknown) {
-        if (error) {
-          *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalid
-                                   message:@"Rule array contained invalid entry"
-                                    detail:rule.description];
-        }
+        [SNTError populateError:&blockErr
+                       withCode:SNTErrorCodeRuleInvalid
+                        message:@"Rule array contained invalid entry"
+                         detail:rule.description];
         *rollback = failed = YES;
         return;
       }
@@ -456,11 +452,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       if (rule.state == SNTRuleStateRemove) {
         if (![db executeUpdate:@"DELETE FROM rules WHERE identifier=? AND type=?", rule.identifier,
                                @(rule.type)]) {
-          if (error) {
-            *error = [SNTError errorWithCode:SNTErrorCodeRemoveRuleFailed
-                                     message:@"A database error occurred while deleting a rule"
-                                      detail:[db lastErrorMessage]];
-          }
+          [SNTError populateError:&blockErr
+                         withCode:SNTErrorCodeRemoveRuleFailed
+                          message:@"A database error occurred while deleting a rule"
+                           detail:[db lastErrorMessage]];
           *rollback = failed = YES;
           return;
         }
@@ -471,18 +466,20 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                      @"VALUES (?, ?, ?, ?, ?, ?, ?);",
                      rule.identifier, @(rule.state), @(rule.type), rule.customMsg, rule.customURL,
                      @(rule.timestamp), rule.comment]) {
-          if (error) {
-            *error = [SNTError
-                errorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
-                      message:@"A database error occurred while inserting/replacing a rule"
-                       detail:[db lastErrorMessage]];
-          }
+          [SNTError populateError:&blockErr
+                         withCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                          message:@"A database error occurred while inserting/replacing a rule"
+                           detail:[db lastErrorMessage]];
           *rollback = failed = YES;
           return;
         }
       }
     }
   }];
+
+  if (blockErr && error) {
+    *error = blockErr;
+  }
 
   return !failed;
 }

@@ -20,27 +20,46 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
 
 @implementation SNTError
 
-+ (nonnull NSError *)errorWithCode:(SNTErrorCode)code
-                           message:(nonnull NSString *)msg
-                            detail:(nonnull NSString *)detail {
-  return [NSError errorWithDomain:SantaErrorDomain
-                             code:code
-                         userInfo:@{
-                           NSLocalizedDescriptionKey : msg,
-                           NSLocalizedFailureReasonErrorKey : detail,
-                         }];
++ (void)populateError:(NSError **)error
+             withCode:(SNTErrorCode)code
+              message:(nonnull NSString *)msg
+               detail:(nonnull NSString *)detail {
+  if (!error) return;
+  *error = [NSError errorWithDomain:SantaErrorDomain
+                               code:code
+                           userInfo:@{
+                             NSLocalizedDescriptionKey : msg,
+                             NSLocalizedFailureReasonErrorKey : detail,
+                           }];
 }
 
-+ (nonnull NSError *)errorWithCode:(SNTErrorCode)code message:(NSString *)msg {
-  return [NSError errorWithDomain:SantaErrorDomain
-                             code:code
-                         userInfo:@{
-                           NSLocalizedDescriptionKey : msg,
-                         }];
++ (void)populateError:(NSError **)error
+             withCode:(SNTErrorCode)code
+               format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(3, 4) {
+  if (!error) return;
+
+  va_list args;
+  va_start(args, format);
+  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+  va_end(args);
+
+  *error = [NSError errorWithDomain:SantaErrorDomain
+                               code:code
+                           userInfo:@{NSLocalizedDescriptionKey : msg}];
 }
 
-+ (nonnull NSError *)errorWithMessage:(nonnull NSString *)msg {
-  return [self errorWithCode:SNTErrorCodeUnknown message:msg];
++ (void)populateError:(NSError **)error
+           withFormat:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(2, 3) {
+  if (!error) return;
+
+  va_list args;
+  va_start(args, format);
+  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+  va_end(args);
+
+  *error = [NSError errorWithDomain:SantaErrorDomain
+                               code:SNTErrorCodeUnknown
+                           userInfo:@{NSLocalizedDescriptionKey : msg}];
 }
 
 @end

@@ -124,9 +124,11 @@ double watchdogRAMPeak = 0;
 #ifndef DEBUG
   SNTConfigurator *config = [SNTConfigurator configurator];
   if (source == SNTRuleAddSourceSantactl && (config.syncBaseURL || config.staticRules.count > 0)) {
-    NSError *error = [SNTError errorWithCode:SNTErrorCodeManualRulesDisabled
-                                     message:@"Rejected by the Santa daemon"
-                                      detail:@"SyncBaseURL or StaticRules are set"];
+    NSError *error;
+    [SNTError populateError:&error
+                   withCode:SNTErrorCodeManualRulesDisabled
+                    message:@"Rejected by the Santa daemon"
+                     detail:@"SyncBaseURL or StaticRules are set"];
     reply(error);
   }
 #endif
@@ -180,8 +182,11 @@ double watchdogRAMPeak = 0;
 
   // Do not return any rules if syncBaseURL is set and return an error.
   if (config.syncBaseURL || config.staticRules.count) {
-    reply(@[], [SNTError errorWithCode:SNTErrorCodeManualRulesDisabled
-                               message:@"SyncBaseURL is set"]);
+    NSError *error;
+    [SNTError populateError:&error
+                   withCode:SNTErrorCodeManualRulesDisabled
+                     format:@"SyncBaseURL is set"];
+    reply(@[], error);
     return;
   }
 
