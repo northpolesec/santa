@@ -105,35 +105,37 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   std::string cursor;
 
   do {
-    auto req = google::protobuf::Arena::Create<::pbv1::RuleDownloadRequest>(&arena);
-    req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
+    @autoreleasepool {
+      auto req = google::protobuf::Arena::Create<::pbv1::RuleDownloadRequest>(&arena);
+      req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
 
-    if (!cursor.empty()) {
-      req->set_cursor(cursor);
-    }
-    ::pbv1::RuleDownloadResponse response;
-    NSError *err = [self performRequest:[self requestWithMessage:req]
-                            intoMessage:&response
-                                timeout:30];
-
-    if (err) {
-      SLOGE(@"Error downloading rules: %@", err);
-      return nil;
-    }
-
-    for (const ::pbv1::Rule &rule : response.rules()) {
-      SNTRule *r = [self ruleFromProtoRule:rule];
-      if (!r) {
-        SLOGD(@"Ignoring bad rule: %s", rule.Utf8DebugString().c_str());
-        continue;
+      if (!cursor.empty()) {
+        req->set_cursor(cursor);
       }
-      [self processBundleNotificationsForRule:r fromProtoRule:&rule];
-      [newRules addObject:r];
-    }
+      ::pbv1::RuleDownloadResponse response;
+      NSError *err = [self performRequest:[self requestWithMessage:req]
+                              intoMessage:&response
+                                  timeout:30];
 
-    cursor = response.cursor();
-    SLOGI(@"Received %lu rules", (unsigned long)response.rules_size());
-    self.syncState.rulesReceived += response.rules_size();
+      if (err) {
+        SLOGE(@"Error downloading rules: %@", err);
+        return nil;
+      }
+
+      for (const ::pbv1::Rule &rule : response.rules()) {
+        SNTRule *r = [self ruleFromProtoRule:rule];
+        if (!r) {
+          SLOGD(@"Ignoring bad rule: %s", rule.Utf8DebugString().c_str());
+          continue;
+        }
+        [self processBundleNotificationsForRule:r fromProtoRule:&rule];
+        [newRules addObject:r];
+      }
+
+      cursor = response.cursor();
+      SLOGI(@"Received %lu rules", (unsigned long)response.rules_size());
+      self.syncState.rulesReceived += response.rules_size();
+    }
   } while (!cursor.empty());
 
   self.syncState.rulesProcessed = newRules.count;
