@@ -218,7 +218,7 @@ santa_unit_test(
 
 objc_library(
     name = "SNTSyncdQueue",
-    srcs = ["SNTSyncdQueue.m"],
+    srcs = ["SNTSyncdQueue.mm"],
     hdrs = ["SNTSyncdQueue.h"],
     deps = [
         "//Source/common:MOLXPCConnection",
@@ -226,6 +226,18 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTXPCSyncServiceInterface",
+        "//Source/common:SantaCache",
+        "//Source/common:String",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTSyncdQueueTest",
+    srcs = ["SNTSyncdQueueTest.mm"],
+    deps = [
+        ":SNTSyncdQueue",
+        "//Source/common:SNTStoredEvent",
+        "@OCMock",
     ],
 )
 
