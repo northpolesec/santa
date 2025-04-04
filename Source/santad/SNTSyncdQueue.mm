@@ -79,6 +79,7 @@
 
 // The event upload is skipped if an event has been initiated for it in the last 10 minutes.
 // The passed-in hash is fileBundleHash for a bundle event, or fileSHA256 for a normal event.
+// Returns YES if backoff is needed, NO otherwise.
 - (BOOL)backoffForPrimaryHash:(NSString *)hash {
   NSDate *backoff = _uploadBackoff->get(santa::NSStringToUTF8String(hash));
   NSDate *now = [NSDate date];
