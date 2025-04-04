@@ -84,57 +84,57 @@
 
   SNTPostflightResult *postflightResult = [[SNTPostflightResult alloc] initWithSyncState:state];
 
-  [postflightResult clientMode:^(SNTClientMode val){
+  [postflightResult clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
     [exp fulfill];
   }];
 
-  [postflightResult syncType:^(SNTSyncType val){
+  [postflightResult syncType:^(SNTSyncType val) {
     XCTAssertEqual(val, SNTSyncTypeNormal);
     [exp fulfill];
   }];
 
-  [postflightResult allowlistRegex:^(NSString *val){
+  [postflightResult allowlistRegex:^(NSString *val) {
     XCTAssertEqualObjects(val, @"allow");
     [exp fulfill];
   }];
 
-  [postflightResult blocklistRegex:^(NSString *val){
+  [postflightResult blocklistRegex:^(NSString *val) {
     XCTAssertEqualObjects(val, @"block");
     [exp fulfill];
   }];
 
-  [postflightResult blockUSBMount:^(BOOL val){
+  [postflightResult blockUSBMount:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult remountUSBMode:^(NSArray *val){
+  [postflightResult remountUSBMode:^(NSArray *val) {
     XCTAssertEqualObjects(val, @[ @"foo" ]);
     [exp fulfill];
   }];
 
-  [postflightResult enableBundles:^(BOOL val){
+  [postflightResult enableBundles:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult enableTransitiveRules:^(BOOL val){
+  [postflightResult enableTransitiveRules:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult enableAllEventUpload:^(BOOL val){
+  [postflightResult enableAllEventUpload:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult disableUnknownEventUpload:^(BOOL val){
+  [postflightResult disableUnknownEventUpload:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult overrideFileAccessAction:^(NSString *val){
+  [postflightResult overrideFileAccessAction:^(NSString *val) {
     XCTAssertEqualObjects(val, @"disable");
     [exp fulfill];
   }];
@@ -151,57 +151,57 @@
 
   SNTPostflightResult *postflightResult = [[SNTPostflightResult alloc] initWithSyncState:state];
 
-  [postflightResult clientMode:^(SNTClientMode val){
+  [postflightResult clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
     [exp fulfill];
   }];
 
-  [postflightResult syncType:^(SNTSyncType val){
+  [postflightResult syncType:^(SNTSyncType val) {
     XCTAssertEqual(val, SNTSyncTypeNormal);
     [exp fulfill];
   }];
 
-  [postflightResult allowlistRegex:^(NSString *val){
+  [postflightResult allowlistRegex:^(NSString *val) {
     XCTAssertEqualObjects(val, @"allow");
     [exp fulfill];
   }];
 
-  [postflightResult blocklistRegex:^(NSString *val){
+  [postflightResult blocklistRegex:^(NSString *val) {
     XCTAssertEqualObjects(val, @"block");
     [exp fulfill];
   }];
 
-  [postflightResult blockUSBMount:^(BOOL val){
+  [postflightResult blockUSBMount:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult remountUSBMode:^(NSArray *val){
+  [postflightResult remountUSBMode:^(NSArray *val) {
     XCTAssertEqualObjects(val, @[ @"foo" ]);
     [exp fulfill];
   }];
 
-  [postflightResult enableBundles:^(BOOL val){
+  [postflightResult enableBundles:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult enableTransitiveRules:^(BOOL val){
+  [postflightResult enableTransitiveRules:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult enableAllEventUpload:^(BOOL val){
+  [postflightResult enableAllEventUpload:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult disableUnknownEventUpload:^(BOOL val){
+  [postflightResult disableUnknownEventUpload:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
 
-  [postflightResult overrideFileAccessAction:^(NSString *val){
+  [postflightResult overrideFileAccessAction:^(NSString *val) {
     XCTAssertEqualObjects(val, @"disable");
     [exp fulfill];
   }];

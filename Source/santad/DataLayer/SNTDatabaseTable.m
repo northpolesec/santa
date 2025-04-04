@@ -99,9 +99,7 @@
   }];
 
   // Vacuum the database to cleanup after version upgrades.
-  [self inDatabase:^(FMDatabase *db) {
-    [db executeUpdate:@"VACUUM"];
-  }];
+  [self vacuum];
 }
 
 - (void)inDatabase:(void (^)(FMDatabase *db))block {
