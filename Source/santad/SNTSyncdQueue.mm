@@ -29,6 +29,7 @@
 @end
 
 @implementation SNTSyncdQueue {
+  // TODO: Eventually replace with an LRU.
   std::unique_ptr<SantaCache<std::string, NSDate *>> _uploadBackoff;
 }
 
