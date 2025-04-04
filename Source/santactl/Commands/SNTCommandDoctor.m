@@ -103,7 +103,7 @@ REGISTER_COMMAND_NAME(@"doctor")
   if (!foundSantad) {
     print(@"[-] Santa system extension doesn't seem to be running");
   }
-  if (!foundSantaSyncService) {
+  if ([SNTConfigurator configurator].syncBaseURL.length && !foundSantaSyncService) {
     print(@"[-] Santa sync service doesn't seem to be running");
   }
   if (foundSanta && foundSantad && foundSantaSyncService) {
