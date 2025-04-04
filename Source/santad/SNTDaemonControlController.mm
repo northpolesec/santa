@@ -225,18 +225,8 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] clientMode]);
 }
 
-- (void)setClientMode:(SNTClientMode)mode reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setSyncServerClientMode:mode];
-  reply();
-}
-
 - (void)fullSyncLastSuccess:(void (^)(NSDate *))reply {
   reply([[SNTConfigurator configurator] fullSyncLastSuccess]);
-}
-
-- (void)setFullSyncLastSuccess:(NSDate *)date reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setFullSyncLastSuccess:date];
-  reply();
 }
 
 - (void)ruleSyncLastSuccess:(void (^)(NSDate *))reply {
@@ -257,78 +247,90 @@ double watchdogRAMPeak = 0;
   reply();
 }
 
-- (void)setAllowedPathRegex:(NSString *)pattern reply:(void (^)(void))reply {
-  NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:pattern
-                                                                      options:0
-                                                                        error:NULL];
-  [[SNTConfigurator configurator] setSyncServerAllowedPathRegex:re];
-  reply();
-}
-
-- (void)setBlockedPathRegex:(NSString *)pattern reply:(void (^)(void))reply {
-  NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:pattern
-                                                                      options:0
-                                                                        error:NULL];
-  [[SNTConfigurator configurator] setSyncServerBlockedPathRegex:re];
-  reply();
-}
-
 - (void)blockUSBMount:(void (^)(BOOL))reply {
   reply([[SNTConfigurator configurator] blockUSBMount]);
-}
-
-- (void)setBlockUSBMount:(BOOL)enabled reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setBlockUSBMount:enabled];
-  reply();
 }
 
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply {
   reply([[SNTConfigurator configurator] remountUSBMode]);
 }
 
-- (void)setRemountUSBMode:(NSArray *)remountUSBMode reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setRemountUSBMode:remountUSBMode];
-  reply();
-}
-
-- (void)setOverrideFileAccessAction:(NSString *)action reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setSyncServerOverrideFileAccessAction:action];
-  reply();
-}
-
 - (void)enableBundles:(void (^)(BOOL))reply {
   reply([SNTConfigurator configurator].enableBundles);
-}
-
-- (void)setEnableBundles:(BOOL)enableBundles reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setEnableBundles:enableBundles];
-  reply();
 }
 
 - (void)enableTransitiveRules:(void (^)(BOOL))reply {
   reply([SNTConfigurator configurator].enableTransitiveRules);
 }
 
-- (void)setEnableTransitiveRules:(BOOL)enabled reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setEnableTransitiveRules:enabled];
-  reply();
-}
-
 - (void)enableAllEventUpload:(void (^)(BOOL))reply {
   reply([SNTConfigurator configurator].enableAllEventUpload);
-}
-
-- (void)setEnableAllEventUpload:(BOOL)enabled reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setEnableAllEventUpload:enabled];
-  reply();
 }
 
 - (void)disableUnknownEventUpload:(void (^)(BOOL))reply {
   reply([SNTConfigurator configurator].disableUnknownEventUpload);
 }
 
-- (void)setDisableUnknownEventUpload:(BOOL)enabled reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setDisableUnknownEventUpload:enabled];
+- (void)postflightResult:(SNTConfigBundle *)result reply:(void (^)(void))reply {
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+
+  [result clientMode:^(SNTClientMode m) {
+    [configurator setSyncServerClientMode:m];
+  }];
+
+  [result syncType:^(SNTSyncType val) {
+    [configurator setSyncTypeRequired:val];
+  }];
+
+  [result allowlistRegex:^(NSString *val) {
+    [configurator
+        setSyncServerAllowedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
+                                                                                options:0
+                                                                                  error:NULL]];
+  }];
+
+  [result blocklistRegex:^(NSString *val) {
+    [configurator
+        setSyncServerBlockedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
+                                                                                options:0
+                                                                                  error:NULL]];
+  }];
+
+  [result blockUSBMount:^(BOOL val) {
+    [configurator setBlockUSBMount:val];
+  }];
+
+  [result remountUSBMode:^(NSArray *val) {
+    [configurator setRemountUSBMode:val];
+  }];
+
+  [result enableBundles:^(BOOL val) {
+    [configurator setEnableBundles:val];
+  }];
+
+  [result enableTransitiveRules:^(BOOL val) {
+    [configurator setEnableTransitiveRules:val];
+  }];
+
+  [result enableAllEventUpload:^(BOOL val) {
+    [configurator setEnableAllEventUpload:val];
+  }];
+
+  [result disableUnknownEventUpload:^(BOOL val) {
+    [configurator setDisableUnknownEventUpload:val];
+  }];
+
+  [result overrideFileAccessAction:^(NSString *val) {
+    [configurator setSyncServerOverrideFileAccessAction:val];
+  }];
+
+  [configurator setFullSyncLastSuccess:[NSDate now]];
+
+  // Vacuum the event databases when postflight is complete since it has just been drained.
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+    [[SNTDatabaseController eventTable] vacuum];
+  });
+
   reply();
 }
 
