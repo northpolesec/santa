@@ -29,14 +29,14 @@
 @end
 
 @implementation SNTSyncdQueue {
-  // TODO: Eventually replace with an LRU.
+  // TODO(https://github.com/northpolesec/santa/issues/344): Eventually replace with an LRU.
   std::unique_ptr<SantaCache<std::string, NSDate *>> _uploadBackoff;
 }
 
 - (instancetype)init {
   self = [super init];
   if (self) {
-    _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(128);
+    _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(256);
     _syncdQueue = dispatch_queue_create("com.northpolesec.syncd_queue", DISPATCH_QUEUE_SERIAL);
   }
   return self;

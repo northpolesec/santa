@@ -34,13 +34,13 @@
   SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] init];
 
   // Fill up the cache.
-  for (int i = 0; i < 128; ++i) {
+  for (int i = 0; i < 256; ++i) {
     BOOL backoff = [sut backoffForPrimaryHash:[NSString stringWithFormat:@"%d", i]];
     XCTAssertFalse(backoff);
   }
 
   // These hashes should now backoff.
-  for (int i = 0; i < 128; ++i) {
+  for (int i = 0; i < 256; ++i) {
     BOOL backoff = [sut backoffForPrimaryHash:[NSString stringWithFormat:@"%d", i]];
     XCTAssertTrue(backoff);
   }
@@ -49,16 +49,16 @@
   XCTAssertFalse([sut backoffForPrimaryHash:@"justonemorebyte"]);
   XCTAssertTrue([sut backoffForPrimaryHash:@"justonemorebyte"]);
 
-  // These hashes should not backoff, remember the cache was just cleared. However, only check 127
-  // of the hashes, "justonemorebyte" takes us a slot. Checking the full 128 hashes here would
+  // These hashes should not backoff, remember the cache was just cleared. However, only check 255
+  // of the hashes, "justonemorebyte" takes us a slot. Checking the full 256 hashes here would
   // overfill the cache again.
-  for (int i = 0; i < 127; ++i) {
+  for (int i = 0; i < 255; ++i) {
     BOOL backoff = [sut backoffForPrimaryHash:[NSString stringWithFormat:@"%d", i]];
     XCTAssertFalse(backoff);
   }
 
   // Again, these hashes should now backoff.
-  for (int i = 0; i < 127; ++i) {
+  for (int i = 0; i < 255; ++i) {
     BOOL backoff = [sut backoffForPrimaryHash:[NSString stringWithFormat:@"%d", i]];
     XCTAssertTrue(backoff);
   }
