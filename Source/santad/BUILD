@@ -1652,6 +1652,7 @@ test_suite(
         ":SNTNotificationQueueTest",
         ":SNTPolicyProcessorTest",
         ":SNTRuleTableTest",
+        ":SNTSyncdQueueTest",
         ":SantadTest",
         ":WatchItemPolicyTest",
         ":WatchItemsTest",
