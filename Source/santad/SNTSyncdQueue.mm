@@ -15,23 +15,28 @@
 
 #import "Source/santad/SNTSyncdQueue.h"
 
+#include <memory>
+
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
+#include "Source/common/SantaCache.h"
+#include "Source/common/String.h"
 
 @interface SNTSyncdQueue ()
-@property NSCache<NSString *, NSDate *> *uploadBackoff;
 @property dispatch_queue_t syncdQueue;
 @end
 
-@implementation SNTSyncdQueue
+@implementation SNTSyncdQueue {
+  // TODO(https://github.com/northpolesec/santa/issues/344): Eventually replace with an LRU.
+  std::unique_ptr<SantaCache<std::string, NSDate *>> _uploadBackoff;
+}
 
 - (instancetype)init {
   self = [super init];
   if (self) {
-    _uploadBackoff = [[NSCache alloc] init];
-    _uploadBackoff.countLimit = 128;
+    _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(256);
     _syncdQueue = dispatch_queue_create("com.northpolesec.syncd_queue", DISPATCH_QUEUE_SERIAL);
   }
   return self;
@@ -41,14 +46,14 @@
   if (!events.count) return;
   SNTStoredEvent *first = events.firstObject;
   NSString *hash = isFromBundle ? first.fileBundleHash : first.fileSHA256;
-  if (![self backoffForPrimaryHash:hash]) return;
+  if ([self backoffForPrimaryHash:hash]) return;
   [self dispatchBlockOnSyncdQueue:^{
     [self.syncConnection.remoteObjectProxy postEventsToSyncServer:events fromBundle:isFromBundle];
   }];
 }
 
 - (void)addBundleEvent:(SNTStoredEvent *)event reply:(void (^)(SNTBundleEventAction))reply {
-  if (![self backoffForPrimaryHash:event.fileBundleHash]) return;
+  if ([self backoffForPrimaryHash:event.fileBundleHash]) return;
   [self dispatchBlockOnSyncdQueue:^{
     [self.syncConnection.remoteObjectProxy
         postBundleEventToSyncServer:event
@@ -57,7 +62,8 @@
                                 // event will be included in the related events synced using
                                 // addEvents:isFromBundle:.
                                 if (action == SNTBundleEventActionSendEvents) {
-                                  [self.uploadBackoff removeObjectForKey:event.fileBundleHash];
+                                  _uploadBackoff->remove(
+                                      santa::NSStringToUTF8String(event.fileBundleHash));
                                 }
                                 reply(action);
                               }];
@@ -73,12 +79,13 @@
 
 // The event upload is skipped if an event has been initiated for it in the last 10 minutes.
 // The passed-in hash is fileBundleHash for a bundle event, or fileSHA256 for a normal event.
+// Returns YES if backoff is needed, NO otherwise.
 - (BOOL)backoffForPrimaryHash:(NSString *)hash {
-  NSDate *backoff = [self.uploadBackoff objectForKey:hash];
+  NSDate *backoff = _uploadBackoff->get(santa::NSStringToUTF8String(hash));
   NSDate *now = [NSDate date];
-  if (([now timeIntervalSince1970] - [backoff timeIntervalSince1970]) < 600) return NO;
-  [self.uploadBackoff setObject:now forKey:hash];
-  return YES;
+  if (([now timeIntervalSince1970] - [backoff timeIntervalSince1970]) < 600) return YES;
+  _uploadBackoff->set(santa::NSStringToUTF8String(hash), now);
+  return NO;
 }
 
 @end
