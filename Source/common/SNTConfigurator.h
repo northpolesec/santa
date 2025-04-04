@@ -752,4 +752,9 @@
 ///
 - (void)clearSyncState;
 
+///
+///  Validate the configuration profile.
+///
+- (nullable NSArray *)validateConfiguration;
+
 @end

@@ -51,6 +51,7 @@ objc_library(
     name = "santactl_lib",
     srcs = [
         "Commands/SNTCommandCheckCache.m",
+        "Commands/SNTCommandDoctor.m",
         "Commands/SNTCommandFileInfo.m",
         "Commands/SNTCommandFlushCache.m",
         "Commands/SNTCommandMetrics.h",
