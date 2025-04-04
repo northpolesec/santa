@@ -46,9 +46,7 @@
   if (!events.count) return;
   SNTStoredEvent *first = events.firstObject;
   NSString *hash = isFromBundle ? first.fileBundleHash : first.fileSHA256;
-  if ([self backoffForPrimaryHash:hash]) {
-    return;
-  }
+  if ([self backoffForPrimaryHash:hash]) return;
   [self dispatchBlockOnSyncdQueue:^{
     [self.syncConnection.remoteObjectProxy postEventsToSyncServer:events fromBundle:isFromBundle];
   }];
