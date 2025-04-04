@@ -126,25 +126,25 @@
 
 - (void)enableBundles:(void (^)(BOOL))block {
   if (self.enableBundles) {
-    block(self.enableBundles);
+    block([self.enableBundles boolValue]);
   }
 }
 
 - (void)enableTransitiveRules:(void (^)(BOOL))block {
   if (self.enableTransitiveRules) {
-    block(self.enableTransitiveRules);
+    block([self.enableTransitiveRules boolValue]);
   }
 }
 
 - (void)enableAllEventUpload:(void (^)(BOOL))block {
   if (self.enableAllEventUpload) {
-    block(self.enableAllEventUpload);
+    block([self.enableAllEventUpload boolValue]);
   }
 }
 
 - (void)disableUnknownEventUpload:(void (^)(BOOL))block {
   if (self.disableUnknownEventUpload) {
-    block(self.disableUnknownEventUpload);
+    block([self.disableUnknownEventUpload boolValue]);
   }
 }
 
