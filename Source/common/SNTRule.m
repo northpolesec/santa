@@ -59,11 +59,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
         identifier = [identifier stringByTrimmingCharactersInSet:nonHex];
         if (identifier.length != (CC_SHA256_DIGEST_LENGTH * 2)) {
-          if (error) {
-            NSString *errStr =
-                [NSString stringWithFormat:@"Rule received with invalid identifier for its type"];
-            *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalidIdentifier message:errStr];
-          }
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                          message:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -75,11 +73,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         identifier =
             [[identifier uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
         if (identifier.length != kExpectedTeamIDLength) {
-          if (error) {
-            NSString *errStr =
-                [NSString stringWithFormat:@"Rule received with invalid identifier for its type"];
-            *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalidIdentifier message:errStr];
-          }
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                          message:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -94,11 +90,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         // as is.
         NSArray *sidComponents = [identifier componentsSeparatedByString:@":"];
         if (!sidComponents || sidComponents.count < 2) {
-          if (error) {
-            NSString *errStr =
-                [NSString stringWithFormat:@"Rule received with invalid identifier for its type"];
-            *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalidIdentifier message:errStr];
-          }
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                          message:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -109,11 +103,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
           teamID =
               [[teamID uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
           if (teamID.length != kExpectedTeamIDLength) {
-            if (error) {
-              NSString *errStr =
-                  [NSString stringWithFormat:@"Rule received with invalid identifier for its type"];
-              *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalidIdentifier message:errStr];
-            }
+            [SNTError populateError:error
+                           withCode:SNTErrorCodeRuleInvalidIdentifier
+                            message:@"Rule received with invalid identifier for its type"];
             return nil;
           }
         }
@@ -124,11 +116,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
             [[sidComponents subarrayWithRange:NSMakeRange(1, sidComponents.count - 1)]
                 componentsJoinedByString:@":"];
         if (signingID.length == 0) {
-          if (error) {
-            NSString *errStr =
-                [NSString stringWithFormat:@"Rule received with invalid identifier for its type"];
-            *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalidIdentifier message:errStr];
-          }
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                          message:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -139,11 +129,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       case SNTRuleTypeCDHash: {
         identifier = [[identifier lowercaseString] stringByTrimmingCharactersInSet:nonHex];
         if (identifier.length != CS_CDHASH_LEN * 2) {
-          if (error) {
-            NSString *errStr =
-                [NSString stringWithFormat:@"Rule received with invalid identifier for its type"];
-            *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalidIdentifier message:errStr];
-          }
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
         break;
@@ -211,11 +199,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 // Converts rule information from santactl or static rules into a SNTRule.
 - (instancetype)initWithDictionary:(NSDictionary *)rawDict error:(NSError **)error {
   if (![rawDict isKindOfClass:[NSDictionary class]]) {
-    if (error) {
-      NSString *errStr =
-          [NSString stringWithFormat:@"Rule received with invalid type %@", [rawDict class]];
-      *error = [SNTError errorWithCode:SNTErrorCodeInvalidType message:errStr];
-    }
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidType
+                     format:@"Rule received with invalid type %@", [rawDict class]];
     return nil;
   }
 
@@ -226,22 +212,18 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     identifier = dict[kRuleSHA256];
   }
   if (![identifier isKindOfClass:[NSString class]] || !identifier.length) {
-    if (error) {
-      NSString *errStr = [NSString
-          stringWithFormat:@"Rule received with missing/invalid identifier '%@'", identifier];
-      *error = [SNTError errorWithCode:SNTErrorCodeRuleMissingIdentifier message:errStr];
-    }
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleMissingIdentifier
+                     format:@"Rule received with missing/invalid identifier '%@'", identifier];
     return nil;
   }
 
   NSString *policyString = dict[kRulePolicy];
   SNTRuleState state;
   if (![policyString isKindOfClass:[NSString class]]) {
-    if (error) {
-      NSString *errStr = [NSString
-          stringWithFormat:@"Rule received with missing/invalid policy '%@'", policyString];
-      *error = [SNTError errorWithCode:SNTErrorCodeRuleMissingPolicy message:errStr];
-    }
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleMissingPolicy
+                     format:@"Rule received with missing/invalid policy '%@'", policyString];
     return nil;
   }
   if ([policyString isEqual:kRulePolicyAllowlist] ||
@@ -263,22 +245,18 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   } else if ([policyString isEqual:kRulePolicyRemove]) {
     state = SNTRuleStateRemove;
   } else {
-    if (error) {
-      NSString *errStr =
-          [NSString stringWithFormat:@"Rule received with invalid policy '%@'", policyString];
-      *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalidPolicy message:errStr];
-    }
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleInvalidPolicy
+                     format:@"Rule received with invalid policy '%@'", policyString];
     return nil;
   }
 
   NSString *ruleTypeString = dict[kRuleType];
   SNTRuleType type;
   if (![ruleTypeString isKindOfClass:[NSString class]]) {
-    if (error) {
-      NSString *errStr = [NSString
-          stringWithFormat:@"Rule received with missing/invalid rule type '%@'", ruleTypeString];
-      *error = [SNTError errorWithCode:SNTErrorCodeRuleMissingRuleType message:errStr];
-    }
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleMissingRuleType
+                     format:@"Rule received with missing/invalid rule type '%@'", ruleTypeString];
     return nil;
   }
   if ([ruleTypeString isEqual:kRuleTypeBinary]) {
@@ -292,11 +270,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   } else if ([ruleTypeString isEqual:kRuleTypeCDHash]) {
     type = SNTRuleTypeCDHash;
   } else {
-    if (error) {
-      NSString *errStr =
-          [NSString stringWithFormat:@"Rule received with invalid rule type '%@'", ruleTypeString];
-      *error = [SNTError errorWithCode:SNTErrorCodeRuleInvalidRuleType message:errStr];
-    }
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleInvalidRuleType
+                     format:@"Rule received with invalid rule type '%@'", ruleTypeString];
     return nil;
   }
 

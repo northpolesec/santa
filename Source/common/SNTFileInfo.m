@@ -93,18 +93,16 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
   if (self) {
     _path = path;
     if (!_path.length) {
-      if (error) {
-        NSString *errStr = @"Unable to use empty path";
-        *error = [SNTError errorWithCode:SNTErrorCodeEmptyPath message:errStr];
-      }
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeEmptyPath
+                      message:@"Unable to use empty path"];
       return nil;
     }
 
     if (!((S_IFMT & fileStat->st_mode) == S_IFREG)) {
-      if (error) {
-        NSString *errStr = [NSString stringWithFormat:@"Non regular file: %s", strerror(errno)];
-        *error = [SNTError errorWithCode:SNTErrorCodeNonRegularFile message:errStr];
-      }
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeNonRegularFile
+                       format:@"Non-regular file: %s", strerror(errno)];
       return nil;
     }
 
@@ -122,10 +120,9 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
 
     int fd = open([_path UTF8String], O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-      if (error) {
-        NSString *errStr = [NSString stringWithFormat:@"Unable to open file: %s", strerror(errno)];
-        *error = [SNTError errorWithCode:SNTErrorCodeFailedToOpen message:errStr];
-      }
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeFailedToOpen
+                       format:@"Unable to open file: %s", strerror(errno)];
       return nil;
     }
     _fileHandle = [[NSFileHandle alloc] initWithFileDescriptor:fd closeOnDealloc:YES];
@@ -141,7 +138,7 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
     if (error) {
       NSString *errStr = @"Unable to resolve empty path";
       if (path) errStr = [@"Unable to resolve path: " stringByAppendingString:path];
-      *error = [SNTError errorWithCode:SNTErrorCodeFailedToResolvePath message:errStr];
+      [SNTError populateError:error withCode:SNTErrorCodeFailedToResolvePath message:errStr];
     }
     return nil;
   }

@@ -213,9 +213,7 @@ using santa::NSStringToUTF8String;
       errStr = requestError.localizedDescription;
     }
     LOGE(@"HTTP Response: %ld %@", code, errStr);
-    if (error != NULL) {
-      *error = [SNTError errorWithCode:SNTErrorCodeFailedToHTTP message:errStr ?: @""];
-    }
+    [SNTError populateError:error withCode:SNTErrorCodeFailedToHTTP message:errStr ?: @""];
     return nil;
   }
   return data;
@@ -239,7 +237,8 @@ using santa::NSStringToUTF8String;
     if (!message->ParseFromString(std::string((const char *)data.bytes, data.length))) {
       NSString *errStr = @"Failed to parse response proto into message";
       SLOGE(@"%@", errStr);
-      return [SNTError errorWithCode:SNTErrorCodeFailedToParseProto message:errStr];
+      [SNTError populateError:&error withCode:SNTErrorCodeFailedToParseProto message:errStr];
+      return error;
     }
     return nil;
   }
@@ -256,7 +255,9 @@ using santa::NSStringToUTF8String;
     NSString *errStr = [NSString stringWithFormat:@"Failed to parse response JSON into message: %s",
                                                   status.ToString().c_str()];
     SLOGE(@"%@", errStr);
-    return [SNTError errorWithCode:SNTErrorCodeFailedToParseJSON message:errStr];
+    NSError *error;
+    [SNTError populateError:&error withCode:SNTErrorCodeFailedToParseJSON message:errStr];
+    return error;
   }
 
   return nil;
