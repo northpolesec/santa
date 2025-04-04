@@ -41,7 +41,6 @@ void print(NSString *format, ...) {
   }
   vfprintf(stdout, format.UTF8String, args);
   va_end(args);
-  fprintf(stdout, "\n");
 }
 
 @implementation SNTCommandDoctor
