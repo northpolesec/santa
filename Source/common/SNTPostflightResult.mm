@@ -14,8 +14,8 @@
 
 #import "Source/common/SNTPostflightResult.h"
 
-#import "Source/santasyncservice/SNTSyncState.h"
 #import "Source/common/CoderMacros.h"
+#import "Source/santasyncservice/SNTSyncState.h"
 
 @interface SNTPostflightResult ()
 @property NSNumber *clientMode;

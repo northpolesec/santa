@@ -345,6 +345,16 @@ objc_library(
 )
 
 santa_unit_test(
+    name = "SNTPostflightResultTest",
+    srcs = ["SNTPostflightResultTest.mm"],
+    deps = [
+        ":SNTCommonEnums",
+        ":SNTPostflightResult",
+        "//Source/santasyncservice:SNTSyncState",
+    ],
+)
+
+santa_unit_test(
     name = "SNTKVOManagerTest",
     srcs = ["SNTKVOManagerTest.mm"],
     deps = [

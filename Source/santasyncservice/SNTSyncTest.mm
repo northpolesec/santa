@@ -14,13 +14,13 @@
 ///    limitations under the License.
 
 #include <Foundation/Foundation.h>
-#import <XCTest/XCTest.h>
-
 #import <OCMock/OCMock.h>
+#import <XCTest/XCTest.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTPostflightResult.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTSyncConstants.h"
@@ -865,41 +865,7 @@
   [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop setFullSyncLastSuccess:OCMOCK_ANY reply:OCMOCK_ANY]);
-
-  self.syncState.clientMode = SNTClientModeMonitor;
-  XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop setClientMode:SNTClientModeMonitor reply:OCMOCK_ANY]);
-
-  // For Clean syncs, the sync type required should be reset to normal
-  self.syncState.syncType = SNTSyncTypeClean;
-  XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop setSyncTypeRequired:SNTSyncTypeNormal reply:OCMOCK_ANY]);
-
-  // For Clean All syncs, the sync type required should be reset to normal
-  self.syncState.syncType = SNTSyncTypeCleanAll;
-  XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop setSyncTypeRequired:SNTSyncTypeNormal reply:OCMOCK_ANY]);
-
-  self.syncState.allowlistRegex = @"^horse$";
-  self.syncState.blocklistRegex = @"^donkey$";
-  XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop setAllowedPathRegex:@"^horse$" reply:OCMOCK_ANY]);
-  OCMVerify([self.daemonConnRop setBlockedPathRegex:@"^donkey$" reply:OCMOCK_ANY]);
-
-  self.syncState.blockUSBMount = @1;
-  self.syncState.remountUSBMode = @[ @"readonly" ];
-  XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop setBlockUSBMount:YES reply:OCMOCK_ANY]);
-  OCMVerify([self.daemonConnRop setRemountUSBMode:@[ @"readonly" ] reply:OCMOCK_ANY]);
-
-  self.syncState.blockUSBMount = @0;
-  XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop setBlockUSBMount:NO reply:OCMOCK_ANY]);
-
-  self.syncState.overrideFileAccessAction = @"Disable";
-  XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop setOverrideFileAccessAction:@"Disable" reply:OCMOCK_ANY]);
+  OCMVerify([self.daemonConnRop postflightResult:OCMOCK_ANY reply:OCMOCK_ANY]);
 }
 
 @end
