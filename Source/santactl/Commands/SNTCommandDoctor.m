@@ -32,9 +32,11 @@ void print(NSString *format, ...) {
 
   if (isatty(STDOUT_FILENO)) {
     if ([format hasPrefix:@"[-]"]) {
-      format = [NSString stringWithFormat:@"\033[31m%@\033[0m", format];
+      format = [NSString stringWithFormat:@"\033[31m%@\033[0m\n", format];
     } else if ([format hasPrefix:@"[+]"]) {
-      format = [NSString stringWithFormat:@"\033[32m%@\033[0m", format];
+      format = [NSString stringWithFormat:@"\033[32m%@\033[0m\n", format];
+    } else if {
+      format = [NSString stringWithFormat:@"%@\n", format];
     }
   }
   vfprintf(stdout, format.UTF8String, args);
