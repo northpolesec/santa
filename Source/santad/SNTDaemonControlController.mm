@@ -185,7 +185,7 @@ double watchdogRAMPeak = 0;
     NSError *error;
     [SNTError populateError:&error
                    withCode:SNTErrorCodeManualRulesDisabled
-                    message:@"SyncBaseURL is set"];
+                     format:@"SyncBaseURL is set"];
     reply(@[], error);
     return;
   }

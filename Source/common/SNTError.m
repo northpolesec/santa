@@ -35,15 +35,6 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
 
 + (void)populateError:(NSError **)error
              withCode:(SNTErrorCode)code
-              message:(nonnull NSString *)msg {
-  if (!error) return;
-  *error = [NSError errorWithDomain:SantaErrorDomain
-                               code:code
-                           userInfo:@{NSLocalizedDescriptionKey : msg}];
-}
-
-+ (void)populateError:(NSError **)error
-             withCode:(SNTErrorCode)code
                format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(3, 4) {
   if (!error) return;
 
@@ -52,11 +43,9 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
   NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
   va_end(args);
 
-  [self populateError:error withCode:code message:msg];
-}
-
-+ (void)populateError:(NSError **)error withMessage:(nonnull NSString *)msg {
-  [self populateError:error withCode:SNTErrorCodeUnknown message:msg];
+  *error = [NSError errorWithDomain:SantaErrorDomain
+                               code:code
+                           userInfo:@{NSLocalizedDescriptionKey : msg}];
 }
 
 + (void)populateError:(NSError **)error
@@ -68,7 +57,9 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
   NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
   va_end(args);
 
-  [self populateError:error withCode:SNTErrorCodeUnknown message:msg];
+  *error = [NSError errorWithDomain:SantaErrorDomain
+                               code:SNTErrorCodeUnknown
+                           userInfo:@{NSLocalizedDescriptionKey : msg}];
 }
 
 @end

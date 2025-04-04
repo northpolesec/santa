@@ -59,22 +59,11 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
               message:(nonnull NSString *)msg
                detail:(nonnull NSString *)detail;
 
-// Generate a new error with the provided code and message, and populate into the provided NSError.
-// `msg` will populate the NSLocalizedErrorDescription key.
-+ (void)populateError:(NSError *_Nullable *_Nullable)error
-             withCode:(SNTErrorCode)code
-              message:(nonnull NSString *)msg;
-
 // Generate a new error with the provided code and format-string message, and populate into the
 // provided NSError; `msg` will populate the NSLocalizedErrorDescription key.
 + (void)populateError:(NSError *_Nullable *_Nullable)error
              withCode:(SNTErrorCode)code
                format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(3, 4);
-
-// Generate a new error with the provided message, and populate into the provided NSError;
-// `msg` will populate the NSLocalizedErrorDescription key.
-// The error code will be SNTErrorCodeUnknown.
-+ (void)populateError:(NSError *_Nullable *_Nullable)error withMessage:(nonnull NSString *)msg;
 
 // Generate a new error with the provided format-string message, and populate into the provided
 // NSError; `msg` will populate the NSLocalizedErrorDescription key. The error code will be

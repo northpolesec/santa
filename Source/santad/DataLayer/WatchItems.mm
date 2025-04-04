@@ -259,8 +259,8 @@ bool VerifyConfigKeyArray(NSDictionary *dict, NSString *key, Class expected, NSE
     }
   }];
 
-  if (!success && block_err) {
-    [SNTError populateError:err withMessage:block_err.localizedDescription];
+  if (!success && block_err && err) {
+    *err = block_err;
   }
 
   return success;
@@ -324,7 +324,7 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id> *p
   }
 
   if (path_list.size() == 0) {
-    [SNTError populateError:err withMessage:@"No paths specified"];
+    [SNTError populateError:err withFormat:@"No paths specified"];
     return Unit{};
   }
 
@@ -372,7 +372,7 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
                                  HexValidator(CC_SHA256_DIGEST_LENGTH * 2)) ||
                 !VerifyConfigKey(process, kWatchItemConfigKeyProcessesPlatformBinary,
                                  [NSNumber class], err, false, nil)) {
-              [SNTError populateError:err withMessage:@"Failed to verify key content"];
+              [SNTError populateError:err withFormat:@"Failed to verify key content"];
               return false;
             }
 
@@ -384,7 +384,7 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
                 !process[kWatchItemConfigKeyProcessesCertificateSha256] &&
                 !process[kWatchItemConfigKeyProcessesPlatformBinary]) {
               [SNTError populateError:err
-                          withMessage:@"No valid attributes set in process dictionary"];
+                           withFormat:@"No valid attributes set in process dictionary"];
               return false;
             }
 
@@ -575,7 +575,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
 bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err) {
   if (!watch_item_name) {
     // This shouldn't be possible as written, but handle just in case
-    [SNTError populateError:err withMessage:@"nil watch item name"];
+    [SNTError populateError:err withFormat:@"nil watch item name"];
     return false;
   }
 

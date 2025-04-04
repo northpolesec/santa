@@ -95,7 +95,7 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
     if (!_path.length) {
       [SNTError populateError:error
                      withCode:SNTErrorCodeEmptyPath
-                      message:@"Unable to use empty path"];
+                       format:@"Unable to use empty path"];
       return nil;
     }
 
@@ -138,7 +138,7 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
     if (error) {
       NSString *errStr = @"Unable to resolve empty path";
       if (path) errStr = [@"Unable to resolve path: " stringByAppendingString:path];
-      [SNTError populateError:error withCode:SNTErrorCodeFailedToResolvePath message:errStr];
+      [SNTError populateError:error withCode:SNTErrorCodeFailedToResolvePath format:@"%@", errStr];
     }
     return nil;
   }

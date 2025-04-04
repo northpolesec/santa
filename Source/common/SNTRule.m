@@ -61,7 +61,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         if (identifier.length != (CC_SHA256_DIGEST_LENGTH * 2)) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                          message:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -75,7 +75,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         if (identifier.length != kExpectedTeamIDLength) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                          message:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -92,7 +92,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         if (!sidComponents || sidComponents.count < 2) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                          message:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
@@ -105,7 +105,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
           if (teamID.length != kExpectedTeamIDLength) {
             [SNTError populateError:error
                            withCode:SNTErrorCodeRuleInvalidIdentifier
-                            message:@"Rule received with invalid identifier for its type"];
+                             format:@"Rule received with invalid identifier for its type"];
             return nil;
           }
         }
@@ -118,7 +118,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         if (signingID.length == 0) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                          message:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type"];
           return nil;
         }
 
