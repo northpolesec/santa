@@ -19,7 +19,7 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
-#include "Source/santasyncservice/SNTPostflightConfigBundle.h"
+#import "Source/santasyncservice/SNTPostflightConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
 #include <google/protobuf/arena.h>
