@@ -433,7 +433,7 @@ NS_ASSUME_NONNULL_BEGIN
                                     ES_EVENT_TYPE_AUTH_MOUNT,
                                     ES_EVENT_TYPE_AUTH_REMOUNT,
                                     ES_EVENT_TYPE_NOTIFY_UNMOUNT,
-                                }];
+  }];
 }
 
 - (es_auth_result_t)handleAuthMount:(const Message &)m {

@@ -111,8 +111,9 @@ es_message_t MakeESMessage(es_event_type_t et, es_process_t *proc, ActionType ac
 }
 
 void SleepMS(long ms) {
-  struct timespec ts {
-    .tv_sec = ms / 1000, .tv_nsec = (long)((ms % 1000) * NSEC_PER_MSEC),
+  struct timespec ts{
+      .tv_sec = ms / 1000,
+      .tv_nsec = (long)((ms % 1000) * NSEC_PER_MSEC),
   };
 
   while (nanosleep(&ts, &ts) != 0) {
