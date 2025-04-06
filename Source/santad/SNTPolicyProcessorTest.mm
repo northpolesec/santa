@@ -14,7 +14,7 @@
 
 #import "Source/santad/SNTPolicyProcessor.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCachedDecision.h"

@@ -17,7 +17,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 
 #include <memory>

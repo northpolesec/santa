@@ -14,7 +14,7 @@
 
 #import "Source/santasyncservice/SNTPostflightConfigBundle.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCommonEnums.h"

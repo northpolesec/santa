@@ -15,7 +15,7 @@
 
 #import "Source/santad/SNTDaemonControlController.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #include <memory>
 
@@ -326,7 +326,7 @@ double watchdogRAMPeak = 0;
 
   [configurator setFullSyncLastSuccess:[NSDate now]];
 
-  // Vacuum the event databases when postflight is complete since it has just been drained.
+  // Vacuum the event database when postflight is complete since it has just been drained.
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
     [[SNTDatabaseController eventTable] vacuum];
   });

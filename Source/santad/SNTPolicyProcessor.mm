@@ -15,7 +15,7 @@
 
 #import "Source/santad/SNTPolicyProcessor.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
 #import <Security/SecCode.h>
 #import <Security/Security.h>

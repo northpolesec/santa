@@ -15,7 +15,7 @@
 
 #import "Source/santasyncservice/SNTSyncStage.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"

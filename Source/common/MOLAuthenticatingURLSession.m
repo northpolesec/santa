@@ -14,7 +14,7 @@
 
 #import "MOLAuthenticatingURLSession.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <Security/Security.h>
 
 #import "Source/common/MOLCertificate.h"

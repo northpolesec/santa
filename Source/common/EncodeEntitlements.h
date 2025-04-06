@@ -15,7 +15,7 @@
 #ifndef SANTA__COMMON__ENCODEENTITLEMENTS_H
 #define SANTA__COMMON__ENCODEENTITLEMENTS_H
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 namespace santa {
 

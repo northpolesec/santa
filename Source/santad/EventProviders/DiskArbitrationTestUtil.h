@@ -15,7 +15,7 @@
 #include <CoreFoundation/CFDictionary.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <DiskArbitration/DiskArbitration.h>
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/ucred.h>
