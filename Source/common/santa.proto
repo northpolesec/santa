@@ -297,7 +297,7 @@ message Execution {
     REASON_UNKNOWN = 0;
     REASON_BINARY = 1;
     REASON_CERT = 2;
-    REASON_COMPILER = 3 [deprecated=true];
+    REASON_COMPILER = 3 [deprecated = true];
     REASON_PENDING_TRANSITIVE = 5;
     REASON_SCOPE = 6;
     REASON_TEAM_ID = 7;
@@ -879,7 +879,6 @@ message AuthenticationAutoUnlock {
     TYPE_UNKNOWN = 0;
     // Unlock the machine using Apple Watch
     TYPE_MACHINE_UNLOCK = 1;
-
     // Approve an authorization prompt using Apple Watch
     TYPE_AUTH_PROMPT = 2;
   }
@@ -961,7 +960,7 @@ message LaunchItem {
     ACTION_UNKNOWN = 0;
     ACTION_ADD = 1;
     ACTION_REMOVE = 2;
-  };
+  }
   Action action = 2;
 
   // The process that triggered the BTM operation. One will always be set.
@@ -976,8 +975,8 @@ message LaunchItem {
 
   // The app the registered the launch item. This field is optional and it is
   // possible that neither case is set.
-  // Note: If the registering app has exited, only process id information will
-  // exist.
+  // Note: If the registering app has exited, only registrant_id information will
+  // exist. It is also possible no app information exists.
   oneof app {
     ProcessInfoLight registrant_process = 5;
     ProcessID registrant_id = 6;
@@ -1011,6 +1010,88 @@ message LaunchItem {
 
   // If available, associated executable path from a launch item's plist
   optional string executable_path = 13;
+}
+
+// Information captured when a TCC permission is granted or revoked.
+message TCCModification {
+  // The process that emitted the event
+  optional ProcessInfoLight instigator = 1;
+  // The TCC service for which permissions are being modified.
+  optional string service = 2;
+  // The identity of the application that is the subject of the permission.
+  optional string identity = 3;
+
+  // The identity type of an application which has access to a TCC service.
+  enum IdentityType {
+    IDENTITY_TYPE_UNKNOWN = 0;
+    IDENTITY_TYPE_BUNDLE_ID = 1;
+    IDENTITY_TYPE_EXECUTABLE_PATH = 2;
+    IDENTITY_TYPE_POLICY_ID = 3;
+    IDENTITY_TYPE_FILE_PROVIDER_DOMAIN_ID = 4;
+  }
+  optional IdentityType identity_type = 4;
+
+  // The type of TCC modification event.
+  enum EventType {
+    // Unknown prior state.
+    EVENT_TYPE_UNKNOWN = 0;
+    // A new TCC authorization record was created.
+    EVENT_TYPE_CREATE = 1;
+    // An existing TCC authorization record was modified.
+    EVENT_TYPE_MODIFY = 2;
+    // An existing TCC authorization record was deleted.
+    EVENT_TYPE_DELETE = 3;
+  }
+  optional EventType event_type = 5;
+
+  // The type of authorization permission an application has to a TCC Service.
+  enum AuthorizationRight {
+    AUTHORIZATION_RIGHT_UNKNOWN = 0;
+    AUTHORIZATION_RIGHT_DENIED = 1;
+    AUTHORIZATION_RIGHT_ALLOWED = 2;
+    AUTHORIZATION_RIGHT_LIMITED = 3;
+    AUTHORIZATION_RIGHT_ADD_MODIFY_ADDED = 4;
+    AUTHORIZATION_RIGHT_SESSION_PID = 5;
+    AUTHORIZATION_RIGHT_LEARN_MORE = 6;
+  }
+  optional AuthorizationRight authorization_right = 6;
+
+  // The reason a TCC permission was updated.
+  enum AuthorizationReason {
+    AUTHORIZATION_REASON_UNKNOWN = 0;
+   AUTHORIZATION_REASON_NONE = 1;
+    AUTHORIZATION_REASON_ERROR = 2;
+    AUTHORIZATION_REASON_USER_CONSENT = 3;
+    AUTHORIZATION_REASON_USER_SET = 4;
+    AUTHORIZATION_REASON_SYSTEM_SET = 5;
+    AUTHORIZATION_REASON_SERVICE_POLICY = 6;
+    AUTHORIZATION_REASON_MDM_POLICY = 7;
+    AUTHORIZATION_REASON_SERVICE_OVERRIDE_POLICY = 8;
+    AUTHORIZATION_REASON_MISSING_USAGE_STRING = 9;
+    AUTHORIZATION_REASON_PROMPT_TIMEOUT = 10;
+    AUTHORIZATION_REASON_PREFLIGHT_UNKNOWN = 11;
+    AUTHORIZATION_REASON_ENTITLED = 12;
+    AUTHORIZATION_REASON_APP_TYPE_POLICY = 13;
+    AUTHORIZATION_REASON_PROMPT_CANCEL = 14;
+  }
+  optional AuthorizationReason authorization_reason = 7;
+
+  // The process that triggered the TCC event.
+  // Note: Due to macOS system limitations, the process that triggered the
+  // event may have already exited before the event could be generated. This
+  // results in only a small subset of the information from the triggering
+  // process to be reported.
+  oneof tcc_instigator {
+    ProcessInfoLight trigger_process = 8;
+    ProcessID trigger_id = 9;
+  }
+
+  // The responsible process for the process that triggered the TCC event.
+  // This field is completely optional and it's possible neither field is set.
+  oneof responsible_instigator {
+    ProcessInfoLight responsible_process = 10;
+    ProcessID responsible_id = 11;
+  }
 }
 
 // A message encapsulating a single event
@@ -1053,6 +1134,7 @@ message SantaMessage {
     Copyfile copyfile = 29;
     GatekeeperOverride gatekeeper_override = 30;
     LaunchItem launch_item = 31;
+    TCCModification tcc_modification = 32;
   }
 }
 

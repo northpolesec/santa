@@ -57,6 +57,7 @@ using santa::TelemetryEvent;
       {"copyfile", TelemetryEvent::kCopyfile},
       {"gatekeeperoverride", TelemetryEvent::kGatekeeperOverride},
       {"LaunchItem", TelemetryEvent::kLaunchItem},
+      {"TCCModification", TelemetryEvent::kTCCModification},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -113,6 +114,9 @@ using santa::TelemetryEvent;
 #if HAVE_MACOS_15
       {ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, TelemetryEvent::kGatekeeperOverride},
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+      {ES_EVENT_TYPE_NOTIFY_TCC_MODIFY, TelemetryEvent::kTCCModification},
+#endif  // HAVE_MACOS_15_4
   };
 
   // Ensure ESEventToTelemetryEvent returns TelemetryEvent::kNone for

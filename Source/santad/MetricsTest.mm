@@ -204,6 +204,9 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 #if HAVE_MACOS_15
       {ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, @"NotifyGatekeeperOverride"},
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+      {ES_EVENT_TYPE_NOTIFY_TCC_MODIFY, @"NotifyTCCModification"},
+#endif  // HAVE_MACOS_15_4
       {ES_EVENT_TYPE_LAST, @"Global"},
   };
 

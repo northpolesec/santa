@@ -714,6 +714,66 @@ class EnrichedGatekeeperOverride : public EnrichedEventType {
   std::optional<EnrichedFile> target_;
 };
 
+class EnrichedTCCModification : public EnrichedEventWithInstigator {
+ public:
+  EnrichedTCCModification(
+      Message &&es_msg, EnrichedProcess instigator,
+      std::optional<EnrichedProcess> enriched_tcc_instigator,
+      std::optional<EnrichedProcess> enriched_responsible_process)
+      : EnrichedEventWithInstigator(std::move(es_msg), std::move(instigator),
+                                    std::move(enriched_tcc_instigator)),
+        enriched_responsible_proc_(std::move(enriched_responsible_process)) {}
+
+  ~EnrichedTCCModification() override = default;
+  EnrichedTCCModification(EnrichedTCCModification &&) = default;
+
+  const es_process_t *EventInstigator() const override {
+#if HAVE_MACOS_15_4
+    return es_msg_->event.tcc_modify->instigator;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> EventInstigatorToken() const override {
+#if HAVE_MACOS_15_4
+    return std::make_optional<audit_token_t>(
+        es_msg_->event.tcc_modify->instigator_token);
+
+#else
+    return std::nullopt;
+#endif
+  }
+
+  const es_process_t *ResponsibleProcess() const {
+#if HAVE_MACOS_15_4
+    return es_msg_->event.tcc_modify->responsible;
+#else
+    return nullptr;
+#endif
+  }
+
+  std::optional<audit_token_t> ResponsibleProcessToken() const {
+#if HAVE_MACOS_15_4
+    if (es_msg_->event.tcc_modify->responsible_token) {
+      return std::make_optional<audit_token_t>(
+          *es_msg_->event.tcc_modify->responsible_token);
+    } else {
+      return std::nullopt;
+    }
+#else
+    return std::nullopt;
+#endif
+  }
+
+  const std::optional<EnrichedProcess> &EnrichedResponsibleProcess() const {
+    return enriched_responsible_proc_;
+  }
+
+ private:
+  std::optional<EnrichedProcess> enriched_responsible_proc_;
+};
+
 using EnrichedType =
     std::variant<EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit,
                  EnrichedFork, EnrichedLink, EnrichedRename, EnrichedUnlink,
@@ -730,6 +790,10 @@ using EnrichedType =
                  ,
                  EnrichedGatekeeperOverride
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+                 ,
+                 EnrichedTCCModification
+#endif  // HAVE_MACOS_15_4
                  >;
 
 class EnrichedMessage {

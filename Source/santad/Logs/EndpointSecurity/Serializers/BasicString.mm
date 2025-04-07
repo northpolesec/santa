@@ -939,6 +939,18 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverr
 
 #endif  // HAVE_MACOS_15
 
+#if HAVE_MACOS_15_4
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=TCC_MODIFICATION");
+
+  return FinalizeString(str);
+}
+
+#endif  // HAVE_MACOS_15_4
+
 std::vector<uint8_t> BasicString::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
     const EnrichedProcess &enriched_process, const std::string &target,
