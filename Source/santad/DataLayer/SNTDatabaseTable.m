@@ -14,9 +14,9 @@
 /// limitations under the License.
 
 #import "Source/santad/DataLayer/SNTDatabaseTable.h"
-#include <stdint.h>
 
 #include <sqlite3.h>
+#include <stdint.h>
 
 #import "Source/common/SNTLogging.h"
 

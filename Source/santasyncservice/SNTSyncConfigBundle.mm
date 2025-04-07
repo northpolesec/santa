@@ -12,7 +12,9 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "Source/santasyncservice/SNTPostflightConfigBundle.h"
+#import <Foundation/Foundation.h>
+
+#import "Source/santasyncservice/SNTSyncConfigBundle.h"
 
 // Expose necessary setters for SNTConfigBundle properties related to Postflight
 @interface SNTConfigBundle (ConfigBundleCreator)
@@ -27,6 +29,8 @@
 @property NSNumber *enableAllEventUpload;
 @property NSNumber *disableUnknownEventUpload;
 @property NSString *overrideFileAccessAction;
+@property NSDate *fullSyncLastSuccess;
+@property NSDate *ruleSyncLastSuccess;
 @end
 
 SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
@@ -43,6 +47,24 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.enableAllEventUpload = syncState.enableAllEventUpload;
   bundle.disableUnknownEventUpload = syncState.disableUnknownEventUpload;
   bundle.overrideFileAccessAction = syncState.overrideFileAccessAction;
+
+  bundle.fullSyncLastSuccess = [NSDate now];
+
+  return bundle;
+}
+
+SNTConfigBundle *RuleSyncConfigBundle() {
+  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+
+  bundle.ruleSyncLastSuccess = [NSDate now];
+
+  return bundle;
+}
+
+SNTConfigBundle *SyncTypeConfigBundle(SNTSyncType syncType) {
+  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+
+  bundle.syncType = @(syncType);
 
   return bundle;
 }

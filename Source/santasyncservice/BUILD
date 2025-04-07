@@ -38,9 +38,9 @@ objc_library(
 )
 
 objc_library(
-    name = "SNTPostflightConfigBundle",
-    srcs = ["SNTPostflightConfigBundle.mm"],
-    hdrs = ["SNTPostflightConfigBundle.h"],
+    name = "SNTSyncConfigBundle",
+    srcs = ["SNTSyncConfigBundle.mm"],
+    hdrs = ["SNTSyncConfigBundle.h"],
     deps = [
         ":SNTSyncState",
         "//Source/common:SNTConfigBundle",
@@ -48,10 +48,10 @@ objc_library(
 )
 
 santa_unit_test(
-    name = "SNTPostflightConfigBundleTest",
-    srcs = ["SNTPostflightConfigBundleTest.mm"],
+    name = "SNTSyncConfigBundleTest",
+    srcs = ["SNTSyncConfigBundleTest.mm"],
     deps = [
-        ":SNTPostflightConfigBundle",
+        ":SNTSyncConfigBundle",
         ":SNTSyncState",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigBundle",
@@ -100,7 +100,7 @@ objc_library(
     sdk_frameworks = ["Network"],
     deps = [
         ":FCM_lib",
-        ":SNTPostflightConfigBundle",
+        ":SNTSyncConfigBundle",
         ":SNTSyncState",
         ":broadcaster_lib",
         ":polaris_lib",
@@ -162,7 +162,7 @@ santa_unit_test(
     sdk_dylibs = ["libz"],
     deps = [
         ":FCM_lib",
-        ":SNTPostflightConfigBundle",
+        ":SNTSyncConfigBundle",
         ":SNTSyncState",
         ":broadcaster_lib",
         "//Source/common:EncodeEntitlements",
@@ -250,7 +250,7 @@ test_suite(
     name = "unit_tests",
     tests = [
         ":NSDataZlibTest",
-        ":SNTPostflightConfigBundleTest",
+        ":SNTSyncConfigBundleTest",
         ":SNTSyncTest",
     ],
     visibility = ["//:santa_package_group"],

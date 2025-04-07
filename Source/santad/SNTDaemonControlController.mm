@@ -233,18 +233,8 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] ruleSyncLastSuccess]);
 }
 
-- (void)setRuleSyncLastSuccess:(NSDate *)date reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setRuleSyncLastSuccess:date];
-  reply();
-}
-
 - (void)syncTypeRequired:(void (^)(SNTSyncType))reply {
   reply([[SNTConfigurator configurator] syncTypeRequired]);
-}
-
-- (void)setSyncTypeRequired:(SNTSyncType)syncType reply:(void (^)(void))reply {
-  [[SNTConfigurator configurator] setSyncTypeRequired:syncType];
-  reply();
 }
 
 - (void)blockUSBMount:(void (^)(BOOL))reply {
@@ -271,7 +261,7 @@ double watchdogRAMPeak = 0;
   reply([SNTConfigurator configurator].disableUnknownEventUpload);
 }
 
-- (void)postflightResult:(SNTConfigBundle *)result reply:(void (^)(void))reply {
+- (void)updateSyncSettings:(SNTConfigBundle *)result reply:(void (^)(void))reply {
   SNTConfigurator *configurator = [SNTConfigurator configurator];
 
   [result clientMode:^(SNTClientMode m) {
@@ -324,12 +314,13 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerOverrideFileAccessAction:val];
   }];
 
-  [configurator setFullSyncLastSuccess:[NSDate now]];
+  [result fullSyncLastSuccess:^(NSDate *val) {
+    [configurator setFullSyncLastSuccess:val];
+  }];
 
-  // Vacuum the event database when postflight is complete since it has just been drained.
-  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
-    [[SNTDatabaseController eventTable] vacuum];
-  });
+  [result ruleSyncLastSuccess:^(NSDate *val) {
+    [configurator setFullSyncLastSuccess:val];
+  }];
 
   reply();
 }

@@ -30,5 +30,7 @@
 - (void)enableAllEventUpload:(void (^)(BOOL))block;
 - (void)disableUnknownEventUpload:(void (^)(BOOL))block;
 - (void)overrideFileAccessAction:(void (^)(NSString *))block;
+- (void)fullSyncLastSuccess:(void (^)(NSDate *))block;
+- (void)ruleSyncLastSuccess:(void (^)(NSDate *))block;
 
 @end

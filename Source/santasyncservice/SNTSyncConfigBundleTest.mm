@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "Source/santasyncservice/SNTPostflightConfigBundle.h"
+#import "Source/santasyncservice/SNTSyncConfigBundle.h"
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
@@ -35,10 +35,10 @@
 @property NSString *overrideFileAccessAction;
 @end
 
-@interface SNTPostflightConfigBundleTest : XCTestCase
+@interface SNTSyncConfigBundleTest : XCTestCase
 @end
 
-@implementation SNTPostflightConfigBundleTest
+@implementation SNTSyncConfigBundleTest
 
 - (void)testInit {
   SNTConfigBundle *bundle;

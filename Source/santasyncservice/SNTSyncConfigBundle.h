@@ -17,3 +17,5 @@
 #import "Source/santasyncservice/SNTSyncState.h"
 
 SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState);
+SNTConfigBundle *RuleSyncConfigBundle();
+SNTConfigBundle *SyncTypeConfigBundle(SNTSyncType syncType);

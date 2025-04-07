@@ -28,6 +28,8 @@
 @property NSNumber *enableAllEventUpload;
 @property NSNumber *disableUnknownEventUpload;
 @property NSString *overrideFileAccessAction;
+@property NSDate *fullSyncLastSuccess;
+@property NSDate *ruleSyncLastSuccess;
 @end
 
 @implementation SNTConfigBundle
@@ -48,6 +50,8 @@
   ENCODE(coder, enableAllEventUpload);
   ENCODE(coder, disableUnknownEventUpload);
   ENCODE(coder, overrideFileAccessAction);
+  ENCODE(coder, fullSyncLastSuccess);
+  ENCODE(coder, ruleSyncLastSuccess);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -64,6 +68,8 @@
     DECODE(decoder, enableAllEventUpload, NSNumber);
     DECODE(decoder, disableUnknownEventUpload, NSNumber);
     DECODE(decoder, overrideFileAccessAction, NSString);
+    DECODE(decoder, fullSyncLastSuccess, NSDate);
+    DECODE(decoder, ruleSyncLastSuccess, NSDate);
   }
   return self;
 }
@@ -131,6 +137,17 @@
 - (void)overrideFileAccessAction:(void (^)(NSString *))block {
   if (self.overrideFileAccessAction) {
     block(self.overrideFileAccessAction);
+  }
+}
+
+- (void)fullSyncLastSuccess:(void (^)(NSDate *))block {
+  if (self.fullSyncLastSuccess) {
+    block(self.fullSyncLastSuccess);
+  }
+}
+- (void)ruleSyncLastSuccess:(void (^)(NSDate *))block {
+  if (self.ruleSyncLastSuccess) {
+    block(self.ruleSyncLastSuccess);
   }
 }
 

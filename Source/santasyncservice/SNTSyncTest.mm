@@ -864,7 +864,7 @@
   [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
-  OCMVerify([self.daemonConnRop postflightResult:OCMOCK_ANY reply:OCMOCK_ANY]);
+  OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
 }
 
 @end

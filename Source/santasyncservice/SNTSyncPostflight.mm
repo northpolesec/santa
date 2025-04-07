@@ -19,7 +19,7 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
-#import "Source/santasyncservice/SNTPostflightConfigBundle.h"
+#import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
 #include <google/protobuf/arena.h>
@@ -52,9 +52,9 @@ using santa::NSStringToUTF8String;
   [self performRequest:[self requestWithMessage:req] intoMessage:&response timeout:30];
 
   [[self.daemonConn synchronousRemoteObjectProxy]
-      postflightResult:PostflightConfigBundle(self.syncState)
-                 reply:^{
-                 }];
+      updateSyncSettings:PostflightConfigBundle(self.syncState)
+                   reply:^{
+                   }];
 
   return YES;
 }

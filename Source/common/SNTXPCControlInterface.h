@@ -47,9 +47,7 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 ///
 ///  Config ops
 ///
-- (void)setRuleSyncLastSuccess:(NSDate *)date reply:(void (^)(void))reply;
-- (void)setSyncTypeRequired:(SNTSyncType)syncType reply:(void (^)(void))reply;
-- (void)postflightResult:(SNTConfigBundle *)result reply:(void (^)(void))reply;
+- (void)updateSyncSettings:(SNTConfigBundle *)result reply:(void (^)(void))reply;
 
 ///
 ///  Syncd Ops
