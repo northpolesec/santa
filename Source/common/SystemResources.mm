@@ -104,4 +104,3 @@ std::optional<std::vector<pid_t>> GetPidList() {
 
   return std::make_optional(pids);
 }
-

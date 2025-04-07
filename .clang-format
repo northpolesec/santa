@@ -24,6 +24,8 @@ SpaceBeforeParens: Custom
 SpaceBeforeParensOptions:
   AfterForeachMacros: false
 
+InsertNewlineAtEOF: true
+
 ---
 Language: Cpp
 Standard: Cpp11
@@ -36,3 +38,5 @@ ColumnLimit: 80
 SpaceBeforeParens: Custom
 SpaceBeforeParensOptions:
   AfterForeachMacros: false
+
+InsertNewlineAtEOF: true
