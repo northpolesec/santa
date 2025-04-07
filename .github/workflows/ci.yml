@@ -20,8 +20,12 @@ jobs:
         run: sudo apt-get install --no-install-recommends -y clang-format-19
       - name: Set default clang-format
         run: sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100
+      - name: Check which
+        run: which clang-format
       - name: Check version
         run: clang-format --version
+      - name: Check specific version
+        run: /usr/bin/clang-format-19 --version
       - name: Run linters
         run: ./Testing/lint.sh
   build_userspace:
