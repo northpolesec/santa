@@ -16,7 +16,6 @@
 #define SANTA__COMMON__SYSTEMRESOURCES_H
 
 #import <Foundation/Foundation.h>
-
 #include <mach/mach_time.h>
 #include <sys/cdefs.h>
 #include <sys/proc_info.h>
