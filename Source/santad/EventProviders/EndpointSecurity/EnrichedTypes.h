@@ -158,9 +158,7 @@ class EnrichedEventType {
   inline const es_message_t *operator->() const { return es_msg_.operator->(); }
 
   const EnrichedProcess &instigator() const { return instigator_; }
-  struct timespec enrichment_time() const {
-    return enrichment_time_;
-  }
+  struct timespec enrichment_time() const { return enrichment_time_; }
 
  protected:
   Message es_msg_;
