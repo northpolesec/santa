@@ -384,7 +384,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   NSString *signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
 
-  [self stubRule:rule forIdentifiers:{ .signingID = signingID, .teamID = @(kExampleTeamID) }];
+  [self stubRule:rule forIdentifiers:{.signingID = signingID, .teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondAllow
              messageSetup:^(es_message_t *msg) {
@@ -401,7 +401,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   rule.type = SNTRuleTypeSigningID;
 
   NSString *signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
-  [self stubRule:rule forIdentifiers:{ .signingID = signingID, .teamID = @(kExampleTeamID) }];
+  [self stubRule:rule forIdentifiers:{.signingID = signingID, .teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondDeny
              messageSetup:^(es_message_t *msg) {
@@ -418,7 +418,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeTeamID;
 
-  [self stubRule:rule forIdentifiers:{ .teamID = @(kExampleTeamID) }];
+  [self stubRule:rule forIdentifiers:{.teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondAllow
              messageSetup:^(es_message_t *msg) {
@@ -434,7 +434,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   rule.state = SNTRuleStateBlock;
   rule.type = SNTRuleTypeTeamID;
 
-  [self stubRule:rule forIdentifiers:{ .teamID = @(kExampleTeamID) }];
+  [self stubRule:rule forIdentifiers:{.teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondDeny
              messageSetup:^(es_message_t *msg) {
@@ -560,7 +560,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   rule.type = SNTRuleTypeSigningID;
 
   [self stubRule:rule
-      forIdentifiers:{ .binarySHA256 = @"a", .signingID = signingID, .teamID = @(kExampleTeamID) }];
+      forIdentifiers:{.binarySHA256 = @"a", .signingID = signingID, .teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondAllowCompiler
              messageSetup:^(es_message_t *msg) {

@@ -223,7 +223,7 @@ using santa::Message;
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_EXEC,
                                     ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
-                                }];
+  }];
 }
 
 - (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher {
