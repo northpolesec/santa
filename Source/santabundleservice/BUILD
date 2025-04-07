@@ -3,10 +3,6 @@ load("@rules_cc//cc:defs.bzl", "objc_library")
 
 licenses(["notice"])
 
-package(
-    default_visibility = ["//:santa_package_group"],
-)
-
 objc_library(
     name = "santabs_lib",
     srcs = [
