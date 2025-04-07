@@ -14,7 +14,7 @@
 
 #import "Source/santad/SNTSyncdQueue.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 

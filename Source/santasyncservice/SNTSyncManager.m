@@ -29,6 +29,7 @@
 #import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
+#import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncPostflight.h"
@@ -193,10 +194,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     SLOGI(@"Starting sync...");
     if (syncType != SNTSyncTypeNormal) {
       dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-      [[self.daemonConn remoteObjectProxy] setSyncTypeRequired:syncType
-                                                         reply:^() {
-                                                           dispatch_semaphore_signal(sema);
-                                                         }];
+      [[self.daemonConn remoteObjectProxy] updateSyncSettings:SyncTypeConfigBundle(syncType)
+                                                        reply:^() {
+                                                          dispatch_semaphore_signal(sema);
+                                                        }];
       if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC))) {
         SLOGE(@"Timeout waiting for daemon");
         if (reply) reply(SNTSyncStatusTypeDaemonTimeout);

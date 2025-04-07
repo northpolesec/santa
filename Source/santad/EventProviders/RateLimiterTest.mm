@@ -14,7 +14,7 @@
 
 #include "Source/santad/EventProviders/RateLimiter.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 #include "Source/common/SystemResources.h"

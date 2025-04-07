@@ -14,7 +14,7 @@
 
 #import "Source/common/SNTError.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
 

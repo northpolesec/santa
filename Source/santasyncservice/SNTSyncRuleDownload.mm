@@ -22,6 +22,7 @@
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
 #import "Source/santasyncservice/SNTPushNotificationsTracker.h"
+#import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
@@ -79,10 +80,10 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
   // Tell santad to record a successful rules sync and wait for it to finish.
   sema = dispatch_semaphore_create(0);
-  [[self.daemonConn remoteObjectProxy] setRuleSyncLastSuccess:[NSDate date]
-                                                        reply:^{
-                                                          dispatch_semaphore_signal(sema);
-                                                        }];
+  [[self.daemonConn remoteObjectProxy] updateSyncSettings:RuleSyncConfigBundle()
+                                                    reply:^{
+                                                      dispatch_semaphore_signal(sema);
+                                                    }];
   dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
 
   SLOGI(@"Processed %lu rules", newRules.count);

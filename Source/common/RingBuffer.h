@@ -15,7 +15,7 @@
 #ifndef SANTA__COMMON__RINGBUFFER_H
 #define SANTA__COMMON__RINGBUFFER_H
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #include <cstdlib>
 #include <deque>

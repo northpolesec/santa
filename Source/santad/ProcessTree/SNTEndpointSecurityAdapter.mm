@@ -14,7 +14,7 @@
 #include "Source/santad/ProcessTree/SNTEndpointSecurityAdapter.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <bsm/libbsm.h>
 
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"

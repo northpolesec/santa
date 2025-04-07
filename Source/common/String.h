@@ -17,7 +17,7 @@
 #define SANTA__COMMON__STRING_H
 
 #include <EndpointSecurity/ESTypes.h>
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #include <optional>
 #include <string>

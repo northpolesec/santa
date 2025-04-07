@@ -13,7 +13,7 @@
 /// limitations under the License.
 #include "Source/santad/ProcessTree/process_tree.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <bsm/libbsm.h>
 #include <libproc.h>
 #include <mach/message.h>

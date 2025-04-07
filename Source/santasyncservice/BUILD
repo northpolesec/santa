@@ -28,6 +28,36 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SNTSyncState",
+    srcs = ["SNTSyncState.m"],
+    hdrs = ["SNTSyncState.h"],
+    deps = [
+        "//Source/common:SNTCommonEnums",
+    ],
+)
+
+objc_library(
+    name = "SNTSyncConfigBundle",
+    srcs = ["SNTSyncConfigBundle.mm"],
+    hdrs = ["SNTSyncConfigBundle.h"],
+    deps = [
+        ":SNTSyncState",
+        "//Source/common:SNTConfigBundle",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTSyncConfigBundleTest",
+    srcs = ["SNTSyncConfigBundleTest.mm"],
+    deps = [
+        ":SNTSyncConfigBundle",
+        ":SNTSyncState",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigBundle",
+    ],
+)
+
 # This setting is used to enable storing all sync requests as JSON files on disk.
 # This can be useful for debugging purposes.
 config_setting(
@@ -60,8 +90,6 @@ objc_library(
         "SNTSyncRuleDownload.mm",
         "SNTSyncStage.h",
         "SNTSyncStage.mm",
-        "SNTSyncState.h",
-        "SNTSyncState.m",
     ],
     hdrs = ["SNTSyncManager.h"],
     defines = select({
@@ -72,6 +100,8 @@ objc_library(
     sdk_frameworks = ["Network"],
     deps = [
         ":FCM_lib",
+        ":SNTSyncConfigBundle",
+        ":SNTSyncState",
         ":broadcaster_lib",
         ":polaris_lib",
         "//Source/common:EncodeEntitlements",
@@ -123,8 +153,6 @@ santa_unit_test(
         "SNTSyncRuleDownload.mm",
         "SNTSyncStage.h",
         "SNTSyncStage.mm",
-        "SNTSyncState.h",
-        "SNTSyncState.m",
         "SNTSyncTest.mm",
     ],
     resources = glob([
@@ -134,6 +162,8 @@ santa_unit_test(
     sdk_dylibs = ["libz"],
     deps = [
         ":FCM_lib",
+        ":SNTSyncConfigBundle",
+        ":SNTSyncState",
         ":broadcaster_lib",
         "//Source/common:EncodeEntitlements",
         "//Source/common:MOLAuthenticatingURLSession",
@@ -220,6 +250,7 @@ test_suite(
     name = "unit_tests",
     tests = [
         ":NSDataZlibTest",
+        ":SNTSyncConfigBundleTest",
         ":SNTSyncTest",
     ],
     visibility = ["//:santa_package_group"],

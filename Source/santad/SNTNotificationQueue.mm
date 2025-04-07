@@ -15,7 +15,7 @@
 
 #import "Source/santad/SNTNotificationQueue.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/RingBuffer.h"

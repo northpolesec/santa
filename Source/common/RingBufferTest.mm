@@ -14,7 +14,7 @@
 
 #include "Source/common/RingBuffer.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 #include <optional>
