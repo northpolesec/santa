@@ -11,11 +11,11 @@
 </p>
 
 Santa is a binary and file access authorization system for macOS. It consists
-of a system extension that monitors for executions, a daemon that makes
-execution decisions based on the contents of a local database, a GUI agent that
-notifies the user in case of a block decision, a background service for
-synchronizing the configuration with a remote server, and a command-line
-utility for managing the system.
+of a system extension that monitors for executions & file access, and makes
+decisions based on the contents of a local database, a GUI agent that notifies
+the user in case of a block decision, a background service for synchronizing
+the configuration with a remote server, and a command-line utility for managing
+the system.
 
 It is named Santa because it keeps track of binaries that are naughty or nice.
 
