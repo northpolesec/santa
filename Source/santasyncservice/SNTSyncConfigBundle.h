@@ -12,10 +12,16 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#include <sys/cdefs.h>
+
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
+__BEGIN_DECLS
+
 SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState);
 SNTConfigBundle *RuleSyncConfigBundle();
 SNTConfigBundle *SyncTypeConfigBundle(SNTSyncType syncType);
+
+__END_DECLS
