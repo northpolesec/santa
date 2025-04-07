@@ -60,11 +60,17 @@ REGISTER_COMMAND_NAME(@"doctor")
 }
 
 + (NSString *)shortHelpText {
-  return @"TODO";
+  return @"Check your system for potential problems.";
 }
 
 + (NSString *)longHelpText {
-  return @"TODO";
+  return @"Doctor checks your system for potential problems and prints out details of any problems "
+         @"that it finds.\n"
+         @"\n"
+         @"Will exit with a non-zero exit code if any problems are found.\n"
+         @"\n"
+         @"Note that this is intended to help debug support personnel issues which Santa is unable "
+         @"to resolve itself.";
 }
 
 - (void)runWithArguments:(NSArray *)arguments {

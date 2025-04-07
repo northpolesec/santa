@@ -39,11 +39,11 @@ REGISTER_COMMAND_NAME(@"bundleinfo")
 }
 
 + (NSString *)shortHelpText {
-  return @"Searches a bundle for binaries";
+  return @"Searches a bundle for binaries.";
 }
 
 + (NSString *)longHelpText {
-  return @"Searches a bundle for binaries";
+  return @"Searches a bundle for binaries.";
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
