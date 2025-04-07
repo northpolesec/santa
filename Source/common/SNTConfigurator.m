@@ -1504,4 +1504,68 @@ static SNTConfigurator *sharedConfigurator = nil;
   self.cachedStaticRules = [rules copy];
 }
 
+#pragma mark - Config Validation
+
+- (nullable NSArray *)validateConfiguration {
+  NSMutableArray *errors = [NSMutableArray array];
+
+  [self.defaults.dictionaryRepresentation enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj,
+                                                                              BOOL *stop) {
+    // If the key is not forced it will be ignored, so we don't need to validate
+    // it. This also has the effect of removing Apple keys that are present in
+    // the user defaults preferences.
+    CFStringRef keyRef = (__bridge CFStringRef)key;
+    if (!CFPreferencesAppValueIsForced(keyRef, kMobileConfigDomain)) return;
+
+    // Check that the key is known to us.
+    id type = self.forcedConfigKeyTypes[key];
+    if (!type) {
+      [errors addObject:[NSString stringWithFormat:@"The key %@ is not recognized", key]];
+      return;
+    }
+
+    // Check that the type of the value matches the expected type.
+    id value = CFBridgingRelease(CFPreferencesCopyAppValue(keyRef, kMobileConfigDomain));
+    if (![value isKindOfClass:type] &&
+        !(type == [NSRegularExpression class] && [value isKindOfClass:[NSString class]])) {
+      [errors addObject:[NSString stringWithFormat:@"The key %@ has an unexpected type: %@", key,
+                                                   [value class]]];
+      return;
+    }
+
+    // If the type is a regex, check that it compiles.
+    if (type == [NSRegularExpression class] && ![self expressionForPattern:value]) {
+      [errors addObject:[NSString
+                            stringWithFormat:@"The regular expression for key %@ does not compile",
+                                             key]];
+    }
+
+    // If the key is StaticRules, validate the passed in rules.
+    if ([key isEqualToString:kStaticRules]) {
+      // We've already validated that `value` is an NSArray
+      [errors addObjectsFromArray:[self validateStaticRules:(NSArray *)value]];
+    }
+  }];
+  return errors;
+}
+
+- (NSArray *)validateStaticRules:(NSArray *)rules {
+  NSMutableArray *errors = [NSMutableArray array];
+  [rules enumerateObjectsUsingBlock:^(id rule, NSUInteger idx, BOOL *stop) {
+    if (![rule isKindOfClass:[NSDictionary class]]) {
+      [errors addObject:[NSString stringWithFormat:@"StaticRule at index %lu has bad type: %@", idx,
+                                                   [rule class]]];
+      return;
+    }
+
+    NSError *error;
+    (void)[[SNTRule alloc] initWithDictionary:rule error:&error];
+    if (error) {
+      [errors addObject:[NSString stringWithFormat:@"StaticRule at index %lu is invalid: %@", idx,
+                                                   error.localizedDescription]];
+    }
+  }];
+  return errors;
+}
+
 @end

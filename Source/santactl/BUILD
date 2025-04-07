@@ -47,6 +47,7 @@ objc_library(
     name = "santactl_lib",
     srcs = [
         "Commands/SNTCommandCheckCache.m",
+        "Commands/SNTCommandDoctor.mm",
         "Commands/SNTCommandFileInfo.m",
         "Commands/SNTCommandFlushCache.m",
         "Commands/SNTCommandMetrics.h",
@@ -89,6 +90,7 @@ objc_library(
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:SNTXPCUnprivilegedControlInterface",
         "//Source/common:SigningIDHelpers",
+        "//Source/common:SystemResources",
         "@FMDB",
     ],
 )
