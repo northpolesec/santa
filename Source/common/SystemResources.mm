@@ -19,6 +19,7 @@
 #include <mach/kern_return.h>
 #include <unistd.h>
 #include <optional>
+#include <vector>
 
 #include "Source/common/SNTLogging.h"
 
@@ -76,4 +77,30 @@ std::optional<SantaTaskInfo> GetTaskInfo() {
       .total_user_nanos = MachTimeToNanos(pti.pti_total_user),
       .total_system_nanos = MachTimeToNanos(pti.pti_total_system),
   };
+}
+
+std::optional<std::vector<pid_t>> GetPidList() {
+  int n_procs = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
+  if (n_procs < 0) {
+    LOGW(@"Failed to retrieve number of pids");
+    return std::nullopt;
+  }
+  n_procs /= sizeof(pid_t);
+
+  // Create a vector to store the pids in. Add space for some extra processes
+  // in case some were started in between the prior call to proc_listpids
+  std::vector<pid_t> pids;
+  pids.resize(n_procs + 16);
+
+  n_procs = proc_listpids(PROC_ALL_PIDS, 0, pids.data(), (int)(pids.size() * sizeof(pid_t)));
+  if (n_procs < 0) {
+    LOGW(@"Failed to retrieve list of pids");
+    return std::nullopt;
+  }
+
+  // Re-size the vector down to the actual number of pids received.
+  n_procs /= sizeof(pid_t);
+  pids.resize(n_procs);
+
+  return std::make_optional(pids);
 }

@@ -16,11 +16,13 @@
 #define SANTA__COMMON__SYSTEMRESOURCES_H
 
 #import <Foundation/Foundation.h>
+
 #include <mach/mach_time.h>
 #include <sys/cdefs.h>
 #include <sys/proc_info.h>
 
 #include <optional>
+#include <vector>
 
 struct SantaTaskInfo {
   uint64_t virtual_size;
@@ -40,5 +42,8 @@ uint64_t AddNanosecondsToMachTime(uint64_t ns, uint64_t machTime);
 
 // Get the result of proc_pidinfo with the PROC_PIDTASKINFO flavor
 std::optional<SantaTaskInfo> GetTaskInfo();
+
+// Get a list of all current pids
+std::optional<std::vector<pid_t>> GetPidList();
 
 #endif

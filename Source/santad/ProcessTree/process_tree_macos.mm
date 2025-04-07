@@ -23,6 +23,7 @@
 #include <memory>
 #include <vector>
 
+#include "Source/common/SystemResources.h"
 #include "Source/santad/ProcessTree/process.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
@@ -138,25 +139,13 @@ absl::StatusOr<Process> LoadPID(pid_t pid) {
 }
 
 absl::Status ProcessTree::Backfill() {
-  int n_procs = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
-  if (n_procs < 0) {
-    return absl::InternalError("proc_listpids failed");
+  std::optional<std::vector<pid_t>> pid_list = GetPidList();
+  if (!pid_list.has_value()) {
+    return absl::InternalError("GetPidList() failed");
   }
-  n_procs /= sizeof(pid_t);
-
-  std::vector<pid_t> pids;
-  pids.resize(n_procs + 16);  // add space for a few more processes
-                              // in case some spawn in-between.
-
-  n_procs = proc_listpids(PROC_ALL_PIDS, 0, pids.data(), (int)(pids.size() * sizeof(pid_t)));
-  if (n_procs < 0) {
-    return absl::InternalError("proc_listpids failed");
-  }
-  n_procs /= sizeof(pid_t);
-  pids.resize(n_procs);
 
   absl::flat_hash_map<pid_t, std::vector<Process>> parent_map;
-  for (pid_t pid : pids) {
+  for (pid_t pid : pid_list.value()) {
     auto proc_status = LoadPID(pid);
     if (proc_status.ok()) {
       auto unlinked_proc = proc_status.value();

@@ -13,12 +13,16 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
-#include <unistd.h>
 
 #include <libproc.h>
+#include <unistd.h>
+
+#include <optional>
+#include <vector>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SystemResources.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
@@ -75,16 +79,13 @@ REGISTER_COMMAND_NAME(@"doctor")
 
   BOOL foundSanta = NO, foundSantad = NO, foundSantaSyncService = NO;
 
-  // Get the number of procs and then allocate a buffer large enough to receive
-  // data about all of them.
-  int n = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
-  int *buffer = (int *)malloc(sizeof(int) * n);
+  std::optional<std::vector<pid_t>> pidList = GetPidList();
+  if (!pidList.has_value()) {
+    print(@"[-] Failed to retrieve processes");
+    return YES;
+  }
 
-  // Retrieve info about all of the pids
-  int k = proc_listpids(PROC_ALL_PIDS, 0, buffer, n * sizeof(int));
-  for (int i = 0; i < k / sizeof(int); ++i) {
-    int pid = buffer[i];
-
+  for (pid_t pid : pidList.value()) {
     // Copies the contents of info.pbi_name or info.pbi_comm into buffer.
     // Since pbi_comm is limited to first 15 chars, pbi_name is preferred.
     char name[2 * MAXCOMLEN];
