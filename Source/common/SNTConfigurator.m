@@ -1526,10 +1526,16 @@ static SNTConfigurator *sharedConfigurator = nil;
 
         // Check that the type of the value matches the expected type.
         id value = CFBridgingRelease(CFPreferencesCopyAppValue(keyRef, kMobileConfigDomain));
-        if (![value isKindOfClass:type]) {
+        if (![value isKindOfClass:type] &&
+            !(type == [NSRegularExpression class] && [value isKindOfClass:[NSString class]])) {
           [errors addObject:[NSString stringWithFormat:@"The key %@ has an unexpected type: %@",
                                                        key, [value class]]];
           return;
+        }
+
+        // If the type is a regex, check that it compiles.
+        if (type == [NSRegularExpression class] && ![self expressionForPattern:value]) {
+          [errors addObject:[NSString stringWithFormat:@"The regular expression for key %@ does not compile", key]];
         }
 
         // If the key is StaticRules, validate the passed in rules.
