@@ -120,7 +120,9 @@ using santa::WatchItemPathType;
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
 
-  { XCTAssertThrows([client handleMessage:Message(mockESApi, &esMsg) recordEventMetrics:nil]); }
+  {
+    XCTAssertThrows([client handleMessage:Message(mockESApi, &esMsg) recordEventMetrics:nil]);
+  }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
