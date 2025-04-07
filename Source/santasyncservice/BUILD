@@ -4,10 +4,6 @@ load("//:helper.bzl", "santa_unit_test")
 
 licenses(["notice"])
 
-package(
-    default_visibility = ["//:santa_package_group"],
-)
-
 objc_library(
     name = "FCM_lib",
     srcs = ["SNTSyncFCM.m"],

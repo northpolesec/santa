@@ -4,10 +4,6 @@ load("//:helper.bzl", "santa_unit_test")
 
 licenses(["notice"])
 
-package(
-    default_visibility = ["//:santa_package_group"],
-)
-
 objc_library(
     name = "santactl_cmd",
     srcs = [
@@ -93,7 +89,6 @@ objc_library(
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:SNTXPCUnprivilegedControlInterface",
         "//Source/common:SigningIDHelpers",
-        "//Source/santasyncservice:sync_lib",
         "@FMDB",
     ],
 )
@@ -116,6 +111,7 @@ macos_command_line_application(
         "//conditions:default": "//profiles:santa_dev",
     }),
     version = "//:version",
+    visibility = ["//:santa_package_group"],
     deps = [":santactl_lib"],
 )
 

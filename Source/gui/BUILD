@@ -5,10 +5,6 @@ load("//:helper.bzl", "santa_unit_test")
 
 licenses(["notice"])
 
-package(
-    default_visibility = ["//:santa_package_group"],
-)
-
 swift_library(
     name = "SNTMessageView",
     srcs = ["SNTMessageView.swift"],
