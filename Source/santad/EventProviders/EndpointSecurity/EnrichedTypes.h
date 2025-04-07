@@ -147,7 +147,7 @@ class EnrichedEventType {
         enrichment_time_(std::move(other.enrichment_time_)) {}
 
   // Note: Move assignment could be safely implemented but not currently needed
-  // so no sense in implementing across all child classes
+  // so no sense in implementing across all child classes.
   EnrichedEventType &operator=(EnrichedEventType &&other) = delete;
 
   EnrichedEventType(const EnrichedEventType &other) = delete;
