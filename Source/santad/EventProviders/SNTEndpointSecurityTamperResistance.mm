@@ -243,7 +243,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
                                     ES_EVENT_TYPE_AUTH_UNLINK,
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,
-                                }];
+  }];
 }
 
 + (SetPairPathAndType)getProtectedPaths {

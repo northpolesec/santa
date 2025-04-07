@@ -147,7 +147,7 @@ class EnrichedEventType {
         enrichment_time_(std::move(other.enrichment_time_)) {}
 
   // Note: Move assignment could be safely implemented but not currently needed
-  // so no sense in implementing across all child classes
+  // so no sense in implementing across all child classes.
   EnrichedEventType &operator=(EnrichedEventType &&other) = delete;
 
   EnrichedEventType(const EnrichedEventType &other) = delete;
@@ -158,10 +158,7 @@ class EnrichedEventType {
   inline const es_message_t *operator->() const { return es_msg_.operator->(); }
 
   const EnrichedProcess &instigator() const { return instigator_; }
-  struct timespec enrichment_time() const {
-    // No reason to return a reference
-    return enrichment_time_;
-  }
+  struct timespec enrichment_time() const { return enrichment_time_; }
 
  protected:
   Message es_msg_;
@@ -709,7 +706,7 @@ class EnrichedGatekeeperOverride : public EnrichedEventType {
   EnrichedGatekeeperOverride(Message &&es_msg, EnrichedProcess &&instigator,
                              std::optional<EnrichedFile> target)
       : EnrichedEventType(std::move(es_msg), std::move(instigator)),
-        target_(std::move(target)){};
+        target_(std::move(target)) {}
 
   const std::optional<EnrichedFile> &Target() const { return target_; }
 
