@@ -1059,7 +1059,7 @@ message TCCModification {
   // The reason a TCC permission was updated.
   enum AuthorizationReason {
     AUTHORIZATION_REASON_UNKNOWN = 0;
-   AUTHORIZATION_REASON_NONE = 1;
+    AUTHORIZATION_REASON_NONE = 1;
     AUTHORIZATION_REASON_ERROR = 2;
     AUTHORIZATION_REASON_USER_CONSENT = 3;
     AUTHORIZATION_REASON_USER_SET = 4;
