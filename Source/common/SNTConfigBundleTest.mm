@@ -31,6 +31,8 @@
 @property NSNumber *enableAllEventUpload;
 @property NSNumber *disableUnknownEventUpload;
 @property NSString *overrideFileAccessAction;
+@property NSDate *fullSyncLastSuccess;
+@property NSDate *ruleSyncLastSuccess;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -40,7 +42,8 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 11;
+  exp.expectedFulfillmentCount = 13;
+  NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
   bundle.clientMode = @(SNTClientModeLockdown);
@@ -54,6 +57,8 @@
   bundle.enableAllEventUpload = @(NO);
   bundle.disableUnknownEventUpload = @(YES);
   bundle.overrideFileAccessAction = @"disable";
+  bundle.fullSyncLastSuccess = nowDate;
+  bundle.ruleSyncLastSuccess = nowDate;
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -110,7 +115,18 @@
     [exp fulfill];
   }];
 
-  [self waitForExpectationsWithTimeout:3.0 handler:NULL];
+  [bundle fullSyncLastSuccess:^(NSDate *val) {
+    XCTAssertEqualObjects(val, nowDate);
+    [exp fulfill];
+  }];
+
+  [bundle ruleSyncLastSuccess:^(NSDate *val) {
+    XCTAssertEqualObjects(val, nowDate);
+    [exp fulfill];
+  }];
+
+  // Low timeout because code above is synchronous
+  [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
 
 - (void)testGettersWithoutValues {
@@ -171,6 +187,16 @@
 
   [bundle overrideFileAccessAction:^(NSString *val) {
     XCTAssertEqualObjects(val, @"disable");
+    [exp fulfill];
+  }];
+
+  [bundle fullSyncLastSuccess:^(NSDate *val) {
+    XCTAssertEqualObjects(val, [NSDate now]);
+    [exp fulfill];
+  }];
+
+  [bundle ruleSyncLastSuccess:^(NSDate *val) {
+    XCTAssertEqualObjects(val, [NSDate now]);
     [exp fulfill];
   }];
 
