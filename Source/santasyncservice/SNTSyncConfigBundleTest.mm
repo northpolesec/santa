@@ -33,6 +33,8 @@
 @property NSNumber *enableAllEventUpload;
 @property NSNumber *disableUnknownEventUpload;
 @property NSString *overrideFileAccessAction;
+@property NSDate *fullSyncLastSuccess;
+@property NSDate *ruleSyncLastSuccess;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -40,7 +42,7 @@
 
 @implementation SNTSyncConfigBundleTest
 
-- (void)testInit {
+- (void)testPostflightConfigBundle {
   SNTConfigBundle *bundle;
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
 
@@ -63,6 +65,52 @@
   syncState.syncType = SNTSyncTypeCleanAll;
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.syncType, @(SNTSyncTypeNormal));
+}
+
+- (void)testRuleSyncConfigBundle {
+  NSDate *curTime = [NSDate now];
+  SNTConfigBundle *bundle = RuleSyncConfigBundle();
+  XCTAssertGreaterThanOrEqual([bundle.ruleSyncLastSuccess timeIntervalSince1970],
+                              [curTime timeIntervalSince1970]);
+
+  XCTAssertNil(bundle.clientMode);
+  XCTAssertNil(bundle.syncType);
+  XCTAssertNil(bundle.allowlistRegex);
+  XCTAssertNil(bundle.blocklistRegex);
+  XCTAssertNil(bundle.blockUSBMount);
+  XCTAssertNil(bundle.remountUSBMode);
+  XCTAssertNil(bundle.enableBundles);
+  XCTAssertNil(bundle.enableTransitiveRules);
+  XCTAssertNil(bundle.enableAllEventUpload);
+  XCTAssertNil(bundle.disableUnknownEventUpload);
+  XCTAssertNil(bundle.overrideFileAccessAction);
+  XCTAssertNil(bundle.fullSyncLastSuccess);
+}
+
+- (void)testSyncTypeConfigBundle {
+  SNTConfigBundle *bundle;
+
+  bundle = SyncTypeConfigBundle(SNTSyncTypeNormal);
+  XCTAssertEqualObjects(bundle.syncType, @(SNTSyncTypeNormal));
+
+  bundle = SyncTypeConfigBundle(SNTSyncTypeCleanAll);
+  XCTAssertEqualObjects(bundle.syncType, @(SNTSyncTypeCleanAll));
+
+  bundle = SyncTypeConfigBundle(SNTSyncTypeClean);
+  XCTAssertEqualObjects(bundle.syncType, @(SNTSyncTypeClean));
+
+  XCTAssertNil(bundle.clientMode);
+  XCTAssertNil(bundle.allowlistRegex);
+  XCTAssertNil(bundle.blocklistRegex);
+  XCTAssertNil(bundle.blockUSBMount);
+  XCTAssertNil(bundle.remountUSBMode);
+  XCTAssertNil(bundle.enableBundles);
+  XCTAssertNil(bundle.enableTransitiveRules);
+  XCTAssertNil(bundle.enableAllEventUpload);
+  XCTAssertNil(bundle.disableUnknownEventUpload);
+  XCTAssertNil(bundle.overrideFileAccessAction);
+  XCTAssertNil(bundle.fullSyncLastSuccess);
+  XCTAssertNil(bundle.ruleSyncLastSuccess);
 }
 
 @end
