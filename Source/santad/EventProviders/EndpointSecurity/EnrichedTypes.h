@@ -709,7 +709,7 @@ class EnrichedGatekeeperOverride : public EnrichedEventType {
   EnrichedGatekeeperOverride(Message &&es_msg, EnrichedProcess &&instigator,
                              std::optional<EnrichedFile> target)
       : EnrichedEventType(std::move(es_msg), std::move(instigator)),
-        target_(std::move(target)) {};
+        target_(std::move(target)) {}
 
   const std::optional<EnrichedFile> &Target() const { return target_; }
 
