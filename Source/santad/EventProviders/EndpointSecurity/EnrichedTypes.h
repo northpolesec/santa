@@ -159,7 +159,6 @@ class EnrichedEventType {
 
   const EnrichedProcess &instigator() const { return instigator_; }
   struct timespec enrichment_time() const {
-    // No reason to return a reference
     return enrichment_time_;
   }
 
