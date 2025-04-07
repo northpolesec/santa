@@ -116,6 +116,12 @@ class MockAuthResultCache : public AuthResultCache {
   }
 #endif  // HAVE_MACOS_15
 
+#if HAVE_MACOS_15_4
+  if (@available(macOS 15.4, *)) {
+    expectedEventSubs.insert(ES_EVENT_TYPE_NOTIFY_TCC_MODIFY);
+  }
+#endif  // HAVE_MACOS_15_4
+
   return expectedEventSubs;
 }
 

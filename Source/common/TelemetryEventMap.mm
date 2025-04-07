@@ -48,6 +48,7 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
       {"copyfile", TelemetryEvent::kCopyfile},
       {"gatekeeperoverride", TelemetryEvent::kGatekeeperOverride},
       {"launchitem", TelemetryEvent::kLaunchItem},
+      {"tccmodification", TelemetryEvent::kTCCModification},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -110,6 +111,9 @@ TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event) {
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return TelemetryEvent::kGatekeeperOverride;
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+    case ES_EVENT_TYPE_NOTIFY_TCC_MODIFY: return TelemetryEvent::kTCCModification;
+#endif  // HAVE_MACOS_15_4
     default: return TelemetryEvent::kNone;
   }
 }

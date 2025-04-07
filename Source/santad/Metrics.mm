@@ -77,6 +77,9 @@ static NSString *const kEventTypeNotifyLaunchItemRemove = @"NotifyLaunchItemRemo
 #if HAVE_MACOS_15
 static NSString *const kEventTypeNotifyGatekeeperOverride = @"NotifyGatekeeperOverride";
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+static NSString *const kEventTypeNotifyTCCModification = @"NotifyTCCModification";
+#endif  // HAVE_MACOS_15_4
 
 static NSString *const kEventDispositionDropped = @"Dropped";
 static NSString *const kEventDispositionProcessed = @"Processed";
@@ -163,6 +166,9 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return kEventTypeNotifyGatekeeperOverride;
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+    case ES_EVENT_TYPE_NOTIFY_TCC_MODIFY: return kEventTypeNotifyTCCModification;
+#endif  // HAVE_MACOS_15_4
     case ES_EVENT_TYPE_LAST: return kPseudoEventTypeGlobal;
     default:
       [NSException raise:@"Invalid event type" format:@"Invalid event type: %d", eventType];

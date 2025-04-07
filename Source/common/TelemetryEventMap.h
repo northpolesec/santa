@@ -47,6 +47,7 @@ enum class TelemetryEvent : uint64_t {
   kCopyfile                = 1 << 19,
   kGatekeeperOverride      = 1 << 20,
   kLaunchItem              = 1 << 21,
+  kTCCModification         = 1 << 22,
   kEverything              = ~0ULL,
 };
 // clang-format on

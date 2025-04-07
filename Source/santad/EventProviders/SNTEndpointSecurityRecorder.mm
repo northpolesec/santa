@@ -235,6 +235,12 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
     events.insert(ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE);
   }
 #endif  // HAVE_MACOS_15
+
+#if HAVE_MACOS_15_4
+  if (@available(macOS 15.4, *)) {
+    events.insert(ES_EVENT_TYPE_NOTIFY_TCC_MODIFY);
+  }
+#endif  // HAVE_MACOS_15_4
   // clang-format on
 
   [super subscribe:events];

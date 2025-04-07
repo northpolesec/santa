@@ -1185,6 +1185,14 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride
 
 #endif  // HAVE_MACOS_15
 
+#if HAVE_MACOS_15_4
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification &msg) {
+  return {};
+}
+
+#endif  // HAVE_MACOS_15_4
+
 std::vector<uint8_t> Protobuf::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
     const EnrichedProcess &enriched_process, const std::string &target,

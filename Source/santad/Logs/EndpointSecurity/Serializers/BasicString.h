@@ -17,6 +17,7 @@
 #define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_BASICSTRING_H
 
 #import <Foundation/Foundation.h>
+#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 
 #include <memory>
 #include <sstream>
@@ -70,6 +71,9 @@ class BasicString : public Serializer {
 #if HAVE_MACOS_15
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) override;
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedTCCModification &) override;
+#endif  // HAVE_MACOS_15_4
 
   std::vector<uint8_t> SerializeFileAccess(
       const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,

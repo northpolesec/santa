@@ -85,6 +85,9 @@ class Serializer {
 #if HAVE_MACOS_15
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) = 0;
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedTCCModification &) = 0;
+#endif  // HAVE_MACOS_15_4
 
   virtual std::vector<uint8_t> SerializeFileAccess(
       const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,

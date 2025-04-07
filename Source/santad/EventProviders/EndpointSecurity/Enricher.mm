@@ -177,6 +177,12 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
               ? std::make_optional(Enrich(*es_msg->event.gatekeeper_user_override->file.file))
               : std::nullopt));
 #endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+    case ES_EVENT_TYPE_NOTIFY_TCC_MODIFY:
+      return std::make_unique<EnrichedMessage>(EnrichedTCCModification(
+          std::move(es_msg), Enrich(*es_msg->process), Enrich(es_msg->event.tcc_modify->instigator),
+          Enrich(es_msg->event.tcc_modify->responsible)));
+#endif  // HAVE_MACOS_15_4
     default:
       // This is a programming error
       LOGE(@"Attempting to enrich an unhandled event type: %d", es_msg->event_type);
