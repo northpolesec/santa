@@ -3,7 +3,7 @@ load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
-    default_visibility = ["//:santa_package_group"],
+    default_visibility = [":__subpackages__"],
 )
 
 licenses(["notice"])
@@ -635,6 +635,9 @@ objc_library(
     hdrs = ["Logs/EndpointSecurity/Serializers/Utilities.h"],
     sdk_dylibs = [
         "bsm",
+    ],
+    visibility = [
+        "//Source/common:__pkg__",
     ],
     deps = [
         ":EndpointSecurityMessage",
