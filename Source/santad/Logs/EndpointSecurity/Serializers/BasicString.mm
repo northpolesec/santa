@@ -1013,7 +1013,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification
   str.append(GetTCCAuthorizationReasonString(msg->event.tcc_modify->reason));
 
   // Note: The string for this event is already very long. Choosing for now to
-  // not serialize potential resposible proc info. If desired, users should
+  // not serialize potential responsible proc info. If desired, users should
   // use the proto log type.
   AppendEventInstigatorOrFallback(str, msg, "event_");
   AppendInstigator(str, msg);

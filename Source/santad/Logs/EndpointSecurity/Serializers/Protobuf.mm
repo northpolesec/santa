@@ -1272,21 +1272,16 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification &m
 
   ::pbv1::TCCModification *pb_tcc = santa_msg->mutable_tcc_modification();
 
-  NSLog(@"About to incode main inst");
   EncodeProcessInfoLight(pb_tcc->mutable_instigator(), msg);
-  NSLog(@"About to incode trigger proc");
   EncodeEventInstigatorOrFallback(
       msg, [pb_tcc] { return pb_tcc->mutable_trigger_process(); },
       [pb_tcc] { return pb_tcc->mutable_trigger_id(); });
-  NSLog(@"About to incode resp proc");
   EncodeEventProcessOrFallback(
       msg, msg.ResponsibleProcess(), msg.ResponsibleProcessToken(),
       msg.EnrichedResponsibleProcess(), [pb_tcc] { return pb_tcc->mutable_responsible_process(); },
       [pb_tcc] { return pb_tcc->mutable_responsible_id(); });
 
-  NSLog(@"About to incode service");
   EncodeStringToken([pb_tcc] { return pb_tcc->mutable_service(); }, tcc->service);
-  NSLog(@"About to incode ident");
   EncodeStringToken([pb_tcc] { return pb_tcc->mutable_identity(); }, tcc->identity);
 
   pb_tcc->set_event_type(GetTCCEventType(tcc->update_type));
