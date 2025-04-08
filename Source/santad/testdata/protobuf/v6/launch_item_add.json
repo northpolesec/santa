@@ -68,14 +68,14 @@
  },
  "registrant_process": {
   "id": {
-   "pid": 21,
-   "pidversion": 43
+   "pid": 22,
+   "pidversion": 33
   },
   "parent_id": {
-   "pid": 65,
-   "pidversion": 87
+   "pid": 44,
+   "pidversion": 55
   },
-  "original_parent_pid": 65,
+  "original_parent_pid": 44,
   "group_id": 111,
   "session_id": 222,
   "effective_user": {
@@ -95,7 +95,7 @@
    "name": "nogroup"
   },
   "executable": {
-   "path": "fooInst",
+   "path": "fooApp",
    "truncated": false
   }
  },

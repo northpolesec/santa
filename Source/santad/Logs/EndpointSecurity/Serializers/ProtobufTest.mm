@@ -1327,7 +1327,7 @@ void SerializeAndCheckNonESEvents(
 
   es_file_t instigatorAppFile = MakeESFile("fooApp");
   es_process_t instigatorApp =
-      MakeESProcess(&instigatorAppFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+      MakeESProcess(&instigatorAppFile, MakeAuditToken(22, 33), MakeAuditToken(44, 55));
 #if HAVE_MACOS_15
   audit_token_t tokInst = MakeAuditToken(654, 321);
   audit_token_t tokApp = MakeAuditToken(111, 222);
@@ -1379,6 +1379,15 @@ void SerializeAndCheckNonESEvents(
                     esMsg->event.btm_launch_item_add = &launchItem;
                   }
                        variant:@"relative_null_app"];
+
+  launchItem.app = NULL;
+  launchItem.instigator = &instigatorProc;
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.btm_launch_item_add = &launchItem;
+                  }
+                       variant:@"null_app"];
 }
 
 - (void)testSerializeMessageLaunchItemRemove {

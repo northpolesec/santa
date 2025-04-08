@@ -1059,8 +1059,9 @@ std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemAdd(const EnrichedLaunc
   EncodeEventInstigatorOrFallback(
       msg, [pb_launch_item] { return pb_launch_item->mutable_trigger_process(); },
       [pb_launch_item] { return pb_launch_item->mutable_trigger_id(); });
-  EncodeEventInstigatorOrFallback(
-      msg, [pb_launch_item] { return pb_launch_item->mutable_registrant_process(); },
+  EncodeEventProcessOrFallback(
+      msg, msg.AppRegistrant(), msg.AppRegistrantToken(), msg.EnrichedAppRegistrant(),
+      [pb_launch_item] { return pb_launch_item->mutable_registrant_process(); },
       [pb_launch_item] { return pb_launch_item->mutable_registrant_id(); });
 
   pb_launch_item->set_item_type(GetBTMLaunchItemType(btm->item->item_type));
