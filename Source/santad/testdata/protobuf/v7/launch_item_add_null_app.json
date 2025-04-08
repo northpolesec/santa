@@ -33,20 +33,16 @@
   }
  },
  "action": "ACTION_ADD",
- "trigger_id": {
-  "pid": 654,
-  "pidversion": 321
- },
- "registrant_process": {
+ "trigger_process": {
   "id": {
-   "pid": 22,
-   "pidversion": 33
+   "pid": 21,
+   "pidversion": 43
   },
   "parent_id": {
-   "pid": 44,
-   "pidversion": 55
+   "pid": 65,
+   "pidversion": 87
   },
-  "original_parent_pid": 44,
+  "original_parent_pid": 65,
   "group_id": 111,
   "session_id": 222,
   "effective_user": {
@@ -66,18 +62,17 @@
    "name": "nogroup"
   },
   "executable": {
-   "path": "fooApp",
+   "path": "fooInst",
    "truncated": false
   }
  },
- "item_type": "ITEM_TYPE_DAEMON",
+ "item_type": "ITEM_TYPE_AGENT",
  "legacy": true,
  "managed": false,
  "item_user": {
   "uid": -2,
   "name": "nobody"
  },
- "item_path": "/path/url/relative/path",
- "app_path": "/path/url",
- "executable_path": "/path/url/exec_path"
+ "item_path": "relative/path",
+ "executable_path": "exec_path"
 }

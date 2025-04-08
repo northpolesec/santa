@@ -33,6 +33,39 @@
   }
  },
  "action": "ACTION_ADD",
+ "registrant_process": {
+  "id": {
+   "pid": 22,
+   "pidversion": 33
+  },
+  "parent_id": {
+   "pid": 44,
+   "pidversion": 55
+  },
+  "original_parent_pid": 44,
+  "group_id": 111,
+  "session_id": 222,
+  "effective_user": {
+   "uid": -2,
+   "name": "nobody"
+  },
+  "effective_group": {
+   "gid": -1,
+   "name": "nogroup"
+  },
+  "real_user": {
+   "uid": -2,
+   "name": "nobody"
+  },
+  "real_group": {
+   "gid": -1,
+   "name": "nogroup"
+  },
+  "executable": {
+   "path": "fooApp",
+   "truncated": false
+  }
+ },
  "item_type": "ITEM_TYPE_DAEMON",
  "legacy": true,
  "managed": false,
