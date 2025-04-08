@@ -1,0 +1,78 @@
+{
+ "instigator": {
+  "id": {
+   "pid": 12,
+   "pidversion": 34
+  },
+  "parent_id": {
+   "pid": 56,
+   "pidversion": 78
+  },
+  "original_parent_pid": 56,
+  "group_id": 111,
+  "session_id": 222,
+  "effective_user": {
+   "uid": -2,
+   "name": "nobody"
+  },
+  "effective_group": {
+   "gid": -1,
+   "name": "nogroup"
+  },
+  "real_user": {
+   "uid": -2,
+   "name": "nobody"
+  },
+  "real_group": {
+   "gid": -1,
+   "name": "nogroup"
+  },
+  "executable": {
+   "path": "foo",
+   "truncated": false
+  }
+ },
+ "service": "SystemPolicyDocumentsFolder",
+ "identity": "security.northpole.santa",
+ "identity_type": "IDENTITY_TYPE_BUNDLE_ID",
+ "event_type": "EVENT_TYPE_MODIFY",
+ "authorization_right": "AUTHORIZATION_RIGHT_ALLOWED",
+ "authorization_reason": "AUTHORIZATION_REASON_MDM_POLICY",
+ "trigger_id": {
+  "pid": 6666,
+  "pidversion": 7777
+ },
+ "responsible_process": {
+  "id": {
+   "pid": 55,
+   "pidversion": 66
+  },
+  "parent_id": {
+   "pid": 77,
+   "pidversion": 88
+  },
+  "original_parent_pid": 77,
+  "group_id": 111,
+  "session_id": 222,
+  "effective_user": {
+   "uid": -2,
+   "name": "nobody"
+  },
+  "effective_group": {
+   "gid": -1,
+   "name": "nogroup"
+  },
+  "real_user": {
+   "uid": -2,
+   "name": "nobody"
+  },
+  "real_group": {
+   "gid": -1,
+   "name": "nogroup"
+  },
+  "executable": {
+   "path": "fooApp",
+   "truncated": false
+  }
+ }
+}

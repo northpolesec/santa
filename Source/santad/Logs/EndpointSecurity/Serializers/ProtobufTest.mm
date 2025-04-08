@@ -78,6 +78,14 @@ extern ::pbv1::AuthenticationAutoUnlock::Type GetAuthenticationAutoUnlockType(
     es_auto_unlock_type_t type);
 extern ::pbv1::LaunchItem::ItemType GetBTMLaunchItemType(es_btm_item_type_t item_type);
 #endif  // HAVE_MACOS_13
+#if HAVE_MACOS_15_4
+extern ::pbv1::TCCModification::IdentityType GetTCCIdentityType(es_tcc_identity_type_t id_type);
+extern ::pbv1::TCCModification::EventType GetTCCEventType(es_tcc_event_type_t event_type);
+extern ::pbv1::TCCModification::AuthorizationRight GetTCCAuthorizationRight(
+    es_tcc_authorization_right_t auth_right);
+extern ::pbv1::TCCModification::AuthorizationReason GetTCCAuthorizationReason(
+    es_tcc_authorization_reason_t auth_reason);
+#endif  // HAVE_MACOS_15_4
 }  // namespace santa
 
 using santa::EncodeEntitlements;
@@ -126,7 +134,10 @@ NSString *ConstructFilename(es_event_type_t eventType, NSString *variant = nil) 
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: name = @"launch_item_remove"; break;
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: name = @"gatekeeper"; break;
-#endif
+#endif  // HAVE_MACOS_15
+#if HAVE_MACOS_15_4
+    case ES_EVENT_TYPE_NOTIFY_TCC_MODIFY: name = @"tcc_modify"; break;
+#endif  // HAVE_MACOS_15_4
     default:
       XCTFail(@"Failed to construct filename: Unhandled event type: %d", eventType);
       return nil;
@@ -191,6 +202,7 @@ const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &s
     case ::pbv1::SantaMessage::kCopyfile: return santaMsg.copyfile();
     case ::pbv1::SantaMessage::kGatekeeperOverride: return santaMsg.gatekeeper_override();
     case ::pbv1::SantaMessage::kLaunchItem: return santaMsg.launch_item();
+    case ::pbv1::SantaMessage::kTccModification: return santaMsg.tcc_modification();
     case ::pbv1::SantaMessage::EVENT_NOT_SET:
       XCTFail(@"Protobuf message SantaMessage did not set an 'event' field");
       OS_FALLTHROUGH;
@@ -1470,6 +1482,160 @@ void SerializeAndCheckNonESEvents(
 }
 
 #endif  // HAVE_MACOS_15
+
+#if HAVE_MACOS_15_4
+
+- (void)testGetTCCIdentityType {
+  std::map<es_tcc_identity_type_t, ::pbv1::TCCModification::IdentityType> identityTypeToString{
+      {ES_TCC_IDENTITY_TYPE_BUNDLE_ID, ::pbv1::TCCModification::IDENTITY_TYPE_BUNDLE_ID},
+      {ES_TCC_IDENTITY_TYPE_EXECUTABLE_PATH,
+       ::pbv1::TCCModification::IDENTITY_TYPE_EXECUTABLE_PATH},
+      {ES_TCC_IDENTITY_TYPE_POLICY_ID, ::pbv1::TCCModification::IDENTITY_TYPE_POLICY_ID},
+      {ES_TCC_IDENTITY_TYPE_FILE_PROVIDER_DOMAIN_ID,
+       ::pbv1::TCCModification::IDENTITY_TYPE_FILE_PROVIDER_DOMAIN_ID},
+      {(es_tcc_identity_type_t)1234, ::pbv1::TCCModification::IDENTITY_TYPE_UNKNOWN},
+  };
+
+  for (const auto &kv : identityTypeToString) {
+    XCTAssertEqual(santa::GetTCCIdentityType(kv.first), kv.second);
+  }
+}
+- (void)testGetTCCEventType {
+  std::map<es_tcc_event_type_t, ::pbv1::TCCModification::EventType> eventTypeToString{
+      {ES_TCC_EVENT_TYPE_CREATE, ::pbv1::TCCModification::EVENT_TYPE_CREATE},
+      {ES_TCC_EVENT_TYPE_MODIFY, ::pbv1::TCCModification::EVENT_TYPE_MODIFY},
+      {ES_TCC_EVENT_TYPE_DELETE, ::pbv1::TCCModification::EVENT_TYPE_DELETE},
+      {(es_tcc_event_type_t)1234, ::pbv1::TCCModification::EVENT_TYPE_UNKNOWN},
+  };
+
+  for (const auto &kv : eventTypeToString) {
+    XCTAssertEqual(santa::GetTCCEventType(kv.first), kv.second);
+  }
+}
+- (void)testGetTCCAuthorizationRight {
+  std::map<es_tcc_authorization_right_t, ::pbv1::TCCModification::AuthorizationRight>
+      authRightToString{
+          {ES_TCC_AUTHORIZATION_RIGHT_DENIED, ::pbv1::TCCModification::AUTHORIZATION_RIGHT_DENIED},
+          {ES_TCC_AUTHORIZATION_RIGHT_UNKNOWN,
+           ::pbv1::TCCModification::AUTHORIZATION_RIGHT_UNKNOWN},
+          {ES_TCC_AUTHORIZATION_RIGHT_ALLOWED,
+           ::pbv1::TCCModification::AUTHORIZATION_RIGHT_ALLOWED},
+          {ES_TCC_AUTHORIZATION_RIGHT_LIMITED,
+           ::pbv1::TCCModification::AUTHORIZATION_RIGHT_LIMITED},
+          {ES_TCC_AUTHORIZATION_RIGHT_ADD_MODIFY_ADDED,
+           ::pbv1::TCCModification::AUTHORIZATION_RIGHT_ADD_MODIFY_ADDED},
+          {ES_TCC_AUTHORIZATION_RIGHT_SESSION_PID,
+           ::pbv1::TCCModification::AUTHORIZATION_RIGHT_SESSION_PID},
+          {ES_TCC_AUTHORIZATION_RIGHT_LEARN_MORE,
+           ::pbv1::TCCModification::AUTHORIZATION_RIGHT_LEARN_MORE},
+          {(es_tcc_authorization_right_t)1234,
+           ::pbv1::TCCModification::AUTHORIZATION_RIGHT_UNKNOWN},
+      };
+
+  for (const auto &kv : authRightToString) {
+    XCTAssertEqual(santa::GetTCCAuthorizationRight(kv.first), kv.second);
+  }
+}
+- (void)testGetTCCAuthorizationReason {
+  std::map<es_tcc_authorization_reason_t, ::pbv1::TCCModification::AuthorizationReason>
+      authReasonToString{
+          {ES_TCC_AUTHORIZATION_REASON_NONE, ::pbv1::TCCModification::AUTHORIZATION_REASON_NONE},
+          {ES_TCC_AUTHORIZATION_REASON_ERROR, ::pbv1::TCCModification::AUTHORIZATION_REASON_ERROR},
+          {ES_TCC_AUTHORIZATION_REASON_USER_CONSENT,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_USER_CONSENT},
+          {ES_TCC_AUTHORIZATION_REASON_USER_SET,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_USER_SET},
+          {ES_TCC_AUTHORIZATION_REASON_SYSTEM_SET,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_SYSTEM_SET},
+          {ES_TCC_AUTHORIZATION_REASON_SERVICE_POLICY,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_SERVICE_POLICY},
+          {ES_TCC_AUTHORIZATION_REASON_MDM_POLICY,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_MDM_POLICY},
+          {ES_TCC_AUTHORIZATION_REASON_SERVICE_OVERRIDE_POLICY,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_SERVICE_OVERRIDE_POLICY},
+          {ES_TCC_AUTHORIZATION_REASON_MISSING_USAGE_STRING,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_MISSING_USAGE_STRING},
+          {ES_TCC_AUTHORIZATION_REASON_PROMPT_TIMEOUT,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_PROMPT_TIMEOUT},
+          {ES_TCC_AUTHORIZATION_REASON_PREFLIGHT_UNKNOWN,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_PREFLIGHT_UNKNOWN},
+          {ES_TCC_AUTHORIZATION_REASON_ENTITLED,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_ENTITLED},
+          {ES_TCC_AUTHORIZATION_REASON_APP_TYPE_POLICY,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_APP_TYPE_POLICY},
+          {ES_TCC_AUTHORIZATION_REASON_PROMPT_CANCEL,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_PROMPT_CANCEL},
+          {(es_tcc_authorization_reason_t)1234,
+           ::pbv1::TCCModification::AUTHORIZATION_REASON_UNKNOWN},
+      };
+
+  for (const auto &kv : authReasonToString) {
+    XCTAssertEqual(santa::GetTCCAuthorizationReason(kv.first), kv.second);
+  }
+}
+
+- (void)testSerializeMessageTCCModification {
+  es_file_t instigatorProcFile = MakeESFile("fooInst");
+  es_process_t instigatorProc =
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_file_t responsibleFile = MakeESFile("fooApp");
+  es_process_t responsibleProc =
+      MakeESProcess(&responsibleFile, MakeAuditToken(55, 66), MakeAuditToken(77, 88));
+
+  audit_token_t tokInstigator = MakeAuditToken(6666, 7777);
+  audit_token_t tokResponsible = MakeAuditToken(8888, 9999);
+
+  __block es_event_tcc_modify_t tcc = {
+      .service = MakeESStringToken("SystemPolicyDocumentsFolder"),
+      .identity = MakeESStringToken("security.northpole.santa"),
+      .identity_type = ES_TCC_IDENTITY_TYPE_BUNDLE_ID,
+      .update_type = ES_TCC_EVENT_TYPE_MODIFY,
+      .instigator_token = tokInstigator,
+      .instigator = &instigatorProc,
+      .responsible_token = &tokResponsible,
+      .responsible = &responsibleProc,
+      .right = ES_TCC_AUTHORIZATION_RIGHT_SESSION_PID,
+      .reason = ES_TCC_AUTHORIZATION_REASON_SERVICE_POLICY,
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_TCC_MODIFY
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.tcc_modify = &tcc;
+                  }];
+
+  tcc.instigator = NULL;
+  tcc.right = ES_TCC_AUTHORIZATION_RIGHT_ALLOWED;
+  tcc.reason = ES_TCC_AUTHORIZATION_REASON_MDM_POLICY;
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_TCC_MODIFY
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.tcc_modify = &tcc;
+                  }
+                       variant:@"null_trigger"];
+
+  tcc.responsible = NULL;
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_TCC_MODIFY
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.tcc_modify = &tcc;
+                  }
+                       variant:@"null_trigger_responsible"];
+
+  tcc.responsible_token = NULL;
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_TCC_MODIFY
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.tcc_modify = &tcc;
+                  }
+                       variant:@"null_everything"];
+}
+
+#endif  // HAVE_MACOS_15_4
 
 - (void)testGetAccessType {
   std::map<es_event_type_t, ::pbv1::FileAccess::AccessType> eventTypeToAccessType = {

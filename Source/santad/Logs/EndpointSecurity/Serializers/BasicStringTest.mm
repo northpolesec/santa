@@ -52,6 +52,12 @@ extern std::string GetFileAccessPolicyDecisionString(FileAccessPolicyDecision de
 extern std::string GetAuthenticationTouchIDModeString(es_touchid_mode_t mode);
 extern std::string GetAuthenticationAutoUnlockTypeString(es_auto_unlock_type_t mode);
 extern std::string GetBTMLaunchItemTypeString(es_btm_item_type_t item_type);
+#if HAVE_MACOS_15_4
+extern std::string GetTCCIdentityTypeString(es_tcc_identity_type_t id_type);
+extern std::string GetTCCEventTypeString(es_tcc_event_type_t event_type);
+extern std::string GetTCCAuthorizationRightString(es_tcc_authorization_right_t auth_right);
+extern std::string GetTCCAuthorizationReasonString(es_tcc_authorization_reason_t auth_reason);
+#endif  // HAVE_MACOS_15_4
 }  // namespace santa
 
 std::string BasicStringSerializeMessage(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
@@ -992,7 +998,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
 #if HAVE_MACOS_15
 
-- (void)testtestSerializeMessageGatekeeperOverride {
+- (void)testSerializeMessageGatekeeperOverride {
   es_file_t procFile = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, &proc);
@@ -1040,6 +1046,132 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 }
 
 #endif  // HAVE_MACOS_15
+
+#if HAVE_MACOS_15_4
+
+- (void)testGetTCCIdentityTypeString {
+  std::map<es_tcc_identity_type_t, std::string> identityTypeToString{
+      {ES_TCC_IDENTITY_TYPE_BUNDLE_ID, "BUNDLE_ID"},
+      {ES_TCC_IDENTITY_TYPE_EXECUTABLE_PATH, "EXECUTABLE_PATH"},
+      {ES_TCC_IDENTITY_TYPE_POLICY_ID, "POLICY_ID"},
+      {ES_TCC_IDENTITY_TYPE_FILE_PROVIDER_DOMAIN_ID, "FILE_PROVIDER_DOMAIN_ID"},
+      {(es_tcc_identity_type_t)1234, "UNKNOWN"},
+  };
+
+  for (const auto &kv : identityTypeToString) {
+    XCTAssertCppStringEqual(santa::GetTCCIdentityTypeString(kv.first), kv.second);
+  }
+}
+- (void)testGetTCCEventTypeString {
+  std::map<es_tcc_event_type_t, std::string> eventTypeToString{
+      {ES_TCC_EVENT_TYPE_CREATE, "CREATE"},
+      {ES_TCC_EVENT_TYPE_MODIFY, "MODIFY"},
+      {ES_TCC_EVENT_TYPE_DELETE, "DELETE"},
+      {(es_tcc_event_type_t)1234, "UNKNOWN"},
+  };
+
+  for (const auto &kv : eventTypeToString) {
+    XCTAssertCppStringEqual(santa::GetTCCEventTypeString(kv.first), kv.second);
+  }
+}
+- (void)testGetTCCAuthorizationRightString {
+  std::map<es_tcc_authorization_right_t, std::string> authRightToString{
+      {ES_TCC_AUTHORIZATION_RIGHT_DENIED, "DENIED"},
+      {ES_TCC_AUTHORIZATION_RIGHT_UNKNOWN, "UNKNOWN"},
+      {ES_TCC_AUTHORIZATION_RIGHT_ALLOWED, "ALLOWED"},
+      {ES_TCC_AUTHORIZATION_RIGHT_LIMITED, "LIMITED"},
+      {ES_TCC_AUTHORIZATION_RIGHT_ADD_MODIFY_ADDED, "ADD_MODIFY_ADDED"},
+      {ES_TCC_AUTHORIZATION_RIGHT_SESSION_PID, "SESSION_PID"},
+      {ES_TCC_AUTHORIZATION_RIGHT_LEARN_MORE, "LEARN_MORE"},
+      {(es_tcc_authorization_right_t)1234, "UNKNOWN"},
+  };
+
+  for (const auto &kv : authRightToString) {
+    XCTAssertCppStringEqual(santa::GetTCCAuthorizationRightString(kv.first), kv.second);
+  }
+}
+- (void)testGetTCCAuthorizationReasonString {
+  std::map<es_tcc_authorization_reason_t, std::string> authReasonToString{
+      {ES_TCC_AUTHORIZATION_REASON_NONE, "NONE"},
+      {ES_TCC_AUTHORIZATION_REASON_ERROR, "ERROR"},
+      {ES_TCC_AUTHORIZATION_REASON_USER_CONSENT, "USER_CONSENT"},
+      {ES_TCC_AUTHORIZATION_REASON_USER_SET, "USER_SET"},
+      {ES_TCC_AUTHORIZATION_REASON_SYSTEM_SET, "SYSTEM_SET"},
+      {ES_TCC_AUTHORIZATION_REASON_SERVICE_POLICY, "SERVICE_POLICY"},
+      {ES_TCC_AUTHORIZATION_REASON_MDM_POLICY, "MDM_POLICY"},
+      {ES_TCC_AUTHORIZATION_REASON_SERVICE_OVERRIDE_POLICY, "SERVICE_OVERRIDE_POLICY"},
+      {ES_TCC_AUTHORIZATION_REASON_MISSING_USAGE_STRING, "MISSING_USAGE_STRING"},
+      {ES_TCC_AUTHORIZATION_REASON_PROMPT_TIMEOUT, "PROMPT_TIMEOUT"},
+      {ES_TCC_AUTHORIZATION_REASON_PREFLIGHT_UNKNOWN, "PREFLIGHT_UNKNOWN"},
+      {ES_TCC_AUTHORIZATION_REASON_ENTITLED, "ENTITLED"},
+      {ES_TCC_AUTHORIZATION_REASON_APP_TYPE_POLICY, "APP_TYPE_POLICY"},
+      {ES_TCC_AUTHORIZATION_REASON_PROMPT_CANCEL, "PROMPT_CANCEL"},
+      {(es_tcc_authorization_reason_t)1234, "UNKNOWN"},
+  };
+
+  for (const auto &kv : authReasonToString) {
+    XCTAssertCppStringEqual(santa::GetTCCAuthorizationReasonString(kv.first), kv.second);
+  }
+}
+
+- (void)testSerializeMessageTCCModification {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_TCC_MODIFY, &proc);
+
+  es_file_t instigatorProcFile = MakeESFile("fooInst");
+  es_process_t instigatorProc =
+      MakeESProcess(&instigatorProcFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  es_file_t responsibleFile = MakeESFile("fooApp");
+  es_process_t responsibleProc =
+      MakeESProcess(&responsibleFile, MakeAuditToken(21, 43), MakeAuditToken(65, 87));
+
+  audit_token_t tokInstigator = MakeAuditToken(654, 321);
+  audit_token_t tokResponsible = MakeAuditToken(111, 222);
+
+  es_event_tcc_modify_t tcc = {
+      .service = MakeESStringToken("SystemPolicyDocumentsFolder"),
+      .identity = MakeESStringToken("security.northpole.santa"),
+      .identity_type = ES_TCC_IDENTITY_TYPE_BUNDLE_ID,
+      .update_type = ES_TCC_EVENT_TYPE_MODIFY,
+      .instigator_token = tokInstigator,
+      .instigator = &instigatorProc,
+      .responsible_token = &tokResponsible,
+      .responsible = &responsibleProc,
+      .right = ES_TCC_AUTHORIZATION_RIGHT_SESSION_PID,
+      .reason = ES_TCC_AUTHORIZATION_REASON_SERVICE_POLICY,
+  };
+
+  esMsg.event.tcc_modify = &tcc;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want =
+      "action=TCC_MODIFICATION|event_type=MODIFY|service=SystemPolicyDocumentsFolder"
+      "|identity=security.northpole.santa|identity_type=BUNDLE_ID|auth_right=SESSION_PID"
+      "|auth_reason=SERVICE_POLICY|event_pid=21|event_ppid=65|event_process=fooInst"
+      "|event_processpath=fooInst|event_uid=-2|event_user=nobody"
+      "|event_gid=-1|event_group=nogroup|pid=12|ppid=56|process=foo|processpath=foo"
+      "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  tcc.instigator = NULL;
+  tcc.update_type = ES_TCC_EVENT_TYPE_CREATE;
+  tcc.identity_type = ES_TCC_IDENTITY_TYPE_POLICY_ID;
+  tcc.right = ES_TCC_AUTHORIZATION_RIGHT_ALLOWED;
+  tcc.reason = ES_TCC_AUTHORIZATION_REASON_PROMPT_TIMEOUT;
+
+  got = BasicStringSerializeMessage(&esMsg);
+  want = "action=TCC_MODIFICATION|event_type=CREATE|service=SystemPolicyDocumentsFolder"
+         "|identity=security.northpole.santa|identity_type=POLICY_ID|auth_right=ALLOWED"
+         "|auth_reason=PROMPT_TIMEOUT|event_pid=654|event_pidver=321|pid=12|ppid=56"
+         "|process=foo|processpath=foo|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+#endif  // HAVE_MACOS_15_4
 
 - (void)testGetAccessTypeString {
   std::map<es_event_type_t, std::string> accessTypeToString = {

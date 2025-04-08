@@ -317,6 +317,10 @@ uint32_t MinSupportedESMessageVersion(es_event_type_t event_type) {
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return 8;
 #endif
 
+#if HAVE_MACOS_15_4
+    case ES_EVENT_TYPE_NOTIFY_TCC_MODIFY: return 8;
+#endif
+
     default: return UINT32_MAX;
   }
 }
