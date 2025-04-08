@@ -1187,8 +1187,109 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride
 
 #if HAVE_MACOS_15_4
 
+::pbv1::TCCModification::IdentityType GetTCCIdentityType(es_tcc_identity_type_t id_type) {
+  switch (id_type) {
+    case ES_TCC_IDENTITY_TYPE_BUNDLE_ID: return ::pbv1::TCCModification::IDENTITY_TYPE_BUNDLE_ID;
+    case ES_TCC_IDENTITY_TYPE_EXECUTABLE_PATH:
+      return ::pbv1::TCCModification::IDENTITY_TYPE_EXECUTABLE_PATH;
+    case ES_TCC_IDENTITY_TYPE_POLICY_ID: return ::pbv1::TCCModification::IDENTITY_TYPE_POLICY_ID;
+    case ES_TCC_IDENTITY_TYPE_FILE_PROVIDER_DOMAIN_ID:
+      return ::pbv1::TCCModification::IDENTITY_TYPE_FILE_PROVIDER_DOMAIN_ID;
+    default: return ::pbv1::TCCModification::IDENTITY_TYPE_UNKNOWN;
+  }
+}
+
+::pbv1::TCCModification::EventType GetTCCEventType(es_tcc_event_type_t event_type) {
+  switch (event_type) {
+    case ES_TCC_EVENT_TYPE_CREATE: return ::pbv1::TCCModification::EVENT_TYPE_CREATE;
+    case ES_TCC_EVENT_TYPE_MODIFY: return ::pbv1::TCCModification::EVENT_TYPE_MODIFY;
+    case ES_TCC_EVENT_TYPE_DELETE: return ::pbv1::TCCModification::EVENT_TYPE_DELETE;
+    default: return ::pbv1::TCCModification::EVENT_TYPE_UNKNOWN;
+  }
+}
+
+::pbv1::TCCModification::AuthorizationRight GetTCCAuthorizationRight(
+    es_tcc_authorization_right_t auth_right) {
+  switch (auth_right) {
+    case ES_TCC_AUTHORIZATION_RIGHT_DENIED:
+      return ::pbv1::TCCModification::AUTHORIZATION_RIGHT_DENIED;
+    case ES_TCC_AUTHORIZATION_RIGHT_UNKNOWN:
+      return ::pbv1::TCCModification::AUTHORIZATION_RIGHT_UNKNOWN;
+    case ES_TCC_AUTHORIZATION_RIGHT_ALLOWED:
+      return ::pbv1::TCCModification::AUTHORIZATION_RIGHT_ALLOWED;
+    case ES_TCC_AUTHORIZATION_RIGHT_LIMITED:
+      return ::pbv1::TCCModification::AUTHORIZATION_RIGHT_LIMITED;
+    case ES_TCC_AUTHORIZATION_RIGHT_ADD_MODIFY_ADDED:
+      return ::pbv1::TCCModification::AUTHORIZATION_RIGHT_ADD_MODIFY_ADDED;
+    case ES_TCC_AUTHORIZATION_RIGHT_SESSION_PID:
+      return ::pbv1::TCCModification::AUTHORIZATION_RIGHT_SESSION_PID;
+    case ES_TCC_AUTHORIZATION_RIGHT_LEARN_MORE:
+      return ::pbv1::TCCModification::AUTHORIZATION_RIGHT_LEARN_MORE;
+    default: return ::pbv1::TCCModification::AUTHORIZATION_RIGHT_UNKNOWN;
+  }
+}
+
+::pbv1::TCCModification::AuthorizationReason GetTCCAuthorizationReason(
+    es_tcc_authorization_reason_t auth_reason) {
+  switch (auth_reason) {
+    case ES_TCC_AUTHORIZATION_REASON_NONE:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_NONE;
+    case ES_TCC_AUTHORIZATION_REASON_ERROR:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_ERROR;
+    case ES_TCC_AUTHORIZATION_REASON_USER_CONSENT:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_USER_CONSENT;
+    case ES_TCC_AUTHORIZATION_REASON_USER_SET:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_USER_SET;
+    case ES_TCC_AUTHORIZATION_REASON_SYSTEM_SET:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_SYSTEM_SET;
+    case ES_TCC_AUTHORIZATION_REASON_SERVICE_POLICY:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_SERVICE_POLICY;
+    case ES_TCC_AUTHORIZATION_REASON_MDM_POLICY:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_MDM_POLICY;
+    case ES_TCC_AUTHORIZATION_REASON_SERVICE_OVERRIDE_POLICY:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_SERVICE_OVERRIDE_POLICY;
+    case ES_TCC_AUTHORIZATION_REASON_MISSING_USAGE_STRING:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_MISSING_USAGE_STRING;
+    case ES_TCC_AUTHORIZATION_REASON_PROMPT_TIMEOUT:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_PROMPT_TIMEOUT;
+    case ES_TCC_AUTHORIZATION_REASON_PREFLIGHT_UNKNOWN:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_PREFLIGHT_UNKNOWN;
+    case ES_TCC_AUTHORIZATION_REASON_ENTITLED:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_ENTITLED;
+    case ES_TCC_AUTHORIZATION_REASON_APP_TYPE_POLICY:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_APP_TYPE_POLICY;
+    case ES_TCC_AUTHORIZATION_REASON_PROMPT_CANCEL:
+      return ::pbv1::TCCModification::AUTHORIZATION_REASON_PROMPT_CANCEL;
+    default: return ::pbv1::TCCModification::AUTHORIZATION_REASON_UNKNOWN;
+  }
+}
+
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification &msg) {
-  return {};
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  const es_event_tcc_modify_t *tcc = msg->event.tcc_modify;
+
+  ::pbv1::TCCModification *pb_tcc = santa_msg->mutable_tcc_modification();
+
+  EncodeProcessInfoLight(pb_tcc->mutable_instigator(), msg);
+  EncodeEventInstigatorOrFallback(
+      msg, [pb_tcc] { return pb_tcc->mutable_trigger_process(); },
+      [pb_tcc] { return pb_tcc->mutable_trigger_id(); });
+  EncodeEventProcessOrFallback(
+      msg, msg.ResponsibleProcess(), msg.ResponsibleProcessToken(),
+      msg.EnrichedResponsibleProcess(), [pb_tcc] { return pb_tcc->mutable_responsible_process(); },
+      [pb_tcc] { return pb_tcc->mutable_responsible_id(); });
+
+  EncodeStringToken([pb_tcc] { return pb_tcc->mutable_service(); }, tcc->service);
+  EncodeStringToken([pb_tcc] { return pb_tcc->mutable_identity(); }, tcc->identity);
+
+  pb_tcc->set_event_type(GetTCCEventType(tcc->update_type));
+  pb_tcc->set_identity_type(GetTCCIdentityType(tcc->identity_type));
+  pb_tcc->set_authorization_right(GetTCCAuthorizationRight(tcc->right));
+  pb_tcc->set_authorization_reason(GetTCCAuthorizationReason(tcc->reason));
+
+  return FinalizeProto(santa_msg);
 }
 
 #endif  // HAVE_MACOS_15_4

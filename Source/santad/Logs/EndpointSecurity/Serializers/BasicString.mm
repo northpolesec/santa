@@ -941,10 +941,82 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverr
 
 #if HAVE_MACOS_15_4
 
+std::string GetTCCIdentityTypeString(es_tcc_identity_type_t id_type) {
+  switch (id_type) {
+    case ES_TCC_IDENTITY_TYPE_BUNDLE_ID: return "BUNDLE_ID";
+    case ES_TCC_IDENTITY_TYPE_EXECUTABLE_PATH: return "EXECUTABLE_PATH";
+    case ES_TCC_IDENTITY_TYPE_POLICY_ID: return "POLICY_ID";
+    case ES_TCC_IDENTITY_TYPE_FILE_PROVIDER_DOMAIN_ID: return "FILE_PROVIDER_DOMAIN_ID";
+    default: return "UNKNOWN";
+  }
+}
+
+std::string GetTCCEventTypeString(es_tcc_event_type_t event_type) {
+  switch (event_type) {
+    case ES_TCC_EVENT_TYPE_CREATE: return "CREATE";
+    case ES_TCC_EVENT_TYPE_MODIFY: return "MODIFY";
+    case ES_TCC_EVENT_TYPE_DELETE: return "DELETE";
+    default: return "UNKNOWN";
+  }
+}
+
+std::string GetTCCAuthorizationRightString(es_tcc_authorization_right_t auth_right) {
+  switch (auth_right) {
+    case ES_TCC_AUTHORIZATION_RIGHT_DENIED: return "DENIED";
+    case ES_TCC_AUTHORIZATION_RIGHT_UNKNOWN: return "UNKNOWN";
+    case ES_TCC_AUTHORIZATION_RIGHT_ALLOWED: return "ALLOWED";
+    case ES_TCC_AUTHORIZATION_RIGHT_LIMITED: return "LIMITED";
+    case ES_TCC_AUTHORIZATION_RIGHT_ADD_MODIFY_ADDED: return "ADD_MODIFY_ADDED";
+    case ES_TCC_AUTHORIZATION_RIGHT_SESSION_PID: return "SESSION_PID";
+    case ES_TCC_AUTHORIZATION_RIGHT_LEARN_MORE: return "LEARN_MORE";
+    default: return "UNKNOWN";
+  }
+}
+
+std::string GetTCCAuthorizationReasonString(es_tcc_authorization_reason_t auth_reason) {
+  switch (auth_reason) {
+    case ES_TCC_AUTHORIZATION_REASON_NONE: return "NONE";
+    case ES_TCC_AUTHORIZATION_REASON_ERROR: return "ERROR";
+    case ES_TCC_AUTHORIZATION_REASON_USER_CONSENT: return "USER_CONSENT";
+    case ES_TCC_AUTHORIZATION_REASON_USER_SET: return "USER_SET";
+    case ES_TCC_AUTHORIZATION_REASON_SYSTEM_SET: return "SYSTEM_SET";
+    case ES_TCC_AUTHORIZATION_REASON_SERVICE_POLICY: return "SERVICE_POLICY";
+    case ES_TCC_AUTHORIZATION_REASON_MDM_POLICY: return "MDM_POLICY";
+    case ES_TCC_AUTHORIZATION_REASON_SERVICE_OVERRIDE_POLICY: return "SERVICE_OVERRIDE_POLICY";
+    case ES_TCC_AUTHORIZATION_REASON_MISSING_USAGE_STRING: return "MISSING_USAGE_STRING";
+    case ES_TCC_AUTHORIZATION_REASON_PROMPT_TIMEOUT: return "PROMPT_TIMEOUT";
+    case ES_TCC_AUTHORIZATION_REASON_PREFLIGHT_UNKNOWN: return "PREFLIGHT_UNKNOWN";
+    case ES_TCC_AUTHORIZATION_REASON_ENTITLED: return "ENTITLED";
+    case ES_TCC_AUTHORIZATION_REASON_APP_TYPE_POLICY: return "APP_TYPE_POLICY";
+    case ES_TCC_AUTHORIZATION_REASON_PROMPT_CANCEL: return "PROMPT_CANCEL";
+    default: return "UNKNOWN";
+  }
+}
+
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification &msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=TCC_MODIFICATION");
+
+  str.append("|event_type=");
+  str.append(GetTCCEventTypeString(msg->event.tcc_modify->update_type));
+
+  str.append("|service=");
+  str.append(msg->event.tcc_modify->service.data);
+  str.append("|identity=");
+  str.append(SanitizableString(msg->event.tcc_modify->identity).Sanitized());
+  str.append("|identity_type=");
+  str.append(GetTCCIdentityTypeString(msg->event.tcc_modify->identity_type));
+  str.append("|auth_right=");
+  str.append(GetTCCAuthorizationRightString(msg->event.tcc_modify->right));
+  str.append("|auth_reason=");
+  str.append(GetTCCAuthorizationReasonString(msg->event.tcc_modify->reason));
+
+  // Note: The string for this event is already very long. Choosing for now to
+  // not serialize potential responsible proc info. If desired, users should
+  // use the proto log type.
+  AppendEventInstigatorOrFallback(str, msg, "event_");
+  AppendInstigator(str, msg);
 
   return FinalizeString(str);
 }
