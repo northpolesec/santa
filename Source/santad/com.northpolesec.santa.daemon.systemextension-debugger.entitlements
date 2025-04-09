@@ -4,13 +4,13 @@
 <dict>
         <key>com.apple.security.get-task-allow</key>
         <true/>
-	<key>com.apple.developer.endpoint-security.client</key>
-	<true/>
+        <key>com.apple.developer.endpoint-security.client</key>
+        <true/>
         <key>com.apple.application-identifier</key>
         <string>ZMCG7MLDV9.com.northpolesec.santa.daemon</string>
         <key>keychain-access-groups</key>
         <array>
-           <string>ZMCG7MLDV9.com.northpolesec.santa.daemon</string> 
+          <string>ZMCG7MLDV9.com.northpolesec.santa.daemon</string> 
         </array>
         <key>com.apple.developer.team-identifier</key>
         <string>ZMCG7MLDV9</string>
