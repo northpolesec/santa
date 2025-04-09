@@ -50,10 +50,9 @@ config_setting(
 # Used for live debugging with SIP enabled.
 config_setting(
     name = "debugger_build",
-    values = {"define": "SANTA_BUILD_TYPE=debug"},
+    values = {"define": "SANTA_BUILD_TYPE=debugger"},
     visibility = [":santa_package_group"],
 )
-
 
 # Used to detect optimized builds
 config_setting(
