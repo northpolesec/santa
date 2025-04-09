@@ -983,6 +983,7 @@ macos_bundle(
     entitlements = select({
         "//:adhoc_build": "com.northpolesec.santa.daemon.systemextension-adhoc.entitlements",
         # Non-adhoc builds get their entitlements from the provisioning profile.
+        "//:debugger_build": "com.northpolesec.santa.daemon.systemextension-debugger.entitlements",
         "//conditions:default": None,
     }),
     infoplists = [

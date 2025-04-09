@@ -46,6 +46,15 @@ config_setting(
     visibility = [":santa_package_group"],
 )
 
+# Production signed but has get-task-allow
+# Used for live debugging with SIP enabled.
+config_setting(
+    name = "debugger_build",
+    values = {"define": "SANTA_BUILD_TYPE=debug"},
+    visibility = [":santa_package_group"],
+)
+
+
 # Used to detect optimized builds
 config_setting(
     name = "opt_build",
