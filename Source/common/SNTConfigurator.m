@@ -197,7 +197,6 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
         return self.syncBaseURL != nil && geteuid() == 0;
       }
       statsStateAccessAuthorizer:^BOOL() {
-        NSLog(@"Check stat state auth - euid: %d (%s)", geteuid(), getprogname());
         return geteuid() == 0;
       }];
 }

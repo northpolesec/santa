@@ -68,8 +68,6 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
         return NO;
       }];
 
-  NSLog(@"sync state: %@", cfg.syncState);
-
   verifierBlock(cfg);
 
   XCTAssertTrue([self.fileMgr removeItemAtPath:syncStatePlistPath error:nil]);
