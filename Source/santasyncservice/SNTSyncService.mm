@@ -146,7 +146,7 @@
       DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
 
   // Trigger a stats collection attempt every hour, however stats will only be
-  // submitted once every 24 hours. The OS is given a 5 minuute scheduling leeway.
+  // submitted once every 24 hours. The OS is given a 5 minute scheduling leeway.
   dispatch_source_set_timer(self.statsSubmissionTimer, DISPATCH_TIME_NOW, 60 * NSEC_PER_SEC,
                             0 * NSEC_PER_SEC);
 
@@ -168,7 +168,7 @@
     NSTimeInterval timeSinceLastOp =
         [[NSDate date] timeIntervalSinceDate:self.lastStatsSubmissionAttempt];
 
-    // Skip submission if the version didn't change or
+    // Skip submission if the version didn't change or the last submission was <23.5h ago
     if ([self.lastStatsSubmissionVersion isEqualToString:self.currentVersion] &&
         timeSinceLastOp < minSubmissionInterval) {
       return;
