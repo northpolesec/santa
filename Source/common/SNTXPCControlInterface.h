@@ -54,6 +54,10 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 ///
 - (void)postRuleSyncNotificationForApplication:(NSString *)app reply:(void (^)(void))reply;
 - (void)requestAPNSToken:(void (^)(NSString *))reply;
+// Retrieve saved stats state info from santad
+- (void)retrieveStatsState:(void (^)(NSDate *, NSString *))reply;
+// Have santad save the latest stats state information
+- (void)saveStatsSubmissionAttemptTime:(NSDate *)timestamp version:(NSString *)version;
 
 ///
 /// Control Ops

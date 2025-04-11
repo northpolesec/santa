@@ -19,6 +19,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDropRootPrivs.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santasyncservice/SNTPolaris.h"
 #import "Source/santasyncservice/SNTSyncBroadcaster.h"
@@ -30,6 +31,9 @@
 @property(nonatomic, readonly) NSMutableArray *logListeners;
 
 @property(nonatomic) dispatch_source_t statsSubmissionTimer;
+@property NSDate *lastStatsSubmissionAttempt;
+@property NSString *lastStatsSubmissionVersion;
+@property NSString *currentVersion;
 @end
 
 @implementation SNTSyncService
@@ -56,7 +60,8 @@
     // Initialize SNTConfigurator ONLY after privileges have been dropped.
     [SNTConfigurator configurator];
     NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
-    LOGI(@"Started, version %@", infoDict[@"CFBundleVersion"]);
+    _currentVersion = infoDict[@"CFBundleVersion"];
+    LOGI(@"Started, version %@", _currentVersion);
 
     // Dropping root privileges to the 'nobody' user causes the default NSURLCache to throw
     // sandbox errors, which are benign but annoying. This line disables the cache entirely.
@@ -126,19 +131,57 @@
 }
 
 - (void)statSubmissionThread {
+  [[self.daemonConn synchronousRemoteObjectProxy]
+      retrieveStatsState:^(NSDate *timestamp, NSString *version) {
+        if (!timestamp || [timestamp timeIntervalSinceNow] > 0) {
+          // There was no stored date or the stored date was in the future.
+          // Change the timestamp to UNIX epoch time as a starting point.
+          timestamp = [NSDate dateWithTimeIntervalSince1970:0];
+        }
+        self.lastStatsSubmissionAttempt = timestamp;
+        self.lastStatsSubmissionVersion = version;
+      }];
+
   self.statsSubmissionTimer = dispatch_source_create(
       DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
 
-  // Submit stats once a day, giving the OS 10 minutes leeway for firing the timer.
-  dispatch_source_set_timer(self.statsSubmissionTimer, DISPATCH_TIME_NOW, 86400 * NSEC_PER_SEC,
-                            600 * NSEC_PER_SEC);
+  // Trigger a stats collection attempt every hour, however stats will only be
+  // submitted once every 24 hours. The OS is given a 5 minuute scheduling leeway.
+  dispatch_source_set_timer(self.statsSubmissionTimer, DISPATCH_TIME_NOW, 60 * NSEC_PER_SEC,
+                            0 * NSEC_PER_SEC);
+
+  WEAKIFY(self);
   dispatch_source_set_event_handler(self.statsSubmissionTimer, ^{
+    STRONGIFY(self);
+
     // If stats collection is not enabled, skip this submission.
     if (![[SNTConfigurator configurator] enableStatsCollection]) {
       LOGI(@"Stats collection is disabled, skipping submission");
       return;
     }
+
+    // Minimum submission interval is slightly less than one day (23h 30m).
+    // This is to account for timing deltas between the dispatch source timer,
+    // leeways, etc. Given submission is attempted every hour, this works out
+    // to a submission happening about every 24 hours +/- 30 min.
+    static const NSTimeInterval minSubmissionInterval = ((23 * 60) + 30) * 60;
+    NSTimeInterval timeSinceLastOp =
+        [[NSDate date] timeIntervalSinceDate:self.lastStatsSubmissionAttempt];
+
+    // Skip submission if the version didn't change or
+    if ([self.lastStatsSubmissionVersion isEqualToString:self.currentVersion] &&
+        timeSinceLastOp < minSubmissionInterval) {
+      return;
+    }
+
     santa::SubmitStats([[SNTConfigurator configurator] statsOrganizationID]);
+
+    // Inform the daemon to update persistent state
+    self.lastStatsSubmissionAttempt = [NSDate now];
+    self.lastStatsSubmissionVersion = self.currentVersion;
+    [[self.daemonConn synchronousRemoteObjectProxy]
+        saveStatsSubmissionAttemptTime:self.lastStatsSubmissionAttempt
+                               version:self.lastStatsSubmissionVersion];
   });
   dispatch_resume(self.statsSubmissionTimer);
 }

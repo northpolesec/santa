@@ -757,4 +757,22 @@
 ///
 - (nullable NSArray *)validateConfiguration;
 
+#pragma mark Stats Submission State
+
+///
+/// Timestamp of the last time a stats submission was attempted
+///
+@property(nullable, readonly, nonatomic) NSDate *lastStatsSubmissionTimestamp;
+
+///
+/// Santa version information from the last time a stats submission was attempted
+///
+@property(nullable, readonly, nonatomic) NSString *lastStatsSubmissionVersion;
+
+///
+/// Update the stats state file
+///
+- (void)saveStatsSubmissionAttemptTime:(nullable NSDate *)timestamp
+                               version:(nullable NSString *)version;
+
 @end
