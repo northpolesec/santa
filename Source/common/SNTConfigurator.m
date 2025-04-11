@@ -54,7 +54,10 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 @property(atomic) NSDictionary *cachedStaticRules;
 
 @property(readonly, nonatomic) NSString *syncStateFilePath;
-@property(nonatomic, copy) BOOL (^syncStateAccessAuthorizerBlock)();
+@property(readonly, nonatomic) NSString *statsStateFilePath;
+
+typedef BOOL (^StateFileAccessAuthorizer)(void);
+@property(nonatomic, copy) StateFileAccessAuthorizer syncStateAccessAuthorizerBlock;
 
 @end
 
@@ -62,6 +65,13 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 
 /// The hard-coded path to the sync state file.
 NSString *const kSyncStateFilePath = @"/var/db/santa/sync-state.plist";
+
+/// The hard-coded path to the stats state file.
+NSString *const kStatsStateFilePath = @"/var/db/santa/stats-state.plist";
+
+/// Keys associated with the stats state file.
+static NSString *const kLastStatsSubmissionAttemptKey = @"LastAttempt";
+static NSString *const kLastStatsSubmissionVersionKey = @"LastVersion";
 
 #ifdef DEBUG
 NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist";
@@ -181,14 +191,20 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 
 - (instancetype)init {
   return [self initWithSyncStateFile:kSyncStateFilePath
-           syncStateAccessAuthorizer:^BOOL() {
-             // Only access the sync state if a sync server is configured and running as root
-             return self.syncBaseURL != nil && geteuid() == 0;
-           }];
+      statsStateFile:kStatsStateFilePath
+      syncStateAccessAuthorizer:^BOOL() {
+        // Only access the sync state if a sync server is configured and running as root
+        return self.syncBaseURL != nil && geteuid() == 0;
+      }
+      statsStateAccessAuthorizer:^BOOL() {
+        return geteuid() == 0;
+      }];
 }
 
 - (instancetype)initWithSyncStateFile:(NSString *)syncStateFilePath
-            syncStateAccessAuthorizer:(BOOL (^)(void))syncStateAccessAuthorizer {
+                       statsStateFile:(NSString *)statsStateFilePath
+            syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
+           statsStateAccessAuthorizer:(StateFileAccessAuthorizer)statsStateAccessAuthorizer {
   self = [super init];
   if (self) {
     Class number = [NSNumber class];
@@ -302,6 +318,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
     };
 
     _syncStateFilePath = syncStateFilePath;
+    _statsStateFilePath = statsStateFilePath;
     _syncStateAccessAuthorizerBlock = syncStateAccessAuthorizer;
 
     // This is used to keep KVO on changes, but we use `CFPreferences*` for reading.
@@ -316,6 +333,8 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       // Save the updated sync state if any keys were migrated.
       [self saveSyncStateToDisk];
     }
+
+    [self readStatsStateFromDisk:statsStateAccessAuthorizer];
 
     _debugFlag = [[NSProcessInfo processInfo].arguments containsObject:@"--debug"];
     [self startWatchingDefaults];
@@ -1353,6 +1372,33 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSArray *)entitlementsTeamIDFilter {
   return EnsureArrayOfStrings(self.configState[kEntitlementsTeamIDFilterKey]);
+}
+
+- (void)readStatsStateFromDisk:(StateFileAccessAuthorizer)statsStateAccessAuthorizerBlock {
+  if (!statsStateAccessAuthorizerBlock()) {
+    return;
+  }
+
+  NSDictionary *state = [NSDictionary dictionaryWithContentsOfFile:self.statsStateFilePath];
+
+  if ([state[kLastStatsSubmissionAttemptKey] isKindOfClass:[NSDate class]]) {
+    _lastStatsSubmissionTimestamp = state[kLastStatsSubmissionAttemptKey];
+  }
+
+  if ([state[kLastStatsSubmissionVersionKey] isKindOfClass:[NSString class]]) {
+    _lastStatsSubmissionVersion = state[kLastStatsSubmissionVersionKey];
+  }
+}
+
+- (void)saveStatsSubmissionAttemptTime:(NSDate *)timestamp version:(NSString *)version {
+  NSMutableDictionary *state = [[NSMutableDictionary alloc] init];
+  state[kLastStatsSubmissionAttemptKey] = timestamp;
+  state[kLastStatsSubmissionVersionKey] = version;
+
+  [state writeToFile:self.statsStateFilePath atomically:YES];
+
+  _lastStatsSubmissionTimestamp = timestamp;
+  _lastStatsSubmissionVersion = version;
 }
 
 #pragma mark - Private Defaults Methods

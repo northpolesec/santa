@@ -222,6 +222,7 @@ objc_library(
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
     ],
