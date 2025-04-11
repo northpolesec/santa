@@ -147,8 +147,8 @@
 
   // Trigger a stats collection attempt every hour, however stats will only be
   // submitted once every 24 hours. The OS is given a 5 minute scheduling leeway.
-  dispatch_source_set_timer(self.statsSubmissionTimer, DISPATCH_TIME_NOW, 60 * NSEC_PER_SEC,
-                            0 * NSEC_PER_SEC);
+  dispatch_source_set_timer(self.statsSubmissionTimer, DISPATCH_TIME_NOW, 3600 * NSEC_PER_SEC,
+                            300 * NSEC_PER_SEC);
 
   WEAKIFY(self);
   dispatch_source_set_event_handler(self.statsSubmissionTimer, ^{
