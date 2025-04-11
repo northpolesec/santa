@@ -18,9 +18,13 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 
+typedef BOOL (^StateFileAccessAuthorizer)(void);
+
 @interface SNTConfigurator (Testing)
 - (instancetype)initWithSyncStateFile:(NSString *)syncStateFilePath
-            syncStateAccessAuthorizer:(BOOL (^)(void))syncStateAccessAuthorizer;
+                       statsStateFile:(NSString *)statsStateFilePath
+            syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
+           statsStateAccessAuthorizer:(StateFileAccessAuthorizer)statsStateAccessAuthorizer;
 
 @property NSDictionary *syncState;
 @end
@@ -55,10 +59,14 @@
   XCTAssertTrue([syncStatePlist writeToFile:syncStatePlistPath atomically:YES]);
 
   SNTConfigurator *cfg = [[SNTConfigurator alloc] initWithSyncStateFile:syncStatePlistPath
-                                              syncStateAccessAuthorizer:^{
-                                                // Allow all access to the test plist
-                                                return YES;
-                                              }];
+      statsStateFile:@"/does/not/need/to/exist"
+      syncStateAccessAuthorizer:^{
+        // Allow all access to the test plist
+        return YES;
+      }
+      statsStateAccessAuthorizer:^BOOL {
+        return NO;
+      }];
 
   NSLog(@"sync state: %@", cfg.syncState);
 
