@@ -444,6 +444,12 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 }
 
 - (void)APNSTokenChanged {
+  // Only message the sync service if a sync server is configured and APNS is enabled, otherwise the
+  // service will needlessly spin up.
+  // TODO: To realize changes to EnableAPNS, both the gui and sync service need to be restarted. Add
+  // KVO watching to allow APNS to be enabled or disabled without process restarts.
+  SNTConfigurator *config = [SNTConfigurator configurator];
+  if (!config.syncBaseURL || !config.enableAPNS) return;
   MOLXPCConnection *syncConn = [SNTXPCSyncServiceInterface configuredConnection];
   [syncConn resume];
   [[syncConn remoteObjectProxy] APNSTokenChanged];
