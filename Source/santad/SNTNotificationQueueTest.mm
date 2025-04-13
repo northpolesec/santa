@@ -65,7 +65,7 @@
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *inv) {
         // Extract the reply block from the invocation and call it
-        void (^replyBlock)(BOOL);
+        void (^__unsafe_unretained replyBlock)(BOOL);
         [inv getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -184,7 +184,7 @@
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *invocation) {
-        void (^replyBlock)(BOOL);
+        void (^__unsafe_unretained replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -198,7 +198,7 @@
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *invocation) {
-        void (^replyBlock)(BOOL);
+        void (^__unsafe_unretained replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -212,7 +212,7 @@
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *inv) {
-        void (^replyBlock)(BOOL);
+        void (^__unsafe_unretained replyBlock)(BOOL);
         [inv getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
