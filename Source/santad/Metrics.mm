@@ -280,7 +280,8 @@ Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t in
       faa_event_counts_(faa_event_counts),
       drop_counts_(drop_counts),
       metric_set_(metric_set),
-      run_on_first_start_(run_on_first_start) {
+      run_on_first_start_(run_on_first_start),
+      rate_limit_counts_cache_(0) {
   SetInterval(interval_);
 
   events_q_ = dispatch_queue_create("com.northpolesec.santa.santametricsservice.events_q",
