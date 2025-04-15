@@ -18,6 +18,7 @@
 #include <memory>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
@@ -26,6 +27,10 @@
 
 @interface SNTSyncdQueue ()
 @property dispatch_queue_t syncdQueue;
+@property(nonatomic) MOLXPCConnection *syncConnection;
+@property dispatch_source_t timer;
+@property NSURL *previousSyncBaseURL;
+@property BOOL syncServiceConnected;
 @end
 
 @implementation SNTSyncdQueue {
@@ -37,9 +42,107 @@
   self = [super init];
   if (self) {
     _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(256);
-    _syncdQueue = dispatch_queue_create("com.northpolesec.syncd_queue", DISPATCH_QUEUE_SERIAL);
+    _syncdQueue = dispatch_queue_create("com.northpolesec.syncd_queue",
+                                        DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
   }
   return self;
+}
+
+/// On each call to reassessSyncServiceConnection, a timer will be created to
+/// run ~1s in the future. If a pending timer exists when this method is
+/// called, it is first cancelled and a new timer is created. This is done to
+/// coalesce bursty calls (e.g. in response to a new configuration that makes
+/// changes to multiple values that affect the sync service running state).
+/// When the timer event handler fires, it will check the current config
+/// state, as well as relevant config deltas, to determine whether the sync
+/// service should be started, bounced, or stopped.
+- (void)reassessSyncServiceConnection {
+  WEAKIFY(self);
+  dispatch_sync(self.syncdQueue, ^{
+    if (self.timer) {
+      dispatch_source_cancel(self.timer);
+    }
+
+    self.timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.syncdQueue);
+    dispatch_source_set_timer(self.timer,
+                              dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC),  // 1 second delay
+                              DISPATCH_TIME_FOREVER,                               // won't repeat
+                              100 * NSEC_PER_MSEC);
+
+    // WEAKIFY(self);
+    dispatch_source_set_event_handler(self.timer, ^{
+      STRONGIFY(self);
+      SNTConfigurator *configurator = [SNTConfigurator configurator];
+
+      // If the SyncBaseURL was added or changed, and a connection already
+      // exists, it must be bounced.
+      if (self.previousSyncBaseURL &&
+          ![self.previousSyncBaseURL isEqual:[configurator syncBaseURL]] &&
+          self.syncServiceConnected) {
+        [self tearDownSyncServiceConnectionSerialized];
+        // Return early. When the sync service spins down, it will trigger the
+        // invalidation handler which will reassess the connection state.
+        return;
+      }
+
+      self.previousSyncBaseURL = [configurator syncBaseURL];
+
+      // If syncBaseURL or enableStatsCollection is set, start the sync service
+      if ([configurator syncBaseURL] || [configurator enableStatsCollection]) {
+        if (!self.syncServiceConnected) {
+          [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
+                                                   selector:@selector(clearSyncState)
+                                                     object:nil];
+
+          [self establishSyncServiceConnectionSerialized];
+        }
+      } else if (self.syncServiceConnected) {
+        // Note: Only teardown the connection if we're connected. This helps
+        // prevent the condition where we would end-up reestablishing the
+        // connection when the invalidationHandler fired and a call to
+        // spindown would be performed.
+        [self tearDownSyncServiceConnectionSerialized];
+
+        // Keep the syncState active for 10 min in case com.apple.ManagedClient is
+        // flapping.
+        [[SNTConfigurator configurator] performSelector:@selector(clearSyncState)
+                                             withObject:nil
+                                             afterDelay:600];
+      }
+
+      // Only run once
+      dispatch_source_cancel(self.timer);
+      self.timer = NULL;
+    });
+
+    dispatch_resume(self.timer);
+  });
+}
+
+- (void)establishSyncServiceConnectionSerialized {
+  MOLXPCConnection *ss = [SNTXPCSyncServiceInterface configuredConnection];
+
+  WEAKIFY(self);
+  ss.invalidationHandler = ^(void) {
+    STRONGIFY(self);
+    self.syncConnection.invalidationHandler = nil;
+    self.syncServiceConnected = false;
+    [self reassessSyncServiceConnection];
+  };
+
+  ss.acceptedHandler = ^{
+    STRONGIFY(self);
+    self.syncServiceConnected = true;
+  };
+
+  [ss resume];
+  self.syncConnection = ss;
+}
+
+- (void)tearDownSyncServiceConnectionSerialized {
+  // Tell the sync service to stop.
+  // Note: syncServiceConnected will be updated when the invalidation handler runs.
+  [[self.syncConnection remoteObjectProxy] spindown];
 }
 
 - (void)addEvents:(NSArray<SNTStoredEvent *> *)events isFromBundle:(BOOL)isFromBundle {

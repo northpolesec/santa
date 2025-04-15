@@ -56,28 +56,6 @@ using santa::TTYWriter;
 using santa::Unit;
 using santa::WatchItems;
 
-static void EstablishSyncServiceConnection(SNTSyncdQueue *syncd_queue) {
-  // The syncBaseURL check is here to stop retrying if the sync server is removed.
-  if (![[SNTConfigurator configurator] syncBaseURL]) {
-    return;
-  }
-
-  MOLXPCConnection *ss = [SNTXPCSyncServiceInterface configuredConnection];
-
-  // This will handle retying connection establishment if there are issues with the service
-  // during initialization (missing binary, malformed plist, bad code signature, etc.).
-  // Once those issues are resolved the connection will establish.
-  // This will also handle re-establishment if the service crashes or is killed.
-  ss.invalidationHandler = ^(void) {
-    syncd_queue.syncConnection.invalidationHandler = nil;
-    dispatch_sync(dispatch_get_main_queue(), ^{
-      EstablishSyncServiceConnection(syncd_queue);
-    });
-  };
-  [ss resume];
-  syncd_queue.syncConnection = ss;
-}
-
 void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logger> logger,
                 std::shared_ptr<Metrics> metrics, std::shared_ptr<santa::WatchItems> watch_items,
                 std::shared_ptr<Enricher> enricher,
@@ -202,7 +180,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [authorizer_client registerAuthExecProbe:proc_faa_client];
   }
 
-  EstablishSyncServiceConnection(syncd_queue);
+  [syncd_queue reassessSyncServiceConnection];
 
   NSMutableArray<SNTKVOManager *> *kvoObservers = [[NSMutableArray alloc] init];
   [kvoObservers addObjectsFromArray:@[
@@ -248,22 +226,37 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   return;
                 }
 
-                if (newValue) {
-                  LOGI(@"Establishing a new sync service connection with SyncBaseURL: %@",
-                       newValue);
-                  [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
-                                                           selector:@selector(clearSyncState)
-                                                             object:nil];
-                  [[syncd_queue.syncConnection remoteObjectProxy] spindown];
-                  EstablishSyncServiceConnection(syncd_queue);
+                LOGI(@"SyncBaseURL %s.",
+                     (!oldValue && newValue) ? "added" : (newValue ? "changed" : "removed"));
+
+                [syncd_queue reassessSyncServiceConnection];
+              }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(enableStatsCollection)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+                                   if (oldBool != newBool) {
+                                     LOGI(@"EnableStatsCollection changed %s -> %s.",
+                                          oldBool ? "NO" : "YES", newBool ? "NO" : "YES");
+                                     [syncd_queue reassessSyncServiceConnection];
+                                   }
+                                 }],
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
+              selector:@selector(statsOrganizationID)
+                  type:[NSString class]
+              callback:^(NSString *oldValue, NSString *newValue) {
+                if ((!newValue && !oldValue) || ([newValue isEqualToString:oldValue])) {
+                  return;
+                } else if (oldValue && newValue) {
+                  // Sync service should've already been started. Nothing to do here.
+                  LOGI(@"StatsOrganizationID changed.");
+                  return;
                 } else {
-                  LOGI(@"SyncBaseURL removed, spinning down sync service");
-                  [[syncd_queue.syncConnection remoteObjectProxy] spindown];
-                  // Keep the syncState active for 10 min in case com.apple.ManagedClient is
-                  // flapping.
-                  [[SNTConfigurator configurator] performSelector:@selector(clearSyncState)
-                                                       withObject:nil
-                                                       afterDelay:600];
+                  LOGI(@"StatsOrganizationID %s.", newValue ? "added" : "removed");
+                  [syncd_queue reassessSyncServiceConnection];
                 }
               }],
     [[SNTKVOManager alloc]
