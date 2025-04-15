@@ -225,6 +225,13 @@ REGISTER_COMMAND_NAME(@"rule")
     }
   }
 
+  if (check) {
+    if (importRules) [self printErrorUsageAndExit:@"--check and --import are mutually exclusive"];
+    if (exportRules) [self printErrorUsageAndExit:@"--check and --export are mutually exclusive"];
+    if (cleanupType != SNTRuleCleanupNone)
+      [self printErrorUsageAndExit:@"--check and --clean/--clean-all are mutually exclusive"];
+  }
+
   if (!importRules && cleanupType != SNTRuleCleanupNone) {
     [[self.daemonConn remoteObjectProxy]
         databaseRuleAddRules:@[]
