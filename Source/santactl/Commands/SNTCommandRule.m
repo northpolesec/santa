@@ -78,9 +78,10 @@ REGISTER_COMMAND_NAME(@"rule")
 #endif
           @"    --message {message}: custom message to show when binary is blocked\n"
           @"    --comment {comment}: comment to attach to a new rule\n"
-          @"    --clean: when importing rules via JSON clear all non-transitive rules before "
-          @"importing\n"
-          @"    --clean-all: when importing rules via JSON clear all rules before importing\n"
+          @"    --clean: clear all non-transitive rules\n"
+          @"        Can be combined with --import to clear existing rules before importing.\n"
+          @"    --clean-all: clear all rules\n"
+          @"        Can be combined with --import to clear existing rules before importing.\n"
           @"\n"
           @"  Notes:\n"
           @"    The format of `identifier` when adding/checking a `signingid` rule is:\n"
@@ -225,18 +226,16 @@ REGISTER_COMMAND_NAME(@"rule")
   }
 
   if (!importRules && cleanupType != SNTRuleCleanupNone) {
-    switch (cleanupType) {
-      case SNTRuleCleanupNonTransitive:
-        [self printErrorUsageAndExit:@"--clean can only be used with --import"];
-        break;
-      case SNTRuleCleanupAll:
-        [self printErrorUsageAndExit:@"--clean-all can only be used with --import"];
-        break;
-      default:
-        // This is a programming error.
-        LOGE(@"Unexpected SNTRuleCleanupType %ld", cleanupType);
-        exit(EXIT_FAILURE);
-    }
+    [[self.daemonConn remoteObjectProxy]
+        databaseRuleAddRules:@[]
+                 ruleCleanup:cleanupType
+                      source:SNTRuleAddSourceSantactl
+                       reply:^(NSError *error) {
+                         printf("Failed to delete rules: %s\n",
+                                error.localizedDescription.UTF8String);
+                         exit(EXIT_FAILURE);
+                       }];
+    exit(EXIT_SUCCESS);
   }
 
   if (jsonFilePath.length > 0) {
@@ -517,7 +516,7 @@ REGISTER_COMMAND_NAME(@"rule")
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
   [rop retrieveAllRules:^(NSArray<SNTRule *> *rules, NSError *error) {
     if (error) {
-      printf("Failed to get rules: %s", [error.localizedDescription UTF8String]);
+      printf("Failed to get rules: %s\n", [error.localizedDescription UTF8String]);
       LOGD(@"Failure reason: %@", error.localizedFailureReason);
       exit(1);
     }
