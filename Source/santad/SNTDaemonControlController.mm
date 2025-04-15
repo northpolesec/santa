@@ -130,6 +130,7 @@ double watchdogRAMPeak = 0;
                     message:@"Rejected by the Santa daemon"
                      detail:@"SyncBaseURL or StaticRules are set"];
     reply(error);
+    return;
   }
 #endif
 
