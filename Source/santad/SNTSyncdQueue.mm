@@ -74,34 +74,44 @@
       STRONGIFY(self);
       SNTConfigurator *configurator = [SNTConfigurator configurator];
 
+      NSURL *newSyncBaseURL = [configurator syncBaseURL];
+      BOOL statsCollectionEnabled = [configurator enableStatsCollection];
+
+      // Don't allow an empty string for the sync base URL
+      if (newSyncBaseURL && newSyncBaseURL.absoluteString.length == 0) {
+        newSyncBaseURL = nil;
+      }
+
       // If the SyncBaseURL was added or changed, and a connection already
       // exists, it must be bounced.
-      if (self.previousSyncBaseURL &&
-          ![self.previousSyncBaseURL isEqual:[configurator syncBaseURL]] &&
-          self.syncServiceConnected) {
+      if (self.previousSyncBaseURL.absoluteString.length &&
+          ![self.previousSyncBaseURL isEqual:newSyncBaseURL] && self.syncServiceConnected) {
         [self tearDownSyncServiceConnectionSerialized];
         // Return early. When the sync service spins down, it will trigger the
         // invalidation handler which will reassess the connection state.
         return;
       }
 
-      self.previousSyncBaseURL = [configurator syncBaseURL];
+      self.previousSyncBaseURL = newSyncBaseURL;
 
-      // If syncBaseURL or enableStatsCollection is set, start the sync service
-      if ([configurator syncBaseURL] || [configurator enableStatsCollection]) {
+      // If newSyncBaseURL or statsCollectionEnabled is set, start the sync service
+      if (newSyncBaseURL || statsCollectionEnabled) {
         if (!self.syncServiceConnected) {
-          [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
-                                                   selector:@selector(clearSyncState)
-                                                     object:nil];
-
           [self establishSyncServiceConnectionSerialized];
         }
-      } else if (self.syncServiceConnected) {
-        // Note: Only teardown the connection if we're connected. This helps
-        // prevent the condition where we would end-up reestablishing the
-        // connection when the invalidationHandler fired and a call to
-        // spindown would be performed.
-        [self tearDownSyncServiceConnectionSerialized];
+
+        // Ensure any pending requests to clear sync state are cancelled.
+        [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
+                                                 selector:@selector(clearSyncState)
+                                                   object:nil];
+      } else {
+        if (self.syncServiceConnected) {
+          // Note: Only teardown the connection if we're connected. This helps
+          // prevent the condition where we would end-up reestablishing the
+          // connection when the invalidationHandler fired and a call to
+          // spindown would be performed.
+          [self tearDownSyncServiceConnectionSerialized];
+        }
 
         // Keep the syncState active for 10 min in case com.apple.ManagedClient is
         // flapping.

@@ -816,7 +816,12 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSURL *)syncBaseURL {
   NSString *urlString = self.configState[kSyncBaseURLKey];
-  if (![urlString hasSuffix:@"/"]) urlString = [urlString stringByAppendingString:@"/"];
+  if (urlString.length == 0) {
+    return nil;
+  }
+  if (![urlString hasSuffix:@"/"]) {
+    urlString = [urlString stringByAppendingString:@"/"];
+  }
   NSURL *url = [NSURL URLWithString:urlString];
   return url;
 }
