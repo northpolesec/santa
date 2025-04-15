@@ -423,7 +423,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 #pragma mark Adding
 
 - (BOOL)addRules:(NSArray *)rules ruleCleanup:(SNTRuleCleanup)cleanupType error:(NSError **)error {
-  if (!rules || rules.count < 1) {
+  // Only accept an empty rules array if the cleanup-type is not none.
+  if ((!rules || rules.count < 1) && cleanupType == SNTRuleCleanupNone) {
     [SNTError populateError:error withCode:SNTErrorCodeEmptyRuleArray format:@"Empty rule array"];
     return NO;
   }
