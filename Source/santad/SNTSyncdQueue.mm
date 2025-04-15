@@ -77,11 +77,6 @@
       NSURL *newSyncBaseURL = [configurator syncBaseURL];
       BOOL statsCollectionEnabled = [configurator enableStatsCollection];
 
-      // Don't allow an empty string for the sync base URL
-      if (newSyncBaseURL && newSyncBaseURL.absoluteString.length == 0) {
-        newSyncBaseURL = nil;
-      }
-
       // If the SyncBaseURL was added or changed, and a connection already
       // exists, it must be bounced.
       if (self.previousSyncBaseURL && ![self.previousSyncBaseURL isEqual:newSyncBaseURL] &&
