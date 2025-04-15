@@ -84,8 +84,8 @@
 
       // If the SyncBaseURL was added or changed, and a connection already
       // exists, it must be bounced.
-      if (self.previousSyncBaseURL.absoluteString.length &&
-          ![self.previousSyncBaseURL isEqual:newSyncBaseURL] && self.syncServiceConnected) {
+      if (self.previousSyncBaseURL && ![self.previousSyncBaseURL isEqual:newSyncBaseURL] &&
+          self.syncServiceConnected) {
         [self tearDownSyncServiceConnectionSerialized];
         // Return early. When the sync service spins down, it will trigger the
         // invalidation handler which will reassess the connection state.
