@@ -173,13 +173,13 @@
 
 - (void)testAddRulesEmptyArray {
   NSError *error;
-  XCTAssertFalse([self.sut addRules:@[] ruleCleanup:SNTRuleCleanupAll error:&error]);
+  XCTAssertFalse([self.sut addRules:@[] ruleCleanup:SNTRuleCleanupNone error:&error]);
   XCTAssertEqual(error.code, SNTErrorCodeEmptyRuleArray);
 }
 
 - (void)testAddRulesNilArray {
   NSError *error;
-  XCTAssertFalse([self.sut addRules:nil ruleCleanup:SNTRuleCleanupAll error:&error]);
+  XCTAssertFalse([self.sut addRules:nil ruleCleanup:SNTRuleCleanupNone error:&error]);
   XCTAssertEqual(error.code, SNTErrorCodeEmptyRuleArray);
 }
 
