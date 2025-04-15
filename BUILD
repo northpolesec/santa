@@ -1,4 +1,5 @@
 load("@build_bazel_rules_apple//apple:versioning.bzl", "apple_bundle_version")
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("//:helper.bzl", "run_command")
 
 package(
@@ -225,4 +226,14 @@ test_suite(
         "//Source/santametricservice:unit_tests",
         "//Source/santasyncservice:unit_tests",
     ],
+)
+
+refresh_compile_commands(
+    name = "refresh_compile_commands",
+    # Only compile targets under //Source, the :release and other genrule
+    # targets cause issues when constructing compile commands for generated
+    # code.
+    targets = {
+        "//Source/...": "",
+    },
 )
