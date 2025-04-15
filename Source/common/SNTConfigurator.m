@@ -44,8 +44,8 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 @property(readonly, nonatomic) NSDictionary *forcedConfigKeyTypes;
 
 /// Holds the configurations from a sync server and mobileconfig.
-@property NSDictionary *syncState;
-@property NSMutableDictionary *configState;
+@property(atomic) NSDictionary *syncState;
+@property(atomic) NSMutableDictionary *configState;
 
 /// Was --debug passed as an argument to this process?
 @property(readonly, nonatomic) BOOL debugFlag;
@@ -816,7 +816,13 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSURL *)syncBaseURL {
   NSString *urlString = self.configState[kSyncBaseURLKey];
-  if (![urlString hasSuffix:@"/"]) urlString = [urlString stringByAppendingString:@"/"];
+  if (urlString.length == 0) {
+    // Treat empty values as nil. This is depended upon by callers.
+    return nil;
+  }
+  if (![urlString hasSuffix:@"/"]) {
+    urlString = [urlString stringByAppendingString:@"/"];
+  }
   NSURL *url = [NSURL URLWithString:urlString];
   return url;
 }
@@ -1364,6 +1370,9 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)clearSyncState {
   self.syncState = [NSMutableDictionary dictionary];
+  // TODO: Start a timer to flush the state to disk. On startup, Santa should
+  // check for the presence of the state file and, if no SyncBaseURL is
+  // configured, start the timer to clear sync state and flush to disk.
 }
 
 - (NSArray *)entitlementsPrefixFilter {

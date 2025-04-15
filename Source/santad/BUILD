@@ -225,6 +225,7 @@ objc_library(
     deps = [
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTXPCSyncServiceInterface",

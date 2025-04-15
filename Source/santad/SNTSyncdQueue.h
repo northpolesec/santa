@@ -21,7 +21,7 @@
 
 @interface SNTSyncdQueue : NSObject
 
-@property(nonatomic) MOLXPCConnection *syncConnection;
+- (void)reassessSyncServiceConnection;
 
 - (void)addEvents:(NSArray<SNTStoredEvent *> *)events isFromBundle:(BOOL)isFromBundle;
 - (void)addBundleEvent:(SNTStoredEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
