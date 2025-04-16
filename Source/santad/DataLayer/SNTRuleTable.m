@@ -139,7 +139,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     if (!binInfo.SHA256) {
       // If there isn't a hash, no need to compute the other info here.
       // Just continue on to the next binary.
-      LOGW(@"Unable to compute hash for critical system binary %@.", path);
+      LOGD(@"Unable to compute hash for critical system binary %@.", path);
       continue;
     }
     MOLCodesignChecker *csInfo = [binInfo codesignCheckerWithError:NULL];
