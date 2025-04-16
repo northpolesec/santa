@@ -214,6 +214,25 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
 - (void)processBundleNotificationsForRule:(SNTRule *)rule
                             fromProtoRule:(const ::pbv1::Rule *)protoRule {
+  // Display a system notification if notification_app_name is set and this is not a clean sync.
+  NSString *appName = StringToNSString(protoRule->notification_app_name());
+  if (appName.length) {
+    // If notification_app_name is set but this is a clean sync, return early. We don't want to
+    // spam users with notifications for many apps that might be included in a clean sync, and
+    // we don't want to fallback to the deprecated behavior.
+    if (self.syncState.syncType != SNTSyncTypeNormal) return;
+    [[SNTPushNotificationsTracker tracker]
+        addNotification:[@{kFileName : appName, kFileBundleBinaryCount : @(0)} mutableCopy]
+                forHash:rule.identifier];
+    return;
+  }
+
+  // If notification_app_name is not set, continue processing with deprecated behavior.
+  [self processDeprecatedBundleNotificationsForRule:rule fromProtoRule:protoRule];
+}
+
+- (void)processDeprecatedBundleNotificationsForRule:(SNTRule *)rule
+                                      fromProtoRule:(const ::pbv1::Rule *)protoRule {
   // Check rule for extra notification related info.
   if (rule.state == SNTRuleStateAllow || rule.state == SNTRuleStateAllowCompiler) {
     // primaryHash is the bundle hash if there was a bundle hash included in the rule, otherwise
