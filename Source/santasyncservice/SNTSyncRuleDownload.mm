@@ -218,7 +218,8 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   NSString *appName = StringToNSString(protoRule->notification_app_name());
   if (appName.length) {
     // If notification_app_name is set but this is a clean sync, return early. We don't want to
-    // continue processing with deprecated behavior.
+    // spam users with notifications for many apps that might be included in a clean sync, and
+    // we don't want to fallback to the deprecated behavior
     if (self.syncState.syncType != SNTSyncTypeNormal) return;
     [[SNTPushNotificationsTracker tracker]
         addNotification:[@{kFileName : appName, kFileBundleBinaryCount : @(0)} mutableCopy]
