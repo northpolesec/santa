@@ -825,6 +825,8 @@
                ruleCleanup:SNTRuleCleanupNone
                     source:SNTRuleAddSourceSyncService
                      reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
+  OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
+                                                               reply:([OCMArg invokeBlock])]);
   [sut sync];
 
   NSArray *rules = @[
@@ -836,6 +838,9 @@
         initWithIdentifier:@"46f8c706d0533a54554af5fc163eea704f10c08b30f8a5db12bfdc04fb382fc3"
                      state:SNTRuleStateAllow
                       type:SNTRuleTypeCertificate],
+    [[SNTRule alloc] initWithIdentifier:@"platform:com.apple.yes"
+                                  state:SNTRuleStateAllow
+                                   type:SNTRuleTypeSigningID],
     [[SNTRule alloc]
         initWithIdentifier:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"
                      state:SNTRuleStateBlock
@@ -853,6 +858,7 @@
                                          ruleCleanup:SNTRuleCleanupNone
                                               source:SNTRuleAddSourceSyncService
                                                reply:OCMOCK_ANY]);
+  OCMVerify([self.daemonConnRop postRuleSyncNotificationForApplication:@"yes" reply:OCMOCK_ANY]);
 }
 
 #pragma mark - SNTSyncPostflight Tests
