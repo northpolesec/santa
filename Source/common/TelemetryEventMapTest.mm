@@ -58,6 +58,7 @@ using santa::TelemetryEvent;
       {"gatekeeperoverride", TelemetryEvent::kGatekeeperOverride},
       {"LaunchItem", TelemetryEvent::kLaunchItem},
       {"TCCModification", TelemetryEvent::kTCCModification},
+      {"XProtect", TelemetryEvent::kXProtect},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -111,6 +112,8 @@ using santa::TelemetryEvent;
       {ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, TelemetryEvent::kOpenSSH},
       {ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD, TelemetryEvent::kLaunchItem},
       {ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE, TelemetryEvent::kLaunchItem},
+      {ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED, TelemetryEvent::kXProtect},
+      {ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED, TelemetryEvent::kXProtect},
 #if HAVE_MACOS_15
       {ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, TelemetryEvent::kGatekeeperOverride},
 #endif  // HAVE_MACOS_15

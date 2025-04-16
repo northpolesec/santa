@@ -1094,6 +1094,54 @@ message TCCModification {
   }
 }
 
+// Information when XProtect detected malware
+message XProtectDetected {
+  // The process that emitted the event
+  optional ProcessInfoLight instigator = 1;
+
+  // Version of the signatures used for detection
+  optional string signature_version = 2;
+
+  // The malware that was detected
+  optional string malware_identifier = 3;
+
+  // Identifier intended for linking multiple malware detected
+  // and remediated events
+  optional string incident_identifier = 4;
+
+  // Type of action that was taken (e.g. "path_delete")
+  optional string action_type = 5;
+
+  // Whether or not remediation was successful
+	optional bool success = 6;
+
+	// Specific reasons for failure or success
+	optional string result_description = 7;
+
+	// Path that was subject to remediation, if any. This path is not necessarily
+	// a malicious binary, it can also be a legitimate file containing a
+	// malicious portion. Specifically, the file at this path may still exist
+	// after successful remediation.
+	optional string remediated_path = 8;
+
+	//Audit token of process that was subject to remediation, if any
+	optional ProcessID remediated_process_id = 9;
+}
+
+// Information when XProtect remediated malware
+message XProtectRemediated {
+  // The process that emitted the event
+  optional ProcessInfoLight instigator = 1;
+}
+
+// Information about XProtect detected and remediated events
+message XProtect {
+  oneof event {
+    XProtectDetected detected = 1;
+    XProtectRemediated remediated = 2;
+  }
+}
+
 // A message encapsulating a single event
 message SantaMessage {
   // Machine ID of the host emitting this log
@@ -1135,6 +1183,7 @@ message SantaMessage {
     GatekeeperOverride gatekeeper_override = 30;
     LaunchItem launch_item = 31;
     TCCModification tcc_modification = 32;
+    XProtect xprotect = 33;
   }
 }
 

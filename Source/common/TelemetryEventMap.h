@@ -48,6 +48,7 @@ enum class TelemetryEvent : uint64_t {
   kGatekeeperOverride      = 1 << 20,
   kLaunchItem              = 1 << 21,
   kTCCModification         = 1 << 22,
+  kXProtect                = 1 << 23,
   kEverything              = ~0ULL,
 };
 // clang-format on
