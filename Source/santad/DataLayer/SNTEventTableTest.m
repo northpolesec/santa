@@ -94,19 +94,24 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 
   SNTStoredEvent *event = [self createTestEvent];
   XCTAssertTrue([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
-  // Attempt to add an event with the same file hash fails because of non-unique filehash256 column
+  // Attempt to add an event with the same file hash succeeds despite
+  // non-unique filehash256 column
   event.idx = @(arc4random());
-  XCTAssertFalse([self.sut addStoredEvent:event]);
+  XCTAssertTrue([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
   // Create a new hash and re-insert
   event.idx = @(arc4random());
   event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
   XCTAssertTrue([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 2);
 
   // Attempting to add an event with a non-unique idx fails
   event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
   XCTAssertFalse([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 2);
 }
 
 - (void)testRetrieveEvent {
