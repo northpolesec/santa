@@ -133,10 +133,10 @@ static const uint32_t kEventTableCurrentVersion = 4;
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
     [eventsData
         enumerateKeysAndObjectsUsingBlock:^(NSData *eventData, SNTStoredEvent *event, BOOL *stop) {
-          success = [db
-              executeUpdate:
-                  @"INSERT OR IGNORE INTO 'events' (idx, filesha256, eventdata) VALUES (?, ?, ?)",
-                  event.idx, event.fileSHA256, eventData];
+          success = [db executeUpdate:@"INSERT INTO 'events' (idx, filesha256, eventdata) "
+                                      @"VALUES (?, ?, ?) "
+                                      @"ON CONFLICT(filesha256) DO NOTHING",
+                                      event.idx, event.fileSHA256, eventData];
           if (!success) *stop = YES;
         }];
   }];
