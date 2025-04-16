@@ -1113,19 +1113,19 @@ message XProtectDetected {
   optional string action_type = 5;
 
   // Whether or not remediation was successful
-	optional bool success = 6;
+  optional bool success = 6;
 
-	// Specific reasons for failure or success
-	optional string result_description = 7;
+  // Specific reasons for failure or success
+  optional string result_description = 7;
 
-	// Path that was subject to remediation, if any. This path is not necessarily
-	// a malicious binary, it can also be a legitimate file containing a
-	// malicious portion. Specifically, the file at this path may still exist
-	// after successful remediation.
-	optional string remediated_path = 8;
+  // Path that was subject to remediation, if any. This path is not necessarily
+  // a malicious binary, it can also be a legitimate file containing a
+  // malicious portion. Specifically, the file at this path may still exist
+  // after successful remediation.
+  optional string remediated_path = 8;
 
-	//Audit token of process that was subject to remediation, if any
-	optional ProcessID remediated_process_id = 9;
+  //Audit token of process that was subject to remediation, if any
+  optional ProcessID remediated_process_id = 9;
 }
 
 // Information when XProtect remediated malware
