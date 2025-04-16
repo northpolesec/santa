@@ -167,6 +167,12 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
                              Enrich(es_msg->event.btm_launch_item_remove->instigator),
                              Enrich(es_msg->event.btm_launch_item_remove->app),
                              UsernameForUID(es_msg->event.btm_launch_item_remove->item->uid)));
+    case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED:
+      return std::make_unique<EnrichedMessage>(
+          EnrichedXProtectDetected(std::move(es_msg), Enrich(*es_msg->process)));
+    case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED:
+      return std::make_unique<EnrichedMessage>(
+          EnrichedXProtectRemediated(std::move(es_msg), Enrich(*es_msg->process)));
 #endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE:

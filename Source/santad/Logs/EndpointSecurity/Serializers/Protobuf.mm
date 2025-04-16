@@ -1130,6 +1130,14 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLaunchItem &msg) {
   }
 }
 
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectDetected &msg) {
+  return {};
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectRemediated &msg) {
+  return {};
+}
+
 #endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15

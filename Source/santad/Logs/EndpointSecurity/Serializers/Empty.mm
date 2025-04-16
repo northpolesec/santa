@@ -129,6 +129,14 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLaunchItem &) {
   return {};
 }
 
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedXProtectDetected &) {
+  return {};
+}
+
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedXProtectRemediated &) {
+  return {};
+}
+
 #endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15

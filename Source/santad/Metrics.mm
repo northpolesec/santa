@@ -73,6 +73,8 @@ static NSString *const kEventTypeNotifyOpenSSHLogin = @"NotifyOpenSSHLogin";
 static NSString *const kEventTypeNotifyOpenSSHLogout = @"NotifyOpenSSHLogout";
 static NSString *const kEventTypeNotifyLaunchItemAdd = @"NotifyLaunchItemAdd";
 static NSString *const kEventTypeNotifyLaunchItemRemove = @"NotifyLaunchItemRemove";
+static NSString *const kEventTypeNotifyXProtectDetected = @"NotifyXProtectDetected";
+static NSString *const kEventTypeNotifyXProtectRemediated = @"NotifyXProtectRemediated";
 #endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
 static NSString *const kEventTypeNotifyGatekeeperOverride = @"NotifyGatekeeperOverride";
@@ -162,6 +164,8 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
     case ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT: return kEventTypeNotifyOpenSSHLogout;
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD: return kEventTypeNotifyLaunchItemAdd;
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: return kEventTypeNotifyLaunchItemRemove;
+    case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED: return kEventTypeNotifyXProtectDetected;
+    case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED: return kEventTypeNotifyXProtectRemediated;
 #endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return kEventTypeNotifyGatekeeperOverride;

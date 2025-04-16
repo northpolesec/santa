@@ -895,6 +895,22 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLaunchItem &msg
   }
 }
 
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectDetected &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=XPROTECT_DETECTED");
+
+  return FinalizeString(str);
+}
+
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectRemediated &msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=XPROTECT_REMEDIATED");
+
+  return FinalizeString(str);
+}
+
 #endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15

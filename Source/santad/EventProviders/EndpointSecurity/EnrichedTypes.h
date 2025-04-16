@@ -701,6 +701,22 @@ class EnrichedCopyfile : public EnrichedEventType {
   EnrichedFile source_;
 };
 
+class EnrichedXProtectDetected : public EnrichedEventType {
+ public:
+  EnrichedXProtectDetected(Message &&es_msg, EnrichedProcess &&instigator)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)) {}
+
+  EnrichedXProtectDetected(EnrichedXProtectDetected &&) = default;
+};
+
+class EnrichedXProtectRemediated : public EnrichedEventType {
+ public:
+  EnrichedXProtectRemediated(Message &&es_msg, EnrichedProcess &&instigator)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)) {}
+
+  EnrichedXProtectRemediated(EnrichedXProtectRemediated &&) = default;
+};
+
 class EnrichedGatekeeperOverride : public EnrichedEventType {
  public:
   EnrichedGatekeeperOverride(Message &&es_msg, EnrichedProcess &&instigator,
@@ -774,27 +790,26 @@ class EnrichedTCCModification : public EnrichedEventWithInstigator {
   std::optional<EnrichedProcess> enriched_responsible_proc_;
 };
 
-using EnrichedType =
-    std::variant<EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit,
-                 EnrichedFork, EnrichedLink, EnrichedRename, EnrichedUnlink,
-                 EnrichedCSInvalidated, EnrichedLoginWindowSessionLogin,
-                 EnrichedLoginWindowSessionLogout,
-                 EnrichedLoginWindowSessionLock,
-                 EnrichedLoginWindowSessionUnlock, EnrichedScreenSharingAttach,
-                 EnrichedScreenSharingDetach, EnrichedOpenSSHLogin,
-                 EnrichedOpenSSHLogout, EnrichedLoginLogin, EnrichedLoginLogout,
-                 EnrichedAuthenticationOD, EnrichedAuthenticationTouchID,
-                 EnrichedAuthenticationToken, EnrichedAuthenticationAutoUnlock,
-                 EnrichedClone, EnrichedCopyfile, EnrichedLaunchItem
+using EnrichedType = std::variant<
+    EnrichedClose, EnrichedExchange, EnrichedExec, EnrichedExit, EnrichedFork,
+    EnrichedLink, EnrichedRename, EnrichedUnlink, EnrichedCSInvalidated,
+    EnrichedLoginWindowSessionLogin, EnrichedLoginWindowSessionLogout,
+    EnrichedLoginWindowSessionLock, EnrichedLoginWindowSessionUnlock,
+    EnrichedScreenSharingAttach, EnrichedScreenSharingDetach,
+    EnrichedOpenSSHLogin, EnrichedOpenSSHLogout, EnrichedLoginLogin,
+    EnrichedLoginLogout, EnrichedAuthenticationOD,
+    EnrichedAuthenticationTouchID, EnrichedAuthenticationToken,
+    EnrichedAuthenticationAutoUnlock, EnrichedClone, EnrichedCopyfile,
+    EnrichedLaunchItem, EnrichedXProtectDetected, EnrichedXProtectRemediated
 #if HAVE_MACOS_15
-                 ,
-                 EnrichedGatekeeperOverride
+    ,
+    EnrichedGatekeeperOverride
 #endif  // HAVE_MACOS_15
 #if HAVE_MACOS_15_4
-                 ,
-                 EnrichedTCCModification
+    ,
+    EnrichedTCCModification
 #endif  // HAVE_MACOS_15_4
-                 >;
+    >;
 
 class EnrichedMessage {
  public:
