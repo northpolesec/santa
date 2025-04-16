@@ -65,9 +65,15 @@ struct MoreDetailsView: View {
     HStack(spacing: 20.0) {
       VStack(spacing: 20.0) {
         Spacer()
+        addLabel {
+          Text("Accessed Path").bold().font(Font.system(size: 12.0))
+          Text(e.accessedPath).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+        }
+
+        Divider()
 
         addLabel {
-          Text("Path").bold().font(Font.system(size: 12.0))
+          Text("Binary Path").bold().font(Font.system(size: 12.0))
           Text(e.filePath).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
         }
 
@@ -142,7 +148,7 @@ struct Event: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 10.0) {
-        Text(e.accessedPath).textSelection(.enabled)
+        TextWithLimit(e.accessedPath).textSelection(.enabled)
         if let app = e.application {
           TextWithLimit(app).textSelection(.enabled)
         } else {
