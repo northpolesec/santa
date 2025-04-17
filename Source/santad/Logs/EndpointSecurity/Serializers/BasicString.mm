@@ -15,6 +15,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
 
+#include <EndpointSecurity/EndpointSecurity.h>
 #import <Security/Security.h>
 #include <bsm/libbsm.h>
 #include <libgen.h>
@@ -895,18 +896,47 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLaunchItem &msg
   }
 }
 
+static inline void AppendStringToken(std::string &str, std::string key, es_string_token_t val) {
+  if (val.length > 0) {
+    str.append(key);
+    str.append(val.data);
+  }
+}
+
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectDetected &msg) {
+  const es_event_xp_malware_detected_t *xp = msg->event.xp_malware_detected;
   std::string str = CreateDefaultString();
 
   str.append("action=XPROTECT_DETECTED");
+
+  AppendStringToken(str, "|signature_version=", xp->signature_version);
+  AppendStringToken(str, "|malware_identifier=", xp->malware_identifier);
+  AppendStringToken(str, "|incident_identifier=", xp->incident_identifier);
+  AppendStringToken(str, "|detected_path=", xp->detected_path);
+
+  AppendInstigator(str, msg);
 
   return FinalizeString(str);
 }
 
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectRemediated &msg) {
+  const es_event_xp_malware_remediated_t *xp = msg->event.xp_malware_remediated;
   std::string str = CreateDefaultString();
 
   str.append("action=XPROTECT_REMEDIATED");
+
+  AppendStringToken(str, "|signature_version=", xp->signature_version);
+  AppendStringToken(str, "|malware_identifier=", xp->malware_identifier);
+  AppendStringToken(str, "|incident_identifier=", xp->incident_identifier);
+  AppendStringToken(str, "|action_type=", xp->action_type);
+  str.append("|success=");
+  str.append(GetBoolString(xp->success));
+  AppendStringToken(str, "|result_description=", xp->result_description);
+  AppendStringToken(str, "|remediated_path=", xp->remediated_path);
+  if (xp->remediated_process_audit_token) {
+    str.append("|remediated_pid=");
+    str.append(std::to_string(Pid(*xp->remediated_process_audit_token)));
+  }
 
   return FinalizeString(str);
 }

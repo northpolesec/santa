@@ -132,6 +132,8 @@ NSString *ConstructFilename(es_event_type_t eventType, NSString *variant = nil) 
     case ES_EVENT_TYPE_NOTIFY_COPYFILE: name = @"copyfile"; break;
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD: name = @"launch_item_add"; break;
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: name = @"launch_item_remove"; break;
+    case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED: name = @"xp_detected"; break;
+    case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED: name = @"xp_remediated"; break;
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: name = @"gatekeeper"; break;
 #endif  // HAVE_MACOS_15
@@ -203,6 +205,7 @@ const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &s
     case ::pbv1::SantaMessage::kGatekeeperOverride: return santaMsg.gatekeeper_override();
     case ::pbv1::SantaMessage::kLaunchItem: return santaMsg.launch_item();
     case ::pbv1::SantaMessage::kTccModification: return santaMsg.tcc_modification();
+    case ::pbv1::SantaMessage::kXprotect: return santaMsg.xprotect();
     case ::pbv1::SantaMessage::EVENT_NOT_SET:
       XCTFail(@"Protobuf message SantaMessage did not set an 'event' field");
       OS_FALLTHROUGH;
@@ -1449,6 +1452,49 @@ void SerializeAndCheckNonESEvents(
                     esMsg->event.btm_launch_item_remove = &launchItem;
                   }
                        variant:@"relative_null_app"];
+}
+
+- (void)testSerializeMessageXProtectDetected {
+  __block es_event_xp_malware_detected_t xp = {
+      .signature_version = MakeESStringToken("sig_ver"),
+      .malware_identifier = MakeESStringToken("mal_id"),
+      .incident_identifier = MakeESStringToken("inc_id"),
+      .detected_path = MakeESStringToken("/detected/path"),
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.xp_malware_detected = &xp;
+                  }];
+}
+
+- (void)testSerializeMessageXProtectRemediated {
+  audit_token_t tok = MakeAuditToken(99, 88);
+  __block es_event_xp_malware_remediated_t xp = {
+      .signature_version = MakeESStringToken("sig_ver"),
+      .malware_identifier = MakeESStringToken("mal_id"),
+      .incident_identifier = MakeESStringToken("inc_id"),
+      .action_type = MakeESStringToken("act_type"),
+      .success = true,
+      .result_description = MakeESStringToken("res_desc"),
+      .remediated_path = MakeESStringToken("/rem/path"),
+      .remediated_process_audit_token = &tok,
+  };
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.xp_malware_remediated = &xp;
+                  }];
+
+  xp.remediated_process_audit_token = NULL;
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t *esMsg) {
+                    esMsg->event.xp_malware_remediated = &xp;
+                  }
+                       variant:@"null_token"];
 }
 
 #endif  // HAVE_MACOS_13

@@ -910,8 +910,7 @@ void EncodeEventProcessOrFallback(
     EncodeProcessInfoLight(lazy_auth_instigator_f(), eventProcess, *enrichedEventProcess);
   } else if (eventProcessToken.has_value()) {
     ::pbv1::ProcessID *pb_proc_id = lazy_auth_instigator_fallback_f();
-    pb_proc_id->set_pid(Pid(*eventProcessToken));
-    pb_proc_id->set_pidversion(Pidversion(*eventProcessToken));
+    EncodeProcessID(pb_proc_id, *eventProcessToken);
   }
 }
 
@@ -1131,11 +1130,56 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLaunchItem &msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectDetected &msg) {
-  return {};
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  ::pbv1::XProtect *pb_xp = santa_msg->mutable_xprotect();
+  ::pbv1::XProtectDetected *pb_xp_detected = pb_xp->mutable_detected();
+
+  EncodeProcessInfoLight(pb_xp_detected->mutable_instigator(), msg);
+
+  const es_event_xp_malware_detected_t *xp = msg->event.xp_malware_detected;
+  EncodeStringToken([pb_xp_detected] { return pb_xp_detected->mutable_signature_version(); },
+                    xp->signature_version);
+  EncodeStringToken([pb_xp_detected] { return pb_xp_detected->mutable_malware_identifier(); },
+                    xp->malware_identifier);
+  EncodeStringToken([pb_xp_detected] { return pb_xp_detected->mutable_incident_identifier(); },
+                    xp->incident_identifier);
+  EncodeStringToken([pb_xp_detected] { return pb_xp_detected->mutable_detected_path(); },
+                    xp->detected_path);
+
+  return FinalizeProto(santa_msg);
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectRemediated &msg) {
-  return {};
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
+
+  ::pbv1::XProtect *pb_xp = santa_msg->mutable_xprotect();
+  ::pbv1::XProtectRemediated *pb_xp_remediated = pb_xp->mutable_remediated();
+
+  EncodeProcessInfoLight(pb_xp_remediated->mutable_instigator(), msg);
+
+  const es_event_xp_malware_remediated_t *xp = msg->event.xp_malware_remediated;
+  EncodeStringToken([pb_xp_remediated] { return pb_xp_remediated->mutable_signature_version(); },
+                    xp->signature_version);
+  EncodeStringToken([pb_xp_remediated] { return pb_xp_remediated->mutable_malware_identifier(); },
+                    xp->malware_identifier);
+  EncodeStringToken([pb_xp_remediated] { return pb_xp_remediated->mutable_incident_identifier(); },
+                    xp->incident_identifier);
+  EncodeStringToken([pb_xp_remediated] { return pb_xp_remediated->mutable_action_type(); },
+                    xp->action_type);
+  pb_xp_remediated->set_success(xp->success);
+  EncodeStringToken([pb_xp_remediated] { return pb_xp_remediated->mutable_result_description(); },
+                    xp->result_description);
+  EncodeStringToken([pb_xp_remediated] { return pb_xp_remediated->mutable_remediated_path(); },
+                    xp->remediated_path);
+  if (xp->remediated_process_audit_token) {
+    EncodeProcessID(pb_xp_remediated->mutable_remediated_process_id(),
+                    *xp->remediated_process_audit_token);
+  }
+
+  return FinalizeProto(santa_msg);
 }
 
 #endif  // HAVE_MACOS_13
