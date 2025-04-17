@@ -88,8 +88,12 @@ func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
 public func CopyDetailsButton(e: SNTStoredEvent?, customURL: String?) -> some View {
   Button(action: { copyDetailsToClipboard(e: e, customURL: customURL as String?) }) {
     HStack(spacing: 2.0) {
-      Text("Copy Details", comment: "Copy Details button in more details dialog")
-        .foregroundColor(.blue)
+      Text(
+        "Copy Details",
+        comment: "Copy Details button to copy all details shown in the More Details dialog"
+      )
+      .foregroundColor(.blue)
+
       Image(systemName: "pencil.and.list.clipboard").foregroundColor(.blue)
     }
   }

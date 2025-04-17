@@ -22,7 +22,7 @@
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
 
-/* Copy Details button in binary block dialog */
+/* Copy Details button to copy all details shown in the More Details dialog */
 "Copy Details" = "Копия Подробности";
 
 /* No comment provided by engineer. */
@@ -108,4 +108,3 @@
 
 /* No comment provided by engineer. */
 "User" = "Пользователь";
-
