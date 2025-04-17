@@ -994,6 +994,66 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   XCTAssertCppStringEqual(got, want);
 }
 
+- (void)testSerializeMessageXProtectDetected {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED, &proc);
+
+  es_event_xp_malware_detected_t xp = {
+      .signature_version = MakeESStringToken("v1.0"),
+      .malware_identifier = MakeESStringToken("Eicar"),
+      .incident_identifier = MakeESStringToken("C42221A2-7C14-4107-8B06-FB94D602187"),
+      .detected_path = MakeESStringToken("/tmp/eicar"),
+  };
+
+  esMsg.event.xp_malware_detected = &xp;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want = "action=XPROTECT_DETECTED|signature_version=v1.0|malware_identifier=Eicar"
+                     "|incident_identifier=C42221A2-7C14-4107-8B06-FB94D602187"
+                     "|detected_path=/tmp/eicar|pid=12|ppid=56|process=foo|processpath=foo"
+                     "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
+- (void)testSerializeMessageXProtectRemediated {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED, &proc);
+
+  audit_token_t tok = MakeAuditToken(99, 88);
+
+  es_event_xp_malware_remediated_t xp = {
+      .signature_version = MakeESStringToken("v1.0"),
+      .malware_identifier = MakeESStringToken("Eicar"),
+      .incident_identifier = MakeESStringToken("C42221A2-7C14-4107-8B06-FB94D602187"),
+      .success = true,
+      .result_description = MakeESStringToken("Successful"),
+      .remediated_path = MakeESStringToken("/tmp/foo"),
+      .remediated_process_audit_token = &tok,
+  };
+
+  esMsg.event.xp_malware_remediated = &xp;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want = "action=XPROTECT_REMEDIATED|signature_version=v1.0|malware_identifier=Eicar"
+                     "|incident_identifier=C42221A2-7C14-4107-8B06-FB94D602187|success=true"
+                     "|result_description=Successful|remediated_path=/tmp/foo"
+                     "|remediated_pid=99|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  xp.remediated_process_audit_token = NULL;
+
+  got = BasicStringSerializeMessage(&esMsg);
+  want = "action=XPROTECT_REMEDIATED|signature_version=v1.0|malware_identifier=Eicar"
+         "|incident_identifier=C42221A2-7C14-4107-8B06-FB94D602187|success=true"
+         "|result_description=Successful|remediated_path=/tmp/foo|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
 #endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15
