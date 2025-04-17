@@ -19,7 +19,7 @@
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
 
-/* Copy Details button in binary block dialog */
+/* Copy Details button to copy all details shown in the More Details dialog */
 "Copy Details" = "Деталі копіювання";
 
 /* The default message to show the user when access to a file is blocked */
@@ -108,4 +108,3 @@
 
 /* No comment provided by engineer. */
 "User" = "Користувач";
-

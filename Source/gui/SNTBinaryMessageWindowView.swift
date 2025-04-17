@@ -85,6 +85,23 @@ func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
   pasteboard.setString(s, forType: .string)
 }
 
+public func CopyDetailsButton(e: SNTStoredEvent?, customURL: String?) -> some View {
+  Button(action: { copyDetailsToClipboard(e: e, customURL: customURL as String?) }) {
+    HStack(spacing: 2.0) {
+      Text(
+        "Copy Details",
+        comment: "Copy Details button to copy all details shown in the More Details dialog"
+      )
+      .foregroundColor(.blue)
+
+      Image(systemName: "pencil.and.list.clipboard").foregroundColor(.blue)
+    }
+  }
+  .buttonStyle(ScalingButtonStyle())
+  .keyboardShortcut("c", modifiers: [.command, .shift])
+  .help("⇧ ⌘  c")
+}
+
 struct MoreDetailsView: View {
   let e: SNTStoredEvent?
   let customURL: NSString?
@@ -156,16 +173,7 @@ struct MoreDetailsView: View {
         Spacer()
 
         HStack {
-          Button(action: { copyDetailsToClipboard(e: e, customURL: customURL as String?) }) {
-            HStack(spacing: 2.0) {
-              Text("Copy Details", comment: "Copy Details button in more details dialog")
-                .foregroundColor(.blue)
-              Image(systemName: "pencil.and.list.clipboard").foregroundColor(.blue)
-            }
-          }
-          .buttonStyle(ScalingButtonStyle())
-          .keyboardShortcut("c", modifiers: [.command, .shift])
-          .help("⇧ ⌘  c")
+          CopyDetailsButton(e: e, customURL: customURL as String?)
 
           Button(action: { presentationMode.wrappedValue.dismiss() }) {
             HStack(spacing: 2.0) {
@@ -231,19 +239,12 @@ struct SNTBinaryMessageEventView: View {
     VStack(spacing: 2.0) {
       Spacer()
 
-      ZStack {
+      HStack {
         MoreDetailsButton($isShowingDetails)
 
-        // This button is hidden and exists only to allow using the Cmd+D keyboard shortcut
-        // to copy the event details to the clipboard even if the "More Details" button hasn't been pressed.
-        Button(action: { copyDetailsToClipboard(e: e, customURL: customURL as String?) }) {
-          Text(verbatim: "Copy Details")
-        }
-        .buttonStyle(ScalingButtonStyle())
-        .opacity(0.0)  // Invisible!
-        .keyboardShortcut("c", modifiers: [.command, .shift])
-        .help("⇧ ⌘  c")
+        CopyDetailsButton(e: e, customURL: customURL as String?)
       }
+
       Spacer()
     }
   }

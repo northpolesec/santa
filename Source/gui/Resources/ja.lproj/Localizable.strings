@@ -23,7 +23,7 @@
 /* No comment provided by engineer. */
 "CDHash" = "CDハッシュ";
 
-/* Copy Details button in more details dialog */
+/* Copy Details button to copy all details shown in the More Details dialog */
 "Copy Details" = "詳細をコピー";
 
 /* Dismiss button in more details dialog */
@@ -109,4 +109,3 @@ unknown = "不明";
 
 /* No comment provided by engineer. */
 User = "ユーザー";
-
