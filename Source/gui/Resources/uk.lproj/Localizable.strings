@@ -5,6 +5,9 @@
 "Approve" = "Затвердити";
 
 /* No comment provided by engineer. */
+"Accessed Path" = "Шлях доступу";
+
+/* No comment provided by engineer. */
 "Application" = "Заявка";
 
 /* No Comment provided by engineer. */
@@ -12,6 +15,9 @@
 
 /* No Comment provided by engineer. */
 "authorize execution of the application %@" = "дозволити виконання заявки %@";
+
+/* No comment provided by engineer. */
+"Binary Path" = "Двійковий шлях";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Пакетний хеш";
@@ -92,7 +98,7 @@
 "Switching into Standalone mode" = "Перехід в автономний режим";
 
 /* The default message to show the user when a banned application is blocked */
-"The following application has been blocked from<br />executing because it has been deemed malicious" = "Наступну програму було заблоковано для виконання,<br />оскільки її було визнано шкідливою";
+"The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "Наступну програму було заблоковано для виконання,<br />через те, що вона була визнана шкідливою або такою, що суперечить політиці";
 
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Наступна програма була заблокована для виконання,<br />оскільки не може бути визначена її достовірність";
