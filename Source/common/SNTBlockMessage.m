@@ -67,7 +67,7 @@ static id ValueOrNull(id value) {
       @"The default message to show the user when an unknown application is blocked");
   NSString *defaultBannedMessage = NSLocalizedString(
       @"The following application has been blocked from<br />executing because it has "
-      @"been deemed malicious",
+      @"been deemed malicious or against policy",
       @"The default message to show the user when a banned application is blocked");
 
   if (customMessage.length) {

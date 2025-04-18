@@ -5,6 +5,9 @@
 "Access to a file has been denied" = "ファイルへのアクセスが拒否されました";
 
 /* No comment provided by engineer. */
+"Accessed Path" = "アクセスパス";
+
+/* No comment provided by engineer. */
 "Application" = "アプリケーション";
 
 /* Default text for Approve */
@@ -16,6 +19,9 @@
 
 /* Bundle name */
 "authorize execution of the application %@" = "%@アプリケーションの実行を許可する";
+
+/* No comment provided by engineer. */
+"Binary Path" = "バイナリーパス";
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "バンドルハッシュ";
@@ -96,7 +102,7 @@
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "次のアプリケーションは信頼性を判断できないため、<br />実行がブロックされました";
 
 /* The default message to show the user when a banned application is blocked */
-"The following application has been blocked from<br />executing because it has been deemed malicious" = "次のアプリケーションは悪意のあるプログラムと判断されたため、<br />実行がブロックされました";
+"The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "以下のアプリケーションは、悪意のあるプログラムまたはポリシーに反すると判断されました、<br />実行がブロックされました";
 
 /* The default message to show the user when a USB device is blocked from mounting */
 "The following device has been blocked from mounting" = "次のデバイスのマウントがブロックされました";

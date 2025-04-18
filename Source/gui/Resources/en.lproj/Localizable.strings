@@ -5,6 +5,9 @@
 "Access to a file has been denied" = "Access to a file has been denied";
 
 /* No comment provided by engineer. */
+"Accessed Path" = "Accessed Path";
+
+/* No comment provided by engineer. */
 "Application" = "Application";
 
 /* Default text for Approve */
@@ -17,12 +20,15 @@
 "authorize execution of the application %@" = "authorize execution of the application %@";
 
 /* No comment provided by engineer. */
+"Binary Path" = "Binary Path";
+
+/* No comment provided by engineer. */
 "Bundle Hash" = "Bundle Hash";
 
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
 
-/* Copy Details button to copy all details shown in the More Details dialog */
+/* Copy Details */
 "Copy Details" = "Copy Details";
 
 /* Dismiss button in more details dialog */
@@ -35,10 +41,10 @@
 "Filename" = "Filename";
 
 /* No comment provided by engineer. */
-"Label after time period picker" = "\U2800";
+"Label after time period picker" = "Label after time period picker";
 
 /* No comment provided by engineer. */
-"Label before time period picker" = "Prevent future notifications for this application for ";
+"Label before time period picker" = "Label before time period picker";
 
 /* More Details button */
 "More Details" = "More Details";
@@ -95,7 +101,7 @@
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";
 
 /* The default message to show the user when a banned application is blocked */
-"The following application has been blocked from<br />executing because it has been deemed malicious" = "The following application has been blocked from<br />executing because it has been deemed malicious";
+"The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "The following application has been blocked from<br />executing because it has been deemed malicious or against policy";
 
 /* The default message to show the user when a USB device is blocked from mounting */
 "The following device has been blocked from mounting" = "The following device has been blocked from mounting";
@@ -108,3 +114,4 @@
 
 /* No comment provided by engineer. */
 "User" = "User";
+
