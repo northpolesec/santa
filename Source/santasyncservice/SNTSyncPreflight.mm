@@ -14,11 +14,13 @@
 ///    limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncPreflight.h"
+
 #include "Source/common/SNTCommonEnums.h"
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTSIPStatus.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -89,6 +91,7 @@ The following table expands upon the above logic to list most of the permutation
   req->set_model_identifier(NSStringToUTF8String([SNTSystemInfo modelIdentifier]));
   req->set_santa_version(NSStringToUTF8String([SNTSystemInfo santaFullVersion]));
   req->set_primary_user(NSStringToUTF8String(self.syncState.machineOwner));
+  req->set_sip_status([SNTSIPStatus currentStatus]);
 
   if (self.syncState.pushNotificationsToken) {
     req->set_push_notification_token(NSStringToUTF8String(self.syncState.pushNotificationsToken));
