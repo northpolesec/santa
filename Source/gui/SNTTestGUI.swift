@@ -7,6 +7,7 @@ import santa_common_SNTDeviceEvent
 import santa_common_SNTStoredEvent
 import Source_gui_SNTDeviceMessageWindowView
 import Source_gui_SNTBinaryMessageWindowView
+import Source_gui_SNTAboutWindowView
 
 func ShowWindow(_ vc: NSViewController, _ window: NSWindow) {
   window.contentRect(forFrameRect: NSMakeRect(0, 0, 0, 0))
@@ -236,12 +237,41 @@ struct DeviceView: View {
   }
 }
 
+struct AboutView: View {
+  @State var dateOverride: SpecialDates = .Nov25
+
+  var body: some View {
+    VStack {
+      HStack {
+        Picker(selection: $dateOverride, label: Text(verbatim: "Date")) {
+          Text(verbatim: "Nov 25").tag(SpecialDates.Nov25)
+          Text(verbatim: "Apr 1").tag(SpecialDates.Apr1)
+          Text(verbatim: "May 4").tag(SpecialDates.May4)
+          Text(verbatim: "Oct 31").tag(SpecialDates.Oct31)
+        }.pickerStyle(.segmented)
+      }
+      Button("Display") {
+        switch dateOverride {
+        case .Apr1: Date.overrideDate = Date(timeIntervalSince1970: 1711980915)
+        case .May4: Date.overrideDate = Date(timeIntervalSince1970: 1714832115)
+        case .Oct31: Date.overrideDate = Date(timeIntervalSince1970: 1730384115)
+        case .Nov25: Date.overrideDate = Date(timeIntervalSince1970: 1732544115)
+        }
+
+        let window = NSWindow()
+        ShowWindow(SNTAboutWindowViewFactory.createWith(window: window), window)
+      }
+    }
+  }
+}
+
 struct ContentView: View {
   var body: some View {
     TabView {
       BinaryView().padding(15.0).tabItem({ Text("Binary") })
       FAAView().padding(15.0).tabItem({ Text("FAA") })
       DeviceView().padding(15.0).tabItem({ Text("Device") })
+      AboutView().padding(15.0).tabItem({ Text("About") })
     }
   }
 }

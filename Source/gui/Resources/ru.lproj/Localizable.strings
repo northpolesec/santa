@@ -5,18 +5,18 @@
 "Access to a file has been denied" = "Доступ к файлу был запрещен";
 
 /* No comment provided by engineer. */
-"Approve" = "Утвердить";
-
-/* No comment provided by engineer. */
 "Accessed Path" = "Доступный путь";
 
 /* No comment provided by engineer. */
 "Application" = "Приложение";
 
-/* No comment provided by engineer. */
+/* Default text for Approve */
+"Approve" = "Утвердить";
+
+/* Authorize execution of an application with Signing ID or Path */
 "authorize execution of %@" = "разрешить исполнение %@";
 
-/* No comment provided by engineer. */
+/* Authorize execution of an application with name */
 "authorize execution of the application %@" = "разрешить выполнение заявки %@";
 
 /* No comment provided by engineer. */
@@ -28,10 +28,10 @@
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
 
-/* Copy Details button to copy all details shown in the More Details dialog */
+/* Copy Details */
 "Copy Details" = "Копия Подробности";
 
-/* No comment provided by engineer. */
+/* Dismiss button in more details dialog */
 "Dismiss" = "Увольте";
 
 /* No comment provided by engineer. */
@@ -46,7 +46,7 @@
 /* No comment provided by engineer. */
 "Label before time period picker" = "Предотвращение будущих уведомлений для этого приложения для ";
 
-/* More Details button in binary block dialog */
+/* More Details button */
 "More Details" = "Подробнее";
 
 /* No comment provided by engineer. */
@@ -80,7 +80,10 @@
 "Rule Version" = "Версия правил";
 
 /* Explanation in About view */
-"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa - это система управления приложениями для macOS.\n\nНет никаких настраиваемых пользователем параметров.";
+"Santa is a security system providing application,\ndevice, and file-access controls." = "Santa - этo система безопасности, обеспечивающая контроль\nнад приложениями, устройствами и доступом к файлам";
+
+/* No comment provided by engineer. */
+"Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santa создана с ❤️ эльфами из [North Pole Security](https://northpole.security)\nвместе с вкладом нашего замечательного сообщества";
 
 /* No comment provided by engineer. */
 "SHA-256" = "SHA-256";
@@ -97,11 +100,11 @@
 /* Client mode change: STANDALONE */
 "Switching into Standalone mode" = "Переход в автономный режим";
 
-/* The default message to show the user when a banned application is blocked */
-"The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "Следующее приложение было заблокировано для выполнения,<br />потому что она была признана вредоносной или противоречащей политике";
-
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Следующее приложение было заблокировано для выполнения,<br />поскольку его надежность не может быть определена";
+
+/* The default message to show the user when a banned application is blocked */
+"The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "Следующее приложение было заблокировано для выполнения,<br />потому что она была признана вредоносной или противоречащей политике";
 
 /* The default message to show the user when a USB device is blocked from mounting */
 "The following device has been blocked from mounting" = "Следующее устройство было заблокировано для установки";
@@ -114,3 +117,6 @@
 
 /* No comment provided by engineer. */
 "User" = "Пользователь";
+
+/* No comment provided by engineer. */
+"Version **%@**" = "Версия **%@**";

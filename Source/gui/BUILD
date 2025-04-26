@@ -16,7 +16,10 @@ swift_library(
     name = "SNTAboutWindowView",
     srcs = ["SNTAboutWindowView.swift"],
     generates_header = 1,
-    deps = ["//Source/common:SNTConfigurator"],
+    deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTConfigurator",
+    ],
 )
 
 swift_library(
@@ -161,6 +164,7 @@ swift_library(
     name = "SNTTestGUI_lib",
     srcs = ["SNTTestGUI.swift"],
     deps = [
+        ":SNTAboutWindowView",
         ":SNTBinaryMessageWindowView",
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",

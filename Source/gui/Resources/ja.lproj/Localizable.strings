@@ -13,11 +13,10 @@
 /* Default text for Approve */
 "Approve" = "許可する";
 
-/* File path
-   Signing ID */
+/* Authorize execution of an application with Signing ID or Path */
 "authorize execution of %@" = "%@実行を許可する";
 
-/* Bundle name */
+/* Authorize execution of an application with name */
 "authorize execution of the application %@" = "%@アプリケーションの実行を許可する";
 
 /* No comment provided by engineer. */
@@ -29,7 +28,7 @@
 /* No comment provided by engineer. */
 "CDHash" = "CDハッシュ";
 
-/* Copy Details button to copy all details shown in the More Details dialog */
+/* Copy Details */
 "Copy Details" = "詳細をコピー";
 
 /* Dismiss button in more details dialog */
@@ -47,7 +46,7 @@
 /* No comment provided by engineer. */
 "Label before time period picker" = "このアプリケーションからの通知を";
 
-/* More Details button in binary block dialog */
+/* More Details button */
 "More Details" = "さらに詳細";
 
 /* No comment provided by engineer. */
@@ -81,7 +80,10 @@
 "Rule Version" = "ルールバージョン";
 
 /* Explanation in About view */
-"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "SantaはmacOS向けアプリケーション制御システムです\n\n　ユーザーによる設定項目はありません";
+"Santa is a security system providing application,\ndevice, and file-access controls." = "Santaはアプリケーション、デバイス、\nファイルアクセスの制御を提供するセキュリティシステムです";
+
+/* No comment provided by engineer. */
+"Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santaは[North Pole Security](https://northpole.security)のエルフたちが❤️を込めて作り、\n素晴らしいコミュニティの貢献によって支えられています";
 
 /* No comment provided by engineer. */
 "SHA-256" = "SHA-256";
@@ -111,7 +113,10 @@
 "The following device has been remounted with reduced permissions" = "次のデバイスは権限を制限して再マウントされました";
 
 /* No comment provided by engineer. */
-unknown = "不明";
+"unknown" = "不明";
 
 /* No comment provided by engineer. */
-User = "ユーザー";
+"User" = "ユーザー";
+
+/* No comment provided by engineer. */
+"Version **%@**" = "バージョン **%@**";

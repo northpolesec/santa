@@ -80,7 +80,10 @@
 "Rule Version" = "Rule Version";
 
 /* Explanation in About view */
-"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa is an application control system for macOS.\n\nThere are no user-configurable settings.";
+"Santa is a security system providing application,\ndevice, and file-access controls." = "Santa is a security system providing application,\ndevice, and file-access controls.";
+
+/* No comment provided by engineer. */
+"Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community";
 
 /* No comment provided by engineer. */
 "SHA-256" = "SHA-256";
@@ -114,4 +117,7 @@
 
 /* No comment provided by engineer. */
 "User" = "User";
+
+/* No comment provided by engineer. */
+"Version **%@**" = "Version **%@**";
 
