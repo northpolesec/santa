@@ -8,6 +8,9 @@
 "Accessed Path" = "Accessed Path";
 
 /* No comment provided by engineer. */
+"An unknown error occurred. Please try again." = "An unknown error occurred. Please try again.";
+
+/* No comment provided by engineer. */
 "Application" = "Application";
 
 /* Default text for Approve */
@@ -36,6 +39,9 @@
 
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Dismiss & Silence";
+
+/* No comment provided by engineer. */
+"Failed to connect to the sync service. Please try again later." = "Failed to connect to the sync service. Please try again later.";
 
 /* No comment provided by engineer. */
 "Filename" = "Filename";
@@ -100,6 +106,12 @@
 /* Client mode change: STANDALONE */
 "Switching into Standalone mode" = "Switching into Standalone mode";
 
+/* No comment provided by engineer. */
+"Sync" = "Sync";
+
+/* No comment provided by engineer. */
+"The event upload failed. Please check your network connection and try again." = "The event upload failed. Please check your network connection and try again.";
+
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";
 
@@ -113,11 +125,26 @@
 "The following device has been remounted with reduced permissions" = "The following device has been remounted with reduced permissions";
 
 /* No comment provided by engineer. */
+"The postflight check failed. Please check your network connection and try again." = "The postflight check failed. Please check your network connection and try again.";
+
+/* No comment provided by engineer. */
+"The preflight check failed. Please check your network connection and try again." = "The preflight check failed. Please check your network connection and try again.";
+
+/* No comment provided by engineer. */
+"The rule download failed. Please check your network connection and try again." = "The rule download failed. Please check your network connection and try again.";
+
+/* No comment provided by engineer. */
+"The sync operation failed. Please try again." = "The sync operation failed. Please try again.";
+
+/* No comment provided by engineer. */
+"Too many syncs are in progress. Please try again later." = "Too many syncs are in progress. Please try again later.";
+
+/* No comment provided by engineer. */
 "unknown" = "unknown";
 
 /* No comment provided by engineer. */
 "User" = "User";
 
-/* No comment provided by engineer. */
+/* Version in About view */
 "Version **%@**" = "Version **%@**";
 
