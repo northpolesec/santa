@@ -7,7 +7,7 @@
 [![downloads](https://img.shields.io/github/downloads/northpolesec/santa/latest/total)](https://github.com/northpolesec/santa/releases/latest)
 
 <p align="center">
-    <img src="./docs/images/nps-logo-256.png" height="128" alt="Santa Icon" />
+    <img src="./docs/static/img/nps-logo-256.png" height="128" alt="Santa Icon" />
 </p>
 
 Santa is a binary and file access authorization system for macOS. It consists
@@ -134,7 +134,7 @@ A tool like Santa doesn't really lend itself to screenshots, so here's a video
 instead.
 
 
-<p align="center"> <img src="./docs/images/santa-block.gif" alt="Santa Block Video" /> </p>
+<p align="center"> <img src="./docs/static/img/santa-block.gif" alt="Santa Block Video" /> </p>
 
 # Contributing
 Patches to this project are very much welcome. Please see the

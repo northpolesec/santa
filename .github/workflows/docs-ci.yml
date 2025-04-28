@@ -1,0 +1,36 @@
+name: 'Docs: Test'
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+
+jobs:
+  test:
+    name: Docs Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # ratchet:pnpm/action-setup@v4
+        with:
+          package_json_file: "docs/package.json"
+          run_install: false
+
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: "docs/package.json"
+          cache: pnpm
+          cache-dependency-path: "docs/pnpm-lock.yaml"
+
+      - name: Install deps
+        working-directory: docs
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: docs
+        run: pnpm build

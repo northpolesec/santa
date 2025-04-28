@@ -1,0 +1,71 @@
+---
+sidebar_position: 1
+---
+
+import ConfigKeyList from "@site/src/components/ConfigKeyList";
+import { SantaConfigKeyGroups } from "@site/src/lib/santaconfig";
+import { RefreshCcwIcon } from "lucide-react";
+
+# Keys
+
+This page describes all of the available configuration options recognized by
+Santa.
+
+The configuration keys are broken down into sections to make it easier to find
+what you're looking for but in the configuration profile all the keys should be
+set together.
+
+Some keys (or available values for a key) will have a badge showing which Santa
+version they were added or deprecated in. Where a key has been deprecated, the
+description will list an alternative if one is available.
+
+A key with <RefreshCcwIcon className="size-3" /> next to the type can be
+overridden by a sync server.
+
+## General
+
+General options
+
+<ConfigKeyList list={SantaConfigKeyGroups.general} />
+
+## Sync
+
+Options related to syncing
+
+<ConfigKeyList list={SantaConfigKeyGroups.sync} />
+
+## GUI
+
+Options controlling how the GUI functions
+
+<ConfigKeyList list={SantaConfigKeyGroups.gui} />
+
+## FAA
+
+Options controlling file-access authorization
+
+<ConfigKeyList list={SantaConfigKeyGroups.faa} />
+
+## Rules
+
+Options controlling binary authorization rules
+
+<ConfigKeyList list={SantaConfigKeyGroups.rules} />
+
+## Telemetry
+
+Options controlling the output of telemetry data
+
+<ConfigKeyList list={SantaConfigKeyGroups.telemetry} />
+
+## USB
+
+Options controlling the USB mount control feature
+
+<ConfigKeyList list={SantaConfigKeyGroups.usb} />
+
+## Metrics
+
+Options controlling the export of agent metrics
+
+<ConfigKeyList list={SantaConfigKeyGroups.metrics} />
