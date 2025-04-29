@@ -504,6 +504,35 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    tty_writer->EnableSilentTTYMode(newBool);
                                  }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(enableMachineIDDecoration)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"enableMachineIDDecoration changed %d -> %d", oldBool,
+                                        newBool);
+
+                                   logger->UpdateMachineIDLogging();
+                                 }],
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
+              selector:@selector(machineID)
+                  type:[NSString class]
+              callback:^(NSString *oldValue, NSString *newValue) {
+                if ((!newValue && !oldValue) || ([newValue isEqualToString:oldValue])) {
+                  return;
+                }
+
+                LOGI(@"Handling change to machineID: %@ -> %@", oldValue, newValue);
+
+                logger->UpdateMachineIDLogging();
+              }],
   ]];
 
   if (@available(macOS 13.0, *)) {

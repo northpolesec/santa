@@ -72,6 +72,8 @@ class Logger {
 
   inline bool ShouldLog(TelemetryEvent event) { return ((event & telemetry_mask_) == event); }
 
+  void UpdateMachineIDLogging() const;
+
   friend class santa::LoggerPeer;
 
  private:

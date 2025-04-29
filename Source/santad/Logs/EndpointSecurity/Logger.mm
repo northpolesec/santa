@@ -127,4 +127,8 @@ void Logger::Flush() {
   writer_->Flush();
 }
 
+void Logger::UpdateMachineIDLogging() const {
+  serializer_->UpdateMachineID();
+}
+
 }  // namespace santa
