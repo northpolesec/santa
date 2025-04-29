@@ -317,7 +317,7 @@ changes in the release notes of any future release that changes them.`,
           value: "syslog",
           description: "Sent to the macOS Unified Logging Systen",
         },
-        { value: "filelog", description: "Sent to a file on disk" },
+        { value: "file", description: "Sent to a file on disk" },
         {
           value: "protobuf",
           description:
@@ -330,11 +330,11 @@ changes in the release notes of any future release that changes them.`,
         },
         { value: "null", description: "Don't output any event logs" },
       ],
-      defaultValue: "filelog",
+      defaultValue: "file",
     },
     {
       key: "EventLogPath",
-      description: `If \`EventLogType\` is set to \`filelog\` or \`json\`, EventLogPath will provide the path to save logs.
+      description: `If \`EventLogType\` is set to \`file\` or \`json\`, EventLogPath will provide the path to save logs.
         If you change this value ensure you also update \`com.northpolesec.santa.newsyslog.conf\` with the new path`,
       type: "string",
       defaultValue: "/var/db/santa/santa.log",
@@ -371,7 +371,7 @@ changes in the release notes of any future release that changes them.`,
     },
     {
       key: "EnableMachineIDDecoration",
-      description: `If \`EventLogType\` is set to \`filelog\` and this key is true, the \`MachineID\` to the end of
+      description: `If \`EventLogType\` is set to \`file\` and this key is true, the \`MachineID\` to the end of
       each log line.`,
       type: "bool",
       defaultValue: false,
@@ -854,8 +854,10 @@ thousand static rules working correctly, but we don't recommend using StaticRule
     },
     {
       key: "MachineID",
-      description: `The machine ID`,
+      description: `The machine ID. Care should be taken if overriding the default value. Using it incorrectly
+        with a sync server that implements progressive syncing could lead to incomplete rules.`,
       type: "string",
+      defaultValue: "Hardware UUID",
     },
     {
       key: "MachineOwnerPlist",
