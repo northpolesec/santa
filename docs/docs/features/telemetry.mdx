@@ -1,0 +1,435 @@
+---
+sidebar_position: 3
+---
+
+import AddedBadge from "@site/src/components/AddedBadge/AddedBadge";
+
+# Telemetry
+
+Santa collects and outputs telemetry data about security events. This data is
+used to provide insights into system activity, security events, and policy
+enforcement decisions.
+
+## Event Types
+
+Santa can log various types of events based on system activity. The following
+event types can be configured for logging:
+
+:::warning
+
+Some of these events are extremely noisy and will generate a lot of data.
+`Fork`, `Exit`, and `Close`, in particular will generate a very large amount of
+data, and should be used with caution.
+
+:::
+
+### Execution/Process
+
+#### `Execution`
+
+Binary execution events include detailed information about all allowed and
+denied executions.
+
+- The decision made by Santa
+- The reason for the decision, which usually indicates the kind of rule that was
+  matched when making the decision
+- The SHA-256 hash of the binary, if available
+- The signing certificate SHA-256 and common name, if available
+- The team ID from the code signature, if available
+- The pid, pidversion and ppid of the process
+- User and group IDs
+- The executable path
+- The arguments passed to the binary
+
+`protobuf` and `json` logs will include far more data, including:
+
+- The working directory
+- Environment variables
+- File descriptors
+- Entitlements
+
+#### `Fork`
+
+Process fork events, emitted every time any process calls `fork()` or
+`posix_spawn()`. This is often a precursor to an execution.
+
+#### `Exit`
+
+Process exit events, emitted every time a process exits, regardless of reason or
+state.
+
+- pid, pidversion and ppid of the process
+- The uid and gid of the process
+
+#### `CodesigningInvalidated`
+
+This event is emitted any time a signed binary is running and its signature
+became invalid during execution. This usually indicates that some part of the
+binary has been modified.
+
+- The code-signing flags of the process will be logged
+
+### File
+
+#### `Close`
+
+Emitted any time a file descriptor/handle is closed *and* was modified. This
+event is also emitted if a file was ever mapped writable (though a file being
+mapped writable does not necessarily mean that it was actually written to).
+
+- The path of the file
+
+#### `Rename`
+
+Emitted any time a file is renamed/moved.
+
+- The original path
+- The new path
+
+#### `Unlink`
+
+Emitted whenever a file is deleted.
+
+- The path of the file
+
+#### `Link`
+
+Emitted whenever a file is hard-linked.
+
+:::tip[Symlinks do not trigger this event]
+:::
+
+- The path of the file
+- The newly linked path
+
+#### `ExchangeData`
+
+Emitted any time a file is updated using the
+[`exchangedata(2)`](https://www.manpagez.com/man/2/exchangedata/)
+function. This is a macOS-specific syscall that atomically swaps the contents
+of two files that was supported on HFS+ formatted drives; it is not supported
+on the modern APFS filesystem.
+
+- The original path of the file
+- The new path
+
+#### `Clone`
+
+Emitted whenever a file is cloned using the
+[`clonefile(2)`](https://www.manpagez.com/man/2/clonefile/) system call.
+
+- The source path
+- The target path
+
+#### `CopyFile`
+
+Emitted whenever a file is copied using the `copyfile(2)` syscall. This is an
+undocumented call with no public API exposed, so it is not generally used.
+
+- The source path
+- The target path
+
+### Other
+
+#### `Disk`
+
+Emitted whenever a disk is mounted or unmounted. This event can be emitted even
+if [USB/SD Blocking](/features/usb-sd-blocking) is not enabled and can be
+useful to see if users are attaching external storage devices that may need to
+monitored or blocked.
+
+- The mount path
+- The volume name
+- The BSD device name
+- The filesystem type
+- The model of the device the mount is from
+- The serial number of the device the mount is from
+- The bus/protocol that the device is mounted from, e.g. `USB`
+- The DMG path, if the mount is from a disk image.
+
+
+#### `Bundle`
+
+Emitted whenever Santa creates a bundle hash for an application bundle. This
+only occurs when an application bundle is blocked, Santa is configured to synchronize
+with a sync server, that sync server has previously indicated that it supports
+Bundles and the GUI is presented to the user.
+
+Bundle hashing is a potentially expensive operation, and it can be useful to
+have these bundle hashes available in analysis separately from the events
+uploaded to the sync server.
+
+- The bundle path
+- The bundle name
+- The bundle ID
+- The bundle hash
+
+#### `Allowlist`
+
+Emitted whenever Santa creates a local allowlist rule for a binary created by an
+allowed compiler. This will only occur if Transitive Allowlisting is enabled and
+the host has one or more `ALLOWLIST_COMPILER` rules.
+
+- The pid and pidversion of the process that created the binary
+- The path of the new binary
+- The SHA-256 of the binary
+
+
+#### `FileAccess`
+
+Emitted whenever a File Access Authorization event occurs.
+
+See the [File Access](/features/faa) documentation for more
+details.
+
+- The policy name and version
+- The accessed path
+- The access type (read, write, execute, etc.)
+- The decision that was made
+
+#### `LoginWindowSession`
+
+Emitted whenever a user logs in, logs out, or locks/unlocks the screen locally.
+
+- The username associated with the session
+- The graphical session ID
+
+#### `LoginLogout`
+
+Emitted whenever a user logs in or out for a console session. This is not a very
+common event.
+
+- Whether the user is logging in or out
+- The associated user
+- Whether the login was successful
+
+#### `ScreenSharing`
+
+Emitted whenever a screen sharing session is started or ended.
+
+When a new session is started, the event will include:
+
+- Whether the session was successfully established
+- The IP address of the connecting user
+- If the user is connecting through iCloud: their Apple ID
+- What kind of authentication method was used
+- The authenticating user
+- The local username of the session
+- Whether the connection was made to an existing session
+- The graphical session ID
+
+:::note
+
+This event is only emitted if the built-in Screen Sharing service is used.
+
+:::
+
+#### `OpenSSH`
+
+Emitted whenever an incoming SSH connection is connected or disconnected.
+
+The event will include:
+
+- The remote IP address of the connection
+- The username or UID of the user that connected
+
+:::note
+
+This event is only emitted if the built-in `sshd` is used.
+
+:::
+
+#### `Authentication`
+
+Authentication events
+
+#### `GatekeeperOverride` <AddedBadge added={"macOS 15.0"} />
+
+Emitted whenever a user overrides Gatekeeper for a binary.
+
+The event will indicate:
+
+- The binary path
+- The binary's SHA-256 hash, if available
+- Details about the binary's code signature, if it is signed
+
+#### `TCCModification` <AddedBadge added={"macOS 15.4"} />
+
+Emitted whenever the Transparency, Consent, and Control database is modified.
+This occurs when an application is granted or denied access to a protected
+resource, such as the camera, microphone, or specific folders on disk.
+
+The event will indicate:
+
+- Whether it was a Create/Modify/Delete operation
+- The TCC service being modified (e.g. `SystemPolicyDocumentsFolder`, `SystemPolicyAllFiles`, `Microphone`, `Camera`, etc.)
+- An identifier for the application being granted/denied access
+- The kind of application identifier (e.g. `BUNDLE_ID`, `EXECUTABLE_PATH`)
+- Whether access is being granted or denied
+- A reason for the change (e.g. `USER_CONSENT`, `MDM_POLICY`)
+
+#### `XProtect` <AddedBadge added={"macOS 15.0"} />
+
+Emitted whenever XProtect detects or remediates malware.
+
+The event will indicate:
+
+- The XProtect signature version
+- The identifier for the malware that was detected
+- The path that it was detected at
+- An `incident_identifier`, which can be used to link multiple malware
+detected/remediated events together
+- If the malware was remediated:
+    - The path that was remediated
+    - The action taken to remediate it (e.g. `path_delete`)
+
+
+#### `LaunchItem`
+
+This item is emitted whenever a LaunchAgent, LaunchDaemon, or LoginItem is
+registered with the system.
+
+:::info[Prior to macOS 13.3 this event had some bugs that could cause events to be missed]
+:::
+
+The event data will indicate:
+
+- Whether an item was added or removed
+- The item type (e.g. `AGENT`, `DAEMON`, `LOGIN_ITEM`)
+- Whether or not the item is _legacy_
+   - When this field is true, the item was registered by placing a
+   `launchd.plist` file in the `/Library/LaunchDaemons` or
+   `/Library/LaunchAgents` directories, instead of being registered using
+   [`SMAppService`](https://developer.apple.com/documentation/servicemanagement/smappservice?language=objc)
+- The item path, if applicable
+- The executable path, if applicable
+
+
+## Configuration
+
+### Event Selection
+
+The `Telemetry` configuration key allows you to specify which events should be logged.
+
+You can use `Everything` to log all events (this is the default):
+
+```xml
+<key>Telemetry</key>
+<array>
+	<string>Everything</string>
+</array>
+```
+
+Or select specific events:
+
+```xml
+<key>Telemetry</key>
+<array>
+	<string>Execution</string>
+	<string>Authentication</string>
+	<string>FileAccess</string>
+</array>
+```
+
+Or disable logging events:
+
+```xml
+<key>Telemetry</key>
+<array>
+	<string>None</string>
+</key>
+```
+
+### Log Storage
+
+The `EventLogType` key determines how event logs are stored:
+
+- **file**: Writes events to a file on disk (default)
+- **syslog**: Sends events to the macOS Unified Logging System
+- **protobuf**: Uses a maildir-like format on disk
+
+   The format of protobuf messages is available in the [proto
+   schema](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto).
+
+- **json**: Writes one JSON object per line to a file
+
+   The format of protobuf messages is available in the [proto
+   schema](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto).
+
+   JSON logs are created by first creating protobuf messages and then converting
+   to JSON. Because JSON output requires this conversion, it is a less
+   performant option.
+
+- **null**: Disables event logging entirely. Consider setting the `Telemetry`
+   key to `none` instead, as this will save Santa from generating events only to
+   discard them.
+
+### File Options
+
+Applies when using the `file` log type.
+
+- `EventLogPath`: Path for filelog/JSON output (default: `/var/db/santa/santa.log`)
+
+### Protobuf-based Options
+
+Applies when using the `protobuf` or `json` log types.
+
+- `SpoolDirectory`: Base directory for protobuf format (default: `/var/db/santa/spool`)
+- `SpoolDirectoryFileSizeThresholdKB`: Per-file size limit (default: 100KB)
+- `SpoolDirectorySizeThresholdMB`: Total spool directory size limit (default: 100MB)
+- `SpoolDirectoryEventMaxFlushTimeSec`: Maximum buffer time before flush (default: 10 sec)
+
+### File Change Monitoring
+
+- `FileChangesRegex`: Regex pattern for paths to monitor for file changes
+- `FileChangesPrefixFilters`: Path prefixes to exclude from file change
+  monitoring. These paths will not be matched against the `FileChangesRegex`,
+  which can be a performance improvement for noisy paths.
+
+### Additional Options
+
+- `EnableMachineIDDecoration`: Adds machine ID to filelog entries
+- `EntitlementsPrefixFilter`: Entitlement prefixes to exclude from logging
+- `EntitlementsTeamIDFilter`: Team IDs whose entitlements should not be logged
+
+## Example Configuration
+
+Here's a complete example configuration for telemetry:
+
+```xml
+<key>Telemetry</key>
+<array>
+    <string>Execution</string>
+    <string>Authentication</string>
+    <string>FileAccess</string>
+</array>
+<key>EventLogType</key>
+<string>filelog</string>
+<key>EventLogPath</key>
+<string>/var/log/santa/events.log</string>
+<key>FileChangesRegex</key>
+<string>^/Users/.*\.sh$</string>
+<key>FileChangesPrefixFilters</key>
+<array>
+    <string>/private/tmp/</string>
+</array>
+<key>EnableMachineIDDecoration</key>
+<true/>
+<key>EntitlementsPrefixFilter</key>
+<array>
+    <string>com.apple.private</string>
+</array>
+<key>EntitlementsTeamIDFilter</key>
+<array>
+    <string>platform</string>
+</array>
+````
+
+This configuration:
+
+- Logs execution, authentication, and file access events
+- Writes logs to a custom file location
+- Monitors shell script changes in user directories
+- Excludes temporary directory changes
+- Adds machine ID to log entries
+- Filters out private Apple entitlements and platform binary entitlements

@@ -1,0 +1,145 @@
+import { themes as prismThemes } from "prism-react-renderer";
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
+
+// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
+
+const config: Config = {
+  title: "Santa",
+  tagline: "",
+  favicon: "img/favicon.ico",
+
+  // Set the production url of your site here
+  url: "https://northpole.dev",
+  // Set the /<baseUrl>/ pathname under which your site is served
+  baseUrl: "/",
+
+  // GitHub pages deployment config.
+  organizationName: "northpolesec",
+  projectName: "santa",
+
+  onBrokenLinks: "throw",
+  onBrokenMarkdownLinks: "warn",
+
+  markdown: {
+    mermaid: true,
+  },
+
+  themes: ["@docusaurus/theme-mermaid"],
+
+  plugins: [
+    ["./src/plugins/tailwind.config.js", {}],
+    [
+      "@docusaurus/plugin-client-redirects",
+      {
+        fromExtensions: ["html", "htm"],
+        redirects: [
+          // Redirects from the old Jekyll-based docs
+          {
+            to: "/configuration/keys",
+            from: "/deployment/configuration.html",
+          },
+          {
+            to: "/features/sync",
+            from: [
+              "/introduction/syncing-overview.html",
+              "/deployment/sync-servers.html",
+              "/development/sync-protocol.html",
+            ],
+          },
+          {
+            to: "/features/stats",
+            from: "/deployment/stats.html",
+          },
+          {
+            to: "/features/faa",
+            from: "/deployment/file-access-auth.html",
+          },
+          {
+            to: "/features/binary-authorization#scope",
+            from: "/concepts/scopes.html",
+          },
+          {
+            to: "/features/binary-authorization#client-mode",
+            from: "/concepts/mode.html",
+          },
+        ],
+      },
+    ],
+  ],
+
+  // Even if you don't use internationalization, you can use this field to set
+  // useful metadata like html lang. For example, if your site is Chinese, you
+  // may want to replace "en" with "zh-Hans".
+  i18n: {
+    defaultLocale: "en",
+    locales: ["en"],
+  },
+
+  presets: [
+    [
+      "classic",
+      {
+        docs: {
+          routeBasePath: "/", // Serve the docs at the site's root
+          sidebarPath: "./sidebars.ts",
+          // Please change this to your repo.
+          // Remove this to remove the "edit this page" links.
+          editUrl: "https://github.com/northpolesec/santa/tree/main/docs",
+        },
+        blog: false,
+        theme: {
+          customCss: "./src/css/custom.css",
+        },
+      } satisfies Preset.Options,
+    ],
+  ],
+
+  themeConfig: {
+    navbar: {
+      logo: {
+        alt: "NPS Santa logo",
+        src: "img/santa.svg",
+        height: 50,
+        width: 176,
+      },
+      items: [
+        {
+          href: "https://github.com/northpolesec/santa",
+          className: "header-github-link",
+          "aria-label": "GitHub",
+          position: "right",
+        },
+      ],
+    },
+
+    footer: {
+      links: [
+        {
+          label: "North Pole Security",
+          href: "https://northpole.security",
+        },
+        {
+          label: "MacAdmins Slack",
+          href: "https://macadmins.slack.com/archives/C0E1VRBGW",
+        },
+        {
+          label: "BlueSky",
+          href: "https://bsky.app/profile/northpolesec.bsky.social",
+        },
+        {
+          label: "X",
+          href: "https://x.com/northpolesec",
+        },
+      ],
+      copyright: `Copyright © ${new Date().getFullYear()} North Pole Security, Inc.`,
+    },
+    prism: {
+      theme: prismThemes.github,
+      darkTheme: prismThemes.dracula,
+      additionalLanguages: ["bash"],
+    },
+  } satisfies Preset.ThemeConfig,
+};
+
+export default config;

@@ -1,0 +1,214 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme) important;
+@import "tailwindcss/utilities.css" layer(utilities) important;
+
+@plugin 'tailwindcss-animate';
+
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+    border-color: hsl(var(--border));
+  }
+
+  :root {
+    /* Shadcn Style new-york - slate */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+
+  html[data-theme="dark"] {
+    /* Shadcn Style new-york - slate */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+
+  html {
+    font: var(--ifm-font-size-base) / var(--ifm-line-height-base)
+      var(--ifm-font-family-base);
+  }
+}
+
+:root {
+  /* Docusaurus vars */
+  --prism-background-color: #edefff;
+  --ifm-footer-background-color: #fff;
+  --ifm-footer-link-color: #333;
+  --ifm-code-font-size: 95%;
+  --ifm-color-primary: #ff4d48;
+  --ifm-color-primary-dark: #ff2d27;
+  --ifm-color-primary-darker: #ff1d17;
+  --ifm-color-primary-darkest: #e50600;
+  --ifm-color-primary-light: #ff6d69;
+  --ifm-color-primary-lighter: #ff7d79;
+  --ifm-color-primary-lightest: #ffacaa;
+  --ifm-h1-font-size: 2.5rem;
+  --docusaurus-highlighted-code-line-bg: #0000001a;
+  --ifm-global-shadow-tl: 2px 3px 5px 0 rgba(0, 0, 0, 0.2), 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  --menu-link-active: rgba(0, 0, 0, 0.1);
+  --ifm-menu-link-padding-vertical: 0.5rem;
+  --docs-fg-base: #030712;
+  --ifm-menu-color-active: var(--docs-fg-base);
+
+  --ifm-navbar-padding-vertical: 1rem;
+  --ifm-navbar-padding-horizontal: 1.75rem;
+  --ifm-navbar-height: 90px;
+}
+
+html[data-theme="dark"] {
+  /* Docusaurus color */
+  --prism-background-color: #1d2144;
+  --ifm-background-color: #18181b;
+  --ifm-background-surface-color: #18181b;
+  --ifm-footer-background-color: #ffffff1a;
+  --ifm-footer-link-color: #dadde1;
+  --ifm-color-primary: #e34048;
+  --ifm-color-primary-dark: #ff4d48;
+  --ifm-color-primary-darker: #de212b;
+  --ifm-color-primary-darkest: #a41920;
+  --ifm-color-primary-light: #e8646a;
+  --ifm-color-primary-lighter: #ed8388;
+  --ifm-color-primary-lightest: #f09ca0;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-menu-color-background-active: #ffffff1a;
+  --menu-link-active: rgba(255, 255, 255, 0.1);
+  --ifm-menu-color-active: var(--ifm-color-primary);
+}
+
+.navbar__brand {
+  height: 100%;
+}
+
+.navbar__brand > .navbar__logo {
+  height: 100%;
+}
+
+[data-theme='light'] .navbar__logo > img {
+  /* The logo is already white, so we invert it to black. */
+  filter: invert(1);
+}
+
+.navbar__logo:hover > img {
+  filter: brightness(0) saturate(100%) invert(31%) sepia(72%) saturate(2005%) hue-rotate(334deg) brightness(93%) contrast(90%);
+}
+
+.header-github-link::before {
+  content: "";
+  background-color: var(--ifm-navbar-link-color);
+  width: 24px;
+  height: 24px;
+  transition: background-color var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+  display: flex;
+  mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'/%3E%3C/svg%3E");
+}
+
+.header-github-link:hover::before {
+  background-color: var(--ifm-navbar-link-hover-color);
+}
+
+.footer__copyright {
+  font-size: small;
+}
+
+[data-theme='light'] img[src$='#dark'],
+[data-theme='dark'] img[src$='#light'] {
+  display: none;
+}
+
+/* Make Leen a little bit happier. */
+.theme-doc-sidebar-item-category-level-1 > div > a {
+  font-weight: 600;
+}
+.theme-doc-sidebar-item-link-level-2 {
+  font-size: 14px;
+}
+
