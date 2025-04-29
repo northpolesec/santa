@@ -55,7 +55,7 @@ void Serializer::UpdateMachineID() {
 
     // Atomically update the shared_ptr - relaxed ordering is sufficient
     // because we separately synchronize with the enabled_machine_id_ flag
-    std::atomic_store(&machine_id_, new_machine_id);
+    std::atomic_store_explicit(&machine_id_, new_machine_id, std::memory_order_relaxed);
 
     // Keep a reference to avoid deallocation
     saved_machine_id_ = new_machine_id;
