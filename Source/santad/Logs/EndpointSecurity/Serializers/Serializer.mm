@@ -51,8 +51,7 @@ void Serializer::UpdateMachineID() {
 
   if (should_enable) {
     NSString *configured_machine_id = [[SNTConfigurator configurator] machineID] ?: @"";
-    auto new_machine_id =
-        std::make_shared<std::string>([configured_machine_id UTF8String]);
+    auto new_machine_id = std::make_shared<std::string>([configured_machine_id UTF8String]);
 
     // Atomically update the shared_ptr - relaxed ordering is sufficient
     // because we separately synchronize with the enabled_machine_id_ flag
