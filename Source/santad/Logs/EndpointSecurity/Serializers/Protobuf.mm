@@ -399,7 +399,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
                                                    struct timespec processed_time) {
   ::pbv1::SantaMessage *santa_msg = Arena::Create<::pbv1::SantaMessage>(arena);
 
-  if (EnabledMachineID()) {
+  if (EnableMachineIDDecoration()) {
     EncodeString([santa_msg] { return santa_msg->mutable_machine_id(); }, *MachineID());
   }
   EncodeTimestamp(santa_msg->mutable_event_time(), event_time);

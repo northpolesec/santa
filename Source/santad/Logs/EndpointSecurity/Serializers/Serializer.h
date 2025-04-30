@@ -48,7 +48,7 @@ class Serializer {
                       msg->GetEnrichedMessage());
   }
 
-  bool EnabledMachineID() const;
+  bool EnableMachineIDDecoration() const;
   std::shared_ptr<std::string> MachineID() const;
   void UpdateMachineID();
 

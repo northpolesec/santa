@@ -285,7 +285,7 @@ std::string BasicString::CreateDefaultString(size_t reserved_size) {
 }
 
 std::vector<uint8_t> BasicString::FinalizeString(std::string &str) {
-  if (EnabledMachineID()) {
+  if (EnableMachineIDDecoration()) {
     str.append("|machineid=");
     str.append(*MachineID());
   }

@@ -67,7 +67,7 @@ void Serializer::UpdateMachineID() {
   }
 }
 
-bool Serializer::EnabledMachineID() const {
+bool Serializer::EnableMachineIDDecoration() const {
   return enabled_machine_id_.load(std::memory_order_acquire);
 }
 
