@@ -31,57 +31,58 @@ have the option for deploying custom profiles, you can use the following
 example as a template.
 
 ```xml showLineNumbers
-<!DOCTYPE plist PUBLIC “-//Apple//DTD PLIST 1.0//EN” “http://www.apple.com/DTDs/PropertyList-1.0.dtd”>
-<plist version=”1.0”>
-<dict>
-	<key>PayloadUUID</key>
-	<string>C5F3332F-9DEA-4FE5-924E-81708D962874</string>
-	<key>PayloadType</key>
-	<string>Configuration</string>
-	<key>PayloadOrganization</key>
-	<string>My Company</string>
-	<key>PayloadIdentifier</key>
-	<string>com.mycompany.santa.servicemanagement.C5F3332F-9DEA-4FE5-924E-81708D962874</string>
-	<key>PayloadDisplayName</key>
-	<string>Santa: Background Apps</string>
-	<key>PayloadDescription</key>
-	<string>Suppress notifications about Santa background apps</string>
-	<key>PayloadScope</key>
-	<key>PayloadVersion</key>
-	<integer>1</integer>
-	<key>PayloadEnabled</key>
-	<true/>
-	<key>PayloadRemovalDisallowed</key>
-	<true/>
-	<string>System</string>
-	<key>PayloadContent</key>
-	<array>
-		<dict>
-			<key>PayloadUUID</key>
-			<string>1161A7ED-2E7B-4744-B933-D3B9F58A1AAE</string>
-			<key>PayloadType</key>
-			<string>com.apple.servicemanagement</string>
-			<key>PayloadOrganization</key>
-			<string>My Company</string>
-			<key>PayloadIdentifier</key>
-			<string>com.mycompany.santa.servicemanagement.1161A7ED-2E7B-4744-B933-D3B9F58A1AAE</string>
-			<key>PayloadDisplayName</key>
-			<string>Background Apps</string>
-			<key>PayloadDescription</key>
-			<string>Allows Santa background tasks without notifications</string>
-			<key>PayloadVersion</key>
-			<integer>1</integer>
-			<key>Rules</key>
-			<array>
-				<dict>
-					<key>RuleType</key>
-					<string>TeamIdentifier</string>
-					<key>RuleValue</key>
-					<string>ZMCG7MLDV9</string>
-				</dict>
-			</array>
-		</dict>
-	</array>
-</dict>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>PayloadUUID</key>
+        <string>C5F3332F-9DEA-4FE5-924E-81708D962874</string>
+        <key>PayloadType</key>
+        <string>Configuration</string>
+        <key>PayloadOrganization</key>
+        <string>My Company</string>
+        <key>PayloadIdentifier</key>
+        <string>com.mycompany.santa.servicemanagement.C5F3332F-9DEA-4FE5-924E-81708D962874</string>
+        <key>PayloadDisplayName</key>
+        <string>Santa: Background Apps</string>
+        <key>PayloadDescription</key>
+        <string>Suppress notifications about Santa background apps</string>
+        <key>PayloadScope</key>
+        <string>System</string>
+        <key>PayloadVersion</key>
+        <integer>1</integer>
+        <key>PayloadEnabled</key>
+        <true />
+        <key>PayloadRemovalDisallowed</key>
+        <true />
+        <key>PayloadContent</key>
+        <array>
+            <dict>
+                <key>PayloadUUID</key>
+                <string>1161A7ED-2E7B-4744-B933-D3B9F58A1AAE</string>
+                <key>PayloadType</key>
+                <string>com.apple.servicemanagement</string>
+                <key>PayloadOrganization</key>
+                <string>My Company</string>
+                <key>PayloadIdentifier</key>
+                <string>com.mycompany.santa.servicemanagement.1161A7ED-2E7B-4744-B933-D3B9F58A1AAE</string>
+                <key>PayloadDisplayName</key>
+                <string>Background Apps</string>
+                <key>PayloadDescription</key>
+                <string>Allows Santa background tasks without notifications</string>
+                <key>PayloadVersion</key>
+                <integer>1</integer>
+                <key>Rules</key>
+                <array>
+                    <dict>
+                        <key>RuleType</key>
+                        <string>TeamIdentifier</string>
+                        <key>RuleValue</key>
+                        <string>ZMCG7MLDV9</string>
+                    </dict>
+                </array>
+            </dict>
+        </array>
+    </dict>
 </plist>
 ```
