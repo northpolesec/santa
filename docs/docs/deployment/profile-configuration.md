@@ -44,6 +44,7 @@ available.
 						<dict>
 							<key>mcx_preference_settings</key>
 							<dict>
+<!-- highlight-start -->
 								<key>ClientMode</key>
 								<integer>1</integer>
 								<key>EnableSilentMode</key>
@@ -91,6 +92,7 @@ available.
 								</array>
 								<key>SyncBaseURL</key>
 								<string>https://sync-server-hostname/api/santa/</string>
+<!-- highlight-end -->
 							</dict>
 						</dict>
 					</array>

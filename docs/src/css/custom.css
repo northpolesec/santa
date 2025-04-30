@@ -142,6 +142,8 @@
   --ifm-navbar-padding-vertical: 1rem;
   --ifm-navbar-padding-horizontal: 1.75rem;
   --ifm-navbar-height: 90px;
+
+  --ifm-container-width-xl: 80%;
 }
 
 html[data-theme="dark"] {
@@ -210,5 +212,9 @@ html[data-theme="dark"] {
 }
 .theme-doc-sidebar-item-link-level-2 {
   font-size: 14px;
+}
+
+pre {
+  tab-size: 2;
 }
 
