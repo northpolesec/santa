@@ -5,7 +5,7 @@ import { SantaConfigKey } from "@site/src/lib/santaconfig";
 
 export default function TypeBadge({ k }: { k: SantaConfigKey }): ReactNode {
   return (
-    <span className="badge badge--secondary mx-2 select-none">
+    <span className="badge badge--secondary mx-2 select-none docsearch-ignore">
       {k.repeated && "Array of "}
       {k.type}
       {k.repeated && "s"}

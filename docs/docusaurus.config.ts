@@ -134,10 +134,19 @@ const config: Config = {
       ],
       copyright: `Copyright © ${new Date().getFullYear()} North Pole Security, Inc.`,
     },
+
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
       additionalLanguages: ["bash"],
+    },
+
+    algolia: {
+      appId: "5Z70AHS23I",
+      // This key is safe to expose.
+      apiKey: "4c12177dbe87a2a9d03f4be3b421c7ae",
+      indexName: "northpole",
+      contextualSearch: true,
     },
   } satisfies Preset.ThemeConfig,
 };
