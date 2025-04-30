@@ -113,8 +113,7 @@ static id ValueOrNull(id value) {
 + (NSString *)stringFromHTML:(NSString *)html {
   NSError *error;
   NSXMLNodeOptions options = NSXMLDocumentIncludeContentTypeDeclaration |
-                             NSXMLNodeCompactEmptyElement |
-                             NSXMLNodeLoadExternalEntitiesNever |
+                             NSXMLNodeCompactEmptyElement | NSXMLNodeLoadExternalEntitiesNever |
                              NSXMLNodeNeverEscapeContents;
   NSXMLDocument *xml = [[NSXMLDocument alloc] initWithXMLString:html options:options error:&error];
 
