@@ -124,14 +124,16 @@ static id ValueOrNull(id value) {
       return nil;
     }
 
-    // If the error is that the document is empty, wrap the message in a basic HTML structure and try again.
-      html = [NSString stringWithFormat:@"<html><body>%@</body></html>", html];
-			xml = [[NSXMLDocument alloc]
-				initWithXMLString:html
-                  options:NSXMLDocumentIncludeContentTypeDeclaration | NSXMLNodeCompactEmptyElement |
-                          NSXMLNodeLoadExternalEntitiesNever | NSXMLNodeNeverEscapeContents
+    // If the error is that the document is empty, wrap the message in a basic HTML structure and
+    // try again.
+    html = [NSString stringWithFormat:@"<html><body>%@</body></html>", html];
+    xml = [[NSXMLDocument alloc]
+        initWithXMLString:html
+                  options:NSXMLDocumentIncludeContentTypeDeclaration |
+                          NSXMLNodeCompactEmptyElement | NSXMLNodeLoadExternalEntitiesNever |
+                          NSXMLNodeNeverEscapeContents
                     error:&error];
-      if (error) {
+    if (error) {
       LOGW(@"Failed to parse HTML message: %@", error);
       return nil;
     }
