@@ -15,12 +15,12 @@ extension Date {
 }
 
 public struct SNTMessageView<Content: View>: View {
-  let blockMessage: NSAttributedString
+  let blockMessage: NSAttributedString?
   @ViewBuilder let content: Content
 
   let enableFunFonts: Bool = SNTConfigurator.configurator().funFontsOnSpecificDays
 
-  public init(_ blockMessage: NSAttributedString, @ViewBuilder content: () -> Content) {
+  public init(_ blockMessage: NSAttributedString? = nil, @ViewBuilder content: () -> Content) {
     self.content = content()
     self.blockMessage = blockMessage
   }
@@ -57,13 +57,15 @@ public struct SNTMessageView<Content: View>: View {
     }.fixedSize()
 
     VStack(spacing: 10.0) {
-      AttributedText(blockMessage)
-        .multilineTextAlignment(.center)
-        .padding([.leading, .trailing], 15.0)
-        .fixedSize(horizontal: false, vertical: true)
+      if let blockMessage = blockMessage {
+        AttributedText(blockMessage)
+          .multilineTextAlignment(.center)
+          .padding([.leading, .trailing], 15.0)
+          .fixedSize(horizontal: false, vertical: true)
+
+      }
 
       Spacer()
-
       content
     }
     .padding([.leading, .trailing], 40.0)

@@ -1,11 +1,12 @@
 import SwiftUI
 
 import santa_common_SNTConfigurator
+import santa_gui_SNTMessageView
 
 @objc public class SNTAboutWindowViewFactory: NSObject {
   @objc public static func createWith(window: NSWindow) -> NSViewController {
     return NSHostingController(
-      rootView: SNTAboutWindowView(w: window).frame(width: 400, height: 200)
+      rootView: SNTAboutWindowView(w: window).fixedSize()
     )
   }
 }
@@ -13,23 +14,25 @@ import santa_common_SNTConfigurator
 struct SNTAboutWindowView: View {
   let w: NSWindow?
   let c = SNTConfigurator.configurator()
+  let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
 
   var body: some View {
-    VStack(spacing: 20.0) {
-      Text(verbatim: "Santa").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
-
+    SNTMessageView() {
       if let t = c.aboutText {
         Text(t).multilineTextAlignment(.center)
       } else {
         Text(
           """
-          Santa is an application control system for macOS.
-
-          There are no user-configurable settings.
+          Santa is a security system providing application,
+          device, and file-access controls.
           """,
           comment: "Explanation in About view"
         ).multilineTextAlignment(.center)
       }
+
+      // Calling .init explicitly to get Markdown rendering
+      let versionString = NSLocalizedString("Version **%@**", comment: "Version in About view")
+      Text(.init(String(format: versionString, v))).padding(10.0)
 
       HStack {
         if c.moreInfoURL?.absoluteString.isEmpty == false {
@@ -44,6 +47,18 @@ struct SNTAboutWindowView: View {
         .keyboardShortcut(.defaultAction)
 
       }.padding(10.0)
+
+      Text(
+        """
+        Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)
+        along with contributions from our wonderful community
+        """
+      )
+      .font(.system(size: 10.0, weight: .regular))
+      .padding([.bottom], 10.0)
+      .foregroundColor(.secondary)
+      .multilineTextAlignment(.center)
+      .padding(10.0)
     }
   }
 

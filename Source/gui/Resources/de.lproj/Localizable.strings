@@ -7,16 +7,16 @@
 /* No comment provided by engineer. */
 "Accessed Path" = "Aufgerufener Pfad";
 
-/* No comment provided by engineer.  */
-"Approve" = "Genehmigen";
-
 /* No comment provided by engineer. */
 "Application" = "Applikation";
 
-/* No comment provided by engineer. */
+/* Default text for Approve */
+"Approve" = "Genehmigen";
+
+/* Authorize execution of an application with Signing ID or Path */
 "authorize execution of %@" = "genehmigen die Ausführung von %@";
 
-/* No comment provided by engineer. */
+/* Authorize execution of an application with name */
 "authorize execution of the application %@" = "Die Ausführung der Anwendung autorisieren %@";
 
 /* No comment provided by engineer. */
@@ -28,7 +28,7 @@
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
 
-/* Copy Details button to copy all details shown in the More Details dialog */
+/* Copy Details */
 "Copy Details" = "Details kopieren";
 
 /* Dismiss button in more details dialog */
@@ -46,7 +46,7 @@
 /* No comment provided by engineer. */
 "Label before time period picker" = "Benachrichtigungen für diese Applikation unterdrücken für ";
 
-/* More Details button in binary block dialog */
+/* More Details button */
 "More Details" = "Mehr Details";
 
 /* No comment provided by engineer. */
@@ -80,7 +80,10 @@
 "Rule Version" = "Regelversion";
 
 /* Explanation in About view */
-"Santa is an application control system for macOS.\n\nThere are no user-configurable settings." = "Santa ist ein Applikationskontrollsystem für macOS.\n\nEs gibt keine benutzerkonfigurierbaren Einstellungen.";
+"Santa is a security system providing application,\ndevice, and file-access controls." = "Santa ist ein Sicherheitssystem, das Kontrolle über\nAnwendungen, Geräte und Dateizugriffe bietet";
+
+/* No comment provided by engineer. */
+"Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santa wurde mit ❤️ von den Elfen bei [North Pole Security](https://northpole.security) entwickelt,\nzusammen mit Beiträgen unserer wunderbaren Community";
 
 /* No comment provided by engineer. */
 "SHA-256" = "SHA-256";
@@ -114,3 +117,6 @@
 
 /* No comment provided by engineer. */
 "User" = "Benutzer";
+
+/* No comment provided by engineer. */
+"Version **%@**" = "Version **%@**";
