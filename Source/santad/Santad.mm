@@ -56,6 +56,15 @@ using santa::TTYWriter;
 using santa::Unit;
 using santa::WatchItems;
 
+static NSString *ClientModeName(SNTClientMode mode) {
+  switch (mode) {
+    case SNTClientModeMonitor: return @"Monitor";
+    case SNTClientModeLockdown: return @"Lockdown";
+    case SNTClientModeStandalone: return @"Standalone";
+    default: return @"Unknown";
+  }
+}
+
 void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logger> logger,
                 std::shared_ptr<Metrics> metrics, std::shared_ptr<santa::WatchItems> watch_items,
                 std::shared_ptr<Enricher> enricher,
@@ -199,18 +208,20 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 SNTClientMode clientMode = (SNTClientMode)[newValue longLongValue];
 
                 switch (clientMode) {
-                  case SNTClientModeLockdown:
-                    LOGI(@"Changed client mode to Lockdown, flushing cache.");
-                    auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
-                                                  FlushCacheReason::kClientModeChanged);
-                    break;
+                  case SNTClientModeLockdown: [[fallthrough]];
                   case SNTClientModeStandalone:
-                    LOGI(@"Changed client mode to Standalone, flushing cache.");
+                    LOGI(@"ClientMode changed: %@ -> %@. Flushing caches.",
+                         ClientModeName((SNTClientMode)[oldValue integerValue]),
+                         ClientModeName((SNTClientMode)[newValue integerValue]));
                     auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
                                                   FlushCacheReason::kClientModeChanged);
                     break;
-                  case SNTClientModeMonitor: LOGI(@"Changed client mode to Monitor."); break;
-                  default: LOGW(@"Changed client mode to unknown value."); break;
+                  case SNTClientModeMonitor: [[fallthrough]];
+                  default:
+                    LOGI(@"ClientMode changed: %@ -> %@",
+                         ClientModeName((SNTClientMode)[oldValue integerValue]),
+                         ClientModeName((SNTClientMode)[newValue integerValue]));
+                    break;
                 }
 
                 [[notifier_queue.notifierConnection remoteObjectProxy]
@@ -226,8 +237,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   return;
                 }
 
-                LOGI(@"SyncBaseURL %s.",
-                     (!oldValue && newValue) ? "added" : (newValue ? "changed" : "removed"));
+                LOGI(@"SyncBaseURL changed: %@ -> %@", oldValue, newValue);
 
                 [syncd_queue reassessSyncServiceConnection];
               }],
@@ -238,8 +248,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    BOOL oldBool = [oldValue boolValue];
                                    BOOL newBool = [newValue boolValue];
                                    if (oldBool != newBool) {
-                                     LOGI(@"EnableStatsCollection changed %s -> %s.",
-                                          oldBool ? "NO" : "YES", newBool ? "NO" : "YES");
+                                     LOGI(@"EnableStatsCollection changed: %d -> %d", oldBool,
+                                          newBool);
                                      [syncd_queue reassessSyncServiceConnection];
                                    }
                                  }],
@@ -250,13 +260,15 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
               callback:^(NSString *oldValue, NSString *newValue) {
                 if ((!newValue && !oldValue) || ([newValue isEqualToString:oldValue])) {
                   return;
-                } else if (oldValue && newValue) {
-                  // Sync service should've already been started. Nothing to do here.
-                  LOGI(@"StatsOrganizationID changed.");
-                  return;
                 } else {
-                  LOGI(@"StatsOrganizationID %s.", newValue ? "added" : "removed");
-                  [syncd_queue reassessSyncServiceConnection];
+                  LOGI(@"StatsOrganizationID changed: %@ -> %@", oldValue, newValue);
+                  // If either the new or old value was missing, we must
+                  // reassess the connection. If they both exist, it means the
+                  // value changed, but the sync service should already be
+                  // running and there is nothing to do.
+                  if (!oldValue || !newValue) {
+                    [syncd_queue reassessSyncServiceConnection];
+                  }
                 }
               }],
     [[SNTKVOManager alloc]
@@ -267,10 +279,12 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 BOOL oldBool = [oldValue boolValue];
                 BOOL newBool = [newValue boolValue];
                 if (oldBool == NO && newBool == YES) {
-                  LOGI(@"metricsExport changed NO -> YES, starting to export metrics");
+                  LOGI(@"ExportMetrics changed: %d -> %d. Starting to export metrics.", oldBool,
+                       newBool);
                   metrics->StartPoll();
                 } else if (oldBool == YES && newBool == NO) {
-                  LOGI(@"metricsExport changed YES -> NO, stopping export of metrics");
+                  LOGI(@"ExportMetrics changed: %d -> %d. Stopping export of metrics", oldBool,
+                       newBool);
                   metrics->StopPoll();
                 }
               }],
@@ -281,8 +295,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
               callback:^(NSNumber *oldValue, NSNumber *newValue) {
                 uint64_t oldInterval = [oldValue unsignedIntValue];
                 uint64_t newInterval = [newValue unsignedIntValue];
-                LOGI(@"MetricExportInterval changed from %llu to %llu restarting export",
-                     oldInterval, newInterval);
+                LOGI(@"MetricExportInterval changed: %llu -> %llu. Restarting export.", oldInterval,
+                     newInterval);
                 metrics->SetInterval(newInterval);
               }],
     [[SNTKVOManager alloc]
@@ -295,7 +309,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   return;
                 }
 
-                LOGI(@"Changed allowlist regex, flushing cache");
+                LOGI(@"AllowedPathRegex changed. Flushing caches.");
                 auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
                                               FlushCacheReason::kPathRegexChanged);
               }],
@@ -309,7 +323,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   return;
                 }
 
-                LOGI(@"Changed denylist regex, flushing cache");
+                LOGI(@"BlockedPathRegex changed. Flushing caches.");
                 auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
                                               FlushCacheReason::kPathRegexChanged);
               }],
@@ -365,7 +379,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      return;
                                    }
 
-                                   LOGI(@"StaticRules set has changed, flushing cache.");
+                                   LOGI(@"StaticRules changed. Flushing caches.");
                                    auth_result_cache->FlushCache(
                                        FlushCacheMode::kAllCaches,
                                        FlushCacheReason::kStaticRulesChanged);
@@ -382,7 +396,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   return;
                 }
 
-                LOGW(@"EventLogType config changed (%ld --> %ld). Restarting...", oldLogType,
+                LOGW(@"EventLogType config changed: %ld -> %ld. Restarting...", oldLogType,
                      newLogType);
 
                 dispatch_semaphore_t sema = dispatch_semaphore_create(0);
@@ -409,7 +423,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   return;
                 }
 
-                LOGI(@"EntitlementsTeamIDFilter changed. '%@' --> '%@'. Flushing caches.", oldValue,
+                LOGI(@"EntitlementsTeamIDFilter changed: '%@' -> '%@'. Flushing caches.", oldValue,
                      newValue);
 
                 // Get the value from the configurator since that method ensures proper structure
@@ -432,7 +446,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   return;
                 }
 
-                LOGI(@"EntitlementsPrefixFilter changed. '%@' --> '%@'. Flushing caches.", oldValue,
+                LOGI(@"EntitlementsPrefixFilter changed: '%@' -> '%@'. Flushing caches.", oldValue,
                      newValue);
 
                 // Get the value from the configurator since that method ensures proper structure
@@ -484,7 +498,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      return;
                                    }
 
-                                   LOGI(@"enableForkAndExitLogging changed %d -> %d", oldBool,
+                                   LOGI(@"EnableForkAndExitLogging changed: %d -> %d", oldBool,
                                         newBool);
                                    logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(
                                        configurator.telemetry, newBool));
@@ -500,40 +514,67 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      return;
                                    }
 
-                                   LOGI(@"enableSilentTTYMode changed %d -> %d", oldBool, newBool);
+                                   LOGI(@"EnableSilentTTYMode changed: %d -> %d", oldBool, newBool);
 
                                    tty_writer->EnableSilentTTYMode(newBool);
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(enableMachineIDDecoration)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"EnableMachineIDDecoration changed: %d -> %d", oldBool,
+                                        newBool);
+
+                                   logger->UpdateMachineIDLogging();
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(machineID)
+                                     type:[NSString class]
+                                 callback:^(NSString *oldValue, NSString *newValue) {
+                                   if ((!newValue && !oldValue) ||
+                                       ([newValue isEqualToString:oldValue])) {
+                                     return;
+                                   }
+
+                                   LOGI(@"MachineID changed: %@ -> %@", oldValue, newValue);
+
+                                   logger->UpdateMachineIDLogging();
                                  }],
   ]];
 
   if (@available(macOS 13.0, *)) {
     // Only watch file access auth keys on mac 13 and newer
     [kvoObservers addObjectsFromArray:@[
-      [[SNTKVOManager alloc]
-          initWithObject:configurator
-                selector:@selector(fileAccessPolicyPlist)
-                    type:[NSString class]
-                callback:^(NSString *oldValue, NSString *newValue) {
-                  if ([configurator fileAccessPolicy]) {
-                    // Ignore any changes to this key if fileAccessPolicy is set
-                    return;
-                  }
+      [[SNTKVOManager alloc] initWithObject:configurator
+                                   selector:@selector(fileAccessPolicyPlist)
+                                       type:[NSString class]
+                                   callback:^(NSString *oldValue, NSString *newValue) {
+                                     if ([configurator fileAccessPolicy]) {
+                                       // Ignore any changes to this key if fileAccessPolicy is set
+                                       return;
+                                     }
 
-                  if ((oldValue && !newValue) ||
-                      (newValue && ![oldValue isEqualToString:newValue])) {
-                    LOGI(@"Filesystem monitoring policy config path changed: %@ -> %@", oldValue,
-                         newValue);
-                    watch_items->SetConfigPath(newValue);
-                  }
-                }],
+                                     if ((oldValue && !newValue) ||
+                                         (newValue && ![oldValue isEqualToString:newValue])) {
+                                       LOGI(@"FileAccessPolicyPlist changed: %@ -> %@", oldValue,
+                                            newValue);
+                                       watch_items->SetConfigPath(newValue);
+                                     }
+                                   }],
       [[SNTKVOManager alloc] initWithObject:configurator
                                    selector:@selector(fileAccessPolicy)
                                        type:[NSDictionary class]
                                    callback:^(NSDictionary *oldValue, NSDictionary *newValue) {
                                      if ((oldValue && !newValue) ||
                                          (newValue && ![oldValue isEqualToDictionary:newValue])) {
-                                       LOGI(
-                                           @"Filesystem monitoring policy embedded config changed");
+                                       LOGI(@"FileAccessPolicy changed");
                                        watch_items->SetConfig(newValue);
                                      }
                                    }],

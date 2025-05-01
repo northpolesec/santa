@@ -30,10 +30,10 @@
 namespace santa {
 
 Serializer::Serializer(SNTDecisionCache *decision_cache) : decision_cache_(decision_cache) {
-  if ([[SNTConfigurator configurator] enableMachineIDDecoration]) {
-    enabled_machine_id_ = true;
-    machine_id_ = [[[SNTConfigurator configurator] machineID] UTF8String] ?: "";
-  }
+  machine_id_ = std::make_shared<std::string>("");
+  saved_machine_id_ = machine_id_;
+
+  UpdateMachineID();
 
   // Prime the xxHash state with invariant data
   common_hash_state_ = XXH3_createState();
@@ -46,13 +46,34 @@ Serializer::~Serializer() {
   XXH3_freeState(common_hash_state_);
 }
 
-bool Serializer::EnabledMachineID() {
-  return enabled_machine_id_;
+void Serializer::UpdateMachineID() {
+  bool should_enable = [[SNTConfigurator configurator] enableMachineIDDecoration];
+
+  if (should_enable) {
+    NSString *configured_machine_id = [[SNTConfigurator configurator] machineID] ?: @"";
+    auto new_machine_id = std::make_shared<std::string>([configured_machine_id UTF8String]);
+
+    // Atomically update the shared_ptr - relaxed ordering is sufficient
+    // because we separately synchronize with the enabled_machine_id_ flag
+    std::atomic_store_explicit(&machine_id_, new_machine_id, std::memory_order_relaxed);
+
+    // Keep a reference to avoid deallocation
+    saved_machine_id_ = new_machine_id;
+
+    // Use release ordering to establish happens-before relationship with readers
+    enabled_machine_id_.store(true, std::memory_order_release);
+  } else {
+    enabled_machine_id_.store(false, std::memory_order_release);
+  }
 }
 
-std::string_view Serializer::MachineID() {
-  return std::string_view(machine_id_);
-};
+bool Serializer::EnableMachineIDDecoration() const {
+  return enabled_machine_id_.load(std::memory_order_acquire);
+}
+
+std::shared_ptr<std::string> Serializer::MachineID() const {
+  return std::atomic_load_explicit(&machine_id_, std::memory_order_relaxed);
+}
 
 std::vector<uint8_t> Serializer::SerializeMessageTemplate(const santa::EnrichedExec &msg) {
   SNTCachedDecision *cd;

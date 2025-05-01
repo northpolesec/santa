@@ -17,6 +17,7 @@
 #define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_SERIALIZER_H
 
 #import <Foundation/Foundation.h>
+#include <atomic>
 
 #include <functional>
 #include <memory>
@@ -47,8 +48,9 @@ class Serializer {
                       msg->GetEnrichedMessage());
   }
 
-  bool EnabledMachineID();
-  std::string_view MachineID();
+  bool EnableMachineIDDecoration() const;
+  std::shared_ptr<std::string> MachineID() const;
+  void UpdateMachineID();
 
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedClose &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedExchange &) = 0;
@@ -123,9 +125,11 @@ class Serializer {
     return SerializeMessage(msg);
   }
 
-  bool enabled_machine_id_ = false;
-  std::string machine_id_;
   SNTDecisionCache *decision_cache_;
+  std::atomic<bool> enabled_machine_id_{false};
+  std::shared_ptr<std::string> machine_id_;
+  // Used to ensure a reference sticks around while no vended copies exists
+  std::shared_ptr<std::string> saved_machine_id_;
   XXH3_state_t *common_hash_state_;
 };
 
