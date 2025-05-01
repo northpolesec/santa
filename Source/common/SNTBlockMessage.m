@@ -112,15 +112,25 @@ static id ValueOrNull(id value) {
 
 + (NSString *)stringFromHTML:(NSString *)html {
   NSError *error;
-  NSXMLDocument *xml = [[NSXMLDocument alloc]
-      initWithXMLString:html
-                options:NSXMLDocumentIncludeContentTypeDeclaration | NSXMLNodeCompactEmptyElement |
-                        NSXMLNodeLoadExternalEntitiesNever | NSXMLNodeNeverEscapeContents
-                  error:&error];
+  NSXMLNodeOptions options = NSXMLDocumentIncludeContentTypeDeclaration |
+                             NSXMLNodeCompactEmptyElement | NSXMLNodeLoadExternalEntitiesNever |
+                             NSXMLNodeNeverEscapeContents;
+  NSXMLDocument *xml = [[NSXMLDocument alloc] initWithXMLString:html options:options error:&error];
 
   if (error) {
-    LOGW(@"Failed to parse HTML message: %@", error);
-    return nil;
+    if (error.code != NSXMLParserEmptyDocumentError) {
+      LOGW(@"Failed to parse HTML message: %@", error);
+      return nil;
+    }
+
+    // If the error is that the document is empty, wrap the message in a basic HTML structure and
+    // try again.
+    html = [NSString stringWithFormat:@"<html><body>%@</body></html>", html];
+    xml = [[NSXMLDocument alloc] initWithXMLString:html options:options error:&error];
+    if (error) {
+      LOGW(@"Failed to parse HTML message: %@", error);
+      return nil;
+    }
   }
 
   // Strip any HTML tags out of the message. Also remove any content inside <style> tags and
