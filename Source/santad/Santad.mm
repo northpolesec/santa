@@ -547,6 +547,38 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    logger->UpdateMachineIDLogging();
                                  }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(enableTelemetryExport)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"EnableTelemetryUpload changed: %d -> %d", oldBool,
+                                        newBool);
+
+                                   logger->StartTimer();
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(telemetryExportIntervalSec)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   uint32_t oldInterval = [oldValue unsignedIntValue];
+                                   uint32_t newInterval = [newValue unsignedIntValue];
+
+                                   if (oldInterval == newInterval) {
+                                     return;
+                                   }
+
+                                   LOGI(@"TelemetryUploadIntervalSec changed: %u -> %u",
+                                        oldInterval, newInterval);
+
+                                   logger->SetTimerInterval(newInterval);
+                                 }],
   ]];
 
   if (@available(macOS 13.0, *)) {
@@ -612,6 +644,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   }
   [monitor_client enable];
   [device_client enable];
+
+  if ([configurator enableTelemetryExport]) {
+    logger->StartTimer();
+  }
 
   [[NSRunLoop mainRunLoop] run];
 }
