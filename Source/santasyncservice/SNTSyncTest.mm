@@ -21,6 +21,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTSIPStatus.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -73,6 +74,9 @@
   OCMStub([siMock osBuild]).andReturn(@"23F79");
   OCMStub([siMock modelIdentifier]).andReturn(@"MacBookPro18,3");
   OCMStub([siMock santaFullVersion]).andReturn(@"2024.6.655965194");
+
+  id sipMock = OCMClassMock([SNTSIPStatus class]);
+  OCMStub([sipMock currentStatus]).andReturn(0x6f);
 
   self.syncState.session = OCMClassMock([NSURLSession class]);
 
@@ -292,7 +296,13 @@
         validateBlock:^BOOL(NSURLRequest *req) {
           NSData *gotReqData = [req HTTPBody];
           NSData *expectedReqData = [self dataFromFixture:@"sync_preflight_request.json"];
-          XCTAssertEqualObjects(gotReqData, expectedReqData);
+
+          NSString *gotReq = [[NSString alloc] initWithData:gotReqData
+                                                   encoding:NSUTF8StringEncoding];
+          NSString *expectedReq = [[NSString alloc] initWithData:expectedReqData
+                                                        encoding:NSUTF8StringEncoding];
+
+          XCTAssertEqualObjects(gotReq, expectedReq);
           XCTAssertEqualObjects([req valueForHTTPHeaderField:@"Content-Type"], @"application/json");
           return YES;
         }];

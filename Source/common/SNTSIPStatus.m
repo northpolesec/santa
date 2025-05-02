@@ -16,10 +16,10 @@
 
 #import "SNTLogging.h"
 
-// https://github.com/apple/darwin-xnu/blob/2ff845c2e033bd0ff64b5b6aa6063a1f8f65aa32/bsd/sys/csr.h#L38C18-L38C30
+// https://github.com/apple-oss-distributions/xnu/blob/8d741a5de7ff4191bf97d57b9f54c2f6d4a15585/bsd/sys/csr.h#L38
 typedef uint32_t csr_config_t;
 
-// https://github.com/apple/darwin-xnu/blob/2ff845c2e033bd0ff64b5b6aa6063a1f8f65aa32/bsd/sys/csr.h#L102
+// https://github.com/apple-oss-distributions/xnu/blob/8d741a5de7ff4191bf97d57b9f54c2f6d4a15585/bsd/sys/csr.h#L104
 extern int csr_get_active_config(csr_config_t *) WEAK_IMPORT_ATTRIBUTE;
 
 @implementation SNTSIPStatus
