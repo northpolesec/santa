@@ -50,13 +50,13 @@ example as a template.
 <dict>
 	<!-- See https://developer.apple.com/documentation/devicemanagement/systemextensions for payload descriptions -->
 	<key>PayloadUUID</key>
-	<string>40C19D5B-76D7-4C1C-BC9D-2F7EB29CFF4D</string>
+	<string>CAA3F5F6-4519-410D-960B-FDC323FA08E2</string>
 	<key>PayloadType</key>
 	<string>Configuration</string>
 	<key>PayloadOrganization</key>
 	<string>My Company</string>
 	<key>PayloadIdentifier</key>
-	<string>com.mycompany.santa.sysx-policy.40C19D5B-76D7-4C1C-BC9D-2F7EB29CFF4D</string>
+	<string>com.mycompany.santa.sysx-policy.CAA3F5F6-4519-410D-960B-FDC323FA08E2</string>
 	<key>PayloadDisplayName</key>
 	<string>Santa: System Extension</string>
 	<key>PayloadDescription</key>
@@ -73,13 +73,13 @@ example as a template.
 	<array>
 		<dict>
 			<key>PayloadUUID</key>
-			<string>98D01A7B-ADC1-43C8-AB8E-8BDC25FCA3C9</string>
+			<string>67EF74B6-F4FB-49FC-A086-5DE3E61B838A</string>
 			<key>PayloadType</key>
 			<string>com.apple.system-extension-policy</string>
 			<key>PayloadOrganization</key>
 			<string>My Company</string>
 			<key>PayloadIdentifier</key>
-			<string>com.mycompany.santa.sysx-policy.98D01A7B-ADC1-43C8-AB8E-8BDC25FCA3C9</string>
+			<string>com.mycompany.santa.sysx-policy.67EF74B6-F4FB-49FC-A086-5DE3E61B838A</string>
 			<key>PayloadDisplayName</key>
 			<string>Sysx</string>
 			<key>PayloadDescription</key>

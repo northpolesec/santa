@@ -62,13 +62,13 @@ for deploying custom profiles, you can use the following example as a template.
 <plist version="1.0">
 <dict>
 	<key>PayloadUUID</key>
-	<string>089CBCFB-F2AA-407C-9F2A-A12967FE20BC</string>
+	<string>9622A065-8AA4-4294-BDA3-71AA5C15BD93</string>
 	<key>PayloadType</key>
 	<string>Configuration</string>
 	<key>PayloadOrganization</key>
 	<string>My Company</string>
 	<key>PayloadIdentifier</key>
-	<string>com.mycompany.santa.tcc-policy.089CBCFB-F2AA-407C-9F2A-A12967FE20BC</string>
+	<string>com.mycompany.santa.tcc-policy.9622A065-8AA4-4294-BDA3-71AA5C15BD93</string>
 	<key>PayloadDisplayName</key>
 	<string>Santa: TCC</string>
 	<key>PayloadDescription</key>
@@ -85,13 +85,13 @@ for deploying custom profiles, you can use the following example as a template.
 	<array>
 		<dict>
 			<key>PayloadUUID</key>
-			<string>2416BA4B-CBFC-4719-B02F-20251B881D6F</string>
+			<string>8339162A-75E7-4E07-91DC-45DC939A4764</string>
 			<key>PayloadType</key>
 			<string>com.apple.TCC.configuration-profile-policy</string>
 			<key>PayloadOrganization</key>
 			<string>My Company</string>
 			<key>PayloadIdentifier</key>
-			<string>com.mycompany.santa.tcc-policy.2416BA4B-CBFC-4719-B02F-20251B881D6F</string>
+			<string>com.mycompany.santa.tcc-policy.8339162A-75E7-4E07-91DC-45DC939A4764</string>
 			<key>PayloadDisplayName</key>
 			<string>TCC</string>
 			<key>PayloadDescription</key>
