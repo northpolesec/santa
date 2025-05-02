@@ -256,7 +256,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   [self preflightWithSyncState:syncState];
 }
 
-- (void)pushNotificationSync {
+- (void)pushNotificationSyncSecondsFromNow:(uint64_t)seconds {
+  if (seconds > 0) {
+    [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:seconds];
+    return;
+  }
+
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
   SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
