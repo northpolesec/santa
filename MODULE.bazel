@@ -7,7 +7,7 @@ bazel_dep(name = "rules_apple", version = "3.19.1", repo_name = "build_bazel_rul
 bazel_dep(name = "rules_shell", version = "0.4.0", repo_name = "build_bazel_rules_shell")
 bazel_dep(name = "rules_swift", version = "2.7.0", repo_name = "build_bazel_rules_swift")
 bazel_dep(name = "rules_fuzzing", version = "0.5.2")
-bazel_dep(name = "protobuf", version = "30.0", repo_name = "com_google_protobuf")
+bazel_dep(name = "protobuf", version = "30.2", repo_name = "com_google_protobuf")
 bazel_dep(name = "googletest", version = "1.16.0", repo_name = "com_google_googletest")
 bazel_dep(name = "xxhash", version = "0.8.2")
 

@@ -19,6 +19,7 @@
 #import <XCTest/XCTest.h>
 
 #include <map>
+#include <string_view>
 
 #include "Source/common/Platform.h"
 
