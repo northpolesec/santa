@@ -493,6 +493,18 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTSIPStatus",
+    srcs = ["SNTSIPStatus.m"],
+    hdrs = ["SNTSIPStatus.h"],
+    sdk_frameworks = [
+        "Foundation",
+    ],
+    deps = [
+        ":SNTLogging",
+    ],
+)
+
+objc_library(
     name = "SNTXPCBundleServiceInterface",
     srcs = ["SNTXPCBundleServiceInterface.m"],
     hdrs = ["SNTXPCBundleServiceInterface.h"],
