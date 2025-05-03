@@ -558,10 +558,14 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      return;
                                    }
 
-                                   LOGI(@"EnableTelemetryUpload changed: %d -> %d", oldBool,
+                                   LOGI(@"EnableTelemetryExport changed: %d -> %d", oldBool,
                                         newBool);
 
-                                   logger->StartTimer();
+                                   if (newBool) {
+                                     logger->StartTimer();
+                                   } else {
+                                     logger->StopTimer();
+                                   }
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(telemetryExportIntervalSec)
@@ -574,7 +578,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      return;
                                    }
 
-                                   LOGI(@"TelemetryUploadIntervalSec changed: %u -> %u",
+                                   LOGI(@"TelemetryExportIntervalSec changed: %u -> %u",
                                         oldInterval, newInterval);
 
                                    logger->SetTimerInterval(newInterval);

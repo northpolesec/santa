@@ -16,9 +16,10 @@
 #define SANTA__COMMON__TIMER_H
 
 #include <Foundation/Foundation.h>
-#include <Foundation/NSDate.h>
 #include <dispatch/dispatch.h>
 #include <sys/qos.h>
+
+#include <algorithm>
 
 namespace santa {
 
@@ -64,7 +65,7 @@ class Timer {
 
   /// Set new timer parameters. If the timer is running, it will fire immediately.
   void SetTimerInterval(NSTimeInterval interval_seconds) {
-    interval_seconds_ = std::min(interval_seconds, minimum_interval_);
+    interval_seconds_ = std::max(interval_seconds, minimum_interval_);
     UpdateTimingParameters();
   }
 
@@ -72,7 +73,7 @@ class Timer {
 
  private:
   /// Update the timer firing settings. If a timer is currently active, will
-  /// resutl in it immediately firing and then again at the current interval.
+  /// result in it immediately firing and then again at the current interval.
   void UpdateTimingParameters() {
     if (timer_source_) {
       dispatch_source_set_timer(timer_source_, DISPATCH_WALLTIME_NOW,
