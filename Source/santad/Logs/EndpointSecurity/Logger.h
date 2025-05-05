@@ -16,13 +16,14 @@
 #ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
 #define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
 
-#include <memory>
-#include <string_view>
-#include "Source/common/TelemetryEventMap.h"
-
 #import <Foundation/Foundation.h>
 
+#include <memory>
+#include <string_view>
+
 #import "Source/common/SNTCommonEnums.h"
+#include "Source/common/TelemetryEventMap.h"
+#include "Source/common/Timer.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
@@ -38,14 +39,15 @@ class LoggerPeer;
 
 namespace santa {
 
-class Logger {
+class Logger : public Timer<Logger> {
  public:
   static std::unique_ptr<Logger> Create(std::shared_ptr<santa::EndpointSecurityAPI> esapi,
                                         TelemetryEvent telemetry_mask, SNTEventLogType log_type,
                                         SNTDecisionCache *decision_cache, NSString *event_log_path,
                                         NSString *spool_log_path, size_t spool_dir_size_threshold,
                                         size_t spool_file_size_threshold,
-                                        uint64_t spool_flush_timeout_ms);
+                                        uint64_t spool_flush_timeout_ms,
+                                        uint32_t telemetry_export_seconds);
 
   Logger(TelemetryEvent telemetry_mask, std::shared_ptr<santa::Serializer> serializer,
          std::shared_ptr<santa::Writer> writer);
@@ -73,6 +75,8 @@ class Logger {
   inline bool ShouldLog(TelemetryEvent event) { return ((event & telemetry_mask_) == event); }
 
   void UpdateMachineIDLogging() const;
+
+  void OnTimer();
 
   friend class santa::LoggerPeer;
 

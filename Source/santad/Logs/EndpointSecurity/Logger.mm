@@ -32,11 +32,14 @@
 namespace santa {
 
 // Flush the write buffer every 5 seconds
-static const uint64_t kFlushBufferTimeoutMS = 10000;
+static constexpr uint64_t kFlushBufferTimeoutMS = 10000;
 // Batch writes up to 128kb
-static const size_t kBufferBatchSizeBytes = (1024 * 128);
+static constexpr size_t kBufferBatchSizeBytes = (1024 * 128);
 // Reserve an extra 4kb of buffer space to account for event overflow
-static const size_t kMaxExpectedWriteSizeBytes = 4096;
+static constexpr size_t kMaxExpectedWriteSizeBytes = 4096;
+// Minimum allowable telemetry upload frequency.
+// Semi-arbitrary. Goal is to protect against too much strain on the upload path.
+static constexpr uint32_t kMinTelemetryUploadIntervalSecs = 60;
 
 // Translate configured log type to appropriate Serializer/Writer pairs
 std::unique_ptr<Logger> Logger::Create(std::shared_ptr<EndpointSecurityAPI> esapi,
@@ -44,41 +47,58 @@ std::unique_ptr<Logger> Logger::Create(std::shared_ptr<EndpointSecurityAPI> esap
                                        SNTDecisionCache *decision_cache, NSString *event_log_path,
                                        NSString *spool_log_path, size_t spool_dir_size_threshold,
                                        size_t spool_file_size_threshold,
-                                       uint64_t spool_flush_timeout_ms) {
+                                       uint64_t spool_flush_timeout_ms,
+                                       uint32_t telemetry_export_seconds) {
+  std::unique_ptr<Logger> logger;
+
   switch (log_type) {
     case SNTEventLogTypeFilelog:
-      return std::make_unique<Logger>(
+      logger = std::make_unique<Logger>(
           telemetry_mask, BasicString::Create(esapi, std::move(decision_cache)),
           File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
                        kMaxExpectedWriteSizeBytes));
+      break;
     case SNTEventLogTypeSyslog:
-      return std::make_unique<Logger>(telemetry_mask,
-                                      BasicString::Create(esapi, std::move(decision_cache), false),
-                                      Syslog::Create());
+      logger = std::make_unique<Logger>(
+          telemetry_mask, BasicString::Create(esapi, std::move(decision_cache), false),
+          Syslog::Create());
+      break;
     case SNTEventLogTypeNull:
-      return std::make_unique<Logger>(telemetry_mask, Empty::Create(), Null::Create());
+      logger = std::make_unique<Logger>(telemetry_mask, Empty::Create(), Null::Create());
+      break;
     case SNTEventLogTypeProtobuf:
-      return std::make_unique<Logger>(
+      logger = std::make_unique<Logger>(
           telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache)),
           Spool::Create([spool_log_path UTF8String], spool_dir_size_threshold,
                         spool_file_size_threshold, spool_flush_timeout_ms));
+      break;
     case SNTEventLogTypeJSON:
-      return std::make_unique<Logger>(
+      logger = std::make_unique<Logger>(
           telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache), true),
           File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
                        kMaxExpectedWriteSizeBytes));
+      break;
     default: LOGE(@"Invalid log type: %ld", log_type); return nullptr;
   }
+
+  logger->SetTimerInterval(telemetry_export_seconds);
+
+  return logger;
 }
 
 Logger::Logger(TelemetryEvent telemetry_mask, std::shared_ptr<santa::Serializer> serializer,
                std::shared_ptr<santa::Writer> writer)
-    : telemetry_mask_(telemetry_mask),
+    : Timer<Logger>(kMinTelemetryUploadIntervalSecs),
+      telemetry_mask_(telemetry_mask),
       serializer_(std::move(serializer)),
       writer_(std::move(writer)) {}
 
 void Logger::SetTelemetryMask(TelemetryEvent mask) {
   telemetry_mask_ = mask;
+}
+
+void Logger::OnTimer() {
+  LOGD(@"Timer Fired!");
 }
 
 void Logger::Log(std::unique_ptr<EnrichedMessage> msg) {

@@ -142,6 +142,9 @@ static NSString *const kFileAccessPolicyPlist = @"FileAccessPolicyPlist";
 static NSString *const kFileAccessBlockMessage = @"FileAccessBlockMessage";
 static NSString *const kFileAccessPolicyUpdateIntervalSec = @"FileAccessPolicyUpdateIntervalSec";
 
+static NSString *const kEnableTelemetryExport = @"EnableTelemetryExport";
+static NSString *const kTelemetryExportIntervalSec = @"TelemetryExportIntervalSec";
+
 static NSString *const kEnableMachineIDDecoration = @"EnableMachineIDDecoration";
 
 static NSString *const kEnableForkAndExitLogging = @"EnableForkAndExitLogging";
@@ -295,6 +298,8 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFileAccessPolicyPlist : string,
       kFileAccessBlockMessage : string,
       kFileAccessPolicyUpdateIntervalSec : number,
+      kEnableTelemetryExport : number,
+      kTelemetryExportIntervalSec : number,
       kEnableMachineIDDecoration : number,
       kEnableForkAndExitLogging : number,
       kIgnoreOtherEndpointSecurityClients : number,
@@ -679,6 +684,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingTelemetry {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableTelemetryExport {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingTelemetryExportIntervalSec {
   return [self configStateSet];
 }
 
@@ -1091,6 +1104,16 @@ static SNTConfigurator *sharedConfigurator = nil;
   return self.configState[kFileAccessPolicyUpdateIntervalSec]
              ? [self.configState[kFileAccessPolicyUpdateIntervalSec] unsignedIntValue]
              : 60 * 10;
+}
+
+- (BOOL)enableTelemetryExport {
+  return [self.configState[kEnableTelemetryExport] boolValue];
+}
+
+- (uint32_t)telemetryExportIntervalSec {
+  return self.configState[kTelemetryExportIntervalSec]
+             ? [self.configState[kTelemetryExportIntervalSec] unsignedIntValue]
+             : 60 * 15;
 }
 
 - (BOOL)enableMachineIDDecoration {

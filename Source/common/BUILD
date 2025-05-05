@@ -228,6 +228,13 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "Timer",
+    hdrs = ["Timer.h"],
+    deps = [
+    ],
+)
+
 santa_unit_test(
     name = "TelemetryEventMapTest",
     srcs = ["TelemetryEventMapTest.mm"],

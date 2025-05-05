@@ -130,13 +130,14 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   size_t spool_file_threshold_bytes = [configurator spoolDirectoryFileSizeThresholdKB] * 1024;
   size_t spool_dir_threshold_bytes = [configurator spoolDirectorySizeThresholdMB] * 1024 * 1024;
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
+  uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
 
   std::unique_ptr<::Logger> logger = Logger::Create(
       esapi,
       TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
       [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
       [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,
-      spool_flush_timeout_ms);
+      spool_flush_timeout_ms, telemetry_export_frequency_secs);
   if (!logger) {
     LOGE(@"Failed to create logger.");
     exit(EXIT_FAILURE);

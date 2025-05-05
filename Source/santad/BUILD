@@ -785,6 +785,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:TelemetryEventMap",
+        "//Source/common:Timer",
     ],
 )
 

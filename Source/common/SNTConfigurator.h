@@ -255,6 +255,22 @@
 @property(readonly, nonatomic) float spoolDirectoryEventMaxFlushTimeSec;
 
 ///
+///  If true, Santa will attempt to periodically export telemetry to configured location.
+///  Defaults to false.
+///
+///  @note: This property is KVO compliant.
+///
+@property(readonly) BOOL enableTelemetryExport;
+
+///
+///  If enableTelemetryExport is true, this defined how often telemetry export is performed.
+///  Defaults to 900 (15 minutes). Minimum allowed value is 60.
+///
+///  @note: This property is KVO compliant.
+///
+@property(readonly) uint32_t telemetryExportIntervalSec;
+
+///
 ///  If set, contains the filesystem access policy configuration.
 ///
 ///  @note: The property fileAccessPolicyPlist will be ignored if
