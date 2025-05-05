@@ -60,15 +60,22 @@
 }
 
 - (void)handleAPNSMessage:(NSDictionary *)message {
-  // Embrace APNS; do not rely on any payload information. Message delivery is best effort. Only a
-  // single message will be queued per-{bundle ID and device}, in a non-deterministic way.
-  // To avoid sync actions from being dropped or delivered out of order, do not store or interpret
-  // any payload data. Instead, use the retrieval as signal that there is new data on the sync
-  // server for the client. Simply, kick off a sync - but let the sync server know this sync was
-  // triggered by a push notification. This allows the sync server to respond with any time
-  // sensitive actions, like displaying a UI notification.
-  // https://developer.apple.com/documentation/usernotifications/sending-notification-requests-to-apns?language=objc
-  [self.delegate pushNotificationSync];
+  LOGD(@"APNS message received: %@", message);
+
+  // The APNS payload is purposefully _very_ simple given the way APNS handles message re-delivery.
+  // The payload dictionary contains a single key "S" with a value of either 0 or 1. If the value is
+  // 0 then the sync should happen immediately. If the value is 1 then the sync should happen after
+  // a random delay between now and the global rule sync deadline. This allows sync servers
+  // implementing APNS support to smear syncs of a large number of hosts to avoid a thundering herd,
+  // while still reaching resolution within a reasonable time period.
+  id syncType = message[@"S"];
+  if ([syncType isKindOfClass:[NSNumber class]] && [(NSNumber *)syncType integerValue] == 1) {
+    uint32_t delaySeconds = arc4random_uniform((uint32_t)self.globalRuleSyncDeadline);
+    LOGD(@"Global rule_sync, staggering: %u second delay", delaySeconds);
+    [self.delegate pushNotificationSyncSecondsFromNow:delaySeconds];
+    return;
+  }
+  [self.delegate pushNotificationSyncSecondsFromNow:0];
 }
 
 @end

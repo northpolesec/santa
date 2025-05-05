@@ -23,7 +23,7 @@
 - (void)ruleSync;
 - (void)ruleSyncSecondsFromNow:(uint64_t)seconds;
 - (void)preflightSync;
-- (void)pushNotificationSync;
+- (void)pushNotificationSyncSecondsFromNow:(uint64_t)seconds;
 - (MOLXPCConnection *)daemonConnection;
 @end
 
