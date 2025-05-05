@@ -8,6 +8,9 @@
 "Accessed Path" = "Шлях доступу";
 
 /* No comment provided by engineer. */
+"An unknown error occurred. Please try again." = "Сталася невідома помилка. Будь ласка, спробуйте ще раз.";
+
+/* No comment provided by engineer. */
 "Application" = "Заявка";
 
 /* Default text for Approve */
@@ -36,6 +39,9 @@
 
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Звільнити і замовкнути";
+
+/* No comment provided by engineer. */
+"Failed to connect to the sync service. Please try again later." = "Не вдалося підключитися до служби синхронізації. Будь ласка, спробуйте пізніше.";
 
 /* No comment provided by engineer. */
 "Filename" = "Ім'я файлу";
@@ -90,6 +96,27 @@
 
 /* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
+
+/* No comment provided by engineer. */
+"Sync" = "Синхронізація";
+
+/* No comment provided by engineer. */
+"The event upload failed. Please check your network connection and try again." = "Не вдалося завантажити подію. Будь ласка, перевірте підключення до мережі та спробуйте ще раз.";
+
+/* No comment provided by engineer. */
+"The postflight check failed. Please check your network connection and try again." = "Перевірка після польоту не вдалася. Будь ласка, перевірте підключення до мережі та спробуйте ще раз.";
+
+/* No comment provided by engineer. */
+"The preflight check failed. Please check your network connection and try again." = "Попередня перевірка не вдалася. Будь ласка, перевірте підключення до мережі та спробуйте ще раз.";
+
+/* No comment provided by engineer. */
+"The rule download failed. Please check your network connection and try again." = "Не вдалося завантажити правило. Будь ласка, перевірте підключення до мережі та спробуйте ще раз.";
+
+/* No comment provided by engineer. */
+"The sync operation failed. Please try again." = "Операція синхронізації не вдалася. Будь ласка, спробуйте ще раз.";
+
+/* No comment provided by engineer. */
+"Too many syncs are in progress. Please try again later." = "Забагато синхронізацій виконується. Будь ласка, спробуйте пізніше.";
 
 /* Client mode change: LOCKDOWN */
 "Switching into Lockdown mode" = "Перехід у режим блокування";

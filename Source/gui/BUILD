@@ -18,7 +18,9 @@ swift_library(
     generates_header = 1,
     deps = [
         ":SNTMessageView",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTXPCSyncServiceInterface",
     ],
 )
 

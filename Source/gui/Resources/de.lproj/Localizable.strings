@@ -8,6 +8,9 @@
 "Accessed Path" = "Aufgerufener Pfad";
 
 /* No comment provided by engineer. */
+"An unknown error occurred. Please try again." = "Ein unbekannter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.";
+
+/* No comment provided by engineer. */
 "Application" = "Applikation";
 
 /* Default text for Approve */
@@ -36,6 +39,9 @@
 
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Ignorieren & Stummschalten";
+
+/* No comment provided by engineer. */
+"Failed to connect to the sync service. Please try again later." = "Verbindung zum Synchronisierungsdienst fehlgeschlagen. Bitte versuchen Sie es später erneut.";
 
 /* No comment provided by engineer. */
 "Filename" = "Dateiname";
@@ -90,6 +96,27 @@
 
 /* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
+
+/* No comment provided by engineer. */
+"Sync" = "Synchronisieren";
+
+/* No comment provided by engineer. */
+"The event upload failed. Please check your network connection and try again." = "Der Upload des Ereignisses ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.";
+
+/* No comment provided by engineer. */
+"The postflight check failed. Please check your network connection and try again." = "Die Postflight-Prüfung ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.";
+
+/* No comment provided by engineer. */
+"The preflight check failed. Please check your network connection and try again." = "Die Preflight-Prüfung ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.";
+
+/* No comment provided by engineer. */
+"The rule download failed. Please check your network connection and try again." = "Der Download der Regel ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.";
+
+/* No comment provided by engineer. */
+"The sync operation failed. Please try again." = "Die Synchronisierungsoperation ist fehlgeschlagen. Bitte versuchen Sie es erneut.";
+
+/* No comment provided by engineer. */
+"Too many syncs are in progress. Please try again later." = "Zu viele Synchronisierungen laufen. Bitte versuchen Sie es später erneut.";
 
 /* Client mode change: LOCKDOWN */
 "Switching into Lockdown mode" = "Umschalten in den Lockdown-Modus";

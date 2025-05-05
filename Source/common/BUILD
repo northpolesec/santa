@@ -573,6 +573,7 @@ objc_library(
     name = "SNTXPCSyncServiceInterface",
     srcs = ["SNTXPCSyncServiceInterface.m"],
     hdrs = ["SNTXPCSyncServiceInterface.h"],
+    module_name = "santa_common_SNTXPCSyncServiceInterface",
     deps = [
         ":MOLXPCConnection",
         ":SNTCommonEnums",
@@ -773,6 +774,7 @@ objc_library(
     name = "MOLXPCConnection",
     srcs = ["MOLXPCConnection.m"],
     hdrs = ["MOLXPCConnection.h"],
+    module_name = "santa_common_MOLXPCConnection",
     sdk_frameworks = ["Security"],
     deps = [":MOLCodesignChecker"],
 )

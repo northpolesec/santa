@@ -149,6 +149,7 @@ typedef NS_ENUM(NSInteger, SNTSyncStatusType) {
   SNTSyncStatusTypeMissingMachineID,
   SNTSyncStatusTypeDaemonTimeout,
   SNTSyncStatusTypeSyncStarted,
+  SNTSyncStatusTypeFailedXPCConnection,
   SNTSyncStatusTypeUnknown,
 };
 
