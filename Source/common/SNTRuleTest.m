@@ -209,6 +209,18 @@
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects(sut.identifier, ident);
   }
+
+  // Comments are left intact
+  sut = [[SNTRule alloc] initWithDictionary:@{
+    @"identifier" : @"ABCDEFGHIJ",
+    @"policy" : @"REMOVE",
+    @"rule_type" : @"TEAMID",
+    @"Comment" : @"ThIs iS Only A Comment!",
+  }
+                                      error:nil];
+  XCTAssertNotNil(sut);
+  XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ");
+  XCTAssertEqualObjects(sut.comment, @"ThIs iS Only A Comment!");
 }
 
 - (void)testInitWithDictionaryInvalid {

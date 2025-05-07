@@ -286,13 +286,18 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     customURL = nil;
   }
 
+  NSString *comment = dict[kRuleComment];
+  if (![comment isKindOfClass:[NSString class]] || comment.length == 0) {
+    comment = nil;
+  }
+
   return [self initWithIdentifier:identifier
                             state:state
                              type:type
                         customMsg:customMsg
                         customURL:customURL
                         timestamp:0
-                          comment:nil
+                          comment:comment
                             error:error];
 }
 

@@ -179,9 +179,9 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)retrieveAllRules:(void (^)(NSArray<SNTRule *> *, NSError *))reply {
+#ifndef DEBUG
   SNTConfigurator *config = [SNTConfigurator configurator];
-
-  // Do not return any rules if syncBaseURL is set and return an error.
+  // Do not return any rules if syncBaseURL or static rules are set and return an error.
   if (config.syncBaseURL || config.staticRules.count) {
     NSError *error;
     [SNTError populateError:&error
@@ -190,6 +190,7 @@ double watchdogRAMPeak = 0;
     reply(@[], error);
     return;
   }
+#endif
 
   NSArray<SNTRule *> *rules = [[SNTDatabaseController ruleTable] retrieveAllRules];
   reply(rules, nil);
