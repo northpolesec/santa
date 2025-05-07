@@ -234,7 +234,6 @@ macos_command_line_application(
     name = "santasyncservice",
     bundle_id = "com.northpolesec.santa.syncservice",
     codesignopts = [
-        "--timestamp",
         "--force",
         "--options library,kill,runtime",
     ],
