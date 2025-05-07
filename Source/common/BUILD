@@ -197,6 +197,7 @@ objc_library(
     name = "SigningIDHelpers",
     srcs = ["SigningIDHelpers.m"],
     hdrs = ["SigningIDHelpers.h"],
+    module_name = "santa_common_SigningIDHelpers",
     deps = [
         ":MOLCodesignChecker",
         ":SNTLogging",
@@ -380,6 +381,7 @@ objc_library(
     name = "SNTFileInfo",
     srcs = ["SNTFileInfo.m"],
     hdrs = ["SNTFileInfo.h"],
+    module_name = "santa_common_SNTFileInfo",
     deps = [
         ":MOLCodesignChecker",
         ":SNTError",
@@ -748,6 +750,7 @@ objc_library(
     name = "MOLCodesignChecker",
     srcs = ["MOLCodesignChecker.m"],
     hdrs = ["MOLCodesignChecker.h"],
+    module_name = "santa_common_MOLCodesignChecker",
     sdk_frameworks = [
         "Foundation",
         "Security",

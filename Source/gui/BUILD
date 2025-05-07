@@ -25,6 +25,21 @@ swift_library(
 )
 
 swift_library(
+    name = "SNTFileInfoView",
+    srcs = [
+        "SNTFileInfoView.swift",
+    ],
+    generates_header = 1,
+    module_name = "santa_gui_SNTFileInfoView",
+    deps = [
+        ":SNTMessageView",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SigningIDHelpers",
+    ],
+)
+
+swift_library(
     name = "SNTBinaryMessageWindowView",
     srcs = ["SNTBinaryMessageWindowView.swift"],
     generates_header = 1,
@@ -101,6 +116,7 @@ objc_library(
         ":SNTBinaryMessageWindowView",
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
+        ":SNTFileInfoView",
         "//Source/common:CertificateHelpers",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
@@ -110,6 +126,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
         "//Source/common:SNTFileAccessEvent",
+        "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStrengthify",
@@ -146,7 +163,7 @@ macos_application(
         "Info.plist",
         "//Source/common:CommitHash",
     ],
-    minimum_os_version = "12.0",
+    minimum_os_version = "13.0",
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",

@@ -31,6 +31,23 @@
 		<key>LSLaunchModifierDoNotAddToRecentApplications</key>
 		<true/>
 	</dict>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSSupportsOpeningDocumentsInPlace</key>
+			<true/>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.application</string>
+				<string>public.executable</string>
+				<string>com.apple.application-bundle</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSHumanReadableCopyright</key>
 	<string>North Pole Security, Inc.</string>
 	<key>NSPrincipalClass</key>

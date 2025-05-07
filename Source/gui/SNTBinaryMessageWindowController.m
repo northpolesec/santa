@@ -86,8 +86,7 @@
 
   self.window =
       [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                  styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
-                                            NSWindowStyleMaskTitled
+                                  styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskTitled
                                     backing:NSBackingStoreBuffered
                                       defer:NO];
   self.window.titlebarAppearsTransparent = YES;

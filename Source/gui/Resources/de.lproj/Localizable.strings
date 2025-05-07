@@ -41,6 +41,9 @@
 "Dismiss & Silence" = "Ignorieren & Stummschalten";
 
 /* No comment provided by engineer. */
+"Drop for application info" = "Zum Anzeigen der App-Informationen ablegen";
+
+/* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Verbindung zum Synchronisierungsdienst fehlgeschlagen. Bitte versuchen Sie es später erneut.";
 
 /* No comment provided by engineer. */
@@ -95,6 +98,9 @@
 "SHA-256" = "SHA-256";
 
 /* No comment provided by engineer. */
+"Signed" = "Signiert";
+
+/* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
 
 /* No comment provided by engineer. */
@@ -126,6 +132,9 @@
 
 /* Client mode change: STANDALONE */
 "Switching into Standalone mode" = "Umschalten in den Standalone-Modus";
+
+/* No comment provided by engineer. */
+"Team ID" = "Team-ID";
 
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Die folgende Applikation wurde blockiert,<br />da ihre Vertrauenswürdigkeit nicht überprüft werden kann";

@@ -17,11 +17,13 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #import "Source/gui/SNTAboutWindowController.h"
+#import "Source/gui/SNTFileInfoView-Swift.h"
 #import "Source/gui/SNTNotificationManager.h"
 
 @interface SNTAppDelegate ()
@@ -68,6 +70,35 @@
   }
   [self.aboutWindowController showWindow:self];
   return NO;
+}
+
+- (void)application:(NSApplication *)sender openURLs:(NSArray<NSURL *> *)urls {
+  // Handle requests to open other applications, either by being dropped onto
+  // the app's dock icon or dropped onto the About window. Unfortunately,
+  // dropping onto the app icon doesn't work.
+  for (NSURL *url in urls) {
+    SNTFileInfo *fileInfo = [[SNTFileInfo alloc] initWithPath:url.path];
+    if (fileInfo) {
+      NSViewController *vc = [SNTFileInfoViewFactory createWithFileInfo:fileInfo];
+
+      NSWindow *window = [[NSWindow alloc]
+          initWithContentRect:NSMakeRect(0, 0, 0, 0)
+                    styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskTitled |
+                              NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
+                      backing:NSBackingStoreBuffered
+                        defer:NO];
+      window.contentViewController = vc;
+      window.releasedWhenClosed = NO;
+      window.title =
+          [NSString stringWithFormat:@"File info for %@",
+                                     fileInfo.bundleName ?: fileInfo.path.lastPathComponent];
+      [window makeKeyAndOrderFront:nil];
+      [window center];
+
+      // Add app to Cmd+Tab and Dock.
+      NSApp.activationPolicy = NSApplicationActivationPolicyRegular;
+    }
+  }
 }
 
 #pragma mark Connection handling
