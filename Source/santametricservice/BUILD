@@ -57,7 +57,6 @@ macos_command_line_application(
     name = "santametricservice",
     bundle_id = "com.northpolesec.santa.metricservice",
     codesignopts = [
-        "--timestamp",
         "--force",
         "--options library,kill,runtime",
     ],

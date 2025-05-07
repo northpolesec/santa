@@ -99,7 +99,6 @@ macos_command_line_application(
     name = "santactl",
     bundle_id = "com.northpolesec.santa.ctl",
     codesignopts = [
-        "--timestamp",
         "--force",
         "--options library,kill,runtime",
     ],
