@@ -130,14 +130,12 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 @interface WatchItemsTest : XCTestCase
 @property NSFileManager *fileMgr;
 @property NSString *testDir;
-@property NSMutableArray *dirStack;
 @property dispatch_queue_t q;
 @end
 
 @implementation WatchItemsTest
 
 - (void)setUp {
-  self.dirStack = [[NSMutableArray alloc] init];
   self.fileMgr = [NSFileManager defaultManager];
   self.testDir =
       [NSString stringWithFormat:@"%@santa-watchitems-%d", NSTemporaryDirectory(), getpid()];
@@ -153,25 +151,6 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
 - (void)tearDown {
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:nil]);
-}
-
-- (void)pushd:(NSString *)path withRoot:(NSString *)root {
-  NSString *dir = [NSString pathWithComponents:@[ root, path ]];
-  NSString *origCwd = [self.fileMgr currentDirectoryPath];
-  XCTAssertNotNil(origCwd);
-
-  XCTAssertTrue([self.fileMgr changeCurrentDirectoryPath:dir]);
-  [self.dirStack addObject:origCwd];
-}
-
-- (void)pushd:(NSString *)dir {
-  [self pushd:dir withRoot:self.testDir];
-}
-
-- (void)popd {
-  NSString *dir = [self.dirStack lastObject];
-  XCTAssertTrue([self.fileMgr changeCurrentDirectoryPath:dir]);
-  [self.dirStack removeLastObject];
 }
 
 - (void)createTestDirStructure:(NSArray *)fs rootedAt:(NSString *)root {
@@ -275,7 +254,6 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // filesystem didn't change.
   {
     WatchItemsPeer watchItems((NSString *)nil, NULL, NULL);
-    [self pushd:@"a"];
     watchItems.ReloadConfig(configAllFilesOriginalA);
 
     targetPolicies = watchItems.FindPoliciesForTargets(af1Path);
@@ -342,7 +320,6 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   });
 
   // Move into the base test directory and write the config to disk
-  [self pushd:@""];
   XCTAssertTrue([firstConfig writeToFile:configFile atomically:YES]);
 
   std::vector<FAAPolicyProcessor::PathTarget> f1Path = {MakePathTarget("f1", self.testDir)};
@@ -368,8 +345,6 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertSemaTrue(sema, 5, "Periodic task did not complete within expected window");
   XCTAssertTrue(watchItems->FindPoliciesForTargets(f1Path)[0].second.has_value());
   XCTAssertTrue(watchItems->FindPoliciesForTargets(weird1Path)[0].second.has_value());
-
-  [self popd];
 }
 
 - (void)testPolicyLookup {
@@ -399,9 +374,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertEqual(watchItems.FindPoliciesForTargets(paths).size(), 2);
 
   // Load the initial config
-  [self pushd:@""];
   watchItems.ReloadConfig(config);
-  [self popd];
 
   {
     // Test expected values with the inital policy
@@ -438,9 +411,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   [config[@"WatchItems"] setObject:barTxtFilePolicy forKey:@"bar_txt"];
 
   // Load the updated config
-  [self pushd:@""];
   watchItems.ReloadConfig(config);
-  [self popd];
 
   {
     // Test expected values with the updated policy
@@ -468,9 +439,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   [config[@"WatchItems"] setObject:catchAllFilePolicy forKey:@"slash_everything"];
 
   // Load the updated config
-  [self pushd:@""];
   watchItems.ReloadConfig(config);
-  [self popd];
 
   {
     // Test expected values with the catch-all policy
@@ -490,9 +459,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   // Now remove the foo_subdir rule, previous matches should fallback to the catch-all
   [config[@"WatchItems"] removeObjectForKey:@"foo_subdir"];
-  [self pushd:@""];
   watchItems.ReloadConfig(config);
-  [self popd];
 
   {
     // Test expected values with the foo_subdir policy removed
