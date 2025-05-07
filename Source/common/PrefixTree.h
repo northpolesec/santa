@@ -93,11 +93,10 @@ class PrefixTree {
 
 #if SANTA_PREFIX_TREE_DEBUG
   void Print() {
-    char buf[max_depth_ + 1];
-    memset(buf, 0, sizeof(buf));
+    std::vector<char> buf(max_depth_ + 1);
 
     absl::ReaderMutexLock lock(&lock_);
-    PrintLocked(root_, buf, 0);
+    PrintLocked(root_, buf.data(), 0);
   }
 #endif
 

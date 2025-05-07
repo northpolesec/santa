@@ -38,11 +38,17 @@
                 (got), (want))
 
 // Pretty print C++ string match errors
-#define XCTAssertCppStringEqual(got, want) XCTAssertCStringEqual((got).c_str(), (want).c_str())
+#define XCTAssertCppStringEqual(got, want) \
+  XCTAssertCStringEqual((std::string(got)).c_str(), (std::string(want)).c_str())
 
 #define XCTAssertCppStringBeginsWith(got, want)                                               \
   XCTAssertTrue((got).rfind((want), 0) == 0, "\nPrefix not found.\n\t got: %s\n\twant: %s\n", \
                 (got).c_str(), (want).c_str())
+
+#define XCTAssertCppStringEndsWith(got, want)                                                \
+  XCTAssertTrue(std::string(got).ends_with(std::string(want)),                               \
+                "\nSuffix not found.\n\t got: %s\n\twant: %s\n", (std::string(got)).c_str(), \
+                (std::string(want)).c_str())
 
 // Note: Delta between local formatter and the one run on Github. Disable for now.
 // clang-format off

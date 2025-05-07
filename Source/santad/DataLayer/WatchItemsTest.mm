@@ -69,6 +69,7 @@ extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray
 std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDictionary *watch_item,
                                                                        NSError **err);
 extern std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type);
+extern std::vector<std::string> FindMatches(NSString *path);
 
 class WatchItemsPeer : public WatchItems {
  public:
@@ -85,6 +86,7 @@ class WatchItemsPeer : public WatchItems {
 }  // namespace santa
 
 using santa::FAAPolicyProcessor;
+using santa::FindMatches;
 using santa::GetRuleType;
 using santa::IsWatchItemNameValid;
 using santa::ParseConfig;
@@ -97,9 +99,21 @@ static constexpr std::string_view kBadPolicyName("__BAD_NAME__");
 static constexpr std::string_view kBadPolicyPath("__BAD_PATH__");
 static constexpr std::string_view kVersion("v0.1");
 
-static santa::FAAPolicyProcessor::PathTarget MakePathTarget(std::string path) {
+NSString *MakeTestDirPath(NSString *target, NSString *root = nil) {
+  if (![target hasPrefix:@"/"]) {
+    target = [NSString stringWithFormat:@"/%@", target];
+  }
+
+  return root ? [NSString stringWithFormat:@"%@%@", root, target]
+              : [NSString stringWithFormat:@"%@", target];
+};
+
+static santa::FAAPolicyProcessor::PathTarget MakePathTarget(std::string path,
+                                                            NSString *root = nil) {
+  NSString *fullPath = root ? [NSString stringWithFormat:@"%@/%s", root, path.c_str()]
+                            : [NSString stringWithFormat:@"%s", path.c_str()];
   return {
-      .path = std::move(path),
+      .path = std::string(fullPath.UTF8String),
       .is_readable = true,
       .devno_ino = std::nullopt,
   };
@@ -116,14 +130,12 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 @interface WatchItemsTest : XCTestCase
 @property NSFileManager *fileMgr;
 @property NSString *testDir;
-@property NSMutableArray *dirStack;
 @property dispatch_queue_t q;
 @end
 
 @implementation WatchItemsTest
 
 - (void)setUp {
-  self.dirStack = [[NSMutableArray alloc] init];
   self.fileMgr = [NSFileManager defaultManager];
   self.testDir =
       [NSString stringWithFormat:@"%@santa-watchitems-%d", NSTemporaryDirectory(), getpid()];
@@ -139,25 +151,6 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
 - (void)tearDown {
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:nil]);
-}
-
-- (void)pushd:(NSString *)path withRoot:(NSString *)root {
-  NSString *dir = [NSString pathWithComponents:@[ root, path ]];
-  NSString *origCwd = [self.fileMgr currentDirectoryPath];
-  XCTAssertNotNil(origCwd);
-
-  XCTAssertTrue([self.fileMgr changeCurrentDirectoryPath:dir]);
-  [self.dirStack addObject:origCwd];
-}
-
-- (void)pushd:(NSString *)dir {
-  [self pushd:dir withRoot:self.testDir];
-}
-
-- (void)popd {
-  NSString *dir = [self.dirStack lastObject];
-  XCTAssertTrue([self.fileMgr changeCurrentDirectoryPath:dir]);
-  [self.dirStack removeLastObject];
 }
 
 - (void)createTestDirStructure:(NSArray *)fs rootedAt:(NSString *)root {
@@ -239,54 +232,56 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
     },
   ]];
 
-  NSDictionary *allFilesPolicy = @{kWatchItemConfigKeyPaths : @[ @"*" ]};
-  NSDictionary *configAllFilesOriginal =
-      WrapWatchItemsConfig(@{@"all_files_orig" : allFilesPolicy});
-  NSDictionary *configAllFilesRename =
-      WrapWatchItemsConfig(@{@"all_files_rename" : allFilesPolicy});
+  NSDictionary *aAllFilesPolicy =
+      @{kWatchItemConfigKeyPaths : @[ MakeTestDirPath(@"a/*", self.testDir) ]};
+  NSDictionary *configAllFilesOriginalA =
+      WrapWatchItemsConfig(@{@"all_files_orig" : aAllFilesPolicy});
+  NSDictionary *configAllFilesRenameA =
+      WrapWatchItemsConfig(@{@"all_files_rename" : aAllFilesPolicy});
+  NSDictionary *configAllFilesOriginalB = WrapWatchItemsConfig(@{
+    @"all_files_orig" : @{kWatchItemConfigKeyPaths : @[ MakeTestDirPath(@"b/*", self.testDir) ]}
+  });
 
   std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicies;
-  std::vector<FAAPolicyProcessor::PathTarget> f1Path = {MakePathTarget("f1")};
-  std::vector<FAAPolicyProcessor::PathTarget> f2Path = {MakePathTarget("f2")};
+  std::vector<FAAPolicyProcessor::PathTarget> af1Path = {
+      MakePathTarget("f1", [self.testDir stringByAppendingPathComponent:@"a"])};
+  std::vector<FAAPolicyProcessor::PathTarget> af2Path = {
+      MakePathTarget("f2", [self.testDir stringByAppendingPathComponent:@"a"])};
+  std::vector<FAAPolicyProcessor::PathTarget> bf2Path = {
+      MakePathTarget("f2", [self.testDir stringByAppendingPathComponent:@"b"])};
 
   // Changes in config dictionary will update policy info even if the
   // filesystem didn't change.
   {
     WatchItemsPeer watchItems((NSString *)nil, NULL, NULL);
-    [self pushd:@"a"];
-    watchItems.ReloadConfig(configAllFilesOriginal);
+    watchItems.ReloadConfig(configAllFilesOriginalA);
 
-    targetPolicies = watchItems.FindPoliciesForTargets(f1Path);
+    targetPolicies = watchItems.FindPoliciesForTargets(af1Path);
     XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(),
                           "all_files_orig");
 
-    watchItems.ReloadConfig(configAllFilesRename);
-    targetPolicies = watchItems.FindPoliciesForTargets(f1Path);
+    watchItems.ReloadConfig(configAllFilesRenameA);
+    targetPolicies = watchItems.FindPoliciesForTargets(af1Path);
     XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(),
                           "all_files_rename");
 
-    targetPolicies = watchItems.FindPoliciesForTargets(f1Path);
+    targetPolicies = watchItems.FindPoliciesForTargets(af1Path);
     XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(),
                           "all_files_rename");
-    [self popd];
   }
 
   // Changes to fileystem structure are reflected when a config is reloaded
   {
     WatchItemsPeer watchItems((NSString *)nil, NULL, NULL);
-    [self pushd:@"a"];
-    watchItems.ReloadConfig(configAllFilesOriginal);
-    [self popd];
+    watchItems.ReloadConfig(configAllFilesOriginalA);
 
-    targetPolicies = watchItems.FindPoliciesForTargets(f2Path);
+    targetPolicies = watchItems.FindPoliciesForTargets(af2Path);
     XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(),
                           "all_files_orig");
 
-    [self pushd:@"b"];
-    watchItems.ReloadConfig(configAllFilesOriginal);
-    [self popd];
+    watchItems.ReloadConfig(configAllFilesOriginalB);
 
-    targetPolicies = watchItems.FindPoliciesForTargets(f2Path);
+    targetPolicies = watchItems.FindPoliciesForTargets(bf2Path);
     XCTAssertFalse(targetPolicies[0].second.has_value());
   }
 }
@@ -297,13 +292,13 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   NSDictionary *fFiles = @{
     kWatchItemConfigKeyPaths : @[ @{
-      kWatchItemConfigKeyPathsPath : @"f?",
+      kWatchItemConfigKeyPathsPath : MakeTestDirPath(@"f?", self.testDir),
       kWatchItemConfigKeyPathsIsPrefix : @(NO),
     } ]
   };
   NSDictionary *weirdFiles = @{
     kWatchItemConfigKeyPaths : @[ @{
-      kWatchItemConfigKeyPathsPath : @"weird?",
+      kWatchItemConfigKeyPathsPath : MakeTestDirPath(@"weird?", self.testDir),
       kWatchItemConfigKeyPathsIsPrefix : @(NO),
     } ]
   };
@@ -325,11 +320,10 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   });
 
   // Move into the base test directory and write the config to disk
-  [self pushd:@""];
   XCTAssertTrue([firstConfig writeToFile:configFile atomically:YES]);
 
-  std::vector<FAAPolicyProcessor::PathTarget> f1Path = {MakePathTarget("f1")};
-  std::vector<FAAPolicyProcessor::PathTarget> weird1Path = {MakePathTarget("weird1")};
+  std::vector<FAAPolicyProcessor::PathTarget> f1Path = {MakePathTarget("f1", self.testDir)};
+  std::vector<FAAPolicyProcessor::PathTarget> weird1Path = {MakePathTarget("weird1", self.testDir)};
 
   // Ensure no policy has been loaded yet
   XCTAssertFalse(watchItems->FindPoliciesForTargets(f1Path)[0].second.has_value());
@@ -351,24 +345,16 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   XCTAssertSemaTrue(sema, 5, "Periodic task did not complete within expected window");
   XCTAssertTrue(watchItems->FindPoliciesForTargets(f1Path)[0].second.has_value());
   XCTAssertTrue(watchItems->FindPoliciesForTargets(weird1Path)[0].second.has_value());
-
-  [self popd];
 }
 
 - (void)testPolicyLookup {
   // Test multiple, more comprehensive policies before/after config reload
-  [self createTestDirStructure:@[
-    @{
-      @"foo" : @[ @"bar.txt", @"bar.txt.tmp" ],
-      @"baz" : @[ @{@"qaz" : @[]} ],
-    },
-    @"f1",
-  ]];
-
+  // Note: This test doesn't use glob chars, so no need to create FS artifacts since
+  // paths that don't require expansion will always be watched.
   NSMutableDictionary *config = WrapWatchItemsConfig(@{
     @"foo_subdir" : @{
       kWatchItemConfigKeyPaths : @[ @{
-        kWatchItemConfigKeyPathsPath : @"./foo",
+        kWatchItemConfigKeyPathsPath : @"/foo",
         kWatchItemConfigKeyPathsIsPrefix : @(YES),
       } ]
     }
@@ -381,24 +367,22 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Initially nothing should be in the map
   std::vector<FAAPolicyProcessor::PathTarget> paths;
   XCTAssertEqual(watchItems.FindPoliciesForTargets(paths).size(), 0);
-  paths.push_back(MakePathTarget("./foo"));
+  paths.push_back(MakePathTarget("/foo"));
   XCTAssertEqual(watchItems.FindPoliciesForTargets(paths).size(), 1);
   XCTAssertFalse(watchItems.FindPoliciesForTargets(paths)[0].second.has_value());
-  paths.push_back(MakePathTarget("./baz"));
+  paths.push_back(MakePathTarget("/baz"));
   XCTAssertEqual(watchItems.FindPoliciesForTargets(paths).size(), 2);
 
   // Load the initial config
-  [self pushd:@""];
   watchItems.ReloadConfig(config);
-  [self popd];
 
   {
     // Test expected values with the inital policy
     const std::map<std::string, std::string_view> pathToPolicyName = {
-        {"./foo", "foo_subdir"},
-        {"./foo/bar.txt.tmp", "foo_subdir"},
-        {"./foo/bar.txt", "foo_subdir"},
-        {"./does/not/exist", kBadPolicyName},
+        {"/foo", "foo_subdir"},
+        {"/foo/bar.txt.tmp", "foo_subdir"},
+        {"/foo/bar.txt", "foo_subdir"},
+        {"/does/not/exist", kBadPolicyName},
     };
 
     for (const auto &kv : pathToPolicyName) {
@@ -411,7 +395,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
     // Test multiple lookup
     targetPolicies = watchItems.FindPoliciesForTargets(
-        {MakePathTarget("./foo"), MakePathTarget("./does/not/exist")});
+        {MakePathTarget("/foo"), MakePathTarget("/does/not/exist")});
     XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(),
                           "foo_subdir");
     XCTAssertFalse(targetPolicies[1].second.has_value());
@@ -420,24 +404,22 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Add a new policy and reload the config
   NSDictionary *barTxtFilePolicy = @{
     kWatchItemConfigKeyPaths : @[ @{
-      kWatchItemConfigKeyPathsPath : @"./foo/bar.txt",
+      kWatchItemConfigKeyPathsPath : @"/foo/bar.txt",
       kWatchItemConfigKeyPathsIsPrefix : @(NO),
     } ]
   };
   [config[@"WatchItems"] setObject:barTxtFilePolicy forKey:@"bar_txt"];
 
   // Load the updated config
-  [self pushd:@""];
   watchItems.ReloadConfig(config);
-  [self popd];
 
   {
     // Test expected values with the updated policy
     const std::map<std::string, std::string_view> pathToPolicyName = {
-        {"./foo", "foo_subdir"},
-        {"./foo/bar.txt.tmp", "foo_subdir"},
-        {"./foo/bar.txt", "bar_txt"},
-        {"./does/not/exist", kBadPolicyName},
+        {"/foo", "foo_subdir"},
+        {"/foo/bar.txt.tmp", "foo_subdir"},
+        {"/foo/bar.txt", "bar_txt"},
+        {"/does/not/exist", kBadPolicyName},
     };
 
     for (const auto &kv : pathToPolicyName) {
@@ -450,24 +432,22 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
   // Add a catch-all policy that should only affect the previously non-matching path
   NSDictionary *catchAllFilePolicy = @{
     kWatchItemConfigKeyPaths : @[ @{
-      kWatchItemConfigKeyPathsPath : @".",
+      kWatchItemConfigKeyPathsPath : @"/",
       kWatchItemConfigKeyPathsIsPrefix : @(YES),
     } ]
   };
-  [config[@"WatchItems"] setObject:catchAllFilePolicy forKey:@"dot_everything"];
+  [config[@"WatchItems"] setObject:catchAllFilePolicy forKey:@"slash_everything"];
 
   // Load the updated config
-  [self pushd:@""];
   watchItems.ReloadConfig(config);
-  [self popd];
 
   {
     // Test expected values with the catch-all policy
     const std::map<std::string, std::string_view> pathToPolicyName = {
-        {"./foo", "foo_subdir"},
-        {"./foo/bar.txt.tmp", "foo_subdir"},
-        {"./foo/bar.txt", "bar_txt"},
-        {"./does/not/exist", "dot_everything"},
+        {"/foo", "foo_subdir"},
+        {"/foo/bar.txt.tmp", "foo_subdir"},
+        {"/foo/bar.txt", "bar_txt"},
+        {"/does/not/exist", "slash_everything"},
     };
 
     for (const auto &kv : pathToPolicyName) {
@@ -479,17 +459,15 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   // Now remove the foo_subdir rule, previous matches should fallback to the catch-all
   [config[@"WatchItems"] removeObjectForKey:@"foo_subdir"];
-  [self pushd:@""];
   watchItems.ReloadConfig(config);
-  [self popd];
 
   {
     // Test expected values with the foo_subdir policy removed
     const std::map<std::string, std::string_view> pathToPolicyName = {
-        {"./foo", "dot_everything"},
-        {"./foo/bar.txt.tmp", "dot_everything"},
-        {"./foo/bar.txt", "bar_txt"},
-        {"./does/not/exist", "dot_everything"},
+        {"/foo", "slash_everything"},
+        {"/foo/bar.txt.tmp", "slash_everything"},
+        {"/foo/bar.txt", "bar_txt"},
+        {"/does/not/exist", "slash_everything"},
     };
 
     for (const auto &kv : pathToPolicyName) {
@@ -1142,7 +1120,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   // Ensure that non-glob patterns are watched
   std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicies =
-      watchItems.FindPoliciesForTargets({MakePathTarget("abc")});
+      watchItems.FindPoliciesForTargets({MakePathTarget("/abc")});
   XCTAssertCStringEqual(targetPolicies[0].second.value_or(MakeBadPolicy())->name.c_str(), "rule1");
 
   // Check that patterns with globs are not returned
@@ -1169,6 +1147,183 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   XCTAssertNil(watchItems.config_path_);
   XCTAssertNotNil(watchItems.embedded_config_);
+}
+
+- (void)testDataWatchItemsFindMatches {
+  [self createTestDirStructure:@[ @{
+          @"tmp" : @[
+            @{
+              @"nested" : @[ @{
+                @"app" : @[
+                  @{
+                    @"v1" : @[ @{
+                      @"plugins" : @[
+                        @{@"foo" : @[ @"hi.txt" ]},
+                        @{@"bar" : @[ @"bye.txt" ]},
+                      ]
+                    } ]
+                  },
+                  @{
+                    @"v2" : @[ @{
+                      @"plugins" : @[
+                        @{@"foo" : @[ @"hi.txt" ]},
+                        @{@"baz" : @[ @"hello.txt" ]},
+                      ]
+                    } ]
+                  },
+                  @{
+                    @"v3" : @[],
+                  }
+                ]
+              } ],
+            },
+            @{
+              @"My.app" : @[
+                @{
+                  @"Contents" : @[
+                    @"Info.plist",
+                    @{@"MacOS" : @[ @"MyApp.exe" ]},
+                  ]
+                },
+              ]
+            }
+          ]
+        } ]];
+
+  NSString * (^MakeTestDirPath)(NSString *) = ^NSString *(NSString *target) {
+    if (![target hasPrefix:@"/"]) {
+      target = [NSString stringWithFormat:@"/%@", target];
+    }
+    return [NSString stringWithFormat:@"%@%@", self.testDir, target];
+  };
+
+  std::vector<std::string> matches;
+
+  matches = FindMatches(MakeTestDirPath(@"/tmp/My.app/C*/*.plist"));
+  XCTAssertEqual(matches.size(), 1);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp/My.app/Contents/Info.plist");
+
+  matches = FindMatches(MakeTestDirPath(@"/*"));
+
+  matches = FindMatches(MakeTestDirPath(@"/tmp/*/app/*/plugins/hi.txt"));
+  XCTAssertEqual(matches.size(), 3);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp/nested/app/v1/plugins/hi.txt");
+  XCTAssertCppStringEndsWith(matches[1], "/tmp/nested/app/v2/plugins/hi.txt");
+  XCTAssertCppStringEndsWith(matches[2], "/tmp/nested/app/v3/plugins/hi.txt");
+
+  matches = FindMatches(MakeTestDirPath(@"/tmp/*/app/*/*/"));
+  XCTAssertEqual(matches.size(), 2);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp/nested/app/v1/plugins/");
+  XCTAssertCppStringEndsWith(matches[1], "/tmp/nested/app/v2/plugins/");
+
+  matches = FindMatches(MakeTestDirPath(@"/tmp/*/app/*/*"));
+  XCTAssertEqual(matches.size(), 2);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp/nested/app/v1/plugins");
+  XCTAssertCppStringEndsWith(matches[1], "/tmp/nested/app/v2/plugins");
+
+  matches = FindMatches(MakeTestDirPath(@"/tmp/*/app/*/*"));
+  XCTAssertEqual(matches.size(), 2);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp/nested/app/v1/plugins");
+  XCTAssertCppStringEndsWith(matches[1], "/tmp/nested/app/v2/plugins");
+
+  matches = FindMatches(MakeTestDirPath(@"/tmp/*/apps/"));
+  XCTAssertEqual(matches.size(), 2);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp/My.app/apps/");
+  XCTAssertCppStringEndsWith(matches[1], "/tmp/nested/apps/");
+
+  matches = FindMatches(MakeTestDirPath(@"/tmp/*/apps/foo"));
+  XCTAssertEqual(matches.size(), 2);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp/My.app/apps/foo");
+  XCTAssertCppStringEndsWith(matches[1], "/tmp/nested/apps/foo");
+
+  matches = FindMatches(MakeTestDirPath(@"/tmp/*/apps/*"));
+  XCTAssertEqual(matches.size(), 0);
+
+  matches = FindMatches(MakeTestDirPath(@"/*"));
+  XCTAssertEqual(matches.size(), 1);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp");
+
+  // Test path without a leading slash to ensure the function forces it
+  NSString *path = MakeTestDirPath(@"*");
+  path = [path substringFromIndex:1];
+  matches = FindMatches(path);
+  XCTAssertEqual(matches.size(), 1);
+  XCTAssertCppStringEndsWith(matches[0], "/tmp");
+}
+
+- (void)testDataWatchItemsBuild {
+  [self createTestDirStructure:@[
+    @{
+      @"foo" : @[
+        @{
+          @"cake" : @[ @"hi.txt" ],
+        },
+        @{
+          @"asdf" : @[ @"bye.txt" ],
+        },
+        @{
+          @"appv1" : @[
+            @{
+              @"plugins" : @[
+                @{
+                  @"testplugin" : @[ @"t.txt" ],
+                },
+              ],
+            },
+          ]
+        },
+        @{
+          @"appv2" : @[
+            @{
+              @"plugins" : @[
+                @{
+                  @"anotherplugin" : @[ @"t.txt" ],
+                },
+              ],
+            },
+          ]
+        }
+      ]
+    },
+  ]];
+
+  FAAPolicyProcessor::PathTarget(^MakeTestDirPathTarget)(NSString *) =
+      ^FAAPolicyProcessor::PathTarget(NSString *target) {
+    return MakePathTarget([[NSString stringWithFormat:@"%@%@", self.testDir, target] UTF8String]);
+  };
+
+  std::shared_ptr<DataWatchItemPolicy> (^MakeDataPolicy)(std::string, NSString *) =
+      ^std::shared_ptr<DataWatchItemPolicy>(std::string name, NSString *path) {
+    NSString *full = [NSString stringWithFormat:@"%@%@", self.testDir, path];
+    return std::make_shared<DataWatchItemPolicy>(name, "v1", full.UTF8String,
+                                                 WatchItemPathType::kPrefix);
+  };
+
+  SetSharedDataWatchItemPolicy policies{
+      MakeDataPolicy("n1", @"/foo/*/plugins/"),
+      MakeDataPolicy("n2", @"/foo/*/plugins/testplugin"),
+      MakeDataPolicy("n3", @"/foo/*/plugins/does_not_yet_exist"),
+  };
+
+  DataWatchItems watchItems;
+
+  watchItems.Build(policies);
+
+  // Existing v1 testplugin found
+  auto found = watchItems.FindPolicies({MakeTestDirPathTarget(@"/foo/appv1/plugins/testplugin")});
+  XCTAssertEqual(found.size(), 1);
+  XCTAssertCStringEqual(found[0].second.value_or(MakeBadPolicy())->name.c_str(), "n2");
+
+  // Existing v2 anotherplugin found, but no rule, matches parent plugins dir
+  found = watchItems.FindPolicies({MakeTestDirPathTarget(@"/foo/appv2/plugins/anotherplugin")});
+  XCTAssertEqual(found.size(), 1);
+  XCTAssertCStringEqual(found[0].second.value_or(MakeBadPolicy())->name.c_str(), "n1");
+
+  // Non existent path with a backing rule
+  found =
+      watchItems.FindPolicies({MakeTestDirPathTarget(@"/foo/appv1/plugins/does_not_yet_exist")});
+  XCTAssertEqual(found.size(), 1);
+  XCTAssertCStringEqual(found[0].second.value_or(MakeBadPolicy())->name.c_str(), "n3");
 }
 
 - (void)testDataWatchItemsSubtraction {
@@ -1200,16 +1355,16 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
   SetPairPathAndType pathTypePairs1_2 = watchItems1 - watchItems2;
   XCTAssertEqual(pathTypePairs1_2.size(), 3);
-  XCTAssertEqual(pathTypePairs1_2.count({"a", WatchItemPathType::kPrefix}), 1);
-  XCTAssertEqual(pathTypePairs1_2.count({"c", WatchItemPathType::kPrefix}), 1);
-  XCTAssertEqual(pathTypePairs1_2.count({"e", WatchItemPathType::kPrefix}), 1);
+  XCTAssertEqual(pathTypePairs1_2.count({"/a", WatchItemPathType::kPrefix}), 1);
+  XCTAssertEqual(pathTypePairs1_2.count({"/c", WatchItemPathType::kPrefix}), 1);
+  XCTAssertEqual(pathTypePairs1_2.count({"/e", WatchItemPathType::kPrefix}), 1);
 
   SetPairPathAndType pathTypePairs2_1 = watchItems2 - watchItems1;
   XCTAssertEqual(pathTypePairs2_1.size(), 4);
-  XCTAssertEqual(pathTypePairs2_1.count({"c", WatchItemPathType::kLiteral}), 1);
-  XCTAssertEqual(pathTypePairs2_1.count({"x", WatchItemPathType::kPrefix}), 1);
-  XCTAssertEqual(pathTypePairs2_1.count({"y", WatchItemPathType::kPrefix}), 1);
-  XCTAssertEqual(pathTypePairs2_1.count({"z", WatchItemPathType::kPrefix}), 1);
+  XCTAssertEqual(pathTypePairs2_1.count({"/c", WatchItemPathType::kLiteral}), 1);
+  XCTAssertEqual(pathTypePairs2_1.count({"/x", WatchItemPathType::kPrefix}), 1);
+  XCTAssertEqual(pathTypePairs2_1.count({"/y", WatchItemPathType::kPrefix}), 1);
+  XCTAssertEqual(pathTypePairs2_1.count({"/z", WatchItemPathType::kPrefix}), 1);
 }
 
 @end
