@@ -1107,7 +1107,12 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (BOOL)enableTelemetryExport {
+  // Temporarily only enable for debug builds
+#ifdef DEBUG
   return [self.configState[kEnableTelemetryExport] boolValue];
+#else
+  return NO;
+#endif
 }
 
 - (uint32_t)telemetryExportIntervalSec {

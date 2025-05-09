@@ -719,6 +719,10 @@ objc_library(
 objc_library(
     name = "EndpointSecurityWriter",
     hdrs = ["Logs/EndpointSecurity/Writers/Writer.h"],
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
 )
 
 objc_library(
@@ -750,6 +754,8 @@ objc_library(
         "//Source/common:santa_cc_proto_library_wrapper",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -781,11 +787,14 @@ objc_library(
         ":EndpointSecurityWriterSpool",
         ":EndpointSecurityWriterSyslog",
         ":SNTDecisionCache",
+        ":SNTSyncdQueue",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Timer",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 

@@ -97,6 +97,12 @@
   [self.syncManager pushNotificationStatus:reply];
 }
 
+- (void)exportTelemetryFile:(NSFileHandle *)fd reply:(void (^)(BOOL))reply {
+  // Note: For now, reply false so that spool files are not removed
+  LOGD(@"SNTSyncService: exportTelemetryFile:reply: - Got file descriptor: %@", fd);
+  reply(NO);
+}
+
 // TODO(bur): Add support for santactl sync --debug to enable debug logging for that sync.
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
                    syncType:(SNTSyncType)syncType

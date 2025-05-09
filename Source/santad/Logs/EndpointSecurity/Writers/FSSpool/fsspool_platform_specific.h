@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -34,8 +35,9 @@ bool StatIsReg(mode_t mode);
 int Unlink(const char* pathname);
 int Write(int fd, absl::string_view buf);
 
-absl::Status IterateDirectory(const std::string& dir,
-                              std::function<void(const std::string&)> callback);
+absl::Status IterateDirectory(
+    const std::string& dir,
+    std::function<void(const std::string&, bool*)> callback);
 
 }  // namespace fsspool
 

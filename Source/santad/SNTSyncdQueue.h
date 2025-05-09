@@ -22,8 +22,11 @@
 @interface SNTSyncdQueue : NSObject
 
 - (void)reassessSyncServiceConnection;
+- (void)reassessSyncServiceConnectionImmediately;
 
 - (void)addEvents:(NSArray<SNTStoredEvent *> *)events isFromBundle:(BOOL)isFromBundle;
 - (void)addBundleEvent:(SNTStoredEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
+- (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
+          completionHandler:(void (^)(BOOL))completionHandler;
 
 @end

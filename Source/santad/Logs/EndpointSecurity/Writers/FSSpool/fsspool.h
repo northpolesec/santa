@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -99,9 +100,11 @@ class FsSpoolWriter {
 class FsSpoolReader {
  public:
   explicit FsSpoolReader(absl::string_view base_directory);
-  absl::Status AckMessage(const std::string& message_path);
+  absl::Status AckMessage(const std::string& message_path, bool delete_file);
   // Returns absl::NotFoundError in case the FsSpool is empty.
   absl::StatusOr<std::string> NextMessagePath();
+  absl::StatusOr<absl::flat_hash_set<std::string>> BatchMessagePaths(
+      size_t count);
   int NumberOfUnackedMessages() const;
 
  private:
