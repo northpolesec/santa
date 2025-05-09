@@ -197,7 +197,6 @@
 
 - (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
           completionHandler:(void (^)(BOOL))completionHandler {
-  LOGE(@"Syncd queue, about to dispatch...");
   [self dispatchBlockOnSyncdQueue:^{
     if (self.syncConnection.remoteObjectProxy) {
       [self.syncConnection.remoteObjectProxy exportTelemetryFile:telemetryFile
