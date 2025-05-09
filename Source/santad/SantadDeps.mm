@@ -34,13 +34,11 @@
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;
-using santa::EndpointSecurityAPI;
 using santa::Enricher;
 using santa::Logger;
 using santa::Metrics;
 using santa::PrefixTree;
 using santa::TTYWriter;
-using santa::Unit;
 using santa::WatchItems;
 
 namespace santa {
