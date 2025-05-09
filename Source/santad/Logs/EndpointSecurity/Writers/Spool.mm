@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
 
 #import "Source/common/SNTLogging.h"
 #include "Source/common/santa_proto_include_wrapper.h"
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
 static const char *kTypeGoogleApisComPrefix = "type.googleapis.com/";
@@ -48,6 +50,7 @@ Spool::Spool(dispatch_queue_t q, dispatch_source_t timer_source, std::string_vie
              void (^flush_task_complete_f)(void))
     : q_(q),
       timer_source_(timer_source),
+      spool_reader_(absl::string_view(base_dir.data(), base_dir.length())),
       spool_writer_(absl::string_view(base_dir.data(), base_dir.length()), max_spool_disk_size),
       log_batch_writer_(&spool_writer_, SIZE_T_MAX),
       spool_file_size_threshold_(max_spool_file_size),
@@ -68,6 +71,34 @@ Spool::~Spool() {
     dispatch_source_cancel(timer_source_);
     dispatch_resume(timer_source_);
   }
+}
+
+std::optional<absl::flat_hash_set<std::string>> Spool::GetFilesToExport(size_t max_count) {
+  __block absl::StatusOr<absl::flat_hash_set<std::string>> paths;
+  dispatch_sync(q_, ^{
+    paths = spool_reader_.BatchMessagePaths(max_count);
+  });
+
+  return paths.ok() ? std::make_optional(std::move(*paths)) : std::nullopt;
+}
+
+std::optional<std::string> Spool::NextFileToExport() {
+  std::optional<absl::flat_hash_set<std::string>> paths = GetFilesToExport(1);
+  if (paths.has_value() && paths->size() == 1) {
+    return *paths->begin();
+  } else {
+    return std::nullopt;
+  }
+}
+
+void Spool::FilesExported(absl::flat_hash_map<std::string, bool> files_exported) {
+  dispatch_async(q_, ^{
+    for (const auto &file_exported : files_exported) {
+      if (!spool_reader_.AckMessage(file_exported.first, file_exported.second).ok()) {
+        LOGW(@"Unable to delete exported file.");
+      }
+    }
+  });
 }
 
 void Spool::BeginFlushTask() {

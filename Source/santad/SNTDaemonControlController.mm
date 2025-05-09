@@ -514,4 +514,9 @@ double watchdogRAMPeak = 0;
   [self reloadSystemExtension];
 }
 
+- (void)exportTelemetryWithReply:(void (^)(BOOL))reply {
+  _logger->ExportTelemetry();
+  reply(YES);
+}
+
 @end

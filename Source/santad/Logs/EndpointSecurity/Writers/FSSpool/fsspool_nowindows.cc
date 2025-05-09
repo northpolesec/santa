@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -53,7 +54,8 @@ int Open(const char* filename, int flags, mode_t mode) {
 int Close(int fd) { return close(fd); }
 
 absl::Status IterateDirectory(
-    const std::string& dir, std::function<void(const std::string&)> callback) {
+    const std::string& dir,
+    std::function<void(const std::string&, bool*)> callback) {
   if (!IsDirectory(dir)) {
     return absl::InvalidArgumentError(
         absl::StrFormat("%s is not a directory", dir));
@@ -63,8 +65,9 @@ absl::Status IterateDirectory(
     return absl::ErrnoToStatus(errno, absl::StrCat("failed to open ", dir));
   }
   struct dirent* ep;
-  while ((ep = readdir(dp)) != nullptr) {
-    callback(ep->d_name);
+  bool stop = false;
+  while (!stop && ((ep = readdir(dp)) != nullptr)) {
+    callback(ep->d_name, &stop);
   }
   closedir(dp);
   return absl::OkStatus();

@@ -73,10 +73,13 @@ class Timer {
 
  private:
   /// Update the timer firing settings. If a timer is currently active, will
-  /// result in it immediately firing and then again at the current interval.
+  /// result in it firing in 10 seconds and then again at the current interval.
+  /// The 10 second delay is to allow the sync service to launch and settle
+  /// since it is often launched around the same time this timer is started.
   void UpdateTimingParameters() {
     if (timer_source_) {
-      dispatch_source_set_timer(timer_source_, DISPATCH_WALLTIME_NOW,
+      dispatch_source_set_timer(timer_source_,
+                                dispatch_time(DISPATCH_WALLTIME_NOW, 10 * NSEC_PER_SEC),
                                 interval_seconds_ * NSEC_PER_SEC, 0);
     }
   }

@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@
 #include <dispatch/dispatch.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -26,6 +28,8 @@
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_log_batch_writer.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 // Forward declarations
 namespace santa {
@@ -48,6 +52,10 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool> {
   void Write(std::vector<uint8_t> &&bytes) override;
   void Flush() override;
 
+  std::optional<absl::flat_hash_set<std::string>> GetFilesToExport(size_t max_count) override;
+  std::optional<std::string> NextFileToExport() override;
+  void FilesExported(absl::flat_hash_map<std::string, bool> files_exported) override;
+
   void BeginFlushTask();
 
   // Peer class for testing
@@ -58,6 +66,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool> {
 
   dispatch_queue_t q_ = NULL;
   dispatch_source_t timer_source_ = NULL;
+  ::fsspool::FsSpoolReader spool_reader_;
   ::fsspool::FsSpoolWriter spool_writer_;
   ::fsspool::FsSpoolLogBatchWriter log_batch_writer_;
   const size_t spool_file_size_threshold_;
