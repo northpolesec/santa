@@ -21,6 +21,7 @@
 #include <mach-o/arch.h>
 #include <mach-o/loader.h>
 #include <mach-o/swap.h>
+#include <mach-o/utils.h>
 #include <pwd.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
@@ -729,14 +730,11 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
 ///  Return a human-readable string for a cpu_type_t.
 ///
 - (NSString *)nameForCPUType:(cpu_type_t)cpuType cpuSubType:(cpu_subtype_t)cpuSubType {
-  const NXArchInfo *archInfo = NXGetArchInfoFromCpuType(cpuType, cpuSubType);
-  NSString *arch;
-  if (archInfo && archInfo->name) {
-    arch = @(archInfo->name);
-  } else {
-    arch = [NSString stringWithFormat:@"%i:%i", cpuType, cpuSubType];
+  const char *name = macho_arch_name_for_cpu_type(cpuType, cpuSubType);
+  if (name) {
+    return @(name);
   }
-  return arch;
+  return [NSString stringWithFormat:@"%i:%i", cpuType, cpuSubType];
 }
 
 ///

@@ -18,6 +18,7 @@
 
 #include <mach-o/arch.h>
 #include <mach-o/fat.h>
+#include <mach-o/utils.h>
 
 #import "Source/common/MOLCertificate.h"
 
@@ -369,14 +370,11 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
 - (NSString *)architectureString:(struct fat_arch *)fatArch bigEndian:(BOOL)bigEndian {
   cpu_type_t cpu = bigEndian ? OSSwapBigToHostInt(fatArch->cputype) : fatArch->cputype;
   cpu_subtype_t cpuSub = bigEndian ? OSSwapBigToHostInt(fatArch->cpusubtype) : fatArch->cpusubtype;
-  const NXArchInfo *archInfo = NXGetArchInfoFromCpuType(cpu, cpuSub);
-  NSString *arch;
-  if (archInfo && archInfo->name) {
-    arch = @(archInfo->name);
-  } else {
-    arch = [NSString stringWithFormat:@"%i:%i", cpu, cpuSub];
+  const char *name = macho_arch_name_for_cpu_type(cpuType, cpuSubType);
+  if (name) {
+    return @(name);
   }
-  return arch;
+  return [NSString stringWithFormat:@"%i:%i", cpu, cpuSub];
 }
 
 - (NSDictionary *)architectureAndOffsetsForFileDescriptor:(int)fd {
