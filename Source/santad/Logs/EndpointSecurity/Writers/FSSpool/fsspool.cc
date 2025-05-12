@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -129,8 +130,8 @@ absl::Status RenameFile(const std::string& src, const std::string& dst) {
 
 absl::StatusOr<size_t> EstimateDirSize(const std::string& dir) {
   size_t estimate = 0;
-  absl::Status status =
-      IterateDirectory(dir, [&dir, &estimate](const std::string& file_name) {
+  absl::Status status = IterateDirectory(
+      dir, [&dir, &estimate](const std::string& file_name, bool* stop) {
         /// NOMUTANTS--We could skip this condition altogether, as S_ISREG on
         /// the directory would be false anyway.
         if (file_name == std::string(".") || file_name == std::string("..")) {
@@ -266,15 +267,48 @@ int FsSpoolReader::NumberOfUnackedMessages() const {
   return unacked_messages_.size();
 }
 
-absl::Status FsSpoolReader::AckMessage(const std::string& message_path) {
-  int remove_status = remove(message_path.c_str());
-  if ((remove_status != 0) && (errno != ENOENT)) {
-    return absl::ErrnoToStatus(
-        errno,
-        absl::Substitute("Failed to remove $0: $1", message_path, errno));
+absl::Status FsSpoolReader::AckMessage(const std::string& message_path,
+                                       bool delete_file) {
+  if (delete_file) {
+    int remove_status = remove(message_path.c_str());
+    if ((remove_status != 0) && (errno != ENOENT)) {
+      return absl::ErrnoToStatus(
+          errno,
+          absl::Substitute("Failed to remove $0: $1", message_path, errno));
+    }
   }
   unacked_messages_.erase(message_path);
   return absl::OkStatus();
+}
+
+absl::StatusOr<absl::flat_hash_set<std::string>>
+FsSpoolReader::BatchMessagePaths(size_t count) {
+  absl::flat_hash_set<std::string> batch;
+  if (count == 0) {
+    return batch;
+  }
+  absl::Status status = IterateDirectory(
+      spool_dir_,
+      [this, count, &batch](const std::string& file_name, bool* stop) {
+        if (file_name == "." || file_name == "..") {
+          return;
+        }
+
+        std::string file_path =
+            absl::StrCat(spool_dir_, PathSeparator(), file_name);
+
+        if (unacked_messages_.contains(file_path)) {
+          return;
+        }
+
+        batch.insert(file_path);
+        unacked_messages_.insert(file_path);
+
+        if (batch.size() >= count) {
+          *stop = true;
+        }
+      });
+  return batch;
 }
 
 absl::StatusOr<std::string> FsSpoolReader::NextMessagePath() {
@@ -294,8 +328,8 @@ absl::StatusOr<std::string> FsSpoolReader::OldestSpooledFile() {
   absl::Time oldest_file_mtime;
   std::string oldest_file_path;
   absl::Status status = IterateDirectory(
-      spool_dir_, [this, &oldest_file_path,
-                   &oldest_file_mtime](const std::string& file_name) {
+      spool_dir_, [this, &oldest_file_path, &oldest_file_mtime](
+                      const std::string& file_name, bool* stop) {
         std::string file_path =
             absl::StrCat(spool_dir_, PathSeparator(), file_name);
         struct stat stats;

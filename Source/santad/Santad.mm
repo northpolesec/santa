@@ -189,7 +189,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [authorizer_client registerAuthExecProbe:proc_faa_client];
   }
 
-  [syncd_queue reassessSyncServiceConnection];
+  [syncd_queue reassessSyncServiceConnectionImmediately];
 
   NSMutableArray<SNTKVOManager *> *kvoObservers = [[NSMutableArray alloc] init];
   [kvoObservers addObjectsFromArray:@[
@@ -560,6 +560,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    LOGI(@"EnableTelemetryExport changed: %d -> %d", oldBool,
                                         newBool);
+
+                                   [syncd_queue reassessSyncServiceConnectionImmediately];
 
                                    if (newBool) {
                                      logger->StartTimer();

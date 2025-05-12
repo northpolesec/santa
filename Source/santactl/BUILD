@@ -44,6 +44,17 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTCommandTelemetry",
+    srcs = ["Commands/SNTCommandTelemetry.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
     name = "santactl_lib",
     srcs = [
         "Commands/SNTCommandCheckCache.m",
@@ -69,6 +80,7 @@ objc_library(
     deps = [
         ":SNTCommandInstall",
         ":SNTCommandPrintLog",
+        ":SNTCommandTelemetry",
         ":santactl_cmd",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",

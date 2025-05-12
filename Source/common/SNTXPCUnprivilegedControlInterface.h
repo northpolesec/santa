@@ -98,6 +98,11 @@ struct RuleCounts {
 ///
 - (void)syncBundleEvent:(SNTStoredEvent *)event relatedEvents:(NSArray<SNTStoredEvent *> *)events;
 
+///
+///  Telemetry Ops
+///
+- (void)exportTelemetryWithReply:(void (^)(BOOL))reply;
+
 @end
 
 @interface SNTXPCUnprivilegedControlInterface : NSObject

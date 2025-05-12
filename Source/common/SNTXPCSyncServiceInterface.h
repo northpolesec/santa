@@ -29,6 +29,7 @@
 - (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
+- (void)exportTelemetryFile:(NSFileHandle *)fd reply:(void (^)(BOOL))reply;
 
 // The syncservice regularly syncs with a configured sync server. Use this method to sync out of
 // band. The syncservice ensures syncs do not run concurrently.

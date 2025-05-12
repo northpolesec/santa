@@ -27,7 +27,7 @@
 
 @interface SNTSyncdQueue ()
 @property dispatch_queue_t syncdQueue;
-@property(nonatomic) MOLXPCConnection *syncConnection;
+@property MOLXPCConnection *syncConnection;
 @property dispatch_source_t timer;
 @property NSURL *previousSyncBaseURL;
 @property BOOL syncServiceConnected;
@@ -57,6 +57,13 @@
 /// state, as well as relevant config deltas, to determine whether the sync
 /// service should be started, bounced, or stopped.
 - (void)reassessSyncServiceConnection {
+  [self reassessSyncServiceConnectionWithDelay:1];
+}
+- (void)reassessSyncServiceConnectionImmediately {
+  [self reassessSyncServiceConnectionWithDelay:0];
+}
+
+- (void)reassessSyncServiceConnectionWithDelay:(uint32_t)seconds {
   WEAKIFY(self);
   dispatch_sync(self.syncdQueue, ^{
     if (self.timer) {
@@ -64,9 +71,8 @@
     }
 
     self.timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.syncdQueue);
-    dispatch_source_set_timer(self.timer,
-                              dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC),  // 1 second delay
-                              DISPATCH_TIME_FOREVER,                               // won't repeat
+    dispatch_source_set_timer(self.timer, dispatch_time(DISPATCH_TIME_NOW, seconds * NSEC_PER_SEC),
+                              DISPATCH_TIME_FOREVER,  // won't repeat
                               100 * NSEC_PER_MSEC);
 
     // WEAKIFY(self);
@@ -76,6 +82,7 @@
 
       NSURL *newSyncBaseURL = [configurator syncBaseURL];
       BOOL statsCollectionEnabled = [configurator enableStatsCollection];
+      BOOL telemetryExportEnabled = [configurator enableTelemetryExport];
 
       // If the SyncBaseURL was added or changed, and a connection already
       // exists, it must be bounced.
@@ -90,15 +97,18 @@
       self.previousSyncBaseURL = newSyncBaseURL;
 
       // If newSyncBaseURL or statsCollectionEnabled is set, start the sync service
-      if (newSyncBaseURL || statsCollectionEnabled) {
+      if (newSyncBaseURL || statsCollectionEnabled || telemetryExportEnabled) {
         if (!self.syncServiceConnected) {
           [self establishSyncServiceConnectionSerialized];
         }
 
-        // Ensure any pending requests to clear sync state are cancelled.
-        [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
-                                                 selector:@selector(clearSyncState)
-                                                   object:nil];
+        // Ensure any pending requests to clear sync state are cancelled, but
+        // only if there is a sync base URL set
+        if (newSyncBaseURL) {
+          [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
+                                                   selector:@selector(clearSyncState)
+                                                     object:nil];
+        }
       } else {
         if (self.syncServiceConnected) {
           // Note: Only teardown the connection if we're connected. This helps
@@ -183,6 +193,19 @@
   dispatch_async(self.syncdQueue, ^{
     block();
   });
+}
+
+- (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
+          completionHandler:(void (^)(BOOL))completionHandler {
+  [self dispatchBlockOnSyncdQueue:^{
+    if (self.syncConnection.remoteObjectProxy) {
+      [self.syncConnection.remoteObjectProxy exportTelemetryFile:telemetryFile
+                                                           reply:completionHandler];
+    } else {
+      // Unable to send to sync service, but still must call the completion handler
+      completionHandler(NO);
+    }
+  }];
 }
 
 // The event upload is skipped if an event has been initiated for it in the last 10 minutes.

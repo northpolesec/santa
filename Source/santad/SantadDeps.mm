@@ -131,7 +131,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
 
   std::unique_ptr<::Logger> logger = Logger::Create(
-      esapi,
+      esapi, syncd_queue,
       TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
       [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
       [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,

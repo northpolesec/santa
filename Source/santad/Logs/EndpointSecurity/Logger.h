@@ -33,6 +33,7 @@
 
 // Forward declarations
 @class SNTStoredEvent;
+@class SNTSyncdQueue;
 namespace santa {
 class LoggerPeer;
 }
@@ -42,15 +43,16 @@ namespace santa {
 class Logger : public Timer<Logger> {
  public:
   static std::unique_ptr<Logger> Create(std::shared_ptr<santa::EndpointSecurityAPI> esapi,
-                                        TelemetryEvent telemetry_mask, SNTEventLogType log_type,
-                                        SNTDecisionCache *decision_cache, NSString *event_log_path,
-                                        NSString *spool_log_path, size_t spool_dir_size_threshold,
+                                        SNTSyncdQueue *syncd_queue, TelemetryEvent telemetry_mask,
+                                        SNTEventLogType log_type, SNTDecisionCache *decision_cache,
+                                        NSString *event_log_path, NSString *spool_log_path,
+                                        size_t spool_dir_size_threshold,
                                         size_t spool_file_size_threshold,
                                         uint64_t spool_flush_timeout_ms,
                                         uint32_t telemetry_export_seconds);
 
-  Logger(TelemetryEvent telemetry_mask, std::shared_ptr<santa::Serializer> serializer,
-         std::shared_ptr<santa::Writer> writer);
+  Logger(SNTSyncdQueue *syncd_queue, TelemetryEvent telemetry_mask,
+         std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer);
 
   virtual ~Logger() = default;
 
@@ -78,12 +80,19 @@ class Logger : public Timer<Logger> {
 
   void OnTimer();
 
+  /// Export existing telemetry files.
+  void ExportTelemetry();
+
   friend class santa::LoggerPeer;
 
  private:
+  void ExportTelemetrySerialized();
+
+  SNTSyncdQueue *syncd_queue_;
   TelemetryEvent telemetry_mask_;
   std::shared_ptr<santa::Serializer> serializer_;
   std::shared_ptr<santa::Writer> writer_;
+  dispatch_queue_t export_queue_;
 };
 
 }  // namespace santa
