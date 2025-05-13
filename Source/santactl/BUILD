@@ -118,7 +118,7 @@ macos_command_line_application(
         "Info.plist",
         "//Source/common:CommitHash",
     ],
-    minimum_os_version = "12.0",
+    minimum_os_version = "13.0",
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",

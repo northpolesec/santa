@@ -21,6 +21,7 @@
 #include <mach-o/arch.h>
 #include <mach-o/loader.h>
 #include <mach-o/swap.h>
+#include <mach-o/utils.h>
 #include <pwd.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
@@ -533,7 +534,18 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
   if (mh->magic == MH_CIGAM || mh->magic == MH_CIGAM_64) {
     NSMutableData *mutableInput = [inputData mutableCopy];
     mh = (struct mach_header *)[mutableInput mutableBytes];
-    swap_mach_header(mh, NXHostByteOrder());
+
+    // swap_mach_header() was deprecated in macOS 13 and there is no replacement.
+    // This is probably because both Intel and Apple Silicon are little-endian and
+    // almost every Mach-O file we'll ever see will be too but _just in case_ we
+    // ever see a big-endian binary we still support reading the header.
+    mh->magic = OSSwapInt32(mh->magic);
+    mh->cputype = OSSwapInt32(mh->cputype);
+    mh->cpusubtype = OSSwapInt32(mh->cpusubtype);
+    mh->filetype = OSSwapInt32(mh->filetype);
+    mh->ncmds = OSSwapInt32(mh->ncmds);
+    mh->sizeofcmds = OSSwapInt32(mh->sizeofcmds);
+    mh->flags = OSSwapInt32(mh->flags);
   }
 
   if (mh->magic == MH_MAGIC || mh->magic == MH_MAGIC_64) {
@@ -729,14 +741,11 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
 ///  Return a human-readable string for a cpu_type_t.
 ///
 - (NSString *)nameForCPUType:(cpu_type_t)cpuType cpuSubType:(cpu_subtype_t)cpuSubType {
-  const NXArchInfo *archInfo = NXGetArchInfoFromCpuType(cpuType, cpuSubType);
-  NSString *arch;
-  if (archInfo && archInfo->name) {
-    arch = @(archInfo->name);
-  } else {
-    arch = [NSString stringWithFormat:@"%i:%i", cpuType, cpuSubType];
+  const char *name = macho_arch_name_for_cpu_type(cpuType, cpuSubType);
+  if (name) {
+    return @(name);
   }
-  return arch;
+  return [NSString stringWithFormat:@"%i:%i", cpuType, cpuSubType];
 }
 
 ///
