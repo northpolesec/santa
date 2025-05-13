@@ -90,10 +90,6 @@
   XCTAssertFalse(sut.isMissingPageZero);
 }
 
-- (void)testKext {
-  // Skip this test on macOS 13 as KEXTs have moved into the kernelcache.
-}
-
 - (void)testDylibs {
   SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:@"/usr/lib/system/libsystem_platform.dylib"];
 
