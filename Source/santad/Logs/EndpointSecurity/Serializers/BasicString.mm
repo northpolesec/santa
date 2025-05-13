@@ -194,8 +194,6 @@ static inline void AppendInstigator(std::string &str, const EnrichedEventType &e
   AppendInstigator(str, event->process, event.instigator(), prefix);
 }
 
-#if HAVE_MACOS_13
-
 static inline void AppendEventUser(std::string &str,
                                    const std::optional<std::shared_ptr<std::string>> &user,
                                    uid_t uid, const std::string prefix = "event_") {
@@ -243,8 +241,6 @@ static inline std::string GetOpenSSHLoginResult(std::string &str,
     default: return "UNKNOWN";
   }
 }
-
-#endif  // HAVE_MACOS_13
 
 static char *FormattedDateString(char *buf, size_t len) {
   struct timeval tv;
@@ -512,8 +508,6 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCopyfile &msg) 
 
   return FinalizeString(str);
 }
-
-#if HAVE_MACOS_13
 
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLogin &msg) {
   std::string str = CreateDefaultString();
@@ -940,8 +934,6 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectRemedia
 
   return FinalizeString(str);
 }
-
-#endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15
 

@@ -24,7 +24,6 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///  Controller for a single message window.
 ///
-API_AVAILABLE(macos(13.0))
 @interface SNTFileAccessMessageWindowController : SNTMessageWindowController <NSWindowDelegate>
 
 - (instancetype)initWithEvent:(SNTFileAccessEvent *)event

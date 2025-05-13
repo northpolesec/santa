@@ -67,8 +67,6 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedCopyfile &msg) {
   return {};
 }
 
-#if HAVE_MACOS_13
-
 std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLogin &msg) {
   return {};
 }
@@ -136,8 +134,6 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedXProtectDetected &) {
 std::vector<uint8_t> Empty::SerializeMessage(const EnrichedXProtectRemediated &) {
   return {};
 }
-
-#endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15
 

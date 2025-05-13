@@ -186,7 +186,6 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
       {ES_EVENT_TYPE_NOTIFY_RENAME, @"NotifyRename"},
       {ES_EVENT_TYPE_NOTIFY_UNLINK, @"NotifyUnlink"},
       {ES_EVENT_TYPE_NOTIFY_UNMOUNT, @"NotifyUnmount"},
-#if HAVE_MACOS_13
       {ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, @"NotifyAuthentication"},
       {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN, @"NotifyLoginLogin"},
       {ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT, @"NotifyLoginLogout"},
@@ -202,7 +201,6 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
       {ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE, @"NotifyLaunchItemRemove"},
       {ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED, @"NotifyXProtectDetected"},
       {ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED, @"NotifyXProtectRemediated"},
-#endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
       {ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, @"NotifyGatekeeperOverride"},
 #endif  // HAVE_MACOS_15

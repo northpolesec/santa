@@ -34,12 +34,8 @@
 - (void)testPathStandardizing {
   SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:@"/Applications/Safari.app"];
   XCTAssertNotNil(sut);
-  if (@available(macOS 13.0, *)) {
-    XCTAssertEqualObjects(sut.path, @"/System/Volumes/Preboot/Cryptexes/App/System/Applications/"
-                                    @"Safari.app/Contents/MacOS/Safari");
-  } else {
-    XCTAssertEqualObjects(sut.path, @"/Applications/Safari.app/Contents/MacOS/Safari");
-  }
+  XCTAssertEqualObjects(sut.path, @"/System/Volumes/Preboot/Cryptexes/App/System/Applications/"
+                                  @"Safari.app/Contents/MacOS/Safari");
 
   sut = [[SNTFileInfo alloc] initWithPath:@"../../../../../../../../../../../../../../../bin/ls"];
   XCTAssertEqualObjects(sut.path, @"/bin/ls");
@@ -96,20 +92,6 @@
 
 - (void)testKext {
   // Skip this test on macOS 13 as KEXTs have moved into the kernelcache.
-  if (@available(macOS 13.0, *)) {
-    return;
-  }
-
-  SNTFileInfo *sut = [[SNTFileInfo alloc]
-      initWithPath:@"/System/Library/Extensions/AppleAPIC.kext/Contents/MacOS/AppleAPIC"];
-
-  XCTAssertTrue(sut.isMachO);
-  XCTAssertTrue(sut.isKext);
-
-  XCTAssertFalse(sut.isDylib);
-  XCTAssertFalse(sut.isExecutable);
-  XCTAssertFalse(sut.isFat);
-  XCTAssertFalse(sut.isScript);
 }
 
 - (void)testDylibs {

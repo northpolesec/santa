@@ -270,7 +270,6 @@ uint32_t MinSupportedESMessageVersion(es_event_type_t event_type) {
     case ES_EVENT_TYPE_AUTH_COPYFILE:
     case ES_EVENT_TYPE_NOTIFY_COPYFILE: return 4;
 
-#if HAVE_MACOS_13
     // The following events are available beginning in macOS 13.0
     case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION:
     case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED:
@@ -287,7 +286,6 @@ uint32_t MinSupportedESMessageVersion(es_event_type_t event_type) {
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT:
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD:
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: return 6;
-#endif
 
 #if HAVE_MACOS_14
     // The following events are available beginning in macOS 14.0

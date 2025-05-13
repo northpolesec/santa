@@ -90,7 +90,6 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
     case ES_EVENT_TYPE_NOTIFY_COPYFILE:
       return std::make_unique<EnrichedMessage>(EnrichedCopyfile(
           std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.copyfile.source)));
-#if HAVE_MACOS_13
     case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION:
       switch (es_msg->event.authentication->type) {
         case ES_AUTHENTICATION_TYPE_OD:
@@ -173,7 +172,6 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
     case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED:
       return std::make_unique<EnrichedMessage>(
           EnrichedXProtectRemediated(std::move(es_msg), Enrich(*es_msg->process)));
-#endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE:
       return std::make_unique<EnrichedMessage>(EnrichedGatekeeperOverride(

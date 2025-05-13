@@ -101,7 +101,6 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
     case ES_EVENT_TYPE_NOTIFY_CLOSE: {
       BOOL shouldLogClose = esMsg->event.close.modified;
 
-#if HAVE_MACOS_13
       if (esMsg->version >= 6) {
         // As of macSO 13.0 we have a new field for if a file was mmaped with
         // write permissions on close events. However due to a bug in ES, it
@@ -113,7 +112,6 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
         // account.
         shouldLogClose |= esMsg->event.close.was_mapped_writable;
       }
-#endif
 
       if (!shouldLogClose) {
         // Ignore unmodified files
@@ -209,28 +207,22 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
     ES_EVENT_TYPE_NOTIFY_LINK,
     ES_EVENT_TYPE_NOTIFY_RENAME,
     ES_EVENT_TYPE_NOTIFY_UNLINK,
+    ES_EVENT_TYPE_NOTIFY_AUTHENTICATION,
+    ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN,
+    ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT,
+    ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN,
+    ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT,
+    ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK,
+    ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK,
+    ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH,
+    ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH,
+    ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN,
+    ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT,
+    ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD,
+    ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE,
+    ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED,
+    ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED,
   };
-
-#if HAVE_MACOS_13
-  if (@available(macOS 13.0, *)) {
-    events.insert({
-      ES_EVENT_TYPE_NOTIFY_AUTHENTICATION,
-      ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN,
-      ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT,
-      ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN,
-      ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT,
-      ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK,
-      ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK,
-      ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH,
-      ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH,
-      ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN,
-      ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT,
-      ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD,
-      ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE,
-      ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED,
-      ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED});
-  }
-#endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15
   if (@available(macOS 15.0, *)) {

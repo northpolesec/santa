@@ -50,7 +50,6 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile &) override;
-#if HAVE_MACOS_13
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogout &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLock &) override;
@@ -68,7 +67,6 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLaunchItem &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectDetected &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectRemediated &) override;
-#endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) override;
 #endif  // HAVE_MACOS_15

@@ -472,11 +472,7 @@ class EnrichedAuthenticationOD : public EnrichedEventWithInstigator {
   EnrichedAuthenticationOD(EnrichedAuthenticationOD &&) = default;
 
   const es_process_t *EventInstigator() const override {
-#if HAVE_MACOS_13
     return es_msg_->event.authentication->data.od->instigator;
-#else
-    return nullptr;
-#endif
   }
 
   std::optional<audit_token_t> EventInstigatorToken() const override {
@@ -504,11 +500,7 @@ class EnrichedAuthenticationTouchID : public EnrichedEventWithInstigator {
   EnrichedAuthenticationTouchID(EnrichedAuthenticationTouchID &&) = default;
 
   const es_process_t *EventInstigator() const override {
-#if HAVE_MACOS_13
     return es_msg_->event.authentication->data.touchid->instigator;
-#else
-    return nullptr;
-#endif
   }
 
   std::optional<audit_token_t> EventInstigatorToken() const override {
@@ -537,11 +529,7 @@ class EnrichedAuthenticationToken : public EnrichedEventWithInstigator {
   EnrichedAuthenticationToken(EnrichedAuthenticationToken &&) = default;
 
   const es_process_t *EventInstigator() const override {
-#if HAVE_MACOS_13
     return es_msg_->event.authentication->data.token->instigator;
-#else
-    return nullptr;
-#endif
   }
 
   std::optional<audit_token_t> EventInstigatorToken() const override {
@@ -589,15 +577,11 @@ class EnrichedLaunchItem : public EnrichedEventWithInstigator {
   EnrichedLaunchItem(EnrichedLaunchItem &&) = default;
 
   const es_process_t *EventInstigator() const override {
-#if HAVE_MACOS_13
     if (es_msg_->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD) {
       return es_msg_->event.btm_launch_item_add->instigator;
     } else {
       return es_msg_->event.btm_launch_item_remove->instigator;
     }
-#else
-    return nullptr;
-#endif
   }
 
   std::optional<audit_token_t> EventInstigatorToken() const override {
@@ -624,15 +608,11 @@ class EnrichedLaunchItem : public EnrichedEventWithInstigator {
   }
 
   const es_process_t *AppRegistrant() const {
-#if HAVE_MACOS_13
     if (es_msg_->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD) {
       return es_msg_->event.btm_launch_item_add->app;
     } else {
       return es_msg_->event.btm_launch_item_remove->app;
     }
-#else
-    return nullptr;
-#endif
   }
 
   std::optional<audit_token_t> AppRegistrantToken() const {

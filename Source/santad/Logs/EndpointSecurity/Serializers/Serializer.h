@@ -64,7 +64,6 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile &) = 0;
-#if HAVE_MACOS_13
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(
       const santa::EnrichedLoginWindowSessionLogout &) = 0;
@@ -85,7 +84,6 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLaunchItem &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectDetected &) = 0;
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectRemediated &) = 0;
-#endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
   virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) = 0;
 #endif  // HAVE_MACOS_15
