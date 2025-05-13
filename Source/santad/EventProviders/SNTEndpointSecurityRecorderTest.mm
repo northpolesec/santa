@@ -81,28 +81,32 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (std::set<es_event_type_t>)expectedSubscriptions {
-  std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_NOTIFY_CLONE,        ES_EVENT_TYPE_NOTIFY_CLOSE,
-      ES_EVENT_TYPE_NOTIFY_COPYFILE,     ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED,
-      ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, ES_EVENT_TYPE_NOTIFY_EXEC,
-      ES_EVENT_TYPE_NOTIFY_FORK,         ES_EVENT_TYPE_NOTIFY_EXIT,
-      ES_EVENT_TYPE_NOTIFY_LINK,         ES_EVENT_TYPE_NOTIFY_RENAME,
-      ES_EVENT_TYPE_NOTIFY_UNLINK,
-  };
-
-#if HAVE_MACOS_13
-  if (@available(macOS 13.0, *)) {
-    expectedEventSubs.insert(
-        {ES_EVENT_TYPE_NOTIFY_AUTHENTICATION, ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN,
-         ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT, ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK,
-         ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK, ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH,
-         ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH, ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN,
-         ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT, ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN,
-         ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT, ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD,
-         ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE, ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED,
-         ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED});
-  }
-#endif  // HAVE_MACOS_13
+  std::set<es_event_type_t> expectedEventSubs{ES_EVENT_TYPE_NOTIFY_CLONE,
+                                              ES_EVENT_TYPE_NOTIFY_CLOSE,
+                                              ES_EVENT_TYPE_NOTIFY_COPYFILE,
+                                              ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED,
+                                              ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA,
+                                              ES_EVENT_TYPE_NOTIFY_EXEC,
+                                              ES_EVENT_TYPE_NOTIFY_FORK,
+                                              ES_EVENT_TYPE_NOTIFY_EXIT,
+                                              ES_EVENT_TYPE_NOTIFY_LINK,
+                                              ES_EVENT_TYPE_NOTIFY_RENAME,
+                                              ES_EVENT_TYPE_NOTIFY_UNLINK,
+                                              ES_EVENT_TYPE_NOTIFY_AUTHENTICATION,
+                                              ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN,
+                                              ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT,
+                                              ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK,
+                                              ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK,
+                                              ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH,
+                                              ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH,
+                                              ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN,
+                                              ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT,
+                                              ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN,
+                                              ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT,
+                                              ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD,
+                                              ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE,
+                                              ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED,
+                                              ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED};
 
 #if HAVE_MACOS_15
   if (@available(macOS 15.0, *)) {
@@ -248,64 +252,56 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 }
 
 - (void)testHandleEventCloseMappedWritableMatchesRegex {
-#if HAVE_MACOS_13
-  if (@available(macOS 13.0, *)) {
-    // CLOSE not modified, but was_mapped_writable, should remove from cache,
-    // and matches fileChangesRegex
-    TestHelperBlock testBlock =
-        ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-          SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-          __autoreleasing dispatch_semaphore_t *sema,
-          __autoreleasing dispatch_semaphore_t *semaMetrics) {
-          esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
-          esMsg->event.close.modified = false;
-          esMsg->event.close.was_mapped_writable = true;
-          esMsg->event.close.target = &targetFileMatchesRegex;
-          Message msg(mockESApi, esMsg);
-
-          OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
-
-          XCTAssertNoThrow([recorderClient handleMessage:Message(mockESApi, esMsg)
-                                      recordEventMetrics:^(EventDisposition d) {
-                                        XCTAssertEqual(d, EventDisposition::kProcessed);
-                                        dispatch_semaphore_signal(*semaMetrics);
-                                      }]);
-          XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
-          XCTAssertSemaTrue(*sema, 5, "Log wasn't called within expected time window");
-        };
-
-    [self handleMessageShouldLog:YES shouldRemoveFromCache:YES withBlock:testBlock];
-  }
-#endif
-}
-
-- (void)testHandleEventCloseMappedWritableMissesRegex {
-#if HAVE_MACOS_13
-  if (@available(macOS 13.0, *)) {
-    // CLOSE not modified, but was_mapped_writable, remove from cache, and does not match
-    // fileChangesRegex
-    TestHelperBlock testBlock = ^(
-        es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+  // CLOSE not modified, but was_mapped_writable, should remove from cache,
+  // and matches fileChangesRegex
+  TestHelperBlock testBlock =
+      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
         SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
         __autoreleasing dispatch_semaphore_t *sema,
         __autoreleasing dispatch_semaphore_t *semaMetrics) {
-      esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
-      esMsg->event.close.modified = false;
-      esMsg->event.close.was_mapped_writable = true;
-      esMsg->event.close.target = &targetFileMissesRegex;
-      Message msg(mockESApi, esMsg);
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
+        esMsg->event.close.modified = false;
+        esMsg->event.close.was_mapped_writable = true;
+        esMsg->event.close.target = &targetFileMatchesRegex;
+        Message msg(mockESApi, esMsg);
 
-      OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
+        OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
 
-      XCTAssertNoThrow([recorderClient handleMessage:Message(mockESApi, esMsg)
-                                  recordEventMetrics:^(EventDisposition d) {
-                                    XCTFail("Metrics record callback should not be called here");
-                                  }]);
-    };
+        XCTAssertNoThrow([recorderClient handleMessage:Message(mockESApi, esMsg)
+                                    recordEventMetrics:^(EventDisposition d) {
+                                      XCTAssertEqual(d, EventDisposition::kProcessed);
+                                      dispatch_semaphore_signal(*semaMetrics);
+                                    }]);
+        XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
+        XCTAssertSemaTrue(*sema, 5, "Log wasn't called within expected time window");
+      };
 
-    [self handleMessageShouldLog:NO shouldRemoveFromCache:YES withBlock:testBlock];
-  }
-#endif
+  [self handleMessageShouldLog:YES shouldRemoveFromCache:YES withBlock:testBlock];
+}
+
+- (void)testHandleEventCloseMappedWritableMissesRegex {
+  // CLOSE not modified, but was_mapped_writable, remove from cache, and does not match
+  // fileChangesRegex
+  TestHelperBlock testBlock =
+      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t *sema,
+        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
+        esMsg->event.close.modified = false;
+        esMsg->event.close.was_mapped_writable = true;
+        esMsg->event.close.target = &targetFileMissesRegex;
+        Message msg(mockESApi, esMsg);
+
+        OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
+
+        XCTAssertNoThrow([recorderClient handleMessage:Message(mockESApi, esMsg)
+                                    recordEventMetrics:^(EventDisposition d) {
+                                      XCTFail("Metrics record callback should not be called here");
+                                    }]);
+      };
+
+  [self handleMessageShouldLog:NO shouldRemoveFromCache:YES withBlock:testBlock];
 }
 
 - (void)testHandleMessage {

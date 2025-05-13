@@ -59,7 +59,6 @@ static NSString *const kEventTypeNotifyRename = @"NotifyRename";
 static NSString *const kEventTypeNotifyUnlink = @"NotifyUnlink";
 static NSString *const kEventTypeNotifyUnmount = @"NotifyUnmount";
 static NSString *const kPseudoEventTypeGlobal = @"Global";
-#if HAVE_MACOS_13
 static NSString *const kEventTypeNotifyAuthentication = @"NotifyAuthentication";
 static NSString *const kEventTypeNotifyLoginLogin = @"NotifyLoginLogin";
 static NSString *const kEventTypeNotifyLoginLogout = @"NotifyLoginLogout";
@@ -75,7 +74,6 @@ static NSString *const kEventTypeNotifyLaunchItemAdd = @"NotifyLaunchItemAdd";
 static NSString *const kEventTypeNotifyLaunchItemRemove = @"NotifyLaunchItemRemove";
 static NSString *const kEventTypeNotifyXProtectDetected = @"NotifyXProtectDetected";
 static NSString *const kEventTypeNotifyXProtectRemediated = @"NotifyXProtectRemediated";
-#endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
 static NSString *const kEventTypeNotifyGatekeeperOverride = @"NotifyGatekeeperOverride";
 #endif  // HAVE_MACOS_15
@@ -150,7 +148,6 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
     case ES_EVENT_TYPE_NOTIFY_RENAME: return kEventTypeNotifyRename;
     case ES_EVENT_TYPE_NOTIFY_UNLINK: return kEventTypeNotifyUnlink;
     case ES_EVENT_TYPE_NOTIFY_UNMOUNT: return kEventTypeNotifyUnmount;
-#if HAVE_MACOS_13
     case ES_EVENT_TYPE_NOTIFY_AUTHENTICATION: return kEventTypeNotifyAuthentication;
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN: return kEventTypeNotifyLoginLogin;
     case ES_EVENT_TYPE_NOTIFY_LOGIN_LOGOUT: return kEventTypeNotifyLoginLogout;
@@ -166,7 +163,6 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: return kEventTypeNotifyLaunchItemRemove;
     case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED: return kEventTypeNotifyXProtectDetected;
     case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED: return kEventTypeNotifyXProtectRemediated;
-#endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return kEventTypeNotifyGatekeeperOverride;
 #endif  // HAVE_MACOS_15

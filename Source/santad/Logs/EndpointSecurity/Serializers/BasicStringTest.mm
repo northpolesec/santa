@@ -306,8 +306,6 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   XCTAssertCppStringEqual(got, want);
 }
 
-#if HAVE_MACOS_13
-
 - (void)testSerializeMessageLoginWindowSessionLogin {
   es_file_t procFile = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
@@ -1053,8 +1051,6 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 
   XCTAssertCppStringEqual(got, want);
 }
-
-#endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15
 

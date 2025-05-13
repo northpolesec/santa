@@ -683,8 +683,6 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCopyfile &msg) {
   return FinalizeProto(santa_msg);
 }
 
-#if HAVE_MACOS_13
-
 ::pbv1::SocketAddress::Type GetSocketAddressType(es_address_type_t type) {
   switch (type) {
     case ES_ADDRESS_TYPE_NONE: return ::pbv1::SocketAddress::TYPE_NONE;
@@ -1181,8 +1179,6 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectRemediated
 
   return FinalizeProto(santa_msg);
 }
-
-#endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15
 

@@ -35,7 +35,7 @@
                           customMessage:(NSString *)message
                               customURL:(NSString *)url
                              customText:(NSString *)text
-                            configState:(SNTConfigState *)configState API_AVAILABLE(macos(13.0));
+                            configState:(SNTConfigState *)configState;
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
 - (void)postRuleSyncNotificationForApplication:(NSString *)app;
 - (void)updateCountsForEvent:(SNTStoredEvent *)event

@@ -70,14 +70,12 @@ extern ::pbv1::Execution::Mode GetModeEnum(SNTClientMode mode);
 extern ::pbv1::FileDescriptor::FDType GetFileDescriptorType(uint32_t fdtype);
 extern ::pbv1::FileAccess::AccessType GetAccessType(es_event_type_t event_type);
 extern ::pbv1::FileAccess::PolicyDecision GetPolicyDecision(FileAccessPolicyDecision decision);
-#if HAVE_MACOS_13
 extern ::pbv1::SocketAddress::Type GetSocketAddressType(es_address_type_t type);
 extern ::pbv1::OpenSSHLogin::Result GetOpenSSHLoginResultType(es_openssh_login_result_type_t type);
 extern ::pbv1::AuthenticationTouchID::Mode GetAuthenticationTouchIDMode(es_touchid_mode_t mode);
 extern ::pbv1::AuthenticationAutoUnlock::Type GetAuthenticationAutoUnlockType(
     es_auto_unlock_type_t type);
 extern ::pbv1::LaunchItem::ItemType GetBTMLaunchItemType(es_btm_item_type_t item_type);
-#endif  // HAVE_MACOS_13
 #if HAVE_MACOS_15_4
 extern ::pbv1::TCCModification::IdentityType GetTCCIdentityType(es_tcc_identity_type_t id_type);
 extern ::pbv1::TCCModification::EventType GetTCCEventType(es_tcc_event_type_t event_type);
@@ -893,8 +891,6 @@ void SerializeAndCheckNonESEvents(
                   }];
 }
 
-#if HAVE_MACOS_13
-
 - (void)testSerializeMessageLoginWindowSessionLogin {
   __block es_event_lw_session_login_t lwLogin = {
       .username = MakeESStringToken("daemon"),
@@ -1496,8 +1492,6 @@ void SerializeAndCheckNonESEvents(
                   }
                        variant:@"null_token"];
 }
-
-#endif  // HAVE_MACOS_13
 
 #if HAVE_MACOS_15
 

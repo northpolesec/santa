@@ -20,7 +20,6 @@ import santa_common_SNTConfigState
 import santa_common_SNTFileAccessEvent
 import santa_gui_SNTMessageView
 
-@available(macOS 13, *)
 @objc public class SNTFileAccessMessageWindowViewFactory: NSObject {
   @objc public static func createWith(
     window: NSWindow,

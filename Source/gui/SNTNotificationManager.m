@@ -408,7 +408,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                           customMessage:(NSString *)message
                               customURL:(NSString *)url
                              customText:(NSString *)text
-                            configState:(SNTConfigState *)configState API_AVAILABLE(macos(13.0)) {
+                            configState:(SNTConfigState *)configState {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;

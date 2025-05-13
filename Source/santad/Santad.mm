@@ -127,67 +127,65 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                          metrics:metrics
                                                           logger:logger];
 
-  if (@available(macOS 13.0, *)) {
-    auto faaPolicyProcessor = std::make_shared<santa::FAAPolicyProcessor>(
-        [SNTDecisionCache sharedCache], enricher, logger, tty_writer, metrics,
-        ^santa::FAAPolicyProcessor::URLTextPair(
-            const std::shared_ptr<santa::WatchItemPolicyBase> &policy) {
-          return watch_items->EventDetailLinkInfo(policy);
-        });
+  auto faaPolicyProcessor = std::make_shared<santa::FAAPolicyProcessor>(
+      [SNTDecisionCache sharedCache], enricher, logger, tty_writer, metrics,
+      ^santa::FAAPolicyProcessor::URLTextPair(
+          const std::shared_ptr<santa::WatchItemPolicyBase> &policy) {
+        return watch_items->EventDetailLinkInfo(policy);
+      });
 
-    SNTEndpointSecurityDataFileAccessAuthorizer *data_faa_client =
-        [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
-                          initWithESAPI:esapi
-                                metrics:metrics
-                                 logger:logger
-                               enricher:enricher
-                     faaPolicyProcessor:std::make_shared<santa::DataFAAPolicyProcessorProxy>(
-                                            faaPolicyProcessor)
-                              ttyWriter:tty_writer
-            findPoliciesForTargetsBlock:^std::vector<santa::FAAPolicyProcessor::TargetPolicyPair>(
-                const std::vector<santa::FAAPolicyProcessor::PathTarget> &targets) {
-              return watch_items->FindPoliciesForTargets(targets);
-            }];
-    watch_items->RegisterDataClient(data_faa_client);
+  SNTEndpointSecurityDataFileAccessAuthorizer *data_faa_client =
+      [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
+                        initWithESAPI:esapi
+                              metrics:metrics
+                               logger:logger
+                             enricher:enricher
+                   faaPolicyProcessor:std::make_shared<santa::DataFAAPolicyProcessorProxy>(
+                                          faaPolicyProcessor)
+                            ttyWriter:tty_writer
+          findPoliciesForTargetsBlock:^std::vector<santa::FAAPolicyProcessor::TargetPolicyPair>(
+              const std::vector<santa::FAAPolicyProcessor::PathTarget> &targets) {
+            return watch_items->FindPoliciesForTargets(targets);
+          }];
+  watch_items->RegisterDataClient(data_faa_client);
 
-    data_faa_client.fileAccessDeniedBlock = ^(SNTFileAccessEvent *event, NSString *customMsg,
-                                              NSString *customURL, NSString *customText) {
-      // TODO: The config state should be an argument to the block.
-      SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
-      [[notifier_queue.notifierConnection remoteObjectProxy]
-          postFileAccessBlockNotification:event
-                            customMessage:customMsg
-                                customURL:customURL
-                               customText:customText
-                              configState:cs];
-    };
+  data_faa_client.fileAccessDeniedBlock =
+      ^(SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {
+        // TODO: The config state should be an argument to the block.
+        SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+        [[notifier_queue.notifierConnection remoteObjectProxy]
+            postFileAccessBlockNotification:event
+                              customMessage:customMsg
+                                  customURL:customURL
+                                 customText:customText
+                                configState:cs];
+      };
 
-    SNTEndpointSecurityProcessFileAccessAuthorizer *proc_faa_client =
-        [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
-                          initWithESAPI:esapi
-                                metrics:metrics
-                     faaPolicyProcessor:std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(
-                                            faaPolicyProcessor)
-            iterateProcessPoliciesBlock:^(santa::CheckPolicyBlock checkPolicyBlock) {
-              watch_items->IterateProcessPolicies(checkPolicyBlock);
-            }];
+  SNTEndpointSecurityProcessFileAccessAuthorizer *proc_faa_client =
+      [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
+                        initWithESAPI:esapi
+                              metrics:metrics
+                   faaPolicyProcessor:std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(
+                                          faaPolicyProcessor)
+          iterateProcessPoliciesBlock:^(santa::CheckPolicyBlock checkPolicyBlock) {
+            watch_items->IterateProcessPolicies(checkPolicyBlock);
+          }];
 
-    watch_items->RegisterProcessClient(proc_faa_client);
+  watch_items->RegisterProcessClient(proc_faa_client);
 
-    proc_faa_client.fileAccessDeniedBlock = ^(SNTFileAccessEvent *event, NSString *customMsg,
-                                              NSString *customURL, NSString *customText) {
-      // TODO: The config state should be an argument to the block.
-      SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
-      [[notifier_queue.notifierConnection remoteObjectProxy]
-          postFileAccessBlockNotification:event
-                            customMessage:customMsg
-                                customURL:customURL
-                               customText:customText
-                              configState:cs];
-    };
+  proc_faa_client.fileAccessDeniedBlock =
+      ^(SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {
+        // TODO: The config state should be an argument to the block.
+        SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+        [[notifier_queue.notifierConnection remoteObjectProxy]
+            postFileAccessBlockNotification:event
+                              customMessage:customMsg
+                                  customURL:customURL
+                                 customText:customText
+                                configState:cs];
+      };
 
-    [authorizer_client registerAuthExecProbe:proc_faa_client];
-  }
+  [authorizer_client registerAuthExecProbe:proc_faa_client];
 
   [syncd_queue reassessSyncServiceConnectionImmediately];
 
@@ -585,39 +583,32 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    logger->SetTimerInterval(newInterval);
                                  }],
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
+              selector:@selector(fileAccessPolicyPlist)
+                  type:[NSString class]
+              callback:^(NSString *oldValue, NSString *newValue) {
+                if ([configurator fileAccessPolicy]) {
+                  // Ignore any changes to this key if fileAccessPolicy is set
+                  return;
+                }
+
+                if ((oldValue && !newValue) || (newValue && ![oldValue isEqualToString:newValue])) {
+                  LOGI(@"FileAccessPolicyPlist changed: %@ -> %@", oldValue, newValue);
+                  watch_items->SetConfigPath(newValue);
+                }
+              }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(fileAccessPolicy)
+                                     type:[NSDictionary class]
+                                 callback:^(NSDictionary *oldValue, NSDictionary *newValue) {
+                                   if ((oldValue && !newValue) ||
+                                       (newValue && ![oldValue isEqualToDictionary:newValue])) {
+                                     LOGI(@"FileAccessPolicy changed");
+                                     watch_items->SetConfig(newValue);
+                                   }
+                                 }],
   ]];
-
-  if (@available(macOS 13.0, *)) {
-    // Only watch file access auth keys on mac 13 and newer
-    [kvoObservers addObjectsFromArray:@[
-      [[SNTKVOManager alloc] initWithObject:configurator
-                                   selector:@selector(fileAccessPolicyPlist)
-                                       type:[NSString class]
-                                   callback:^(NSString *oldValue, NSString *newValue) {
-                                     if ([configurator fileAccessPolicy]) {
-                                       // Ignore any changes to this key if fileAccessPolicy is set
-                                       return;
-                                     }
-
-                                     if ((oldValue && !newValue) ||
-                                         (newValue && ![oldValue isEqualToString:newValue])) {
-                                       LOGI(@"FileAccessPolicyPlist changed: %@ -> %@", oldValue,
-                                            newValue);
-                                       watch_items->SetConfigPath(newValue);
-                                     }
-                                   }],
-      [[SNTKVOManager alloc] initWithObject:configurator
-                                   selector:@selector(fileAccessPolicy)
-                                       type:[NSDictionary class]
-                                   callback:^(NSDictionary *oldValue, NSDictionary *newValue) {
-                                     if ((oldValue && !newValue) ||
-                                         (newValue && ![oldValue isEqualToDictionary:newValue])) {
-                                       LOGI(@"FileAccessPolicy changed");
-                                       watch_items->SetConfig(newValue);
-                                     }
-                                   }],
-    ]];
-  }
 
   // Make the compiler happy. The variable is only used to ensure proper lifetime
   // of the SNTKVOManager objects it contains.
@@ -643,11 +634,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   (void)tamper_client;  // Prevent unused variable issues in debug builds
 #endif  // DEBUG
 
-  if (@available(macOS 13.0, *)) {
-    // Start monitoring any watched items
-    // Note: This feature is only enabled on macOS 13.0+
-    watch_items->BeginPeriodicTask();
-  }
+  // Start monitoring any watched items
+  watch_items->BeginPeriodicTask();
+
   [monitor_client enable];
   [device_client enable];
 
