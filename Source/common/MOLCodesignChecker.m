@@ -370,7 +370,7 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
 - (NSString *)architectureString:(struct fat_arch *)fatArch bigEndian:(BOOL)bigEndian {
   cpu_type_t cpu = bigEndian ? OSSwapBigToHostInt(fatArch->cputype) : fatArch->cputype;
   cpu_subtype_t cpuSub = bigEndian ? OSSwapBigToHostInt(fatArch->cpusubtype) : fatArch->cpusubtype;
-  const char *name = macho_arch_name_for_cpu_type(cpuType, cpuSubType);
+  const char *name = macho_arch_name_for_cpu_type(fatArch->cputype, fatArch->cpusubtype);
   if (name) {
     return @(name);
   }

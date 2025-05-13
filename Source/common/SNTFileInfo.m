@@ -534,7 +534,18 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
   if (mh->magic == MH_CIGAM || mh->magic == MH_CIGAM_64) {
     NSMutableData *mutableInput = [inputData mutableCopy];
     mh = (struct mach_header *)[mutableInput mutableBytes];
-    swap_mach_header(mh, NXHostByteOrder());
+
+    // swap_mach_header() was deprecated in macOS 13 and there is no replacement.
+    // This is probably because both Intel and Apple Silicon are little-endian and
+    // almost every Mach-O file we'll ever see will be too but _just in case_ we
+    // ever see a big-endian binary we still support reading the header.
+    mh->magic = OSSwapInt32(mh->magic);
+    mh->cputype = OSSwapInt32(mh->cputype);
+    mh->cpusubtype = OSSwapInt32(mh->cpusubtype);
+    mh->filetype = OSSwapInt32(mh->filetype);
+    mh->ncmds = OSSwapInt32(mh->ncmds);
+    mh->sizeofcmds = OSSwapInt32(mh->sizeofcmds);
+    mh->flags = OSSwapInt32(mh->flags);
   }
 
   if (mh->magic == MH_MAGIC || mh->magic == MH_MAGIC_64) {
