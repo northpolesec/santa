@@ -41,6 +41,9 @@
 "Dismiss & Silence" = "Dismiss & Silence";
 
 /* No comment provided by engineer. */
+"Drop for application info" = "Drop for application info";
+
+/* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Failed to connect to the sync service. Please try again later.";
 
 /* No comment provided by engineer. */
@@ -95,6 +98,9 @@
 "SHA-256" = "SHA-256";
 
 /* No comment provided by engineer. */
+"Signed" = "Signed";
+
+/* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
 
 /* Client mode change: LOCKDOWN */
@@ -108,6 +114,9 @@
 
 /* No comment provided by engineer. */
 "Sync" = "Sync";
+
+/* No comment provided by engineer. */
+"Team ID" = "Team ID";
 
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "The event upload failed. Please check your network connection and try again.";

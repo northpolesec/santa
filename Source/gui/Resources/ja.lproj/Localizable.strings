@@ -41,6 +41,9 @@
 "Dismiss & Silence" = "閉じて通知を停止";
 
 /* No comment provided by engineer. */
+"Drop for application info" = "アプリ情報のためにドロップ";
+
+/* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "同期サービスへの接続に失敗しました。後ほどもう一度お試しください。";
 
 /* No comment provided by engineer. */
@@ -95,6 +98,9 @@
 "SHA-256" = "SHA-256";
 
 /* No comment provided by engineer. */
+"Signed" = "署名済み";
+
+/* No comment provided by engineer. */
 "Signing ID" = "署名ID";
 
 /* No comment provided by engineer. */
@@ -126,6 +132,9 @@
 
 /* Client mode change: STANDALONE */
 "Switching into Standalone mode" = "スタンドアロン・モードへの切り替え";
+
+/* No comment provided by engineer. */
+"Team ID" = "チームID";
 
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "次のアプリケーションは信頼性を判断できないため、<br />実行がブロックされました";

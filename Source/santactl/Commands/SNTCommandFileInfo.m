@@ -361,39 +361,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 
 - (SNTAttributeBlock)codeSigned {
   return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    NSError *error;
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:&error];
-    if (error) {
-      switch (error.code) {
-        case errSecCSUnsigned: return @"No";
-        case errSecCSSignatureFailed:
-        case errSecCSStaticCodeChanged:
-        case errSecCSSignatureNotVerifiable:
-        case errSecCSSignatureUnsupported: return @"Yes, but code/signature changed/unverifiable";
-        case errSecCSResourceDirectoryFailed:
-        case errSecCSResourceNotSupported:
-        case errSecCSResourceRulesInvalid:
-        case errSecCSResourcesInvalid:
-        case errSecCSResourcesNotFound:
-        case errSecCSResourcesNotSealed: return @"Yes, but resources invalid";
-        case errSecCSReqFailed:
-        case errSecCSReqInvalid:
-        case errSecCSReqUnsupported: return @"Yes, but failed requirement validation";
-        case errSecCSInfoPlistFailed: return @"Yes, but can't validate as Info.plist is missing";
-        case errSecCSSignatureInvalid:
-          if ([error.domain isEqualToString:@"com.northpolesec.molcodesignchecker"]) {
-            return @"Yes, but signing is not consistent for all architectures";
-          }
-        case CSSMERR_TP_CERT_REVOKED: return @"Yes, but the signing certificate was revoked";
-        default: {
-          return [NSString stringWithFormat:@"Yes, but failed to validate (%ld)", error.code];
-        }
-      }
-    } else if (csc.signatureFlags & kSecCodeSignatureAdhoc) {
-      return @"Yes, but ad-hoc";
-    } else {
-      return @"Yes";
-    }
+    return [fileInfo codesignStatus];
   };
 }
 

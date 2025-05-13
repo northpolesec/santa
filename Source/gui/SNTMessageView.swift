@@ -153,6 +153,57 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
   .help("⌘ Return")
 }
 
+public struct CopyDetailsButton: View {
+  let action: () -> Void
+
+  @State private var showCopyConfirmation = false
+
+  public init(action: @escaping () -> Void) {
+    self.action = action
+  }
+
+  public var body: some View {
+    Button(action: {
+      action()
+      withAnimation {
+        showCopyConfirmation = true
+      }
+
+      // Hide after 1 second
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        withAnimation {
+          showCopyConfirmation = false
+        }
+      }
+    }) {
+      HStack(spacing: 2.0) {
+        Text("Copy Details", comment: "Copy Details")
+          .foregroundColor(.blue)
+
+        Image(systemName: "pencil.and.list.clipboard")
+          .foregroundColor(.blue)
+
+        // Reserve space for the checkmark to maintain consistent width
+        ZStack {
+          // Invisible placeholder with the same size as the checkmark
+          Image(systemName: "checkmark.circle.fill")
+            .foregroundColor(.clear)
+
+          // Actual checkmark that appears and fades
+          if showCopyConfirmation {
+            Image(systemName: "checkmark.circle.fill")
+              .foregroundColor(.blue)
+              .transition(.opacity)
+          }
+        }
+      }
+    }
+    .buttonStyle(ScalingButtonStyle())
+    .keyboardShortcut("c", modifiers: [.command, .shift])
+    .help("⇧ ⌘  c")
+  }
+}
+
 public func AuthorizeViaTouchID(reason: String, replyBlock: @escaping (Bool) -> Void) {
   let policy: LAPolicy =
     SNTConfigurator.configurator().enableStandalonePasswordFallback

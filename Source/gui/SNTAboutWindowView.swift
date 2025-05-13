@@ -20,6 +20,8 @@ struct SNTAboutWindowView: View {
   let c = SNTConfigurator.configurator()
   let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
 
+  @State private var isDragging = false
+
   var body: some View {
     SNTMessageView() {
       if let t = c.aboutText {
@@ -66,6 +68,36 @@ struct SNTAboutWindowView: View {
       .foregroundColor(.secondary)
       .multilineTextAlignment(.center)
       .padding(10.0)
+    }
+    .overlay(draggingOverlay, alignment: .top)
+    .dropDestination(for: URL.self) { items, location in
+      for item in items {
+        // While the input is a URL, we need to standardize the path and then
+        // turn it back into a URL.
+        let url = URL(fileURLWithPath: item.standardized.path)
+
+        // Now open the passed in file using ourself as the handler application.
+        // This triggers the application:openURLs: method in SNTAppDelegate.
+        NSWorkspace.shared.open(
+          [url],
+          withApplicationAt: Bundle.main.bundleURL,
+          configuration: NSWorkspace.OpenConfiguration()
+        )
+      }
+      return true
+    } isTargeted: {
+      isDragging = $0
+    }
+  }
+
+  @ViewBuilder private var draggingOverlay: some View {
+    if isDragging {
+      ZStack {
+        Color(white: 1, opacity: 1)
+        VStack {
+          Text("Drop for application info").tint(.white)
+        }
+      }
     }
   }
 

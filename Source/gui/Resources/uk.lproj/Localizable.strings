@@ -41,6 +41,9 @@
 "Dismiss & Silence" = "Звільнити і замовкнути";
 
 /* No comment provided by engineer. */
+"Drop for application info" = "Перетягніть для інформації про додаток";
+
+/* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Не вдалося підключитися до служби синхронізації. Будь ласка, спробуйте пізніше.";
 
 /* No comment provided by engineer. */
@@ -98,7 +101,22 @@
 "Signing ID" = "Signing ID";
 
 /* No comment provided by engineer. */
+"Signed" = "Підписано";
+
+/* Client mode change: LOCKDOWN */
+"Switching into Lockdown mode" = "Перехід у режим блокування";
+
+/* Client mode change: MONITOR */
+"Switching into Monitor mode" = "Перехід у режим монітора";
+
+/* Client mode change: STANDALONE */
+"Switching into Standalone mode" = "Перехід в автономний режим";
+
+/* No comment provided by engineer. */
 "Sync" = "Синхронізація";
+
+/* No comment provided by engineer. */
+"Team ID" = "ID команди";
 
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "Не вдалося завантажити подію. Будь ласка, перевірте підключення до мережі та спробуйте ще раз.";
@@ -117,15 +135,6 @@
 
 /* No comment provided by engineer. */
 "Too many syncs are in progress. Please try again later." = "Забагато синхронізацій виконується. Будь ласка, спробуйте пізніше.";
-
-/* Client mode change: LOCKDOWN */
-"Switching into Lockdown mode" = "Перехід у режим блокування";
-
-/* Client mode change: MONITOR */
-"Switching into Monitor mode" = "Перехід у режим монітора";
-
-/* Client mode change: STANDALONE */
-"Switching into Standalone mode" = "Перехід в автономний режим";
 
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Наступна програма була заблокована для виконання,<br />оскільки не може бути визначена її достовірність";

@@ -239,4 +239,9 @@
 ///
 - (MOLCodesignChecker *)codesignCheckerWithError:(NSError **)error;
 
+///
+///  @return A human-readable string describing the codesign status of the file.
+///
+- (NSString *)codesignStatus;
+
 @end
