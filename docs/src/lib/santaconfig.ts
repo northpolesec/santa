@@ -41,6 +41,11 @@ export type SantaConfigKey = {
   // What version of Santa added/deprecated support for this key.
   versionAdded?: string;
   versionDeprecated?: string;
+
+  // If set, will be called to determine if the key should be displayed in the
+  // config generator. All existing values are passed in, so that the function
+  // can use the current state to make its determination.
+  enableIf?: (data: any) => boolean;
 };
 
 // Represents a possible value for keys that accept a limited set of options.
@@ -201,7 +206,7 @@ sequences will be replaced in the final URL:
     },
     {
       key: "UnknownBlockMessage",
-      description: `In Lockdown mode this is the message shown to the user when an unknown binary is blocked.
+      description: `In Lockdown/Standalone mode this is the message shown to the user when an unknown binary is blocked.
         If this message is not configured a reasonable default is provided`,
       type: "string",
     },
@@ -338,6 +343,8 @@ changes in the release notes of any future release that changes them.`,
         If you change this value ensure you also update \`com.northpolesec.santa.newsyslog.conf\` with the new path`,
       type: "string",
       defaultValue: "/var/db/santa/santa.log",
+      enableIf: (data) =>
+        data.EventLogType == "file" || data.EventLogType == "json",
     },
     {
       key: "SpoolDirectory",
@@ -345,6 +352,7 @@ changes in the release notes of any future release that changes them.`,
         save files according to a maildir-like format`,
       type: "string",
       defaultValue: "/var/db/santa/spool",
+      enableIf: (data) => data.EventLogType == "protobuf",
     },
     {
       key: "SpoolDirectoryFileSizeThresholdKB",
@@ -353,6 +361,7 @@ changes in the release notes of any future release that changes them.`,
         exceeded (or \`SpoolDirectoryEventMaxFlushTimeSec\` is exceeded)`,
       type: "integer",
       defaultValue: 100,
+      enableIf: (data) => data.EventLogType == "protobuf",
     },
     {
       key: "SpoolDirectorySizeThresholdMB",
@@ -360,6 +369,7 @@ changes in the release notes of any future release that changes them.`,
         limit of all files in the spool directory. Once the threshold is met, no more events will be saved`,
       type: "integer",
       defaultValue: 100,
+      enableIf: (data) => data.EventLogType == "protobuf",
     },
     {
       key: "SpoolDirectoryEventMaxFlushTimeSec",
@@ -368,6 +378,7 @@ changes in the release notes of any future release that changes them.`,
         \`SpoolDirectoryFileSizeThresholdKB\` would be exceeded`,
       type: "integer",
       defaultValue: 10,
+      enableIf: (data) => data.EventLogType == "protobuf",
     },
     {
       key: "EnableMachineIDDecoration",
@@ -375,6 +386,7 @@ changes in the release notes of any future release that changes them.`,
       each log line.`,
       type: "bool",
       defaultValue: false,
+      enableIf: (data) => data.EventLogType == "file",
     },
     {
       key: "EntitlementsPrefixFilter",
@@ -394,12 +406,14 @@ changes in the release notes of any future release that changes them.`,
     {
       key: "FileAccessPolicyPlist",
       description: `Path to a file access configuration plist. This is ignored if \`FileAccessPolicy\` is also set.
-        See [File Access Authorization](/features/faa) for configuration details.`, // TODO: Link to FAA config page
+        See [File Access Authorization](/features/faa) for configuration details.`,
       type: "string",
       versionAdded: "2023.1",
     },
     {
       key: "FileAccessPolicy",
+      // TODO: Remove once the config generator can support generating FAA policies.
+      enableIf: (data) => false,
       description: `A complete file access configuration policy embedded in the main Santa config.
         If set, \`FileAccessPolicyPlist\` will be ignored. See File Access Authorization for configuration details`,
       type: "dict",
@@ -648,6 +662,7 @@ changes in the release notes of any future release that changes them.`,
         { value: "async" },
         { value: "-j" },
       ],
+      enableIf: (data) => data.BlockUSBMount,
     },
     {
       key: "OnStartUSBOptions",
@@ -663,6 +678,7 @@ mount flags that are a superset of \`RemountUSBMode\` are unaffected and left as
         { value: "Remount" },
         { value: "ForceRemount" },
       ],
+      enableIf: (data) => data.BlockUSBMount,
     },
   ],
   metrics: [
@@ -686,12 +702,14 @@ mount flags that are a superset of \`RemountUSBMode\` are unaffected and left as
       key: "MetricURL",
       description: "URL describing where monitoring metrics should be exported",
       type: "string",
+      enableIf: (data) => data.MetricFormat !== "",
     },
     {
       key: "MetricExportInterval",
       description: "Number of seconds to wait between exporting metrics",
       type: "integer",
       defaultValue: 30,
+      enableIf: (data) => data.MetricFormat !== "",
     },
     {
       key: "MetricExportTimeout",
@@ -699,6 +717,7 @@ mount flags that are a superset of \`RemountUSBMode\` are unaffected and left as
         "Number of seconds to wait before a timeout occurs when exporting metrics",
       type: "integer",
       defaultValue: 30,
+      enableIf: (data) => data.MetricFormat !== "",
     },
     {
       key: "MetricExtraLabels",
@@ -706,6 +725,7 @@ mount flags that are a superset of \`RemountUSBMode\` are unaffected and left as
       description: `A map of key value pairs to add to all metric root labels.
         If a previously set key (e.g. host_name is set to "" then the key is removed from the metric root labels.
         Alternatively if a value is set for an existing key then the new value will override the old.`,
+      enableIf: (data) => data.MetricFormat !== "",
     },
   ],
   rules: [
@@ -746,6 +766,8 @@ mount flags that are a superset of \`RemountUSBMode\` are unaffected and left as
     },
     {
       key: "StaticRules",
+      // TODO: Remove once the config generator can support StaticRules.
+      enableIf: (data) => false,
       description: `A static set of rules to always apply to the host. These rules always take precedence over any
       configured by a sync server. Having this key set will also prevent local configuration of rules using the
       \`santactl rule\` command.
@@ -807,6 +829,8 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       description: `The proxy configuration to use when syncing.
         See the Apple Documentation for details on the keys that can be used in this dictionary`,
       type: "dict",
+      // TODO: Remove once the generator can support SyncProxyConfiguration.
+      enableIf: (data) => false,
     },
     {
       key: "SyncEnableCleanSyncEventUpload",
@@ -823,6 +847,7 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       key: "ClientAuthCertificatePassword",
       description: `Contains the password for the PKCS#12 certificate`,
       type: "string",
+      enableIf: (data) => data.ClientAuthCertificateFile !== "",
     },
     {
       key: "ClientAuthCertificateCN",
@@ -868,6 +893,7 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       key: "MachineOwnerKey",
       description: `The key to use on \`MachineOwnerPlist\``,
       type: "string",
+      enableIf: (data) => data.MachineOwnerPlist !== "",
     },
     {
       key: "MachineIDPlist",
@@ -878,6 +904,7 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       key: "MachineIDKey",
       description: `The key to use on \`MachineIDPlist\``,
       type: "string",
+      enableIf: (data) => data.MachineIDPlist !== "",
     },
     {
       key: "EnableAllEventUpload",
@@ -914,3 +941,5 @@ thousand static rules working correctly, but we don't recommend using StaticRule
     },
   ],
 };
+
+export const SantaConfigAllKeys = Object.values(SantaConfigKeyGroups).flat();

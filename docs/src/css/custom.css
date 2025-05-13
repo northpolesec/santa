@@ -2,12 +2,17 @@
 @import "tailwindcss/theme.css" layer(theme) important;
 @import "tailwindcss/utilities.css" layer(utilities) important;
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @plugin 'tailwindcss-animate';
 
 @custom-variant dark (&:is([data-theme="dark"] *));
 
 @theme {
   --color-border: hsl(var(--border));
+  --color-bright: hsl(var(--bright));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
   --color-background: hsl(var(--background));
@@ -15,6 +20,7 @@
 
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-hover: hsl(var(--primary-hover));
 
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
@@ -37,7 +43,6 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
-
 }
 
 @layer base {
@@ -56,61 +61,103 @@
   }
 
   :root {
-    /* Shadcn Style new-york - slate */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+		--background: 223.81 0% 98%;
+		--foreground: 240.08 6% 26%;
+		--bright: 240.02 6% 10%;
+		--card: 223.81 0% 98%;
+		--card-foreground: 240.02 6% 10%;
+		--popover: 223.81 0% 98%;
+		--popover-foreground: 240.02 6% 10%;
+		--primary: 357 74% 50%;
+		--primary-foreground: 0 85.7% 97.3%;
+		--primary-hover: 357 74% 55%;
+		--secondary: 0 0% 90%;
+		--secondary-foreground: 0 0% 9%;
+		--secondary-hover: 0 0% 95%;
+		--muted: 0 0% 90%;
+		--muted-foreground: 0 0% 45.1%;
+		--accent: 223.81 0% 93%;
+		--accent-foreground: 0 0% 9%;
+		--destructive: 29.84 100% 44%;
+		--destructive-foreground: 0 0% 98%;
+		--destructive-hover: 29.84 100% 49%;
+		--success: 142.1 76.2% 31.2%;
+		--success-foreground: 0 0% 98%;
+		--success-hover: 142.1 76.2% 36.2%;
+		--border: 0 0% 80%;
+		--input: 0 0% 80%;
+		--radius: 0.5rem;
+		--ring: 346.8 77.2% 49.8%;
+		--chart-1: 42 100% 62%;
+		--chart-2: 189 73% 38%;
+		--chart-3: 164 95% 43%;
+		--chart-4: 354 65% 59%;
+		--chart-5: 188 56% 23%;
+		--chart-6: 153 100% 25%;
+		--chart-7: 208 53% 32%;
+		--chart-8: 210 30% 51%;
+		--chart-9: 290 57% 65%;
+		--chart-10: 311 64% 27%;
+		--sidebar-background: 0 0% 98%;
+		--sidebar-foreground: 240 5.3% 26.1%;
+		--sidebar-primary: 240 5.9% 10%;
+		--sidebar-primary-foreground: 0 0% 98%;
+		--sidebar-accent: 240 4.8% 95.9%;
+		--sidebar-accent-foreground: 240 5.9% 10%;
+		--sidebar-border: 220 13% 91%;
+		--sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   html[data-theme="dark"] {
-    /* Shadcn Style new-york - slate */
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+		--background: 240.02 6% 10%;
+		--foreground: 240.02 5% 84%;
+		--bright: 223.81 0% 98%;
+		--card: 240.02 5% 13%;
+		--card-foreground: 223.81 0% 98%;
+		--popover: 240.02 6% 13%;
+		--popover-foreground: 223.81 0% 98%;
+		--primary: 357 74% 50%;
+		--primary-foreground: 0 85.7% 97.3%;
+		--primary-hover: 357 74% 55%;
+		--secondary: 0 0% 14.9%;
+		--secondary-foreground: 0 0% 98%;
+		--secondary-hover: 0 0% 19.6%;
+		--muted: 0 0% 20%;
+		--muted-foreground: 0 0% 63.9%;
+		--accent: 240.02 6% 15%;
+		--accent-foreground: 0 0% 98%;
+		--destructive: 29.84 100% 44%;
+		--destructive-foreground: 0 0% 98%;
+		--destructive-hover: 29.84 100% 49%;
+		--success: 142.1 76.2% 31.2%;
+		--success-foreground: 0 0% 98%;
+		--success-hover: 142.1 76.2% 36.2%;
+		--border: 0 0% 20%;
+		--input: 0 0% 20%;
+		--ring: 221.2 83.2% 53.3%;
+		--sidebar-background: 240 5.9% 10%;
+		--sidebar-foreground: 240 4.8% 95.9%;
+		--sidebar-primary: 0 0% 98%;
+		--sidebar-primary-foreground: 240 5.9% 10%;
+		--sidebar-accent: 240 3.7% 15.9%;
+		--sidebar-accent-foreground: 240 4.8% 95.9%;
+		--sidebar-border: 240 3.7% 15.9%;
+		--sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  * {
+		@apply border-border outline-ring/50;
+	}
+
+	/* Add styles for invalid form elements */
+	[aria-invalid="true"] {
+		@apply border-destructive ring-destructive/50;
+	}
+
+	/* Style invalid buttons with destructive outline */
+	button[aria-invalid="true"] {
+		@apply ring-2 ring-destructive/50;
+	}
 
   html {
     font: var(--ifm-font-size-base) / var(--ifm-line-height-base)
@@ -218,3 +265,8 @@ pre {
   tab-size: 2;
 }
 
+/* Stop indenting switches */
+button {
+  padding-inline: 0;
+  border: none;
+}
