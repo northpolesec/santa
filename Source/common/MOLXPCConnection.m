@@ -124,6 +124,7 @@
     self.currentConnection.remoteObjectInterface = self.validationInterface;
     self.currentConnection.interruptionHandler = self.currentConnection.invalidationHandler = ^{
       STRONGIFY(self);
+      self.currentConnection.remoteObjectInterface = nil;
       if (self.invalidationHandler) self.invalidationHandler();
     };
     [self.currentConnection resume];
@@ -158,15 +159,6 @@
     interface = self.privilegedInterface;
   } else {
     interface = self.unprivilegedInterface;
-  }
-
-  // TODO(any): Remove 1-2 releases after exportedInterface was marked deprecated.
-  if (!interface) {
-    // Silence warning about using exportedInterface temporarily until this is removed.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    interface = self.exportedInterface;
-#pragma clang diagnostic pop
   }
 
   if (!interface) return NO;
@@ -205,8 +197,7 @@
 }
 
 - (id)remoteObjectProxy {
-  if (self.currentConnection.remoteObjectInterface &&
-      self.currentConnection.remoteObjectInterface != self.validationInterface) {
+  if (self.isConnected) {
     return [self.currentConnection remoteObjectProxyWithErrorHandler:^(NSError *error) {
       [self.currentConnection invalidate];
     }];
@@ -215,13 +206,17 @@
 }
 
 - (id)synchronousRemoteObjectProxy {
-  if (self.currentConnection.remoteObjectInterface &&
-      self.currentConnection.remoteObjectInterface != self.validationInterface) {
+  if (self.isConnected) {
     return [self.currentConnection synchronousRemoteObjectProxyWithErrorHandler:^(NSError *error) {
       [self.currentConnection invalidate];
     }];
   }
   return nil;
+}
+
+- (BOOL)isConnected {
+  return self.currentConnection.remoteObjectInterface &&
+         self.currentConnection.remoteObjectInterface == self.remoteInterface;
 }
 
 #pragma mark Connection tear-down

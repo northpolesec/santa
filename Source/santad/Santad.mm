@@ -559,7 +559,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    LOGI(@"EnableTelemetryExport changed: %d -> %d", oldBool,
                                         newBool);
 
-                                   [syncd_queue reassessSyncServiceConnectionImmediately];
+                                   [syncd_queue reassessSyncServiceConnection];
 
                                    if (newBool) {
                                      logger->StartTimer();
