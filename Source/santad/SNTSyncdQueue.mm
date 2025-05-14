@@ -30,7 +30,6 @@
 @property MOLXPCConnection *syncConnection;
 @property dispatch_source_t timer;
 @property NSURL *previousSyncBaseURL;
-@property BOOL syncServiceConnected;
 @end
 
 @implementation SNTSyncdQueue {
@@ -87,7 +86,7 @@
       // If the SyncBaseURL was added or changed, and a connection already
       // exists, it must be bounced.
       if (self.previousSyncBaseURL && ![self.previousSyncBaseURL isEqual:newSyncBaseURL] &&
-          self.syncServiceConnected) {
+          self.syncConnection.isConnected) {
         [self tearDownSyncServiceConnectionSerialized];
         // Return early. When the sync service spins down, it will trigger the
         // invalidation handler which will reassess the connection state.
@@ -98,7 +97,7 @@
 
       // If newSyncBaseURL or statsCollectionEnabled is set, start the sync service
       if (newSyncBaseURL || statsCollectionEnabled || telemetryExportEnabled) {
-        if (!self.syncServiceConnected) {
+        if (!self.syncConnection.isConnected) {
           [self establishSyncServiceConnectionSerialized];
         }
 
@@ -110,7 +109,7 @@
                                                      object:nil];
         }
       } else {
-        if (self.syncServiceConnected) {
+        if (self.syncConnection.isConnected) {
           // Note: Only teardown the connection if we're connected. This helps
           // prevent the condition where we would end-up reestablishing the
           // connection when the invalidationHandler fired and a call to
@@ -141,13 +140,7 @@
   ss.invalidationHandler = ^(void) {
     STRONGIFY(self);
     self.syncConnection.invalidationHandler = nil;
-    self.syncServiceConnected = false;
     [self reassessSyncServiceConnection];
-  };
-
-  ss.acceptedHandler = ^{
-    STRONGIFY(self);
-    self.syncServiceConnected = true;
   };
 
   [ss resume];
@@ -156,7 +149,6 @@
 
 - (void)tearDownSyncServiceConnectionSerialized {
   // Tell the sync service to stop.
-  // Note: syncServiceConnected will be updated when the invalidation handler runs.
   [[self.syncConnection remoteObjectProxy] spindown];
 }
 
@@ -198,7 +190,7 @@
 - (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
           completionHandler:(void (^)(BOOL))completionHandler {
   [self dispatchBlockOnSyncdQueue:^{
-    if (self.syncConnection.remoteObjectProxy) {
+    if (self.syncConnection.isConnected) {
       [self.syncConnection.remoteObjectProxy exportTelemetryFile:telemetryFile
                                                            reply:completionHandler];
     } else {

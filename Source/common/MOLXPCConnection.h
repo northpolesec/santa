@@ -132,13 +132,6 @@
 @property(retain, nullable) NSXPCInterface *unprivilegedInterface;
 
 /**
-  Old interface property, please update to use privilegedExportedInterface and/or
-  unprivilegedExportedInterface instead.
- */
-@property(retain, nullable) NSXPCInterface *exportedInterface
-    __attribute__((deprecated("Use privilegedInterface and / or unprivilegedInterface instead.")));
-
-/**
  The object that responds to messages from the other end. (server)
  */
 @property(retain, nullable) id exportedObject;
@@ -152,6 +145,11 @@
  A block to run when a/the connection is invalidated/interrupted/rejected.
  */
 @property(copy, nullable) void (^invalidationHandler)(void);
+
+/**
+ Whether or not the XPC connection is currently established.
+ */
+@property(readonly) BOOL isConnected;
 
 @end
 
