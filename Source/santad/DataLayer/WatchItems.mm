@@ -684,37 +684,119 @@ SetPairPathAndType DataWatchItems::operator-(const DataWatchItems &other) const 
   return diff;
 }
 
-bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
+void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NSUInteger idx,
+                 std::vector<std::string> &matches) {
+  if (path_components.count == idx) {
+    // Nothing left to match, add the current full base path
+    matches.push_back(base.UTF8String);
+    return;
+  }
+
+  NSString *path = [NSString stringWithFormat:@"%@%@", base, path_components[idx]];
+
   glob_t *g = (glob_t *)alloca(sizeof(glob_t));
-  for (const std::shared_ptr<DataWatchItemPolicy> &item : data_policies) {
-    int err = glob(item->path.c_str(), 0, nullptr, g);
-    if (err != 0 && err != GLOB_NOMATCH) {
-      LOGE(@"Failed to generate path names for watch item: %s", item->name.c_str());
-      return false;
-    }
-
-    // If no paths were returned, check if the search pattern contained any magic
-    // characters. If not, we can go ahead and start monitoring the configured path.
-    if (g->gl_pathc == 0 && ((g->gl_flags & GLOB_MAGCHAR) == 0)) {
-      if (item->path_type == WatchItemPathType::kPrefix) {
-        tree_->InsertPrefix(item->path.c_str(), item);
-      } else {
-        tree_->InsertLiteral(item->path.c_str(), item);
-      }
-
-      paths_.insert({item->path.c_str(), item->path_type});
-    } else {
-      for (size_t i = g->gl_offs; i < g->gl_pathc; i++) {
-        if (item->path_type == WatchItemPathType::kPrefix) {
-          tree_->InsertPrefix(g->gl_pathv[i], item);
-        } else {
-          tree_->InsertLiteral(g->gl_pathv[i], item);
-        }
-
-        paths_.insert({g->gl_pathv[i], item->path_type});
-      }
-    }
+  int err = glob(path.UTF8String, GLOB_NOSORT, nullptr, g);
+  if (err != 0 && err != GLOB_NOMATCH) {
+    LOGE(@"Failed to generate path names for watch item: %@", path);
     globfree(g);
+    return;
+  }
+
+  if (g->gl_pathc == 0) {
+    // If there were no hits...
+    if ((g->gl_flags & GLOB_MAGCHAR) == 0) {
+      // As long as there are no remaining magic chars in any of the path
+      // components, we can add a watch item
+      NSArray<NSString *> *remaining_components =
+          (idx == path_components.count - 1)
+              ? @[]
+              : [path_components
+                    subarrayWithRange:NSMakeRange(idx + 1, path_components.count - idx - 1)];
+      NSString *remaining_path = [remaining_components componentsJoinedByString:@""];
+
+      globfree(g);
+      glob(remaining_path.UTF8String, 0, NULL, g);
+      if ((g->gl_flags & GLOB_MAGCHAR) == 0) {
+        matches.push_back([NSString stringWithFormat:@"%@%@", path, remaining_path].UTF8String);
+      }
+    } else {
+      // There was a magic char but no FS match. No paths will be watched.
+    }
+  } else {
+    // For every subpath match, recurse into
+    for (size_t i = g->gl_offs; i < g->gl_pathc; i++) {
+      FindMatches(@(g->gl_pathv[i]), path_components, idx + 1, matches);
+    }
+  }
+
+  globfree(g);
+}
+
+std::vector<std::string> FindMatches(NSString *path) {
+  if (!path) {
+    return {};
+  }
+
+  if (![path hasPrefix:@"/"]) {
+    path = [NSString stringWithFormat:@"/%@", path];
+  }
+
+  glob_t *g = (glob_t *)alloca(sizeof(glob_t));
+  int err = glob(path.UTF8String, 0, nullptr, g);
+  if (err != 0 && err != GLOB_NOMATCH) {
+    LOGE(@"Failed to generate path names for watch item: %@", path);
+    return {};
+  }
+
+  // If the path had no glob char, begin watching it whether or not it exists
+  if ((g->gl_flags & GLOB_MAGCHAR) == 0) {
+    globfree(g);
+    return {path.UTF8String};
+  }
+
+  NSArray<NSString *> *path_components = [path pathComponents];
+  // Code above enforces the given path starts with a /, so must be at least two entries
+  assert(path_components.count > 1);
+
+  // Semi-arbitrary to prevent run away recursion. We could consider increasing this if
+  // anyone ever has a good use case.
+  if (path_components.count > 40) {
+    LOGW(@"Watch path contained too many components, skipping: %@", path);
+    return {};
+  }
+
+  // Modify each path component to have a trailing slash. This is to ensure that when path
+  // components are appended for recursive glob searches, only directory results will be returned.
+  NSMutableArray<NSString *> *modified_path_components = [NSMutableArray array];
+  NSUInteger limit = [path hasSuffix:@"/"] ? path_components.count - 1 : path_components.count;
+  for (NSUInteger i = 1; i < limit; i++) {
+    // If adding the last component and the input doesn't end with a slash, don't append the slash
+    if (i == limit - 1 && ![path hasSuffix:@"/"]) {
+      [modified_path_components addObject:path_components[i]];
+    } else {
+      [modified_path_components addObject:[NSString stringWithFormat:@"%@/", path_components[i]]];
+    }
+  }
+
+  std::vector<std::string> matches;
+  FindMatches(@"/", modified_path_components, 0, matches);
+
+  return matches;
+}
+
+bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
+  for (const std::shared_ptr<DataWatchItemPolicy> &item : data_policies) {
+    std::vector<std::string> matches = FindMatches(@(item->path.c_str()));
+
+    for (const auto &match : matches) {
+      if (item->path_type == WatchItemPathType::kPrefix) {
+        tree_->InsertPrefix(match.c_str(), item);
+      } else {
+        tree_->InsertLiteral(match.c_str(), item);
+      }
+
+      paths_.insert({match.c_str(), item->path_type});
+    }
   }
 
   return true;
