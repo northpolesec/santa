@@ -216,7 +216,7 @@
 
 - (BOOL)isConnected {
   return self.currentConnection.remoteObjectInterface &&
-      self.currentConnection.remoteObjectInterface == self.remoteInterface;
+         self.currentConnection.remoteObjectInterface == self.remoteInterface;
 }
 
 #pragma mark Connection tear-down
