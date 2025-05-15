@@ -1,4 +1,4 @@
-load("@build_bazel_rules_apple//apple:macos.bzl", "macos_bundle")
+load("@rules_apple//apple:macos.bzl", "macos_bundle")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -49,7 +49,7 @@ objc_library(
     deps = [
         "//Source/common:PrefixTree",
         "//Source/common:Unit",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -58,7 +58,7 @@ santa_unit_test(
     srcs = ["DataLayer/WatchItemPolicyTest.mm"],
     deps = [
         ":WatchItemPolicy",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -75,7 +75,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:String",
         "//Source/common:Unit",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -90,7 +90,7 @@ santa_unit_test(
         "//Source/common:TestUtils",
         "//Source/common:Unit",
         "@OCMock",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -265,7 +265,7 @@ objc_library(
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
         "@FMDB",
-        "@com_google_absl//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 
@@ -335,7 +335,7 @@ objc_library(
         "//Source/common:SantaVnode",
         "//Source/common:String",
         "//Source/common:Unit",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -399,7 +399,7 @@ santa_unit_test(
         ":SNTEndpointSecurityTreeAwareClient",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -711,8 +711,8 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:String",
         "//Source/common:santa_cc_proto_library_wrapper",
-        "@com_google_absl//absl/status",
-        "@com_google_protobuf//src/google/protobuf/json",
+        "@abseil-cpp//absl/status",
+        "@protobuf//src/google/protobuf/json",
     ],
 )
 
@@ -720,8 +720,8 @@ objc_library(
     name = "EndpointSecurityWriter",
     hdrs = ["Logs/EndpointSecurity/Writers/Writer.h"],
     deps = [
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -754,9 +754,9 @@ objc_library(
         "//Source/common:santa_cc_proto_library_wrapper",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -793,8 +793,8 @@ objc_library(
         "//Source/common:SNTStoredEvent",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Timer",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -1034,7 +1034,7 @@ objc_library(
         ":EndpointSecurityClient",
         ":EndpointSecurityMessage",
         ":WatchItemPolicy",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1053,7 +1053,7 @@ objc_library(
         ":TTYWriter",
         ":WatchItemPolicy",
         "//Source/common:SNTCachedDecision",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1066,7 +1066,7 @@ objc_library(
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         "//Source/common:TelemetryEventMap",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1149,7 +1149,7 @@ santa_unit_test(
         "//Source/common:SNTConfigurator",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1191,7 +1191,7 @@ santa_unit_test(
         ":MockEndpointSecurityAPI",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1217,7 +1217,7 @@ santa_unit_test(
         "//Source/common:SNTStoredEvent",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1243,9 +1243,9 @@ santa_unit_test(
         "//Source/common:TestUtils",
         "//Source/common:santa_cc_proto_library_wrapper",
         "@OCMock",
-        "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest",
-        "@com_google_protobuf//src/google/protobuf/json",
+        "@abseil-cpp//absl/status",
+        "@googletest//:gtest",
+        "@protobuf//src/google/protobuf/json",
     ],
 )
 
@@ -1262,7 +1262,7 @@ santa_unit_test(
         "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1296,7 +1296,7 @@ santa_unit_test(
         ":EndpointSecurityWriterFile",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1336,7 +1336,7 @@ santa_unit_test(
         "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1374,7 +1374,7 @@ santa_unit_test(
         ":MockEndpointSecurityAPI",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1432,7 +1432,7 @@ santa_unit_test(
         "//Source/common:SystemResources",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1485,7 +1485,7 @@ santa_unit_test(
         "//Source/common:SNTCommonEnums",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1501,7 +1501,7 @@ santa_unit_test(
         "//Source/common:SNTConfigurator",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1537,7 +1537,7 @@ santa_unit_test(
         "//Source/common:SNTCachedDecision",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1557,7 +1557,7 @@ santa_unit_test(
         "//Source/common:SNTLogging",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1586,7 +1586,7 @@ santa_unit_test(
         "//Source/common:TestUtils",
         "//Source/common:Unit",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1611,7 +1611,7 @@ santa_unit_test(
         "//Source/common:SNTDeviceEvent",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1631,7 +1631,7 @@ santa_unit_test(
         "//Source/common:SNTFileInfo",
         "//Source/common:TestUtils",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 

@@ -1,5 +1,5 @@
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -12,9 +12,9 @@ cc_library(
     hdrs = ["process.h"],
     deps = [
         "//Source/santad/ProcessTree/annotations:annotator",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -36,11 +36,11 @@ objc_library(
         "//Source/common:SystemResources",
         "//Source/santad/ProcessTree:process_tree_cc_proto",
         "//Source/santad/ProcessTree/annotations:annotator",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -65,7 +65,7 @@ objc_library(
         ":process_tree",
         "//Source/santad:EndpointSecurityAPI",
         "//Source/santad:EndpointSecurityMessage",
-        "@com_google_absl//absl/status:statusor",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -76,7 +76,7 @@ objc_library(
     deps = [
         ":process",
         ":process_tree",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -87,6 +87,6 @@ santa_unit_test(
         ":process",
         ":process_tree_test_helpers",
         "//Source/santad/ProcessTree/annotations:annotator",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
     ],
 )

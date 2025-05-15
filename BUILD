@@ -1,5 +1,5 @@
-load("@build_bazel_rules_apple//apple:versioning.bzl", "apple_bundle_version")
 load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
+load("@rules_apple//apple:versioning.bzl", "apple_bundle_version")
 load("//:helper.bzl", "run_command")
 
 package(

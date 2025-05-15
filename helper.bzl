@@ -1,9 +1,9 @@
 """This module defines some helper rules."""
 
-load("@build_bazel_rules_apple//apple:macos.bzl", "macos_unit_test")
-load("@build_bazel_rules_apple//apple:resources.bzl", "apple_resource_group")
-load("@build_bazel_rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("@rules_apple//apple:macos.bzl", "macos_unit_test")
+load("@rules_apple//apple:resources.bzl", "apple_resource_group")
 load("@rules_cc//cc:defs.bzl", "objc_library")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 
 def run_command(name, cmd, **kwargs):
     """A rule to run a command."""

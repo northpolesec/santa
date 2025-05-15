@@ -22,7 +22,7 @@ cc_library(
         "//Source/santad/ProcessTree:process",
         "//Source/santad/ProcessTree:process_tree",
         "//Source/santad/ProcessTree:process_tree_cc_proto",
-        "@com_google_absl//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 

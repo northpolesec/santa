@@ -1,4 +1,4 @@
-load("@build_bazel_rules_apple//apple:macos.bzl", "macos_command_line_application")
+load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -28,7 +28,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:santa_cc_proto_library_wrapper",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:binaryproto_cc_proto_library_wrapper",
-        "@com_google_protobuf//src/google/protobuf/json",
+        "@protobuf//src/google/protobuf/json",
     ],
 )
 

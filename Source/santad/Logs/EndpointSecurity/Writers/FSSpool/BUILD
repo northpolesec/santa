@@ -1,5 +1,5 @@
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -11,8 +11,8 @@ proto_library(
     name = "binaryproto_proto",
     srcs = ["binaryproto.proto"],
     deps = [
-        "@com_google_protobuf//:any_proto",
-        "@com_google_protobuf//:timestamp_proto",
+        "@protobuf//:any_proto",
+        "@protobuf//:timestamp_proto",
     ],
 )
 
@@ -42,14 +42,14 @@ cc_library(
         "fsspool_platform_specific.h",
     ],
     deps = [
-        "@com_google_absl//absl/cleanup",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/random",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/time",
+        "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/random",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/time",
     ],
 )
 
@@ -60,9 +60,9 @@ cc_library(
     deps = [
         ":binaryproto_cc_proto",
         ":fsspool",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 

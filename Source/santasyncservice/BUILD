@@ -1,4 +1,4 @@
-load("@build_bazel_rules_apple//apple:macos.bzl", "macos_command_line_application")
+load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -24,7 +24,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTSystemInfo",
         "//Source/common:String",
-        "@northpole_protos//stats:v1_cc_proto",
+        "@northpolesec_protos//stats:v1_cc_proto",
     ],
 )
 
@@ -122,8 +122,8 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:String",
-        "@com_google_protobuf//src/google/protobuf/json",
-        "@northpole_protos//sync:v1_cc_proto",
+        "@northpolesec_protos//sync:v1_cc_proto",
+        "@protobuf//src/google/protobuf/json",
     ],
 )
 
@@ -184,8 +184,8 @@ santa_unit_test(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:String",
         "@OCMock",
-        "@com_google_protobuf//src/google/protobuf/json",
-        "@northpole_protos//sync:v1_cc_proto",
+        "@northpolesec_protos//sync:v1_cc_proto",
+        "@protobuf//src/google/protobuf/json",
     ],
 )
 
