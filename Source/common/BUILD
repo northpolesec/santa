@@ -1,5 +1,5 @@
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -16,8 +16,8 @@ proto_library(
     srcs = ["santa.proto"],
     deps = [
         "//Source/santad/ProcessTree:process_tree_proto",
-        "@com_google_protobuf//:any_proto",
-        "@com_google_protobuf//:timestamp_proto",
+        "@protobuf//:any_proto",
+        "@protobuf//:timestamp_proto",
     ],
 )
 
@@ -56,7 +56,7 @@ cc_library(
     hdrs = ["SantaCache.h"],
     deps = [
         ":BranchPrediction",
-        "@com_google_absl//absl/hash",
+        "@abseil-cpp//absl/hash",
     ],
 )
 
@@ -65,10 +65,10 @@ cc_library(
     hdrs = ["SantaSetCache.h"],
     deps = [
         ":SantaCache",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -152,7 +152,7 @@ objc_library(
     name = "SantaVnode",
     hdrs = ["SantaVnode.h"],
     deps = [
-        "@com_google_absl//absl/hash",
+        "@abseil-cpp//absl/hash",
     ],
 )
 
@@ -225,7 +225,7 @@ objc_library(
     deps = [
         ":Platform",
         ":String",
-        "@com_google_absl//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 
@@ -403,7 +403,7 @@ objc_library(
     hdrs = ["PrefixTree.h"],
     deps = [
         ":SNTLogging",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -710,7 +710,7 @@ objc_library(
         ":Platform",
         ":SystemResources",
         "@OCMock",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
