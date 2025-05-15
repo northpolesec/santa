@@ -88,7 +88,6 @@ func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
 struct MoreDetailsView: View {
   let e: SNTStoredEvent?
   let customURL: NSString?
-  @StateObject var bundleProgress: SNTBundleProgress
 
   @Environment(\.presentationMode) var presentationMode
 
@@ -182,7 +181,6 @@ struct MoreDetailsView: View {
 struct SNTBinaryMessageEventView: View {
   let e: SNTStoredEvent?
   let customURL: NSString?
-  @StateObject var bundleProgress: SNTBundleProgress
 
   @State private var isShowingDetails = false
 
@@ -218,7 +216,7 @@ struct SNTBinaryMessageEventView: View {
         TextWithLimit(e?.executingUser ?? "")
       }.textSelection(.enabled)
     }.sheet(isPresented: $isShowingDetails) {
-      MoreDetailsView(e: e, customURL: customURL, bundleProgress: bundleProgress)
+      MoreDetailsView(e: e, customURL: customURL)
     }
 
     VStack(spacing: 2.0) {
@@ -254,11 +252,18 @@ struct SNTBinaryMessageWindowView: View {
 
   let c = SNTConfigurator.configurator()
 
+  func getDismissText() -> String? {
+    if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
+      return "Cancel"
+    }
+    return c.dismissText
+  }
+
   var body: some View {
     SNTMessageView(
       SNTBlockMessage.attributedBlockMessage(for: event, customMessage: customMsg as String?)
     ) {
-      SNTBinaryMessageEventView(e: event!, customURL: customURL, bundleProgress: bundleProgress)
+      SNTBinaryMessageEventView(e: event!, customURL: customURL)
 
       if configState.enableNotificationSilences {
         SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
@@ -290,17 +295,22 @@ struct SNTBinaryMessageWindowView: View {
         if shouldAddStandaloneButton() {
           StandaloneButton(action: standAloneButton)
         } else if shouldAddOpenButton() {
-          OpenEventButton(customText: c.eventDetailText, action: openButton)
+          OpenEventButton(
+            customText: c.eventDetailText,
+            disabled: (event?.needsBundleHash ?? false && !bundleProgress.isFinished),
+            action: openButton
+          )
         }
 
         DismissButton(
-          customText: c.dismissText,
+          customText: getDismissText(),
           silence: preventFutureNotifications,
           action: dismissButton
         )
       }
       Spacer()
-    }.fixedSize()
+    }
+    .fixedSize()
   }
 
   func shouldAddStandaloneButton() -> Bool {
@@ -328,9 +338,6 @@ struct SNTBinaryMessageWindowView: View {
     if c.eventDetailURL?.isEmpty ?? true {
       return false
     }
-    if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
-      return false
-    }
     return true
   }
 
@@ -354,7 +361,6 @@ struct SNTBinaryMessageWindowView: View {
     if let url = detailsURL {
       openURL(url)
     }
-
   }
 
   // This button is only shown when the standalone mode is enabled in place of

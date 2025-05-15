@@ -141,7 +141,11 @@ public func MoreDetailsButton(_ showDetails: Binding<Bool>) -> some View {
   .help("⌘ m")
 }
 
-public func OpenEventButton(customText: String? = nil, action: @escaping () -> Void) -> some View {
+public func OpenEventButton(
+  customText: String? = nil,
+  disabled: Bool? = false,
+  action: @escaping () -> Void
+) -> some View {
   Button(
     action: action,
     label: {
@@ -149,6 +153,7 @@ public func OpenEventButton(customText: String? = nil, action: @escaping () -> V
       Text(t).frame(maxWidth: 200.0)
     }
   )
+  .disabled(disabled ?? false)
   .keyboardShortcut(.return, modifiers: .command)
   .help("⌘ Return")
 }
