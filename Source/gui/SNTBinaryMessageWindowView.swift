@@ -269,17 +269,15 @@ struct SNTBinaryMessageWindowView: View {
         SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
       }
 
-      if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
-        if bundleProgress.fractionCompleted == 0.0 {
-          ProgressView() {
-            Text(bundleProgress.label)
-          }.progressViewStyle(.linear)
-        } else {
-          ProgressView(value: bundleProgress.fractionCompleted) {
-            Text(bundleProgress.label)
-          }
-        }
+      ProgressView(value: (bundleProgress.fractionCompleted == 0.0 ? nil : bundleProgress.fractionCompleted)) {
+        Text(bundleProgress.label)
       }
+      .progressViewStyle(.linear)
+      .frame(
+        width: bundleProgress.isFinished ? 0.0 : .infinity,
+        height: bundleProgress.isFinished ? 0.0 : .infinity,
+      )
+      .animation(.spring(duration: 0.4), value: bundleProgress.isFinished)
 
       // Display the standalone error message to the user if one is provided.
       if configState.clientMode == .standalone {

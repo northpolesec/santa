@@ -466,10 +466,17 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     SNTBinaryMessageWindowController *controller =
         (SNTBinaryMessageWindowController *)self.currentWindowController;
 
+    __block uint64_t guiFileCount = fileCount;
     if ([controller.event.idx isEqual:event.idx]) {
       dispatch_async(dispatch_get_main_queue(), ^{
+        // Ensure that the file count is always at least equal the binary count.
+        // In rare cases we can receive 1 binary and 0 files, which looks silly.
+        if (binaryCount > guiFileCount) {
+          guiFileCount = binaryCount;
+        }
+
         NSString *fileLabel =
-            [NSString stringWithFormat:@"%llu binaries / %llu files", binaryCount, fileCount];
+            [NSString stringWithFormat:@"%llu binaries / %llu files", binaryCount, guiFileCount];
         NSString *hashedLabel =
             [NSString stringWithFormat:@"%llu hashed / %llu binaries", hashedCount, binaryCount];
         controller.bundleProgress.label = hashedCount ? hashedLabel : fileLabel;
