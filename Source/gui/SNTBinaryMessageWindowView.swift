@@ -275,7 +275,7 @@ struct SNTBinaryMessageWindowView: View {
       .progressViewStyle(.linear)
       .frame(
         width: bundleProgress.isFinished ? 0.0 : .infinity,
-        height: bundleProgress.isFinished ? 0.0 : .infinity,
+        height: bundleProgress.isFinished ? 0.0 : .infinity
       )
       .animation(.spring(duration: 0.4), value: bundleProgress.isFinished)
 
