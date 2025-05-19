@@ -122,7 +122,13 @@
   dispatch_async(dispatch_get_main_queue(), ^{
     if ([self.event.idx isEqual:event.idx]) {
       self.event.fileBundleHash = bundleHash;
-      self.bundleProgress.isFinished = YES;
+
+      // Delay the completion of the bundle progress to prevent the GUI from
+      // "flashing" when a small bundle is scanned.
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC),
+                     dispatch_get_main_queue(), ^{
+                       self.bundleProgress.isFinished = YES;
+                     });
     }
   });
 }
