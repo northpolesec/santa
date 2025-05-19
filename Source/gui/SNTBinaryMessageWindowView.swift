@@ -269,6 +269,10 @@ struct SNTBinaryMessageWindowView: View {
         SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
       }
 
+      // ProgressView supports showing both determinate and indeterminate progress.
+      // Normally to show indeterminate progress you initialize without providing
+      // any value, but passing nil has the same effect. Until bundle hashing has
+      // made progress scanning the bundle we want to show an indeterminate spinner.
       ProgressView(value: (bundleProgress.fractionCompleted == 0.0 ? nil : bundleProgress.fractionCompleted)) {
         Text(bundleProgress.label)
       }
