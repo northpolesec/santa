@@ -220,9 +220,11 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
       if ([self.currentWindowController isKindOfClass:[SNTBinaryMessageWindowController class]]) {
         SNTBinaryMessageWindowController *controller =
             (SNTBinaryMessageWindowController *)self.currentWindowController;
-        dispatch_async(self.hashBundleBinariesQueue, ^{
-          [self hashBundleBinariesForEvent:controller.event withController:controller];
-        });
+        if (controller.event.needsBundleHash) {
+          dispatch_async(self.hashBundleBinariesQueue, ^{
+            [self hashBundleBinariesForEvent:controller.event withController:controller];
+          });
+        }
       }
     }
   });
