@@ -20,6 +20,7 @@
 
 #import <atomic>
 #import <memory>
+#import <vector>
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
@@ -164,10 +165,10 @@
   //
   // Xcode.app has roughly 500k files, 8bytes per pointer is ~4MB for this array. This size to space
   // ratio seems appropriate as Xcode.app is in the upper bounds of bundle size.
-  __block void **fis = static_cast<void **>(calloc(subpaths.count, sizeof(void *)));
+  // Using a shared pointer to make block capture easy.
+  __block auto fis = std::make_shared<std::vector<SNTFileInfo *>>(subpaths.count);
 
   // Counts used as additional progress information in SantaGUI
-  // Using a shared pointer to make block capture easy.
   __block auto binaryCount = std::make_shared<std::atomic<int64_t>>(0);
   __block auto completedUnits = std::make_shared<std::atomic<int64_t>>(0);
 
@@ -203,7 +204,7 @@
       SNTFileInfo *fi = [[SNTFileInfo alloc] initWithResolvedPath:file error:NULL];
       if (!fi.isExecutable) return;
 
-      fis[i] = (__bridge_retained void *)fi;
+      fis->at(i) = fi;
       binaryCount->fetch_add(1);
     }
   });
@@ -212,10 +213,8 @@
 
   NSMutableArray *fileInfos = [NSMutableArray arrayWithCapacity:binaryCount->load()];
   for (NSUInteger i = 0; i < subpaths.count; i++) {
-    if (fis[i]) [fileInfos addObject:(__bridge_transfer SNTFileInfo *)fis[i]];
+    if (fis->at(i)) [fileInfos addObject:fis->at(i)];
   }
-
-  free(fis);
 
   return [self generateEventsFromBinaries:fileInfos
                             blockingEvent:event

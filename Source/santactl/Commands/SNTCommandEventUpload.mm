@@ -96,12 +96,11 @@ REGISTER_COMMAND_NAME(@"eventupload")
 
   // Hash the bundle if the server declares support and if the caller has not explicitly disabled
   // bundle hashing.
-  __block BOOL enableBundles = NO;
-  [self.daemonConn.synchronousRemoteObjectProxy enableBundles:^(BOOL response) {
-    enableBundles = response;
-  }];
-  if (skipBundles) {
-    enableBundles = false;
+  __block BOOL enableBundles = !skipBundles;
+  if (enableBundles) {
+    [self.daemonConn.synchronousRemoteObjectProxy enableBundles:^(BOOL response) {
+      enableBundles = response;
+    }];
   }
 
   MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];

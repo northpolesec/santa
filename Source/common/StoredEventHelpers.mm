@@ -25,8 +25,10 @@ SNTStoredEvent *StoredEventFromFileInfo(SNTFileInfo *fileInfo) {
   se.fileSHA256 = fileInfo.SHA256;
   NSError *csError;
   MOLCodesignChecker *cs = [fileInfo codesignCheckerWithError:&csError];
-  if (csError) cs = nil;
-  if (cs) {
+  if (csError) {
+    se.signingStatus =
+        (csError.code == errSecCSUnsigned) ? SNTSigningStatusUnsigned : SNTSigningStatusInvalid;
+  } else {
     se.signingChain = cs.certificates;
     se.cdhash = cs.cdhash;
     se.teamID = cs.teamID;
@@ -39,9 +41,6 @@ SNTStoredEvent *StoredEventFromFileInfo(SNTFileInfo *fileInfo) {
     } else {
       se.signingStatus = SNTSigningStatusProduction;
     }
-  } else {
-    se.signingStatus =
-        (csError.code == errSecCSUnsigned) ? SNTSigningStatusUnsigned : SNTSigningStatusInvalid;
   }
   return se;
 }

@@ -465,7 +465,7 @@ objc_library(
 
 objc_library(
     name = "StoredEventHelpers",
-    srcs = ["StoredEventHelpers.m"],
+    srcs = ["StoredEventHelpers.mm"],
     hdrs = ["StoredEventHelpers.h"],
     module_name = "santa_common_StoredEventHelpers",
     deps = [
@@ -480,7 +480,7 @@ objc_library(
 
 santa_unit_test(
     name = "StoredEventHelpersTest",
-    srcs = ["StoredEventHelpersTest.m"],
+    srcs = ["StoredEventHelpersTest.mm"],
     resources = [
         "testdata/signed-with-teamid",
     ],
