@@ -297,6 +297,8 @@ sequences will be replaced in the final URL:
         { value: "Copyfile" },
         { value: "GatekeeperOverride" },
         { value: "LaunchItem" },
+        { value: "TCCModification" },
+        { value: "XProtect" },
         { value: "None" },
       ],
       versionAdded: "2024.11",

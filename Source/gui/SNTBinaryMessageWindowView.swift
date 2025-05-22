@@ -273,15 +273,17 @@ struct SNTBinaryMessageWindowView: View {
       // Normally to show indeterminate progress you initialize without providing
       // any value, but passing nil has the same effect. Until bundle hashing has
       // made progress scanning the bundle we want to show an indeterminate spinner.
-      ProgressView(value: (bundleProgress.fractionCompleted == 0.0 ? nil : bundleProgress.fractionCompleted)) {
-        Text(bundleProgress.label)
+      if event?.needsBundleHash ?? false {
+        ProgressView(value: (bundleProgress.fractionCompleted == 0.0 ? nil : bundleProgress.fractionCompleted)) {
+          Text(bundleProgress.label)
+        }
+        .progressViewStyle(.linear)
+        .frame(
+          width: bundleProgress.isFinished ? 0.0 : .infinity,
+          height: bundleProgress.isFinished ? 0.0 : .infinity
+        )
+        .animation(.spring(duration: 0.4), value: bundleProgress.isFinished)
       }
-      .progressViewStyle(.linear)
-      .frame(
-        width: bundleProgress.isFinished ? 0.0 : .infinity,
-        height: bundleProgress.isFinished ? 0.0 : .infinity
-      )
-      .animation(.spring(duration: 0.4), value: bundleProgress.isFinished)
 
       // Display the standalone error message to the user if one is provided.
       if configState.clientMode == .standalone {

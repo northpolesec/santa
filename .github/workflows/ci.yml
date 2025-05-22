@@ -1,15 +1,15 @@
 name: CI
 on:
-  push:
-    branches:
-      - "*"
-    paths:
-      - "Source/**"
   pull_request:
     branches:
       - main
     paths:
       - "Source/**"
+      - "Testing/**"
+      - MODULE.bazel
+      - BUILD
+      - helper.bzl
+      - non_module_deps.bzl
 
 jobs:
   lint:

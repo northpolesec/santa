@@ -50,6 +50,8 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
       {"launchitem", TelemetryEvent::kLaunchItem},
       {"tccmodification", TelemetryEvent::kTCCModification},
       {"xprotect", TelemetryEvent::kXProtect},
+      // IMPORTANT: When adding new keys to the map, keep the set of keys in
+      // `docs/src/lib/santaconfig.ts` in sync.
 
       // special cases
       {"none", TelemetryEvent::kNone},
