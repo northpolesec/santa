@@ -2,6 +2,83 @@
 sidebar_position: 3
 ---
 
+import { Button } from "@site/src/components/shadcn/button";
+import { ConfigGeneratorSection, ConfigGeneratorForm } from "@site/src/components/ConfigGenerator";
+import { SantaConfigKeyGroups } from "@site/src/lib/santaconfig";
+
 # Config Generator
 
-Coming soon!
+:::warning
+This generator is still under active development and there are known rough
+edges with some of the more complex configuration keys as well as more features
+that will be coming soon. Please give it a try!
+:::
+
+Use this form to generate a valid Santa configuration, ready to put inside a
+configuration profile and deploy to your machines. The generator will ensure
+that the configuration is valid and help storing default values.
+
+:::info
+The generation is all done inside your browser; the data you input never leaves
+your machine.
+:::
+
+
+<ConfigGeneratorForm>
+
+## General
+
+<ConfigGeneratorSection list={SantaConfigKeyGroups.general} />
+
+---
+
+## Sync
+
+<ConfigGeneratorSection list={SantaConfigKeyGroups.sync} />
+
+---
+
+## GUI
+
+<ConfigGeneratorSection list={SantaConfigKeyGroups.gui} />
+
+---
+
+## FAA
+
+<ConfigGeneratorSection list={SantaConfigKeyGroups.faa} />
+
+---
+
+## Rules
+
+<ConfigGeneratorSection list={SantaConfigKeyGroups.rules} />
+
+---
+
+## Telemetry
+
+<ConfigGeneratorSection list={SantaConfigKeyGroups.telemetry} />
+
+---
+
+## USB
+
+<ConfigGeneratorSection list={SantaConfigKeyGroups.usb} />
+
+---
+
+## Metrics
+
+<ConfigGeneratorSection list={SantaConfigKeyGroups.metrics} />
+
+---
+
+## Generate
+
+Click the button to generate and download the generated configuration file.
+
+<Button type="submit">Generate</Button>
+
+</ConfigGeneratorForm>
+
