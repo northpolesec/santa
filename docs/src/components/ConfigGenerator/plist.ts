@@ -2,6 +2,7 @@ import { SantaConfigKey, SantaConfigAllKeys } from "@site/src/lib/santaconfig";
 
 export function generatePlist(data: any) {
   return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
 ${Object.entries(data)
@@ -60,6 +61,14 @@ export function downloadDataAsFile(filename: string, data: string) {
 // Handles special cases for some keys, handles undefined defaults and handles
 // repeated fields.
 function isDefault(key: SantaConfigKey, value: any) {
+  // The Telemetry key is a little bit unusual.
+  // If it is not set to anything, the default value is everything except Fork
+  // and Exit, unless the EnableForkAndExitLogging key is set to true.
+  // If the value *is* set then the value of EnableForkAndExitLogging is ignored
+  // and the set value will be used.
+  // As the generator hides deprecated keys (which EnableForkAndExitLogging is)
+  // and the default value is Everything we still want to output that value even
+  // if it is the default, as this makes the generator easier to understand.
   if (key.key == "Telemetry") return false;
 
   if (key.defaultValue === undefined) return false;

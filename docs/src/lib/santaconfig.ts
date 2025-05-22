@@ -384,11 +384,9 @@ changes in the release notes of any future release that changes them.`,
     },
     {
       key: "EnableMachineIDDecoration",
-      description: `If \`EventLogType\` is set to \`file\` and this key is true, the \`MachineID\` to the end of
-      each log line.`,
+      description: `If this key is true, the \`MachineID\` will be added to each log entry.`,
       type: "bool",
       defaultValue: false,
-      enableIf: (data) => data.EventLogType == "file",
     },
     {
       key: "EntitlementsPrefixFilter",
