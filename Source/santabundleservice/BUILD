@@ -7,7 +7,7 @@ objc_library(
     name = "santabs_lib",
     srcs = [
         "SNTBundleService.h",
-        "SNTBundleService.m",
+        "SNTBundleService.mm",
         "main.m",
     ],
     deps = [
@@ -19,6 +19,7 @@ objc_library(
         "//Source/common:SNTXPCBundleServiceInterface",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SigningIDHelpers",
+        "//Source/common:StoredEventHelpers",
         "@FMDB",
     ],
 )

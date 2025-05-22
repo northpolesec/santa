@@ -464,6 +464,33 @@ objc_library(
 )
 
 objc_library(
+    name = "StoredEventHelpers",
+    srcs = ["StoredEventHelpers.m"],
+    hdrs = ["StoredEventHelpers.h"],
+    module_name = "santa_common_StoredEventHelpers",
+    deps = [
+        ":CertificateHelpers",
+        ":MOLCertificate",
+        ":MOLCodesignChecker",
+        ":SNTFileInfo",
+        ":SNTStoredEvent",
+        ":SigningIDHelpers",
+    ],
+)
+
+santa_unit_test(
+    name = "StoredEventHelpersTest",
+    srcs = ["StoredEventHelpersTest.m"],
+    resources = [
+        "testdata/signed-with-teamid",
+    ],
+    structured_resources = glob([
+        "testdata/BundleExample.app/**",
+    ]),
+    deps = [":StoredEventHelpers"],
+)
+
+objc_library(
     name = "SNTConfigState",
     srcs = ["SNTConfigState.m"],
     hdrs = ["SNTConfigState.h"],

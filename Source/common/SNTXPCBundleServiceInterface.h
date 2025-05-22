@@ -22,13 +22,20 @@
 ///  A block that takes the calculated bundle hash, associated events and hashing time in ms.
 typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredEvent *> *, NSNumber *);
 
+///
+///  Protocol implemented by the client of of SNTBundleServiceXPC. A listener of this type is passed
+///  to `-[SNTBundleServiceXPC hashBundleBinariesForEvent:listener:reply:]`. SNTBundleServiceXPC
+///  will then message the listener with hashing progress.
+///
+@protocol SNTBundleServiceProgressXPC
+- (void)updateCountsForEvent:(SNTStoredEvent *)event
+                 binaryCount:(uint64_t)binaryCount
+                   fileCount:(uint64_t)fileCount
+                 hashedCount:(uint64_t)hashedCount;
+@end
+
 ///  Protocol implemented by santabundleservice and utilized by SantaGUI for bundle hashing
 @protocol SNTBundleServiceXPC
-
-///
-///  @param listener The listener to connect back to the SantaGUI.
-///
-- (void)setNotificationListener:(NSXPCListenerEndpoint *)listener;
 
 ///
 ///  Hash a bundle for an event. The SNTBundleHashBlock will be called with nil parameters if a
@@ -36,17 +43,14 @@ typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredEvent *> *, NSNu
 ///
 ///  @param event The event that includes the fileBundlePath to be hashed. This method will
 ///      attempt to to find and use the ancestor bundle as a starting point.
+///  @param listener A listener to connect back to the caller.
 ///  @param reply A SNTBundleHashBlock to be executed upon completion or cancellation.
 ///
 ///  @note If there is a current NSProgress when called this method will report back its progress.
 ///
-- (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event reply:(SNTBundleHashBlock)reply;
-
-///
-///  santabundleservice is launched on demand by launchd, call spindown to let santabundleservice
-///  know you are done with it.
-///
-- (void)spindown;
+- (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event
+                          listener:(NSXPCListenerEndpoint *)listener
+                             reply:(SNTBundleHashBlock)reply;
 
 @end
 

@@ -17,7 +17,9 @@
 
 #import <CommonCrypto/CommonDigest.h>
 #import <pthread/pthread.h>
-#include <stdatomic.h>
+
+#import <atomic>
+#import <memory>
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
@@ -26,14 +28,16 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SigningIDHelpers.h"
+#import "Source/common/StoredEventHelpers.h"
 
 @interface SNTBundleService ()
-@property MOLXPCConnection *notifierConnection;
-@property MOLXPCConnection *listener;
 @property(nonatomic) dispatch_queue_t queue;
+@property(nonatomic) dispatch_source_t spindownTimer;
 @end
 
-@implementation SNTBundleService
+@implementation SNTBundleService {
+  std::atomic<uint64_t> _current_events;
+}
 
 - (instancetype)init {
   self = [super init];
@@ -45,29 +49,34 @@
 
 #pragma mark SNTBundleServiceXPC Methods
 
-// Connect to the SantaGUI
-- (void)setNotificationListener:(NSXPCListenerEndpoint *)listener {
+- (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event
+                          listener:(NSXPCListenerEndpoint *)listener
+                             reply:(SNTBundleHashBlock)reply {
+  // Start a new hashing operation. Cancel any previously scheduled spindowns.
+  // If a spindown was scheduled, it was from the main run loop - do the cancellation from there.
+  ++_current_events;
   dispatch_async(dispatch_get_main_queue(), ^{
-    [self.notifierConnection invalidate];
-    self.notifierConnection = nil;
-
-    MOLXPCConnection *c = [[MOLXPCConnection alloc] initClientWithListener:listener];
-    c.remoteInterface = [SNTXPCNotifierInterface notifierInterface];
-    c.acceptedHandler = ^{
-      LOGI(@"Connected to Santa.app");
-    };
-    [c resume];
-    self.notifierConnection = c;
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(spindown) object:nil];
   });
-}
 
-- (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event reply:(SNTBundleHashBlock)reply {
   NSProgress *progress =
       [NSProgress currentProgress] ? [NSProgress progressWithTotalUnitCount:100] : nil;
 
   NSDate *startTime = [NSDate date];
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  // Connect back to the client.
+  MOLXPCConnection *clientListener;
+  if (listener) {
+    clientListener = [[MOLXPCConnection alloc] initClientWithListener:listener];
+    clientListener.remoteInterface =
+        [NSXPCInterface interfaceWithProtocol:@protocol(SNTBundleServiceProgressXPC)];
+    clientListener.invalidationHandler = ^{
+      [progress cancel];
+    };
+    [clientListener resume];
+  }
 
   dispatch_async(self.queue, ^{
     // Use the highest bundle we can find.
@@ -95,10 +104,11 @@
           [b.bundle.executablePath substringFromIndex:b.bundlePath.length + 1];
     }
 
-    NSDictionary *relatedEvents = [self findRelatedBinaries:event progress:progress];
+    NSDictionary *relatedEvents = [self findRelatedBinaries:event
+                                                   progress:progress
+                                             clientListener:clientListener];
     NSString *bundleHash = [self calculateBundleHashFromSHA256Hashes:relatedEvents.allKeys
                                                             progress:progress];
-
     NSNumber *ms = [NSNumber numberWithDouble:[startTime timeIntervalSinceNow] * -1000.0];
 
     reply(bundleHash, relatedEvents.allValues, ms);
@@ -111,15 +121,28 @@
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC))) {
       [progress cancel];
     }
+
+    // If there are no more active hashing events, schedule a spindown of this service. The GUI or
+    // santactl clients may call this method back to back, add a delay of 10 seconds before spinning
+    // down to allow for new requests to come in and be handled by this process.
+    // -performSelector:withObject:afterDelay: depends on a run loop, shove this over to the main
+    // run loop.
+    if (--_current_events == 0) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self performSelector:@selector(spindown) withObject:nil afterDelay:10.0f];
+      });
+    }
   });
 }
 
-- (void)spindown {
-  LOGI(@"Spinning down");
-  exit(0);
-}
-
 #pragma mark Internal Methods
+
+- (void)spindown {
+  if (_current_events == 0) {
+    LOGI(@"Spinning down");
+    exit(0);
+  }
+}
 
 /**
   Find binaries within a bundle given the bundle's event. It will run until a timeout occurs,
@@ -128,7 +151,9 @@
   @param event The SNTStoredEvent to begin searching.
   @return An NSDictionary object with keys of fileSHA256 and values of SNTStoredEvent objects.
 */
-- (NSDictionary *)findRelatedBinaries:(SNTStoredEvent *)event progress:(NSProgress *)progress {
+- (NSDictionary *)findRelatedBinaries:(SNTStoredEvent *)event
+                             progress:(NSProgress *)progress
+                       clientListener:(MOLXPCConnection *)clientListener {
   // Find all files and folders within the fileBundlePath
   NSFileManager *fm = [NSFileManager defaultManager];
   NSArray *subpaths = [fm subpathsOfDirectoryAtPath:event.fileBundlePath error:NULL];
@@ -139,11 +164,12 @@
   //
   // Xcode.app has roughly 500k files, 8bytes per pointer is ~4MB for this array. This size to space
   // ratio seems appropriate as Xcode.app is in the upper bounds of bundle size.
-  __block void **fis = calloc(subpaths.count, sizeof(void *));
+  __block void **fis = static_cast<void **>(calloc(subpaths.count, sizeof(void *)));
 
   // Counts used as additional progress information in SantaGUI
-  __block atomic_llong binaryCount = 0;
-  __block volatile int64_t completedUnits = 0;
+  // Using a shared pointer to make block capture easy.
+  __block auto binaryCount = std::make_shared<std::atomic<int64_t>>(0);
+  __block auto completedUnits = std::make_shared<std::atomic<int64_t>>(0);
 
   // Account for 80% of the work
   NSProgress *p;
@@ -159,14 +185,14 @@
 
       dispatch_sync(dispatch_get_main_queue(), ^{
         // Update the UI for every 1% of work completed.
-        ++completedUnits;
-        if ((((double)completedUnits / subpaths.count) -
+        completedUnits->fetch_add(1);
+        if ((((double)completedUnits->load() / subpaths.count) -
              ((double)p.completedUnitCount / subpaths.count)) > 0.01) {
-          p.completedUnitCount = completedUnits;
-          [[self.notifierConnection remoteObjectProxy] updateCountsForEvent:event
-                                                                binaryCount:binaryCount
-                                                                  fileCount:i
-                                                                hashedCount:0];
+          p.completedUnitCount = completedUnits->load();
+          [[clientListener remoteObjectProxy] updateCountsForEvent:event
+                                                       binaryCount:binaryCount->load()
+                                                         fileCount:i
+                                                       hashedCount:0];
         }
       });
 
@@ -178,25 +204,29 @@
       if (!fi.isExecutable) return;
 
       fis[i] = (__bridge_retained void *)fi;
-      atomic_fetch_add(&binaryCount, 1);
+      binaryCount->fetch_add(1);
     }
   });
 
   [progress resignCurrent];
 
-  NSMutableArray *fileInfos = [NSMutableArray arrayWithCapacity:binaryCount];
+  NSMutableArray *fileInfos = [NSMutableArray arrayWithCapacity:binaryCount->load()];
   for (NSUInteger i = 0; i < subpaths.count; i++) {
     if (fis[i]) [fileInfos addObject:(__bridge_transfer SNTFileInfo *)fis[i]];
   }
 
   free(fis);
 
-  return [self generateEventsFromBinaries:fileInfos blockingEvent:event progress:progress];
+  return [self generateEventsFromBinaries:fileInfos
+                            blockingEvent:event
+                                 progress:progress
+                           clientListener:clientListener];
 }
 
 - (NSDictionary *)generateEventsFromBinaries:(NSArray *)fis
                                blockingEvent:(SNTStoredEvent *)event
-                                    progress:(NSProgress *)progress {
+                                    progress:(NSProgress *)progress
+                              clientListener:(MOLXPCConnection *)clientListener {
   if (progress.isCancelled) return nil;
 
   NSMutableDictionary *relatedEvents = [NSMutableDictionary dictionaryWithCapacity:fis.count];
@@ -214,12 +244,8 @@
 
       SNTFileInfo *fi = fis[i];
 
-      SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
-      se.filePath = fi.path;
-      se.fileSHA256 = fi.SHA256;
-      se.occurrenceDate = [NSDate distantFuture];
+      SNTStoredEvent *se = StoredEventFromFileInfo(fi);
       se.decision = SNTEventStateBundleBinary;
-
       se.fileBundlePath = event.fileBundlePath;
       se.fileBundleExecutableRelPath = event.fileBundleExecutableRelPath;
       se.fileBundleID = event.fileBundleID;
@@ -227,20 +253,14 @@
       se.fileBundleVersion = event.fileBundleVersion;
       se.fileBundleVersionString = event.fileBundleVersionString;
 
-      MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
-      se.signingChain = cs.certificates;
-      se.cdhash = cs.cdhash;
-      se.teamID = cs.teamID;
-      se.signingID = FormatSigningID(cs);
-
       dispatch_sync(dispatch_get_main_queue(), ^{
         relatedEvents[se.fileSHA256] = se;
         p.completedUnitCount++;
         if (progress) {
-          [[self.notifierConnection remoteObjectProxy] updateCountsForEvent:event
-                                                                binaryCount:fis.count
-                                                                  fileCount:0
-                                                                hashedCount:i];
+          [[clientListener remoteObjectProxy] updateCountsForEvent:event
+                                                       binaryCount:fis.count
+                                                         fileCount:0
+                                                       hashedCount:i];
         }
       });
     }

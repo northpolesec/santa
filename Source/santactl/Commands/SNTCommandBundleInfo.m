@@ -65,6 +65,7 @@ REGISTER_COMMAND_NAME(@"bundleinfo")
 
   [[bc remoteObjectProxy]
       hashBundleBinariesForEvent:se
+                        listener:nil
                            reply:^(NSString *hash, NSArray<SNTStoredEvent *> *events,
                                    NSNumber *time) {
                              printf("Hashing time: %llu ms\n", time.unsignedLongLongValue);
@@ -76,7 +77,6 @@ REGISTER_COMMAND_NAME(@"bundleinfo")
                                       event.fileBundleID.UTF8String, event.fileSHA256.UTF8String,
                                       event.filePath.UTF8String);
                              }
-                             [[bc remoteObjectProxy] spindown];
                              exit(0);
                            }];
 }

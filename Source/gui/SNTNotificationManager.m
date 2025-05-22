@@ -76,16 +76,13 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     [self updateSilenceDate:d forHash:hash];
   }
 
+  [self.currentWindowController.bundleListener invalidate];
   [self.pendingNotifications removeObject:self.currentWindowController];
   self.currentWindowController = nil;
 
   if (self.pendingNotifications.count) {
     [self showQueuedWindow];
   } else {
-    MOLXPCConnection *bc = [SNTXPCBundleServiceInterface configuredConnection];
-    [bc resume];
-    [[bc remoteObjectProxy] spindown];
-    [bc invalidate];
     // Remove app from Cmd+Tab and Dock.
     NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
     [NSApp hide:self];
@@ -247,7 +244,13 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     return;
   }
 
-  [[bc remoteObjectProxy] setNotificationListener:self.notificationListener];
+  NSXPCListener *al = [NSXPCListener anonymousListener];
+  MOLXPCConnection *pl = [[MOLXPCConnection alloc] initServerWithListener:al];
+  pl.exportedObject = self;
+  pl.privilegedInterface =
+      [NSXPCInterface interfaceWithProtocol:@protocol(SNTBundleServiceProgressXPC)];
+  [pl resume];
+  self.currentWindowController.bundleListener = pl;
 
   // NSProgress becomes current for this thread. XPC messages vend a child node to the receiver.
   [withController.progress becomeCurrentWithPendingUnitCount:100];
@@ -256,6 +259,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   // (currentWindowController.progress).
   [[bc remoteObjectProxy]
       hashBundleBinariesForEvent:event
+                        listener:al.endpoint
                            reply:^(NSString *bh, NSArray<SNTStoredEvent *> *events, NSNumber *ms) {
                              // Revert to displaying the blockable event if we fail to calculate the
                              // bundle hash
@@ -456,7 +460,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [syncConn invalidate];
 }
 
-#pragma mark SNTBundleNotifierXPC protocol methods
+#pragma mark SNTBundleServiceProgressXPC protocol methods
 
 - (void)updateCountsForEvent:(SNTStoredEvent *)event
                  binaryCount:(uint64_t)binaryCount
