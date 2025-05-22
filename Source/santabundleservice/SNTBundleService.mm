@@ -33,12 +33,9 @@
 
 @interface SNTBundleService ()
 @property(nonatomic) dispatch_queue_t queue;
-@property(nonatomic) dispatch_source_t spindownTimer;
 @end
 
-@implementation SNTBundleService {
-  std::atomic<uint64_t> _current_events;
-}
+@implementation SNTBundleService
 
 - (instancetype)init {
   self = [super init];
@@ -53,13 +50,6 @@
 - (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event
                           listener:(NSXPCListenerEndpoint *)listener
                              reply:(SNTBundleHashBlock)reply {
-  // Start a new hashing operation. Cancel any previously scheduled spindowns.
-  // If a spindown was scheduled, it was from the main run loop - do the cancellation from there.
-  ++_current_events;
-  dispatch_async(dispatch_get_main_queue(), ^{
-    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(spindown) object:nil];
-  });
-
   NSProgress *progress =
       [NSProgress currentProgress] ? [NSProgress progressWithTotalUnitCount:100] : nil;
 
@@ -122,28 +112,10 @@
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC))) {
       [progress cancel];
     }
-
-    // If there are no more active hashing events, schedule a spindown of this service. The GUI or
-    // santactl clients may call this method back to back, add a delay of 10 seconds before spinning
-    // down to allow for new requests to come in and be handled by this process.
-    // -performSelector:withObject:afterDelay: depends on a run loop, shove this over to the main
-    // run loop.
-    if (--_current_events == 0) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        [self performSelector:@selector(spindown) withObject:nil afterDelay:10.0f];
-      });
-    }
   });
 }
 
 #pragma mark Internal Methods
-
-- (void)spindown {
-  if (_current_events == 0) {
-    LOGI(@"Spinning down");
-    exit(0);
-  }
-}
 
 /**
   Find binaries within a bundle given the bundle's event. It will run until a timeout occurs,
