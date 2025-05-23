@@ -316,6 +316,10 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerOverrideFileAccessAction:val];
   }];
 
+  [result exportConfiguration:^(SNTExportConfiguration *val) {
+    LOGD(@"Received export configuration: %@", val);
+  }];
+
   [result fullSyncLastSuccess:^(NSDate *val) {
     [configurator setFullSyncLastSuccess:val];
   }];

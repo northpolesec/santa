@@ -15,7 +15,7 @@
 #ifndef SANTA__COMMON__CODERMACROS_H
 #define SANTA__COMMON__CODERMACROS_H
 
-// Encode the property keyed by the property name.
+/// Encode the property keyed by the property name.
 #define ENCODE(c, o)                        \
   do {                                      \
     if (self.o) {                           \
@@ -23,44 +23,58 @@
     }                                       \
   } while (0)
 
-// Encode the property (by first boxing the value) keyed
-// by the property name.
+/// Encode the property (by first boxing the value) keyed
+/// by the property name.
 #define ENCODE_BOXABLE(c, o)                   \
   do {                                         \
     id local_obj__ = @(self.o);                \
     [c encodeObject:local_obj__ forKey:@(#o)]; \
   } while (0)
 
-// Decode a property of a given type and assign the value to
-// the named property.
+/// Decode a property of a given type and assign the value to
+/// the named property.
 #define DECODE(d, o, c)                                    \
   do {                                                     \
     _##o = [d decodeObjectOfClass:[c class] forKey:@(#o)]; \
   } while (0)
 
-// Decode a property of a given type and calls a method on that
-// type before assigning the value to the named property
+/// Decode a property of a given type and calls a method on that
+/// type before assigning the value to the named property
+#ifdef __cplusplus
+#define DECODE_SELECTOR(d, o, c, s)                                                         \
+  do {                                                                                      \
+    _##o = static_cast<decltype(_##o)>([[d decodeObjectOfClass:[c class] forKey:@(#o)] s]); \
+  } while (0)
+#else
 #define DECODE_SELECTOR(d, o, c, s)                            \
   do {                                                         \
     _##o = [[d decodeObjectOfClass:[c class] forKey:@(#o)] s]; \
   } while (0)
+#endif
 
-// Decode a property of an array of objects of the given type
-// and assign the value to the named property.
+/// Decode a property of an array of objects of the given type
+/// and assign the value to the named property.
 #define DECODE_ARRAY(d, o, c)                                                              \
   do {                                                                                     \
     _##o = [d decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [c class], nil] \
                              forKey:@(#o)];                                                \
   } while (0)
 
-// Decode a property of a dictionary of objects of many common types
-// and assign the value to the named property.
+/// Decode a property of a dictionary of objects of many common types
+/// and assign the value to the named property.
 #define DECODE_DICT(d, o)                                                                        \
   do {                                                                                           \
     _##o = [d decodeObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], \
                                                           [NSString class], [NSNumber class],    \
                                                           [NSData class], nil]                   \
                              forKey:@(#o)];                                                      \
+  } while (0)
+
+/// Decode a property of a specific set of given objects and
+/// assign the value to the named property.
+#define DECODE_SET(d, o, s)                          \
+  do {                                               \
+    _##o = [d decodeObjectOfClasses:s forKey:@(#o)]; \
   } while (0)
 
 #endif

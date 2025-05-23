@@ -34,6 +34,7 @@ objc_library(
     hdrs = ["SNTSyncState.h"],
     deps = [
         "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTExportConfiguration",
     ],
 )
 
@@ -44,6 +45,7 @@ objc_library(
     deps = [
         ":SNTSyncState",
         "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTExportConfiguration",
     ],
 )
 
