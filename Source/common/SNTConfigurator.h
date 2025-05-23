@@ -185,7 +185,7 @@
 ///    SNTEventLogTypeSyslog "syslog": Sent to ASL or ULS (if built with the 10.12 SDK or later).
 ///    SNTEventLogTypeFilelog "file": Sent to a file on disk. Use eventLogPath to specify a path.
 ///    SNTEventLogTypeNull "null": Logs nothing
-///    SNTEventLogTypeProtobuf "protobuf": (BETA) Sent to a file on disk, using a maildir-like
+///    SNTEventLogTypeProtobuf "protobuf": Sent to a file on disk, using a maildir-like
 ///      format. Use spoolDirectory to specify a path. Use spoolDirectoryFileSizeThresholdKB,
 ///      spoolDirectorySizeThresholdMB and spoolDirectoryEventMaxFlushTimeSec to configure
 ///      additional settings.
@@ -578,7 +578,7 @@
 @property(nullable, readonly, nonatomic) NSString *machineID;
 
 ///
-///  If YES, enables bundle detection for blocked events. This property is not stored on disk.
+///  If YES, enables bundle detection for blocked events.
 ///  Its value is set by a sync server that supports bundles. Defaults to NO.
 ///
 @property BOOL enableBundles;

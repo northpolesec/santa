@@ -185,6 +185,7 @@ static NSString *const kBlockedPathRegexKey = @"BlockedPathRegex";
 static NSString *const kBlockedPathRegexKeyDeprecated = @"BlacklistRegex";
 static NSString *const kEnableAllEventUploadKey = @"EnableAllEventUpload";
 static NSString *const kOverrideFileAccessActionKey = @"OverrideFileAccessAction";
+static NSString *const kEnableBundlesKey = @"EnableBundles";
 
 // The keys managed by a sync server.
 static NSString *const kFullSyncLastSuccess = @"FullSyncLastSuccess";
@@ -233,6 +234,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kSyncTypeRequired : number,
       kEnableAllEventUploadKey : number,
       kOverrideFileAccessActionKey : string,
+      kEnableBundlesKey : number,
     };
     _forcedConfigKeyTypes = @{
       kClientModeKey : number,
@@ -695,6 +697,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self configStateSet];
 }
 
++ (NSSet *)keyPathsForValuesAffectingEnableBundles {
+  return [self syncStateSet];
+}
+
 #pragma mark Public Interface
 
 - (SNTClientMode)clientMode {
@@ -740,6 +746,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)setEnableTransitiveRules:(BOOL)enabled {
   [self updateSyncStateForKey:kEnableTransitiveRulesKey value:@(enabled)];
+}
+
+- (BOOL)enableBundles {
+  return [self.syncState[kEnableBundlesKey] boolValue];
+}
+
+- (void)setEnableBundles:(BOOL)enable {
+  [self updateSyncStateForKey:kEnableBundlesKey value:@(enable)];
 }
 
 - (NSRegularExpression *)allowedPathRegex {
@@ -1386,7 +1400,6 @@ static SNTConfigurator *sharedConfigurator = nil;
     return;
   }
 
-  // Either remove
   NSMutableDictionary *syncState = self.syncState.mutableCopy;
   syncState[kAllowedPathRegexKey] = [syncState[kAllowedPathRegexKey] pattern];
   syncState[kBlockedPathRegexKey] = [syncState[kBlockedPathRegexKey] pattern];
