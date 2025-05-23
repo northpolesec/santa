@@ -28,19 +28,19 @@ SNTStoredEvent *StoredEventFromFileInfo(SNTFileInfo *fileInfo) {
   if (csError) {
     se.signingStatus =
         (csError.code == errSecCSUnsigned) ? SNTSigningStatusUnsigned : SNTSigningStatusInvalid;
+    return se;
+  }
+  se.signingChain = cs.certificates;
+  se.cdhash = cs.cdhash;
+  se.teamID = cs.teamID;
+  se.signingID = FormatSigningID(cs);
+  se.entitlements = cs.entitlements;
+  if (cs.signatureFlags & kSecCodeSignatureAdhoc) {
+    se.signingStatus = SNTSigningStatusAdhoc;
+  } else if (IsDevelopmentCert(cs.leafCertificate)) {
+    se.signingStatus = SNTSigningStatusDevelopment;
   } else {
-    se.signingChain = cs.certificates;
-    se.cdhash = cs.cdhash;
-    se.teamID = cs.teamID;
-    se.signingID = FormatSigningID(cs);
-    se.entitlements = cs.entitlements;
-    if (cs.signatureFlags & kSecCodeSignatureAdhoc) {
-      se.signingStatus = SNTSigningStatusAdhoc;
-    } else if (IsDevelopmentCert(cs.leafCertificate)) {
-      se.signingStatus = SNTSigningStatusDevelopment;
-    } else {
-      se.signingStatus = SNTSigningStatusProduction;
-    }
+    se.signingStatus = SNTSigningStatusProduction;
   }
   return se;
 }
