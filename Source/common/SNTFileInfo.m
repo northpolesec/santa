@@ -812,7 +812,8 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
       case errSecCSReqFailed:
       case errSecCSReqInvalid:
       case errSecCSReqUnsupported: return @"Yes, but failed requirement validation";
-      case errSecCSInfoPlistFailed: return @"Yes, but can't validate as Info.plist is missing";
+      case errSecCSInfoPlistFailed:
+        return @"Yes, but can't validate as the Info.plist has been modified";
       case errSecCSSignatureInvalid:
         if ([error.domain isEqualToString:@"com.northpolesec.molcodesignchecker"]) {
           return @"Yes, but signing is not consistent for all architectures";

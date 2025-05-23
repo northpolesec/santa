@@ -237,7 +237,7 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 }
 
 - (void)testCodeSignedInfoPlistFailed {
-  NSString *expected = @"Yes, but can't validate as Info.plist is missing";
+  NSString *expected = @"Yes, but can't validate as the Info.plist has been modified";
   NSError *err = [NSError errorWithDomain:@"" code:errSecCSInfoPlistFailed userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
