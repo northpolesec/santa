@@ -14,6 +14,8 @@
 
 #import <Cocoa/Cocoa.h>
 
+@class MOLXPCConnection;
+
 @protocol SNTMessageWindowControllerDelegate
 - (void)windowDidCloseSilenceHash:(NSString *)hash withInterval:(NSTimeInterval)interval;
 @end
@@ -31,5 +33,9 @@
 @property NSTimeInterval silenceFutureNotificationsPeriod;
 
 @property(weak) id<SNTMessageWindowControllerDelegate> delegate;
+
+// Keep track of the current bundle listener, allowing us to cancel hashing if the window is
+// dismissed.
+@property MOLXPCConnection *bundleListener;
 
 @end

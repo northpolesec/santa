@@ -38,10 +38,6 @@
                             configState:(SNTConfigState *)configState;
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
 - (void)postRuleSyncNotificationForApplication:(NSString *)app;
-- (void)updateCountsForEvent:(SNTStoredEvent *)event
-                 binaryCount:(uint64_t)binaryCount
-                   fileCount:(uint64_t)fileCount
-                 hashedCount:(uint64_t)hashedCount;
 - (void)requestAPNSToken:(void (^)(NSString *))reply;
 @end
 

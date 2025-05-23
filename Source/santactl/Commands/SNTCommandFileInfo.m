@@ -767,6 +767,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 
       [[bc remoteObjectProxy]
           hashBundleBinariesForEvent:se
+                            listener:nil
                                reply:^(NSString *hash, NSArray<SNTStoredEvent *> *events,
                                        NSNumber *time) {
                                  bundleInfo[kBundleHash] = hash;
@@ -781,7 +782,6 @@ REGISTER_COMMAND_NAME(@"fileinfo")
                                  }
 
                                  bundleInfo[kBundleHashes] = bundleHashes;
-                                 [[bc remoteObjectProxy] spindown];
                                  dispatch_semaphore_signal(sema);
                                }];
 

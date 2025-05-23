@@ -1,4 +1,3 @@
-/// Copyright 2015 Google Inc. All rights reserved.
 /// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +12,14 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <Cocoa/Cocoa.h>
+#import "Source/common/SNTStoredEvent.h"
 
-#import "Source/common/SNTXPCBundleServiceInterface.h"
-#import "Source/common/SNTXPCNotifierInterface.h"
-#import "Source/gui/SNTMessageWindowController.h"
+@class SNTFileInfo;
 
-///
-///  Keeps track of pending notifications and ensures only one is presented to the user at a time.
-///
-@interface SNTNotificationManager
-    : NSObject <SNTMessageWindowControllerDelegate, SNTNotifierXPC, SNTBundleServiceProgressXPC>
+__BEGIN_DECLS
 
-@property NSXPCListenerEndpoint *notificationListener;
-- (void)didRegisterForAPNS:(NSString *)deviceToken;
-- (void)APNSTokenChanged;
-@end
+// Generate a synthetic event from a file info object. The generated event will not have any runtime
+// infomation populated.
+SNTStoredEvent *StoredEventFromFileInfo(SNTFileInfo *fileInfo);
+
+__END_DECLS

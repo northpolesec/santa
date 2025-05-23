@@ -22,6 +22,8 @@
 	<string>Interactive</string>
 	<key>ThrottleInterval</key>
 	<integer>0</integer>
+	<key>EnablePressuredExit</key>
+	<true/>
 	<key>AssociatedBundleIdentifiers</key>
 	<array>
 		<string>com.northpolesec.santa</string>
