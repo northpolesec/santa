@@ -14,7 +14,7 @@
 
 #import <Foundation/Foundation.h>
 
-#include "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTCommonEnums.h"
 
 @class SNTExportConfiguration;
 

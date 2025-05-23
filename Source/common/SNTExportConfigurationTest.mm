@@ -14,8 +14,8 @@
 
 #import "Source/common/SNTExportConfiguration.h"
 
-#include <Foundation/Foundation.h>
-#include <XCTest/XCTest.h>
+#import <Foundation/Foundation.h>
+#import <XCTest/XCTest.h>
 
 @interface SNTExportConfigurationTest : XCTestCase
 @end

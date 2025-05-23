@@ -14,12 +14,13 @@
 /// limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncPreflight.h"
-#include "Source/common/SNTExportConfiguration.h"
 
-#include "Source/common/SNTCommonEnums.h"
+#include <google/protobuf/arena.h>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSIPStatus.h"
 #import "Source/common/SNTSyncConstants.h"
@@ -28,9 +29,8 @@
 #import "Source/common/String.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
-
-#include <google/protobuf/arena.h>
 #include "sync/v1.pb.h"
+
 namespace pbv1 = ::santa::sync::v1;
 
 using santa::NSStringToUTF8String;
