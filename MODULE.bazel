@@ -19,6 +19,16 @@ git_override(
     remote = "https://github.com/northpolesec/protos",
 )
 
+# cel-cpp
+# The 0.11.0 release has a bug in it that was fixed a few weeks later but hasn't
+# been released yet.
+bazel_dep(name = "cel-cpp", version = "0.11.0")
+git_override(
+    module_name = "cel-cpp",
+    commit = "dbf9eff24a835193fae8eec27540ddbb6464e63a",
+    remote = "https://github.com/google/cel-cpp.git",
+)
+
 # FMDB
 non_module_deps = use_extension("//:non_module_deps.bzl", "non_module_deps")
 use_repo(non_module_deps, "FMDB")
