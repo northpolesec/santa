@@ -16,6 +16,8 @@
 
 #include "Source/common/SNTCommonEnums.h"
 
+@class SNTExportConfiguration;
+
 @interface SNTConfigBundle : NSObject <NSSecureCoding>
 
 /// If the value for the backing property was set, the given block will be called.
@@ -30,6 +32,7 @@
 - (void)enableAllEventUpload:(void (^)(BOOL))block;
 - (void)disableUnknownEventUpload:(void (^)(BOOL))block;
 - (void)overrideFileAccessAction:(void (^)(NSString *))block;
+- (void)exportConfiguration:(void (^)(SNTExportConfiguration *))block;
 - (void)fullSyncLastSuccess:(void (^)(NSDate *))block;
 - (void)ruleSyncLastSuccess:(void (^)(NSDate *))block;
 

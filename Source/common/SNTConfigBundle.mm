@@ -15,6 +15,7 @@
 #import "Source/common/SNTConfigBundle.h"
 
 #import "Source/common/CoderMacros.h"
+#import "Source/common/SNTExportConfiguration.h"
 
 @interface SNTConfigBundle ()
 @property NSNumber *clientMode;
@@ -28,6 +29,7 @@
 @property NSNumber *enableAllEventUpload;
 @property NSNumber *disableUnknownEventUpload;
 @property NSString *overrideFileAccessAction;
+@property SNTExportConfiguration *exportConfiguration;
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
 @end
@@ -50,6 +52,7 @@
   ENCODE(coder, enableAllEventUpload);
   ENCODE(coder, disableUnknownEventUpload);
   ENCODE(coder, overrideFileAccessAction);
+  ENCODE(coder, exportConfiguration);
   ENCODE(coder, fullSyncLastSuccess);
   ENCODE(coder, ruleSyncLastSuccess);
 }
@@ -68,6 +71,7 @@
     DECODE(decoder, enableAllEventUpload, NSNumber);
     DECODE(decoder, disableUnknownEventUpload, NSNumber);
     DECODE(decoder, overrideFileAccessAction, NSString);
+    DECODE(decoder, exportConfiguration, SNTExportConfiguration);
     DECODE(decoder, fullSyncLastSuccess, NSDate);
     DECODE(decoder, ruleSyncLastSuccess, NSDate);
   }
@@ -137,6 +141,12 @@
 - (void)overrideFileAccessAction:(void (^)(NSString *))block {
   if (self.overrideFileAccessAction) {
     block(self.overrideFileAccessAction);
+  }
+}
+
+- (void)exportConfiguration:(void (^)(SNTExportConfiguration *))block {
+  if (self.exportConfiguration) {
+    block(self.exportConfiguration);
   }
 }
 

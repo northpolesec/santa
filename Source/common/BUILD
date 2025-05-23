@@ -342,6 +342,7 @@ objc_library(
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
+        ":SNTExportConfiguration",
     ],
 )
 
@@ -351,6 +352,25 @@ santa_unit_test(
     deps = [
         ":SNTCommonEnums",
         ":SNTConfigBundle",
+        ":SNTExportConfiguration",
+    ],
+)
+
+objc_library(
+    name = "SNTExportConfiguration",
+    srcs = ["SNTExportConfiguration.mm"],
+    hdrs = ["SNTExportConfiguration.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTCommonEnums",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTExportConfigurationTest",
+    srcs = ["SNTExportConfigurationTest.mm"],
+    deps = [
+        ":SNTExportConfiguration",
     ],
 )
 
@@ -712,6 +732,7 @@ test_suite(
         ":SNTCachedDecisionTest",
         ":SNTConfigBundleTest",
         ":SNTConfiguratorTest",
+        ":SNTExportConfigurationTest",
         ":SNTFileInfoTest",
         ":SNTKVOManagerTest",
         ":SNTMetricSetTest",

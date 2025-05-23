@@ -5,15 +5,16 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncPreflight.h"
+#include "Source/common/SNTExportConfiguration.h"
 
 #include "Source/common/SNTCommonEnums.h"
 
@@ -220,6 +221,20 @@ The following table expands upon the above logic to list most of the permutation
       case ::pbv1::DISABLE: self.syncState.overrideFileAccessAction = @"DISABLE"; break;
       case ::pbv1::FILE_ACCESS_ACTION_UNSPECIFIED:  // Intentional fallthrough
       default: self.syncState.overrideFileAccessAction = nil; break;
+    }
+  }
+
+  if (resp.has_export_configuration()) {
+    auto protoExportConfig = resp.export_configuration();
+    if (protoExportConfig.has_aws_config() && !protoExportConfig.aws_config().token().empty()) {
+      self.syncState.exportConfig = [[SNTExportConfiguration alloc]
+          initWithAWSToken:[NSData dataWithBytes:protoExportConfig.aws_config().token().data()
+                                          length:protoExportConfig.aws_config().token().length()]];
+    } else if (protoExportConfig.has_gcp_config() &&
+               !protoExportConfig.gcp_config().token().empty()) {
+      self.syncState.exportConfig = [[SNTExportConfiguration alloc]
+          initWithGCPToken:[NSData dataWithBytes:protoExportConfig.gcp_config().token().data()
+                                          length:protoExportConfig.gcp_config().token().length()]];
     }
   }
 
