@@ -19,7 +19,7 @@
 	<key>KeepAlive</key>
 	<false/>
 	<key>ProcessType</key>
-	<string>Interactive</string>
+	<string>Adaptive</string>
 	<key>ThrottleInterval</key>
 	<integer>0</integer>
 	<key>EnablePressuredExit</key>
