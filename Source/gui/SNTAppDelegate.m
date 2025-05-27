@@ -61,7 +61,30 @@
                                     [self attemptDaemonReconnection];
                                   }];
 
+  // Watch for windows being closed, so that we can restore the activation policy to accessory.
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(aWindowWillClose:)
+                                               name:NSWindowWillCloseNotification
+                                             object:nil];
+
   [self createDaemonConnection];
+}
+
+- (void)applicationDidBecomeActive:(NSNotification *)notification {
+  NSApp.activationPolicy = NSApplicationActivationPolicyRegular;
+}
+
+- (void)aWindowWillClose:(NSNotification *)notification {
+  NSWindow *closingWindow = notification.object;
+  __block BOOL hasVisibleWindows = NO;
+  [NSApp enumerateWindowsWithOptions:0
+                          usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
+                            if (window == closingWindow) return;
+                            *stop = hasVisibleWindows = window.visible;
+                          }];
+  if (!hasVisibleWindows) {
+    NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
+  }
 }
 
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
@@ -94,9 +117,6 @@
                                      fileInfo.bundleName ?: fileInfo.path.lastPathComponent];
       [window makeKeyAndOrderFront:nil];
       [window center];
-
-      // Add app to Cmd+Tab and Dock.
-      NSApp.activationPolicy = NSApplicationActivationPolicyRegular;
     }
   }
 }

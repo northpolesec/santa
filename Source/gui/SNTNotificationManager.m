@@ -79,13 +79,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [self.currentWindowController.bundleListener invalidate];
   [self.pendingNotifications removeObject:self.currentWindowController];
   self.currentWindowController = nil;
-
-  if (self.pendingNotifications.count) {
-    [self showQueuedWindow];
-  } else if (NSApp.windows.count < 2) {
-    // Remove app from Cmd+Tab and Dock.
-    NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
-  }
+  if (self.pendingNotifications.count) [self showQueuedWindow];
 }
 
 - (void)updateSilenceDate:(NSDate *)date forHash:(NSString *)hash {
@@ -148,8 +142,6 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     [self.pendingNotifications addObject:pendingMsg];
 
     if (!self.currentWindowController) {
-      // Add app to Cmd+Tab and Dock.
-      NSApp.activationPolicy = NSApplicationActivationPolicyRegular;
       [self showQueuedWindow];
     }
   });
