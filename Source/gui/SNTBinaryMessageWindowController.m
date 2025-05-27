@@ -91,6 +91,7 @@
                                       defer:NO];
   self.window.titlebarAppearsTransparent = YES;
   self.window.movableByWindowBackground = YES;
+  self.window.releasedWhenClosed = YES;
   [self.window standardWindowButton:NSWindowZoomButton].hidden = YES;
   [self.window standardWindowButton:NSWindowCloseButton].hidden = YES;
   [self.window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
