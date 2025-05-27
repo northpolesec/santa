@@ -65,7 +65,7 @@ public struct FileInfoView: View {
 
         if let csc = csc {
           Text("Signing ID").bold().padding(.top, 15.0)
-          Text(FormatSigningID(csc)).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+          Text(FormatSigningID(csc) ?? "Unknown").font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
 
           if let cdhash = csc.cdhash {
             Text("CDHash").bold().padding(.top, 15.0)
