@@ -82,10 +82,9 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
   if (self.pendingNotifications.count) {
     [self showQueuedWindow];
-  } else {
+  } else if (NSApp.windows.count < 2) {
     // Remove app from Cmd+Tab and Dock.
     NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
-    [NSApp hide:self];
   }
 }
 

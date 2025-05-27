@@ -32,6 +32,7 @@
   self.window.contentViewController = [SNTAboutWindowViewFactory createWithWindow:self.window];
   self.window.titlebarAppearsTransparent = YES;
   self.window.movableByWindowBackground = YES;
+  self.window.releasedWhenClosed = YES;
   [self.window standardWindowButton:NSWindowZoomButton].hidden = YES;
   [self.window standardWindowButton:NSWindowCloseButton].hidden = YES;
   [self.window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
@@ -45,8 +46,10 @@
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
-  // Remove app from Cmd+Tab and Dock.
-  NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
+  if (NSApp.windows.count < 2) {
+    // Remove app from Cmd+Tab and Dock.
+    NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
+  }
 }
 
 @end
