@@ -34,7 +34,9 @@ public struct FileInfoView: View {
     s += "\nSHA-256  : \(fileInfo.sha256() ?? "Unknown")"
     s += "\nSHA-1    : \(fileInfo.sha1() ?? "Unknown")"
     if let csc = csc {
-      s += "\nSigningID: \(FormatSigningID(csc) ?? "Unknown")"
+      if let signingID = FormatSigningID(csc) {
+        s += "\nSigningID: \(signingID)"
+      }
 
       if let cdhash = csc.cdhash {
         s += "\nCDHash   : \(cdhash)"
@@ -64,8 +66,10 @@ public struct FileInfoView: View {
         Text(fileInfo.sha1()).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
 
         if let csc = csc {
-          Text("Signing ID").bold().padding(.top, 15.0)
-          Text(FormatSigningID(csc) ?? "Unknown").font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+          if let signingID = FormatSigningID(csc) {
+            Text("Signing ID").bold().padding(.top, 15.0)
+            Text(signingID).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+          }
 
           if let cdhash = csc.cdhash {
             Text("CDHash").bold().padding(.top, 15.0)
