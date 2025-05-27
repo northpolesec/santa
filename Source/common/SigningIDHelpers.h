@@ -27,6 +27,6 @@ __BEGIN_DECLS
 
   @return An NSString formated as teamID:signingID or nil if there isn't a valid signing ID.
 */
-NSString *FormatSigningID(MOLCodesignChecker *csc);
+NSString *_Nullable FormatSigningID(MOLCodesignChecker *_Nullable csc);
 
 __END_DECLS
