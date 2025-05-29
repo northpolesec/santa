@@ -657,13 +657,6 @@
 @property(readonly, nonatomic) BOOL ignoreOtherEndpointSecurityClients;
 
 ///
-///  If true, debug logging will be enabled for all Santa components. Defaults to false.
-///  Passing --debug as an executable argument will enable debug logging for that specific
-///  component.
-///
-@property(readonly, nonatomic) BOOL enableDebugLogging;
-
-///
 ///  If true, compressed requests from "santactl sync" will set "Content-Encoding" to "zlib"
 ///  instead of the new default "deflate". If syncing with Upvote deployed at commit 0b4477d
 ///  or below, set this option to true.
