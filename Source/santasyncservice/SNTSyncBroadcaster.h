@@ -13,6 +13,7 @@
 ///    limitations under the License
 
 #import <Foundation/Foundation.h>
+#include <os/log.h>
 
 @class MOLXPCConnection;
 
@@ -25,7 +26,7 @@
 
 - (void)addLogListener:(MOLXPCConnection *)logListener;
 - (void)removeLogListener:(MOLXPCConnection *)logListener;
-- (void)broadcastToLogListeners:(NSString *)log;
+- (void)broadcastToLogListeners:(NSString *)log logType:(os_log_type_t)logType;
 
 // Blocks until all the currently enqueued (up to this point) logs from -[broadcastToLogListeners:]
 // are sent.

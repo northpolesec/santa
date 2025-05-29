@@ -5,15 +5,16 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     https://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include <os/log.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
@@ -24,6 +25,7 @@
 #import "Source/santactl/SNTCommandController.h"
 
 @interface SNTCommandSync : SNTCommand <SNTCommandProtocol, SNTSyncServiceLogReceiverXPC>
+@property BOOL enableDebugLogging;
 @end
 
 @implementation SNTCommandSync
@@ -86,12 +88,15 @@ REGISTER_COMMAND_NAME(@"sync")
     syncType = SNTSyncTypeClean;
   }
 
+  self.enableDebugLogging = [NSProcessInfo.processInfo.arguments containsObject:@"--debug"];
+
   [[ss remoteObjectProxy]
       syncWithLogListener:logListener.endpoint
                  syncType:syncType
                     reply:^(SNTSyncStatusType status) {
                       if (status == SNTSyncStatusTypeTooManySyncsInProgress) {
-                        [self didReceiveLog:@"Too many syncs in progress, try again later."];
+                        [self didReceiveLog:@"Too many syncs in progress, try again later."
+                                   withType:OS_LOG_TYPE_ERROR];
                       }
                       exit((int)status);
                     }];
@@ -101,7 +106,10 @@ REGISTER_COMMAND_NAME(@"sync")
 }
 
 /// Implement the SNTSyncServiceLogReceiverXPC protocol.
-- (void)didReceiveLog:(NSString *)log {
+- (void)didReceiveLog:(NSString *)log withType:(os_log_type_t)logType {
+  if (logType == OS_LOG_TYPE_DEBUG && !self.enableDebugLogging) {
+    return;
+  }
   printf("%s\n", log.UTF8String);
   fflush(stdout);
 }

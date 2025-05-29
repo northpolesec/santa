@@ -118,7 +118,7 @@ struct SNTAboutWindowView: View {
 class SyncLogReceiver: NSObject, SNTSyncServiceLogReceiverXPC {
   private var logs: [String] = []
 
-  func didReceiveLog(_ log: String) {
+  func didReceiveLog(_ log: String, with _: OSLogType) {
     logs.append(log)
   }
 
