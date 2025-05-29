@@ -15,7 +15,7 @@ The best way to start diagnosing the Santa daemon is by running:
 /usr/local/bin/santactl status
 ```
 
-If the daemon is up and running, you should see [normal status output](./install-package#verification).
+If the daemon is up and running, you should see [normal status output](./install-package.md#verification).
 
 However, if you see a message like "`An error occurred communicating with the
 Santa daemon...`", then use the following tips to diagnose the issue.
@@ -101,16 +101,15 @@ Profile payloads that require a supervision relationship cannot be applied
 manually for testing. Therefore, it's crucial to ensure the MDM connection is
 working as expected during mass deployments.
 
-Additionally, confirm the system extension and TCC/PPPC profiles are present,
-as described in the ["MDM-Specific Client Configuration"](configuration.md)
-section of the Configuration page. After confirming that Santa is running, you
-can verify that settings are being applied as expected by running
-`santactl status`.
+Additionally, confirm the system extension and TCC/PPPC profiles are present, as
+described in the [Getting Started](./getting-started.md) flow.
 
 ## Verifying Expected Functionality
 
-Reviewing Santa's [logs](#checking-santa-daemon-logs) and
+After confirming that Santa is running, you can verify that settings are being
+applied as expected by running `santactl status`.
+
+Additionally, reviewing Santa's [logs](#checking-santa-daemon-logs) and
 [telemetry](../features/telemetry.mdx) is helpful for understanding Santa's
-operation. The documentation on [binary
-authorization](../features/binary-authorization.md) explains precedence and
-decision-making.
+operation. The documentation on [binary authorization](../features/binary-authorization.md)
+explains precedence and decision-making.
