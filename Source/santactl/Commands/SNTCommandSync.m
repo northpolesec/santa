@@ -59,17 +59,17 @@ REGISTER_COMMAND_NAME(@"sync")
 - (void)runWithArguments:(NSArray *)arguments {
   // Ensure we have no privileges
   if (!DropRootPrivileges()) {
-    LOGE(@"Failed to drop root privileges. Exiting.");
+    TEE_LOGE(@"Failed to drop root privileges. Exiting.");
     exit(1);
   }
 
   if (![[SNTConfigurator configurator] syncBaseURL]) {
-    LOGE(@"Missing SyncBaseURL. Exiting.");
+    TEE_LOGE(@"Missing SyncBaseURL. Exiting.");
     exit(1);
   }
   MOLXPCConnection *ss = [SNTXPCSyncServiceInterface configuredConnection];
   ss.invalidationHandler = ^(void) {
-    LOGE(@"Failed to connect to the sync service.");
+    TEE_LOGE(@"Failed to connect to the sync service.");
     exit(1);
   };
   [ss resume];

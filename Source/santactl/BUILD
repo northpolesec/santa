@@ -15,6 +15,7 @@ objc_library(
         "SNTCommandController.h",
     ],
     deps = [
+        "//Source/common:SNTLogging",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTXPCControlInterface",
     ],
