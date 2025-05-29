@@ -15,10 +15,18 @@ The best way to start diagnosing the Santa daemon is by running:
 /usr/local/bin/santactl status
 ```
 
-If the daemon is up and running, you should see [normal status output](../binaries/santactl.md#status).
+If the daemon is up and running, you should see [normal status output](./install-package#verification).
 
 However, if you see a message like "`An error occurred communicating with the
 Santa daemon...`", then use the following tips to diagnose the issue.
+
+## Run the doctor command
+
+The doctor command checks Santa and its configuration for potential problems.
+
+```sh
+sudo santactl doctor
+```
 
 ## Enabling Full Disk Access
 
@@ -101,13 +109,8 @@ can verify that settings are being applied as expected by running
 
 ## Verifying Expected Functionality
 
-Reviewing the [logs](../concepts/logs.md) is helpful for understanding Santa's
-operation. The documentation on [scopes](../concepts/scopes.md) and
-[rules](../concepts/rules.md) explains precedence and decision-making. To see
-how Santa evaluates binary execution, use the santactl fileinfo command with a
-binary path (see the [santactl docs](../binaries/santactl.md) for more
-information):
-
-```sh
-/usr/local/bin/santactl fileinfo /path/to/binary
-```
+Reviewing Santa's [logs](#checking-santa-daemon-logs) and
+[telemetry](../features/telemetry.mdx) is helpful for understanding Santa's
+operation. The documentation on [binary
+authorization](../features/binary-authorization.md) explains precedence and
+decision-making.
