@@ -23,7 +23,7 @@
 __BEGIN_DECLS
 
 #define SNT_LOG_WITH_TYPE(type, fmt, ...)      \
-  os_log_with_type(OS_LOG_DEFAULT, type, "%s", \
+  os_log_with_type(OS_LOG_DEFAULT, type, "%{public}s", \
                    [[NSString stringWithFormat:fmt, ##__VA_ARGS__] UTF8String])
 
 #define LOGD(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_DEBUG, logFormat, ##__VA_ARGS__)
