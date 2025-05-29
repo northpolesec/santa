@@ -788,7 +788,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       if (dispatch_semaphore_wait(sema,
                                   dispatch_time(DISPATCH_TIME_NOW, secondsToWait * NSEC_PER_SEC))) {
         TEE_LOGE(@"The bundle service did not finish collecting hashes within %d seconds\n",
-                secondsToWait);
+                 secondsToWait);
       }
 
       outputDict[kBundleInfo] = bundleInfo;

@@ -22,7 +22,7 @@
 
 __BEGIN_DECLS
 
-#define SNT_LOG_WITH_TYPE(type, fmt, ...)      \
+#define SNT_LOG_WITH_TYPE(type, fmt, ...)              \
   os_log_with_type(OS_LOG_DEFAULT, type, "%{public}s", \
                    [[NSString stringWithFormat:fmt, ##__VA_ARGS__] UTF8String])
 
@@ -37,33 +37,33 @@ __BEGIN_DECLS
 
 // The TEE_LOG* variants print both via os_log and to either stdout or stderr.
 // These are largely intended to be used by santactl.
-#define TEE_LOGD(logFormat, ...) \
-  do { \
-    LOGD(logFormat, ##__VA_ARGS__); \
+#define TEE_LOGD(logFormat, ...)                     \
+  do {                                               \
+    LOGD(logFormat, ##__VA_ARGS__);                  \
     SNT_PRINT_LOG(stdout, logFormat, ##__VA_ARGS__); \
   } while (0)
 
-#define TEE_LOGI(logFormat, ...) \
-  do { \
-    LOGI(logFormat, ##__VA_ARGS__); \
+#define TEE_LOGI(logFormat, ...)                     \
+  do {                                               \
+    LOGI(logFormat, ##__VA_ARGS__);                  \
     SNT_PRINT_LOG(stdout, logFormat, ##__VA_ARGS__); \
   } while (0)
 
-#define TEE_LOG(logFormat, ...) \
-  do { \
-    LOG(logFormat, ##__VA_ARGS__); \
+#define TEE_LOG(logFormat, ...)                      \
+  do {                                               \
+    LOG(logFormat, ##__VA_ARGS__);                   \
     SNT_PRINT_LOG(stdout, logFormat, ##__VA_ARGS__); \
   } while (0)
 
-#define TEE_LOGW(logFormat, ...) \
-  do { \
-    LOGW(logFormat, ##__VA_ARGS__); \
+#define TEE_LOGW(logFormat, ...)                     \
+  do {                                               \
+    LOGW(logFormat, ##__VA_ARGS__);                  \
     SNT_PRINT_LOG(stderr, logFormat, ##__VA_ARGS__); \
   } while (0)
 
-#define TEE_LOGE(logFormat, ...) \
-  do { \
-    LOGE(logFormat, ##__VA_ARGS__); \
+#define TEE_LOGE(logFormat, ...)                     \
+  do {                                               \
+    LOGE(logFormat, ##__VA_ARGS__);                  \
     SNT_PRINT_LOG(stderr, logFormat, ##__VA_ARGS__); \
   } while (0)
 

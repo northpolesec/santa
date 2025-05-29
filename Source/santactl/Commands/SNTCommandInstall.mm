@@ -61,7 +61,8 @@ REGISTER_COMMAND_NAME(@"install")
                   if (success) {
                     TEE_LOGI(@"Installation was successful");
                   } else {
-                    TEE_LOGI(@"Installation unsuccessful. Please consult logs for more information.");
+                    TEE_LOGI(
+                        @"Installation unsuccessful. Please consult logs for more information.");
                   }
 
                   dispatch_semaphore_signal(sema);
