@@ -136,9 +136,11 @@ struct SyncButtonView: View {
   @State private var syncStatus: SNTSyncStatusType = .unknown
   @State private var lr: MOLXPCConnection?
 
+  @StateObject private var modifierFlags = ModifierFlags()
+
   let logReceiver = SyncLogReceiver()
 
-  func sync() {
+  func sync(clean: Bool = false) {
     logReceiver.clear()
     inProgress = true
 
@@ -158,7 +160,7 @@ struct SyncButtonView: View {
     lr?.resume()
 
     let proxy = ss?.remoteObjectProxy as? SNTSyncServiceXPC
-    proxy?.sync(withLogListener: logListener.endpoint, syncType: .normal) { status in
+    proxy?.sync(withLogListener: logListener.endpoint, syncType: clean ? .clean : .normal) { status in
       lr = nil
 
       DispatchQueue.main.sync {
@@ -178,15 +180,15 @@ struct SyncButtonView: View {
   var body: some View {
     @State var showAlert = (syncStatus != .success && syncStatus != .unknown)
 
-    Button(action: {
-      sync()
-    }) {
+    Button(action: { sync(clean: modifierFlags.isOptionPressed()) }) {
       if inProgress {
         ProgressView().frame(width: 90.0).controlSize(.small)
       } else if syncStatus == .success {
         Image(systemName: "checkmark.circle.fill")
           .foregroundColor(.blue)
           .frame(width: 90.0)
+      } else if modifierFlags.isOptionPressed() {
+        Text("Clean Sync").frame(width: 90.0)
       } else {
         Text("Sync").frame(width: 90.0)
       }
@@ -231,5 +233,20 @@ struct SyncButtonView: View {
 struct SNTAboutWindow_Previews: PreviewProvider {
   static var previews: some View {
     SNTAboutWindowView(w: nil)
+  }
+}
+
+final class ModifierFlags: ObservableObject {
+  @Published var flags = NSEvent.ModifierFlags([])
+
+  init() {
+    NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+      self?.flags = event.modifierFlags
+      return event;
+    }
+  }
+
+  func isOptionPressed() -> Bool {
+    return flags.contains(.option)
   }
 }
