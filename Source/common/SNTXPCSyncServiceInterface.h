@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include <os/log.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
@@ -94,5 +95,5 @@
 ///  the syncservice during a user initiated sync.
 ///
 @protocol SNTSyncServiceLogReceiverXPC
-- (void)didReceiveLog:(NSString *)log;
+- (void)didReceiveLog:(NSString *)log withType:(os_log_type_t)logType;
 @end

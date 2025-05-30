@@ -5,19 +5,20 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import <Foundation/Foundation.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santactl/Commands/SNTCommandMetrics.h"
@@ -77,8 +78,7 @@ REGISTER_COMMAND_NAME(@"metrics")
         NSArray<NSString *> *fieldValues = [field[@"value"] componentsSeparatedByString:@","];
 
         if (fields.count != fieldValues.count) {
-          fprintf(stderr, "metric %s has a different number of field names and field values",
-                  [fieldName UTF8String]);
+          TEE_LOGE(@"metric %@ has a different number of field names and field values", fieldName);
           continue;
         }
 
@@ -126,7 +126,7 @@ REGISTER_COMMAND_NAME(@"metrics")
   }
 
   if (!exportMetrics) {
-    printf("Metrics not configured\n");
+    TEE_LOGI(@"Metrics not configured\n");
     return;
   }
 

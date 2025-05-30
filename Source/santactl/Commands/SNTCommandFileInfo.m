@@ -5,13 +5,13 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
@@ -597,7 +597,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   BOOL isDir = NO, isBundle = NO;
   if (![fm fileExistsAtPath:path isDirectory:&isDir]) {
     dispatch_group_async(self.printGroup, self.printQueue, ^{
-      fprintf(stderr, "File does not exist: %s\n", [path UTF8String]);
+      TEE_LOGE(@"File does not exist: %@", path);
     });
     return;
   }
@@ -652,8 +652,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     }
   } else if (isDir && !isBundle) {
     dispatch_group_async(self.printGroup, self.printQueue, ^{
-      fprintf(stderr, "%s is a directory.  Use the -r flag to search recursively.\n",
-              [path UTF8String]);
+      TEE_LOGE(@"%@ is a directory.  Use the -r flag to search recursively.", path);
     });
   } else {
     [operationQueue addOperationWithBlock:^{
@@ -691,7 +690,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   SNTFileInfo *fileInfo = [[SNTFileInfo alloc] initWithPath:path];
   if (!fileInfo) {
     dispatch_group_async(self.printGroup, self.printQueue, ^{
-      fprintf(stderr, "Invalid or empty file: %s\n", [path UTF8String]);
+      TEE_LOGE(@"Invalid or empty file: %@", path);
     });
     return;
   }
@@ -708,12 +707,12 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     if (index < 0) {
       index = (int)signingChain.count - -(index);
       if (index < 0) {
-        fprintf(stderr, "Invalid --cert-index: %d\n", index);
+        TEE_LOGE(@"Invalid --cert-index: %d\n", index);
         return;
       }
     } else {
       if (index >= (int)signingChain.count) {
-        fprintf(stderr, "Invalid --cert-index: %d\n", index);
+        TEE_LOGE(@"Invalid --cert-index: %d", index);
         return;
       }
     }
@@ -788,8 +787,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       int secondsToWait = 30;
       if (dispatch_semaphore_wait(sema,
                                   dispatch_time(DISPATCH_TIME_NOW, secondsToWait * NSEC_PER_SEC))) {
-        fprintf(stderr, "The bundle service did not finish collecting hashes within %d seconds\n",
-                secondsToWait);
+        TEE_LOGE(@"The bundle service did not finish collecting hashes within %d seconds\n",
+                 secondsToWait);
       }
 
       outputDict[kBundleInfo] = bundleInfo;

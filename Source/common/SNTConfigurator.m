@@ -47,9 +47,6 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 @property(atomic) NSDictionary *syncState;
 @property(atomic) NSMutableDictionary *configState;
 
-/// Was --debug passed as an argument to this process?
-@property(readonly, nonatomic) BOOL debugFlag;
-
 /// Holds the last processed hash of the static rules list.
 @property(atomic) NSDictionary *cachedStaticRules;
 
@@ -149,7 +146,6 @@ static NSString *const kEnableMachineIDDecoration = @"EnableMachineIDDecoration"
 
 static NSString *const kEnableForkAndExitLogging = @"EnableForkAndExitLogging";
 static NSString *const kIgnoreOtherEndpointSecurityClients = @"IgnoreOtherEndpointSecurityClients";
-static NSString *const kEnableDebugLogging = @"EnableDebugLogging";
 static NSString *const kTelemetryKey = @"Telemetry";
 
 static NSString *const kClientContentEncoding = @"SyncClientContentEncoding";
@@ -305,7 +301,6 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kEnableMachineIDDecoration : number,
       kEnableForkAndExitLogging : number,
       kIgnoreOtherEndpointSecurityClients : number,
-      kEnableDebugLogging : number,
       kFCMProject : string,
       kFCMEntity : string,
       kFCMAPIKey : string,
@@ -343,7 +338,6 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 
     [self readStatsStateFromDisk:statsStateAccessAuthorizer];
 
-    _debugFlag = [[NSProcessInfo processInfo].arguments containsObject:@"--debug"];
     [self startWatchingDefaults];
   }
   return self;
@@ -622,10 +616,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingIgnoreOtherEndpointSecurityClients {
-  return [self configStateSet];
-}
-
-+ (NSSet *)keyPathsForValuesAffectingEnableDebugLogging {
   return [self configStateSet];
 }
 
@@ -1197,11 +1187,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (BOOL)ignoreOtherEndpointSecurityClients {
   NSNumber *number = self.configState[kIgnoreOtherEndpointSecurityClients];
   return number ? [number boolValue] : NO;
-}
-
-- (BOOL)enableDebugLogging {
-  NSNumber *number = self.configState[kEnableDebugLogging];
-  return [number boolValue] || self.debugFlag;
 }
 
 - (NSString *)fcmProject {

@@ -103,7 +103,6 @@
   reply(NO);
 }
 
-// TODO(bur): Add support for santactl sync --debug to enable debug logging for that sync.
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
                    syncType:(SNTSyncType)syncType
                       reply:(void (^)(SNTSyncStatusType))reply {

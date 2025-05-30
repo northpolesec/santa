@@ -413,9 +413,7 @@ objc_library(
 
 objc_library(
     name = "SNTLogging",
-    srcs = ["SNTLogging.m"],
     hdrs = ["SNTLogging.h"],
-    deps = [":SNTConfigurator"],
 )
 
 objc_library(

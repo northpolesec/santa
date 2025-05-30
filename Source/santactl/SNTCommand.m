@@ -14,6 +14,8 @@
 
 #import "Source/santactl/SNTCommand.h"
 
+#import "Source/common/SNTLogging.h"
+
 @implementation SNTCommand
 
 + (void)runWithArguments:(NSArray *)arguments daemonConnection:(MOLXPCConnection *)daemonConn {
@@ -35,7 +37,8 @@
 }
 
 - (void)printErrorUsageAndExit:(NSString *)error {
-  fprintf(stderr, "%s\n\n", [error UTF8String]);
+  // Only send the error string to both the system logger and stderr, not the usage string
+  TEE_LOGE(@"%@\n\n", error);
   fprintf(stderr, "%s\n", [[[self class] longHelpText] UTF8String]);
   exit(1);
 }
