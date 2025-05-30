@@ -31,8 +31,7 @@ __BEGIN_DECLS
 
 #define LOGD(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_DEBUG, logFormat, ##__VA_ARGS__)
 #define LOGI(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_INFO, logFormat, ##__VA_ARGS__)
-#define LOG(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_DEFAULT, logFormat, ##__VA_ARGS__)
-#define LOGW(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_ERROR, logFormat, ##__VA_ARGS__)
+#define LOGW(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_DEFAULT, logFormat, ##__VA_ARGS__)
 #define LOGE(logFormat, ...) SNT_LOG_WITH_TYPE(OS_LOG_TYPE_ERROR, logFormat, ##__VA_ARGS__)
 
 // The TEE_LOG* variants print both via os_log and to either stdout or stderr.
@@ -49,12 +48,8 @@ __BEGIN_DECLS
     SNT_PRINT_LOG(stdout, logFormat, ##__VA_ARGS__); \
   } while (0)
 
-#define TEE_LOG(logFormat, ...)                      \
-  do {                                               \
-    LOG(logFormat, ##__VA_ARGS__);                   \
-    SNT_PRINT_LOG(stdout, logFormat, ##__VA_ARGS__); \
-  } while (0)
-
+// TEE_LOGW will log to the system log as a default log type, but output to
+// the terminal will be sent to stderr so as not to interfere with stdout.
 #define TEE_LOGW(logFormat, ...)                     \
   do {                                               \
     LOGW(logFormat, ##__VA_ARGS__);                  \
