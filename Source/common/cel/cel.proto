@@ -1,0 +1,49 @@
+/// Copyright 2025 North Pole Security, Inc.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///     http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
+syntax = "proto3";
+
+package santa.cel.v1;
+
+import "google/protobuf/timestamp.proto";
+
+enum ReturnValue {
+  UNSPECIFIED = 0;
+
+  // Allow the process to execute.
+  ALLOWLIST = 1;
+
+  // Allow the process to execute and if the client has transitive allowlisting
+  // enabled, any files created by this binary will be locally allowlisted.
+  ALLOWLIST_COMPILER = 2;
+
+  // Block the process from executing.
+  BLOCKLIST = 3;
+
+  // Block the process from executing and do not show GUI notifications to the
+  // user. This should be used sparingly as the behavior of applications being
+  // silently blocked can be very confusing for users.
+  SILENT_BLOCKLIST = 4;
+}
+
+// The fields in this message provided to CEL programs.
+message Context {
+  FileContext file = 1;
+  repeated string args = 2;
+  repeated string envs = 3;
+}
+
+message FileContext {
+  google.protobuf.Timestamp signing_timestamp = 1;
+}
