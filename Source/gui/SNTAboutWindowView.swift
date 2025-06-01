@@ -190,7 +190,7 @@ struct SyncButtonView: View {
       } else if modifierFlags.isOptionPressed() {
         Text("Clean Sync").frame(width: 90.0)
       } else {
-        Text("Sync").frame(width: 90.0)
+        Text("Sync").frame(width: 90.0).help("Hold Option for Clean Sync")
       }
     }
     .disabled(inProgress || syncStatus != .unknown)
@@ -244,6 +244,10 @@ final class ModifierFlags: ObservableObject {
       self?.flags = event.modifierFlags
       return event;
     }
+  }
+
+  func isShiftPressed() -> Bool {
+    return flags.contains(.shift)
   }
 
   func isOptionPressed() -> Bool {
