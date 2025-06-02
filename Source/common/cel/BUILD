@@ -1,5 +1,6 @@
 load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
