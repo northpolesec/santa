@@ -701,7 +701,6 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
-        ":CELTest",
         ":EncodeEntitlementsTest",
         ":MOLAuthenticatingURLSessionTest",
         ":MOLCertificateTest",
@@ -722,6 +721,7 @@ test_suite(
         ":ScopedCFTypeRefTest",
         ":ScopedIOObjectRefTest",
         ":TelemetryEventMapTest",
+        "//Source/common/cel:CELTest",
     ],
     visibility = ["//:santa_package_group"],
 )
