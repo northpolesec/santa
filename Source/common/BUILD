@@ -238,6 +238,8 @@ santa_unit_test(
     deps = [
         ":Keychain",
         ":TestUtils",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 

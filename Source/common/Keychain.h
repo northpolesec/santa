@@ -15,8 +15,8 @@
 #ifndef SANTA__COMMON__KEYCHAIN_H
 #define SANTA__COMMON__KEYCHAIN_H
 
-#include <Foundation/Foundation.h>
-#include <Security/Security.h>
+#import <Foundation/Foundation.h>
+#import <Security/Security.h>
 
 #include <memory>
 

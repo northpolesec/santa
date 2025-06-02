@@ -19,6 +19,8 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/TestUtils.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 using santa::keychain_utils::IsValidAccountName;
 using santa::keychain_utils::IsValidDescription;
@@ -26,9 +28,19 @@ using santa::keychain_utils::IsValidServiceName;
 using santa::keychain_utils::SecurityOSStatusToAbslStatus;
 
 @interface KeychainTest : XCTestCase
+@property NSString *testKeychainPath;
 @end
 
 @implementation KeychainTest
+
+- (void)setUp {
+  self.testKeychainPath =
+      [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+}
+
+- (void)tearDown {
+  [[NSFileManager defaultManager] removeItemAtPath:self.testKeychainPath error:nil];
+}
 
 - (void)testValidationUtils {
   XCTAssertFalse(IsValidAccountName(nil));
@@ -56,6 +68,61 @@ using santa::keychain_utils::SecurityOSStatusToAbslStatus;
 
 - (void)testFactoryFailure {
   santa::KeychainManager::Create(nil, kSecPreferencesDomainSystem);
+}
+
+- (void)testKeychainItem {
+  SecKeychainRef keychain;
+  NSString *password = @"TestPassword";
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  OSStatus osStatus = SecKeychainCreate(self.testKeychainPath.UTF8String, (UInt32)password.length,
+                                        password.UTF8String, NO, NULL, &keychain);
+#pragma clang diagnostic pop
+
+  if (osStatus != errSecSuccess) {
+    XCTFail(@"Failed to create keychain. Status: %d", osStatus);
+    return;
+  }
+  XCTAssertNotEqual(keychain, nullptr);
+
+  santa::KeychainManager mgr(@"com.norhpolesec.test.service", keychain);
+  std::unique_ptr<santa::KeychainItem> item1 =
+      mgr.CreateItem(@"TestAccount1", @"Test keychain item");
+  std::unique_ptr<santa::KeychainItem> item2 =
+      mgr.CreateItem(@"TestAccount2", @"Test keychain item");
+
+  NSData *testData1 = [@"hello1" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData *testData2 = [@"hello2" dataUsingEncoding:NSUTF8StringEncoding];
+
+  // Getting a non-existent item is a failure
+  absl::StatusOr<NSData *> maybeItem = item1->Get();
+  XCTAssertEqual(maybeItem.status().code(), absl::StatusCode::kNotFound);
+
+  // Deleting a non-existent item is successful
+  absl::Status status = item1->Delete();
+  XCTAssertTrue(status.ok());
+
+  status = item1->Store(testData1);
+  XCTAssertTrue(status.ok());
+
+  // Storing a duplicate item should succeed (it is first deleted)
+  status = item1->Store(testData1);
+  XCTAssertTrue(status.ok());
+
+  // Store the second item
+  status = item2->Store(testData2);
+  XCTAssertTrue(status.ok());
+
+  // Retrieve the first item and verify contents
+  maybeItem = item1->Get();
+  XCTAssertTrue(maybeItem.ok());
+  XCTAssertEqualObjects(*maybeItem, testData1);
+
+  // Retrieve the second item and verify contents
+  maybeItem = item2->Get();
+  XCTAssertTrue(maybeItem.ok());
+  XCTAssertEqualObjects(*maybeItem, testData2);
 }
 
 @end

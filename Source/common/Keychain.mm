@@ -14,11 +14,9 @@
 
 #include "Source/common/Keychain.h"
 
-#include <Security/SecBase.h>
-#include <Security/SecItem.h>
 #include <errno.h>
 
-#include "Source/common/SNTLogging.h"
+#import "Source/common/SNTLogging.h"
 
 namespace santa {
 
@@ -152,20 +150,20 @@ absl::Status KeychainItem::Store(NSData *data) {
     return status;
   }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   NSDictionary *attributes = @{
     (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword,
     (__bridge id)kSecAttrService : service_,
     (__bridge id)kSecAttrAccount : account_,
     (__bridge id)kSecValueData : data,
-    (__bridge id)kSecAttrAccessible : (__bridge id)kSecAttrAccessibleAlwaysThisDeviceOnly,
     (__bridge id)kSecAttrSynchronizable : @(NO),
     (__bridge id)kSecAttrDescription : description_,
     (__bridge id)kSecReturnAttributes : @(NO),
     (__bridge id)kSecUseKeychain : (__bridge id)keychain_,
-  };
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    (__bridge id)kSecAttrAccessible : (__bridge id)kSecAttrAccessibleAlwaysThisDeviceOnly,
 #pragma clang diagnostic pop
+  };
 
   OSStatus status = SecItemAdd((__bridge CFDictionaryRef)attributes, NULL);
   if (status != errSecSuccess) {
