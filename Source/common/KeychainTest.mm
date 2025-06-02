@@ -22,10 +22,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
-using santa::keychain_utils::IsValidAccountName;
-using santa::keychain_utils::IsValidDescription;
-using santa::keychain_utils::IsValidServiceName;
-using santa::keychain_utils::SecurityOSStatusToAbslStatus;
+namespace keychain = ::santa::keychain;
 
 @interface KeychainTest : XCTestCase
 @property NSString *testKeychainPath;
@@ -43,31 +40,31 @@ using santa::keychain_utils::SecurityOSStatusToAbslStatus;
 }
 
 - (void)testValidationUtils {
-  XCTAssertFalse(IsValidAccountName(nil));
-  XCTAssertFalse(IsValidAccountName(RepeatedString(@"A", 512)));
-  XCTAssertTrue(IsValidAccountName(RepeatedString(@"A", 64)));
+  XCTAssertFalse(keychain::IsValidAccountName(nil));
+  XCTAssertFalse(keychain::IsValidAccountName(RepeatedString(@"A", 512)));
+  XCTAssertTrue(keychain::IsValidAccountName(RepeatedString(@"A", 64)));
 
-  XCTAssertFalse(IsValidDescription(nil));
-  XCTAssertFalse(IsValidDescription(RepeatedString(@"A", 512)));
-  XCTAssertTrue(IsValidDescription(RepeatedString(@"A", 64)));
+  XCTAssertFalse(keychain::IsValidDescription(nil));
+  XCTAssertFalse(keychain::IsValidDescription(RepeatedString(@"A", 512)));
+  XCTAssertTrue(keychain::IsValidDescription(RepeatedString(@"A", 64)));
 
-  XCTAssertFalse(IsValidServiceName(nil));
-  XCTAssertFalse(IsValidServiceName(RepeatedString(@"A", 512)));
-  XCTAssertTrue(IsValidServiceName(RepeatedString(@"A", 64)));
+  XCTAssertFalse(keychain::IsValidServiceName(nil));
+  XCTAssertFalse(keychain::IsValidServiceName(RepeatedString(@"A", 512)));
+  XCTAssertTrue(keychain::IsValidServiceName(RepeatedString(@"A", 64)));
 }
 
 - (void)testSecurityOSStatusToAbslStatus {
   absl::Status s;
 
-  s = SecurityOSStatusToAbslStatus(errSecSuccess);
+  s = keychain::SecurityOSStatusToAbslStatus(errSecSuccess);
   XCTAssertTrue(s.ok());
 
-  s = SecurityOSStatusToAbslStatus(errSecDuplicateItem);
+  s = keychain::SecurityOSStatusToAbslStatus(errSecDuplicateItem);
   XCTAssertFalse(s.ok());
 }
 
 - (void)testFactoryFailure {
-  santa::KeychainManager::Create(nil, kSecPreferencesDomainSystem);
+  keychain::Manager::Create(nil, kSecPreferencesDomainSystem);
 }
 
 - (void)testKeychainItem {
@@ -86,11 +83,9 @@ using santa::keychain_utils::SecurityOSStatusToAbslStatus;
   }
   XCTAssertNotEqual(keychain, nullptr);
 
-  santa::KeychainManager mgr(@"com.norhpolesec.test.service", keychain);
-  std::unique_ptr<santa::KeychainItem> item1 =
-      mgr.CreateItem(@"TestAccount1", @"Test keychain item");
-  std::unique_ptr<santa::KeychainItem> item2 =
-      mgr.CreateItem(@"TestAccount2", @"Test keychain item");
+  keychain::Manager mgr(@"com.norhpolesec.test.service", keychain);
+  std::unique_ptr<keychain::Item> item1 = mgr.CreateItem(@"TestAccount1", @"Test keychain item");
+  std::unique_ptr<keychain::Item> item2 = mgr.CreateItem(@"TestAccount2", @"Test keychain item");
 
   NSData *testData1 = [@"hello1" dataUsingEncoding:NSUTF8StringEncoding];
   NSData *testData2 = [@"hello2" dataUsingEncoding:NSUTF8StringEncoding];

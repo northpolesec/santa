@@ -19,8 +19,8 @@
 #import "Source/common/SNTLogging.h"
 
 namespace santa {
+namespace keychain {
 
-namespace keychain_utils {
 bool IsValidServiceName(NSString *service) {
   return service.length > 0 && service.length <= 128;
 }
@@ -58,11 +58,8 @@ absl::Status SecurityOSStatusToAbslStatus(OSStatus status) {
   return absl::Status(OSStatusToAbslStatusCode(status), msg.UTF8String);
 }
 
-}  // namespace keychain_utils
-
-std::unique_ptr<KeychainManager> KeychainManager::Create(NSString *service,
-                                                         SecPreferencesDomain domain) {
-  if (!keychain_utils::IsValidServiceName(service)) {
+std::unique_ptr<Manager> Manager::Create(NSString *service, SecPreferencesDomain domain) {
+  if (!IsValidServiceName(service)) {
     return nullptr;
   }
 
@@ -76,27 +73,27 @@ std::unique_ptr<KeychainManager> KeychainManager::Create(NSString *service,
     return nullptr;
   }
 
-  return std::make_unique<KeychainManager>(service, keychain);
+  return std::make_unique<Manager>(service, keychain);
 }
 
-KeychainManager::KeychainManager(NSString *service, SecKeychainRef keychain)
+Manager::Manager(NSString *service, SecKeychainRef keychain)
     : service_(service), keychain_(keychain) {
   assert(keychain_ != nullptr);
 }
 
-KeychainManager::~KeychainManager() {
+Manager::~Manager() {
   if (keychain_ != nullptr) {
     CFRelease(keychain_);
   }
 }
 
-KeychainManager::KeychainManager(KeychainManager &&other)
+Manager::Manager(Manager &&other)
     : service_(std::move(other.service_)), keychain_(other.keychain_) {
   other.service_ = nil;
   other.keychain_ = nullptr;
 }
 
-KeychainManager &KeychainManager::operator=(KeychainManager &&other) {
+Manager &Manager::operator=(Manager &&other) {
   if (this != &other) {
     if (keychain_ != nullptr) {
       CFRelease(keychain_);
@@ -111,36 +108,34 @@ KeychainManager &KeychainManager::operator=(KeychainManager &&other) {
   return *this;
 }
 
-std::unique_ptr<KeychainItem> KeychainManager::CreateItem(NSString *account,
-                                                          NSString *description) {
-  if (!keychain_utils::IsValidAccountName(account)) {
+std::unique_ptr<Item> Manager::CreateItem(NSString *account, NSString *description) {
+  if (!IsValidAccountName(account)) {
     LOGE(@"Invalid account name for keychain item: %@", account);
     return nullptr;
   }
 
-  if (!keychain_utils::IsValidDescription(description)) {
+  if (!IsValidDescription(description)) {
     LOGE(@"Invalid description for keychain item: %@", description);
     return nullptr;
   }
 
-  return std::make_unique<KeychainItem>(service_, account, description, keychain_);
+  return std::make_unique<Item>(service_, account, description, keychain_);
 }
 
-KeychainItem::KeychainItem(NSString *service, NSString *account, NSString *description,
-                           SecKeychainRef keychain)
+Item::Item(NSString *service, NSString *account, NSString *description, SecKeychainRef keychain)
     : service_(service), account_(account), description_(description), keychain_(keychain) {
   assert(keychain_ != nullptr);
   // Retain the keychain reference for ourselves
   CFRetain(keychain_);
 }
 
-KeychainItem::~KeychainItem() {
+Item::~Item() {
   if (keychain_ != nullptr) {
     CFRelease(keychain_);
   }
 }
 
-absl::Status KeychainItem::Store(NSData *data) {
+absl::Status Item::Store(NSData *data) {
   if (data.length == 0) {
     return absl::ErrnoToStatus(EINVAL, "No data to store");
   }
@@ -167,13 +162,13 @@ absl::Status KeychainItem::Store(NSData *data) {
 
   OSStatus status = SecItemAdd((__bridge CFDictionaryRef)attributes, NULL);
   if (status != errSecSuccess) {
-    return keychain_utils::SecurityOSStatusToAbslStatus(status);
+    return SecurityOSStatusToAbslStatus(status);
   }
 
   return absl::OkStatus();
 }
 
-absl::Status KeychainItem::Delete() {
+absl::Status Item::Delete() {
   NSDictionary *query = @{
     (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword,
     (__bridge id)kSecAttrService : service_,
@@ -186,13 +181,13 @@ absl::Status KeychainItem::Delete() {
 
   // Don't consider it an error if the item didn't exist
   if (status != errSecSuccess && status != errSecItemNotFound) {
-    return keychain_utils::SecurityOSStatusToAbslStatus(status);
+    return SecurityOSStatusToAbslStatus(status);
   }
 
   return absl::OkStatus();
 }
 
-absl::StatusOr<NSData *> KeychainItem::Get() {
+absl::StatusOr<NSData *> Item::Get() {
   NSDictionary *query = @{
     (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword,
     (__bridge id)kSecAttrService : service_,
@@ -206,10 +201,11 @@ absl::StatusOr<NSData *> KeychainItem::Get() {
   OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
 
   if (status != errSecSuccess) {
-    return keychain_utils::SecurityOSStatusToAbslStatus(status);
+    return SecurityOSStatusToAbslStatus(status);
   }
 
   return CFBridgingRelease(result);
 }
 
+}  // namespace keychain
 }  // namespace santa
