@@ -23,9 +23,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/arena.h"
-#include "sync/v1.pb.h"
 
-namespace syncv1 = ::santa::sync::v1;
 namespace pbv1 = ::santa::cel::v1;
 
 @interface CELTest : XCTestCase

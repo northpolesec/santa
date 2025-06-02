@@ -56,7 +56,6 @@ objc_library(
         "@cel-cpp//eval/public/structs:cel_proto_wrapper",
         "@cel-cpp//internal:status_macros",
         "@cel-cpp//parser",
-        "@northpolesec_protos//sync:v1_cc_proto",
     ],
 )
 
@@ -68,6 +67,5 @@ santa_unit_test(
         ":cel_cc_proto",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
-        "@northpolesec_protos//sync:v1_cc_proto",
     ],
 )
