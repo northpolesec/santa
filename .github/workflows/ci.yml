@@ -10,6 +10,7 @@ on:
       - BUILD
       - helper.bzl
       - non_module_deps.bzl
+      - .github/**
 
 jobs:
   lint:
@@ -34,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@90b352333885f9fb6bf262d8e659f01b6219cc25 # ratchet:bazel-contrib/setup-bazel@0.9.0
+        uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8 # ratchet:bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true
           disk-cache: ${{ matrix.os }}
@@ -64,22 +65,10 @@ jobs:
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@90b352333885f9fb6bf262d8e659f01b6219cc25 # ratchet:bazel-contrib/setup-bazel@0.9.0
+        uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8 # ratchet:bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true
           disk-cache: ${{ matrix.os }}
           repository-cache: true
       - name: Run All Tests
         run: bazel test :unit_tests --define=SANTA_BUILD_TYPE=adhoc --test_output=errors
-# test_coverage:
-#   runs-on: macos-14
-#   steps:
-#     - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
-#     - name: Generate test coverage
-#       run: sh ./generate_cov.sh
-#     - name: Coveralls
-#       uses: coverallsapp/github-action@09b709cf6a16e30b0808ba050c7a6e8a5ef13f8d # ratchet:coverallsapp/github-action@master
-#       with:
-#         github-token: ${{ secrets.GITHUB_TOKEN }}
-#         path-to-lcov: ./bazel-out/_coverage/_coverage_report.dat
-#         flag-name: Unit
