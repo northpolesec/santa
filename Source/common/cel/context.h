@@ -34,8 +34,8 @@ namespace pbv1 = ::santa::cel::v1;
 namespace santa {
 namespace cel {
 
-// SantaActivation is a CEL activation that provides lookups of values from the santa.pb.cel.v1.Context message,
-// and easy access to variables for return values.
+// SantaActivation is a CEL activation that provides lookups of values from the
+// santa.pb.cel.v1.Context message, and easy access to variables for return values.
 class SantaActivation : public ::cel_runtime::BaseActivation {
  public:
   SantaActivation(const ::pbv1::FileContext *file, std::vector<std::string> (^args)(),
