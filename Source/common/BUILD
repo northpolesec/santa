@@ -219,6 +219,31 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "Keychain",
+    srcs = ["Keychain.mm"],
+    hdrs = ["Keychain.h"],
+    sdk_frameworks = [
+        "Security",
+    ],
+    deps = [
+        ":SNTLogging",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+santa_unit_test(
+    name = "KeychainTest",
+    srcs = ["KeychainTest.mm"],
+    deps = [
+        ":Keychain",
+        ":TestUtils",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+objc_library(
     name = "TelemetryEventMap",
     srcs = ["TelemetryEventMap.mm"],
     hdrs = ["TelemetryEventMap.h"],
