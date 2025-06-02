@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CEL_H
-#define SANTA__COMMON__CEL_H
+#ifndef SANTA__COMMON__CEL__EVALUATOR_H
+#define SANTA__COMMON__CEL__EVALUATOR_H
 
 #include <memory>
 
@@ -73,4 +73,4 @@ class Evaluator {
 }  // namespace cel
 }  // namespace santa
 
-#endif  // SANTA__COMMON__CEL_H
+#endif  // SANTA__COMMON__CEL__EVALUATOR_H

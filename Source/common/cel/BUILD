@@ -28,6 +28,7 @@ objc_library(
         "context.h",
         "context.mm",
         "evaluator.mm",
+        "memoizer.h",
     ],
     hdrs = ["evaluator.h"],
     deps = [

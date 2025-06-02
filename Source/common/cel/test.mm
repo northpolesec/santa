@@ -12,6 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#include "Source/common/cel/context.h"
 #include "Source/common/cel/evaluator.h"
 
 #import <Foundation/Foundation.h>
@@ -126,6 +127,29 @@ namespace pbv1 = ::santa::cel::v1;
     } else {
       XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
     }
+  }
+  {
+    // Test memoization
+    __block int argsCallCount = 0;
+    santa::cel::SantaActivation activation(
+        f,
+        ^std::vector<std::string>() {
+          argsCallCount++;
+          return {"hello", "world"};
+        },
+        ^std::vector<std::string>() {
+          argsCallCount++;
+          return {"DYLD_INSERT_LIBRARIES=1"};
+        });
+
+    auto result = sut.value()->CompileAndEvaluate(
+        "args[0] == 'foo' || args[0] == 'bar' || args[0] == 'hello'", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
+    }
+    XCTAssertEqual(argsCallCount, 1);
   }
 }
 

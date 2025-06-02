@@ -12,13 +12,13 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CELCONTEXT_H
-#define SANTA__COMMON__CELCONTEXT_H
+#ifndef SANTA__COMMON__CEL__CONTEXT_H
+#define SANTA__COMMON__CEL__CONTEXT_H
 
 #include "Source/common/cel/cel.pb.h"
+#include "Source/common/cel/memoizer.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 // CEL headers have warnings and our config turns them into errors.
 // For some reason these can't be disabled with --per_file_copt.
@@ -57,8 +57,8 @@ class SantaActivation : public ::cel_runtime::BaseActivation {
 
  private:
   const ::santa::cel::v1::FileContext *file_;
-  std::vector<std::string> (^args_)();
-  std::vector<std::string> (^envs_)();
+  Memoizer<std::vector<std::string>> args_;
+  Memoizer<std::vector<std::string>> envs_;
 
   static cel_runtime::CelValue CELValueFromVector(const std::vector<std::string> &v,
                                                   google::protobuf::Arena *arena);

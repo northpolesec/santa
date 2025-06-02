@@ -46,9 +46,9 @@ absl::optional<cel_runtime::CelValue> SantaActivation::FindValue(
   // Handle the fields from the CELContext message.
   if (name == "file" && file_ != nullptr) {
     return cel_runtime::CelProtoWrapper::CreateMessage(file_, arena);
-  } else if (name == "args" && args_ != nullptr) {
+  } else if (name == "args") {
     return CELValueFromVector(args_(), arena);
-  } else if (name == "envs" && envs_ != nullptr) {
+  } else if (name == "envs") {
     return CELValueFromVector(envs_(), arena);
   }
 
