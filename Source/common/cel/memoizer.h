@@ -23,14 +23,16 @@ namespace cel {
 
 // Memoizer is a template class that memoizes the result of a function call that
 // requires no arguments to avoid expensive recalculations.
-template<typename T> class Memoizer {
+template <typename T>
+class Memoizer {
  public:
   // Constructor takes the function to be memoized
   Memoizer(std::function<T()> func) : func_(func) {}
 
   // Overload the operator() to enable calling the Memoizer like a function
-  // Mark this as const to allow it to be called from const methods. It technically
-  // isn't const given that cache_ is updated but we mark that field as mutable.
+  // Mark this as const to allow it to be called from const methods. It
+  // technically isn't const given that cache_ is updated but we mark that field
+  // as mutable.
   T operator()() const {
     if (cache_.has_value()) {
       return cache_.value();
