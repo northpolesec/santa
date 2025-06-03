@@ -300,6 +300,10 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
   return self.signingInformation[(__bridge NSString *)kSecCodeInfoEntitlementsDict];
 }
 
+- (NSDate *)signingTimestamp {
+  return self.signingInformation[(__bridge NSString *)kSecCodeInfoTimestamp];
+}
+
 - (BOOL)signingInformationMatches:(MOLCodesignChecker *)otherChecker {
   return [self.certificates isEqual:otherChecker.certificates];
 }

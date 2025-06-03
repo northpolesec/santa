@@ -50,6 +50,7 @@ static NSString *const kTeamID = @"Team ID";
 static NSString *const kSigningID = @"Signing ID";
 static NSString *const kCDHash = @"CDHash";
 static NSString *const kEntitlements = @"Entitlements";
+static NSString *const kSigningTimestamp = @"Signing Timestamp";
 
 // signing chain keys
 static NSString *const kCommonName = @"Common Name";
@@ -138,6 +139,7 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock universalSigningChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock entitlements;
+@property(readonly, copy, nonatomic) SNTAttributeBlock signingTimestamp;
 
 // Mapping between property string keys and SNTAttributeBlocks
 @property(nonatomic) NSDictionary<NSString *, SNTAttributeBlock> *propertyMap;
@@ -230,6 +232,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     kType,
     kPageZero,
     kCodeSigned,
+    kSigningTimestamp,
     kRule,
     kEntitlements,
     kSigningChain,
@@ -269,6 +272,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kSigningID : self.signingID,
       kCDHash : self.cdhash,
       kEntitlements : self.entitlements,
+      kSigningTimestamp : self.signingTimestamp,
     };
 
     _printQueue =
@@ -533,6 +537,13 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
     MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
     return csc.entitlements ?: @{};
+  };
+}
+
+- (SNTAttributeBlock)signingTimestamp {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+    return [cmd.dateFormatter stringFromDate:csc.signingTimestamp];
   };
 }
 

@@ -164,6 +164,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     cd.sha256 = binInfo.SHA256;
     cd.signingID = FormatSigningID(csInfo);
     cd.cdhash = csInfo.cdhash;
+    cd.signingTimestamp = csInfo.signingTimestamp;
     cd.signingStatus = IsDevelopmentCert(csInfo.leafCertificate) ? SNTSigningStatusDevelopment
                                                                  : SNTSigningStatusProduction;
 

@@ -35,6 +35,7 @@ SNTStoredEvent *StoredEventFromFileInfo(SNTFileInfo *fileInfo) {
   se.teamID = cs.teamID;
   se.signingID = FormatSigningID(cs);
   se.entitlements = cs.entitlements;
+  se.signingTimestamp = cs.signingTimestamp;
   if (cs.signatureFlags & kSecCodeSignatureAdhoc) {
     se.signingStatus = SNTSigningStatusAdhoc;
   } else if (IsDevelopmentCert(cs.leafCertificate)) {

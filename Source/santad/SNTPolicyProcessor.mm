@@ -226,6 +226,8 @@ static void UpdateCachedDecisionSigningInfo(
     cd.entitlements = [entitlements sntDeepCopy];
     cd.entitlementsFiltered = NO;
   }
+
+  cd.signingTimestamp = csInfo.signingTimestamp;
 }
 
 - (nonnull SNTCachedDecision *)

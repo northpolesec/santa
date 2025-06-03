@@ -83,6 +83,13 @@
 /** The entitlements encoded in this binary. */
 @property(readonly) NSDictionary *entitlements;
 
+/** The timestamp of when the binary was signed.
+
+  This timestamp is the secure timestamp that was certified by Apple's timestamp
+  authority service and can be trusted.
+*/
+@property(readonly) NSDate *signingTimestamp;
+
 /**
   Designated initializer
 

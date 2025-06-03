@@ -15,7 +15,7 @@ bazel_dep(name = "xxhash", version = "0.8.2")
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    commit = "f4587ecd0c2e34c2bc764da56838cfa22d5f19b4",
+    commit = "126060741a2b6d7bb4fa439869fbf35c39aadeb6",
     remote = "https://github.com/northpolesec/protos",
 )
 

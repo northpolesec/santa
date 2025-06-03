@@ -200,6 +200,7 @@ using santa::NSStringToUTF8StringView;
   e->set_signing_id(NSStringToUTF8String(event.signingID));
   e->set_cdhash(NSStringToUTF8String(event.cdhash));
   e->set_cs_flags(event.codesigningFlags);
+  e->set_signing_timestamp([event.signingTimestamp timeIntervalSince1970]);
 
   switch (event.signingStatus) {
     case SNTSigningStatusUnsigned: e->set_signing_status(::pbv1::SIGNING_STATUS_UNSIGNED); break;
