@@ -19,6 +19,7 @@
 #include <memory>
 
 #include "Source/common/RingBuffer.h"
+#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -132,6 +133,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
 
   std::unique_ptr<::Logger> logger = Logger::Create(
       esapi, syncd_queue,
+      ^SNTExportConfiguration *() {
+        return [configurator exportConfig];
+      },
       TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
       [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
       [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,

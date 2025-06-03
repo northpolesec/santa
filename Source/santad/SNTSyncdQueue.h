@@ -16,6 +16,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 
+@class SNTExportConfiguration;
 @class SNTStoredEvent;
 @class MOLXPCConnection;
 
@@ -27,6 +28,7 @@
 - (void)addEvents:(NSArray<SNTStoredEvent *> *)events isFromBundle:(BOOL)isFromBundle;
 - (void)addBundleEvent:(SNTStoredEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
 - (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
+                     config:(SNTExportConfiguration *)config
           completionHandler:(void (^)(BOOL))completionHandler;
 
 @end

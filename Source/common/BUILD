@@ -354,6 +354,7 @@ objc_library(
     ],
     deps = [
         ":SNTCommonEnums",
+        ":SNTExportConfiguration",
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
@@ -388,6 +389,7 @@ objc_library(
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
+        ":SNTLogging",
     ],
 )
 

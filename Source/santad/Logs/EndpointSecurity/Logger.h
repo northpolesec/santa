@@ -32,6 +32,7 @@
 #import "Source/santad/SNTDecisionCache.h"
 
 // Forward declarations
+@class SNTExportConfiguration;
 @class SNTStoredEvent;
 @class SNTSyncdQueue;
 namespace santa {
@@ -40,19 +41,20 @@ class LoggerPeer;
 
 namespace santa {
 
+using GetExportConfigBlock = SNTExportConfiguration * (^)(void);
+
 class Logger : public Timer<Logger> {
  public:
-  static std::unique_ptr<Logger> Create(std::shared_ptr<santa::EndpointSecurityAPI> esapi,
-                                        SNTSyncdQueue *syncd_queue, TelemetryEvent telemetry_mask,
-                                        SNTEventLogType log_type, SNTDecisionCache *decision_cache,
-                                        NSString *event_log_path, NSString *spool_log_path,
-                                        size_t spool_dir_size_threshold,
-                                        size_t spool_file_size_threshold,
-                                        uint64_t spool_flush_timeout_ms,
-                                        uint32_t telemetry_export_seconds);
+  static std::unique_ptr<Logger> Create(
+      std::shared_ptr<santa::EndpointSecurityAPI> esapi, SNTSyncdQueue *syncd_queue,
+      GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
+      SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
+      NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
+      uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds);
 
-  Logger(SNTSyncdQueue *syncd_queue, TelemetryEvent telemetry_mask,
-         std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer);
+  Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock getExportConfigBlock,
+         TelemetryEvent telemetry_mask, std::shared_ptr<santa::Serializer> serializer,
+         std::shared_ptr<santa::Writer> writer);
 
   virtual ~Logger() = default;
 
@@ -89,6 +91,7 @@ class Logger : public Timer<Logger> {
   void ExportTelemetrySerialized();
 
   SNTSyncdQueue *syncd_queue_;
+  GetExportConfigBlock get_export_config_block_;
   TelemetryEvent telemetry_mask_;
   std::shared_ptr<santa::Serializer> serializer_;
   std::shared_ptr<santa::Writer> writer_;
