@@ -374,7 +374,8 @@ static NSString *const kPrinterProxyPostMonterey =
     se.parentName = @(esMsg.ParentProcessName().c_str());
     se.entitlements = cd.entitlements;
     se.entitlementsFiltered = cd.entitlementsFiltered;
-    se.signingTimestamp = cd.signingTimestamp;
+    se.secureTimestamp = cd.secureTimestamp;
+    se.insecureTimestamp = cd.insecureTimestamp;
 
     // Bundle data
     se.fileBundleID = [binInfo bundleIdentifier];

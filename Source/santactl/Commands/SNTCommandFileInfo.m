@@ -50,7 +50,8 @@ static NSString *const kTeamID = @"Team ID";
 static NSString *const kSigningID = @"Signing ID";
 static NSString *const kCDHash = @"CDHash";
 static NSString *const kEntitlements = @"Entitlements";
-static NSString *const kSigningTimestamp = @"Signing Timestamp";
+static NSString *const kSecureTimestamp = @"Secure Timestamp";
+static NSString *const kInsecureTimestamp = @"Insecure Timestamp";
 
 // signing chain keys
 static NSString *const kCommonName = @"Common Name";
@@ -139,7 +140,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock universalSigningChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock entitlements;
-@property(readonly, copy, nonatomic) SNTAttributeBlock signingTimestamp;
+@property(readonly, copy, nonatomic) SNTAttributeBlock secureTimestamp;
+@property(readonly, copy, nonatomic) SNTAttributeBlock insecureTimestamp;
 
 // Mapping between property string keys and SNTAttributeBlocks
 @property(nonatomic) NSDictionary<NSString *, SNTAttributeBlock> *propertyMap;
@@ -232,7 +234,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     kType,
     kPageZero,
     kCodeSigned,
-    kSigningTimestamp,
+    kSecureTimestamp,
+    kInsecureTimestamp,
     kRule,
     kEntitlements,
     kSigningChain,
@@ -272,7 +275,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kSigningID : self.signingID,
       kCDHash : self.cdhash,
       kEntitlements : self.entitlements,
-      kSigningTimestamp : self.signingTimestamp,
+      kSecureTimestamp : self.secureTimestamp,
+      kInsecureTimestamp : self.insecureTimestamp,
     };
 
     _printQueue =
@@ -540,10 +544,17 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   };
 }
 
-- (SNTAttributeBlock)signingTimestamp {
+- (SNTAttributeBlock)secureTimestamp {
   return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
     MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
-    return [cmd.dateFormatter stringFromDate:csc.signingTimestamp];
+    return [cmd.dateFormatter stringFromDate:csc.secureTimestamp] ?: @"None";
+  };
+}
+
+- (SNTAttributeBlock)insecureTimestamp {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+    return [cmd.dateFormatter stringFromDate:csc.insecureTimestamp] ?: @"None";
   };
 }
 

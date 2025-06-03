@@ -88,7 +88,15 @@
   This timestamp is the secure timestamp that was certified by Apple's timestamp
   authority service and can be trusted.
 */
-@property(readonly) NSDate *signingTimestamp;
+@property(readonly) NSDate *secureTimestamp;
+
+/**
+  The timestamp of when the binary was signed.
+
+  This timestamp is the insecure timestamp provided by the developer during
+  signing. It has not been validated and could be spoofed.
+*/
+@property(readonly) NSDate *insecureTimestamp;
 
 /**
   Designated initializer

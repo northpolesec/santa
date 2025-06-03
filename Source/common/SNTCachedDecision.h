@@ -45,7 +45,8 @@
 @property BOOL entitlementsFiltered;
 @property uint32_t codesigningFlags;
 @property SNTSigningStatus signingStatus;
-@property NSDate *signingTimestamp;
+@property NSDate *secureTimestamp;
+@property NSDate *insecureTimestamp;
 
 @property NSString *quarantineURL;
 
