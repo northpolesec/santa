@@ -124,6 +124,7 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:String",
+        "//Source/common/cel:CEL",
         "@northpolesec_protos//sync:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
     ],

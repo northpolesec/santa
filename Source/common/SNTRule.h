@@ -82,7 +82,8 @@
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
                          customMsg:(NSString *)customMsg
-                         customURL:(NSString *)customURL;
+                         customURL:(NSString *)customURL
+                           celExpr:(NSString *)celExpr;
 
 ///
 ///  Initialize with a default timestamp: current time if rule state is transitive, 0 otherwise.

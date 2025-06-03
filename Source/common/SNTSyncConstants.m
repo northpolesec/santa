@@ -127,6 +127,7 @@ NSString *const kRulePolicyBlocklistDeprecated = @"BLACKLIST";
 NSString *const kRulePolicySilentBlocklist = @"SILENT_BLOCKLIST";
 NSString *const kRulePolicySilentBlocklistDeprecated = @"SILENT_BLACKLIST";
 NSString *const kRulePolicyRemove = @"REMOVE";
+NSString *const kRulePolicyCEL = @"CEL";
 NSString *const kRuleType = @"rule_type";
 NSString *const kRuleTypeBinary = @"BINARY";
 NSString *const kRuleTypeCertificate = @"CERTIFICATE";
@@ -136,6 +137,7 @@ NSString *const kRuleTypeCDHash = @"CDHASH";
 NSString *const kRuleCustomMsg = @"custom_msg";
 NSString *const kRuleCustomURL = @"custom_url";
 NSString *const kRuleComment = @"comment";
+NSString *const kRuleCELExpr = @"cel_expr";
 NSString *const kCursor = @"cursor";
 
 NSString *const kBackoffInterval = @"backoff";
