@@ -226,6 +226,9 @@ static void UpdateCachedDecisionSigningInfo(
     cd.entitlements = [entitlements sntDeepCopy];
     cd.entitlementsFiltered = NO;
   }
+
+  cd.secureTimestamp = csInfo.secureTimestamp;
+  cd.insecureTimestamp = csInfo.insecureTimestamp;
 }
 
 - (nonnull SNTCachedDecision *)
