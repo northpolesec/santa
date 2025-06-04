@@ -60,17 +60,17 @@ REGISTER_COMMAND_NAME(@"checkcache")
       checkCacheForVnodeID:vnodeID
                  withReply:^(SNTAction action) {
                    if (action == SNTActionRespondAllow) {
-                     LOGI(@"File exists in [allowlist] cache");
+                     TEE_LOGI(@"File exists in [allowlist] cache");
                      exit(0);
                    } else if (action == SNTActionRespondDeny) {
-                     LOGI(@"File exists in [blocklist] cache");
+                     TEE_LOGI(@"File exists in [blocklist] cache");
                      exit(0);
                    } else if (action == SNTActionRespondAllowCompiler) {
-                     LOGI(@"File exists in [allowlist compiler] cache");
+                     TEE_LOGI(@"File exists in [allowlist compiler] cache");
                      exit(0);
                    } else if (action == SNTActionUnset) {
-                     LOGE(@"File does not exist in cache");
-                     exit(1);
+                     TEE_LOGI(@"File does not exist in cache");
+                     exit(0);
                    }
                  }];
 }

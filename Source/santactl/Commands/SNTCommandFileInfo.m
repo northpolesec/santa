@@ -5,13 +5,13 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
@@ -50,6 +50,8 @@ static NSString *const kTeamID = @"Team ID";
 static NSString *const kSigningID = @"Signing ID";
 static NSString *const kCDHash = @"CDHash";
 static NSString *const kEntitlements = @"Entitlements";
+static NSString *const kSecureTimestamp = @"Secure Timestamp";
+static NSString *const kInsecureTimestamp = @"Insecure Timestamp";
 
 // signing chain keys
 static NSString *const kCommonName = @"Common Name";
@@ -138,6 +140,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock universalSigningChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock entitlements;
+@property(readonly, copy, nonatomic) SNTAttributeBlock secureTimestamp;
+@property(readonly, copy, nonatomic) SNTAttributeBlock insecureTimestamp;
 
 // Mapping between property string keys and SNTAttributeBlocks
 @property(nonatomic) NSDictionary<NSString *, SNTAttributeBlock> *propertyMap;
@@ -189,6 +193,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           @"                    -1 down to -n-1 for the root certificate down to the leaf\n"
           @"                  Incompatible with --bundleinfo."
           @"\n"
+          @"    --localtz: Use timestamps in the local timezone for all dates, instead of UTC.\n"
           @"    --filter: Use predicates of the form 'key=regex' to filter out which files\n"
           @"              are displayed. Valid keys are the same as for --key. Value is a\n"
           @"              case-insensitive regular expression which must match anywhere in\n"
@@ -230,6 +235,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     kType,
     kPageZero,
     kCodeSigned,
+    kSecureTimestamp,
+    kInsecureTimestamp,
     kRule,
     kEntitlements,
     kSigningChain,
@@ -247,6 +254,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   if (self) {
     _dateFormatter = [[NSDateFormatter alloc] init];
     _dateFormatter.dateFormat = @"yyyy/MM/dd HH:mm:ss Z";
+    _dateFormatter.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
 
     _propertyMap = @{
       kPath : self.path,
@@ -269,6 +277,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kSigningID : self.signingID,
       kCDHash : self.cdhash,
       kEntitlements : self.entitlements,
+      kSecureTimestamp : self.secureTimestamp,
+      kInsecureTimestamp : self.insecureTimestamp,
     };
 
     _printQueue =
@@ -536,6 +546,20 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   };
 }
 
+- (SNTAttributeBlock)secureTimestamp {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+    return [cmd.dateFormatter stringFromDate:csc.secureTimestamp] ?: @"None";
+  };
+}
+
+- (SNTAttributeBlock)insecureTimestamp {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+    return [cmd.dateFormatter stringFromDate:csc.insecureTimestamp] ?: @"None";
+  };
+}
+
 #pragma mark -
 
 // Entry point for the command.
@@ -597,7 +621,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   BOOL isDir = NO, isBundle = NO;
   if (![fm fileExistsAtPath:path isDirectory:&isDir]) {
     dispatch_group_async(self.printGroup, self.printQueue, ^{
-      fprintf(stderr, "File does not exist: %s\n", [path UTF8String]);
+      TEE_LOGE(@"File does not exist: %@", path);
     });
     return;
   }
@@ -652,8 +676,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     }
   } else if (isDir && !isBundle) {
     dispatch_group_async(self.printGroup, self.printQueue, ^{
-      fprintf(stderr, "%s is a directory.  Use the -r flag to search recursively.\n",
-              [path UTF8String]);
+      TEE_LOGE(@"%@ is a directory.  Use the -r flag to search recursively.", path);
     });
   } else {
     [operationQueue addOperationWithBlock:^{
@@ -691,7 +714,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   SNTFileInfo *fileInfo = [[SNTFileInfo alloc] initWithPath:path];
   if (!fileInfo) {
     dispatch_group_async(self.printGroup, self.printQueue, ^{
-      fprintf(stderr, "Invalid or empty file: %s\n", [path UTF8String]);
+      TEE_LOGE(@"Invalid or empty file: %@", path);
     });
     return;
   }
@@ -708,12 +731,12 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     if (index < 0) {
       index = (int)signingChain.count - -(index);
       if (index < 0) {
-        fprintf(stderr, "Invalid --cert-index: %d\n", index);
+        TEE_LOGE(@"Invalid --cert-index: %d\n", index);
         return;
       }
     } else {
       if (index >= (int)signingChain.count) {
-        fprintf(stderr, "Invalid --cert-index: %d\n", index);
+        TEE_LOGE(@"Invalid --cert-index: %d", index);
         return;
       }
     }
@@ -788,8 +811,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       int secondsToWait = 30;
       if (dispatch_semaphore_wait(sema,
                                   dispatch_time(DISPATCH_TIME_NOW, secondsToWait * NSEC_PER_SEC))) {
-        fprintf(stderr, "The bundle service did not finish collecting hashes within %d seconds\n",
-                secondsToWait);
+        TEE_LOGE(@"The bundle service did not finish collecting hashes within %d seconds\n",
+                 secondsToWait);
       }
 
       outputDict[kBundleInfo] = bundleInfo;
@@ -929,6 +952,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       self.enableEntitlements = YES;
     } else if ([arg caseInsensitiveCompare:@"--filter-inclusive"] == NSOrderedSame) {
       self.filterInclusive = YES;
+    } else if ([arg caseInsensitiveCompare:@"--localtz"] == NSOrderedSame) {
+      self.dateFormatter.timeZone = [NSTimeZone localTimeZone];
     } else {
       [paths addObject:arg];
     }

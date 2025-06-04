@@ -194,4 +194,18 @@
 ///
 @property BOOL entitlementsFiltered;
 
+///
+/// The timestamp of when the binary was signed. This timestamp is the secure
+/// timestamp that was certified by Apple's timestamp authority service and can
+/// be trusted.
+///
+@property NSDate *secureTimestamp;
+
+///
+/// The timestamp of when the binary was signed. This timestamp is the insecure
+/// timestamp provided by the developer during signing. It has not been validated
+/// and could be spoofed.
+///
+@property NSDate *insecureTimestamp;
+
 @end

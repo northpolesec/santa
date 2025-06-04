@@ -5,13 +5,13 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTFileInfo.h"
@@ -50,10 +50,10 @@ REGISTER_COMMAND_NAME(@"bundleinfo")
   NSError *error;
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:arguments.firstObject error:&error];
   if (!fi) {
-    printf("%s\n", error.description.UTF8String);
+    TEE_LOGE(@"%@", error.description);
     exit(1);
   } else if (!fi.bundle) {
-    printf("Not a bundle\n");
+    TEE_LOGE(@"Not a bundle");
     exit(2);
   }
 

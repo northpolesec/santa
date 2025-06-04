@@ -119,13 +119,6 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
       defaultValue: false,
     },
     {
-      key: "EnableDebugLogging",
-      description: `If true, the client will log additional debug messages to the Apple Unified Log. For example,
-        transitive rule creation logs can be viewed with \`log stream --predicate 'sender=="com.northpolesec.santa.daemon"'\``,
-      type: "bool",
-      defaultValue: false,
-    },
-    {
       key: "EnableStatsCollection",
       description: `If true, Santa will periodically collect and send basic, non-identifying stats to the maintainers
         at North Pole Security to help better support Santa. See Stats documentation for complete details`,

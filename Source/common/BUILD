@@ -219,6 +219,31 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "Keychain",
+    srcs = ["Keychain.mm"],
+    hdrs = ["Keychain.h"],
+    sdk_frameworks = [
+        "Security",
+    ],
+    deps = [
+        ":SNTLogging",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+santa_unit_test(
+    name = "KeychainTest",
+    srcs = ["KeychainTest.mm"],
+    deps = [
+        ":Keychain",
+        ":TestUtils",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+objc_library(
     name = "TelemetryEventMap",
     srcs = ["TelemetryEventMap.mm"],
     hdrs = ["TelemetryEventMap.h"],
@@ -342,6 +367,7 @@ objc_library(
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
+        ":SNTExportConfiguration",
     ],
 )
 
@@ -351,6 +377,25 @@ santa_unit_test(
     deps = [
         ":SNTCommonEnums",
         ":SNTConfigBundle",
+        ":SNTExportConfiguration",
+    ],
+)
+
+objc_library(
+    name = "SNTExportConfiguration",
+    srcs = ["SNTExportConfiguration.mm"],
+    hdrs = ["SNTExportConfiguration.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTCommonEnums",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTExportConfigurationTest",
+    srcs = ["SNTExportConfigurationTest.mm"],
+    deps = [
+        ":SNTExportConfiguration",
     ],
 )
 
@@ -393,9 +438,7 @@ objc_library(
 
 objc_library(
     name = "SNTLogging",
-    srcs = ["SNTLogging.m"],
     hdrs = ["SNTLogging.h"],
-    deps = [":SNTConfigurator"],
 )
 
 objc_library(
@@ -712,6 +755,7 @@ test_suite(
         ":SNTCachedDecisionTest",
         ":SNTConfigBundleTest",
         ":SNTConfiguratorTest",
+        ":SNTExportConfigurationTest",
         ":SNTFileInfoTest",
         ":SNTKVOManagerTest",
         ":SNTMetricSetTest",

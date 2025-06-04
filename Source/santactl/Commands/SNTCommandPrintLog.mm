@@ -1,10 +1,11 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -75,7 +76,7 @@ REGISTER_COMMAND_NAME(@"printlog")
     NSString *path = arguments[argIdx];
     int fd = open([path UTF8String], O_RDONLY);
     if (fd == -1) {
-      LOGE(@"Failed to open '%@': errno: %d: %s", path, errno, strerror(errno));
+      TEE_LOGE(@"Failed to open '%@': errno: %d: %s\n", path, errno, strerror(errno));
       continue;
     }
 
@@ -84,7 +85,7 @@ REGISTER_COMMAND_NAME(@"printlog")
     close(fd);
 
     if (!ret) {
-      LOGE(@"Failed to parse '%@'", path);
+      TEE_LOGE(@"Failed to parse '%@'\n", path);
       continue;
     }
 
@@ -102,7 +103,7 @@ REGISTER_COMMAND_NAME(@"printlog")
       const google::protobuf::Any &any = logBatch.records(i);
       ::pbv1::SantaMessage santaMsg;
       if (!any.UnpackTo(&santaMsg)) {
-        LOGE(@"Failed to unpack Any proto to SantaMessage in file '%@'", path);
+        TEE_LOGE(@"Failed to unpack Any proto to SantaMessage in file '%@\n", path);
         break;
       }
 
@@ -112,7 +113,7 @@ REGISTER_COMMAND_NAME(@"printlog")
 
       std::string json;
       if (!MessageToJsonString(santaMsg, &json, options).ok()) {
-        LOGE(@"Unable to convert message to JSON in file: '%@'", path);
+        TEE_LOGE(@"Unable to convert message to JSON in file: '%@'\n", path);
       }
       std::cout << json;
     }

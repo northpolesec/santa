@@ -84,7 +84,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
 
 - (void)runWithArguments:(NSArray *)arguments {
   if (![SNTConfigurator configurator].syncBaseURL) {
-    LOGE(@"Missing SyncBaseURL. Exiting.");
+    TEE_LOGE(@"Missing SyncBaseURL. Exiting.");
     exit(1);
   }
 
@@ -105,7 +105,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
 
   MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
   bs.invalidationHandler = ^(void) {
-    fprintf(stderr, "Failed to connect to the bundle service.\n");
+    TEE_LOGE(@"Failed to connect to the bundle service.");
     exit(1);
   };
   [bs resume];
@@ -114,7 +114,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
     NSError *error;
     SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path error:&error];
     if (!fi) {
-      fprintf(stderr, "Skipping %s: %s\n", path.UTF8String, error.description.UTF8String);
+      TEE_LOGE(@"Skipping %@: %@", path, error.description);
       continue;
     }
 
@@ -172,7 +172,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
 
   MOLXPCConnection *ss = [SNTXPCSyncServiceInterface configuredConnection];
   ss.invalidationHandler = ^(void) {
-    fprintf(stderr, "Failed to connect to the sync service.\n");
+    TEE_LOGE(@"Failed to connect to the sync service.");
     exit(1);
   };
   [ss resume];

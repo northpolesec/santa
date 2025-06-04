@@ -89,9 +89,9 @@ REGISTER_COMMAND_NAME(@"telemetry")
 
   [[self.daemonConn synchronousRemoteObjectProxy] exportTelemetryWithReply:^(BOOL success) {
     if (success) {
-      LOGI(@"Telemetry exported successfully.");
+      TEE_LOGI(@"Telemetry exported successfully.");
     } else {
-      LOGI(@"Telemetry export failed. Please consult logs for more information.");
+      TEE_LOGE(@"Telemetry export failed. Please consult logs for more information.");
     }
 
     dispatch_semaphore_signal(sema);
@@ -99,7 +99,7 @@ REGISTER_COMMAND_NAME(@"telemetry")
 
   if (dispatch_semaphore_wait(sema,
                               dispatch_time(DISPATCH_TIME_NOW, secondsToWait * NSEC_PER_SEC)) > 0) {
-    LOGW(@"Timed out waiting for export to complete.");
+    TEE_LOGW(@"Timed out waiting for export to complete.");
     exit(EXIT_FAILURE);
   }
 

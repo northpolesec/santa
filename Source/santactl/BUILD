@@ -16,6 +16,7 @@ objc_library(
     ],
     deps = [
         "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
     ],
 )

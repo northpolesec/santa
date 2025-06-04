@@ -5,13 +5,13 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import <CommonCrypto/CommonDigest.h>
 #import <Foundation/Foundation.h>
@@ -123,7 +123,7 @@ REGISTER_COMMAND_NAME(@"rule")
 #else
   ) {
 #endif
-    printf("(SyncBaseURL/StaticRules is set, rules are managed centrally.)\n");
+    TEE_LOGE(@"(SyncBaseURL/StaticRules is set, rules are managed centrally.)");
     exit(1);
   }
 
@@ -238,8 +238,7 @@ REGISTER_COMMAND_NAME(@"rule")
                  ruleCleanup:cleanupType
                       source:SNTRuleAddSourceSantactl
                        reply:^(NSError *error) {
-                         printf("Failed to delete rules: %s\n",
-                                error.localizedDescription.UTF8String);
+                         TEE_LOGE(@"Failed to delete rules: %@\n", error.localizedDescription);
                          exit(EXIT_FAILURE);
                        }];
     exit(EXIT_SUCCESS);
@@ -326,9 +325,7 @@ REGISTER_COMMAND_NAME(@"rule")
                     source:SNTRuleAddSourceSantactl
                      reply:^(NSError *error) {
                        if (error) {
-                         printf("Failed to modify rules: %s\n",
-                                [error.localizedDescription UTF8String]);
-                         LOGD(@"Failure reason: %@", error.localizedFailureReason);
+                         TEE_LOGE(@"Failed to modify rules: %@", error.localizedFailureReason);
                          exit(1);
                        } else {
                          NSString *ruleType;
@@ -509,9 +506,7 @@ REGISTER_COMMAND_NAME(@"rule")
                     source:SNTRuleAddSourceSantactl
                      reply:^(NSError *error) {
                        if (error) {
-                         printf("Failed to modify rules: %s",
-                                [error.localizedDescription UTF8String]);
-                         LOGD(@"Failure reason: %@", error.localizedFailureReason);
+                         TEE_LOGE(@"Failed to modify rules: %@", error.localizedFailureReason);
                          exit(1);
                        }
                        exit(0);
@@ -523,13 +518,12 @@ REGISTER_COMMAND_NAME(@"rule")
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
   [rop retrieveAllRules:^(NSArray<SNTRule *> *rules, NSError *error) {
     if (error) {
-      printf("Failed to get rules: %s\n", [error.localizedDescription UTF8String]);
-      LOGD(@"Failure reason: %@", error.localizedFailureReason);
+      TEE_LOGE(@"Failed to get rules: %@\n", error.localizedDescription);
       exit(1);
     }
 
     if (rules.count == 0) {
-      printf("No rules to export.\n");
+      TEE_LOGI(@"No rules to export.");
       exit(1);
     }
     // Convert Rules to an NSDictionary.
@@ -555,8 +549,7 @@ REGISTER_COMMAND_NAME(@"rule")
                                                          error:&error];
     // Print error
     if (error) {
-      printf("Failed to jsonify rules: %s", [error.localizedDescription UTF8String]);
-      LOGD(@"Failure reason: %@", error.localizedFailureReason);
+      TEE_LOGE(@"Failed to jsonify rules: %@", error.localizedDescription);
       exit(1);
     }
     // Write jsonData to the file

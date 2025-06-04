@@ -18,6 +18,7 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTExportConfiguration.h"
 
 @interface SNTConfigBundle (Testing)
 @property NSNumber *clientMode;
@@ -31,6 +32,7 @@
 @property NSNumber *enableAllEventUpload;
 @property NSNumber *disableUnknownEventUpload;
 @property NSString *overrideFileAccessAction;
+@property SNTExportConfiguration *exportConfiguration;
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
 @end
@@ -42,7 +44,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 13;
+  exp.expectedFulfillmentCount = 14;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -59,6 +61,8 @@
   bundle.overrideFileAccessAction = @"disable";
   bundle.fullSyncLastSuccess = nowDate;
   bundle.ruleSyncLastSuccess = nowDate;
+  bundle.exportConfiguration = [[SNTExportConfiguration alloc]
+      initWithAWSToken:[@"foo" dataUsingEncoding:NSUTF8StringEncoding]];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -112,6 +116,11 @@
 
   [bundle overrideFileAccessAction:^(NSString *val) {
     XCTAssertEqualObjects(val, @"disable");
+    [exp fulfill];
+  }];
+
+  [bundle exportConfiguration:^(SNTExportConfiguration *val) {
+    XCTAssertEqual(val.configType, SNTExportConfigurationTypeAWS);
     [exp fulfill];
   }];
 
@@ -187,6 +196,11 @@
 
   [bundle overrideFileAccessAction:^(NSString *val) {
     XCTAssertEqualObjects(val, @"disable");
+    [exp fulfill];
+  }];
+
+  [bundle exportConfiguration:^(SNTExportConfiguration *val) {
+    XCTAssertEqual(val.configType, SNTExportConfigurationTypeAWS);
     [exp fulfill];
   }];
 
