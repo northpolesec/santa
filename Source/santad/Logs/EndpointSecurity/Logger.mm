@@ -21,6 +21,7 @@
 #include <utility>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTExportConfiguration.h"
 #include "Source/common/SNTLogging.h"
 #include "Source/common/SNTStoredEvent.h"
 #include "Source/common/TelemetryEventMap.h"
@@ -53,59 +54,65 @@ static constexpr uint32_t kMinTelemetryExportIntervalSecs = 60;
 static constexpr uint32_t kMinTelemetryExportTimeoutSecs = kMinTelemetryExportIntervalSecs - 2;
 
 // Translate configured log type to appropriate Serializer/Writer pairs
-std::unique_ptr<Logger> Logger::Create(std::shared_ptr<EndpointSecurityAPI> esapi,
-                                       SNTSyncdQueue *syncd_queue, TelemetryEvent telemetry_mask,
-                                       SNTEventLogType log_type, SNTDecisionCache *decision_cache,
-                                       NSString *event_log_path, NSString *spool_log_path,
-                                       size_t spool_dir_size_threshold,
-                                       size_t spool_file_size_threshold,
-                                       uint64_t spool_flush_timeout_ms,
-                                       uint32_t telemetry_export_seconds) {
-  std::unique_ptr<Logger> logger;
+std::unique_ptr<Logger> Logger::Create(
+    std::shared_ptr<EndpointSecurityAPI> esapi, SNTSyncdQueue *syncd_queue,
+    GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
+    SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
+    NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
+    uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds) {
+  std::shared_ptr<santa::Serializer> serializer;
+  std::shared_ptr<santa::Writer> writer;
 
   switch (log_type) {
     case SNTEventLogTypeFilelog:
-      logger = std::make_unique<Logger>(
-          syncd_queue, telemetry_mask, BasicString::Create(esapi, std::move(decision_cache)),
-          File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
-                       kMaxExpectedWriteSizeBytes));
+      serializer = BasicString::Create(esapi, std::move(decision_cache));
+      writer = File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
+                            kMaxExpectedWriteSizeBytes);
       break;
     case SNTEventLogTypeSyslog:
-      logger = std::make_unique<Logger>(
-          syncd_queue, telemetry_mask, BasicString::Create(esapi, std::move(decision_cache), false),
-          Syslog::Create());
+      serializer = BasicString::Create(esapi, std::move(decision_cache), false);
+      writer = Syslog::Create();
       break;
     case SNTEventLogTypeNull:
-      logger =
-          std::make_unique<Logger>(syncd_queue, telemetry_mask, Empty::Create(), Null::Create());
+      serializer = Empty::Create();
+      writer = Null::Create();
       break;
     case SNTEventLogTypeProtobuf:
-      logger = std::make_unique<Logger>(
-          syncd_queue, telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache)),
-          Spool::Create([spool_log_path UTF8String], spool_dir_size_threshold,
-                        spool_file_size_threshold, spool_flush_timeout_ms));
+      serializer = Protobuf::Create(esapi, std::move(decision_cache));
+      writer = Spool::Create([spool_log_path UTF8String], spool_dir_size_threshold,
+                             spool_file_size_threshold, spool_flush_timeout_ms);
       break;
     case SNTEventLogTypeJSON:
-      logger = std::make_unique<Logger>(
-          syncd_queue, telemetry_mask, Protobuf::Create(esapi, std::move(decision_cache), true),
-          File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
-                       kMaxExpectedWriteSizeBytes));
+      serializer = Protobuf::Create(esapi, std::move(decision_cache), true);
+      writer = File::Create(event_log_path, kFlushBufferTimeoutMS, kBufferBatchSizeBytes,
+                            kMaxExpectedWriteSizeBytes);
       break;
     default: LOGE(@"Invalid log type: %ld", log_type); return nullptr;
   }
 
+  auto logger = std::make_unique<Logger>(syncd_queue, getExportConfigBlock, telemetry_mask,
+                                         std::move(serializer), std::move(writer));
   logger->SetTimerInterval(telemetry_export_seconds);
 
   return logger;
 }
 
-Logger::Logger(SNTSyncdQueue *syncd_queue, TelemetryEvent telemetry_mask,
-               std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer)
+Logger::Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock get_export_config_block,
+               TelemetryEvent telemetry_mask, std::shared_ptr<santa::Serializer> serializer,
+               std::shared_ptr<santa::Writer> writer)
     : Timer<Logger>(kMinTelemetryExportIntervalSecs),
       syncd_queue_(syncd_queue),
+      get_export_config_block_(get_export_config_block),
       telemetry_mask_(telemetry_mask),
       serializer_(std::move(serializer)),
       writer_(std::move(writer)) {
+  // Provide a default block instead of leaving nil
+  if (get_export_config_block_ == nil) {
+    get_export_config_block_ = ^SNTExportConfiguration *() {
+      return nil;
+    };
+  }
+
   export_queue_ = dispatch_queue_create("com.northpolesec.santa.daemon.export",
                                         DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
 }
@@ -126,6 +133,9 @@ void Logger::ExportTelemetry() {
 
 void Logger::ExportTelemetrySerialized() {
   dispatch_group_t group = dispatch_group_create();
+
+  // Get a copy of the current export config to be used for the entire export
+  SNTExportConfiguration *export_config = get_export_config_block_();
 
   // Track which files have been provided by the writer for exporting as well
   // as their export status so the writer can know which ones to clean up.
@@ -160,6 +170,7 @@ void Logger::ExportTelemetrySerialized() {
 
     dispatch_group_enter(group);
     [syncd_queue_ exportTelemetryFile:handle
+                               config:export_config
                     completionHandler:^(BOOL success) {
                       [handle closeFile];
                       files_exported.insert_or_assign(*file_to_export, success);

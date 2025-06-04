@@ -17,6 +17,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 
+@class SNTExportConfiguration;
 @class SNTRule;
 
 ///
@@ -526,6 +527,22 @@
 ///
 @property(nullable, readonly, nonatomic) NSString *statsOrganizationID;
 
+///
+///  If YES, enables bundle detection for blocked events.
+///  Its value is set by a sync server that supports bundles. Defaults to NO.
+///
+@property BOOL enableBundles;
+
+///
+///  Currently defined export configuration. Its value is set by a sync server.
+///
+@property(nullable, readonly) SNTExportConfiguration *exportConfig;
+
+///
+///  Set the export configuration as received from a sync server.
+///
+- (void)setSyncServerExportConfig:(nonnull SNTExportConfiguration *)exportConfig;
+
 #pragma mark - USB Settings
 
 ///
@@ -576,12 +593,6 @@
 ///  If set, this over-rides the default machine ID used for syncing.
 ///
 @property(nullable, readonly, nonatomic) NSString *machineID;
-
-///
-///  If YES, enables bundle detection for blocked events.
-///  Its value is set by a sync server that supports bundles. Defaults to NO.
-///
-@property BOOL enableBundles;
 
 #pragma mark Transitive Allowlist Settings
 

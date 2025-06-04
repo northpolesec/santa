@@ -25,6 +25,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTError.h"
+#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
@@ -318,6 +319,7 @@ double watchdogRAMPeak = 0;
 
   [result exportConfiguration:^(SNTExportConfiguration *val) {
     LOGD(@"Received export configuration: %@", val);
+    [configurator setSyncServerExportConfig:val];
   }];
 
   [result fullSyncLastSuccess:^(NSDate *val) {

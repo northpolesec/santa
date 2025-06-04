@@ -17,6 +17,7 @@
 
 #include <sys/stat.h>
 
+#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -182,6 +183,7 @@ static NSString *const kBlockedPathRegexKeyDeprecated = @"BlacklistRegex";
 static NSString *const kEnableAllEventUploadKey = @"EnableAllEventUpload";
 static NSString *const kOverrideFileAccessActionKey = @"OverrideFileAccessAction";
 static NSString *const kEnableBundlesKey = @"EnableBundles";
+static NSString *const kExportConfigurationKey = @"ExportConfiguration";
 
 // The keys managed by a sync server.
 static NSString *const kFullSyncLastSuccess = @"FullSyncLastSuccess";
@@ -231,6 +233,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kEnableAllEventUploadKey : number,
       kOverrideFileAccessActionKey : string,
       kEnableBundlesKey : number,
+      kExportConfigurationKey : data,
     };
     _forcedConfigKeyTypes = @{
       kClientModeKey : number,
@@ -691,6 +694,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self syncStateSet];
 }
 
++ (NSSet *)keyPathsForValuesAffectingExportConfig {
+  return [self syncStateSet];
+}
+
 #pragma mark Public Interface
 
 - (SNTClientMode)clientMode {
@@ -744,6 +751,13 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)setEnableBundles:(BOOL)enable {
   [self updateSyncStateForKey:kEnableBundlesKey value:@(enable)];
+}
+- (SNTExportConfiguration *)exportConfig {
+  return [SNTExportConfiguration deserialize:self.syncState[kExportConfigurationKey]];
+}
+
+- (void)setSyncServerExportConfig:(SNTExportConfiguration *)exportConfig {
+  [self updateSyncStateForKey:kExportConfigurationKey value:[exportConfig serialize]];
 }
 
 - (NSRegularExpression *)allowedPathRegex {

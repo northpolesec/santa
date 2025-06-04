@@ -45,4 +45,7 @@ typedef NS_ENUM(NSInteger, SNTExportConfigurationType) {
 - (instancetype)initWithAWSToken:(NSData *)token;
 - (instancetype)initWithGCPToken:(NSData *)token;
 
+- (NSData *)serialize;
++ (instancetype)deserialize:(NSData *)data;
+
 @end

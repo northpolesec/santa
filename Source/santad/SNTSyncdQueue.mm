@@ -19,6 +19,7 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
@@ -188,10 +189,12 @@
 }
 
 - (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
+                     config:(SNTExportConfiguration *)config
           completionHandler:(void (^)(BOOL))completionHandler {
   [self dispatchBlockOnSyncdQueue:^{
     if (self.syncConnection.isConnected) {
       [self.syncConnection.remoteObjectProxy exportTelemetryFile:telemetryFile
+                                                          config:config
                                                            reply:completionHandler];
     } else {
       // Unable to send to sync service, but still must call the completion handler

@@ -18,6 +18,7 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDropRootPrivs.h"
+#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -97,9 +98,11 @@
   [self.syncManager pushNotificationStatus:reply];
 }
 
-- (void)exportTelemetryFile:(NSFileHandle *)fd reply:(void (^)(BOOL))reply {
+- (void)exportTelemetryFile:(NSFileHandle *)fd
+                     config:(SNTExportConfiguration *)config
+                      reply:(void (^)(BOOL))reply {
   // Note: For now, reply false so that spool files are not removed
-  LOGD(@"SNTSyncService: exportTelemetryFile:reply: - Got file descriptor: %@", fd);
+  LOGD(@"SNTSyncService: exportTelemetryFile:reply: - Got fd: %@, export cfg: %@", fd, config);
   reply(NO);
 }
 
