@@ -80,7 +80,7 @@ absl::StatusOr<std::unique_ptr<Evaluator>> Evaluator::Create() {
 absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile(
     absl::string_view expr) {
   if (!compiler_) {
-    return absl::InvalidArgumentError("CELEvaluator::Initialize() must be called before Compile()");
+    return absl::InvalidArgumentError("Evaluator not properly initialized");
   }
 
   // Compile the expression.
@@ -141,7 +141,7 @@ absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::Evaluate(
   } else if (int64_t value; result->GetValue(&value) && pbv1::ReturnValue_IsValid((int)value)) {
     auto policy = static_cast<pbv1::ReturnValue>(value);
     return policy;
-  } else if (const cel_runtime::CelError * value; result->GetValue(&value)) {
+  } else if (const cel_runtime::CelError *value; result->GetValue(&value)) {
     return *value;
   } else {
     return absl::InvalidArgumentError(absl::StrCat(
