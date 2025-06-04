@@ -141,7 +141,7 @@ absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::Evaluate(
   } else if (int64_t value; result->GetValue(&value) && pbv1::ReturnValue_IsValid((int)value)) {
     auto policy = static_cast<pbv1::ReturnValue>(value);
     return policy;
-  } else if (const cel_runtime::CelError *value; result->GetValue(&value)) {
+  } else if (const cel_runtime::CelError * value; result->GetValue(&value)) {
     return *value;
   } else {
     return absl::InvalidArgumentError(absl::StrCat(
