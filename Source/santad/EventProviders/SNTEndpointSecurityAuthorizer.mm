@@ -117,7 +117,10 @@ using santa::Message;
         default: break;
       }
 
-      [self respondToMessage:msg withAuthResult:authResult forcePreventCache:NO];
+      // Do not cache compiler processes so future instances get marked appropriately.
+      [self respondToMessage:msg
+              withAuthResult:authResult
+           forcePreventCache:(returnAction == SNTActionRespondAllowCompiler)];
 
       return;
     } else if (returnAction == SNTActionRespondHold) {
@@ -211,9 +214,11 @@ using santa::Message;
   if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
     // Do not allow caching when the action is SNTActionRespondHold because Santa
     // also authorizes EXECs that occur while the current authorization is pending.
+    // Do not cache compiler processes so future instances get marked appropriately.
     return [self respondToMessage:esMsg
                    withAuthResult:authResult
-                forcePreventCache:(action == SNTActionRespondHold)];
+                forcePreventCache:(action == SNTActionRespondHold ||
+                                   action == SNTActionRespondAllowCompiler)];
   } else {
     return true;
   }
