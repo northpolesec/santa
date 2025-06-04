@@ -193,7 +193,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           @"                    -1 down to -n-1 for the root certificate down to the leaf\n"
           @"                  Incompatible with --bundleinfo."
           @"\n"
-          @"    --utc: Use UTC timestamps for all dates.\n"
+          @"    --localtz: Use timestamps in the local timezone for all dates, instead of UTC.\n"
           @"    --filter: Use predicates of the form 'key=regex' to filter out which files\n"
           @"              are displayed. Valid keys are the same as for --key. Value is a\n"
           @"              case-insensitive regular expression which must match anywhere in\n"
@@ -254,6 +254,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   if (self) {
     _dateFormatter = [[NSDateFormatter alloc] init];
     _dateFormatter.dateFormat = @"yyyy/MM/dd HH:mm:ss Z";
+    _dateFormatter.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
 
     _propertyMap = @{
       kPath : self.path,
@@ -951,8 +952,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       self.enableEntitlements = YES;
     } else if ([arg caseInsensitiveCompare:@"--filter-inclusive"] == NSOrderedSame) {
       self.filterInclusive = YES;
-    } else if ([arg caseInsensitiveCompare:@"--utc"] == NSOrderedSame) {
-      self.dateFormatter.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
+    } else if ([arg caseInsensitiveCompare:@"--localtz"] == NSOrderedSame) {
+      self.dateFormatter.timeZone = [NSTimeZone localTimeZone];
     } else {
       [paths addObject:arg];
     }
