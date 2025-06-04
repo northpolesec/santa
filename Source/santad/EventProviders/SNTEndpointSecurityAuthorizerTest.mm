@@ -403,8 +403,9 @@ class MockAuthResultCache : public AuthResultCache {
       [mockAuthClient postAction:kv.first forMessage:msg];
 
       XCTAssertEqual(gotAuthResult, kv.second);
-      XCTAssertEqual(gotCachable,
-                     kv.second == ES_AUTH_RESULT_ALLOW && kv.first != SNTActionRespondHold);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW &&
+                                      (kv.first != SNTActionRespondHold &&
+                                       kv.first != SNTActionRespondAllowCompiler));
     }
   }
 
