@@ -51,19 +51,21 @@ class Evaluator {
   Evaluator &operator=(const Evaluator &other) = delete;
 
   // Compile a CEL expression from a string into an expression plan
-  // ready for evaluation. These expression plans could be cached.
+  // ready for evaluation. These expression plans could be cached but it's
+  // important that the compiled expression is not used after the Evaluator
+  // is destroyed.
   absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>>
   Compile(absl::string_view cel_expr);
 
   // Evaluate an expression plan with a SantaActivation object.
   absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluate(
       ::google::api::expr::runtime::CelExpression const *expression_plan,
-      const SantaActivation &activation);
+      const Activation &activation);
 
   // Convenience method that combines Compile() and Evaluate() into a single
   // call.
   absl::StatusOr<::santa::cel::v1::ReturnValue> CompileAndEvaluate(
-      absl::string_view cel_expr, const SantaActivation &activation);
+      absl::string_view cel_expr, const Activation &activation);
 
  private:
   std::unique_ptr<google::protobuf::Arena> arena_;

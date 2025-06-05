@@ -15,8 +15,8 @@
 #ifndef SANTA__COMMON__CEL__CONTEXT_H
 #define SANTA__COMMON__CEL__CONTEXT_H
 
+#include "Source/common/Memoizer.h"
 #include "Source/common/cel/cel.pb.h"
-#include "Source/common/cel/memoizer.h"
 
 #include "absl/strings/string_view.h"
 
@@ -36,12 +36,12 @@ namespace cel {
 
 // SantaActivation is a CEL activation that provides lookups of values from the
 // santa.pb.cel.v1.Context message, and easy access to variables for return values.
-class SantaActivation : public ::cel_runtime::BaseActivation {
+class Activation : public ::cel_runtime::BaseActivation {
  public:
-  SantaActivation(const ::pbv1::FileContext *file, std::vector<std::string> (^args)(),
-                  std::vector<std::string> (^envs)())
+  Activation(const ::pbv1::FileContext *file, std::vector<std::string> (^args)(),
+             std::vector<std::string> (^envs)())
       : file_(file), args_(args), envs_(envs) {};
-  ~SantaActivation() = default;
+  ~Activation() = default;
 
   absl::optional<cel_runtime::CelValue> FindValue(absl::string_view name,
                                                   google::protobuf::Arena *arena) const override;

@@ -157,6 +157,11 @@ objc_library(
 )
 
 objc_library(
+    name = "Memoizer",
+    hdrs = ["Memoizer.h"],
+)
+
+objc_library(
     name = "Platform",
     hdrs = ["Platform.h"],
 )

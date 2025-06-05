@@ -12,17 +12,16 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CEL__MEMOIZER_H
-#define SANTA__COMMON__CEL__MEMOIZER_H
+#ifndef SANTA__COMMON__MEMOIZER_H
+#define SANTA__COMMON__MEMOIZER_H
 
 #include <functional>
 #include <optional>
 
 namespace santa {
-namespace cel {
 
 // Memoizer is a template class that memoizes the result of a function call that
-// requires no arguments to avoid expensive recalculations.
+// requires no arguments, to avoid expensive recalculations.
 template <typename T>
 class Memoizer {
  public:
@@ -35,7 +34,7 @@ class Memoizer {
   // as mutable.
   T operator()() const {
     if (cache_.has_value()) {
-      return cache_.value();
+      return *cache_;
     }
 
     T result = func_();
@@ -48,7 +47,6 @@ class Memoizer {
   mutable std::optional<T> cache_;
 };
 
-}  // namespace cel
 }  // namespace santa
 
-#endif  // SANTA__COMMON__CEL__MEMOIZER_H
+#endif  // SANTA__COMMON__MEMOIZER_H

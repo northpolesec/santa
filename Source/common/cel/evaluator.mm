@@ -35,14 +35,15 @@ namespace pbv1 = ::santa::cel::v1;
 namespace santa {
 namespace cel {
 
-absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(google::protobuf::Arena *arena) {
+static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
+    google::protobuf::Arena *arena) {
   // Create a compiler builder with the generated descriptor pool for protos.
   absl::StatusOr<std::unique_ptr<::cel::CompilerBuilder>> builderStatus =
       ::cel::NewCompilerBuilder(google::protobuf::DescriptorPool::generated_pool());
   if (!builderStatus.ok()) {
     return builderStatus.status();
   }
-  auto builder = std::move(builderStatus.value());
+  auto builder = std::move(*builderStatus);
 
   // Add the standard library.
   if (auto result = builder->AddLibrary(::cel::StandardCompilerLibrary()); !result.ok()) {
@@ -51,11 +52,11 @@ absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(google::protobuf
 
   // Link the reflection for needed messages to that the CEL compiler can
   // recognize them.
-  google::protobuf::LinkMessageReflection<::pbv1::Context>();
+  google::protobuf::LinkMessageReflection<::pbv1::ExecutionContext>();
 
   // Add all the possible variables to the type checker.
   ::cel::TypeCheckerBuilder &checker_builder = builder->GetCheckerBuilder();
-  for (const auto &variable : SantaActivation::GetVariables(arena)) {
+  for (const auto &variable : Activation::GetVariables(arena)) {
     if (auto result =
             checker_builder.AddVariable(::cel::MakeVariableDecl(variable.first, variable.second));
         !result.ok()) {
@@ -74,7 +75,7 @@ absl::StatusOr<std::unique_ptr<Evaluator>> Evaluator::Create() {
   if (!compiler.ok()) {
     return compiler.status();
   }
-  return std::make_unique<Evaluator>(std::move(compiler.value()), std::move(arena));
+  return std::make_unique<Evaluator>(std::move(*compiler), std::move(arena));
 }
 
 absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile(
@@ -88,7 +89,7 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile
   if (!result.ok()) {
     return result.status();
   }
-  if (!result->IsValid() || result->GetAst() == nullptr) {
+  if (!result->IsValid()) {
     return absl::InvalidArgumentError(result->FormatError());
   }
 
@@ -98,10 +99,11 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile
     return status;
   }
 
-  // // Setup a default environment for building expressions.
+  // Setup a default environment for building expressions.
   cel_runtime::InterpreterOptions options;
   options.constant_folding = true;
   options.constant_arena = arena_.get();
+  options.enable_regex_precompilation = true;
 
   std::unique_ptr<cel_runtime::CelExpressionBuilder> builder =
       CreateCelExpressionBuilder(google::protobuf::DescriptorPool::generated_pool(),
@@ -120,11 +122,10 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile
 };
 
 absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::Evaluate(
-    const ::cel_runtime::CelExpression *expression_plan, const SantaActivation &activation) {
-  google::protobuf::Arena arena;
-
+    const ::cel_runtime::CelExpression *expression_plan, const Activation &activation) {
   // Evaluate the parsed expression.
-  absl::StatusOr<cel_runtime::CelValue> result = expression_plan->Evaluate(activation, &arena);
+  absl::StatusOr<cel_runtime::CelValue> result =
+      expression_plan->Evaluate(activation, arena_.get());
   if (!result.ok()) {
     return result.status();
   }
@@ -139,8 +140,7 @@ absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::Evaluate(
     }
     return pbv1::ReturnValue::BLOCKLIST;
   } else if (int64_t value; result->GetValue(&value) && pbv1::ReturnValue_IsValid((int)value)) {
-    auto policy = static_cast<pbv1::ReturnValue>(value);
-    return policy;
+    return static_cast<pbv1::ReturnValue>(value);
   } else if (const cel_runtime::CelError * value; result->GetValue(&value)) {
     return *value;
   } else {
@@ -150,7 +150,7 @@ absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::Evaluate(
 }
 
 absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::CompileAndEvaluate(
-    absl::string_view cel_expr, const SantaActivation &activation) {
+    absl::string_view cel_expr, const Activation &activation) {
   absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> expr = Compile(cel_expr);
   if (!expr.ok()) {
     return expr.status();

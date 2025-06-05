@@ -37,7 +37,7 @@ namespace pbv1 = ::santa::cel::v1;
 
   auto f = google::protobuf::Arena::Create<::pbv1::FileContext>(&arena);
   f->mutable_signing_timestamp()->set_seconds(1748436989);
-  santa::cel::SantaActivation activation(
+  santa::cel::Activation activation(
       f,
       ^std::vector<std::string>() {
         return {"hello", "world"};
@@ -92,7 +92,7 @@ namespace pbv1 = ::santa::cel::v1;
 
     ::pbv1::FileContext *f2 = google::protobuf::Arena::Create<::pbv1::FileContext>(&arena);
     f2->mutable_signing_timestamp()->set_seconds(1716916129);
-    santa::cel::SantaActivation activation2(
+    santa::cel::Activation activation2(
         f2,
         ^std::vector<std::string>() {
           return {"hello", "world"};
@@ -131,7 +131,7 @@ namespace pbv1 = ::santa::cel::v1;
   {
     // Test memoization
     __block int argsCallCount = 0;
-    santa::cel::SantaActivation activation(
+    santa::cel::Activation activation(
         f,
         ^std::vector<std::string>() {
           argsCallCount++;

@@ -28,11 +28,11 @@ objc_library(
         "context.h",
         "context.mm",
         "evaluator.mm",
-        "memoizer.h",
     ],
     hdrs = ["evaluator.h"],
     deps = [
         ":cel_cc_proto",
+        "//Source/common:Memoizer",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",

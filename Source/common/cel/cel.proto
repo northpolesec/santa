@@ -38,7 +38,7 @@ enum ReturnValue {
 }
 
 // The fields in this message provided to CEL programs.
-message Context {
+message ExecutionContext {
   FileContext file = 1;
   repeated string args = 2;
   repeated string envs = 3;
