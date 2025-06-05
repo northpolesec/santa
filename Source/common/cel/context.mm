@@ -43,7 +43,7 @@ absl::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view na
   }
 
   // Handle the fields from the CELContext message.
-  if (name == "file" && file_ != nullptr) {
+  if (name == "executable" && file_ != nullptr) {
     return cel_runtime::CelProtoWrapper::CreateMessage(file_, arena);
   } else if (name == "args") {
     return CELValueFromVector(args_(), arena);

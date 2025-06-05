@@ -38,7 +38,7 @@ namespace cel {
 // santa.pb.cel.v1.Context message, and easy access to variables for return values.
 class Activation : public ::cel_runtime::BaseActivation {
  public:
-  Activation(const ::pbv1::FileContext *file, std::vector<std::string> (^args)(),
+  Activation(const ::pbv1::ExecutableFile *file, std::vector<std::string> (^args)(),
              std::vector<std::string> (^envs)())
       : file_(file), args_(args), envs_(envs) {};
   ~Activation() = default;
@@ -56,7 +56,7 @@ class Activation : public ::cel_runtime::BaseActivation {
       google::protobuf::Arena *arena);
 
  private:
-  const ::santa::cel::v1::FileContext *file_;
+  const ::santa::cel::v1::ExecutableFile *file_;
   Memoizer<std::vector<std::string>> args_;
   Memoizer<std::vector<std::string>> envs_;
 

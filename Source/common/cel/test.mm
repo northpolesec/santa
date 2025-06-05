@@ -35,7 +35,7 @@ namespace pbv1 = ::santa::cel::v1;
 - (void)testBasic {
   google::protobuf::Arena arena;
 
-  auto f = google::protobuf::Arena::Create<::pbv1::FileContext>(&arena);
+  auto f = google::protobuf::Arena::Create<::pbv1::ExecutableFile>(&arena);
   f->mutable_signing_timestamp()->set_seconds(1748436989);
   santa::cel::Activation activation(
       f,
@@ -58,8 +58,8 @@ namespace pbv1 = ::santa::cel::v1;
   }
   {
     // Timestamp comparison by seconds.
-    auto result = sut.value()->CompileAndEvaluate("file.signing_timestamp >= timestamp(1748436989)",
-                                                  activation);
+    auto result = sut.value()->CompileAndEvaluate(
+        "executable.signing_timestamp >= timestamp(1748436989)", activation);
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -69,7 +69,7 @@ namespace pbv1 = ::santa::cel::v1;
   {
     // Timestamp comparison by date string.
     auto result = sut.value()->CompileAndEvaluate(
-        "file.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')", activation);
+        "executable.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')", activation);
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -78,7 +78,8 @@ namespace pbv1 = ::santa::cel::v1;
   }
   {
     // Re-use of a compiled expression.
-    auto expr = sut.value()->Compile("file.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')");
+    auto expr =
+        sut.value()->Compile("executable.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')");
     if (!expr.ok()) {
       XCTFail("Failed to compile: %s", expr.status().message().data());
     }
@@ -90,7 +91,7 @@ namespace pbv1 = ::santa::cel::v1;
       XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
     }
 
-    ::pbv1::FileContext *f2 = google::protobuf::Arena::Create<::pbv1::FileContext>(&arena);
+    ::pbv1::ExecutableFile *f2 = google::protobuf::Arena::Create<::pbv1::ExecutableFile>(&arena);
     f2->mutable_signing_timestamp()->set_seconds(1716916129);
     santa::cel::Activation activation2(
         f2,
