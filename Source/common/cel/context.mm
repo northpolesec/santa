@@ -33,8 +33,8 @@ namespace cel_runtime = ::google::api::expr::runtime;
 namespace santa {
 namespace cel {
 
-absl::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view name,
-                                                            google::protobuf::Arena *arena) const {
+std::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view name,
+                                                           google::protobuf::Arena *arena) const {
   // Handle the ReturnValue values.
   auto retDescriptor = pbv1::ReturnValue_descriptor();
   auto retValue = retDescriptor->FindValueByName(name);

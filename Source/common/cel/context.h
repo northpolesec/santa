@@ -43,7 +43,7 @@ class Activation : public ::cel_runtime::BaseActivation {
       : file_(file), args_(args), envs_(envs) {};
   ~Activation() = default;
 
-  absl::optional<cel_runtime::CelValue> FindValue(absl::string_view name,
+  std::optional<cel_runtime::CelValue> FindValue(absl::string_view name,
                                                   google::protobuf::Arena *arena) const override;
 
   // SantaActivation does not support lazy-loaded functions.
