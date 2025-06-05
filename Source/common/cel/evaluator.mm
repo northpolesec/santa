@@ -141,7 +141,7 @@ absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::Evaluate(
     return pbv1::ReturnValue::BLOCKLIST;
   } else if (int64_t value; result->GetValue(&value) && pbv1::ReturnValue_IsValid((int)value)) {
     return static_cast<pbv1::ReturnValue>(value);
-  } else if (const cel_runtime::CelError *value; result->GetValue(&value)) {
+  } else if (const cel_runtime::CelError * value; result->GetValue(&value)) {
     return *value;
   } else {
     return absl::InvalidArgumentError(absl::StrCat(
