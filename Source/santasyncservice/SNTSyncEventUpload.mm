@@ -101,8 +101,7 @@ using santa::NSStringToUTF8StringView;
     if (event.idx) [eventIds addObject:event.idx];
 
     std::optional<::pbv1::Event> e = [self messageForEvent:event withArena:pArena];
-    if (!e.has_value()) return;
-    uploadEvents->Add(*std::move(e));
+    if (e.has_value()) uploadEvents->Add(*std::move(e));
 
     if (uploadEvents->size() >= self.syncState.eventBatchSize || idx == finalIdx) {
       if (![self performRequest:req]) {
