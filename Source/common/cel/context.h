@@ -15,6 +15,9 @@
 #ifndef SANTA__COMMON__CEL__CONTEXT_H
 #define SANTA__COMMON__CEL__CONTEXT_H
 
+#include <map>
+#include <vector>
+
 #include "Source/common/Memoizer.h"
 #include "Source/common/cel/cel.pb.h"
 
@@ -39,7 +42,7 @@ namespace cel {
 class Activation : public ::cel_runtime::BaseActivation {
  public:
   Activation(const ::pbv1::ExecutableFile *file, std::vector<std::string> (^args)(),
-             std::vector<std::string> (^envs)())
+             std::map<std::string, std::string> (^envs)())
       : file_(file), args_(args), envs_(envs) {};
   ~Activation() = default;
 
@@ -58,10 +61,13 @@ class Activation : public ::cel_runtime::BaseActivation {
  private:
   const ::santa::cel::v1::ExecutableFile *file_;
   Memoizer<std::vector<std::string>> args_;
-  Memoizer<std::vector<std::string>> envs_;
+  Memoizer<std::map<std::string, std::string>> envs_;
 
-  static cel_runtime::CelValue CELValueFromVector(const std::vector<std::string> &v,
-                                                  google::protobuf::Arena *arena);
+  static ::cel::Type CELType(google::protobuf::internal::FieldDescriptorLite::CppType type, const google::protobuf::Descriptor *messageType);
+
+  template <typename T> static cel_runtime::CelValue CELValue(const T &v, google::protobuf::Arena *arena);
+  template <typename T> static cel_runtime::CelValue CELValue(const std::vector<T> &v, google::protobuf::Arena *arena);
+  template <typename K, typename V> static cel_runtime::CelValue CELValue(const std::map<K, V> &v, google::protobuf::Arena *arena);
 };
 
 }  // namespace cel

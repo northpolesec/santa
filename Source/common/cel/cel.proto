@@ -39,11 +39,25 @@ enum ReturnValue {
 
 // The fields in this message provided to CEL programs.
 message ExecutionContext {
-  ExecutableFile executable = 1;
+  // The file being executed. All the fields in this message are based on the
+  // content of the file, so programs that only use fields in this message can
+  // be cached.
+  ExecutableFile target = 1;
+
+  // The command-line arguments being passed to the new process.
+  // Using this field will prevent the result from being cached.
   repeated string args = 2;
-  repeated string envs = 3;
+
+  // The environment variables being passed to the new process.
+  // Using this field will prevent the result from being cached.
+  map<string, string> envs = 3;
 }
 
+// The fields in this message are provided to the CEL program and are static,
+// related only to the content of the executable file. The fields inside this
+// message will always be the same as long as the content of the file doesn't
+// change, which allows Santa to cache the results of CEL expressions that only
+// use fields from this message.
 message ExecutableFile {
   google.protobuf.Timestamp signing_timestamp = 1;
 }

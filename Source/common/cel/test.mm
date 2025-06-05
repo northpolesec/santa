@@ -42,8 +42,8 @@ namespace pbv1 = ::santa::cel::v1;
       ^std::vector<std::string>() {
         return {"hello", "world"};
       },
-      ^std::vector<std::string>() {
-        return {"DYLD_INSERT_LIBRARIES=1"};
+      ^std::map<std::string, std::string>() {
+        return {{"DYLD_INSERT_LIBRARIES", "1"}};
       });
 
   auto sut = santa::cel::Evaluator::Create();
@@ -59,7 +59,7 @@ namespace pbv1 = ::santa::cel::v1;
   {
     // Timestamp comparison by seconds.
     auto result = sut.value()->CompileAndEvaluate(
-        "executable.signing_timestamp >= timestamp(1748436989)", activation);
+        "target.signing_timestamp >= timestamp(1748436989)", activation);
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -69,7 +69,7 @@ namespace pbv1 = ::santa::cel::v1;
   {
     // Timestamp comparison by date string.
     auto result = sut.value()->CompileAndEvaluate(
-        "executable.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')", activation);
+        "target.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')", activation);
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -79,7 +79,7 @@ namespace pbv1 = ::santa::cel::v1;
   {
     // Re-use of a compiled expression.
     auto expr =
-        sut.value()->Compile("executable.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')");
+        sut.value()->Compile("target.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')");
     if (!expr.ok()) {
       XCTFail("Failed to compile: %s", expr.status().message().data());
     }
@@ -98,8 +98,8 @@ namespace pbv1 = ::santa::cel::v1;
         ^std::vector<std::string>() {
           return {"hello", "world"};
         },
-        ^std::vector<std::string>() {
-          return {"DYLD_INSERT_LIBRARIES=1"};
+        ^std::map<std::string, std::string>() {
+          return {{"DYLD_INSERT_LIBRARIES", "1"}};
         });
 
     auto result2 = sut.value()->Evaluate(expr.value().get(), activation2);
@@ -121,8 +121,7 @@ namespace pbv1 = ::santa::cel::v1;
   {
     // Dynamic, env vars, ternary
     auto result = sut.value()->CompileAndEvaluate(
-        "envs.exists(env, env.startsWith('DYLD_INSERT_LIBRARIES')) ? ALLOWLIST : BLOCKLIST",
-        activation);
+        "has(envs.DYLD_INSERT_LIBRARIES) ? ALLOWLIST : BLOCKLIST", activation);
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -138,9 +137,9 @@ namespace pbv1 = ::santa::cel::v1;
           argsCallCount++;
           return {"hello", "world"};
         },
-        ^std::vector<std::string>() {
+        ^std::map<std::string, std::string>() {
           argsCallCount++;
-          return {"DYLD_INSERT_LIBRARIES=1"};
+          return {{"DYLD_INSERT_LIBRARIES", "1"}};
         });
 
     auto result = sut.value()->CompileAndEvaluate(

@@ -26,12 +26,59 @@
 #include "eval/public/structs/cel_proto_wrapper.h"
 #pragma clang diagnostic pop
 
-#include <vector>
-
 namespace cel_runtime = ::google::api::expr::runtime;
 
 namespace santa {
 namespace cel {
+
+template <>
+cel_runtime::CelValue Activation::CELValue(const int &v, google::protobuf::Arena *unused_arena) {
+  return cel_runtime::CelValue::CreateInt64(v);
+}
+
+template <>
+cel_runtime::CelValue Activation::CELValue(const int64_t &v,
+                                           google::protobuf::Arena *unused_arena) {
+  return cel_runtime::CelValue::CreateInt64(v);
+}
+
+template <>
+cel_runtime::CelValue Activation::CELValue(const bool &v, google::protobuf::Arena *unused_arena) {
+  return cel_runtime::CelValue::CreateBool(v);
+}
+
+template <>
+cel_runtime::CelValue Activation::CELValue(const double &v, google::protobuf::Arena *unused_arena) {
+  return cel_runtime::CelValue::CreateDouble(v);
+}
+
+template <>
+cel_runtime::CelValue Activation::CELValue(const std::string &v, google::protobuf::Arena *arena) {
+  return cel_runtime::CelValue::CreateString(
+      cel_runtime::CelValue::StringHolder(arena->Create<std::string>(arena, v)));
+}
+
+template <typename T>
+cel_runtime::CelValue Activation::CELValue(const std::vector<T> &v,
+                                           google::protobuf::Arena *arena) {
+  std::vector<cel_runtime::CelValue> values;
+  for (const auto &value : v) {
+    values.push_back(CELValue(value, arena));
+  }
+
+  return cel_runtime::CelValue::CreateList(
+      arena->Create<cel_runtime::ContainerBackedListImpl>(arena, values));
+}
+
+template <typename K, typename V>
+cel_runtime::CelValue Activation::CELValue(const std::map<K, V> &v,
+                                           google::protobuf::Arena *arena) {
+  cel_runtime::CelMapBuilder *builder = arena->Create<cel_runtime::CelMapBuilder>(arena);
+  for (const auto &pair : v) {
+    (void)builder->Add(CELValue(pair.first, arena), CELValue(pair.second, arena));
+  }
+  return cel_runtime::CelValue::CreateMap(builder);
+}
 
 std::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view name,
                                                            google::protobuf::Arena *arena) const {
@@ -39,18 +86,17 @@ std::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view nam
   auto retDescriptor = pbv1::ReturnValue_descriptor();
   auto retValue = retDescriptor->FindValueByName(name);
   if (retValue != nullptr) {
-    return cel_runtime::CelValue::CreateInt64(retValue->number());
+    return CELValue(retValue->number(), arena);
   }
 
   // Handle the fields from the CELContext message.
-  if (name == "executable" && file_ != nullptr) {
+  if (name == "target" && file_ != nullptr) {
     return cel_runtime::CelProtoWrapper::CreateMessage(file_, arena);
   } else if (name == "args") {
-    return CELValueFromVector(args_(), arena);
+    return CELValue(args_(), arena);
   } else if (name == "envs") {
-    return CELValueFromVector(envs_(), arena);
+    return CELValue(envs_(), arena);
   }
-
   return {};
 }
 
@@ -74,23 +120,16 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
     auto field = ctxDescriptor->field(i);
 
     ::cel::Type type;
-    switch (field->cpp_type()) {
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_STRING: type = ::cel::StringType(); break;
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE:
-        type = ::cel::MessageType(field->message_type());
-        break;
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_INT64: [[fallthrough]];
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_UINT64: [[fallthrough]];
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_INT32: [[fallthrough]];
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_UINT32: [[fallthrough]];
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_ENUM: type = ::cel::IntType(); break;
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_BOOL: type = ::cel::BoolType(); break;
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_DOUBLE: [[fallthrough]];
-      case ::google::protobuf::FieldDescriptor::CPPTYPE_FLOAT: type = ::cel::DoubleType(); break;
-    }
-
-    if (field->is_repeated()) {
-      type = ::cel::ListType(arena, type);
+    if (field->is_map()) {
+      auto msgType = field->message_type();
+      auto key = msgType->field(0);
+      auto value = msgType->field(1);
+      type = ::cel::MapType(arena, CELType(key->cpp_type(), key->message_type()),
+                            CELType(value->cpp_type(), value->message_type()));
+    } else if (field->is_repeated()) {
+      type = ::cel::ListType(arena, CELType(field->cpp_type(), field->message_type()));
+    } else {
+      type = CELType(field->cpp_type(), field->message_type());
     }
 
     v.push_back({field->name(), type});
@@ -99,16 +138,21 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
   return v;
 }
 
-cel_runtime::CelValue Activation::CELValueFromVector(const std::vector<std::string> &v,
-                                                     google::protobuf::Arena *arena) {
-  std::vector<cel_runtime::CelValue> values;
-  for (const auto &value : v) {
-    values.push_back(cel_runtime::CelValue::CreateString(
-        cel_runtime::CelValue::StringHolder(arena->Create<std::string>(arena, value))));
+::cel::Type Activation::CELType(google::protobuf::internal::FieldDescriptorLite::CppType type,
+                                const google::protobuf::Descriptor *messageType) {
+  switch (type) {
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_STRING: return ::cel::StringType();
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE:
+      return ::cel::MessageType(messageType);
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_INT64: [[fallthrough]];
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_UINT64: [[fallthrough]];
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_INT32: [[fallthrough]];
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_UINT32: [[fallthrough]];
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_ENUM: return ::cel::IntType();
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_BOOL: return ::cel::BoolType();
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_DOUBLE: [[fallthrough]];
+    case ::google::protobuf::FieldDescriptor::CPPTYPE_FLOAT: return ::cel::DoubleType();
   }
-
-  return cel_runtime::CelValue::CreateList(
-      arena->Create<cel_runtime::ContainerBackedListImpl>(arena, values));
 }
 
 }  // namespace cel
