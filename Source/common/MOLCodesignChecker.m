@@ -300,11 +300,11 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
   return self.signingInformation[(__bridge NSString *)kSecCodeInfoEntitlementsDict];
 }
 
-- (NSDate *)secureTimestamp {
+- (NSDate *)secureSigningTime {
   return self.signingInformation[(__bridge NSString *)kSecCodeInfoTimestamp];
 }
 
-- (NSDate *)insecureTimestamp {
+- (NSDate *)signingTime {
   return self.signingInformation[(__bridge NSString *)kSecCodeInfoTime];
 }
 

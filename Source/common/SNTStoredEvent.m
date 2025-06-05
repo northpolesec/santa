@@ -49,8 +49,8 @@
   ENCODE_BOXABLE(coder, signingStatus);
   ENCODE(coder, entitlements);
   ENCODE_BOXABLE(coder, entitlementsFiltered);
-  ENCODE(coder, secureTimestamp);
-  ENCODE(coder, insecureTimestamp);
+  ENCODE(coder, secureSigningTime);
+  ENCODE(coder, signingTime);
 
   ENCODE(coder, executingUser);
   ENCODE(coder, occurrenceDate);
@@ -102,8 +102,8 @@
     DECODE_SELECTOR(decoder, signingStatus, NSNumber, integerValue);
     DECODE_DICT(decoder, entitlements);
     DECODE_SELECTOR(decoder, entitlementsFiltered, NSNumber, boolValue);
-    DECODE(decoder, secureTimestamp, NSDate);
-    DECODE(decoder, insecureTimestamp, NSDate);
+    DECODE(decoder, secureSigningTime, NSDate);
+    DECODE(decoder, signingTime, NSDate);
 
     DECODE(decoder, executingUser, NSString);
     DECODE(decoder, occurrenceDate, NSDate);
