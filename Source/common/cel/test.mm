@@ -138,7 +138,6 @@ namespace pbv1 = ::santa::cel::v1;
           return {"hello", "world"};
         },
         ^std::map<std::string, std::string>() {
-          argsCallCount++;
           return {{"DYLD_INSERT_LIBRARIES", "1"}};
         });
 
