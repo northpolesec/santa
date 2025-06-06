@@ -60,6 +60,14 @@ cc_library(
     ],
 )
 
+santa_unit_test(
+    name = "SantaCacheTest",
+    srcs = ["SantaCacheTest.mm"],
+    deps = [
+        ":SantaCache",
+    ],
+)
+
 cc_library(
     name = "SantaSetCache",
     hdrs = ["SantaSetCache.h"],
@@ -72,25 +80,17 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "AuditUtilities",
-    hdrs = ["AuditUtilities.h"],
-)
-
-santa_unit_test(
-    name = "SantaCacheTest",
-    srcs = ["SantaCacheTest.mm"],
-    deps = [
-        ":SantaCache",
-    ],
-)
-
 santa_unit_test(
     name = "SantaSetCacheTest",
     srcs = ["SantaSetCacheTest.mm"],
     deps = [
         ":SantaSetCache",
     ],
+)
+
+cc_library(
+    name = "AuditUtilities",
+    hdrs = ["AuditUtilities.h"],
 )
 
 # This target shouldn't be used directly.
@@ -154,6 +154,11 @@ objc_library(
     deps = [
         "@abseil-cpp//absl/hash",
     ],
+)
+
+objc_library(
+    name = "Memoizer",
+    hdrs = ["Memoizer.h"],
 )
 
 objc_library(
@@ -767,6 +772,7 @@ test_suite(
         ":ScopedCFTypeRefTest",
         ":ScopedIOObjectRefTest",
         ":TelemetryEventMapTest",
+        "//Source/common/cel:CELTest",
     ],
     visibility = ["//:santa_package_group"],
 )
