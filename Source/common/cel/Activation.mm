@@ -21,6 +21,7 @@
 // For some reason these can't be disabled with --per_file_copt.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #include "eval/public/containers/container_backed_list_impl.h"
 #include "eval/public/containers/container_backed_map_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"

@@ -26,6 +26,7 @@
 // For some reason these can't be disabled with --per_file_copt.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #include "cel/expr/checked.pb.h"
 #include "compiler/compiler.h"
 #include "eval/public/cel_expression.h"
