@@ -12,9 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/cel/evaluator.h"
+#include "Source/common/cel/Evaluator.h"
 
-#include "Source/common/cel/context.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "cel/expr/checked.pb.h"
@@ -28,6 +27,8 @@
 #include "eval/public/cel_function_adapter.h"
 #include "eval/public/transform_utility.h"
 #include "parser/parser.h"
+
+#include "Source/common/cel/Activation.h"
 
 namespace cel_runtime = ::google::api::expr::runtime;
 namespace pbv1 = ::santa::cel::v1;

@@ -25,11 +25,13 @@ cc_proto_library(
 objc_library(
     name = "CEL",
     srcs = [
-        "context.h",
-        "context.mm",
-        "evaluator.mm",
+        "Activation.mm",
+        "Evaluator.mm",
     ],
-    hdrs = ["evaluator.h"],
+    hdrs = [
+        "Activation.h",
+        "Evaluator.h",
+    ],
     deps = [
         ":cel_cc_proto",
         "//Source/common:Memoizer",
@@ -63,7 +65,7 @@ objc_library(
 
 santa_unit_test(
     name = "CELTest",
-    srcs = ["test.mm"],
+    srcs = ["Test.mm"],
     deps = [
         ":CEL",
         ":cel_cc_proto",

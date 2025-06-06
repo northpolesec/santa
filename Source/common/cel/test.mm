@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/cel/context.h"
-#include "Source/common/cel/evaluator.h"
+#include "Source/common/cel/Activation.h"
+#include "Source/common/cel/Evaluator.h"
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>

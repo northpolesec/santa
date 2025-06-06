@@ -17,8 +17,8 @@
 
 #include <memory>
 
+#include "Source/common/cel/Activation.h"
 #include "Source/common/cel/cel.pb.h"
-#include "Source/common/cel/context.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 

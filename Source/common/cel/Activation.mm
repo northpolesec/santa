@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/cel/context.h"
+#include "Source/common/cel/Activation.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
