@@ -124,7 +124,12 @@
     self.currentConnection.remoteObjectInterface = self.validationInterface;
     self.currentConnection.interruptionHandler = self.currentConnection.invalidationHandler = ^{
       STRONGIFY(self);
-      self.currentConnection.remoteObjectInterface = nil;
+      // If the remoteObjectInterface is still the validation interface, do not nil it out.
+      // This ensures that the currentConnections's remoteObjectProxy doesn't return an
+      // object that doesn't conform to `MOLXPCConnectionProtocol`.
+      if (self.currentConnection.remoteObjectInterface != self.validationInterface) {
+        self.currentConnection.remoteObjectInterface = nil;
+      }
       if (self.invalidationHandler) self.invalidationHandler();
     };
     [self.currentConnection resume];
