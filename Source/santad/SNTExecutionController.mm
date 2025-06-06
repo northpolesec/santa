@@ -64,6 +64,8 @@ using santa::Unit;
 
 static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account for null terminator
 
+typedef santa::cel::Activation * (^ActivationCallbackBlock)(void);
+
 void UpdateTeamIDFilterLocked(std::set<std::string> &filterSet, NSArray<NSString *> *filter) {
   filterSet.clear();
 
@@ -270,10 +272,15 @@ static NSString *const kPrinterProxyPostMonterey =
   // TODO(markowsky): Maybe add a metric here for how many large executables we're seeing.
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
+  __block BOOL preventCaching = NO;
   SNTCachedDecision *cd = [self.policyProcessor
              decisionForFileInfo:binInfo
                    targetProcess:targetProc
                      configState:configState
+              activationCallback:[self createActivationForMessage:esMsg
+                                                        andCSInfo:[binInfo
+                                                                      codesignCheckerWithError:NULL]
+                                                   preventCaching:&preventCaching]
       entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
         if (!entitlements) {
           return nil;
@@ -311,8 +318,9 @@ static NSString *const kPrinterProxyPostMonterey =
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
 
   // Formulate an initial action from the decision.
-  SNTAction action =
-      (SNTEventStateAllow & cd.decision) ? SNTActionRespondAllow : SNTActionRespondDeny;
+  SNTAction action = (SNTEventStateAllow & cd.decision)
+                         ? (preventCaching ? SNTActionRespondAllowNoCache : SNTActionRespondAllow)
+                         : SNTActionRespondDeny;
 
   // Save decision details for logging the execution later.  For transitive rules, we also use
   // the shasum stored in the decision details to update the rule's timestamp whenever an
@@ -410,7 +418,8 @@ static NSString *const kPrinterProxyPostMonterey =
     }
 
     // If binary was blocked, do the needful
-    if (action != SNTActionRespondAllow && action != SNTActionRespondAllowCompiler) {
+    if (action != SNTActionRespondAllow && action != SNTActionRespondAllowCompiler &&
+        action != SNTActionRespondAllowNoCache) {
       if (config.enableBundles && binInfo.bundle) {
         // If the binary is part of a bundle, find and hash all the related binaries in the bundle.
         // Let the GUI know hashing is needed. Once the hashing is complete the GUI will send a
@@ -612,6 +621,7 @@ static NSString *const kPrinterProxyPostMonterey =
                                                customURL:nil
                                                timestamp:[[NSDate now] timeIntervalSince1970]
                                                  comment:commentStr
+                                                 celExpr:nil
                                                    error:&err];
   if (err) {
     LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
@@ -626,6 +636,38 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   // TODO: Notify the sync service of the new rule.
+}
+
+- (ActivationCallbackBlock)createActivationForMessage:(const santa::Message &)esMsg
+                                            andCSInfo:(nullable MOLCodesignChecker *)csInfo
+                                       preventCaching:(nonnull BOOL *)preventCaching {
+  return ^santa::cel::Activation *() {
+    auto f = std::make_unique<::santa::cel::v1::ExecutableFile>();
+    f->mutable_signing_timestamp()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
+
+    auto activation = new santa::cel::Activation(
+        f.get(),
+        ^std::vector<std::string>() {
+          *preventCaching = YES;
+          std::vector<std::string> args;
+          for (int i = 0; i < es_exec_arg_count(&esMsg->event.exec); i++) {
+            args.push_back(
+                std::string(santa::StringTokenToStringView(es_exec_arg(&esMsg->event.exec, i))));
+          }
+          return args;
+        },
+        ^std::map<std::string, std::string>() {
+          *preventCaching = YES;
+          std::map<std::string, std::string> envs;
+          for (int i = 0; i < es_exec_env_count(&esMsg->event.exec); i++) {
+            auto s = santa::StringTokenToStringView(es_exec_env(&esMsg->event.exec, i));
+            auto npos = s.find("=");
+            envs[std::string(s.substr(0, npos))] = std::string(s.substr(npos + 1));
+          }
+          return envs;
+        });
+    return activation;
+  };
 }
 
 @end

@@ -58,6 +58,11 @@
 @property(copy) NSString *comment;
 
 ///
+///  A CEL expression for this rule, required if the state is SNTRuleStateCEL.
+///
+@property(copy) NSString *celExpr;
+
+///
 ///  Designated initializer.
 ///
 - (instancetype)initWithIdentifier:(NSString *)identifier
@@ -67,6 +72,7 @@
                          customURL:(NSString *)customURL
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString *)comment
+                           celExpr:(NSString *)celExpr
                              error:(NSError **)error;
 
 ///

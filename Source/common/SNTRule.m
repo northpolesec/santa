@@ -39,6 +39,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                          customURL:(NSString *)customURL
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString *)comment
+                           celExpr:(NSString *)celExpr
                              error:(NSError **)error {
   self = [super init];
   if (self) {
@@ -142,6 +143,13 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       }
     }
 
+    if (state == SNTRuleStateCEL && celExpr.length == 0) {
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeRuleInvalidCELExpression
+                       format:@"Rule received missing CEL expression"];
+      return nil;
+    }
+
     _identifier = identifier;
     _state = state;
     _type = type;
@@ -149,6 +157,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     _customURL = customURL;
     _timestamp = timestamp;
     _comment = comment;
+    _celExpr = celExpr;
   }
   return self;
 }
@@ -165,6 +174,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         customURL:customURL
                         timestamp:0
                           comment:nil
+                          celExpr:nil
                             error:nil];
   // Initialize timestamp to current time if rule is transitive.
   if (self && state == SNTRuleStateAllowTransitive) {
@@ -298,6 +308,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         customURL:customURL
                         timestamp:0
                           comment:comment
+                          celExpr:nil
                             error:error];
 }
 
@@ -315,6 +326,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   ENCODE(coder, customURL);
   ENCODE_BOXABLE(coder, timestamp);
   ENCODE(coder, comment);
+  ENCODE(coder, celExpr);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -327,6 +339,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     DECODE(decoder, customURL, NSString);
     DECODE_SELECTOR(decoder, timestamp, NSNumber, unsignedIntegerValue);
     DECODE(decoder, comment, NSString);
+    DECODE(decoder, celExpr, NSString);
   }
   return self;
 }
@@ -375,7 +388,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   if (other == self) return YES;
   if (![other isKindOfClass:[SNTRule class]]) return NO;
   SNTRule *o = other;
-  return ([self.identifier isEqual:o.identifier] && self.state == o.state && self.type == o.type);
+  return ([self.identifier isEqual:o.identifier] && self.state == o.state && self.type == o.type &&
+          (self.celExpr == nil || [self.celExpr isEqual:o.celExpr]));
 }
 
 - (NSUInteger)hash {
@@ -384,6 +398,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   result = prime * result + [self.identifier hash];
   result = prime * result + self.state;
   result = prime * result + self.type;
+  result = prime * result + [self.celExpr hash];
   return result;
 }
 

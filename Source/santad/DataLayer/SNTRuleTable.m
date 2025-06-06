@@ -30,9 +30,8 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
 
-static const uint32_t kRuleTableCurrentVersion = 8;
+static const uint32_t kRuleTableCurrentVersion = 9;
 
-// TODO(nguyenphillip): this should be configurable.
 // How many rules must be in database before we start trying to remove transitive rules.
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
 // Consider transitive rules out of date if they haven't been used in six months.
@@ -265,6 +264,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     newVersion = 8;
   }
 
+  if (version < 9) {
+    [db executeUpdate:@"ALTER TABLE 'rules' ADD 'cel_expr' TEXT"];
+    newVersion = 9;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -339,6 +343,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                                    customURL:[rs stringForColumn:@"customurl"]
                                    timestamp:[rs intForColumn:@"timestamp"]
                                      comment:[rs stringForColumn:@"comment"]
+                                     celExpr:[rs stringForColumn:@"cel_expr"]
                                        error:nil];
 }
 
@@ -463,12 +468,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
           return;
         }
       } else {
-        if (![db executeUpdate:
-                     @"INSERT OR REPLACE INTO rules "
-                     @"(identifier, state, type, custommsg, customurl, timestamp, comment) "
-                     @"VALUES (?, ?, ?, ?, ?, ?, ?);",
-                     rule.identifier, @(rule.state), @(rule.type), rule.customMsg, rule.customURL,
-                     @(rule.timestamp), rule.comment]) {
+        if (![db executeUpdate:@"INSERT OR REPLACE INTO rules "
+                               @"(identifier, state, type, custommsg, customurl, timestamp, "
+                               @"comment, cel_expr) "
+                               @"VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+                               rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
+                               rule.customURL, @(rule.timestamp), rule.comment, rule.celExpr]) {
           [SNTError populateError:&blockErr
                          withCode:SNTErrorCodeInsertOrReplaceRuleFailed
                           message:@"A database error occurred while inserting/replacing a rule"
