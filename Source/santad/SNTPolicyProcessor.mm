@@ -97,10 +97,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 
 @implementation SNTPolicyProcessor
 
-- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable {
+- (instancetype)init {
   self = [super init];
   if (self) {
-    _ruleTable = ruleTable;
     _configurator = [SNTConfigurator configurator];
 
     auto evaluator = santa::cel::Evaluator::Create();
@@ -110,6 +109,14 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       LOGW(@"Failed to create CEL evaluator: %s",
            std::string(evaluator.status().message()).c_str());
     }
+  }
+  return self;
+}
+
+- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable {
+  self = [self init];
+  if (self) {
+    _ruleTable = ruleTable;
   }
   return self;
 }
@@ -125,10 +132,10 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     auto evalResult = self->celEvaluator_->CompileAndEvaluate(
         santa::NSStringToUTF8StringView(rule.celExpr), *activation);
     if (!evalResult.ok()) {
-      LOGE(@"Failed to evaluate CEL rule: %s", std::string(evalResult.status().message()).c_str());
+      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
+           std::string(evalResult.status().message()).c_str());
       return NO;
     }
-
     LOGD(@"Ran CEL program and received result: %d", evalResult.value());
 
     auto returnValue = evalResult.value();

@@ -22,7 +22,8 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
-
+#import "Source/common/cel/Activation.h"
+#import "Source/common/cel/cel.pb.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 
 extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd);
@@ -88,7 +89,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   }
   BOOL decisionIsFinal = [self.processor decision:cd
                                           forRule:rule
-                              withTransitiveRules:transitiveRules];
+                              withTransitiveRules:transitiveRules
+                                 andCELActivation:nil];
   XCTAssertEqual(cd.decision, decision);
   XCTAssertEqual(decisionIsFinal, final);
   XCTAssertEqual(cd.silentBlock, silent);
@@ -605,7 +607,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = rule.identifier;
 
-  [self.processor decision:cd forRule:rule withTransitiveRules:YES];
+  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivation:nil];
 
   XCTAssertEqualObjects(cd.customMsg, @"Custom Message");
   XCTAssertEqualObjects(cd.customURL, @"https://example.com");
@@ -664,6 +666,73 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                                                .certificateSHA256 = nil,
                                                                .teamID = nil,
                                                            })));
+}
+
+- (void)testCELDecisions {
+  santa::cel::v1::ExecutableFile *ef = new santa::cel::v1::ExecutableFile();
+  ef->mutable_signing_timestamp()->set_seconds(1717987200);
+  auto activation = santa::cel::Activation(
+      ef,
+      ^std::vector<std::string>() {
+        return std::vector<std::string>{"arg1", "arg2"};
+      },
+      ^std::map<std::string, std::string>() {
+        return std::map<std::string, std::string>{{"ENV_VARIABLE1", "value1"},
+                                                  {"OTHER_ENV_VAR", "value2"}};
+      });
+
+  SNTRule * (^createCELRule)(NSString *) = ^SNTRule *(NSString *celExpr) {
+    return [[SNTRule alloc]
+        initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                     state:SNTRuleStateCEL
+                      type:SNTRuleTypeBinary
+                 customMsg:nil
+                 customURL:nil
+                 timestamp:0
+                   comment:nil
+                   celExpr:celExpr
+                     error:NULL];
+  };
+  {
+    SNTRule *r = createCELRule(@"target.signing_timestamp > timestamp(1717987100)");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd forRule:r withTransitiveRules:YES andCELActivation:&activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertEqual(cd.silentBlock, NO);
+  }
+  {
+    SNTRule *r = createCELRule(@"target.signing_timestamp < timestamp(1717987100)");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd forRule:r withTransitiveRules:YES andCELActivation:&activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertEqual(cd.silentBlock, NO);
+  }
+  {
+    SNTRule *r = createCELRule(@"'arg1' in args");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd forRule:r withTransitiveRules:YES andCELActivation:&activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertEqual(cd.silentBlock, NO);
+  }
+  {
+    SNTRule *r = createCELRule(@"has(envs.ENV_VARIABLE1)");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd forRule:r withTransitiveRules:YES andCELActivation:&activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertEqual(cd.silentBlock, NO);
+  }
+  {
+    SNTRule *r = createCELRule(@"'--inspect' in args ? ALLOWLIST : SILENT_BLOCKLIST");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd forRule:r withTransitiveRules:YES andCELActivation:&activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertEqual(cd.silentBlock, YES);
+  }
 }
 
 @end

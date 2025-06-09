@@ -52,7 +52,8 @@
            decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                  targetProcess:(nonnull const es_process_t *)targetProc
                    configState:(nonnull SNTConfigState *)configState
-            activationCallback:(santa::cel::Activation * (^_Nonnull)(void))activationCallback
+            activationCallback:
+                (santa::cel::Activation *_Nonnull (^_Nonnull)(void))activationCallback
     entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nonnull)(
                                    const char *_Nullable teamID,
                                    NSDictionary *_Nullable entitlements))entitlementsFilterCallback;
@@ -73,6 +74,6 @@
 - (BOOL)decision:(nonnull SNTCachedDecision *)cd
                 forRule:(nonnull SNTRule *)rule
     withTransitiveRules:(BOOL)transitive
-       andCELActivation:(nonnull santa::cel::Activation *)activation;
+       andCELActivation:(nullable santa::cel::Activation *)activation;
 
 @end
