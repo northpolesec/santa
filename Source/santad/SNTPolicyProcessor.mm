@@ -128,8 +128,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
                      forRule:(SNTRule *)rule
          withTransitiveRules:(BOOL)enableTransitiveRules
     andCELActivationCallback:(ActivationCallbackBlock)activationCallback {
-  if (rule.state == SNTRuleStateCEL) {
-    auto activation = activationCallback ? activationCallback() : nullptr;
+  if (rule.state == SNTRuleStateCEL && activationCallback) {
+    auto activation = activationCallback();
     auto evalResult = self->celEvaluator_->CompileAndEvaluate(
         santa::NSStringToUTF8StringView(rule.celExpr), *activation);
     if (!evalResult.ok()) {
@@ -138,9 +138,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       return NO;
     }
 
-    ::santa::cel::v1::ReturnValue returnValue = (*evalResult).first;
+    ::santa::cel::v1::ReturnValue returnValue = evalResult->first;
     LOGD(@"Ran CEL program and received result: %d (cacheable %d)", returnValue,
-         (*evalResult).second);
+         evalResult->second);
     switch (returnValue) {
       case santa::cel::v1::ReturnValue::ALLOWLIST: rule.state = SNTRuleStateAllow; break;
       case santa::cel::v1::ReturnValue::ALLOWLIST_COMPILER:
@@ -473,34 +473,32 @@ static void UpdateCachedDecisionSigningInfo(
   }
 
   return [self decisionForFileInfo:fileInfo
-      configState:[[SNTConfigState alloc] initWithConfig:self.configurator]
-      cdhash:identifiers.cdhash
-      fileSHA256:identifiers.binarySHA256
-      certificateSHA256:identifiers.certificateSHA256
-      teamID:identifiers.teamID
-      signingID:identifiers.signingID
-      platformBinaryState:PlatformBinaryState::kStaticCheck
-      signingStatusCallback:^SNTSigningStatus {
-        if (csInfo) {
-          if (csInfo.signatureFlags & kSecCodeSignatureAdhoc) {
-            return SNTSigningStatusAdhoc;
-          } else if (IsDevelopmentCert(csInfo.leafCertificate)) {
-            return SNTSigningStatusDevelopment;
-          } else {
-            return SNTSigningStatusProduction;
-          }
-        } else {
-          if (error.code == errSecCSUnsigned) {
-            return SNTSigningStatusUnsigned;
-          } else {
-            return SNTSigningStatusInvalid;
-          }
-        }
-      }
-      activationCallback:^santa::cel::Activation *() {
-        return nil;
-      }
-      entitlementsFilterCallback:nil];
+                       configState:[[SNTConfigState alloc] initWithConfig:self.configurator]
+                            cdhash:identifiers.cdhash
+                        fileSHA256:identifiers.binarySHA256
+                 certificateSHA256:identifiers.certificateSHA256
+                            teamID:identifiers.teamID
+                         signingID:identifiers.signingID
+               platformBinaryState:PlatformBinaryState::kStaticCheck
+             signingStatusCallback:^SNTSigningStatus {
+               if (csInfo) {
+                 if (csInfo.signatureFlags & kSecCodeSignatureAdhoc) {
+                   return SNTSigningStatusAdhoc;
+                 } else if (IsDevelopmentCert(csInfo.leafCertificate)) {
+                   return SNTSigningStatusDevelopment;
+                 } else {
+                   return SNTSigningStatusProduction;
+                 }
+               } else {
+                 if (error.code == errSecCSUnsigned) {
+                   return SNTSigningStatusUnsigned;
+                 } else {
+                   return SNTSigningStatusInvalid;
+                 }
+               }
+             }
+                activationCallback:nil
+        entitlementsFilterCallback:nil];
 }
 
 ///

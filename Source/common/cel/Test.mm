@@ -33,12 +33,10 @@ namespace pbv1 = ::santa::cel::v1;
 @implementation CELTest
 
 - (void)testBasic {
-  google::protobuf::Arena arena;
-
-  auto f = google::protobuf::Arena::Create<::pbv1::ExecutableFile>(&arena);
-  f->mutable_signing_timestamp()->set_seconds(1748436989);
+  auto f = std::make_unique<::pbv1::ExecutableFile>();
+  f->mutable_signing_time()->set_seconds(1748436989);
   santa::cel::Activation activation(
-      f,
+      std::move(f),
       ^std::vector<std::string>() {
         return {"hello", "world"};
       },
@@ -58,8 +56,8 @@ namespace pbv1 = ::santa::cel::v1;
   }
   {
     // Timestamp comparison by seconds.
-    auto result = sut.value()->CompileAndEvaluate(
-        "target.signing_timestamp >= timestamp(1748436989)", activation);
+    auto result =
+        sut.value()->CompileAndEvaluate("target.signing_time >= timestamp(1748436989)", activation);
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -70,7 +68,7 @@ namespace pbv1 = ::santa::cel::v1;
   {
     // Timestamp comparison by date string.
     auto result = sut.value()->CompileAndEvaluate(
-        "target.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')", activation);
+        "target.signing_time >= timestamp('2025-05-28T12:00:00Z')", activation);
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -80,8 +78,7 @@ namespace pbv1 = ::santa::cel::v1;
   }
   {
     // Re-use of a compiled expression.
-    auto expr =
-        sut.value()->Compile("target.signing_timestamp >= timestamp('2025-05-28T12:00:00Z')");
+    auto expr = sut.value()->Compile("target.signing_time >= timestamp('2025-05-28T12:00:00Z')");
     if (!expr.ok()) {
       XCTFail("Failed to compile: %s", expr.status().message().data());
     }
@@ -94,10 +91,10 @@ namespace pbv1 = ::santa::cel::v1;
       XCTAssertEqual(result.value().second, true);
     }
 
-    ::pbv1::ExecutableFile *f2 = google::protobuf::Arena::Create<::pbv1::ExecutableFile>(&arena);
-    f2->mutable_signing_timestamp()->set_seconds(1716916129);
+    auto f2 = std::make_unique<::pbv1::ExecutableFile>();
+    f2->mutable_signing_time()->set_seconds(1716916129);
     santa::cel::Activation activation2(
-        f2,
+        std::move(f2),
         ^std::vector<std::string>() {
           return {"hello", "world"};
         },
@@ -138,7 +135,7 @@ namespace pbv1 = ::santa::cel::v1;
     // Test memoization
     __block int argsCallCount = 0;
     santa::cel::Activation activation(
-        f,
+        std::move(f),
         ^std::vector<std::string>() {
           argsCallCount++;
           return {"hello", "world"};

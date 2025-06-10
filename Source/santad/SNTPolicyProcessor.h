@@ -28,7 +28,7 @@
 @class SNTFileInfo;
 @class SNTRuleTable;
 
-typedef santa::cel::Activation * (^ActivationCallbackBlock)(void);
+typedef std::unique_ptr<santa::cel::Activation> (^ActivationCallbackBlock)(void);
 
 ///
 ///  Creates SNTCachedDecision objects from a SNTFileInfo object or a file path. Decisions are based

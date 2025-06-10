@@ -64,11 +64,11 @@ message ExecutableFile {
   // This timestamp is provided by the developer when this binary was signed.
   // It is possible for developers to set this to whatever they wish when signing
   // unlike the secure_signing_timestamp.
-  optional google.protobuf.Timestamp signing_timestamp = 1;
+  optional google.protobuf.Timestamp signing_time = 1;
 
   // The timestamp of when the binary was signed.
   //
   // This timestamp is the secure timestamp that was certified by Apple's timestamp
   // authority service and can be trusted.
-  optional google.protobuf.Timestamp secure_signing_timestamp = 2;
+  optional google.protobuf.Timestamp secure_signing_time = 2;
 }

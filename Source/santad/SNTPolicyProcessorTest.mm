@@ -669,12 +669,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELDecisions {
-  ActivationCallbackBlock activation = ^santa::cel::Activation *() {
-    santa::cel::v1::ExecutableFile *ef = new santa::cel::v1::ExecutableFile();
-    ef->mutable_signing_timestamp()->set_seconds(1717987200);
-    ef->mutable_secure_signing_timestamp()->set_seconds(1717987200);
-    return new santa::cel::Activation(
-        ef,
+  ActivationCallbackBlock activation = ^std::unique_ptr<santa::cel::Activation>() {
+    auto ef = std::make_unique<santa::cel::v1::ExecutableFile>();
+    ef->mutable_signing_time()->set_seconds(1717987200);
+    ef->mutable_secure_signing_time()->set_seconds(1717987200);
+    return std::make_unique<santa::cel::Activation>(
+        std::move(ef),
         ^std::vector<std::string>() {
           return std::vector<std::string>{"arg1", "arg2"};
         },
@@ -697,7 +697,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                      error:NULL];
   };
   {
-    SNTRule *r = createCELRule(@"target.signing_timestamp > timestamp(1717987100)");
+    SNTRule *r = createCELRule(@"target.signing_time > timestamp(1717987100)");
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
@@ -709,7 +709,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertTrue(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"target.signing_timestamp < timestamp(1717987100)");
+    SNTRule *r = createCELRule(@"target.signing_time < timestamp(1717987100)");
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd

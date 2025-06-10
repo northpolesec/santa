@@ -42,9 +42,9 @@ namespace cel {
 // santa.pb.cel.v1.Context message, and easy access to variables for return values.
 class Activation : public ::cel_runtime::BaseActivation {
  public:
-  Activation(const ::pbv1::ExecutableFile *file, std::vector<std::string> (^args)(),
+  Activation(std::unique_ptr<::pbv1::ExecutableFile> file, std::vector<std::string> (^args)(),
              std::map<std::string, std::string> (^envs)())
-      : file_(file), args_(args), envs_(envs) {};
+      : file_(std::move(file)), args_(args), envs_(envs) {};
   ~Activation() = default;
 
   std::optional<cel_runtime::CelValue> FindValue(absl::string_view name,
@@ -62,7 +62,7 @@ class Activation : public ::cel_runtime::BaseActivation {
   friend class Evaluator;
 
  private:
-  const ::santa::cel::v1::ExecutableFile *file_;
+  std::unique_ptr<::santa::cel::v1::ExecutableFile> file_;
   Memoizer<std::vector<std::string>> args_;
   Memoizer<std::map<std::string, std::string>> envs_;
 

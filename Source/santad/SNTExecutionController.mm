@@ -644,18 +644,17 @@ static NSString *const kPrinterProxyPostMonterey =
 - (ActivationCallbackBlock)createActivationBlockForMessage:(const santa::Message &)esMsg
                                                  andCSInfo:(nullable MOLCodesignChecker *)csInfo {
   std::shared_ptr<santa::EndpointSecurityAPI> esApi = esMsg.ESAPI();
-  return ^santa::cel::Activation *() {
-    auto f = std::make_unique<::santa::cel::v1::ExecutableFile>();
+  return ^std::unique_ptr<santa::cel::Activation>() {
+    auto f = std::make_unique<santa::cel::v1::ExecutableFile>();
     if (csInfo.signingTime) {
-      f->mutable_signing_timestamp()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
+      f->mutable_signing_time()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
     }
     if (csInfo.secureSigningTime) {
-      f->mutable_secure_signing_timestamp()->set_seconds(
-          csInfo.secureSigningTime.timeIntervalSince1970);
+      f->mutable_secure_signing_time()->set_seconds(csInfo.secureSigningTime.timeIntervalSince1970);
     }
 
-    return new santa::cel::Activation(
-        f.get(),
+    return std::make_unique<santa::cel::Activation>(
+        std::move(f),
         ^std::vector<std::string>() {
           return esApi->ExecArgs(&esMsg->event.exec);
         },
