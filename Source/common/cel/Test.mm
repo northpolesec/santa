@@ -123,11 +123,11 @@ namespace pbv1 = ::santa::cel::v1;
   {
     // Dynamic, env vars, ternary
     auto result = sut.value()->CompileAndEvaluate(
-        "has(envs.DYLD_INSERT_LIBRARIES) ? ALLOWLIST : BLOCKLIST", activation);
+        "! has(envs.DYLD_INSERT_LIBRARIES) ? ALLOWLIST : BLOCKLIST", activation);
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, pbv1::ReturnValue::BLOCKLIST);
       XCTAssertEqual(result.value().second, false);
     }
   }
