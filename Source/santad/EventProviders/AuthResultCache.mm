@@ -122,7 +122,6 @@ bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision) {
 
     case SNTActionRespondAllow: OS_FALLTHROUGH;
     case SNTActionRespondAllowCompiler: OS_FALLTHROUGH;
-    case SNTActionRespondAllowNoCache: OS_FALLTHROUGH;
     case SNTActionRespondDeny:
       return cache->set(vnode_id, CacheableAction(decision),
                         CacheableAction(SNTActionRequestBinary, 0));
@@ -156,15 +155,6 @@ SNTAction AuthResultCache::CheckCache(SantaVnode vnode_id) {
 
   uint64_t cached_val = cache->get(vnode_id);
   if (cached_val == 0) {
-    return SNTActionUnset;
-  }
-
-  // If the cached value is SNTActionRespondAllowNoCache, remove the cached
-  // value and return. We needed to add the cached value to allow any threads
-  // waiting to see a value but we don't want to let them use the cached value
-  // because the dynamic values might be different.
-  if (cached_val == CacheableAction(SNTActionRespondAllowNoCache)) {
-    cache->remove(vnode_id);
     return SNTActionUnset;
   }
 

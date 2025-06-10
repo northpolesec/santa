@@ -312,6 +312,7 @@ objc_library(
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
     deps = [
+        ":EndpointSecurityAPI",
         ":EndpointSecurityMessage",
         ":ProcessControl",
         ":SNTDecisionCache",
@@ -813,6 +814,7 @@ objc_library(
     deps = [
         ":EndpointSecurityClient",
         ":WatchItemPolicy",
+        "//Source/common:String",
         "//Source/santad/ProcessTree:process_tree",
     ],
 )

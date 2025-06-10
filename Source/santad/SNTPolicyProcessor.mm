@@ -14,7 +14,6 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTPolicyProcessor.h"
-#include "Source/common/String.h"
 
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
@@ -30,6 +29,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
+#include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 #include "Source/common/cel/cel.pb.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -104,7 +104,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 
     auto evaluator = santa::cel::Evaluator::Create();
     if (evaluator.ok()) {
-      celEvaluator_ = std::move(evaluator.value());
+      celEvaluator_ = std::move(*evaluator);
     } else {
       LOGW(@"Failed to create CEL evaluator: %s",
            std::string(evaluator.status().message()).c_str());
@@ -125,10 +125,11 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 //
 // It returns YES if the decision was made, NO if the decision was not made.
 - (BOOL)decision:(SNTCachedDecision *)cd
-                forRule:(SNTRule *)rule
-    withTransitiveRules:(BOOL)enableTransitiveRules
-       andCELActivation:(santa::cel::Activation *)activation {
+                     forRule:(SNTRule *)rule
+         withTransitiveRules:(BOOL)enableTransitiveRules
+    andCELActivationCallback:(ActivationCallbackBlock)activationCallback {
   if (rule.state == SNTRuleStateCEL) {
+    auto activation = activationCallback ? activationCallback() : nullptr;
     auto evalResult = self->celEvaluator_->CompileAndEvaluate(
         santa::NSStringToUTF8StringView(rule.celExpr), *activation);
     if (!evalResult.ok()) {
@@ -338,9 +339,9 @@ static void UpdateCachedDecisionSigningInfo(
   if (rule) {
     // If we have a rule match we don't need to process any further.
     if ([self decision:cd
-                        forRule:rule
-            withTransitiveRules:self.configurator.enableTransitiveRules
-               andCELActivation:activationCallback()]) {
+                             forRule:rule
+                 withTransitiveRules:self.configurator.enableTransitiveRules
+            andCELActivationCallback:activationCallback]) {
       return cd;
     }
   }
@@ -379,7 +380,7 @@ static void UpdateCachedDecisionSigningInfo(
            decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                  targetProcess:(nonnull const es_process_t *)targetProc
                    configState:(nonnull SNTConfigState *)configState
-            activationCallback:(santa::cel::Activation * (^_Nonnull)(void))activationCallback
+            activationCallback:(santa::cel::Activation * (^_Nullable)(void))activationCallback
     entitlementsFilterCallback:
         (NSDictionary *_Nullable (^_Nonnull)(const char *_Nullable teamID,
                                              NSDictionary *_Nullable entitlements))

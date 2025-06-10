@@ -196,18 +196,26 @@ using santa::Message;
     case SNTActionRespondAllowCompiler:
       // Do not cache compiler processes so future instances get marked appropriately.
       [self.compilerController setProcess:esMsg->event.exec.target->audit_token isCompiler:true];
-      OS_FALLTHROUGH;
-    case SNTActionRespondHold:
-      // Do not allow caching when the action is SNTActionRespondHold because Santa
-      // also authorizes EXECs that occur while the current authorization is pending.
       cacheable = false;
-      OS_FALLTHROUGH;
+      authResult = ES_AUTH_RESULT_ALLOW;
+      break;
+    case SNTActionRespondHold:
+      // Do not allow caching when the action is SNTActionRespondHold. Santa will
+      // allow the current exec because the process was first suspended so no code
+      // will be executed. However if additional instances of the binary are executed
+      // while authorization is pending, neither Santa nor ES should use the decision
+      // as it is not yet final.
+      cacheable = false;
+      authResult = ES_AUTH_RESULT_ALLOW;
+      break;
     case SNTActionRespondAllowNoCache:
       // Do not cache when the action is SNTActionRespondAllowNoCache because this
       // implies a CEL evaluation was performed and used per-process data to make
       // its decision.
       cacheable = false;
-      OS_FALLTHROUGH;
+      authResult = ES_AUTH_RESULT_ALLOW;
+      self->_authResultCache->RemoveFromCache(esMsg->event.exec.target->executable);
+      break;
     case SNTActionRespondAllow: authResult = ES_AUTH_RESULT_ALLOW; break;
     case SNTActionRespondDeny: authResult = ES_AUTH_RESULT_DENY; break;
 

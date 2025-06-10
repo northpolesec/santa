@@ -28,6 +28,8 @@
 @class SNTFileInfo;
 @class SNTRuleTable;
 
+typedef santa::cel::Activation * (^ActivationCallbackBlock)(void);
+
 ///
 ///  Creates SNTCachedDecision objects from a SNTFileInfo object or a file path. Decisions are based
 ///  on any existing rules for that specific binary, its signing certificate and the operating mode
@@ -52,8 +54,7 @@
            decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                  targetProcess:(nonnull const es_process_t *)targetProc
                    configState:(nonnull SNTConfigState *)configState
-            activationCallback:
-                (santa::cel::Activation *_Nonnull (^_Nonnull)(void))activationCallback
+            activationCallback:(nullable ActivationCallbackBlock)activationCallback
     entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nonnull)(
                                    const char *_Nullable teamID,
                                    NSDictionary *_Nullable entitlements))entitlementsFilterCallback;
@@ -72,8 +73,8 @@
 ///
 /// Returns YES if the decision requires no futher processing NO otherwise.
 - (BOOL)decision:(nonnull SNTCachedDecision *)cd
-                forRule:(nonnull SNTRule *)rule
-    withTransitiveRules:(BOOL)transitive
-       andCELActivation:(nullable santa::cel::Activation *)activation;
+                     forRule:(nonnull SNTRule *)rule
+         withTransitiveRules:(BOOL)transitive
+    andCELActivationCallback:(nullable ActivationCallbackBlock)activationCallback;
 
 @end

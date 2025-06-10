@@ -50,6 +50,7 @@
 #include "Source/common/Unit.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
@@ -63,8 +64,6 @@ using santa::TTYWriter;
 using santa::Unit;
 
 static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account for null terminator
-
-typedef santa::cel::Activation * (^ActivationCallbackBlock)(void);
 
 void UpdateTeamIDFilterLocked(std::set<std::string> &filterSet, NSArray<NSString *> *filter) {
   filterSet.clear();
@@ -277,10 +276,10 @@ static NSString *const kPrinterProxyPostMonterey =
              decisionForFileInfo:binInfo
                    targetProcess:targetProc
                      configState:configState
-              activationCallback:[self createActivationForMessage:esMsg
-                                                        andCSInfo:[binInfo
-                                                                      codesignCheckerWithError:NULL]
-                                                   preventCaching:&preventCaching]
+              activationCallback:
+                  [self createActivationBlockForMessage:esMsg
+                                              andCSInfo:[binInfo codesignCheckerWithError:NULL]
+                                         preventCaching:&preventCaching]
       entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
         if (!entitlements) {
           return nil;
@@ -638,35 +637,24 @@ static NSString *const kPrinterProxyPostMonterey =
   // TODO: Notify the sync service of the new rule.
 }
 
-- (ActivationCallbackBlock)createActivationForMessage:(const santa::Message &)esMsg
-                                            andCSInfo:(nullable MOLCodesignChecker *)csInfo
-                                       preventCaching:(nonnull BOOL *)preventCaching {
+- (ActivationCallbackBlock)createActivationBlockForMessage:(const santa::Message &)esMsg
+                                                 andCSInfo:(nullable MOLCodesignChecker *)csInfo
+                                            preventCaching:(nonnull BOOL *)preventCaching {
+  std::shared_ptr<santa::EndpointSecurityAPI> esApi = esMsg.ESAPI();
   return ^santa::cel::Activation *() {
     auto f = std::make_unique<::santa::cel::v1::ExecutableFile>();
     f->mutable_signing_timestamp()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
 
-    auto activation = new santa::cel::Activation(
+    return new santa::cel::Activation(
         f.get(),
         ^std::vector<std::string>() {
           *preventCaching = YES;
-          std::vector<std::string> args;
-          for (int i = 0; i < es_exec_arg_count(&esMsg->event.exec); i++) {
-            args.push_back(
-                std::string(santa::StringTokenToStringView(es_exec_arg(&esMsg->event.exec, i))));
-          }
-          return args;
+          return esApi->ExecArgs(&esMsg->event.exec);
         },
         ^std::map<std::string, std::string>() {
           *preventCaching = YES;
-          std::map<std::string, std::string> envs;
-          for (int i = 0; i < es_exec_env_count(&esMsg->event.exec); i++) {
-            auto s = santa::StringTokenToStringView(es_exec_env(&esMsg->event.exec, i));
-            auto npos = s.find("=");
-            envs[std::string(s.substr(0, npos))] = std::string(s.substr(npos + 1));
-          }
-          return envs;
+          return esApi->ExecEnvs(&esMsg->event.exec);
         });
-    return activation;
   };
 }
 
