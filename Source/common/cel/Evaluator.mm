@@ -122,7 +122,7 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile
   return expression_plan;
 };
 
-absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::Evaluate(
+absl::StatusOr<std::pair<::santa::cel::v1::ReturnValue, bool>> Evaluator::Evaluate(
     const ::cel_runtime::CelExpression *expression_plan, const Activation &activation) {
   // Evaluate the parsed expression.
   absl::StatusOr<cel_runtime::CelValue> result =
@@ -137,20 +137,20 @@ absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::Evaluate(
   // Everything else is an error.
   if (bool value; result->GetValue(&value)) {
     if (value) {
-      return pbv1::ReturnValue::ALLOWLIST;
+      return {{pbv1::ReturnValue::ALLOWLIST, activation.IsResultCacheable()}};
     }
-    return pbv1::ReturnValue::BLOCKLIST;
+    return {{pbv1::ReturnValue::BLOCKLIST, activation.IsResultCacheable()}};
   } else if (int64_t value; result->GetValue(&value) && pbv1::ReturnValue_IsValid((int)value)) {
-    return static_cast<pbv1::ReturnValue>(value);
+    return {{static_cast<pbv1::ReturnValue>(value), activation.IsResultCacheable()}};
   } else if (const cel_runtime::CelError * value; result->GetValue(&value)) {
-    return *value;
+    return absl::InvalidArgumentError(value->message());
   } else {
     return absl::InvalidArgumentError(absl::StrCat(
         "expected 'santa.cel.v1.ReturnValue' result got '", result->DebugString(), "'"));
   }
 }
 
-absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluator::CompileAndEvaluate(
+absl::StatusOr<std::pair<::santa::cel::v1::ReturnValue, bool>> Evaluator::CompileAndEvaluate(
     absl::string_view cel_expr, const Activation &activation) {
   absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> expr = Compile(cel_expr);
   if (!expr.ok()) {

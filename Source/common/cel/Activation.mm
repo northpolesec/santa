@@ -139,6 +139,10 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
   return v;
 }
 
+bool Activation::IsResultCacheable() const {
+  return !args_.HasValue() && !envs_.HasValue();
+}
+
 ::cel::Type Activation::CELType(google::protobuf::internal::FieldDescriptorLite::CppType type,
                                 const google::protobuf::Descriptor *messageType) {
   switch (type) {

@@ -59,14 +59,14 @@ class Evaluator {
   Compile(absl::string_view cel_expr);
 
   // Evaluate an expression plan with a SantaActivation object.
-  absl::StatusOr<::santa::cel::v1::ReturnValue> Evaluate(
+  absl::StatusOr<std::pair<::santa::cel::v1::ReturnValue, bool>> Evaluate(
       ::google::api::expr::runtime::CelExpression const *expression_plan,
       const Activation &activation);
 
   // Convenience method that combines Compile() and Evaluate() into a single
   // call.
-  absl::StatusOr<::santa::cel::v1::ReturnValue> CompileAndEvaluate(
-      absl::string_view cel_expr, const Activation &activation);
+  absl::StatusOr<std::pair<::santa::cel::v1::ReturnValue, bool>>
+  CompileAndEvaluate(absl::string_view cel_expr, const Activation &activation);
 
  private:
   std::unique_ptr<google::protobuf::Arena> arena_;

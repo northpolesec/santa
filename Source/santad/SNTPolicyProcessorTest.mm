@@ -672,6 +672,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   ActivationCallbackBlock activation = ^santa::cel::Activation *() {
     santa::cel::v1::ExecutableFile *ef = new santa::cel::v1::ExecutableFile();
     ef->mutable_signing_timestamp()->set_seconds(1717987200);
+    ef->mutable_secure_signing_timestamp()->set_seconds(1717987200);
     return new santa::cel::Activation(
         ef,
         ^std::vector<std::string>() {
@@ -704,7 +705,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
-    XCTAssertEqual(cd.silentBlock, NO);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertTrue(cd.cacheable);
   }
   {
     SNTRule *r = createCELRule(@"target.signing_timestamp < timestamp(1717987100)");
@@ -715,7 +717,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
-    XCTAssertEqual(cd.silentBlock, NO);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertTrue(cd.cacheable);
   }
   {
     SNTRule *r = createCELRule(@"'arg1' in args");
@@ -726,7 +729,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
-    XCTAssertEqual(cd.silentBlock, NO);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
   }
   {
     SNTRule *r = createCELRule(@"has(envs.ENV_VARIABLE1)");
@@ -737,7 +741,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
-    XCTAssertEqual(cd.silentBlock, NO);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
   }
   {
     SNTRule *r = createCELRule(@"'--inspect' in args ? ALLOWLIST : SILENT_BLOCKLIST");
@@ -748,7 +753,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
-    XCTAssertEqual(cd.silentBlock, YES);
+    XCTAssertTrue(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
   }
 }
 

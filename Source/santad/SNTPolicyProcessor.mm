@@ -137,9 +137,10 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
            std::string(evalResult.status().message()).c_str());
       return NO;
     }
-    LOGD(@"Ran CEL program and received result: %d", evalResult.value());
 
-    auto returnValue = evalResult.value();
+    ::santa::cel::v1::ReturnValue returnValue = (*evalResult).first;
+    LOGD(@"Ran CEL program and received result: %d (cacheable %d)", returnValue,
+         (*evalResult).second);
     switch (returnValue) {
       case santa::cel::v1::ReturnValue::ALLOWLIST: rule.state = SNTRuleStateAllow; break;
       case santa::cel::v1::ReturnValue::ALLOWLIST_COMPILER:
@@ -150,6 +151,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
         rule.state = SNTRuleStateSilentBlock;
         break;
       default: break;
+    }
+    if (!(*evalResult).second) {
+      cd.cacheable = NO;
     }
   }
 
@@ -287,7 +291,7 @@ static void UpdateCachedDecisionSigningInfo(
                      signingID:(nullable NSString *)signingID
            platformBinaryState:(PlatformBinaryState)platformBinaryState
          signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
-            activationCallback:(santa::cel::Activation * (^_Nonnull)(void))activationCallback
+            activationCallback:(nullable ActivationCallbackBlock)activationCallback
     entitlementsFilterCallback:
         (NSDictionary *_Nullable (^_Nullable)(NSDictionary *_Nullable entitlements))
             entitlementsFilterCallback {
@@ -380,7 +384,7 @@ static void UpdateCachedDecisionSigningInfo(
            decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                  targetProcess:(nonnull const es_process_t *)targetProc
                    configState:(nonnull SNTConfigState *)configState
-            activationCallback:(santa::cel::Activation * (^_Nullable)(void))activationCallback
+            activationCallback:(nullable ActivationCallbackBlock)activationCallback
     entitlementsFilterCallback:
         (NSDictionary *_Nullable (^_Nonnull)(const char *_Nullable teamID,
                                              NSDictionary *_Nullable entitlements))

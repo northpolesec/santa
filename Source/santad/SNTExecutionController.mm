@@ -271,15 +271,13 @@ static NSString *const kPrinterProxyPostMonterey =
   // TODO(markowsky): Maybe add a metric here for how many large executables we're seeing.
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
-  __block BOOL preventCaching = NO;
   SNTCachedDecision *cd = [self.policyProcessor
              decisionForFileInfo:binInfo
                    targetProcess:targetProc
                      configState:configState
               activationCallback:
                   [self createActivationBlockForMessage:esMsg
-                                              andCSInfo:[binInfo codesignCheckerWithError:NULL]
-                                         preventCaching:&preventCaching]
+                                              andCSInfo:[binInfo codesignCheckerWithError:NULL]]
       entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
         if (!entitlements) {
           return nil;
@@ -318,7 +316,7 @@ static NSString *const kPrinterProxyPostMonterey =
 
   // Formulate an initial action from the decision.
   SNTAction action = (SNTEventStateAllow & cd.decision)
-                         ? (preventCaching ? SNTActionRespondAllowNoCache : SNTActionRespondAllow)
+                         ? (cd.cacheable ? SNTActionRespondAllow : SNTActionRespondAllowNoCache)
                          : SNTActionRespondDeny;
 
   // Save decision details for logging the execution later.  For transitive rules, we also use
@@ -637,22 +635,31 @@ static NSString *const kPrinterProxyPostMonterey =
   // TODO: Notify the sync service of the new rule.
 }
 
+// Create a block that returns a santa::cel::Activation object for the given Message
+// and MOLCodesignChecker object.
+//
+// Note: The returned block captures a reference to the Message object and must
+// not use it after the Message object is destroyed. Care must be taken to not
+// use this in an asynchronous context outside of the evaluation of that execution.
 - (ActivationCallbackBlock)createActivationBlockForMessage:(const santa::Message &)esMsg
-                                                 andCSInfo:(nullable MOLCodesignChecker *)csInfo
-                                            preventCaching:(nonnull BOOL *)preventCaching {
+                                                 andCSInfo:(nullable MOLCodesignChecker *)csInfo {
   std::shared_ptr<santa::EndpointSecurityAPI> esApi = esMsg.ESAPI();
   return ^santa::cel::Activation *() {
     auto f = std::make_unique<::santa::cel::v1::ExecutableFile>();
-    f->mutable_signing_timestamp()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
+    if (csInfo.signingTime) {
+      f->mutable_signing_timestamp()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
+    }
+    if (csInfo.secureSigningTime) {
+      f->mutable_secure_signing_timestamp()->set_seconds(
+          csInfo.secureSigningTime.timeIntervalSince1970);
+    }
 
     return new santa::cel::Activation(
         f.get(),
         ^std::vector<std::string>() {
-          *preventCaching = YES;
           return esApi->ExecArgs(&esMsg->event.exec);
         },
         ^std::map<std::string, std::string>() {
-          *preventCaching = YES;
           return esApi->ExecEnvs(&esMsg->event.exec);
         });
   };

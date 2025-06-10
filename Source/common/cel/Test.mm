@@ -63,7 +63,8 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().second, true);
     }
   }
   {
@@ -73,7 +74,8 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().second, true);
     }
   }
   {
@@ -88,7 +90,8 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().second, true);
     }
 
     ::pbv1::ExecutableFile *f2 = google::protobuf::Arena::Create<::pbv1::ExecutableFile>(&arena);
@@ -106,7 +109,8 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result2.ok()) {
       XCTFail("Failed to evaluate: %s", result2.status().message().data());
     } else {
-      XCTAssertEqual(result2.value(), pbv1::ReturnValue::BLOCKLIST);
+      XCTAssertEqual(result2.value().first, pbv1::ReturnValue::BLOCKLIST);
+      XCTAssertEqual(result2.value().second, true);
     }
   }
   {
@@ -115,7 +119,8 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().second, false);
     }
   }
   {
@@ -125,7 +130,8 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().second, false);
     }
   }
   {
@@ -146,7 +152,8 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value(), pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().second, false);
     }
     XCTAssertEqual(argsCallCount, 1);
   }

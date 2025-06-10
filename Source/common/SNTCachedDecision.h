@@ -54,4 +54,6 @@
 @property NSString *customURL;
 @property BOOL silentBlock;
 
+@property BOOL cacheable;
+
 @end

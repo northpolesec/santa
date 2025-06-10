@@ -50,7 +50,7 @@ class Activation : public ::cel_runtime::BaseActivation {
   std::optional<cel_runtime::CelValue> FindValue(absl::string_view name,
                                                  google::protobuf::Arena *arena) const override;
 
-  // SantaActivation does not support lazy-loaded functions.
+  // Activation does not support lazy-loaded functions.
   std::vector<const cel_runtime::CelFunction *> FindFunctionOverloads(
       absl::string_view) const override {
     return {};
@@ -59,10 +59,14 @@ class Activation : public ::cel_runtime::BaseActivation {
   static std::vector<std::pair<absl::string_view, ::cel::Type>> GetVariables(
       google::protobuf::Arena *arena);
 
+  friend class Evaluator;
+
  private:
   const ::santa::cel::v1::ExecutableFile *file_;
   Memoizer<std::vector<std::string>> args_;
   Memoizer<std::map<std::string, std::string>> envs_;
+
+  bool IsResultCacheable() const;
 
   static ::cel::Type CELType(google::protobuf::internal::FieldDescriptorLite::CppType type,
                              const google::protobuf::Descriptor *messageType);
