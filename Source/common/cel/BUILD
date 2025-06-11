@@ -1,5 +1,3 @@
-load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -8,19 +6,6 @@ package(
 )
 
 licenses(["notice"])
-
-proto_library(
-    name = "cel_proto",
-    srcs = ["cel.proto"],
-    deps = [
-        "@protobuf//:timestamp_proto",
-    ],
-)
-
-cc_proto_library(
-    name = "cel_cc_proto",
-    deps = [":cel_proto"],
-)
 
 objc_library(
     name = "CEL",
@@ -33,7 +18,6 @@ objc_library(
         "Evaluator.h",
     ],
     deps = [
-        ":cel_cc_proto",
         "//Source/common:Memoizer",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
@@ -60,6 +44,7 @@ objc_library(
         "@cel-cpp//eval/public/structs:cel_proto_wrapper",
         "@cel-cpp//internal:status_macros",
         "@cel-cpp//parser",
+        "@northpolesec_protos//cel:v1_cc_proto",
     ],
 )
 
@@ -68,8 +53,8 @@ santa_unit_test(
     srcs = ["Test.mm"],
     deps = [
         ":CEL",
-        ":cel_cc_proto",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
+        "@northpolesec_protos//cel:v1_cc_proto",
     ],
 )

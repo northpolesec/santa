@@ -20,9 +20,9 @@
 
 #include <optional>
 
-#include "Source/common/cel/cel.pb.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "cel/v1.pb.h"
 #include "google/protobuf/arena.h"
 
 namespace pbv1 = ::santa::cel::v1;

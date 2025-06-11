@@ -18,9 +18,9 @@
 #include <memory>
 
 #include "Source/common/cel/Activation.h"
-#include "Source/common/cel/cel.pb.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "cel/v1.pb.h"
 
 // CEL headers have warnings and our config turns them into errors.
 // For some reason these can't be disabled with --per_file_copt.

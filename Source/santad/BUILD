@@ -267,9 +267,9 @@ objc_library(
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
-        "//Source/common/cel:cel_cc_proto",
         "@FMDB",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@northpolesec_protos//cel:v1_cc_proto",
     ],
 )
 
