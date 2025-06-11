@@ -36,7 +36,7 @@
 
 - (void)testStringifyRule {
   std::map<std::pair<SNTRuleType, SNTRuleState>, NSString *> ruleCheckToString = {
-      {{SNTRuleTypeUnknown, SNTRuleStateUnknown}, @"No rule exists with the given parameters"},
+      {{SNTRuleTypeUnknown, SNTRuleStateUnknown}, @"None"},
       {{SNTRuleTypeUnknown, SNTRuleStateAllow}, @"Allowed (Unknown)"},
       {{SNTRuleTypeUnknown, SNTRuleStateBlock}, @"Blocked (Unknown)"},
       {{SNTRuleTypeUnknown, SNTRuleStateSilentBlock}, @"Blocked (Unknown, Silent)"},
@@ -45,7 +45,7 @@
       {{SNTRuleTypeUnknown, SNTRuleStateAllowTransitive},
        @"Allowed (Unknown, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
 
-      {{SNTRuleTypeBinary, SNTRuleStateUnknown}, @"No rule exists with the given parameters"},
+      {{SNTRuleTypeBinary, SNTRuleStateUnknown}, @"None"},
       {{SNTRuleTypeBinary, SNTRuleStateAllow}, @"Allowed (Binary)"},
       {{SNTRuleTypeBinary, SNTRuleStateBlock}, @"Blocked (Binary)"},
       {{SNTRuleTypeBinary, SNTRuleStateSilentBlock}, @"Blocked (Binary, Silent)"},
@@ -54,7 +54,7 @@
       {{SNTRuleTypeBinary, SNTRuleStateAllowTransitive},
        @"Allowed (Binary, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
 
-      {{SNTRuleTypeSigningID, SNTRuleStateUnknown}, @"No rule exists with the given parameters"},
+      {{SNTRuleTypeSigningID, SNTRuleStateUnknown}, @"None"},
       {{SNTRuleTypeSigningID, SNTRuleStateAllow}, @"Allowed (SigningID)"},
       {{SNTRuleTypeSigningID, SNTRuleStateBlock}, @"Blocked (SigningID)"},
       {{SNTRuleTypeSigningID, SNTRuleStateSilentBlock}, @"Blocked (SigningID, Silent)"},
@@ -63,7 +63,7 @@
       {{SNTRuleTypeSigningID, SNTRuleStateAllowTransitive},
        @"Allowed (SigningID, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
 
-      {{SNTRuleTypeCertificate, SNTRuleStateUnknown}, @"No rule exists with the given parameters"},
+      {{SNTRuleTypeCertificate, SNTRuleStateUnknown}, @"None"},
       {{SNTRuleTypeCertificate, SNTRuleStateAllow}, @"Allowed (Certificate)"},
       {{SNTRuleTypeCertificate, SNTRuleStateBlock}, @"Blocked (Certificate)"},
       {{SNTRuleTypeCertificate, SNTRuleStateSilentBlock}, @"Blocked (Certificate, Silent)"},
@@ -72,7 +72,7 @@
       {{SNTRuleTypeCertificate, SNTRuleStateAllowTransitive},
        @"Allowed (Certificate, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
 
-      {{SNTRuleTypeTeamID, SNTRuleStateUnknown}, @"No rule exists with the given parameters"},
+      {{SNTRuleTypeTeamID, SNTRuleStateUnknown}, @"None"},
       {{SNTRuleTypeTeamID, SNTRuleStateAllow}, @"Allowed (TeamID)"},
       {{SNTRuleTypeTeamID, SNTRuleStateBlock}, @"Blocked (TeamID)"},
       {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, @"Blocked (TeamID, Silent)"},
@@ -89,7 +89,7 @@
     rule.type = typeAndState.first;
     rule.state = typeAndState.second;
 
-    NSString *got = [SNTCommandRule stringifyRule:rule withColor:NO];
+    NSString *got = [rule stringifyWithColor:NO];
     XCTAssertEqualObjects(got, want);
   }
 }
