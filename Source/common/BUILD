@@ -479,7 +479,7 @@ objc_library(
 
 santa_unit_test(
     name = "SNTRuleTest",
-    srcs = ["SNTRuleTest.m"],
+    srcs = ["SNTRuleTest.mm"],
     deps = [
         ":SNTCommonEnums",
         ":SNTError",
