@@ -104,6 +104,11 @@
 - (instancetype)initWithDictionary:(NSDictionary *)rawDict error:(NSError **)error;
 
 ///
+///  Stringify the rule with optional colorization.
+///
+- (NSString *)stringifyWithColor:(BOOL)colorize;
+
+///
 ///  Sets timestamp of rule to the current time.
 ///
 - (void)resetTimestamp;

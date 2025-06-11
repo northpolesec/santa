@@ -60,15 +60,6 @@ typedef std::unique_ptr<santa::cel::Activation> (^ActivationCallbackBlock)(void)
                                    NSDictionary *_Nullable entitlements))entitlementsFilterCallback;
 
 ///
-///  A wrapper for decisionForFileInfo:fileSHA256:certificateSHA256:. This method is slower as it
-///  has to create the SNTFileInfo object. This is mainly used by the santactl binary because
-///  SNTFileInfo is not SecureCoding compliant. If the SHA256 hash of the file has already been
-///  calculated, use the fileSHA256 parameter to save a second calculation of the hash.
-///
-- (nonnull SNTCachedDecision *)decisionForFilePath:(nonnull NSString *)filePath
-                                       identifiers:(nonnull SNTRuleIdentifiers *)identifiers;
-
-///
 /// Updates a decision for a given file and agent configuration.
 ///
 /// Returns YES if the decision requires no futher processing NO otherwise.

@@ -383,7 +383,6 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     dispatch_once(&token, ^{
       [cmd.daemonConn resume];
     });
-    __block SNTEventState state;
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     NSError *err;
     MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:&err];
@@ -400,60 +399,19 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         .teamID = teamID,
     };
 
-    [[cmd.daemonConn remoteObjectProxy]
-        decisionForFilePath:fileInfo.path
-                identifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
-                      reply:^(SNTEventState s) {
-                        state = s;
-                        dispatch_semaphore_signal(sema);
-                      }];
+    __block NSString *output = @"None";
+    id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
+    [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
+                              reply:^(SNTRule *r) {
+        if (r) output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
+        dispatch_semaphore_signal(sema);
+    }];
+
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
       cmd.daemonUnavailable = YES;
       return kCommunicationErrorMsg;
-    } else {
-      NSMutableString *output =
-          (SNTEventStateAllow & state) ? @"Allowed".mutableCopy : @"Blocked".mutableCopy;
-      switch (state) {
-        case SNTEventStateAllowUnknown:
-        case SNTEventStateBlockUnknown: [output appendString:@" (Unknown)"]; break;
-        case SNTEventStateAllowBinary:
-        case SNTEventStateAllowLocalBinary:
-        case SNTEventStateBlockBinary: [output appendString:@" (Binary)"]; break;
-        case SNTEventStateAllowCertificate:
-        case SNTEventStateBlockCertificate: [output appendString:@" (Certificate)"]; break;
-        case SNTEventStateAllowTeamID:
-        case SNTEventStateBlockTeamID: [output appendString:@" (TeamID)"]; break;
-        case SNTEventStateAllowSigningID:
-        case SNTEventStateAllowLocalSigningID:
-        case SNTEventStateBlockSigningID: [output appendString:@" (SigningID)"]; break;
-        case SNTEventStateAllowCDHash:
-        case SNTEventStateBlockCDHash: [output appendString:@" (CDHash)"]; break;
-        case SNTEventStateAllowScope:
-        case SNTEventStateBlockScope: [output appendString:@" (Scope)"]; break;
-        case SNTEventStateAllowCompilerBinary: [output appendString:@" (Compiler, Binary)"]; break;
-        case SNTEventStateAllowCompilerCDHash: [output appendString:@" (Compiler, CDHash)"]; break;
-        case SNTEventStateAllowCompilerSigningID:
-          [output appendString:@" (Compiler, SigningID)"];
-          break;
-        case SNTEventStateAllowTransitive: [output appendString:@" (Transitive)"]; break;
-        case SNTEventStateBlockLongPath: [output appendString:@" (Long Path)"]; break;
-
-        default: output = @"None".mutableCopy; break;
-      }
-      if (cmd.prettyOutput) {
-        if ((SNTEventStateAllow & state)) {
-          [output insertString:@"\033[32m" atIndex:0];
-          [output appendString:@"\033[0m"];
-        } else if ((SNTEventStateBlock & state)) {
-          [output insertString:@"\033[31m" atIndex:0];
-          [output appendString:@"\033[0m"];
-        } else {
-          [output insertString:@"\033[33m" atIndex:0];
-          [output appendString:@"\033[0m"];
-        }
-      }
-      return output.copy;
     }
+    return output;
   };
 }
 

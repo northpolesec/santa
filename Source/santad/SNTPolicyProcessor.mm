@@ -455,52 +455,6 @@ static void UpdateCachedDecisionSigningInfo(
       }];
 }
 
-// Used by `$ santactl fileinfo`.
-- (nonnull SNTCachedDecision *)decisionForFilePath:(nonnull NSString *)filePath
-                                       identifiers:(nonnull SNTRuleIdentifiers *)identifiers {
-  MOLCodesignChecker *csInfo;
-  NSError *error;
-
-  SNTFileInfo *fileInfo = [[SNTFileInfo alloc] initWithPath:filePath error:&error];
-  if (!fileInfo) {
-    LOGW(@"Failed to read file %@: %@", filePath, error.localizedDescription);
-  } else {
-    csInfo = [fileInfo codesignCheckerWithError:&error];
-    if (error) {
-      LOGW(@"Failed to get codesign info for file %@: %@", filePath, error.localizedDescription);
-      csInfo = nil;
-    }
-  }
-
-  return [self decisionForFileInfo:fileInfo
-                       configState:[[SNTConfigState alloc] initWithConfig:self.configurator]
-                            cdhash:identifiers.cdhash
-                        fileSHA256:identifiers.binarySHA256
-                 certificateSHA256:identifiers.certificateSHA256
-                            teamID:identifiers.teamID
-                         signingID:identifiers.signingID
-               platformBinaryState:PlatformBinaryState::kStaticCheck
-             signingStatusCallback:^SNTSigningStatus {
-               if (csInfo) {
-                 if (csInfo.signatureFlags & kSecCodeSignatureAdhoc) {
-                   return SNTSigningStatusAdhoc;
-                 } else if (IsDevelopmentCert(csInfo.leafCertificate)) {
-                   return SNTSigningStatusDevelopment;
-                 } else {
-                   return SNTSigningStatusProduction;
-                 }
-               } else {
-                 if (error.code == errSecCSUnsigned) {
-                   return SNTSigningStatusUnsigned;
-                 } else {
-                   return SNTSigningStatusInvalid;
-                 }
-               }
-             }
-                activationCallback:nil
-        entitlementsFilterCallback:nil];
-}
-
 ///
 ///  Checks whether the file at @c path is in-scope for checking with Santa.
 ///

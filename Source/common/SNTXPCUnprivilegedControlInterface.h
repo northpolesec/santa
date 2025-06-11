@@ -51,18 +51,7 @@ struct RuleCounts {
 - (void)databaseRuleCounts:(void (^)(struct RuleCounts ruleCounts))reply;
 - (void)databaseEventCount:(void (^)(int64_t count))reply;
 - (void)staticRuleCount:(void (^)(int64_t count))reply;
-
-///
-///  Decision ops
-///
-
-///
-///  @param filePath A Path to the file, can be nil.
-///  @param identifiers The various identifiers to be used when making a decision.
-///
-- (void)decisionForFilePath:(NSString *)filePath
-                identifiers:(SNTRuleIdentifiers *)identifiers
-                      reply:(void (^)(SNTEventState))reply;
+- (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers reply:(void (^)(SNTRule *))reply;
 
 ///
 ///  Config ops

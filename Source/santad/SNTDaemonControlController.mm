@@ -197,14 +197,6 @@ double watchdogRAMPeak = 0;
   reply(rules, nil);
 }
 
-#pragma mark Decision Ops
-
-- (void)decisionForFilePath:(NSString *)filePath
-                identifiers:(SNTRuleIdentifiers *)identifiers
-                      reply:(void (^)(SNTEventState))reply {
-  reply([self.policyProcessor decisionForFilePath:filePath identifiers:identifiers].decision);
-}
-
 #pragma mark Config Ops
 
 - (void)watchdogInfo:(void (^)(uint64_t, uint64_t, double, double))reply {
