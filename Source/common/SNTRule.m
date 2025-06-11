@@ -414,9 +414,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   SNTEventState eventState = SNTEventStateUnknown;
 
   switch (self.state) {
-    case SNTRuleStateUnknown:
-      output = [@"None" mutableCopy];
-      break;
+    case SNTRuleStateUnknown: output = [@"None" mutableCopy]; break;
     case SNTRuleStateAllow: OS_FALLTHROUGH;
     case SNTRuleStateAllowCompiler: OS_FALLTHROUGH;
     case SNTRuleStateAllowTransitive:
@@ -428,9 +426,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       output = [@"Blocked" mutableCopy];
       eventState = SNTEventStateBlock;
       break;
-    case SNTRuleStateCEL:
-      output = [@"CEL" mutableCopy];
-      break;
+    case SNTRuleStateCEL: output = [@"CEL" mutableCopy]; break;
     case SNTRuleStateRemove: OS_FALLTHROUGH;
     default:
       output = [NSMutableString stringWithFormat:@"Unexpected rule state: %ld", self.state];

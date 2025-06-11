@@ -51,7 +51,8 @@ struct RuleCounts {
 - (void)databaseRuleCounts:(void (^)(struct RuleCounts ruleCounts))reply;
 - (void)databaseEventCount:(void (^)(int64_t count))reply;
 - (void)staticRuleCount:(void (^)(int64_t count))reply;
-- (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers reply:(void (^)(SNTRule *))reply;
+- (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
+                             reply:(void (^)(SNTRule *))reply;
 
 ///
 ///  Config ops

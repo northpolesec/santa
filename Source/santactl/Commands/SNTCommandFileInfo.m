@@ -403,9 +403,9 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
     [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
                               reply:^(SNTRule *r) {
-        if (r) output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
-        dispatch_semaphore_signal(sema);
-    }];
+                                if (r) output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
+                                dispatch_semaphore_signal(sema);
+                              }];
 
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
       cmd.daemonUnavailable = YES;
