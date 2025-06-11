@@ -42,15 +42,15 @@ namespace cel {
 // santa.pb.cel.v1.Context message, and easy access to variables for return values.
 class Activation : public ::cel_runtime::BaseActivation {
  public:
-  Activation(const ::pbv1::ExecutableFile *file, std::vector<std::string> (^args)(),
+  Activation(std::unique_ptr<::pbv1::ExecutableFile> file, std::vector<std::string> (^args)(),
              std::map<std::string, std::string> (^envs)())
-      : file_(file), args_(args), envs_(envs) {};
+      : file_(std::move(file)), args_(args), envs_(envs) {};
   ~Activation() = default;
 
   std::optional<cel_runtime::CelValue> FindValue(absl::string_view name,
                                                  google::protobuf::Arena *arena) const override;
 
-  // SantaActivation does not support lazy-loaded functions.
+  // Activation does not support lazy-loaded functions.
   std::vector<const cel_runtime::CelFunction *> FindFunctionOverloads(
       absl::string_view) const override {
     return {};
@@ -59,10 +59,14 @@ class Activation : public ::cel_runtime::BaseActivation {
   static std::vector<std::pair<absl::string_view, ::cel::Type>> GetVariables(
       google::protobuf::Arena *arena);
 
+  friend class Evaluator;
+
  private:
-  const ::santa::cel::v1::ExecutableFile *file_;
+  std::unique_ptr<::santa::cel::v1::ExecutableFile> file_;
   Memoizer<std::vector<std::string>> args_;
   Memoizer<std::map<std::string, std::string>> envs_;
+
+  bool IsResultCacheable() const;
 
   static ::cel::Type CELType(google::protobuf::internal::FieldDescriptorLite::CppType type,
                              const google::protobuf::Descriptor *messageType);

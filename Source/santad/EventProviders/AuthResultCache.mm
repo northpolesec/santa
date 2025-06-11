@@ -134,6 +134,7 @@ bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision) {
                         CacheableAction(decision == SNTActionHoldAllowed ? SNTActionRespondAllow
                                                                          : SNTActionRespondDeny),
                         CacheableAction(SNTActionRespondHold, 0));
+    case SNTActionRespondAllowNoCache: return YES;
     default:
       // This is a programming error. Bail.
       LOGE(@"Invalid cache value, exiting.");

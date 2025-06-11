@@ -30,6 +30,7 @@ typedef NS_ENUM(NSInteger, SNTAction) {
 
   // RESPONSES
   SNTActionRespondAllow,
+  SNTActionRespondAllowNoCache,
   SNTActionRespondDeny,
   SNTActionRespondAllowCompiler,
 
@@ -75,6 +76,8 @@ typedef NS_ENUM(NSInteger, SNTRuleState) {
   SNTRuleStateAllowTransitive = 6,
   SNTRuleStateAllowLocalBinary = 7,
   SNTRuleStateAllowLocalSigningID = 8,
+
+  SNTRuleStateCEL = 9,
 };
 
 typedef NS_ENUM(NSInteger, SNTClientMode) {

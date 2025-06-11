@@ -265,6 +265,9 @@ objc_library(
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
+        "//Source/common:String",
+        "//Source/common/cel:CEL",
+        "//Source/common/cel:cel_cc_proto",
         "@FMDB",
         "@abseil-cpp//absl/container:flat_hash_map",
     ],
@@ -309,6 +312,7 @@ objc_library(
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
     deps = [
+        ":EndpointSecurityAPI",
         ":EndpointSecurityMessage",
         ":ProcessControl",
         ":SNTDecisionCache",
@@ -810,6 +814,7 @@ objc_library(
     deps = [
         ":EndpointSecurityClient",
         ":WatchItemPolicy",
+        "//Source/common:String",
         "//Source/santad/ProcessTree:process_tree",
     ],
 )

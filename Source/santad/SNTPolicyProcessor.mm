@@ -29,6 +29,9 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
+#include "Source/common/String.h"
+#include "Source/common/cel/Evaluator.h"
+#include "Source/common/cel/cel.pb.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "absl/container/flat_hash_map.h"
 
@@ -85,18 +88,35 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   };
 }
 
-@interface SNTPolicyProcessor ()
+@interface SNTPolicyProcessor () {
+  std::unique_ptr<santa::cel::Evaluator> celEvaluator_;
+}
 @property SNTRuleTable *ruleTable;
 @property SNTConfigurator *configurator;
 @end
 
 @implementation SNTPolicyProcessor
 
-- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable {
+- (instancetype)init {
   self = [super init];
   if (self) {
-    _ruleTable = ruleTable;
     _configurator = [SNTConfigurator configurator];
+
+    auto evaluator = santa::cel::Evaluator::Create();
+    if (evaluator.ok()) {
+      celEvaluator_ = std::move(*evaluator);
+    } else {
+      LOGW(@"Failed to create CEL evaluator: %s",
+           std::string(evaluator.status().message()).c_str());
+    }
+  }
+  return self;
+}
+
+- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable {
+  self = [self init];
+  if (self) {
+    _ruleTable = ruleTable;
   }
   return self;
 }
@@ -105,8 +125,38 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 //
 // It returns YES if the decision was made, NO if the decision was not made.
 - (BOOL)decision:(SNTCachedDecision *)cd
-                forRule:(SNTRule *)rule
-    withTransitiveRules:(BOOL)enableTransitiveRules {
+                     forRule:(SNTRule *)rule
+         withTransitiveRules:(BOOL)enableTransitiveRules
+    andCELActivationCallback:(ActivationCallbackBlock)activationCallback {
+  if (rule.state == SNTRuleStateCEL && activationCallback) {
+    auto activation = activationCallback();
+    auto evalResult = self->celEvaluator_->CompileAndEvaluate(
+        santa::NSStringToUTF8StringView(rule.celExpr), *activation);
+    if (!evalResult.ok()) {
+      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
+           std::string(evalResult.status().message()).c_str());
+      return NO;
+    }
+
+    ::santa::cel::v1::ReturnValue returnValue = evalResult->first;
+    LOGD(@"Ran CEL program and received result: %d (cacheable %d)", returnValue,
+         evalResult->second);
+    switch (returnValue) {
+      case santa::cel::v1::ReturnValue::ALLOWLIST: rule.state = SNTRuleStateAllow; break;
+      case santa::cel::v1::ReturnValue::ALLOWLIST_COMPILER:
+        rule.state = SNTRuleStateAllowTransitive;
+        break;
+      case santa::cel::v1::ReturnValue::BLOCKLIST: rule.state = SNTRuleStateBlock; break;
+      case santa::cel::v1::ReturnValue::SILENT_BLOCKLIST:
+        rule.state = SNTRuleStateSilentBlock;
+        break;
+      default: break;
+    }
+    if (!(*evalResult).second) {
+      cd.cacheable = NO;
+    }
+  }
+
   static const auto decisions =
       absl::flat_hash_map<std::pair<SNTRuleType, SNTRuleState>, SNTEventState>{
           {{SNTRuleTypeCDHash, SNTRuleStateAllow}, SNTEventStateAllowCDHash},
@@ -241,6 +291,7 @@ static void UpdateCachedDecisionSigningInfo(
                      signingID:(nullable NSString *)signingID
            platformBinaryState:(PlatformBinaryState)platformBinaryState
          signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
+            activationCallback:(nullable ActivationCallbackBlock)activationCallback
     entitlementsFilterCallback:
         (NSDictionary *_Nullable (^_Nullable)(NSDictionary *_Nullable entitlements))
             entitlementsFilterCallback {
@@ -292,8 +343,9 @@ static void UpdateCachedDecisionSigningInfo(
   if (rule) {
     // If we have a rule match we don't need to process any further.
     if ([self decision:cd
-                        forRule:rule
-            withTransitiveRules:self.configurator.enableTransitiveRules]) {
+                             forRule:rule
+                 withTransitiveRules:self.configurator.enableTransitiveRules
+            andCELActivationCallback:activationCallback]) {
       return cd;
     }
   }
@@ -328,13 +380,15 @@ static void UpdateCachedDecisionSigningInfo(
   }
 }
 
-- (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                                     targetProcess:(nonnull const es_process_t *)targetProc
-                                       configState:(nonnull SNTConfigState *)configState
-                        entitlementsFilterCallback:
-                            (NSDictionary *_Nullable (^_Nonnull)(
-                                const char *_Nullable teamID,
-                                NSDictionary *_Nullable entitlements))entitlementsFilterCallback {
+- (nonnull SNTCachedDecision *)
+           decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                 targetProcess:(nonnull const es_process_t *)targetProc
+                   configState:(nonnull SNTConfigState *)configState
+            activationCallback:(nullable ActivationCallbackBlock)activationCallback
+    entitlementsFilterCallback:
+        (NSDictionary *_Nullable (^_Nonnull)(const char *_Nullable teamID,
+                                             NSDictionary *_Nullable entitlements))
+            entitlementsFilterCallback {
   NSString *signingID;
   NSString *teamID;
   NSString *cdhash;
@@ -395,6 +449,7 @@ static void UpdateCachedDecisionSigningInfo(
           return SNTSigningStatusProduction;
         }
       }
+      activationCallback:activationCallback
       entitlementsFilterCallback:^NSDictionary *(NSDictionary *entitlements) {
         return entitlementsFilterCallback(entitlementsFilterTeamID, entitlements);
       }];
@@ -442,6 +497,7 @@ static void UpdateCachedDecisionSigningInfo(
                  }
                }
              }
+                activationCallback:nil
         entitlementsFilterCallback:nil];
 }
 

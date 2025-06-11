@@ -21,11 +21,14 @@
 #import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#include "Source/common/cel/Activation.h"
 
 @class MOLCodesignChecker;
 @class SNTCachedDecision;
 @class SNTFileInfo;
 @class SNTRuleTable;
+
+typedef std::unique_ptr<santa::cel::Activation> (^ActivationCallbackBlock)(void);
 
 ///
 ///  Creates SNTCachedDecision objects from a SNTFileInfo object or a file path. Decisions are based
@@ -47,13 +50,14 @@
 ///  only guaranteed for the duration of the call to the block. Do not perform
 ///  any async processing without extending their lifetimes.
 ///
-- (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                                     targetProcess:(nonnull const es_process_t *)targetProc
-                                       configState:(nonnull SNTConfigState *)configState
-                        entitlementsFilterCallback:
-                            (NSDictionary *_Nullable (^_Nonnull)(
-                                const char *_Nullable teamID,
-                                NSDictionary *_Nullable entitlements))entitlementsFilterCallback;
+- (nonnull SNTCachedDecision *)
+           decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                 targetProcess:(nonnull const es_process_t *)targetProc
+                   configState:(nonnull SNTConfigState *)configState
+            activationCallback:(nullable ActivationCallbackBlock)activationCallback
+    entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nonnull)(
+                                   const char *_Nullable teamID,
+                                   NSDictionary *_Nullable entitlements))entitlementsFilterCallback;
 
 ///
 ///  A wrapper for decisionForFileInfo:fileSHA256:certificateSHA256:. This method is slower as it
@@ -69,7 +73,8 @@
 ///
 /// Returns YES if the decision requires no futher processing NO otherwise.
 - (BOOL)decision:(nonnull SNTCachedDecision *)cd
-                forRule:(nonnull SNTRule *)rule
-    withTransitiveRules:(BOOL)transitive;
+                     forRule:(nonnull SNTRule *)rule
+         withTransitiveRules:(BOOL)transitive
+    andCELActivationCallback:(nullable ActivationCallbackBlock)activationCallback;
 
 @end

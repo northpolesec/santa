@@ -92,7 +92,7 @@ std::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view nam
 
   // Handle the fields from the CELContext message.
   if (name == "target" && file_ != nullptr) {
-    return cel_runtime::CelProtoWrapper::CreateMessage(file_, arena);
+    return cel_runtime::CelProtoWrapper::CreateMessage(file_.get(), arena);
   } else if (name == "args") {
     return CELValue(args_(), arena);
   } else if (name == "envs") {
@@ -137,6 +137,10 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
   }
 
   return v;
+}
+
+bool Activation::IsResultCacheable() const {
+  return !args_.HasValue() && !envs_.HasValue();
 }
 
 ::cel::Type Activation::CELType(google::protobuf::internal::FieldDescriptorLite::CppType type,

@@ -50,6 +50,7 @@
 #include "Source/common/Unit.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
@@ -274,6 +275,9 @@ static NSString *const kPrinterProxyPostMonterey =
              decisionForFileInfo:binInfo
                    targetProcess:targetProc
                      configState:configState
+              activationCallback:
+                  [self createActivationBlockForMessage:esMsg
+                                              andCSInfo:[binInfo codesignCheckerWithError:NULL]]
       entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
         if (!entitlements) {
           return nil;
@@ -311,8 +315,9 @@ static NSString *const kPrinterProxyPostMonterey =
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
 
   // Formulate an initial action from the decision.
-  SNTAction action =
-      (SNTEventStateAllow & cd.decision) ? SNTActionRespondAllow : SNTActionRespondDeny;
+  SNTAction action = (SNTEventStateAllow & cd.decision)
+                         ? (cd.cacheable ? SNTActionRespondAllow : SNTActionRespondAllowNoCache)
+                         : SNTActionRespondDeny;
 
   // Save decision details for logging the execution later.  For transitive rules, we also use
   // the shasum stored in the decision details to update the rule's timestamp whenever an
@@ -410,7 +415,8 @@ static NSString *const kPrinterProxyPostMonterey =
     }
 
     // If binary was blocked, do the needful
-    if (action != SNTActionRespondAllow && action != SNTActionRespondAllowCompiler) {
+    if (action != SNTActionRespondAllow && action != SNTActionRespondAllowCompiler &&
+        action != SNTActionRespondAllowNoCache) {
       if (config.enableBundles && binInfo.bundle) {
         // If the binary is part of a bundle, find and hash all the related binaries in the bundle.
         // Let the GUI know hashing is needed. Once the hashing is complete the GUI will send a
@@ -612,6 +618,7 @@ static NSString *const kPrinterProxyPostMonterey =
                                                customURL:nil
                                                timestamp:[[NSDate now] timeIntervalSince1970]
                                                  comment:commentStr
+                                                 celExpr:nil
                                                    error:&err];
   if (err) {
     LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
@@ -626,6 +633,35 @@ static NSString *const kPrinterProxyPostMonterey =
   }
 
   // TODO: Notify the sync service of the new rule.
+}
+
+// Create a block that returns a santa::cel::Activation object for the given Message
+// and MOLCodesignChecker object.
+//
+// Note: The returned block captures a reference to the Message object and must
+// not use it after the Message object is destroyed. Care must be taken to not
+// use this in an asynchronous context outside of the evaluation of that execution.
+- (ActivationCallbackBlock)createActivationBlockForMessage:(const santa::Message &)esMsg
+                                                 andCSInfo:(nullable MOLCodesignChecker *)csInfo {
+  std::shared_ptr<santa::EndpointSecurityAPI> esApi = esMsg.ESAPI();
+  return ^std::unique_ptr<santa::cel::Activation>() {
+    auto f = std::make_unique<santa::cel::v1::ExecutableFile>();
+    if (csInfo.signingTime) {
+      f->mutable_signing_time()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
+    }
+    if (csInfo.secureSigningTime) {
+      f->mutable_secure_signing_time()->set_seconds(csInfo.secureSigningTime.timeIntervalSince1970);
+    }
+
+    return std::make_unique<santa::cel::Activation>(
+        std::move(f),
+        ^std::vector<std::string>() {
+          return esApi->ExecArgs(&esMsg->event.exec);
+        },
+        ^std::map<std::string, std::string>() {
+          return esApi->ExecEnvs(&esMsg->event.exec);
+        });
+  };
 }
 
 @end

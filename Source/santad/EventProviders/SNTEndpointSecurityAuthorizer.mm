@@ -190,12 +190,32 @@ using santa::Message;
 
 - (bool)postAction:(SNTAction)action forMessage:(const Message &)esMsg {
   es_auth_result_t authResult;
+  bool cacheable = true;
 
   switch (action) {
     case SNTActionRespondAllowCompiler:
+      // Do not cache compiler processes so future instances get marked appropriately.
       [self.compilerController setProcess:esMsg->event.exec.target->audit_token isCompiler:true];
-      OS_FALLTHROUGH;
-    case SNTActionRespondHold: OS_FALLTHROUGH;
+      cacheable = false;
+      authResult = ES_AUTH_RESULT_ALLOW;
+      break;
+    case SNTActionRespondHold:
+      // Do not allow caching when the action is SNTActionRespondHold. Santa will
+      // allow the current exec because the process was first suspended so no code
+      // will be executed. However if additional instances of the binary are executed
+      // while authorization is pending, neither Santa nor ES should use the decision
+      // as it is not yet final.
+      cacheable = false;
+      authResult = ES_AUTH_RESULT_ALLOW;
+      break;
+    case SNTActionRespondAllowNoCache:
+      // Do not cache when the action is SNTActionRespondAllowNoCache because this
+      // implies a CEL evaluation was performed and used per-process data to make
+      // its decision.
+      cacheable = false;
+      authResult = ES_AUTH_RESULT_ALLOW;
+      self->_authResultCache->RemoveFromCache(esMsg->event.exec.target->executable);
+      break;
     case SNTActionRespondAllow: authResult = ES_AUTH_RESULT_ALLOW; break;
     case SNTActionRespondDeny: authResult = ES_AUTH_RESULT_DENY; break;
 
@@ -212,13 +232,7 @@ using santa::Message;
   self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, action);
 
   if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
-    // Do not allow caching when the action is SNTActionRespondHold because Santa
-    // also authorizes EXECs that occur while the current authorization is pending.
-    // Do not cache compiler processes so future instances get marked appropriately.
-    return [self respondToMessage:esMsg
-                   withAuthResult:authResult
-                forcePreventCache:(action == SNTActionRespondHold ||
-                                   action == SNTActionRespondAllowCompiler)];
+    return [self respondToMessage:esMsg withAuthResult:authResult forcePreventCache:!cacheable];
   } else {
     return true;
   }

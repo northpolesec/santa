@@ -42,6 +42,8 @@ class Memoizer {
     return result;
   }
 
+  bool HasValue() const { return cache_.has_value(); }
+
  private:
   std::function<T()> func_;
   mutable std::optional<T> cache_;

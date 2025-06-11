@@ -29,6 +29,7 @@
   self = [super init];
   if (self) {
     _vnodeId = vnode;
+    _cacheable = YES;
   }
   return self;
 }

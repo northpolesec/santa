@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "Source/common/Platform.h"
+#include "Source/common/String.h"
 
 namespace santa {
 
@@ -130,12 +131,34 @@ es_string_token_t EndpointSecurityAPI::ExecArg(const es_event_exec_t *event, uin
   return es_exec_arg(event, index);
 }
 
+std::vector<std::string> EndpointSecurityAPI::ExecArgs(const es_event_exec_t *event) {
+  std::vector<std::string> args;
+  for (uint32_t i = 0; i < es_exec_arg_count(event); i++) {
+    args.push_back(std::string(santa::StringTokenToStringView(es_exec_arg(event, i))));
+  }
+  return args;
+}
+
 uint32_t EndpointSecurityAPI::ExecEnvCount(const es_event_exec_t *event) {
   return es_exec_env_count(event);
 }
 
 es_string_token_t EndpointSecurityAPI::ExecEnv(const es_event_exec_t *event, uint32_t index) {
   return es_exec_env(event, index);
+}
+
+std::map<std::string, std::string> EndpointSecurityAPI::ExecEnvs(const es_event_exec_t *event) {
+  std::map<std::string, std::string> envs;
+  for (uint32_t i = 0; i < es_exec_env_count(event); i++) {
+    auto s = santa::StringTokenToStringView(es_exec_env(event, i));
+    auto npos = s.find("=");
+    if (npos == ::std::string::npos) {
+      envs[std::string(s)] = "SANTA_ENV_VAL_MISSING_PLACEHOLDER";
+    } else {
+      envs[std::string(s.substr(0, npos))] = std::string(s.substr(npos + 1));
+    }
+  }
+  return envs;
 }
 
 uint32_t EndpointSecurityAPI::ExecFDCount(const es_event_exec_t *event) {

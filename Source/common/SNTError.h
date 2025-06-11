@@ -42,6 +42,7 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeRuleInvalidPolicy = 414,
   SNTErrorCodeRuleMissingRuleType = 415,
   SNTErrorCodeRuleInvalidRuleType = 416,
+  SNTErrorCodeRuleInvalidCELExpression = 417,
 
   // Database errors
   SNTErrorCodeEmptyRuleArray = 510,
