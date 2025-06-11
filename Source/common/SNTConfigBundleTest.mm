@@ -61,8 +61,11 @@
   bundle.overrideFileAccessAction = @"disable";
   bundle.fullSyncLastSuccess = nowDate;
   bundle.ruleSyncLastSuccess = nowDate;
-  bundle.exportConfiguration = [[SNTExportConfiguration alloc]
-      initWithAWSToken:[@"foo" dataUsingEncoding:NSUTF8StringEncoding]];
+  bundle.exportConfiguration = [[SNTExportConfiguration alloc] initWithAWSAccessKey:@"MyAccessKey"
+                                       secretAccessKey:@"MySecretAccessKey"
+                                          sessionToken:@"MySessionToken"
+                                            bucketName:@"MyBucketName"
+                                       objectKeyPrefix:@"MyObjectKeyPrefix"];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);

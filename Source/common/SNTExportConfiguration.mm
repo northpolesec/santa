@@ -19,10 +19,18 @@
 
 @implementation SNTExportConfigurationAWS
 
-- (instancetype)initWithToken:(NSData *)token {
+- (instancetype)initWithAccessKey:(NSString *)accessKey
+                  secretAccessKey:(NSString *)secretAccessKey
+                     sessionToken:(NSString *)sessionToken
+                       bucketName:(NSString *)bucketName
+                  objectKeyPrefix:(NSString *)objectKeyPrefix {
   self = [super self];
   if (self) {
-    _token = token;
+    _accessKey = accessKey;
+    _secretAccessKey = secretAccessKey;
+    _sessionToken = sessionToken;
+    _bucketName = bucketName;
+    _objectKeyPrefix = objectKeyPrefix;
   }
   return self;
 }
@@ -32,13 +40,21 @@
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(coder, token);
+  ENCODE(coder, accessKey);
+  ENCODE(coder, secretAccessKey);
+  ENCODE(coder, sessionToken);
+  ENCODE(coder, bucketName);
+  ENCODE(coder, objectKeyPrefix);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super init];
   if (self) {
-    DECODE(decoder, token, NSData);
+    DECODE(decoder, accessKey, NSString);
+    DECODE(decoder, secretAccessKey, NSString);
+    DECODE(decoder, sessionToken, NSString);
+    DECODE(decoder, bucketName, NSString);
+    DECODE(decoder, objectKeyPrefix, NSString);
   }
   return self;
 }
@@ -75,10 +91,18 @@
 
 @implementation SNTExportConfiguration
 
-- (instancetype)initWithAWSToken:(NSData *)token {
+- (instancetype)initWithAWSAccessKey:(NSString *)accessKey
+                     secretAccessKey:(NSString *)secretAccessKey
+                        sessionToken:(NSString *)sessionToken
+                          bucketName:(NSString *)bucketName
+                     objectKeyPrefix:(NSString *)objectKeyPrefix {
   self = [super init];
   if (self) {
-    _config = [[SNTExportConfigurationAWS alloc] initWithToken:token];
+    _config = [[SNTExportConfigurationAWS alloc] initWithAccessKey:accessKey
+                                                   secretAccessKey:secretAccessKey
+                                                      sessionToken:sessionToken
+                                                        bucketName:bucketName
+                                                   objectKeyPrefix:objectKeyPrefix];
     _configType = SNTExportConfigurationTypeAWS;
   }
   return self;

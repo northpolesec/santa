@@ -26,8 +26,16 @@ typedef NS_ENUM(NSInteger, SNTExportConfigurationType) {
 
 /// Configuration required for exporting to AWS
 @interface SNTExportConfigurationAWS : NSObject <SNTExportConfigurationProtocol>
-@property(readonly) NSData *token;
-- (instancetype)initWithToken:(NSData *)token;
+@property(readonly) NSString *accessKey;
+@property(readonly) NSString *secretAccessKey;
+@property(readonly) NSString *sessionToken;
+@property(readonly) NSString *bucketName;
+@property(readonly) NSString *objectKeyPrefix;
+- (instancetype)initWithAccessKey:(NSString *)accessKey
+                  secretAccessKey:(NSString *)secretAccessKey
+                     sessionToken:(NSString *)sessionToken
+                       bucketName:(NSString *)bucketName
+                  objectKeyPrefix:(NSString *)objectKeyPrefix;
 @end
 
 /// Configuration required for exporting to GCP
@@ -42,7 +50,11 @@ typedef NS_ENUM(NSInteger, SNTExportConfigurationType) {
 @property(readonly) SNTExportConfigurationType configType;
 @property(readonly) id<SNTExportConfigurationProtocol> config;
 
-- (instancetype)initWithAWSToken:(NSData *)token;
+- (instancetype)initWithAWSAccessKey:(NSString *)accessKey
+                     secretAccessKey:(NSString *)secretAccessKey
+                        sessionToken:(NSString *)sessionToken
+                          bucketName:(NSString *)bucketName
+                     objectKeyPrefix:(NSString *)objectKeyPrefix;
 - (instancetype)initWithGCPToken:(NSData *)token;
 
 - (NSData *)serialize;
