@@ -31,9 +31,10 @@
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
-#include "Source/common/cel/cel.pb.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+
 #include "absl/container/flat_hash_map.h"
+#include "cel/v1.pb.h"
 
 enum class PlatformBinaryState {
   kRuntimeTrue = 0,

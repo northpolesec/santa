@@ -23,8 +23,9 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/cel/Activation.h"
-#import "Source/common/cel/cel.pb.h"
 #import "Source/santad/SNTPolicyProcessor.h"
+
+#import "cel/v1.pb.h"
 
 extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd);
 

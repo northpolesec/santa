@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "Source/common/Memoizer.h"
-#include "Source/common/cel/cel.pb.h"
+#include "cel/v1.pb.h"
 
 #include "absl/strings/string_view.h"
 
