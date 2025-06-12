@@ -84,6 +84,7 @@ objc_library(
         ":SNTCommandPrintLog",
         ":SNTCommandTelemetry",
         ":santactl_cmd",
+        "//Source/common:CertificateHelpers",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",

@@ -14,8 +14,10 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#import <Security/Security.h>
 #import <objc/runtime.h>
 
+#import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
@@ -384,24 +386,33 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       [cmd.daemonConn resume];
     });
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
     NSError *err;
     MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:&err];
-
-    NSString *cdhash = csc.cdhash;
-    NSString *teamID = csc.teamID;
-    NSString *signingID = FormatSigningID(csc);
+    SNTSigningStatus signingStatus = SNTSigningStatusInvalid;
+    if (!err) {
+      if (csc.signatureFlags & kSecCodeSignatureAdhoc) {
+        signingStatus = SNTSigningStatusAdhoc;
+      } else if (IsDevelopmentCert(csc.leafCertificate)) {
+        signingStatus = SNTSigningStatusDevelopment;
+      } else {
+        signingStatus = SNTSigningStatusProduction;
+      }
+    }
 
     struct RuleIdentifiers identifiers = {
-        .cdhash = cdhash,
+        .cdhash = csc.cdhash,
         .binarySHA256 = fileInfo.SHA256,
-        .signingID = signingID,
+        .signingID = FormatSigningID(csc),
         .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
-        .teamID = teamID,
+        .teamID = csc.teamID,
     };
+
+
 
     __block NSString *output = @"None";
     id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
-    [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
+    [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers andSigningStatus:signingStatus]
                               reply:^(SNTRule *r) {
                                 if (r) output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
                                 dispatch_semaphore_signal(sema);

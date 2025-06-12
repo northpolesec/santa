@@ -42,50 +42,17 @@ enum class PlatformBinaryState {
 };
 
 struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
-  NSString *cdhash;
-  NSString *binarySHA256;
-  NSString *signingID;
-  NSString *certificateSHA256;
-  NSString *teamID;
+  SNTRuleIdentifiers *ri =
+      [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:{
+                                                              .cdhash = cd.cdhash,
+                                                              .binarySHA256 = cd.sha256,
+                                                              .signingID = cd.signingID,
+                                                              .certificateSHA256 = cd.certSHA256,
+                                                              .teamID = cd.teamID,
+                                                          }
+                                         andSigningStatus:cd.signingStatus];
 
-  // Waterfall thru the signing status in order of most-to-least permissive
-  // in terms of identifiers allowed for policy match search. Fields from
-  // the given SNTCachedDecision are assigned only when valid for a given
-  // signing status.
-  //
-  // Do not evaluate TeamID/SigningID rules for dev-signed code based on the
-  // assumption that orgs are generally more relaxed about dev signed cert
-  // protections and users can more easily produce dev-signed code that
-  // would otherwise be inadvertently allowed.
-  //
-  // Note: All labels fall through.
-  // clang-format off
-  switch (cd.signingStatus) {
-    case SNTSigningStatusProduction:
-      signingID = cd.signingID;
-      teamID = cd.teamID;
-      OS_FALLTHROUGH;
-    case SNTSigningStatusDevelopment:
-      certificateSHA256 = cd.certSHA256;
-      OS_FALLTHROUGH;
-    case SNTSigningStatusAdhoc:
-      cdhash = cd.cdhash;
-      OS_FALLTHROUGH;
-    case SNTSigningStatusInvalid:
-      OS_FALLTHROUGH;
-    case SNTSigningStatusUnsigned:
-      binarySHA256 = cd.sha256;
-      break;
-  }
-  // clang-format on
-
-  return (struct RuleIdentifiers){
-      .cdhash = cdhash,
-      .binarySHA256 = binarySHA256,
-      .signingID = signingID,
-      .certificateSHA256 = certificateSHA256,
-      .teamID = teamID,
-  };
+  return [ri toStruct];
 }
 
 @interface SNTPolicyProcessor () {

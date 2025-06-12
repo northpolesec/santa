@@ -494,6 +494,8 @@ objc_library(
     hdrs = ["SNTRuleIdentifiers.h"],
     deps = [
         ":CoderMacros",
+        ":SNTCommonEnums",
+        ":StoredEventHelpers",
     ],
 )
 

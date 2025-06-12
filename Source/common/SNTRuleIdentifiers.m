@@ -15,6 +15,7 @@
 #import "Source/common/SNTRuleIdentifiers.h"
 
 #import "Source/common/CoderMacros.h"
+#import "Source/common/StoredEventHelpers.h"
 
 @implementation SNTRuleIdentifiers
 
@@ -28,6 +29,54 @@
     _teamID = identifiers.teamID;
   }
   return self;
+}
+
+- (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)ri
+                       andSigningStatus:(SNTSigningStatus)signingStatus {
+  NSString *cdhash;
+  NSString *binarySHA256;
+  NSString *signingID;
+  NSString *certificateSHA256;
+  NSString *teamID;
+
+  // Waterfall thru the signing status in order of most-to-least permissive
+  // in terms of identifiers allowed for policy match search. Fields from
+  // the given SNTCachedDecision are assigned only when valid for a given
+  // signing status.
+  //
+  // Do not evaluate TeamID/SigningID rules for dev-signed code based on the
+  // assumption that orgs are generally more relaxed about dev signed cert
+  // protections and users can more easily produce dev-signed code that
+  // would otherwise be inadvertently allowed.
+  //
+  // Note: All labels fall through.
+  // clang-format off
+  switch (signingStatus) {
+    case SNTSigningStatusProduction:
+      signingID = ri.signingID;
+      teamID = ri.teamID;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusDevelopment:
+      certificateSHA256 = ri.certificateSHA256;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusAdhoc:
+      cdhash = ri.cdhash;
+      OS_FALLTHROUGH;
+    case SNTSigningStatusInvalid:
+      OS_FALLTHROUGH;
+    case SNTSigningStatusUnsigned:
+      binarySHA256 = ri.binarySHA256;
+      break;
+  }
+  // clang-format on
+
+  return [self initWithRuleIdentifiers:(struct RuleIdentifiers){
+      .cdhash = cdhash,
+      .binarySHA256 = binarySHA256,
+      .signingID = signingID,
+      .certificateSHA256 = certificateSHA256,
+      .teamID = teamID,
+  }];
 }
 
 - (struct RuleIdentifiers)toStruct {
