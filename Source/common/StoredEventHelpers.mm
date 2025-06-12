@@ -37,12 +37,7 @@ SNTStoredEvent *StoredEventFromFileInfo(SNTFileInfo *fileInfo) {
   se.entitlements = cs.entitlements;
   se.secureSigningTime = cs.secureSigningTime;
   se.signingTime = cs.signingTime;
-  if (cs.signatureFlags & kSecCodeSignatureAdhoc) {
-    se.signingStatus = SNTSigningStatusAdhoc;
-  } else if (IsDevelopmentCert(cs.leafCertificate)) {
-    se.signingStatus = SNTSigningStatusDevelopment;
-  } else {
-    se.signingStatus = SNTSigningStatusProduction;
-  }
+  se.signingStatus = SigningStatus(cs, csError);
+
   return se;
 }

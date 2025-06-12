@@ -389,16 +389,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 
     NSError *err;
     MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:&err];
-    SNTSigningStatus signingStatus = SNTSigningStatusInvalid;
-    if (!err) {
-      if (csc.signatureFlags & kSecCodeSignatureAdhoc) {
-        signingStatus = SNTSigningStatusAdhoc;
-      } else if (IsDevelopmentCert(csc.leafCertificate)) {
-        signingStatus = SNTSigningStatusDevelopment;
-      } else {
-        signingStatus = SNTSigningStatusProduction;
-      }
-    }
+    SNTSigningStatus signingStatus = SigningStatus(csc, err);
 
     struct RuleIdentifiers identifiers = {
         .cdhash = csc.cdhash,

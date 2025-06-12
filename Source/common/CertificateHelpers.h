@@ -16,7 +16,10 @@
 #import <Foundation/Foundation.h>
 #include <sys/cdefs.h>
 
+#import "Source/common/SNTCommonEnums.h"
+
 @class MOLCertificate;
+@class MOLCodesignChecker;
 
 __BEGIN_DECLS
 
@@ -50,5 +53,15 @@ NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs);
   @return True if any development OIDs exist, otherwise false.
 */
 BOOL IsDevelopmentCert(MOLCertificate *cert);
+
+/**
+  Determine the signing status of a binary based on the signature flags and error.
+
+  @param csc The MOLCodesignChecker for this binary.
+  @param error The error returned from MOLCodesignChecker
+
+  @return The signing status of the binary
+*/
+SNTSigningStatus SigningStatus(MOLCodesignChecker *csc, NSError *error);
 
 __END_DECLS

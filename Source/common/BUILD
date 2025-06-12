@@ -178,6 +178,8 @@ objc_library(
     module_name = "santa_common_CertificateHelpers",
     deps = [
         ":MOLCertificate",
+        ":MOLCodesignChecker",
+        ":SNTCommonEnums",
     ],
 )
 

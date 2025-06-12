@@ -414,7 +414,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   SNTEventState eventState = SNTEventStateUnknown;
 
   switch (self.state) {
-    case SNTRuleStateUnknown: output = [@"None" mutableCopy]; break;
+    case SNTRuleStateUnknown: return @"None"; break;
     case SNTRuleStateAllow: OS_FALLTHROUGH;
     case SNTRuleStateAllowCompiler: OS_FALLTHROUGH;
     case SNTRuleStateAllowTransitive:
@@ -431,11 +431,6 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     default:
       output = [NSMutableString stringWithFormat:@"Unexpected rule state: %ld", self.state];
       break;
-  }
-
-  if (self.state == SNTRuleStateUnknown) {
-    // No more output to append
-    return output;
   }
 
   [output appendString:@" ("];
