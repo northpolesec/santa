@@ -23,8 +23,13 @@
 @implementation SNTExportConfigurationTest
 
 - (void)testTypes {
-  SNTExportConfiguration *cfg = [[SNTExportConfiguration alloc]
-      initWithAWSToken:[@"foo" dataUsingEncoding:NSUTF8StringEncoding]];
+  SNTExportConfiguration *cfg =
+      [[SNTExportConfiguration alloc] initWithAWSAccessKey:@"MyAccessKey"
+                                           secretAccessKey:@"MySecretAccessKey"
+                                              sessionToken:@"MySessionToken"
+                                                bucketName:@"MyBucketName"
+                                           objectKeyPrefix:@"MyObjectKeyPrefix"];
+
   XCTAssertEqual(cfg.configType, SNTExportConfigurationTypeAWS);
   XCTAssertTrue([cfg.config isKindOfClass:[SNTExportConfigurationAWS class]]);
 
@@ -35,8 +40,12 @@
 
 - (void)testEncodeDecodeSerializeDeserialize {
   // Encode and decode AWS config
-  SNTExportConfiguration *cfg = [[SNTExportConfiguration alloc]
-      initWithAWSToken:[@"foo" dataUsingEncoding:NSUTF8StringEncoding]];
+  SNTExportConfiguration *cfg =
+      [[SNTExportConfiguration alloc] initWithAWSAccessKey:@"MyAccessKey"
+                                           secretAccessKey:@"MySecretAccessKey"
+                                              sessionToken:@"MySessionToken"
+                                                bucketName:@"MyBucketName"
+                                           objectKeyPrefix:@"MyObjectKeyPrefix"];
 
   NSData *data = [NSKeyedArchiver archivedDataWithRootObject:cfg
                                        requiringSecureCoding:YES
@@ -54,19 +63,24 @@
   XCTAssertTrue([obj isKindOfClass:[SNTExportConfiguration class]]);
   XCTAssertTrue(
       [((SNTExportConfiguration *)obj).config isKindOfClass:[SNTExportConfigurationAWS class]]);
-  NSString *tokenValue = [[NSString alloc]
-      initWithData:((SNTExportConfigurationAWS *)((SNTExportConfiguration *)obj).config).token
-          encoding:NSUTF8StringEncoding];
-  XCTAssertEqualObjects(tokenValue, @"foo");
+  SNTExportConfigurationAWS *awsConfig =
+      (SNTExportConfigurationAWS *)((SNTExportConfiguration *)obj).config;
+  XCTAssertEqualObjects(awsConfig.accessKey, @"MyAccessKey");
+  XCTAssertEqualObjects(awsConfig.secretAccessKey, @"MySecretAccessKey");
+  XCTAssertEqualObjects(awsConfig.sessionToken, @"MySessionToken");
+  XCTAssertEqualObjects(awsConfig.bucketName, @"MyBucketName");
+  XCTAssertEqualObjects(awsConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
 
   // Ensure deserializing the serialized data results in an object with the
   // same content as what is returned by NSKeyedUnarchiver
   SNTExportConfiguration *deserializedObj = [SNTExportConfiguration deserialize:serializedData];
   XCTAssertTrue([deserializedObj.config isKindOfClass:[SNTExportConfigurationAWS class]]);
-  tokenValue =
-      [[NSString alloc] initWithData:((SNTExportConfigurationAWS *)(deserializedObj.config)).token
-                            encoding:NSUTF8StringEncoding];
-  XCTAssertEqualObjects(tokenValue, @"foo");
+  awsConfig = (SNTExportConfigurationAWS *)(deserializedObj.config);
+  XCTAssertEqualObjects(awsConfig.accessKey, @"MyAccessKey");
+  XCTAssertEqualObjects(awsConfig.secretAccessKey, @"MySecretAccessKey");
+  XCTAssertEqualObjects(awsConfig.sessionToken, @"MySessionToken");
+  XCTAssertEqualObjects(awsConfig.bucketName, @"MyBucketName");
+  XCTAssertEqualObjects(awsConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
 
   // Encode and decode GCP config
   cfg = [[SNTExportConfiguration alloc]
@@ -82,7 +96,7 @@
   XCTAssertTrue(
       [((SNTExportConfiguration *)obj).config isKindOfClass:[SNTExportConfigurationGCP class]]);
 
-  tokenValue = [[NSString alloc]
+  NSString *tokenValue = [[NSString alloc]
       initWithData:((SNTExportConfigurationGCP *)((SNTExportConfiguration *)obj).config).token
           encoding:NSUTF8StringEncoding];
   XCTAssertEqualObjects(tokenValue, @"bar");

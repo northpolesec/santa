@@ -226,10 +226,18 @@ The following table expands upon the above logic to list most of the permutation
 
   if (resp.has_export_configuration()) {
     auto protoExportConfig = resp.export_configuration();
-    if (protoExportConfig.has_aws_config() && !protoExportConfig.aws_config().token().empty()) {
-      self.syncState.exportConfig = [[SNTExportConfiguration alloc]
-          initWithAWSToken:[NSData dataWithBytes:protoExportConfig.aws_config().token().data()
-                                          length:protoExportConfig.aws_config().token().length()]];
+    if (protoExportConfig.has_aws_config()) {
+      auto protoAWS = protoExportConfig.aws_config();
+      // Check required fields are set.
+      if (!protoAWS.access_key().empty() && !protoAWS.secret_access_key().empty() &&
+          !protoAWS.session_token().empty() && !protoAWS.bucket_name().empty()) {
+        self.syncState.exportConfig = [[SNTExportConfiguration alloc]
+            initWithAWSAccessKey:StringToNSString(protoAWS.access_key())
+                 secretAccessKey:StringToNSString(protoAWS.secret_access_key())
+                    sessionToken:StringToNSString(protoAWS.session_token())
+                      bucketName:StringToNSString(protoAWS.bucket_name())
+                 objectKeyPrefix:StringToNSString(protoAWS.object_key_prefix())];
+      }
     } else if (protoExportConfig.has_gcp_config() &&
                !protoExportConfig.gcp_config().token().empty()) {
       self.syncState.exportConfig = [[SNTExportConfiguration alloc]
