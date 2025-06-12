@@ -408,11 +408,11 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         .teamID = csc.teamID,
     };
 
-
-
     __block NSString *output = @"None";
     id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
-    [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers andSigningStatus:signingStatus]
+    [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc]
+                                        initWithRuleIdentifiers:identifiers
+                                               andSigningStatus:signingStatus]
                               reply:^(SNTRule *r) {
                                 if (r) output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
                                 dispatch_semaphore_signal(sema);

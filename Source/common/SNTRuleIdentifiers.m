@@ -71,12 +71,12 @@
   // clang-format on
 
   return [self initWithRuleIdentifiers:(struct RuleIdentifiers){
-      .cdhash = cdhash,
-      .binarySHA256 = binarySHA256,
-      .signingID = signingID,
-      .certificateSHA256 = certificateSHA256,
-      .teamID = teamID,
-  }];
+                                           .cdhash = cdhash,
+                                           .binarySHA256 = binarySHA256,
+                                           .signingID = signingID,
+                                           .certificateSHA256 = certificateSHA256,
+                                           .teamID = teamID,
+                                       }];
 }
 
 - (struct RuleIdentifiers)toStruct {
