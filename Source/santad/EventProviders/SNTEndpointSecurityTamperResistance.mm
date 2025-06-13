@@ -44,6 +44,7 @@ using santa::WatchItemPathType;
 constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
     {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral},
     {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral},
+    {"/private/var/db/santa/sync-state.plist", WatchItemPathType::kLiteral},
     {"/Applications/Santa.app", WatchItemPathType::kPrefix},
     {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix},
     {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix},
@@ -187,6 +188,13 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
         result = ES_AUTH_RESULT_DENY;
         break;
       }
+      if ([SNTEndpointSecurityTamperResistance
+              isLiteralProtectedPath:esMsg->event.open.file->path.data]) {
+        LOGW(@"Preventing attempt to open sensitive Santa files as readable!");
+        result = ES_AUTH_RESULT_DENY;
+        break;
+      }
+
       result = ES_AUTH_RESULT_ALLOW;
       // OPEN events are not currently cacheable because we haven't yet implemented a method to
       // respond with a subset of allowed flags. This could be changed in the future if desired, but
@@ -271,6 +279,14 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
         if (path.rfind(pf.first, 0) == 0) return true;
         break;
     }
+  }
+  return false;
+}
+
++ (bool)isLiteralProtectedPath:(const std::string_view)path {
+  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); ++i) {
+    auto pf = kProtectedFiles[i];
+    if (pf.second == WatchItemPathType::kLiteral && path == pf.first) return true;
   }
   return false;
 }
