@@ -15,6 +15,7 @@
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCertificate.h"
+#import "Source/common/MOLCodesignChecker.h"
 
 #include <Security/SecCertificate.h>
 
@@ -58,4 +59,19 @@ BOOL IsDevelopmentCert(MOLCertificate *cert) {
       CFBridgingRelease(SecCertificateCopyValues(cert.certRef, (__bridge CFArrayRef)keys, NULL));
 
   return vals.count > 0;
+}
+
+SNTSigningStatus SigningStatus(MOLCodesignChecker *csc, NSError *error) {
+  if (error) {
+    if (error.code == errSecCSUnsigned) {
+      return SNTSigningStatusUnsigned;
+    }
+    return SNTSigningStatusInvalid;
+  }
+  if (csc.signatureFlags & kSecCodeSignatureAdhoc) {
+    return SNTSigningStatusAdhoc;
+  } else if (IsDevelopmentCert(csc.leafCertificate)) {
+    return SNTSigningStatusDevelopment;
+  }
+  return SNTSigningStatusProduction;
 }

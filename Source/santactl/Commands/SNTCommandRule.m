@@ -361,89 +361,9 @@ REGISTER_COMMAND_NAME(@"rule")
                      }];
 }
 
-// IMPORTANT: This method makes no attempt to validate whether or not the data
-// in a rule is valid. It merely constructs a string with the given data.
-// E.g., TeamID compiler rules are not currently supproted, but if a test rule
-// is provided with that state, an appropriate string will be returned.
-+ (NSString *)stringifyRule:(SNTRule *)rule withColor:(BOOL)colorize {
-  NSMutableString *output;
-  // Rule state is saved as eventState for output colorization down below
-  SNTEventState eventState = SNTEventStateUnknown;
-
-  switch (rule.state) {
-    case SNTRuleStateUnknown:
-      output = [@"No rule exists with the given parameters" mutableCopy];
-      break;
-    case SNTRuleStateAllow: OS_FALLTHROUGH;
-    case SNTRuleStateAllowCompiler: OS_FALLTHROUGH;
-    case SNTRuleStateAllowTransitive:
-      output = [@"Allowed" mutableCopy];
-      eventState = SNTEventStateAllow;
-      break;
-    case SNTRuleStateBlock: OS_FALLTHROUGH;
-    case SNTRuleStateSilentBlock:
-      output = [@"Blocked" mutableCopy];
-      eventState = SNTEventStateBlock;
-      break;
-    case SNTRuleStateRemove: OS_FALLTHROUGH;
-    default:
-      output = [NSMutableString stringWithFormat:@"Unexpected rule state: %ld", rule.state];
-      break;
-  }
-
-  if (rule.state == SNTRuleStateUnknown) {
-    // No more output to append
-    return output;
-  }
-
-  [output appendString:@" ("];
-
-  switch (rule.type) {
-    case SNTRuleTypeUnknown: [output appendString:@"Unknown"]; break;
-    case SNTRuleTypeCDHash: [output appendString:@"CDHash"]; break;
-    case SNTRuleTypeBinary: [output appendString:@"Binary"]; break;
-    case SNTRuleTypeSigningID: [output appendString:@"SigningID"]; break;
-    case SNTRuleTypeCertificate: [output appendString:@"Certificate"]; break;
-    case SNTRuleTypeTeamID: [output appendString:@"TeamID"]; break;
-    default:
-      output = [NSMutableString stringWithFormat:@"Unexpected rule type: %ld", rule.type];
-      break;
-  }
-
-  // Add additional attributes
-  switch (rule.state) {
-    case SNTRuleStateAllowCompiler: [output appendString:@", Compiler"]; break;
-    case SNTRuleStateAllowTransitive: [output appendString:@", Transitive"]; break;
-    case SNTRuleStateSilentBlock: [output appendString:@", Silent"]; break;
-    default: break;
-  }
-
-  [output appendString:@")"];
-
-  // Colorize
-  if (colorize) {
-    if ((SNTEventStateAllow & eventState)) {
-      [output insertString:@"\033[32m" atIndex:0];
-      [output appendString:@"\033[0m"];
-    } else if ((SNTEventStateBlock & eventState)) {
-      [output insertString:@"\033[31m" atIndex:0];
-      [output appendString:@"\033[0m"];
-    } else {
-      [output insertString:@"\033[33m" atIndex:0];
-      [output appendString:@"\033[0m"];
-    }
-  }
-
-  if (rule.state == SNTRuleStateAllowTransitive) {
-    NSDate *date = [NSDate dateWithTimeIntervalSinceReferenceDate:rule.timestamp];
-    [output appendString:[NSString stringWithFormat:@"\nlast access date: %@", [date description]]];
-  }
-  return output;
-}
-
 - (void)printStateOfRule:(SNTRule *)rule daemonConnection:(MOLXPCConnection *)daemonConn {
   id<SNTDaemonControlXPC> rop = [daemonConn synchronousRemoteObjectProxy];
-  __block NSString *output;
+  __block NSString *output = @"No matching rule exists";
 
   struct RuleIdentifiers identifiers = {
       .cdhash = (rule.type == SNTRuleTypeCDHash) ? rule.identifier : nil,
@@ -455,8 +375,7 @@ REGISTER_COMMAND_NAME(@"rule")
 
   [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
                             reply:^(SNTRule *r) {
-                              output = [SNTCommandRule stringifyRule:r
-                                                           withColor:(isatty(STDOUT_FILENO) == 1)];
+                              if (r) output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
                             }];
 
   printf("%s\n", output.UTF8String);

@@ -178,6 +178,8 @@ objc_library(
     module_name = "santa_common_CertificateHelpers",
     deps = [
         ":MOLCertificate",
+        ":MOLCodesignChecker",
+        ":SNTCommonEnums",
     ],
 )
 
@@ -479,7 +481,7 @@ objc_library(
 
 santa_unit_test(
     name = "SNTRuleTest",
-    srcs = ["SNTRuleTest.m"],
+    srcs = ["SNTRuleTest.mm"],
     deps = [
         ":SNTCommonEnums",
         ":SNTError",
@@ -494,6 +496,8 @@ objc_library(
     hdrs = ["SNTRuleIdentifiers.h"],
     deps = [
         ":CoderMacros",
+        ":SNTCommonEnums",
+        ":StoredEventHelpers",
     ],
 )
 

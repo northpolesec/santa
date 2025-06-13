@@ -25,6 +25,8 @@
 
 #import <Foundation/Foundation.h>
 
+#import "Source/common/SNTCommonEnums.h"
+
 struct RuleIdentifiers {
   NSString *cdhash;
   NSString *binarySHA256;
@@ -34,17 +36,24 @@ struct RuleIdentifiers {
 };
 
 @interface SNTRuleIdentifiers : NSObject <NSSecureCoding>
+
 @property(readonly) NSString *cdhash;
 @property(readonly) NSString *binarySHA256;
 @property(readonly) NSString *signingID;
 @property(readonly) NSString *certificateSHA256;
 @property(readonly) NSString *teamID;
 
-/// Please use `initWithRuleIdentifiers:`
+/// Please use `initWithRuleIdentifiers:` or `initWithRuleIdentifiers:andSigningStatus:`
 - (instancetype)init NS_UNAVAILABLE;
 
+/// Initialize with a struct of rule identifiers.
 - (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)identifiers
     NS_DESIGNATED_INITIALIZER;
+
+/// Initialize with a struct of rule identifiers and a signing status.
+/// Depending on the signing status, some identifiers may be omitted.
+- (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)fileInfo
+                       andSigningStatus:(SNTSigningStatus)signingStatus;
 
 - (struct RuleIdentifiers)toStruct;
 

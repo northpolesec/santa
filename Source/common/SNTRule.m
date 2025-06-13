@@ -408,6 +408,76 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                        self.identifier, self.state, self.type, (unsigned long)self.timestamp];
 }
 
+- (NSString *)stringifyWithColor:(BOOL)colorize {
+  NSMutableString *output;
+  // Rule state is saved as eventState for output colorization down below
+  SNTEventState eventState = SNTEventStateUnknown;
+
+  switch (self.state) {
+    case SNTRuleStateUnknown: return @"None"; break;
+    case SNTRuleStateAllow: OS_FALLTHROUGH;
+    case SNTRuleStateAllowCompiler: OS_FALLTHROUGH;
+    case SNTRuleStateAllowTransitive:
+      output = [@"Allowed" mutableCopy];
+      eventState = SNTEventStateAllow;
+      break;
+    case SNTRuleStateBlock: OS_FALLTHROUGH;
+    case SNTRuleStateSilentBlock:
+      output = [@"Blocked" mutableCopy];
+      eventState = SNTEventStateBlock;
+      break;
+    case SNTRuleStateCEL: output = [@"CEL" mutableCopy]; break;
+    case SNTRuleStateRemove: OS_FALLTHROUGH;
+    default:
+      output = [NSMutableString stringWithFormat:@"Unexpected rule state: %ld", self.state];
+      break;
+  }
+
+  [output appendString:@" ("];
+
+  switch (self.type) {
+    case SNTRuleTypeUnknown: [output appendString:@"Unknown"]; break;
+    case SNTRuleTypeCDHash: [output appendString:@"CDHash"]; break;
+    case SNTRuleTypeBinary: [output appendString:@"Binary"]; break;
+    case SNTRuleTypeSigningID: [output appendString:@"SigningID"]; break;
+    case SNTRuleTypeCertificate: [output appendString:@"Certificate"]; break;
+    case SNTRuleTypeTeamID: [output appendString:@"TeamID"]; break;
+    default:
+      output = [NSMutableString stringWithFormat:@"Unexpected rule type: %ld", self.type];
+      break;
+  }
+
+  // Add additional attributes
+  switch (self.state) {
+    case SNTRuleStateAllowCompiler: [output appendString:@", Compiler"]; break;
+    case SNTRuleStateAllowTransitive: [output appendString:@", Transitive"]; break;
+    case SNTRuleStateSilentBlock: [output appendString:@", Silent"]; break;
+    default: break;
+  }
+
+  [output appendString:@")"];
+
+  // Colorize
+  if (colorize) {
+    if ((SNTEventStateAllow & eventState)) {
+      [output insertString:@"\033[32m" atIndex:0];
+      [output appendString:@"\033[0m"];
+    } else if ((SNTEventStateBlock & eventState)) {
+      [output insertString:@"\033[31m" atIndex:0];
+      [output appendString:@"\033[0m"];
+    } else {
+      [output insertString:@"\033[33m" atIndex:0];
+      [output appendString:@"\033[0m"];
+    }
+  }
+
+  if (self.state == SNTRuleStateAllowTransitive) {
+    NSDate *date = [NSDate dateWithTimeIntervalSinceReferenceDate:self.timestamp];
+    [output appendString:[NSString stringWithFormat:@"\nlast access date: %@", [date description]]];
+  }
+  return output;
+}
+
 #pragma mark Last-access Timestamp
 
 - (void)resetTimestamp {

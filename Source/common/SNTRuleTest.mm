@@ -14,11 +14,17 @@
 
 #import <XCTest/XCTest.h>
 
+#include <map>
+
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTSyncConstants.h"
 
 #import "Source/common/SNTRule.h"
+
+@interface SNTRule ()
+@property(readwrite) NSUInteger timestamp;
+@end
 
 @interface SNTRuleTest : XCTestCase
 @end
@@ -344,6 +350,66 @@
     SNTRule *rule = [[SNTRule alloc] initWithDictionary:dict error:nil];
     NSDictionary *final = [rule dictionaryRepresentation];
     XCTAssertEqualObjects(expected, final);
+  }
+}
+
+- (void)testStringifyWithColor {
+  std::map<std::pair<SNTRuleType, SNTRuleState>, NSString *> ruleCheckToString = {
+      {{SNTRuleTypeUnknown, SNTRuleStateUnknown}, @"None"},
+      {{SNTRuleTypeUnknown, SNTRuleStateAllow}, @"Allowed (Unknown)"},
+      {{SNTRuleTypeUnknown, SNTRuleStateBlock}, @"Blocked (Unknown)"},
+      {{SNTRuleTypeUnknown, SNTRuleStateSilentBlock}, @"Blocked (Unknown, Silent)"},
+      {{SNTRuleTypeUnknown, SNTRuleStateRemove}, @"Unexpected rule state: 4 (Unknown)"},
+      {{SNTRuleTypeUnknown, SNTRuleStateAllowCompiler}, @"Allowed (Unknown, Compiler)"},
+      {{SNTRuleTypeUnknown, SNTRuleStateAllowTransitive},
+       @"Allowed (Unknown, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
+
+      {{SNTRuleTypeBinary, SNTRuleStateUnknown}, @"None"},
+      {{SNTRuleTypeBinary, SNTRuleStateAllow}, @"Allowed (Binary)"},
+      {{SNTRuleTypeBinary, SNTRuleStateBlock}, @"Blocked (Binary)"},
+      {{SNTRuleTypeBinary, SNTRuleStateSilentBlock}, @"Blocked (Binary, Silent)"},
+      {{SNTRuleTypeBinary, SNTRuleStateRemove}, @"Unexpected rule state: 4 (Binary)"},
+      {{SNTRuleTypeBinary, SNTRuleStateAllowCompiler}, @"Allowed (Binary, Compiler)"},
+      {{SNTRuleTypeBinary, SNTRuleStateAllowTransitive},
+       @"Allowed (Binary, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
+
+      {{SNTRuleTypeSigningID, SNTRuleStateUnknown}, @"None"},
+      {{SNTRuleTypeSigningID, SNTRuleStateAllow}, @"Allowed (SigningID)"},
+      {{SNTRuleTypeSigningID, SNTRuleStateBlock}, @"Blocked (SigningID)"},
+      {{SNTRuleTypeSigningID, SNTRuleStateSilentBlock}, @"Blocked (SigningID, Silent)"},
+      {{SNTRuleTypeSigningID, SNTRuleStateRemove}, @"Unexpected rule state: 4 (SigningID)"},
+      {{SNTRuleTypeSigningID, SNTRuleStateAllowCompiler}, @"Allowed (SigningID, Compiler)"},
+      {{SNTRuleTypeSigningID, SNTRuleStateAllowTransitive},
+       @"Allowed (SigningID, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
+
+      {{SNTRuleTypeCertificate, SNTRuleStateUnknown}, @"None"},
+      {{SNTRuleTypeCertificate, SNTRuleStateAllow}, @"Allowed (Certificate)"},
+      {{SNTRuleTypeCertificate, SNTRuleStateBlock}, @"Blocked (Certificate)"},
+      {{SNTRuleTypeCertificate, SNTRuleStateSilentBlock}, @"Blocked (Certificate, Silent)"},
+      {{SNTRuleTypeCertificate, SNTRuleStateRemove}, @"Unexpected rule state: 4 (Certificate)"},
+      {{SNTRuleTypeCertificate, SNTRuleStateAllowCompiler}, @"Allowed (Certificate, Compiler)"},
+      {{SNTRuleTypeCertificate, SNTRuleStateAllowTransitive},
+       @"Allowed (Certificate, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
+
+      {{SNTRuleTypeTeamID, SNTRuleStateUnknown}, @"None"},
+      {{SNTRuleTypeTeamID, SNTRuleStateAllow}, @"Allowed (TeamID)"},
+      {{SNTRuleTypeTeamID, SNTRuleStateBlock}, @"Blocked (TeamID)"},
+      {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, @"Blocked (TeamID, Silent)"},
+      {{SNTRuleTypeTeamID, SNTRuleStateRemove}, @"Unexpected rule state: 4 (TeamID)"},
+      {{SNTRuleTypeTeamID, SNTRuleStateAllowCompiler}, @"Allowed (TeamID, Compiler)"},
+      {{SNTRuleTypeTeamID, SNTRuleStateAllowTransitive},
+       @"Allowed (TeamID, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
+  };
+
+  SNTRule *rule = [[SNTRule alloc] init];
+  rule.timestamp = 700000000;  // time interval since reference date
+
+  for (const auto &[typeAndState, want] : ruleCheckToString) {
+    rule.type = typeAndState.first;
+    rule.state = typeAndState.second;
+
+    NSString *got = [rule stringifyWithColor:NO];
+    XCTAssertEqualObjects(got, want);
   }
 }
 
