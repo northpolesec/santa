@@ -136,6 +136,13 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     if (!evalResult.ok()) {
       LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
            std::string(evalResult.status().message()).c_str());
+
+      // If the CEL program failed to execute and the failClosed key is set
+      // to true, then we should block.
+      if ([SNTConfigurator configurator].failClosed) {
+        cd.decision = SNTEventStateBlockUnknown;
+        return YES;
+      }
       return NO;
     }
 
