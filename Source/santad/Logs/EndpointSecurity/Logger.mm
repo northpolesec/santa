@@ -105,7 +105,8 @@ Logger::Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock get_export_confi
       get_export_config_block_(get_export_config_block),
       telemetry_mask_(telemetry_mask),
       serializer_(std::move(serializer)),
-      writer_(std::move(writer)) {
+      writer_(std::move(writer)),
+      tracker_(ExportTracker::Create()) {
   // Provide a default block instead of leaving nil
   if (get_export_config_block_ == nil) {
     get_export_config_block_ = ^SNTExportConfiguration *() {
@@ -136,10 +137,10 @@ void Logger::ExportTelemetrySerialized() {
 
   // Get a copy of the current export config to be used for the entire export
   SNTExportConfiguration *export_config = get_export_config_block_();
-
-  // Track which files have been provided by the writer for exporting as well
-  // as their export status so the writer can know which ones to clean up.
-  __block absl::flat_hash_map<std::string, bool> files_exported;
+  if (!export_config) {
+    LOGW(@"Telemetry export enabled, but no export configuration is set.");
+    return;
+  }
 
   while (std::optional<std::string> file_to_export = writer_->NextFileToExport()) {
     NSString *path = @((*file_to_export).c_str());
@@ -147,33 +148,35 @@ void Logger::ExportTelemetrySerialized() {
     NSFileHandle *handle = [NSFileHandle fileHandleForReadingAtPath:path];
     if (!handle) {
       LOGW(@"Failed to get a file handle for telemetry file to export: %@", path);
-      files_exported.insert_or_assign(*file_to_export, true);
+      tracker_.AckCompleted(*file_to_export);
       continue;
     }
 
     struct stat sb;
     if (fstat(handle.fileDescriptor, &sb) != 0) {
       LOGW(@"Failed to stat telemetry file to export: %@", path);
-      files_exported.insert_or_assign(*file_to_export, true);
+      tracker_.AckCompleted(*file_to_export);
       continue;
     }
 
     if (!S_ISREG(sb.st_mode)) {
       LOGW(@"Telemetry file to export is not a regular file: %@", path);
-      files_exported.insert_or_assign(*file_to_export, true);
+      tracker_.AckCompleted(*file_to_export);
       continue;
     }
 
     // Track all files as initially unsuccessfully processed
     // in case the export times out.
-    files_exported.insert_or_assign(*file_to_export, false);
+    tracker_.Track(*file_to_export);
 
     dispatch_group_enter(group);
     [syncd_queue_ exportTelemetryFile:handle
                                config:export_config
                     completionHandler:^(BOOL success) {
                       [handle closeFile];
-                      files_exported.insert_or_assign(*file_to_export, success);
+                      if (success) {
+                        tracker_.AckCompleted(*file_to_export);
+                      }
                       dispatch_group_leave(group);
                     }];
   }
@@ -183,7 +186,7 @@ void Logger::ExportTelemetrySerialized() {
     LOGW(@"Timed out waiting for telemetry to export.");
   }
 
-  writer_->FilesExported(files_exported);
+  writer_->FilesExported(tracker_.Drain());
 }
 
 void Logger::Log(std::unique_ptr<EnrichedMessage> msg) {
