@@ -251,6 +251,20 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "Defer",
+    hdrs = ["Defer.h"],
+)
+
+santa_unit_test(
+    name = "DeferTest",
+    srcs = ["DeferTest.mm"],
+    deps = [
+        ":Defer",
+        ":TestUtils",
+    ],
+)
+
+objc_library(
     name = "TelemetryEventMap",
     srcs = ["TelemetryEventMap.mm"],
     hdrs = ["TelemetryEventMap.h"],
