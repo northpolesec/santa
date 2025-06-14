@@ -60,15 +60,16 @@ namespace santa {
 
 class LoggerPeer : public Logger {
  public:
-  // Make base class constructors visible
+  // Make base class constructors and members visible
   using Logger::Logger;
+  using Logger::serializer_;
+  using Logger::tracker_;
+  using Logger::writer_;
 
   LoggerPeer(std::unique_ptr<Logger> l)
       : Logger(nil, nil, TelemetryEvent::kEverything, l->serializer_, l->writer_) {}
 
-  std::shared_ptr<santa::Serializer> Serializer() { return serializer_; }
-
-  std::shared_ptr<santa::Writer> Writer() { return writer_; }
+  absl::flat_hash_map<std::string, bool> TrackerState() { return tracker_.file_state_; }
 };
 
 }  // namespace santa
@@ -120,32 +121,32 @@ class MockWriter : public Null {
   LoggerPeer logger(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
                                    SNTEventLogTypeFilelog, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                    1, 1));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.Serializer()));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<File>(logger.Writer()));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.serializer_));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<File>(logger.writer_));
 
   logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeSyslog, nil, @"/tmp/temppy", @"/tmp/spool", 1,
                                      1, 1, 1));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.Serializer()));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Syslog>(logger.Writer()));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.serializer_));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Syslog>(logger.writer_));
 
   logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeNull, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                      1, 1));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Empty>(logger.Serializer()));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Null>(logger.Writer()));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Empty>(logger.serializer_));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Null>(logger.writer_));
 
   logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobuf, nil, @"/tmp/temppy", @"/tmp/spool", 1,
                                      1, 1, 1));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.Serializer()));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Spool>(logger.Writer()));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Spool>(logger.writer_));
 
   logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeJSON, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                      1, 1));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.Serializer()));
-  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<File>(logger.Writer()));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<File>(logger.writer_));
 }
 
 - (void)testLog {
@@ -261,6 +262,62 @@ class MockWriter : public Null {
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
+}
+
+- (void)testExportTracker {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  LoggerPeer logger(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+                                   SNTEventLogTypeNull, nil, @"", @"", 1, 1, 1, 1));
+
+  // Nothing in the map initially
+  auto map = logger.tracker_.Drain();
+  XCTAssertEqual(logger.TrackerState().size(), 0);
+  XCTAssertEqual(map.size(), 0);
+
+  // Start tracking a couple of keys
+  logger.tracker_.Track("foo");
+  XCTAssertEqual(logger.TrackerState().size(), 1);
+  XCTAssertEqual(logger.TrackerState().at("foo"), false);
+
+  logger.tracker_.Track("bar");
+  XCTAssertEqual(logger.TrackerState().size(), 2);
+  XCTAssertEqual(logger.TrackerState().at("bar"), false);
+
+  // Change state of an existing key
+  logger.tracker_.AckCompleted("bar");
+  XCTAssertEqual(logger.TrackerState().at("bar"), true);
+
+  // Change state of a non-existing key, it should be created
+  logger.tracker_.AckCompleted("cake");
+  XCTAssertEqual(logger.TrackerState().at("cake"), true);
+
+  // Drain the tracker
+  map = logger.tracker_.Drain();
+  XCTAssertEqual(logger.TrackerState().size(), 0);
+  XCTAssertEqual(map.size(), 3);
+  XCTAssertEqual(map.at("foo"), false);
+  XCTAssertEqual(map.at("bar"), true);
+  XCTAssertEqual(map.at("cake"), true);
+
+  // Add some more keys after draining
+  logger.tracker_.Track("baz");
+  logger.tracker_.AckCompleted("qaz");
+  XCTAssertEqual(logger.TrackerState().size(), 2);
+  XCTAssertEqual(logger.TrackerState().at("baz"), false);
+  XCTAssertEqual(logger.TrackerState().at("qaz"), true);
+
+  // Track something already ack'd, ensure value doesn't change
+  logger.tracker_.Track("qaz");
+  XCTAssertEqual(logger.TrackerState().size(), 2);
+  XCTAssertEqual(logger.TrackerState().at("baz"), false);
+  XCTAssertEqual(logger.TrackerState().at("qaz"), true);
+
+  // One last drain for fun
+  map = logger.tracker_.Drain();
+  XCTAssertEqual(logger.TrackerState().size(), 0);
+  XCTAssertEqual(map.size(), 2);
+  XCTAssertEqual(map.at("baz"), false);
+  XCTAssertEqual(map.at("qaz"), true);
 }
 
 @end

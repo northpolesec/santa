@@ -58,6 +58,11 @@ class Logger : public Timer<Logger> {
 
   virtual ~Logger() = default;
 
+  Logger(Logger &&) = default;
+  Logger &operator=(Logger &&rhs) = default;
+  Logger(Logger &) = default;
+  Logger &operator=(Logger &rhs) = default;
+
   virtual void Log(std::unique_ptr<santa::EnrichedMessage> msg);
 
   void LogAllowlist(const santa::Message &msg, const std::string_view hash);
@@ -88,6 +93,52 @@ class Logger : public Timer<Logger> {
   friend class santa::LoggerPeer;
 
  private:
+  class ExportTracker {
+   public:
+    static ExportTracker Create() {
+      dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.export_tracker",
+                                                 DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
+      return ExportTracker(q);
+    }
+
+    ExportTracker(dispatch_queue_t q) : q_(q) {}
+    ExportTracker(ExportTracker &&) = default;
+    ExportTracker &operator=(ExportTracker &&rhs) = default;
+    ExportTracker(ExportTracker &) = default;
+    ExportTracker &operator=(ExportTracker &rhs) = default;
+
+    /// Track a new key. If the key isn't yet tracked, its value will be set
+    /// to false. If the key is already tracked, its value will not be changed.
+    void Track(std::string file_path) {
+      dispatch_sync(q_, ^{
+        file_state_.try_emplace(std::move(file_path), false);
+      });
+    }
+
+    /// Mark the given key as completed. If the key doesn't previously exist,
+    /// it will automatically start being tracked.
+    void AckCompleted(std::string file_path) {
+      dispatch_sync(q_, ^{
+        file_state_.insert_or_assign(std::move(file_path), true);
+      });
+    }
+
+    /// Empty the map and return the previous state
+    absl::flat_hash_map<std::string, bool> Drain() {
+      __block absl::flat_hash_map<std::string, bool> return_state;
+      dispatch_sync(q_, ^{
+        std::swap(return_state, file_state_);
+      });
+      return return_state;
+    }
+
+    friend class santa::LoggerPeer;
+
+   private:
+    absl::flat_hash_map<std::string, bool> file_state_;
+    dispatch_queue_t q_;
+  };
+
   void ExportTelemetrySerialized();
 
   SNTSyncdQueue *syncd_queue_;
@@ -95,6 +146,7 @@ class Logger : public Timer<Logger> {
   TelemetryEvent telemetry_mask_;
   std::shared_ptr<santa::Serializer> serializer_;
   std::shared_ptr<santa::Writer> writer_;
+  ExportTracker tracker_;
   dispatch_queue_t export_queue_;
 };
 
