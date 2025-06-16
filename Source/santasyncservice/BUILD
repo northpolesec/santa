@@ -230,6 +230,7 @@ objc_library(
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
+        "@rednose//rednose:rednose_static",
     ],
 )
 

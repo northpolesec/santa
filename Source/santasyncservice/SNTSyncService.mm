@@ -25,6 +25,7 @@
 #import "Source/santasyncservice/SNTPolaris.h"
 #import "Source/santasyncservice/SNTSyncBroadcaster.h"
 #import "Source/santasyncservice/SNTSyncManager.h"
+#include "rednose/src/export/bridge.rs.h"
 
 @interface SNTSyncService ()
 @property(nonatomic, readonly) SNTSyncManager *syncManager;
