@@ -47,6 +47,7 @@ objc_library(
     name = "WatchItemPolicy",
     hdrs = ["DataLayer/WatchItemPolicy.h"],
     deps = [
+        "//Source/common:Glob",
         "//Source/common:PrefixTree",
         "//Source/common:Unit",
         "@abseil-cpp//absl/container:flat_hash_set",
@@ -70,12 +71,12 @@ objc_library(
         ":FAAPolicyProcessor",
         ":SNTEndpointSecurityEventHandler",
         ":WatchItemPolicy",
+        "//Source/common:Glob",
         "//Source/common:PrefixTree",
         "//Source/common:SNTError",
         "//Source/common:SNTLogging",
         "//Source/common:String",
         "//Source/common:Unit",
-        "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )

@@ -24,6 +24,7 @@
 #include <string_view>
 #include <vector>
 
+#import "Source/common/Glob.h"
 #import "Source/common/PrefixTree.h"
 #import "Source/common/Unit.h"
 #include "absl/container/flat_hash_set.h"
@@ -218,10 +219,14 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
         tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
     // Build tree
     for (const auto &pt_pair : path_type_pairs) {
-      if (pt_pair.second == WatchItemPathType::kPrefix) {
-        tree->InsertPrefix(pt_pair.first.c_str(), santa::Unit{});
-      } else {
-        tree->InsertLiteral(pt_pair.first.c_str(), santa::Unit{});
+      std::vector<std::string> matches = FindMatches(@(pt_pair.first.c_str()));
+
+      for (const auto &match : matches) {
+        if (pt_pair.second == WatchItemPathType::kPrefix) {
+          tree->InsertPrefix(match.c_str(), santa::Unit{});
+        } else {
+          tree->InsertLiteral(match.c_str(), santa::Unit{});
+        }
       }
     }
   }

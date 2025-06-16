@@ -226,6 +226,16 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "Glob",
+    srcs = ["Glob.mm"],
+    hdrs = ["Glob.h"],
+    deps = [
+        ":SNTLogging",
+        "@abseil-cpp//absl/cleanup:cleanup",
+    ],
+)
+
+objc_library(
     name = "Keychain",
     srcs = ["Keychain.mm"],
     hdrs = ["Keychain.h"],
