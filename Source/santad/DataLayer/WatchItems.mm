@@ -39,6 +39,7 @@
 #import "Source/common/String.h"
 #import "Source/common/Unit.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "absl/cleanup/cleanup.h"
 
 NSString *const kWatchItemConfigKeyVersion = @"Version";
 NSString *const kWatchItemConfigKeyEventDetailURL = @"EventDetailURL";
@@ -695,10 +696,17 @@ void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NS
   NSString *path = [NSString stringWithFormat:@"%@%@", base, path_components[idx]];
 
   glob_t *g = (glob_t *)alloca(sizeof(glob_t));
+  // Ensure gl_pathv is NULL so globfree can always safely be called
+  g->gl_pathv = NULL;
+
+  // Ensure globfree is always called
+  absl::Cleanup glob_cleaup = ^{
+    globfree(g);
+  };
+
   int err = glob(path.UTF8String, GLOB_NOSORT, nullptr, g);
   if (err != 0 && err != GLOB_NOMATCH) {
     LOGE(@"Failed to generate path names for watch item: %@", path);
-    globfree(g);
     return;
   }
 
@@ -714,6 +722,7 @@ void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NS
                     subarrayWithRange:NSMakeRange(idx + 1, path_components.count - idx - 1)];
       NSString *remaining_path = [remaining_components componentsJoinedByString:@""];
 
+      // Need to manually globfree here since we're about to re-glob
       globfree(g);
       glob(remaining_path.UTF8String, 0, NULL, g);
       if ((g->gl_flags & GLOB_MAGCHAR) == 0) {
@@ -728,8 +737,6 @@ void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NS
       FindMatches(@(g->gl_pathv[i]), path_components, idx + 1, matches);
     }
   }
-
-  globfree(g);
 }
 
 std::vector<std::string> FindMatches(NSString *path) {
@@ -742,6 +749,14 @@ std::vector<std::string> FindMatches(NSString *path) {
   }
 
   glob_t *g = (glob_t *)alloca(sizeof(glob_t));
+  // Ensure gl_pathv is NULL so globfree can always safely be called
+  g->gl_pathv = NULL;
+
+  // Ensure globfree is always called
+  absl::Cleanup glob_cleaup = ^{
+    globfree(g);
+  };
+
   int err = glob(path.UTF8String, 0, nullptr, g);
   if (err != 0 && err != GLOB_NOMATCH) {
     LOGE(@"Failed to generate path names for watch item: %@", path);
@@ -750,7 +765,6 @@ std::vector<std::string> FindMatches(NSString *path) {
 
   // If the path had no glob char, begin watching it whether or not it exists
   if ((g->gl_flags & GLOB_MAGCHAR) == 0) {
-    globfree(g);
     return {path.UTF8String};
   }
 
