@@ -75,6 +75,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:String",
         "//Source/common:Unit",
+        "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
