@@ -65,6 +65,8 @@ flowchart TD
 
 #### CDHash
 
+Value: `CDHASH`
+
 CDHash rules use a binary’s signed code directory hash as an identifier. This is
 the most specific rule in Santa. The code directory hash identifies a specific
 version of a program, similar to a file hash. Note that the operating system
@@ -79,11 +81,15 @@ to ensure that a process will be killed if the CDHash was tampered with
 
 #### Binary
 
+Value: `BINARY`
+
 Binary rules use the SHA-256 hash of the entire binary file as an identifier.
 This means that if the binary file is tampered with in any way then the rule
 will not match.
 
 #### SigningID
+
+Value: `SIGNINGID`
 
 Signing IDs are arbitrary identifiers under developer control that are given to
 a binary at signing time. Typically, these use reverse domain name notation and
@@ -115,6 +121,8 @@ Rule                   : Allowed (SigningID)
 ```
 
 #### Certificate
+
+Value: `CERTIFICATE`
 
 Certificate rules are formed from the SHA-256 fingerprint of an X.509 leaf
 signing certificate. This is a powerful rule type that has a much broader reach
@@ -174,6 +182,8 @@ Signing Chain:
 
 #### TeamID
 
+Value: `TEAMID`
+
 The Apple Developer Program Team ID is a 10-character identifier issued by Apple
 and tied to developer accounts/organizations. This is distinct from
 Certificates, as a single developer account can and frequently will
@@ -206,16 +216,20 @@ is based on the policy attached to the rule. Santa supports several policies.
 
 #### Allowlist
 
+Value: `ALLOWLIST`
+
 The binary is allowed to execute and this decision is cached such that
 subsequent executions of the same binary will not be processed to increase
 performance.
 
 #### Allowlist Compiler
 
+Value: `ALLOWLIST_COMPILER`
+
 If Santa is configured to
 [enable transitive allowlisting](https://northpole.dev/configuration/keys#EnableTransitiveRules)
 then the binary is allowed to execute and any files that it writes will be
-read upon closing to check whether they are Mach-O binaries.
+read upon closing (or renamed) to check whether they are Mach-O binaries.
 
 When a Mach-O binary has been written by an allowed compiler, a transitive rule
 will be created for it that is valid for 6 months. This rule will allow that
@@ -240,6 +254,8 @@ were a regular [Allowlist](#allowlist) rule.
 
 #### Blocklist
 
+Value: `BLOCKLIST`
+
 The execution will be blocked. This will be the case even if the host is in
 Monitor or Standalone mode, and it will not be possible to override.
 
@@ -250,6 +266,8 @@ This can be used in Blocklist rules to inform users _why_ a particular
 application is blocked.
 
 #### Silent Blocklist
+
+Value: `SILENT_BLOCKLIST`
 
 Silent Blocklist rules are identical to normal Blocklist rules but the GUI will
 not be displayed when such a rule is triggered.
