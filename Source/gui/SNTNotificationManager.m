@@ -25,6 +25,7 @@
 #import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
+#import "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStrengthify.h"
@@ -147,19 +148,25 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   });
 }
 
-// For blocked execution notifications, post an NSDistributedNotificationCenter
-// notification with the important details from the stored event. Distributed
-// notifications are system-wide broadcasts that can be sent by apps and observed
-// from separate processes. This allows users of Santa to write tools that
-// perform actions when we block execution, such as trigger management tools or
-// display an enterprise-specific UI (which is particularly useful when combined
-// with the EnableSilentMode configuration option, to disable Santa's standard UI).
+// For blocked execution and file access notifications, post an
+// NSDistributedNotificationCenter notification with the important details from
+// the stored event. Distributed notifications are system-wide broadcasts that
+// can be sent by apps and observed from separate processes. This allows users
+// of Santa to write tools that perform actions when we block, such as trigger
+// management tools or display an enterprise-specific UI (which is particularly
+// useful when combined with the EnableSilentMode configuration option, to
+// disable Santa's standard UI).
 - (void)postDistributedNotification:(SNTMessageWindowController *)pendingMsg {
-  if (![pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
-    return;
+  if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
+    return [self postBinaryDistributedNotification:(SNTBinaryMessageWindowController *)pendingMsg];
+  } else if ([pendingMsg isKindOfClass:[SNTFileAccessMessageWindowController class]]) {
+    return [self
+        postFileAccessDistributedNotification:(SNTFileAccessMessageWindowController *)pendingMsg];
   }
-  SNTBinaryMessageWindowController *wc = (SNTBinaryMessageWindowController *)pendingMsg;
-  NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
+  return;
+}
+
+- (void)postBinaryDistributedNotification:(SNTBinaryMessageWindowController *)wc {
   NSMutableArray<NSDictionary *> *signingChain =
       [NSMutableArray arrayWithCapacity:wc.event.signingChain.count];
   for (MOLCertificate *cert in wc.event.signingChain) {
@@ -188,7 +195,32 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     kSigningChain : signingChain,
   };
 
+  NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
   [dc postNotificationName:@"com.northpolesec.santa.notification.blockedeexecution"
+                    object:@"com.northpolesec.santa"
+                  userInfo:userInfo
+        deliverImmediately:YES];
+}
+
+- (void)postFileAccessDistributedNotification:(SNTFileAccessMessageWindowController *)wc {
+  NSDictionary *userInfo = @{
+    kFileSHA256 : wc.event.fileSHA256 ?: @"",
+    kFilePath : wc.event.filePath ?: @"",
+    kTeamID : wc.event.teamID ?: @"",
+    kExecutingUser : wc.event.executingUser ?: @"",
+    kExecutionTime : @([wc.event.occurrenceDate timeIntervalSince1970]) ?: @0,
+    kPID : wc.event.pid ?: @0,
+    kPPID : wc.event.ppid ?: @0,
+    kParentName : wc.event.parentName ?: @"",
+
+    @"accessed_path" : wc.event.accessedPath ?: @"",
+    @"rule_name" : wc.event.ruleName ?: @"",
+    @"rule_version" : wc.event.ruleVersion ?: @"",
+    @"application" : wc.event.application ?: @"",
+  };
+
+  NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
+  [dc postNotificationName:@"com.northpolesec.santa.notification.blockedfileaccess"
                     object:@"com.northpolesec.santa"
                   userInfo:userInfo
         deliverImmediately:YES];
