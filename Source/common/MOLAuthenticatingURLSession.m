@@ -218,7 +218,8 @@
     allCerts = [MOLCertificate certificatesFromArray:results];
 
     if (self.clientCertCommonName) {
-      [self log:@"[Client Trust] Looking for certificate with common name: %@", self.clientCertCommonName];
+      [self log:@"[Client Trust] Looking for certificate with common name: %@",
+                self.clientCertCommonName];
       foundIdentity = [self identityByFilteringArray:allCerts
                                           commonName:self.clientCertCommonName
                                     issuerCommonName:nil
@@ -226,7 +227,8 @@
                                        issuerOrgName:nil
                                        issuerOrgUnit:nil];
     } else if (self.clientCertIssuerCn) {
-      [self log:@"[Client Trust] Looking for certificate with issuer common name: %@", self.clientCertIssuerCn];
+      [self log:@"[Client Trust] Looking for certificate with issuer common name: %@",
+                self.clientCertIssuerCn];
       foundIdentity = [self identityByFilteringArray:allCerts
                                           commonName:nil
                                     issuerCommonName:self.clientCertIssuerCn
