@@ -85,6 +85,7 @@ objc_library(
         ":SNTCommandTelemetry",
         ":santactl_cmd",
         "//Source/common:CertificateHelpers",
+        "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
@@ -108,6 +109,7 @@ objc_library(
         "//Source/common:StoredEventHelpers",
         "//Source/common:SystemResources",
         "@FMDB",
+        "@abseil-cpp//absl/cleanup:cleanup",
     ],
 )
 

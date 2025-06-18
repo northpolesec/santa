@@ -20,6 +20,9 @@
 #include <optional>
 #include <vector>
 
+#include "absl/cleanup/cleanup.h"
+
+#import "Source/common/MOLAuthenticatingURLSession.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SystemResources.h"
@@ -77,6 +80,7 @@ REGISTER_COMMAND_NAME(@"doctor")
   BOOL err = NO;
   err |= [self validateProcesses];
   err |= [self validateConfiguration];
+  err |= [self validateSync];
   exit(err);
 }
 
@@ -126,6 +130,7 @@ REGISTER_COMMAND_NAME(@"doctor")
   NSArray *errors = [[SNTConfigurator configurator] validateConfiguration];
   if (!errors.count) {
     print(@"[+] No configuration errors detected");
+    print(@"");
     return NO;
   }
 
@@ -135,6 +140,82 @@ REGISTER_COMMAND_NAME(@"doctor")
 
   print(@"");
   return YES;
+}
+
+- (BOOL)validateSync {
+  print(@"=> Validating sync...");
+
+  SNTConfigurator *config = [SNTConfigurator configurator];
+
+  NSURL *syncBaseURL = config.syncBaseURL;
+  if (!syncBaseURL) {
+    print(@"[+] Sync is disabled");
+    print(@"");
+    // Don't treat this as an error.
+    return YES;
+  }
+  print(@"[+] Sync is enabled");
+
+  if (![syncBaseURL.scheme isEqualToString:@"https"]) {
+    print(@"[-] Sync is not using HTTPS");
+  } else {
+    print(@"[+] Sync is using HTTPS");
+  }
+
+  NSURLSessionConfiguration *sessConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
+  sessConfig.connectionProxyDictionary = [[SNTConfigurator configurator] syncProxyConfig];
+
+  MOLAuthenticatingURLSession *authURLSession =
+      [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:sessConfig];
+  authURLSession.userAgent = @"santactl-sync/";
+  NSString *santactlVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
+  if (santactlVersion) {
+    authURLSession.userAgent = [authURLSession.userAgent stringByAppendingString:santactlVersion];
+  }
+  authURLSession.refusesRedirects = YES;
+  authURLSession.serverHostname = syncBaseURL.host;
+  authURLSession.loggingBlock = ^(NSString *line) {
+    print(@"%s", [line UTF8String]);
+  };
+
+  // Configure server auth
+  if ([config syncServerAuthRootsFile]) {
+    authURLSession.serverRootsPemFile = [config syncServerAuthRootsFile];
+  } else if ([config syncServerAuthRootsData]) {
+    authURLSession.serverRootsPemData = [config syncServerAuthRootsData];
+  }
+
+  // Configure client auth
+  if ([config syncClientAuthCertificateFile]) {
+    NSString *certFile = [config syncClientAuthCertificateFile];
+    authURLSession.clientCertFile = certFile;
+    authURLSession.clientCertPassword = [config syncClientAuthCertificatePassword];
+  } else if ([config syncClientAuthCertificateCn]) {
+    authURLSession.clientCertCommonName = [config syncClientAuthCertificateCn];
+  } else if ([config syncClientAuthCertificateIssuer]) {
+    authURLSession.clientCertIssuerCn = [config syncClientAuthCertificateIssuer];
+  }
+
+  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+  NSURLSessionDataTask *task = [[authURLSession session]
+        dataTaskWithURL:[syncBaseURL URLByAppendingPathComponent:@"/preflight/santactl-doctor-test"]
+      completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        absl::Cleanup cleanup = ^{
+          dispatch_semaphore_signal(semaphore);
+        };
+
+        if (error) {
+          print(@"[-] Failed to retrieve preflight data");
+          return;
+        }
+        print(@"[+] Preflight request succeeded");
+      }];
+  [task resume];
+  dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+
+  print(@"");
+
+  return NO;
 }
 
 @end
