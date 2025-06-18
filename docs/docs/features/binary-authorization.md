@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+toc_max_heading_level: 5
 ---
 
 # Binary Authorization
@@ -23,9 +24,15 @@ decide whether the binary is allowed to be executed.
   the top of any other windows detailing what was blocked.
 
 Santa supports multiple mechanisms for controlling which executables are allowed
-to run as friction-free as possible. The primary mechanism for deciding what is
-able to run is **Rules**. Rules can be synchronized from a server,
-configured statically in a profile, or managed locally.
+to run, with as little friction as possible.
+
+## Rules
+
+The primary mechanism for deciding what is able to run is **Rules**. Rules can
+be synchronized from a server, configured statically in a profile, or managed
+locally with `santactl`.
+
+### Rule Types
 
 Santa supports several different rule types and follows a strict evaluation
 order when determining which rule to enforce for a given execution. The
@@ -56,7 +63,7 @@ flowchart TD
 
 </div>
 
-## CDHash
+#### CDHash
 
 CDHash rules use a binary’s signed code directory hash as an identifier. This is
 the most specific rule in Santa. The code directory hash identifies a specific
@@ -70,13 +77,13 @@ Runtime](https://developer.apple.com/documentation/security/hardened-runtime),
 to ensure that a process will be killed if the CDHash was tampered with
 (assuming the system has SIP enabled).
 
-## Binary
+#### Binary
 
 Binary rules use the SHA-256 hash of the entire binary file as an identifier.
 This means that if the binary file is tampered with in any way then the rule
 will not match.
 
-## SigningID
+#### SigningID
 
 Signing IDs are arbitrary identifiers under developer control that are given to
 a binary at signing time. Typically, these use reverse domain name notation and
@@ -107,7 +114,7 @@ Code-signed            : Yes
 Rule                   : Allowed (SigningID)
 ```
 
-## Certificate
+#### Certificate
 
 Certificate rules are formed from the SHA-256 fingerprint of an X.509 leaf
 signing certificate. This is a powerful rule type that has a much broader reach
@@ -165,7 +172,7 @@ Signing Chain:
        Valid Until         : 2035/02/09 16:40:36 -0500
 ```
 
-## TeamID
+#### TeamID
 
 The Apple Developer Program Team ID is a 10-character identifier issued by Apple
 and tied to developer accounts/organizations. This is distinct from
@@ -191,6 +198,66 @@ Type                   : Executable (arm64, x86_64)
 Code-signed            : Yes
 Rule                   : Allowed (SigningID)
 ```
+
+### Policies
+
+Once a rule has been found that matches a given executable, the action to take
+is based on the policy attached to the rule. Santa supports several policies.
+
+#### Allowlist
+
+The binary is allowed to execute and this decision is cached such that
+subsequent executions of the same binary will not be processed to increase
+performance.
+
+#### Allowlist Compiler
+
+If Santa is configured to
+[enable transitive allowlisting](https://northpole.dev/configuration/keys#EnableTransitiveRules)
+then the binary is allowed to execute and any files that it writes will be
+read upon closing to check whether they are Mach-O binaries.
+
+When a Mach-O binary has been written by an allowed compiler, a transitive rule
+will be created for it that is valid for 6 months. This rule will allow that
+binary only on the machine that it was created on.
+
+The purpose of transitive allowlisting is to allow developers to live in
+Lockdown mode while still being able to do local development. Allowlisting the
+final process in a build toolchain (usually a linker or the `codesign` tool)
+will usually allow developers to work as normal.
+
+:::note
+
+While Santa tries to ensure all files created by allowlisted compilers are
+scanned and transitive rules created as quickly as possible, there is a race
+condition in certain scenarios that will cause execution to fail, especially if
+a binary is executed _immediately_ after being created.
+
+:::
+
+If transitive allowlisting is _not_ enabled, the rule will be treated as if it
+were a regular [Allowlist](#allowlist) rule.
+
+#### Blocklist
+
+The execution will be blocked. This will be the case even if the host is in
+Monitor or Standalone mode, and it will not be possible to override.
+
+Blocklist rules are intended to block applications that an organization deems
+to be malicious or against policy. Rules can have custom messages attached to
+them, which override the default message shown when Santa blocks an application.
+This can be used in Blocklist rules to inform users _why_ a particular
+application is blocked.
+
+#### Silent Blocklist
+
+Silent Blocklist rules are identical to normal Blocklist rules but the GUI will
+not be displayed when such a rule is triggered.
+
+This rule type should be used sparingly. Blocking an application without
+informing the user that it was Santa that did it can be a _very_ confusing
+experience for users and lead to wasted time trying to determine the underlying
+cause.
 
 ## Scope
 
@@ -253,3 +320,4 @@ event/telemetry output this is the `UNKNOWN` case:
   either by using TouchID or entering their password. If they approve the
   execution the execution is allowed to continue (without requiring
   re-execution) and a local SigningID or SHA-256 rule is automatically created.
+
