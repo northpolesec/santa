@@ -189,11 +189,13 @@
 }
 
 - (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
+                   fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
           completionHandler:(void (^)(BOOL))completionHandler {
   [self dispatchBlockOnSyncdQueue:^{
     if (self.syncConnection.isConnected) {
       [self.syncConnection.remoteObjectProxy exportTelemetryFile:telemetryFile
+                                                        fileName:fileName
                                                           config:config
                                                            reply:completionHandler];
     } else {
