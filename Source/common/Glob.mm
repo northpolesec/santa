@@ -42,7 +42,7 @@ void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NS
 
   int err = glob(path.UTF8String, GLOB_NOSORT, nullptr, g);
   if (err != 0 && err != GLOB_NOMATCH) {
-    LOGE(@"Failed to generate path names for watch item: %@", path);
+    LOGE(@"Failed to generate path names from glob: %@", path);
     return;
   }
 
@@ -95,7 +95,7 @@ std::vector<std::string> FindMatches(NSString *path) {
 
   int err = glob(path.UTF8String, 0, nullptr, g);
   if (err != 0 && err != GLOB_NOMATCH) {
-    LOGE(@"Failed to generate path names for watch item: %@", path);
+    LOGE(@"Failed to generate path names from glob: %@", path);
     return {};
   }
 
@@ -111,7 +111,7 @@ std::vector<std::string> FindMatches(NSString *path) {
   // Semi-arbitrary to prevent run away recursion. We could consider increasing this if
   // anyone ever has a good use case.
   if (path_components.count > 40) {
-    LOGW(@"Watch path contained too many components, skipping: %@", path);
+    LOGW(@"Glob path contained too many components, skipping: %@", path);
     return {};
   }
 
