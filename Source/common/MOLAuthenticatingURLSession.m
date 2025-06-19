@@ -131,7 +131,7 @@
       completionHandler(NSURLSessionAuthChallengeUseCredential, cred);
       return;
     } else {
-      [self log:@"Server asked for client authentication but no usable client certificate found."];
+      [self log:@"[Client Trust] Server asked for authentication but no usable certificate found."];
       completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
       return;
     }
@@ -141,7 +141,7 @@
       completionHandler(NSURLSessionAuthChallengeUseCredential, cred);
       return;
     } else {
-      [self log:@"Unable to verify server identity."];
+      [self log:@"[Server Trust] Unable to verify server identity."];
       completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, nil);
       return;
     }
@@ -203,6 +203,7 @@
 
   NSArray *allCerts;
   if (self.clientCertFile) {
+    [self log:@"[Client Trust] Using certificate from file: %@", self.clientCertFile];
     foundIdentity = [self identityFromFile:self.clientCertFile password:self.clientCertPassword];
   } else {
     CFArrayRef cfResults = NULL;
@@ -217,6 +218,8 @@
     allCerts = [MOLCertificate certificatesFromArray:results];
 
     if (self.clientCertCommonName) {
+      [self log:@"[Client Trust] Looking for certificate with common name: %@",
+                self.clientCertCommonName];
       foundIdentity = [self identityByFilteringArray:allCerts
                                           commonName:self.clientCertCommonName
                                     issuerCommonName:nil
@@ -224,6 +227,8 @@
                                        issuerOrgName:nil
                                        issuerOrgUnit:nil];
     } else if (self.clientCertIssuerCn) {
+      [self log:@"[Client Trust] Looking for certificate with issuer common name: %@",
+                self.clientCertIssuerCn];
       foundIdentity = [self identityByFilteringArray:allCerts
                                           commonName:nil
                                     issuerCommonName:self.clientCertIssuerCn
@@ -231,12 +236,15 @@
                                        issuerOrgName:nil
                                        issuerOrgUnit:nil];
     } else {
+      [self log:@"[Client Trust] Looking for certificate with server-provided CA names"];
       for (NSData *allowedIssuer in protectionSpace.distinguishedNames) {
         MOLDERDecoder *decoder = [[MOLDERDecoder alloc] initWithData:allowedIssuer];
 
         if (!decoder) {
           continue;
         }
+
+        [self log:@"[Client Trust] Allowed issuer: %@", decoder];
 
         foundIdentity = [self identityByFilteringArray:allCerts
                                             commonName:nil
@@ -254,7 +262,7 @@
     SecIdentityCopyCertificate(foundIdentity, &certificate);
     MOLCertificate *clientCert = [[MOLCertificate alloc] initWithSecCertificateRef:certificate];
     if (certificate) CFRelease(certificate);
-    if (clientCert) [self log:@"Client Trust: %@", clientCert];
+    if (clientCert) [self log:@"[Client Trust] Certificate: %@", clientCert];
 
     NSArray *intermediates = [self locateIntermediatesForCertificate:clientCert inArray:allCerts];
 
@@ -283,7 +291,7 @@
 ///
 - (NSURLCredential *)serverCredentialForProtectionSpace:(NSURLProtectionSpace *)protectionSpace {
   if (protectionSpace.serverTrust == NULL) {
-    [self log:@"Server Trust: No server trust information available"];
+    [self log:@"[Server Trust] No trust information available"];
     return nil;
   }
 
@@ -294,7 +302,7 @@
     err = SecTrustSetAnchorCertificates(protectionSpace.serverTrust,
                                         (__bridge CFArrayRef)self.anchors);
     if (err != errSecSuccess) {
-      [self log:@"Server Trust: Could not set anchor certificates: %d", err];
+      [self log:@"[Server Trust] Could not set anchor certificates: %d", err];
       return nil;
     }
   }
@@ -304,7 +312,7 @@
   if (certChain.firstObject) {
     MOLCertificate *cert = [[MOLCertificate alloc]
         initWithSecCertificateRef:(__bridge SecCertificateRef)certChain.firstObject];
-    [self log:@"Server Trust: %@", cert];
+    [self log:@"[Server Trust] Certificate: %@", cert];
   }
 
   // Evaluate the server's cert chain.
@@ -314,7 +322,7 @@
     NSError *underlyingError = errRef.userInfo[NSUnderlyingErrorKey];
     NSString *errMsg =
         CFBridgingRelease(SecCopyErrorMessageString((OSStatus)underlyingError.code, NULL));
-    [self log:@"Server Trust: Unable to evaluate certificate chain for server: %@ (%d)", errMsg,
+    [self log:@"[Server Trust] Unable to evaluate certificate chain for server: %@ (%d)", errMsg,
               underlyingError.code];
     return nil;
   }
@@ -407,7 +415,7 @@
   NSError *error;
   NSData *data = [NSData dataWithContentsOfFile:file options:0 error:&error];
   if (error) {
-    [self log:@"Client Trust: Couldn't open client certificate %@: %@", self.clientCertFile,
+    [self log:@"[Client Trust] Couldn't open client certificate %@: %@", self.clientCertFile,
               [error localizedDescription]];
     return nil;
   }
@@ -419,7 +427,7 @@
   NSArray *identities = CFBridgingRelease(cfIdentities);
 
   if (err != errSecSuccess) {
-    [self log:@"Client Trust: Couldn't load client certificate %@: %d", self.clientCertFile, err];
+    [self log:@"[Client Trust] Couldn't load client certificate %@: %d", self.clientCertFile, err];
     return nil;
   }
 
@@ -437,7 +445,7 @@
   OSStatus res = SecTrustCreateWithCertificates(leafCert.certRef, NULL, &t);
   if (res != errSecSuccess) {
     NSString *errMsg = CFBridgingRelease(SecCopyErrorMessageString(res, NULL));
-    [self log:@"Failed to create trust for locating intermediate certs: %@", errMsg];
+    [self log:@"[Client Trust] Failed to create trust for locating intermediate certs: %@", errMsg];
     return nil;
   }
 
