@@ -20,7 +20,7 @@ git_override(
 )
 
 # North Pole Rednose
-bazel_dep(name = "rednose", version = "1.0.0")
+bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
 git_override(
     module_name = "rednose",
     commit = "4490560085ed1d62f4142b492fca9214cf933ac0",

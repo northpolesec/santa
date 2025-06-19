@@ -230,7 +230,7 @@ objc_library(
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
-        "@rednose//rednose:export_bridge",
+        "@northpolesec_rednose//rednose:export_bridge",
     ],
 )
 

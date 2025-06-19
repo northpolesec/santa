@@ -14,7 +14,6 @@
 /// limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncService.h"
-#include <objc/objc.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
