@@ -116,8 +116,8 @@
       success = YES;
       LOGD(@"Successfully exported telemetry file: %@", fileName);
     } else {
-      LOGE(@"Failed to export file: %@, status: %d: error: %s", fileName, status.code,
-           status.error.c_str());
+      LOGE(@"Failed to export file: %@, status: %d: error: %s", fileName,
+           static_cast<uint8_t>(status.code), status.error.c_str());
     }
   }
 
