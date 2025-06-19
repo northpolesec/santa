@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncService.h"
+#include <objc/objc.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
@@ -103,17 +104,25 @@
                    fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
                       reply:(void (^)(BOOL))reply {
-  // Note: For now, reply false so that spool files are not removed
-  LOGD(@"SNTSyncService: exportTelemetryFile:reply: - Got fd: %@, export cfg: %@", fd, config);
+  BOOL success = NO;
   if (config.configType == SNTExportConfigurationTypeAWS &&
       [config.config isKindOfClass:[SNTExportConfigurationAWS class]]) {
     SNTExportConfigurationAWS *aws = (SNTExportConfigurationAWS *)config.config;
-    rednose::export_file_aws(fd.fileDescriptor, aws.accessKey.UTF8String,
-                             aws.secretAccessKey.UTF8String, aws.sessionToken.UTF8String,
-                             aws.bucketName.UTF8String, aws.objectKeyPrefix.UTF8String,
-                             fileName.UTF8String);
+    rednose::ExportStatus status = rednose::export_file_aws(
+        fd.fileDescriptor, aws.accessKey.UTF8String, aws.secretAccessKey.UTF8String,
+        aws.sessionToken.UTF8String, aws.bucketName.UTF8String, aws.objectKeyPrefix.UTF8String,
+        fileName.UTF8String);
+
+    if (status.code == rednose::ExportCode::Success) {
+      success = YES;
+      LOGD(@"Successfully exported telemetry file: %@", fileName);
+    } else {
+      LOGE(@"Failed to export file: %@, status: %d: error: %s", fileName, status.code,
+           status.error.c_str());
+    }
   }
-  reply(NO);
+
+  reply(success);
 }
 
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
