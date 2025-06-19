@@ -41,7 +41,7 @@ jobs:
           disk-cache: ${{ matrix.os }}
           repository-cache: true
       - name: Build Userspace
-        run: bazel build --apple_generate_dsym -c opt :release --define=SANTA_BUILD_TYPE=adhoc
+        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym -c opt :release --define=SANTA_BUILD_TYPE=adhoc
   check_localization:
     runs-on: macos-latest
     steps:
@@ -71,4 +71,4 @@ jobs:
           disk-cache: ${{ matrix.os }}
           repository-cache: true
       - name: Run All Tests
-        run: bazel test :unit_tests --define=SANTA_BUILD_TYPE=adhoc --test_output=errors
+        run: bazel test :unit_tests --verbose_failures --sandbox_debug --define=SANTA_BUILD_TYPE=adhoc --test_output=errors
