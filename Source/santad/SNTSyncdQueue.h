@@ -28,6 +28,7 @@
 - (void)addEvents:(NSArray<SNTStoredEvent *> *)events isFromBundle:(BOOL)isFromBundle;
 - (void)addBundleEvent:(SNTStoredEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
 - (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
+                   fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
           completionHandler:(void (^)(BOOL))completionHandler;
 

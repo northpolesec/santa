@@ -2,8 +2,8 @@ module(name = "santa")
 
 bazel_dep(name = "abseil-cpp", version = "20250127.1")
 bazel_dep(name = "apple_support", version = "1.22.0")
-bazel_dep(name = "googletest", version = "1.16.0")
-bazel_dep(name = "protobuf", version = "30.2")
+bazel_dep(name = "googletest", version = "1.17.0")
+bazel_dep(name = "protobuf", version = "31.1")
 bazel_dep(name = "rules_apple", version = "3.21.0")
 bazel_dep(name = "rules_cc", version = "0.1.1")
 bazel_dep(name = "rules_fuzzing", version = "0.5.2")
@@ -17,6 +17,14 @@ git_override(
     module_name = "protos",
     commit = "bd61ba67c96bb8983e1b1ecf51f0af0d9308ac63",
     remote = "https://github.com/northpolesec/protos",
+)
+
+# North Pole Rednose
+bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
+git_override(
+    module_name = "rednose",
+    commit = "e5dbe6eb8ee55b306e953959ce85f672adce4aff",
+    remote = "https://github.com/northpolesec/rednose",
 )
 
 # cel-cpp

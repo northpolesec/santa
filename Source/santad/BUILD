@@ -799,6 +799,7 @@ objc_library(
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTSystemInfo",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Timer",
         "@abseil-cpp//absl/container:flat_hash_map",

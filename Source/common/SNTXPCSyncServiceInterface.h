@@ -32,6 +32,7 @@
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 - (void)exportTelemetryFile:(NSFileHandle *)fd
+                   fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
                       reply:(void (^)(BOOL))reply;
 
