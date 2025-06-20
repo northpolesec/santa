@@ -63,7 +63,7 @@ config_setting(
 
 config_setting(
     name = "missing_xcode_16",
-    values = {"define": "SANTA_BUILD_TYPE=missing_xcode_16"},
+    values = {"define": "SANTA_XCODE_VERSION=missing_xcode_16"},
     visibility = [":santa_package_group"],
 )
 

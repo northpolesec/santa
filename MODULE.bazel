@@ -23,7 +23,7 @@ git_override(
 bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
 git_override(
     module_name = "rednose",
-    commit = "974a84294a70b1f785952a4164b4b4a0f56c87ac",
+    commit = "e5dbe6eb8ee55b306e953959ce85f672adce4aff",
     remote = "https://github.com/northpolesec/rednose",
 )
 
