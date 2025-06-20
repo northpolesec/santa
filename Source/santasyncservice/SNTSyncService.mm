@@ -25,6 +25,9 @@
 #import "Source/santasyncservice/SNTPolaris.h"
 #import "Source/santasyncservice/SNTSyncBroadcaster.h"
 #import "Source/santasyncservice/SNTSyncManager.h"
+#ifndef MISSING_XCODE_16
+#include "rednose/src/export/bridge.rs.h"
+#endif
 
 @interface SNTSyncService ()
 @property(nonatomic, readonly) SNTSyncManager *syncManager;
@@ -99,11 +102,33 @@
 }
 
 - (void)exportTelemetryFile:(NSFileHandle *)fd
+                   fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
                       reply:(void (^)(BOOL))reply {
-  // Note: For now, reply false so that spool files are not removed
-  LOGD(@"SNTSyncService: exportTelemetryFile:reply: - Got fd: %@, export cfg: %@", fd, config);
+#if MISSING_XCODE_16
   reply(NO);
+  return;
+#else
+  BOOL success = NO;
+  if (config.configType == SNTExportConfigurationTypeAWS &&
+      [config.config isKindOfClass:[SNTExportConfigurationAWS class]]) {
+    SNTExportConfigurationAWS *aws = (SNTExportConfigurationAWS *)config.config;
+    rednose::ExportStatus status = rednose::export_file_aws(
+        fd.fileDescriptor, aws.accessKey.UTF8String, aws.secretAccessKey.UTF8String,
+        aws.sessionToken.UTF8String, aws.bucketName.UTF8String, aws.objectKeyPrefix.UTF8String,
+        fileName.UTF8String);
+
+    if (status.code == rednose::ExportCode::Success) {
+      success = YES;
+      LOGD(@"Successfully exported telemetry file: %@", fileName);
+    } else {
+      LOGE(@"Failed to export file: %@, status: %d: error: %s", fileName,
+           static_cast<uint8_t>(status.code), status.error.c_str());
+    }
+  }
+
+  reply(success);
+#endif
 }
 
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener

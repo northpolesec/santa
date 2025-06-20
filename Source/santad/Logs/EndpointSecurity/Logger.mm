@@ -24,6 +24,7 @@
 #import "Source/common/SNTExportConfiguration.h"
 #include "Source/common/SNTLogging.h"
 #include "Source/common/SNTStoredEvent.h"
+#include "Source/common/SNTSystemInfo.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"
@@ -169,8 +170,12 @@ void Logger::ExportTelemetrySerialized() {
     // in case the export times out.
     tracker_.Track(*file_to_export);
 
+    NSString *fileName = [NSString
+        stringWithFormat:@"%@-%@", [SNTSystemInfo bootSessionUUID], [path lastPathComponent]];
+
     dispatch_group_enter(group);
     [syncd_queue_ exportTelemetryFile:handle
+                             fileName:fileName
                                config:export_config
                     completionHandler:^(BOOL success) {
                       [handle closeFile];

@@ -40,8 +40,16 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ matrix.os }}
           repository-cache: true
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # ratchet:maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - name: Build Userspace
-        run: bazel build --apple_generate_dsym -c opt :release --define=SANTA_BUILD_TYPE=adhoc
+        if: matrix.os != 'macos-13'
+        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym -c opt :release --define=SANTA_BUILD_TYPE=adhoc
+      - name: Build Userspace 13
+        if: matrix.os == 'macos-13'
+        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym -c opt :release --define=SANTA_BUILD_TYPE=adhoc --define=SANTA_XCODE_VERSION=missing_xcode_16
   check_localization:
     runs-on: macos-latest
     steps:
@@ -71,4 +79,4 @@ jobs:
           disk-cache: ${{ matrix.os }}
           repository-cache: true
       - name: Run All Tests
-        run: bazel test :unit_tests --define=SANTA_BUILD_TYPE=adhoc --test_output=errors
+        run: bazel test :unit_tests --verbose_failures --sandbox_debug --define=SANTA_BUILD_TYPE=adhoc --test_output=errors
