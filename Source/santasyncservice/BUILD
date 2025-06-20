@@ -186,6 +186,7 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:String",
+        "//Source/common/cel:CEL",
         "@OCMock",
         "@northpolesec_protos//sync:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
