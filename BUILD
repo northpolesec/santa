@@ -61,6 +61,12 @@ config_setting(
     values = {"compilation_mode": "opt"},
 )
 
+config_setting(
+    name = "missing_xcode_16",
+    values = {"define": "SANTA_BUILD_TYPE=missing_xcode_16"},
+    visibility = [":santa_package_group"],
+)
+
 package_group(
     name = "santa_package_group",
     packages = ["//..."],

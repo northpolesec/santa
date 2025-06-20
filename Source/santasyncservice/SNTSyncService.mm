@@ -25,7 +25,9 @@
 #import "Source/santasyncservice/SNTPolaris.h"
 #import "Source/santasyncservice/SNTSyncBroadcaster.h"
 #import "Source/santasyncservice/SNTSyncManager.h"
+#ifndef MISSING_XCODE_16
 #include "rednose/src/export/bridge.rs.h"
+#endif
 
 @interface SNTSyncService ()
 @property(nonatomic, readonly) SNTSyncManager *syncManager;
@@ -103,6 +105,10 @@
                    fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
                       reply:(void (^)(BOOL))reply {
+#if MISSING_XCODE_16
+  reply(NO);
+  return;
+#else
   BOOL success = NO;
   if (config.configType == SNTExportConfigurationTypeAWS &&
       [config.config isKindOfClass:[SNTExportConfigurationAWS class]]) {
@@ -122,6 +128,7 @@
   }
 
   reply(success);
+#endif
 }
 
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
