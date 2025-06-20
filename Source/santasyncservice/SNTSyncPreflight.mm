@@ -92,6 +92,12 @@ The following table expands upon the above logic to list most of the permutation
   req->set_model_identifier(NSStringToUTF8String([SNTSystemInfo modelIdentifier]));
   req->set_santa_version(NSStringToUTF8String([SNTSystemInfo santaFullVersion]));
   req->set_primary_user(NSStringToUTF8String(self.syncState.machineOwner));
+  if (self.syncState.machineOwnerGroups.count) {
+    google::protobuf::RepeatedPtrField<std::string> *groups = req->mutable_primary_user_groups();
+    for (NSString *group in self.syncState.machineOwnerGroups) {
+      groups->Add(NSStringToUTF8String(group));
+    }
+  }
   req->set_sip_status([SNTSIPStatus currentStatus]);
 
   if (self.syncState.pushNotificationsToken) {

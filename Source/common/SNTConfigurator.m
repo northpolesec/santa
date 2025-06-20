@@ -95,9 +95,11 @@ static NSString *const kEnableStatsCollectionKey = @"EnableStatsCollection";
 static NSString *const kStatsOrganizationID = @"StatsOrganizationID";
 
 static NSString *const kMachineOwnerKey = @"MachineOwner";
+static NSString *const kMachineOwnerGroupsKey = @"MachineOwnerGroups";
 static NSString *const kMachineIDKey = @"MachineID";
 static NSString *const kMachineOwnerPlistFileKey = @"MachineOwnerPlist";
 static NSString *const kMachineOwnerPlistKeyKey = @"MachineOwnerKey";
+static NSString *const kMachineOwnerGroupsPlistKeyKey = @"MachineOwnerGroupsKey";
 static NSString *const kMachineIDPlistFileKey = @"MachineIDPlist";
 static NSString *const kMachineIDPlistKeyKey = @"MachineIDKey";
 
@@ -284,9 +286,11 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kEnableStatsCollectionKey : number,
       kStatsOrganizationID : string,
       kMachineOwnerKey : string,
+      kMachineOwnerGroupsKey : array,
       kMachineIDKey : string,
       kMachineOwnerPlistFileKey : string,
       kMachineOwnerPlistKeyKey : string,
+      kMachineOwnerGroupsPlistKeyKey : string,
       kMachineIDPlistFileKey : string,
       kMachineIDPlistKeyKey : string,
       kEventLogType : string,
@@ -539,6 +543,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingMachineOwner {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingMachineOwnerGroups {
   return [self configStateSet];
 }
 
@@ -1037,6 +1045,26 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 
   return machineOwner ?: @"";
+}
+
+- (NSArray<NSString *> *)machineOwnerGroups {
+  NSArray<NSString *> *machineOwnerGroups = self.configState[kMachineOwnerGroupsKey];
+  if (machineOwnerGroups.count) return machineOwnerGroups;
+
+  NSString *plistPath = self.configState[kMachineOwnerPlistFileKey];
+  NSString *plistKey = self.configState[kMachineOwnerGroupsPlistKeyKey];
+  if (plistPath && plistKey) {
+    NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+    machineOwnerGroups = [plist[plistKey] isKindOfClass:[NSArray class]] ? plist[plistKey] : nil;
+    for (NSString *group in machineOwnerGroups) {
+      if (![group isKindOfClass:[NSString class]]) {
+        machineOwnerGroups = nil;
+        break;
+      }
+    }
+  }
+
+  return machineOwnerGroups;
 }
 
 - (NSString *)machineID {
