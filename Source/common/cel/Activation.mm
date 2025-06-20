@@ -84,7 +84,7 @@ cel_runtime::CelValue Activation::CELValue(const std::map<K, V> &v,
 std::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view name,
                                                            google::protobuf::Arena *arena) const {
   // Handle the ReturnValue values.
-  auto retDescriptor = pbv1::ReturnValue_descriptor();
+  auto retDescriptor = santa::cel::v1::ReturnValue_descriptor();
   auto retValue = retDescriptor->FindValueByName(name);
   if (retValue != nullptr) {
     return CELValue(retValue->number(), arena);
@@ -109,14 +109,14 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
   // ALLOWLIST or BLOCKLIST in their CEL expressions without having to use the
   // proto package name prefix. Start from value number 1 to avoid the
   // UNSPECIFIED value.
-  auto retDescriptor = pbv1::ReturnValue_descriptor();
+  auto retDescriptor = ::santa::cel::v1::ReturnValue_descriptor();
   for (int i = 1; i < retDescriptor->value_count(); i++) {
     auto value = retDescriptor->value(i);
     v.push_back({value->name(), ::cel::IntType()});
   }
 
   // Now add all the fields from the CELContext message.
-  auto ctxDescriptor = pbv1::ExecutionContext::descriptor();
+  auto ctxDescriptor = santa::cel::v1::ExecutionContext::descriptor();
   for (int i = 0; i < ctxDescriptor->field_count(); i++) {
     auto field = ctxDescriptor->field(i);
 

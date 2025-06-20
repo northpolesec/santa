@@ -856,12 +856,14 @@
                      state:SNTRuleStateBlock
                       type:SNTRuleTypeCertificate
                  customMsg:@"Hi There"
-                 customURL:@"http://northpole.security"],
+                 customURL:@"http://northpole.security"
+                   celExpr:nil],
     [[SNTRule alloc] initWithIdentifier:@"AAAAAAAAAA"
                                   state:SNTRuleStateBlock
                                    type:SNTRuleTypeTeamID
                               customMsg:@"Banned team ID"
-                              customURL:@"http://northpole.security"],
+                              customURL:@"http://northpole.security"
+                                celExpr:nil],
   ];
 
   OCMVerify([self.daemonConnRop databaseRuleAddRules:rules

@@ -32,26 +32,23 @@
 #include "eval/public/activation.h"
 #pragma clang diagnostic pop
 
-namespace cel_runtime = ::google::api::expr::runtime;
-namespace pbv1 = ::santa::cel::v1;
-
 namespace santa {
 namespace cel {
 
 // SantaActivation is a CEL activation that provides lookups of values from the
 // santa.pb.cel.v1.Context message, and easy access to variables for return values.
-class Activation : public ::cel_runtime::BaseActivation {
+class Activation : public ::google::api::expr::runtime::BaseActivation {
  public:
-  Activation(std::unique_ptr<::pbv1::ExecutableFile> file, std::vector<std::string> (^args)(),
-             std::map<std::string, std::string> (^envs)())
+  Activation(std::unique_ptr<::santa::cel::v1::ExecutableFile> file,
+             std::vector<std::string> (^args)(), std::map<std::string, std::string> (^envs)())
       : file_(std::move(file)), args_(args), envs_(envs) {};
   ~Activation() = default;
 
-  std::optional<cel_runtime::CelValue> FindValue(absl::string_view name,
-                                                 google::protobuf::Arena *arena) const override;
+  std::optional<::google::api::expr::runtime::CelValue> FindValue(
+      absl::string_view name, google::protobuf::Arena *arena) const override;
 
   // Activation does not support lazy-loaded functions.
-  std::vector<const cel_runtime::CelFunction *> FindFunctionOverloads(
+  std::vector<const ::google::api::expr::runtime::CelFunction *> FindFunctionOverloads(
       absl::string_view) const override {
     return {};
   }
@@ -72,11 +69,14 @@ class Activation : public ::cel_runtime::BaseActivation {
                              const google::protobuf::Descriptor *messageType);
 
   template <typename T>
-  static cel_runtime::CelValue CELValue(const T &v, google::protobuf::Arena *arena);
+  static ::google::api::expr::runtime::CelValue CELValue(const T &v,
+                                                         google::protobuf::Arena *arena);
   template <typename T>
-  static cel_runtime::CelValue CELValue(const std::vector<T> &v, google::protobuf::Arena *arena);
+  static ::google::api::expr::runtime::CelValue CELValue(const std::vector<T> &v,
+                                                         google::protobuf::Arena *arena);
   template <typename K, typename V>
-  static cel_runtime::CelValue CELValue(const std::map<K, V> &v, google::protobuf::Arena *arena);
+  static ::google::api::expr::runtime::CelValue CELValue(const std::map<K, V> &v,
+                                                         google::protobuf::Arena *arena);
 };
 
 }  // namespace cel

@@ -126,6 +126,7 @@ extern NSString *const kRulePolicyBlocklistDeprecated;
 extern NSString *const kRulePolicySilentBlocklist;
 extern NSString *const kRulePolicySilentBlocklistDeprecated;
 extern NSString *const kRulePolicyRemove;
+extern NSString *const kRulePolicyCEL;
 extern NSString *const kRuleType;
 extern NSString *const kRuleTypeBinary;
 extern NSString *const kRuleTypeCertificate;
@@ -135,6 +136,7 @@ extern NSString *const kRuleTypeCDHash;
 extern NSString *const kRuleCustomMsg;
 extern NSString *const kRuleCustomURL;
 extern NSString *const kRuleComment;
+extern NSString *const kRuleCELExpr;
 extern NSString *const kCursor;
 
 extern NSString *const kBackoffInterval;

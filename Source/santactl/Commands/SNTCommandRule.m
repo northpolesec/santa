@@ -54,6 +54,7 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    --block: add to block\n"
           @"    --silent-block: add to silent block\n"
           @"    --compiler: allow and mark as a compiler\n"
+          @"    --cel {cel_expr}: add a CEL rule\n"
           @"    --remove: remove existing rule\n"
           @"    --check: check for an existing rule\n"
           @"    --import {path}: import rules from a JSON file\n"
@@ -153,6 +154,12 @@ REGISTER_COMMAND_NAME(@"rule")
       newRule.state = SNTRuleStateSilentBlock;
     } else if ([arg caseInsensitiveCompare:@"--compiler"] == NSOrderedSame) {
       newRule.state = SNTRuleStateAllowCompiler;
+    } else if ([arg caseInsensitiveCompare:@"--cel"] == NSOrderedSame) {
+      if (++i > arguments.count - 1) {
+        [self printErrorUsageAndExit:@"--cel requires an argument"];
+      }
+      newRule.state = SNTRuleStateCEL;
+      newRule.celExpr = arguments[i];
     } else if ([arg caseInsensitiveCompare:@"--remove"] == NSOrderedSame) {
       newRule.state = SNTRuleStateRemove;
     } else if ([arg caseInsensitiveCompare:@"--check"] == NSOrderedSame) {
