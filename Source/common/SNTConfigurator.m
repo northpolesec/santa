@@ -1039,7 +1039,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 
   NSString *plistPath = self.configState[kMachineOwnerPlistFileKey];
   NSString *plistKey = self.configState[kMachineOwnerPlistKeyKey];
-  if (plistPath && plistKey) {
+  if (plistPath.length && plistKey.length) {
     NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:plistPath];
     machineOwner = [plist[plistKey] isKindOfClass:[NSString class]] ? plist[plistKey] : nil;
   }
@@ -1053,7 +1053,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 
   NSString *plistPath = self.configState[kMachineOwnerPlistFileKey];
   NSString *plistKey = self.configState[kMachineOwnerGroupsPlistKeyKey];
-  if (plistPath && plistKey) {
+  if (plistPath.length && plistKey.length) {
     NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:plistPath];
     machineOwnerGroups = [plist[plistKey] isKindOfClass:[NSArray class]] ? plist[plistKey] : nil;
     for (NSString *group in machineOwnerGroups) {
