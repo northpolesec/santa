@@ -497,6 +497,11 @@
 @property(nullable, readonly, nonatomic) NSString *machineOwner;
 
 ///
+///  The machine owner's groups.
+///
+@property(nullable, readonly, nonatomic) NSArray<NSString *> *machineOwnerGroups;
+
+///
 ///  The last date of a successful full sync.
 ///
 @property(nullable, nonatomic) NSDate *fullSyncLastSuccess;

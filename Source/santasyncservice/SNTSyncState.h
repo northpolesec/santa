@@ -58,6 +58,7 @@
 /// Machine identifier and owner.
 @property(copy) NSString *machineID;
 @property(copy) NSString *machineOwner;
+@property(copy) NSArray<NSString *> *machineOwnerGroups;
 
 /// Settings sent from server during preflight that are set during postflight.
 @property SNTClientMode clientMode;

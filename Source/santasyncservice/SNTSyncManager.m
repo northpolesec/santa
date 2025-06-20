@@ -398,6 +398,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     syncState.machineOwner = @"";
     SLOGW(@"Missing Machine Owner.");
   }
+  syncState.machineOwnerGroups = config.machineOwnerGroups;
 
   syncState.xsrfToken = self.xsrfToken;
   syncState.xsrfTokenHeader = self.xsrfTokenHeader;
