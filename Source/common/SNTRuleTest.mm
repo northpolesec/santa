@@ -285,7 +285,7 @@
     @"custom_msg" : @"A custom block message",
     @"custom_url" : @"https://example.com",
     @"comment" : @"",
-    @"cel_expr": @"",
+    @"cel_expr" : @"",
   };
 
   SNTRule *sut = [[SNTRule alloc] initWithDictionary:expectedTeamID error:nil];
@@ -299,7 +299,7 @@
     @"custom_msg" : @"",
     @"custom_url" : @"",
     @"comment" : @"",
-    @"cel_expr": @"",
+    @"cel_expr" : @"",
   };
 
   sut = [[SNTRule alloc] initWithDictionary:expectedBinary error:nil];
@@ -315,7 +315,7 @@
     @"rule_type" : @"BINARY",
     @"custom_msg" : @"A custom block message",
     @"custom_url" : @"https://example.com",
-    @"cel_expr": @"",
+    @"cel_expr" : @"",
   };
 
   SNTRule *sut = [[SNTRule alloc] initWithDictionary:expected error:nil];
@@ -336,7 +336,7 @@
   for (NSString *key in
        @[ kRulePolicy, kRuleIdentifier, kRuleType, kRuleCustomMsg, kRuleCustomURL, kRuleComment ]) {
     NSDictionary *expected = @{
-      @"cel_expr": @"",
+      @"cel_expr" : @"",
       @"identifier" : @"84de9c61777ca36b13228e2446d53e966096e78db7a72c632b5c185b2ffe68a6",
       @"policy" : @"ALLOWLIST",
       @"rule_type" : @"BINARY",
