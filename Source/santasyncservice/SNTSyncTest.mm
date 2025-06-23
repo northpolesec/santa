@@ -873,6 +873,47 @@
   OCMVerify([self.daemonConnRop postRuleSyncNotificationForApplication:@"yes" reply:OCMOCK_ANY]);
 }
 
+- (void)testRuleDownloadCel {
+  auto celEvaluator = santa::cel::Evaluator::Create();
+  self.syncState.celEvaluator = celEvaluator->get();
+
+  SNTSyncRuleDownload *sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
+
+  NSData *respData = [self dataFromFixture:@"sync_ruledownload_with_cel_1.json"];
+  [self stubRequestBody:respData
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest *req) {
+            NSDictionary *requestDict = [self dictFromRequest:req];
+            return requestDict[@"cursor"] == nil;
+          }];
+
+  // Stub out the call to invoke the block, verification of the input is later
+  OCMStub([self.daemonConnRop
+      databaseRuleAddRules:OCMOCK_ANY
+               ruleCleanup:SNTRuleCleanupNone
+                    source:SNTRuleAddSourceSyncService
+                     reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
+  OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
+                                                               reply:([OCMArg invokeBlock])]);
+  [sut sync];
+
+  NSArray *rules = @[
+    [[SNTRule alloc]
+        initWithIdentifier:@"AAAAAAAAAA"
+                     state:SNTRuleStateCEL
+                      type:SNTRuleTypeTeamID
+                 customMsg:nil
+                 customURL:nil
+                   celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"],
+  ];
+
+  OCMVerify([self.daemonConnRop databaseRuleAddRules:rules
+                                         ruleCleanup:SNTRuleCleanupNone
+                                              source:SNTRuleAddSourceSyncService
+                                               reply:OCMOCK_ANY]);
+}
+
 #pragma mark - SNTSyncPostflight Tests
 
 - (void)testPostflightBasicResponse {

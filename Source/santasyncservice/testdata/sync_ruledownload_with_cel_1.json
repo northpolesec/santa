@@ -1,0 +1,16 @@
+{
+  "rules": [
+    {
+      "rule_type": "TEAMID",
+      "policy": "CEL",
+      "identifier": "AAAAAAAAAA",
+      "cel_expr": "target.signing_time >= timestamp('2025-05-31T00:00:00Z')"
+    },
+    {
+      "rule_type": "TEAMID",
+      "policy": "CEL",
+      "identifier": "BBBBBBBBBB",
+      "cel_expr": "this is an invalid expression"
+    }
+  ]
+}
