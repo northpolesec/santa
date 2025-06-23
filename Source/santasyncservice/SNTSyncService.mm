@@ -110,21 +110,35 @@
   return;
 #else
   BOOL success = NO;
+  rednose::ExportStatus status;
   if (config.configType == SNTExportConfigurationTypeAWS &&
       [config.config isKindOfClass:[SNTExportConfigurationAWS class]]) {
     SNTExportConfigurationAWS *aws = (SNTExportConfigurationAWS *)config.config;
-    rednose::ExportStatus status = rednose::export_file_aws(
-        fd.fileDescriptor, aws.accessKey.UTF8String, aws.secretAccessKey.UTF8String,
-        aws.sessionToken.UTF8String, aws.bucketName.UTF8String, aws.objectKeyPrefix.UTF8String,
-        fileName.UTF8String);
+    status = rednose::export_file_aws(fd.fileDescriptor, aws.accessKey.UTF8String,
+                                      aws.secretAccessKey.UTF8String, aws.sessionToken.UTF8String,
+                                      aws.bucketName.UTF8String, aws.objectKeyPrefix.UTF8String,
+                                      fileName.UTF8String);
 
-    if (status.code == rednose::ExportCode::Success) {
-      success = YES;
-      LOGD(@"Successfully exported telemetry file: %@", fileName);
-    } else {
-      LOGE(@"Failed to export file: %@, status: %d: error: %s", fileName,
-           static_cast<uint8_t>(status.code), status.error.c_str());
-    }
+  } else if (config.configType == SNTExportConfigurationTypeGCP &&
+             [config.config isKindOfClass:[SNTExportConfigurationGCP class]]) {
+    SNTExportConfigurationGCP *gcp = (SNTExportConfigurationGCP *)config.config;
+
+    status = rednose::export_file_gcp(fd.fileDescriptor, gcp.bearerToken.UTF8String,
+                                      gcp.bucketName.UTF8String, gcp.objectKeyPrefix.UTF8String,
+                                      fileName.UTF8String);
+  } else {
+    status = rednose::ExportStatus{
+        .code = rednose::ExportCode::InvalidParam,
+        .error = "Invalid export configuration",
+    };
+  }
+
+  if (status.code == rednose::ExportCode::Success) {
+    success = YES;
+    LOGD(@"Successfully exported telemetry file: %@", fileName);
+  } else {
+    LOGE(@"Failed to export file: %@, status: %d: error: %s", fileName,
+         static_cast<uint8_t>(status.code), status.error.c_str());
   }
 
   reply(success);

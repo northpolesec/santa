@@ -29,12 +29,13 @@
                                               sessionToken:@"MySessionToken"
                                                 bucketName:@"MyBucketName"
                                            objectKeyPrefix:@"MyObjectKeyPrefix"];
-
   XCTAssertEqual(cfg.configType, SNTExportConfigurationTypeAWS);
   XCTAssertTrue([cfg.config isKindOfClass:[SNTExportConfigurationAWS class]]);
 
-  cfg = [[SNTExportConfiguration alloc]
-      initWithGCPToken:[@"foo" dataUsingEncoding:NSUTF8StringEncoding]];
+  cfg = [[SNTExportConfiguration alloc] initWithGCPBearerToken:@"MyBearerToken"
+                                                    bucketName:@"MyBucketName"
+                                               objectKeyPrefix:@"MyObjectKeyPrefix"];
+  XCTAssertEqual(cfg.configType, SNTExportConfigurationTypeGCP);
   XCTAssertTrue([cfg.config isKindOfClass:[SNTExportConfigurationGCP class]]);
 }
 
@@ -83,8 +84,9 @@
   XCTAssertEqualObjects(awsConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
 
   // Encode and decode GCP config
-  cfg = [[SNTExportConfiguration alloc]
-      initWithGCPToken:[@"bar" dataUsingEncoding:NSUTF8StringEncoding]];
+  cfg = [[SNTExportConfiguration alloc] initWithGCPBearerToken:@"MyBearerToken"
+                                                    bucketName:@"MyBucketName"
+                                               objectKeyPrefix:@"MyObjectKeyPrefix"];
 
   data = [NSKeyedArchiver archivedDataWithRootObject:cfg requiringSecureCoding:YES error:nil];
   // Ensure the serialize method returns the same bytes as NSKeyedArchiver
@@ -96,19 +98,20 @@
   XCTAssertTrue(
       [((SNTExportConfiguration *)obj).config isKindOfClass:[SNTExportConfigurationGCP class]]);
 
-  NSString *tokenValue = [[NSString alloc]
-      initWithData:((SNTExportConfigurationGCP *)((SNTExportConfiguration *)obj).config).token
-          encoding:NSUTF8StringEncoding];
-  XCTAssertEqualObjects(tokenValue, @"bar");
+  SNTExportConfigurationGCP *gcpConfig =
+      (SNTExportConfigurationGCP *)((SNTExportConfiguration *)obj).config;
+  XCTAssertEqualObjects(gcpConfig.bearerToken, @"MyBearerToken");
+  XCTAssertEqualObjects(gcpConfig.bucketName, @"MyBucketName");
+  XCTAssertEqualObjects(gcpConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
 
   // Ensure deserializing the serialized data results in an object with the
   // same content as what is returned by NSKeyedUnarchiver
   deserializedObj = [SNTExportConfiguration deserialize:serializedData];
   XCTAssertTrue([deserializedObj.config isKindOfClass:[SNTExportConfigurationGCP class]]);
-  tokenValue =
-      [[NSString alloc] initWithData:((SNTExportConfigurationGCP *)(deserializedObj.config)).token
-                            encoding:NSUTF8StringEncoding];
-  XCTAssertEqualObjects(tokenValue, @"bar");
+  gcpConfig = (SNTExportConfigurationGCP *)(deserializedObj.config);
+  XCTAssertEqualObjects(gcpConfig.bearerToken, @"MyBearerToken");
+  XCTAssertEqualObjects(gcpConfig.bucketName, @"MyBucketName");
+  XCTAssertEqualObjects(gcpConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
 }
 
 @end

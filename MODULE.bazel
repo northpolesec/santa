@@ -15,7 +15,7 @@ bazel_dep(name = "xxhash", version = "0.8.2")
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    commit = "704246489aa55e6e2b60b47133a8668bc3656105",
+    commit = "cce5bfeaf16e8bb764a3fb94fbbba4d800e16817",
     remote = "https://github.com/northpolesec/protos",
 )
 
@@ -23,7 +23,7 @@ git_override(
 bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
 git_override(
     module_name = "rednose",
-    commit = "e5dbe6eb8ee55b306e953959ce85f672adce4aff",
+    commit = "31535c5cb700b47ccc06d22aef601b5a6df3a352",
     remote = "https://github.com/northpolesec/rednose",
 )
 

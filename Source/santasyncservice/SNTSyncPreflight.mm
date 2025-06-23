@@ -42,7 +42,6 @@ using santa::StringToNSString;
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 /*
-
 Clean Sync Implementation Notes
 
 The clean sync implementation seems a bit complex at first glance, but boils
@@ -54,9 +53,9 @@ down to the following rules:
 3. All other server responses result in a "NORMAL" sync.
 
 The following table expands upon the above logic to list most of the permutations:
-
++-------------------+---------------------+--------------------+---------------------+
 | Client Sync State | Clean Sync Request? | Server Response    | Sync Type Performed |
-| ----------------- | ------------------- | ------------------ | ------------------- |
++ ----------------- + ------------------- + ------------------ + ------------------- +
 | NORMAL            | No                  | NORMAL OR <empty>  | NORMAL              |
 | NORMAL            | No                  | CLEAN              | CLEAN               |
 | NORMAL            | No                  | CLEAN_ALL          | CLEAN_ALL           |
@@ -72,7 +71,7 @@ The following table expands upon the above logic to list most of the permutation
 | CLEAN_ALL         | Yes                 | CLEAN_ALL          | CLEAN_ALL           |
 | CLEAN_ALL         | Yes                 | clean_sync (dep)   | CLEAN_ALL           |
 | CLEAN_ALL         | Yes                 | New AND Dep Key    | Dep key ignored     |
-
++-------------------+---------------------+--------------------+---------------------+
 */
 @implementation SNTSyncPreflight
 
@@ -244,11 +243,14 @@ The following table expands upon the above logic to list most of the permutation
                       bucketName:StringToNSString(protoAWS.bucket_name())
                  objectKeyPrefix:StringToNSString(protoAWS.object_key_prefix())];
       }
-    } else if (protoExportConfig.has_gcp_config() &&
-               !protoExportConfig.gcp_config().token().empty()) {
-      self.syncState.exportConfig = [[SNTExportConfiguration alloc]
-          initWithGCPToken:[NSData dataWithBytes:protoExportConfig.gcp_config().token().data()
-                                          length:protoExportConfig.gcp_config().token().length()]];
+    } else if (protoExportConfig.has_gcp_config()) {
+      auto protoGCP = protoExportConfig.gcp_config();
+      if (!protoGCP.bearer_token().empty() && !protoGCP.bucket_name().empty()) {
+        self.syncState.exportConfig = [[SNTExportConfiguration alloc]
+            initWithGCPBearerToken:StringToNSString(protoGCP.bearer_token())
+                        bucketName:StringToNSString(protoGCP.bucket_name())
+                   objectKeyPrefix:StringToNSString(protoGCP.object_key_prefix())];
+      }
     }
   }
 
