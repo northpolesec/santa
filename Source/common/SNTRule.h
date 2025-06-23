@@ -63,6 +63,11 @@
 @property(copy) NSString *celExpr;
 
 ///
+///  Whether this rule is a static rule.
+///
+@property(readonly) BOOL staticRule;
+
+///
 ///  Designated initializer.
 ///
 - (instancetype)initWithIdentifier:(NSString *)identifier
@@ -93,7 +98,7 @@
                               type:(SNTRuleType)type;
 
 ///
-///  Initialize with a dictionary received from a static rule or santactl.
+///  Initialize with a dictionary received from santactl or a static rule.
 ///
 ///  As these methods could potentially pass in a "manually-crafted" dictionary this method
 ///  will normalize casing of the passed dictionary before trying to parse it. This is
@@ -103,6 +108,7 @@
 ///  parameter is a non-nil pointer then it will be populated with an appropriate error object.
 ///
 - (instancetype)initWithDictionary:(NSDictionary *)rawDict error:(NSError **)error;
+- (instancetype)initStaticRuleWithDictionary:(NSDictionary *)rawDict error:(NSError **)error;
 
 ///
 ///  Stringify the rule with optional colorization.

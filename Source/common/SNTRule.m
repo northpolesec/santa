@@ -328,6 +328,14 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                             error:error];
 }
 
+- (instancetype)initStaticRuleWithDictionary:(NSDictionary *)rawDict error:(NSError **)error {
+  self = [self initWithDictionary:rawDict error:error];
+  if (self) {
+    _staticRule = YES;
+  }
+  return self;
+}
+
 #pragma mark NSSecureCoding
 
 + (BOOL)supportsSecureCoding {
@@ -343,6 +351,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   ENCODE_BOXABLE(coder, timestamp);
   ENCODE(coder, comment);
   ENCODE(coder, celExpr);
+  ENCODE_BOXABLE(coder, staticRule);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -356,6 +365,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     DECODE_SELECTOR(decoder, timestamp, NSNumber, unsignedIntegerValue);
     DECODE(decoder, comment, NSString);
     DECODE(decoder, celExpr, NSString);
+    DECODE_SELECTOR(decoder, staticRule, NSNumber, boolValue);
   }
   return self;
 }
@@ -472,6 +482,10 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateAllowTransitive: [output appendString:@", Transitive"]; break;
     case SNTRuleStateSilentBlock: [output appendString:@", Silent"]; break;
     default: break;
+  }
+
+  if (self.staticRule) {
+    [output appendString:@", Static"];
   }
 
   [output appendString:@")"];
