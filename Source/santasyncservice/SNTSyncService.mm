@@ -118,11 +118,9 @@
                                       aws.secretAccessKey.UTF8String, aws.sessionToken.UTF8String,
                                       aws.bucketName.UTF8String, aws.objectKeyPrefix.UTF8String,
                                       fileName.UTF8String);
-
   } else if (config.configType == SNTExportConfigurationTypeGCP &&
              [config.config isKindOfClass:[SNTExportConfigurationGCP class]]) {
     SNTExportConfigurationGCP *gcp = (SNTExportConfigurationGCP *)config.config;
-
     status = rednose::export_file_gcp(fd.fileDescriptor, gcp.bearerToken.UTF8String,
                                       gcp.bucketName.UTF8String, gcp.objectKeyPrefix.UTF8String,
                                       fileName.UTF8String);
