@@ -3,6 +3,8 @@ sidebar_position: 1
 toc_max_heading_level: 5
 ---
 
+import AddedBadge from "@site/src/components/AddedBadge/AddedBadge";
+
 # Binary Authorization
 
 Binary authorization, also known as binary allowlisting (and formerly, binary
@@ -277,7 +279,7 @@ informing the user that it was Santa that did it can be a _very_ confusing
 experience for users and lead to wasted time trying to determine the underlying
 cause.
 
-#### CEL
+#### CEL <AddedBadge added={"2025.6"} /> {#cel}
 
 Value: `CEL`
 
@@ -291,11 +293,11 @@ The input to the expression will be an
 and the return value must either be a
 [santa.cel.v1.ReturnValue](https://github.com/northpolesec/protos/blob/704246489aa55e6e2b60b47133a8668bc3656105/cel/v1.proto#L20)
 or a bool. If the return value is a bool, true will be treated as a
-ReturnValue.ALLOWLIST and false will be treated as ReturnValue.BLOCKLIST.
+`ReturnValue.ALLOWLIST` and false will be treated as `ReturnValue.BLOCKLIST`.
 
-The accessed fields in the ExecutionContext will determine whether the result of
-the expression can be cached. This is very important to be aware of, as overuse
-of CEL rules that prevent caching can have a negative impact on system
+The accessed fields in the `ExecutionContext` will determine whether the result
+of the expression can be cached. This is very important to be aware of, as
+overuse of CEL rules that prevent caching can have a negative impact on system
 performance, especially for binaries that are executed frequently.
 
 Some examples of valid CEL expresssions:
@@ -305,11 +307,11 @@ Some examples of valid CEL expresssions:
 // This expression will be cacheable.
 target.signing_time >= timestamp('2025-05-31T00:00:00Z')
 
-// Prevent using the --inspect flag
+// Prevent using the --inspect flag.
 // This expression will NOT be cacheable.
 '--inspect' in args ? BLOCKLIST : ALLOWLIST
 
-// Block all executions with DYLD_INSERT_LIBRARIES environment variable set
+// Block all executions with DYLD_INSERT_LIBRARIES environment variable set.
 // This expression will NOT be cacheable.
 ! has(envs.DYLD_INSERT_LIBRARIES)
 ```
