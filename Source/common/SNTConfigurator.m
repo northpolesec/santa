@@ -1620,7 +1620,7 @@ static SNTConfigurator *sharedConfigurator = nil;
       [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
   for (id rule in staticRules) {
     if (![rule isKindOfClass:[NSDictionary class]]) continue;
-    SNTRule *r = [[SNTRule alloc] initWithDictionary:rule error:nil];
+    SNTRule *r = [[SNTRule alloc] initStaticRuleWithDictionary:rule error:nil];
     if (!r) continue;
     rules[r.identifier] = r;
   }
@@ -1682,7 +1682,7 @@ static SNTConfigurator *sharedConfigurator = nil;
     }
 
     NSError *error;
-    (void)[[SNTRule alloc] initWithDictionary:rule error:&error];
+    (void)[[SNTRule alloc] initStaticRuleWithDictionary:rule error:&error];
     if (error) {
       [errors addObject:[NSString stringWithFormat:@"StaticRule at index %lu is invalid: %@", idx,
                                                    error.localizedDescription]];
