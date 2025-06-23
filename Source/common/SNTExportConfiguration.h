@@ -40,8 +40,12 @@ typedef NS_ENUM(NSInteger, SNTExportConfigurationType) {
 
 /// Configuration required for exporting to GCP
 @interface SNTExportConfigurationGCP : NSObject <SNTExportConfigurationProtocol>
-@property(readonly) NSData *token;
-- (instancetype)initWithToken:(NSData *)token;
+@property(readonly) NSString *bearerToken;
+@property(readonly) NSString *bucketName;
+@property(readonly) NSString *objectKeyPrefix;
+- (instancetype)initWithBearerToken:(NSString *)bearerToken
+                         bucketName:(NSString *)bucketName
+                    objectKeyPrefix:(NSString *)objectKeyPrefix;
 @end
 
 /// Lightweight container for holding the export configuration and its type
@@ -50,12 +54,17 @@ typedef NS_ENUM(NSInteger, SNTExportConfigurationType) {
 @property(readonly) SNTExportConfigurationType configType;
 @property(readonly) id<SNTExportConfigurationProtocol> config;
 
+// AWS Initializer
 - (instancetype)initWithAWSAccessKey:(NSString *)accessKey
                      secretAccessKey:(NSString *)secretAccessKey
                         sessionToken:(NSString *)sessionToken
                           bucketName:(NSString *)bucketName
                      objectKeyPrefix:(NSString *)objectKeyPrefix;
-- (instancetype)initWithGCPToken:(NSData *)token;
+
+// GCP Initializer
+- (instancetype)initWithGCPBearerToken:(NSString *)bearerToken
+                            bucketName:(NSString *)bucketName
+                       objectKeyPrefix:(NSString *)objectKeyPrefix;
 
 - (NSData *)serialize;
 + (instancetype)deserialize:(NSData *)data;

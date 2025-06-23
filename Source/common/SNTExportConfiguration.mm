@@ -63,10 +63,14 @@
 
 @implementation SNTExportConfigurationGCP
 
-- (instancetype)initWithToken:(NSData *)token {
+- (instancetype)initWithBearerToken:(NSString *)bearerToken
+                         bucketName:(NSString *)bucketName
+                    objectKeyPrefix:(NSString *)objectKeyPrefix {
   self = [super self];
   if (self) {
-    _token = token;
+    _bearerToken = bearerToken;
+    _bucketName = bucketName;
+    _objectKeyPrefix = objectKeyPrefix;
   }
   return self;
 }
@@ -76,13 +80,17 @@
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(coder, token);
+  ENCODE(coder, bearerToken);
+  ENCODE(coder, bucketName);
+  ENCODE(coder, objectKeyPrefix);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super init];
   if (self) {
-    DECODE(decoder, token, NSData);
+    DECODE(decoder, bearerToken, NSString);
+    DECODE(decoder, bucketName, NSString);
+    DECODE(decoder, objectKeyPrefix, NSString);
   }
   return self;
 }
@@ -108,10 +116,14 @@
   return self;
 }
 
-- (instancetype)initWithGCPToken:(NSData *)token {
+- (instancetype)initWithGCPBearerToken:(NSString *)bearerToken
+                            bucketName:(NSString *)bucketName
+                       objectKeyPrefix:(NSString *)objectKeyPrefix {
   self = [super init];
   if (self) {
-    _config = [[SNTExportConfigurationGCP alloc] initWithToken:token];
+    _config = [[SNTExportConfigurationGCP alloc] initWithBearerToken:bearerToken
+                                                          bucketName:bucketName
+                                                     objectKeyPrefix:objectKeyPrefix];
     _configType = SNTExportConfigurationTypeGCP;
   }
   return self;
