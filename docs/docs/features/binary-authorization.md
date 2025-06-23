@@ -293,11 +293,11 @@ The input to the expression will be an
 and the return value must either be a
 [santa.cel.v1.ReturnValue](https://github.com/northpolesec/protos/blob/704246489aa55e6e2b60b47133a8668bc3656105/cel/v1.proto#L20)
 or a bool. If the return value is a bool, true will be treated as a
-ReturnValue.ALLOWLIST and false will be treated as ReturnValue.BLOCKLIST.
+`ReturnValue.ALLOWLIST` and false will be treated as `ReturnValue.BLOCKLIST`.
 
-The accessed fields in the ExecutionContext will determine whether the result of
-the expression can be cached. This is very important to be aware of, as overuse
-of CEL rules that prevent caching can have a negative impact on system
+The accessed fields in the `ExecutionContext` will determine whether the result
+of the expression can be cached. This is very important to be aware of, as
+overuse of CEL rules that prevent caching can have a negative impact on system
 performance, especially for binaries that are executed frequently.
 
 Some examples of valid CEL expresssions:
