@@ -281,8 +281,8 @@ cause.
 
 Value: `CEL`
 
-CEL rules allow for more complex policies than would normally be possible. A
-rule with this policy must also include a valid
+CEL (Common Expression Language) rules allow for more complex policies than
+would normally be possible. A rule with this policy must also include a valid
 [CEL expression](https://cel.dev/) which will be evaluated as part of making a
 decision.
 
