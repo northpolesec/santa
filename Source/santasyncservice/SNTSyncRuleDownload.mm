@@ -43,17 +43,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   }
 }
 
-@implementation SNTSyncRuleDownload {
-  std::unique_ptr<santa::cel::Evaluator> _celEvaluator;
-}
-
-- (nullable instancetype)initWithState:(nonnull SNTSyncState *)syncState {
-  self = [super initWithState:syncState];
-  if (self) {
-    _celEvaluator = santa::cel::Evaluator::Create().value();
-  }
-  return self;
-}
+@implementation SNTSyncRuleDownload
 
 - (NSURL *)stageURL {
   NSString *stageName = [@"ruledownload" stringByAppendingFormat:@"/%@", self.syncState.machineID];
@@ -195,8 +185,8 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
   const std::string &cel_expr = rule.cel_expr();
   NSString *celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
-  if (celExpr && _celEvaluator) {
-    auto result = _celEvaluator->Compile(cel_expr);
+  if (celExpr && self.syncState.celEvaluator) {
+    auto result = self.syncState.celEvaluator->Compile(cel_expr);
     if (!result.ok()) {
       LOGE(@"Failed to compile CEL expression: %s", std::string(result.status().message()).c_str());
       return nil;

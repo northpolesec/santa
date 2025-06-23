@@ -26,6 +26,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#include "Source/common/cel/Evaluator.h"
 #import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
@@ -62,7 +63,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 @end
 
-@implementation SNTSyncManager
+@implementation SNTSyncManager {
+  std::unique_ptr<santa::cel::Evaluator> _celEvaluator;
+}
 
 #pragma mark init
 
@@ -93,6 +96,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _syncLimiter = dispatch_semaphore_create(kMaxEnqueuedSyncs);
 
     _eventBatchSize = kDefaultEventBatchSize;
+
+    auto celEvaluator = santa::cel::Evaluator::Create();
+    if (celEvaluator.ok()) {
+      _celEvaluator = std::move(celEvaluator.value());
+    }
   }
   return self;
 }
@@ -440,6 +448,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   syncState.daemonConn = self.daemonConn;
   syncState.contentEncoding = config.syncClientContentEncoding;
   syncState.pushNotificationsToken = self.pushNotifications.token;
+
+  syncState.celEvaluator = _celEvaluator.get();
 
   return syncState;
 }

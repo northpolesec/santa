@@ -55,6 +55,8 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    --silent-block: add to silent block\n"
           @"    --compiler: allow and mark as a compiler\n"
           @"    --cel {cel_expr}: add a CEL rule\n"
+          @"           See https://northpole.dev/features/binary-authorization#cel for more "
+          @"information.\n"
           @"    --remove: remove existing rule\n"
           @"    --check: check for an existing rule\n"
           @"    --import {path}: import rules from a JSON file\n"

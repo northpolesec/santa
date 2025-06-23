@@ -6,7 +6,7 @@ licenses(["notice"])
 
 objc_library(
     name = "FCM_lib",
-    srcs = ["SNTSyncFCM.m"],
+    srcs = ["SNTSyncFCM.mm"],
     hdrs = ["SNTSyncFCM.h"],
     sdk_frameworks = ["Network"],
     deps = [
@@ -30,11 +30,12 @@ objc_library(
 
 objc_library(
     name = "SNTSyncState",
-    srcs = ["SNTSyncState.m"],
+    srcs = ["SNTSyncState.mm"],
     hdrs = ["SNTSyncState.h"],
     deps = [
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTExportConfiguration",
+        "//Source/common/cel:CEL",
     ],
 )
 
@@ -73,9 +74,9 @@ objc_library(
         "NSData+Zlib.h",
         "NSData+Zlib.m",
         "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.m",
+        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
-        "SNTPushClientFCM.m",
+        "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
         "SNTPushNotificationsTracker.h",
         "SNTPushNotificationsTracker.m",
@@ -83,7 +84,7 @@ objc_library(
         "SNTSyncEventUpload.mm",
         "SNTSyncLogging.h",
         "SNTSyncLogging.m",
-        "SNTSyncManager.m",
+        "SNTSyncManager.mm",
         "SNTSyncPostflight.h",
         "SNTSyncPostflight.mm",
         "SNTSyncPreflight.h",
@@ -139,9 +140,9 @@ santa_unit_test(
         "NSData+Zlib.h",
         "NSData+Zlib.m",
         "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.m",
+        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
-        "SNTPushClientFCM.m",
+        "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
         "SNTPushNotificationsTracker.h",
         "SNTPushNotificationsTracker.m",
