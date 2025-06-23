@@ -277,6 +277,43 @@ informing the user that it was Santa that did it can be a _very_ confusing
 experience for users and lead to wasted time trying to determine the underlying
 cause.
 
+#### CEL
+
+Value: `CEL`
+
+CEL (Common Expression Language) rules allow for more complex policies than
+would normally be possible. A rule with this policy must also include a valid
+[CEL expression](https://cel.dev/) which will be evaluated as part of making a
+decision.
+
+The input to the expression will be an
+[santa.cel.v1.ExecutionContext](https://github.com/northpolesec/protos/blob/704246489aa55e6e2b60b47133a8668bc3656105/cel/v1.proto#L42)
+and the return value must either be a
+[santa.cel.v1.ReturnValue](https://github.com/northpolesec/protos/blob/704246489aa55e6e2b60b47133a8668bc3656105/cel/v1.proto#L20)
+or a bool. If the return value is a bool, true will be treated as a
+ReturnValue.ALLOWLIST and false will be treated as ReturnValue.BLOCKLIST.
+
+The accessed fields in the ExecutionContext will determine whether the result of
+the expression can be cached. This is very important to be aware of, as overuse
+of CEL rules that prevent caching can have a negative impact on system
+performance, especially for binaries that are executed frequently.
+
+Some examples of valid CEL expresssions:
+
+```clike
+// Only allow executing versions of an app signed on or after May 31st 2025.
+// This expression will be cacheable.
+target.signing_time >= timestamp('2025-05-31T00:00:00Z')
+
+// Prevent using the --inspect flag
+// This expression will NOT be cacheable.
+'--inspect' in args ? BLOCKLIST : ALLOWLIST
+
+// Block all executions with DYLD_INSERT_LIBRARIES environment variable set
+// This expression will NOT be cacheable.
+! has(envs.DYLD_INSERT_LIBRARIES)
+```
+
 ## Scope
 
 In addition to rules, Santa can allow or block based on scopes. Currently, only
