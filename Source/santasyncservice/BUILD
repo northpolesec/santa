@@ -6,7 +6,7 @@ licenses(["notice"])
 
 objc_library(
     name = "FCM_lib",
-    srcs = ["SNTSyncFCM.m"],
+    srcs = ["SNTSyncFCM.mm"],
     hdrs = ["SNTSyncFCM.h"],
     sdk_frameworks = ["Network"],
     deps = [
@@ -30,11 +30,12 @@ objc_library(
 
 objc_library(
     name = "SNTSyncState",
-    srcs = ["SNTSyncState.m"],
+    srcs = ["SNTSyncState.mm"],
     hdrs = ["SNTSyncState.h"],
     deps = [
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTExportConfiguration",
+        "//Source/common/cel:CEL",
     ],
 )
 
@@ -73,9 +74,9 @@ objc_library(
         "NSData+Zlib.h",
         "NSData+Zlib.m",
         "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.m",
+        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
-        "SNTPushClientFCM.m",
+        "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
         "SNTPushNotificationsTracker.h",
         "SNTPushNotificationsTracker.m",
@@ -83,7 +84,7 @@ objc_library(
         "SNTSyncEventUpload.mm",
         "SNTSyncLogging.h",
         "SNTSyncLogging.m",
-        "SNTSyncManager.m",
+        "SNTSyncManager.mm",
         "SNTSyncPostflight.h",
         "SNTSyncPostflight.mm",
         "SNTSyncPreflight.h",
@@ -124,6 +125,7 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:String",
+        "//Source/common/cel:CEL",
         "@northpolesec_protos//sync:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
     ],
@@ -138,9 +140,9 @@ santa_unit_test(
         "NSData+Zlib.h",
         "NSData+Zlib.m",
         "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.m",
+        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
-        "SNTPushClientFCM.m",
+        "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
         "SNTPushNotificationsTracker.h",
         "SNTPushNotificationsTracker.m",
@@ -185,6 +187,7 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:String",
+        "//Source/common/cel:CEL",
         "@OCMock",
         "@northpolesec_protos//sync:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",

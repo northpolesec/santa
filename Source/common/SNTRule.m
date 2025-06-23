@@ -166,7 +166,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
                          customMsg:(NSString *)customMsg
-                         customURL:(NSString *)customURL {
+                         customURL:(NSString *)customURL
+                           celExpr:(NSString *)celExpr {
   self = [self initWithIdentifier:identifier
                             state:state
                              type:type
@@ -174,7 +175,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         customURL:customURL
                         timestamp:0
                           comment:nil
-                          celExpr:nil
+                          celExpr:celExpr
                             error:nil];
   // Initialize timestamp to current time if rule is transitive.
   if (self && state == SNTRuleStateAllowTransitive) {
@@ -186,7 +187,15 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 - (instancetype)initWithIdentifier:(NSString *)identifier
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type {
-  return [self initWithIdentifier:identifier state:state type:type customMsg:nil customURL:nil];
+  return [self initWithIdentifier:identifier
+                            state:state
+                             type:type
+                        customMsg:nil
+                        customURL:nil
+                        timestamp:0
+                          comment:nil
+                          celExpr:nil
+                            error:nil];
 }
 
 // lowercase policy keys and upper case the policy decision.
@@ -254,6 +263,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     state = SNTRuleStateSilentBlock;
   } else if ([policyString isEqual:kRulePolicyRemove]) {
     state = SNTRuleStateRemove;
+  } else if ([policyString isEqual:kRulePolicyCEL]) {
+    state = SNTRuleStateCEL;
   } else {
     [SNTError populateError:error
                    withCode:SNTErrorCodeRuleInvalidPolicy
@@ -301,6 +312,11 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     comment = nil;
   }
 
+  NSString *celExpr = dict[kRuleCELExpr];
+  if (![celExpr isKindOfClass:[NSString class]] || celExpr.length == 0) {
+    celExpr = nil;
+  }
+
   return [self initWithIdentifier:identifier
                             state:state
                              type:type
@@ -308,7 +324,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         customURL:customURL
                         timestamp:0
                           comment:comment
-                          celExpr:nil
+                          celExpr:celExpr
                             error:error];
 }
 
@@ -354,6 +370,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateAllowTransitive: return @"AllowTransitive";
     case SNTRuleStateAllowLocalBinary: return kRulePolicyAllowlistLocalBinary;
     case SNTRuleStateAllowLocalSigningID: return kRulePolicyAllowlistLocalSigningID;
+    case SNTRuleStateCEL: return kRulePolicyCEL;
     // This should never be hit. But is here for completion.
     default: return @"Unknown";
   }
@@ -381,6 +398,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     kRuleCustomMsg : self.customMsg ?: @"",
     kRuleCustomURL : self.customURL ?: @"",
     kRuleComment : self.comment ?: @"",
+    kRuleCELExpr : self.celExpr ?: @"",
   };
 }
 
@@ -398,6 +416,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   result = prime * result + [self.identifier hash];
   result = prime * result + self.state;
   result = prime * result + self.type;
+  result = prime * result + [self.celExpr hash];
   result = prime * result + [self.celExpr hash];
   return result;
 }

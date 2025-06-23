@@ -21,6 +21,7 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
+#include "Source/common/cel/Evaluator.h"
 #import "Source/santasyncservice/SNTPushNotificationsTracker.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
@@ -162,6 +163,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
     case ::pbv1::BLOCKLIST: state = SNTRuleStateBlock; break;
     case ::pbv1::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
     case ::pbv1::REMOVE: state = SNTRuleStateRemove; break;
+    case ::pbv1::CEL: state = SNTRuleStateCEL; break;
     default: LOGE(@"Failed to process rule with unknown policy: %d", rule.policy()); return nil;
   }
 
@@ -181,11 +183,22 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   const std::string &custom_url = rule.custom_url();
   NSString *customURL = (!custom_url.empty()) ? StringToNSString(custom_url) : nil;
 
+  const std::string &cel_expr = rule.cel_expr();
+  NSString *celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
+  if (celExpr && self.syncState.celEvaluator) {
+    auto result = self.syncState.celEvaluator->Compile(cel_expr);
+    if (!result.ok()) {
+      LOGE(@"Failed to compile CEL expression: %s", std::string(result.status().message()).c_str());
+      return nil;
+    }
+  }
+
   return [[SNTRule alloc] initWithIdentifier:identifier
                                        state:state
                                         type:type
                                    customMsg:customMsg
-                                   customURL:customURL];
+                                   customURL:customURL
+                                     celExpr:celExpr];
 }
 
 // Send out push notifications for allowed bundles/binaries whose rule download was preceded by

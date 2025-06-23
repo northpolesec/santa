@@ -127,7 +127,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
         break;
       default: break;
     }
-    if (!(*evalResult).second) {
+    if (!evalResult->second) {
       cd.cacheable = NO;
     }
   }
