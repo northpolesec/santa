@@ -3,6 +3,8 @@ sidebar_position: 1
 toc_max_heading_level: 5
 ---
 
+import AddedBadge from "@site/src/components/AddedBadge/AddedBadge";
+
 # Binary Authorization
 
 Binary authorization, also known as binary allowlisting (and formerly, binary
@@ -277,7 +279,7 @@ informing the user that it was Santa that did it can be a _very_ confusing
 experience for users and lead to wasted time trying to determine the underlying
 cause.
 
-#### CEL
+#### CEL <AddedBadge added={"2025.6"} />
 
 Value: `CEL`
 
@@ -305,11 +307,11 @@ Some examples of valid CEL expresssions:
 // This expression will be cacheable.
 target.signing_time >= timestamp('2025-05-31T00:00:00Z')
 
-// Prevent using the --inspect flag
+// Prevent using the --inspect flag.
 // This expression will NOT be cacheable.
 '--inspect' in args ? BLOCKLIST : ALLOWLIST
 
-// Block all executions with DYLD_INSERT_LIBRARIES environment variable set
+// Block all executions with DYLD_INSERT_LIBRARIES environment variable set.
 // This expression will NOT be cacheable.
 ! has(envs.DYLD_INSERT_LIBRARIES)
 ```
