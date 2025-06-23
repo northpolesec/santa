@@ -243,7 +243,7 @@ This event is only emitted if the built-in `sshd` is used.
 
 Authentication events
 
-#### `GatekeeperOverride` <AddedBadge added={"macOS 15.0"} />
+#### `GatekeeperOverride` <AddedBadge added={"macOS 15.0"} /> {#gatekeeper-override}
 
 Emitted whenever a user overrides Gatekeeper for a binary.
 
@@ -253,7 +253,7 @@ The event will indicate:
 - The binary's SHA-256 hash, if available
 - Details about the binary's code signature, if it is signed
 
-#### `TCCModification` <AddedBadge added={"macOS 15.4"} />
+#### `TCCModification` <AddedBadge added={"macOS 15.4"} /> {#tcc-modification}
 
 Emitted whenever the Transparency, Consent, and Control database is modified.
 This occurs when an application is granted or denied access to a protected
@@ -268,7 +268,7 @@ The event will indicate:
 - Whether access is being granted or denied
 - A reason for the change (e.g. `USER_CONSENT`, `MDM_POLICY`)
 
-#### `XProtect` <AddedBadge added={"macOS 15.0"} />
+#### `XProtect` <AddedBadge added={"macOS 15.0"} /> {#xprotect}
 
 Emitted whenever XProtect detects or remediates malware.
 

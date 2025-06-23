@@ -279,7 +279,7 @@ informing the user that it was Santa that did it can be a _very_ confusing
 experience for users and lead to wasted time trying to determine the underlying
 cause.
 
-#### CEL <AddedBadge added={"2025.6"} />
+#### CEL <AddedBadge added={"2025.6"} /> {#cel}
 
 Value: `CEL`
 
