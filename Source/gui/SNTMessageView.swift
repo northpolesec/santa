@@ -310,12 +310,50 @@ struct AttributedText: NSViewRepresentable {
     self.attributedString = attributedString
   }
 
-  func makeNSView(context: Context) -> NSTextField {
-    NSTextField(labelWithAttributedString: self.attributedString)
+  func makeNSView(context: Context) -> TextFieldWithCursors {
+    TextFieldWithCursors(labelWithAttributedString: self.attributedString)
   }
 
-  func updateNSView(_ textView: NSTextField, context: Context) {
+  func updateNSView(_ textView: TextFieldWithCursors, context: Context) {
     textView.maximumNumberOfLines = 15
     textView.translatesAutoresizingMaskIntoConstraints = false
+    textView.allowsEditingTextAttributes = true
+    textView.isSelectable = true
+    textView.isEditable = false
+  }
+}
+
+class TextFieldWithCursors: NSTextField {
+  override func resetCursorRects() {
+    super.resetCursorRects()
+
+    let attributedString = self.attributedStringValue
+    attributedString.enumerateAttribute(
+      .link,
+      in: NSRange(location: 0, length: attributedString.length),
+      options: [],
+      using: { value, range, stop in
+        if value != nil {
+          let textStorage = NSTextStorage(attributedString: attributedString)
+          let layoutManager = NSLayoutManager()
+
+          textStorage.addLayoutManager(layoutManager)
+
+          let textContainer = NSTextContainer(size: bounds.size)
+          textContainer.lineFragmentPadding = 0.0
+          layoutManager.addTextContainer(textContainer)
+
+          var glyphRange = NSRange()
+
+          // Convert the range for glyphs.
+          layoutManager.characterRange(forGlyphRange: range, actualGlyphRange: &glyphRange)
+
+          let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+
+          // Set the cursor to a pointing hand where this link is.
+          addCursorRect(rect, cursor: NSCursor.pointingHand)
+        }
+      }
+    )
   }
 }
