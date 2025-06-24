@@ -1,6 +1,6 @@
 build --apple_generate_dsym
 build --define=apple.propagate_embedded_extra_outputs=yes
-# Needed to enable multi-arch builds
+# Needed to enable multi-arch builds across compiler toolchains (e.g. Rust)
 build --incompatible_enable_apple_toolchain_resolution
 
 build --copt=-Werror
