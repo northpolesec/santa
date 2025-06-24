@@ -13,7 +13,7 @@ bazel_dep(name = "xxhash", version = "0.8.2")
 bazel_dep(name = "rules_rust", version = "0.61.0")
 
 # Load rules_rust dependencies needed for rednose.
-# The edition/version must match what's needed by the depedency.
+# The edition/version must match what's needed by the dependency.
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2024",
