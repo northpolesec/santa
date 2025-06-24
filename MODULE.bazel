@@ -10,20 +10,6 @@ bazel_dep(name = "rules_fuzzing", version = "0.5.2")
 bazel_dep(name = "rules_shell", version = "0.4.1")
 bazel_dep(name = "rules_swift", version = "2.8.2")
 bazel_dep(name = "xxhash", version = "0.8.2")
-bazel_dep(name = "rules_rust", version = "0.61.0")
-
-# Load rules_rust dependencies needed for rednose.
-# The edition/version must match what's needed by the dependency.
-rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
-rust.toolchain(
-    edition = "2024",
-    versions = ["1.86.0"],
-    extra_target_triples = [
-      "aarch64-apple-darwin",
-      "x86_64-apple-darwin",
-    ],
-)
-use_repo(rust, "rust_toolchains")
 
 # North Pole Protos
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
@@ -37,7 +23,7 @@ git_override(
 bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
 git_override(
     module_name = "rednose",
-    commit = "d59072d017f3bddf7a242ef2651bc2e2b2455ae2",
+    commit = "cb35c2c65bba0a1799ade11fcece5f0c993f415c",
     remote = "https://github.com/northpolesec/rednose",
 )
 
