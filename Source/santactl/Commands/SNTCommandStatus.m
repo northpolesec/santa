@@ -205,7 +205,6 @@ REGISTER_COMMAND_NAME(@"status")
           ?: @"Never";
 
   NSString *syncURLStr = configurator.syncBaseURL.absoluteString;
-  syncURLStr = @"";
 
   BOOL exportMetrics = configurator.exportMetrics;
   NSURL *metricsURLStr = configurator.metricURL;
