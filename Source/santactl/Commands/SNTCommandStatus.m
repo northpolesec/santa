@@ -278,13 +278,9 @@ REGISTER_COMMAND_NAME(@"status")
   } else {
     printf(">>> Daemon Info\n");
     printf("  %-25s | %s\n", "Mode", [clientMode UTF8String]);
-
-    if (enableTransitiveRules) {
-      printf("  %-25s | %s\n", "Transitive Rules", (enableTransitiveRules ? "Yes" : "No"));
-    }
-
     printf("  %-25s | %s\n", "Log Type", [eventLogType UTF8String]);
     printf("  %-25s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
+    printf("  %-25s | %s\n", "Transitive Rules", (enableTransitiveRules ? "Yes" : "No"));
     printf("  %-25s | %s\n", "USB Blocking", (blockUSBMount ? "Yes" : "No"));
     if (blockUSBMount && remountUSBMode.count > 0) {
       printf("  %-25s | %s\n", "USB Remounting Mode",
@@ -309,10 +305,8 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-25s | %lld\n", "Transitive Rules", ruleCounts.transitive);
     printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
 
-    if ([SNTConfigurator configurator].staticRules.count) {
-      printf(">>> Static Rules\n");
-      printf("  %-25s | %lld\n", "Rules", staticRuleCount);
-    }
+    printf(">>> Static Rules\n");
+    printf("  %-25s | %lld\n", "Rules", staticRuleCount);
 
     printf(">>> Watch Items\n");
     printf("  %-25s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
@@ -323,8 +317,9 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
     }
 
-    if (syncURLStr) {
-      printf(">>> Sync Info\n");
+    printf(">>> Sync\n");
+    printf("  %-25s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");
+    if (syncURLStr.length) {
       printf("  %-25s | %s\n", "Sync Server", [syncURLStr UTF8String]);
       printf("  %-25s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
       printf("  %-25s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
@@ -333,8 +328,9 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
     }
 
+    printf(">>> Metrics\n");
+    printf("  %-25s | %s\n", "Enabled", exportMetrics ? "Yes" : "No");
     if (exportMetrics) {
-      printf(">>> Metrics Info\n");
       printf("  %-25s | %s\n", "Metrics Server", [[metricsURLStr absoluteString] UTF8String]);
       printf("  %-25s | %lu\n", "Export Interval (seconds)", metricExportInterval);
     }
