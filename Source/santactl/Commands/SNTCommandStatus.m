@@ -305,10 +305,8 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-25s | %lld\n", "Transitive Rules", ruleCounts.transitive);
     printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
 
-    if ([SNTConfigurator configurator].staticRules.count) {
-      printf(">>> Static Rules\n");
-      printf("  %-25s | %lld\n", "Rules", staticRuleCount);
-    }
+    printf(">>> Static Rules\n");
+    printf("  %-25s | %lld\n", "Rules", staticRuleCount);
 
     printf(">>> Watch Items\n");
     printf("  %-25s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
