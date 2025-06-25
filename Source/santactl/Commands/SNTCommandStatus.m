@@ -205,6 +205,7 @@ REGISTER_COMMAND_NAME(@"status")
           ?: @"Never";
 
   NSString *syncURLStr = configurator.syncBaseURL.absoluteString;
+  syncURLStr = @"";
 
   BOOL exportMetrics = configurator.exportMetrics;
   NSURL *metricsURLStr = configurator.metricURL;
@@ -317,8 +318,9 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
     }
 
-    if (syncURLStr) {
-      printf(">>> Sync Info\n");
+    printf(">>> Sync\n");
+    printf("  %-25s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");
+    if (syncURLStr.length) {
       printf("  %-25s | %s\n", "Sync Server", [syncURLStr UTF8String]);
       printf("  %-25s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
       printf("  %-25s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
@@ -327,8 +329,9 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
     }
 
+    printf(">>> Metrics\n");
+    printf("  %-25s | %s\n", "Enabled", exportMetrics ? "Yes" : "No");
     if (exportMetrics) {
-      printf(">>> Metrics Info\n");
       printf("  %-25s | %s\n", "Metrics Server", [[metricsURLStr absoluteString] UTF8String]);
       printf("  %-25s | %lu\n", "Export Interval (seconds)", metricExportInterval);
     }
