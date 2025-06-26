@@ -1127,6 +1127,8 @@ santa_unit_test(
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
+        "//Source/common:String",
+        "//Source/common/cel:CEL",
         "@FMDB",
         "@OCMock",
     ],
