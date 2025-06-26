@@ -23,7 +23,10 @@
 #import "Source/common/SNTRule.h"
 
 @interface SNTRule ()
+// Making these properties readwrite makes some tests much easier to write.
 @property(readwrite) NSUInteger timestamp;
+@property(readwrite) SNTRuleState state;
+@property(readwrite) SNTRuleType type;
 @end
 
 @interface SNTRuleTest : XCTestCase

@@ -327,7 +327,7 @@ REGISTER_COMMAND_NAME(@"rule")
                                                    error:nil];
 
   if (check) {
-    if (!identifier) return [self printErrorUsageAndExit:@"--check requires --identifier"];
+    if (!newRule.identifier) return [self printErrorUsageAndExit:@"--check requires --identifier"];
     return [self printStateOfRule:newRule daemonConnection:self.daemonConn];
   }
 
