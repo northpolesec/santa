@@ -246,6 +246,7 @@ REGISTER_COMMAND_NAME(@"status")
     if (syncURLStr.length) {
       stats[@"sync"] = @{
         @"enabled" : @(YES),
+        @"server" : syncURLStr ?: @"null",
         @"clean_required" : @(syncCleanReqd),
         @"last_successful_full" : fullSyncLastSuccessStr ?: @"null",
         @"last_successful_rule" : ruleSyncLastSuccessStr ?: @"null",
@@ -276,6 +277,8 @@ REGISTER_COMMAND_NAME(@"status")
     if (exportMetrics) {
       stats[@"metrics"] = @{
         @"enabled" : @(YES),
+        @"server" : [metricsURLStr absoluteString] ?: @"null",
+        @"export_interval_seconds" : @(metricExportInterval),
       };
     } else {
       stats[@"metrics"] = @{
