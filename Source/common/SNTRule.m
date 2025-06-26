@@ -31,6 +31,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 @property(readwrite) SNTRuleState state;
 @property(readwrite) SNTRuleType type;
 @property(readwrite) NSString *customMsg;
+@property(readwrite) NSString *customURL;
+@property(readwrite) NSString *comment;
 @property(readwrite) NSString *identifier;
 @property(readwrite) NSString *celExpr;
 @end
