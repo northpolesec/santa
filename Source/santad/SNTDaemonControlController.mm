@@ -105,7 +105,7 @@ double watchdogRAMPeak = 0;
 
 - (void)databaseRuleCounts:(void (^)(RuleCounts ruleTypeCounts))reply {
   SNTRuleTable *rdb = [SNTDatabaseController ruleTable];
-  RuleCounts ruleCounts{
+  __block RuleCounts ruleCounts{
       .binary = [rdb binaryRuleCount],
       .certificate = [rdb certificateRuleCount],
       .compiler = [rdb compilerRuleCount],
@@ -114,6 +114,25 @@ double watchdogRAMPeak = 0;
       .signingID = [rdb signingIDRuleCount],
       .cdhash = [rdb cdhashRuleCount],
   };
+
+  // Update counts with data from StaticRules configuration
+  [[[SNTConfigurator configurator] staticRules]
+      enumerateKeysAndObjectsUsingBlock:^(NSString *key, SNTRule *rule, BOOL *stop) {
+        switch (rule.type) {
+          case SNTRuleTypeCDHash: ruleCounts.cdhash++; break;
+          case SNTRuleTypeBinary: ruleCounts.binary++; break;
+          case SNTRuleTypeSigningID: ruleCounts.signingID++; break;
+          case SNTRuleTypeCertificate: ruleCounts.certificate++; break;
+          case SNTRuleTypeTeamID: ruleCounts.teamID++; break;
+          default: break;
+        }
+
+        // Note: Transitive rules cannot come from static rules
+        switch (rule.state) {
+          case SNTRuleStateAllowCompiler: ruleCounts.compiler++; break;
+          default: break;
+        }
+      }];
 
   reply(ruleCounts);
 }
