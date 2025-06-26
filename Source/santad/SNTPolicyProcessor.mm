@@ -174,7 +174,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     case SNTRuleStateSilentBlock: cd.silentBlock = YES; break;
     case SNTRuleStateAllowCompiler:
       if (!enableTransitiveRules) {
-        switch (rule.type) {
+        switch (type) {
           case SNTRuleTypeCDHash: cd.decision = SNTEventStateAllowCDHash; break;
           case SNTRuleTypeBinary: cd.decision = SNTEventStateAllowBinary; break;
           case SNTRuleTypeSigningID: cd.decision = SNTEventStateAllowSigningID; break;

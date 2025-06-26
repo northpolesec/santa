@@ -382,7 +382,6 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
     rule = staticRules[identifiers.signingID];
     if (rule.type == SNTRuleTypeSigningID) {
-      LOGD(@"Found static rule for signing ID %@: %@", identifiers.signingID, rule);
       return rule;
     }
 
