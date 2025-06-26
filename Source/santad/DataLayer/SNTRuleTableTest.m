@@ -464,8 +464,9 @@
   XCTAssertEqual(YES, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
 }
 
-// Ensure that a brand new block rule flushes the decision cache.
 - (void)testAddedRulesShouldFlushDecisionCacheWithOldBlockRule {
+  // Ensure that adding a block rule that already exists in the database does
+  // not flush the decision cache.
   NSError *error;
   SNTRule *r = [self _exampleBinaryRule];
   [self.sut addRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
@@ -475,8 +476,8 @@
   XCTAssertEqual(NO, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
 }
 
-// Ensure that a larger number of blocks flushes the decision cache.
 - (void)testAddedRulesShouldFlushDecisionCacheWithLargeNumberOfBlocks {
+  // Ensure that a large number of blocks flushes the decision cache.
   NSError *error;
   SNTRule *r = [self _exampleBinaryRule];
   [self.sut addRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
@@ -491,9 +492,9 @@
   XCTAssertEqual(YES, [self.sut addedRulesShouldFlushDecisionCache:newRules]);
 }
 
-// Ensure that an allow rule that overrides a compiler rule flushes the
-// decision cache.
 - (void)testAddedRulesShouldFlushDecisionCacheWithCompilerRule {
+  // Ensure that an allow rule that overrides a compiler rule flushes the
+  // decision cache.
   NSError *error;
   SNTRule *r = [self _exampleBinaryRule];
   r.type = SNTRuleTypeBinary;
@@ -507,8 +508,8 @@
   XCTAssertEqual(YES, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
 }
 
-// Ensure that an Remove rule targeting an allow rule causes a flush of the cache.
 - (void)testAddedRulesShouldFlushDecisionCacheWithRemoveRule {
+  // Ensure that a Remove rule targeting an allow rule causes a flush of the cache.
   NSError *error;
   SNTRule *r = [self _exampleBinaryRule];
   r.type = SNTRuleTypeBinary;
@@ -519,6 +520,25 @@
   XCTAssertEqual(self.sut.binaryRuleCount, 1);
 
   r.state = SNTRuleStateRemove;
+  XCTAssertEqual(YES, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
+}
+
+- (void)testAddedRulesShouldFlushDecisionCacheWithCELRule {
+  // Ensure that a CEL rule that already exists in the database does not flush
+  // the decision cache...
+  NSError *error;
+  SNTRule *r = [self _exampleTeamIDRule];
+  r.state = SNTRuleStateCEL;
+  r.celExpr = @"args.size() == 1";
+  [self.sut addRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
+  XCTAssertNil(error);
+  XCTAssertEqual(self.sut.ruleCount, 1);
+  XCTAssertEqual(self.sut.teamIDRuleCount, 1);
+
+  XCTAssertEqual(NO, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
+
+  // Unless the CEL expression is different.
+  r.celExpr = @"args.size() == 2";
   XCTAssertEqual(YES, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
 }
 

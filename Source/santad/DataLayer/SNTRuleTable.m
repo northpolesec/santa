@@ -521,14 +521,15 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
     for (SNTRule *rule in rules) {
-      // If the rule is a block rule, silent block rule, or a compiler rule check if it already
-      // exists in the database.
-      //
-      // If it does not then flush the cache. To ensure that the new rule is honored.
-      if ((rule.state != SNTRuleStateAllow)) {
-        if ([db longForQuery:
-                    @"SELECT COUNT(*) FROM rules WHERE identifier=? AND type=? AND state=? LIMIT 1",
-                    rule.identifier, @(rule.type), @(rule.state)] == 0) {
+      if (rule.state != SNTRuleStateAllow) {
+        // If the rule is a CEL rule, block rule, silent block rule, or a compiler rule check if it
+        // already exists in the database. If it is a CEL rule also check the expression is the
+        // same.
+        //
+        // If it does not then flush the cache. To ensure that the new rule is honored.
+        if ([db longForQuery:@"SELECT COUNT(*) FROM rules WHERE identifier=? AND type=? AND "
+                             @"state=? AND (cel_expr IS NULL OR cel_expr=?) LIMIT 1",
+                             rule.identifier, @(rule.type), @(rule.state), rule.celExpr] == 0) {
           flushDecisionCache = YES;
           return;
         }
