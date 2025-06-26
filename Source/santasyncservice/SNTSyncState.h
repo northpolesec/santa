@@ -17,7 +17,6 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
-#include "Source/common/cel/Evaluator.h"
 
 @class SNTSyncManager;
 @class MOLXPCConnection;
@@ -93,7 +92,5 @@
 
 @property BOOL preflightOnly;
 @property BOOL pushNotificationSync;
-
-@property santa::cel::Evaluator *celEvaluator;
 
 @end

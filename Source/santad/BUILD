@@ -20,7 +20,7 @@ objc_library(
 
 objc_library(
     name = "SNTRuleTable",
-    srcs = ["DataLayer/SNTRuleTable.m"],
+    srcs = ["DataLayer/SNTRuleTable.mm"],
     hdrs = ["DataLayer/SNTRuleTable.h"],
     sdk_dylibs = [
         "EndpointSecurity",
@@ -40,6 +40,8 @@ objc_library(
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
+        "//Source/common:String",
+        "//Source/common/cel:CEL",
     ],
 )
 
@@ -1106,7 +1108,7 @@ santa_unit_test(
         "DataLayer/SNTDatabaseTable.h",
         "DataLayer/SNTDatabaseTable.m",
         "DataLayer/SNTRuleTable.h",
-        "DataLayer/SNTRuleTable.m",
+        "DataLayer/SNTRuleTable.mm",
         "DataLayer/SNTRuleTableTest.m",
     ],
     sdk_dylibs = [

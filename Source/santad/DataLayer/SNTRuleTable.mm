@@ -29,6 +29,8 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
+#include "Source/common/String.h"
+#include "Source/common/cel/Evaluator.h"
 
 static const uint32_t kRuleTableCurrentVersion = 9;
 
@@ -69,7 +71,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   es_delete_client(client);
 }
 
-@interface SNTRuleTable ()
+@interface SNTRuleTable () {
+  std::unique_ptr<santa::cel::Evaluator> _celEvaluator;
+}
 @property MOLCodesignChecker *santadCSInfo;
 @property MOLCodesignChecker *launchdCSInfo;
 @property NSDate *lastTransitiveRuleCulling;
@@ -273,6 +277,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
 
+  auto celEval = santa::cel::Evaluator::Create();
+  if (celEval.ok()) {
+    _celEvaluator = std::move(celEval.value());
+  } else {
+    LOGE(@"Failed to create CEL evaluator: %s", std::string(celEval.status().message()).c_str());
+  }
+
   // Setup critical system binaries
   [self setupSystemCriticalBinaries];
 
@@ -337,8 +348,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (SNTRule *)ruleFromResultSet:(FMResultSet *)rs {
   return [[SNTRule alloc] initWithIdentifier:[rs stringForColumn:@"identifier"]
-                                       state:[rs intForColumn:@"state"]
-                                        type:[rs intForColumn:@"type"]
+                                       state:(SNTRuleState)[rs intForColumn:@"state"]
+                                        type:(SNTRuleType)[rs intForColumn:@"type"]
                                    customMsg:[rs stringForColumn:@"custommsg"]
                                    customURL:[rs stringForColumn:@"customurl"]
                                    timestamp:[rs intForColumn:@"timestamp"]
@@ -455,6 +466,17 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                          detail:rule.description];
         *rollback = failed = YES;
         return;
+      }
+
+      if (rule.state == SNTRuleStateCEL && _celEvaluator) {
+        auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
+        if (!celExpr.ok()) {
+          [SNTError populateError:&blockErr
+                         withCode:SNTErrorCodeRuleInvalid
+                          message:@"Rule array contained rule with invalid CEL expression"
+                           detail:santa::StringToNSString(std::string(celExpr.status().message()))];
+          continue;
+        }
       }
 
       if (rule.state == SNTRuleStateRemove) {

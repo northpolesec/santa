@@ -35,7 +35,6 @@ objc_library(
     deps = [
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTExportConfiguration",
-        "//Source/common/cel:CEL",
     ],
 )
 
@@ -125,7 +124,6 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:String",
-        "//Source/common/cel:CEL",
         "@northpolesec_protos//sync:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
     ],
@@ -187,7 +185,6 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:String",
-        "//Source/common/cel:CEL",
         "@OCMock",
         "@northpolesec_protos//sync:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
