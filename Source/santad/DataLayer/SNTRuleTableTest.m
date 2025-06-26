@@ -35,6 +35,15 @@
 @property id mockConfigurator;
 @end
 
+@interface SNTRule ()
+// Making these properties readwrite makes some tests much easier to write.
+@property(readwrite) SNTRuleState state;
+@property(readwrite) SNTRuleType type;
+@property(readwrite) NSString *customMsg;
+@property(readwrite) NSString *identifier;
+@property(readwrite) NSString *celExpr;
+@end
+
 @implementation SNTRuleTableTest
 
 - (void)setUp {

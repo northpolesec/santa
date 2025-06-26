@@ -539,16 +539,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // Transitive allowlist rules
 - (void)testDecisionForTransitiveAllowlistRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
-    @"rule_type" : @"BINARY",
-    @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-    @"policy" : @"ALLOWLIST"
-  }
-                                                error:nil];
-
-  XCTAssertNotNil(rule, "invalid test rule dictionary");
-
-  rule.state = SNTRuleStateAllowTransitive;
+  SNTRule *rule = [[SNTRule alloc]
+      initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                   state:SNTRuleStateAllowTransitive
+                    type:SNTRuleTypeBinary];
 
   [self testRule:rule
        transitiveRules:YES
@@ -567,16 +561,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testEnsureANonMatchingRuleResultsInUnknown {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
-    @"rule_type" : @"BINARY",
-    @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-    @"policy" : @"ALLOWLIST"
-  }
-                                                error:nil];
-
-  XCTAssertNotNil(rule, "invalid test rule dictionary");
-
-  rule.state = static_cast<SNTRuleState>(88888);  // Set to an invalid state
+  // Set to an invalid state
+  SNTRule *rule = [[SNTRule alloc]
+      initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                   state:static_cast<SNTRuleState>(88888)
+                    type:SNTRuleTypeBinary];
 
   [self testRule:rule
        transitiveRules:YES

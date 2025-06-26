@@ -27,6 +27,7 @@
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
+#include "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
@@ -371,11 +372,13 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(staticRules)
-                                     type:[NSDictionary class]
-                                 callback:^(NSDictionary *oldValue, NSDictionary *newValue) {
-                                   if ([oldValue isEqualToDictionary:newValue]) {
+                                     type:[NSArray class]
+                                 callback:^(NSArray *oldValue, NSArray *newValue) {
+                                   if ([oldValue isEqualToArray:newValue]) {
                                      return;
                                    }
+
+                                   [exec_controller.ruleTable updateStaticRules:newValue];
 
                                    LOGI(@"StaticRules changed. Flushing caches.");
                                    auth_result_cache->FlushCache(

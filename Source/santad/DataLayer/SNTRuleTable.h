@@ -111,6 +111,16 @@
 - (NSArray<SNTRule *> *)retrieveAllRules;
 
 ///
+///  Update the static rules from the configuration.
+///
+- (void)updateStaticRules:(NSArray<NSDictionary *> *)staticRules;
+
+///
+///  Cached static rules.
+///
+@property(readonly) NSDictionary<NSString *, SNTRule *> *cachedStaticRules;
+
+///
 ///  A map of a file hashes to cached decisions. This is used to pre-validate and whitelist
 ///  certain critical system binaries that are integral to Santa's functionality.
 ///

@@ -116,7 +116,7 @@ double watchdogRAMPeak = 0;
   };
 
   // Update counts with data from StaticRules configuration
-  [[[SNTConfigurator configurator] staticRules]
+  [[rdb cachedStaticRules]
       enumerateKeysAndObjectsUsingBlock:^(NSString *key, SNTRule *rule, BOOL *stop) {
         switch (rule.type) {
           case SNTRuleTypeCDHash: ruleCounts.cdhash++; break;

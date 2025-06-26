@@ -79,6 +79,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 @property NSDate *lastTransitiveRuleCulling;
 @property NSDictionary *criticalSystemBinaries;
 @property(readonly) NSArray *criticalSystemBinaryPaths;
+@property(readwrite) NSDictionary<NSString *, SNTRule *> *cachedStaticRules;
 @end
 
 @implementation SNTRuleTable
@@ -287,6 +288,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   // Setup critical system binaries
   [self setupSystemCriticalBinaries];
 
+  // Prime the cached static rules.
+  [self updateStaticRules:[[SNTConfigurator configurator] staticRules]];
+
   return newVersion;
 }
 
@@ -362,7 +366,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   __block SNTRule *rule;
 
   // Look for a static rule that matches.
-  NSDictionary *staticRules = [[SNTConfigurator configurator] staticRules];
+  NSDictionary *staticRules = self.cachedStaticRules;
   if (staticRules.count) {
     // IMPORTANT: The order static rules are checked here should be the same
     // order as given by the SQL query for the rules database.
@@ -624,6 +628,39 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     [rs close];
   }];
   return rules;
+}
+
+#pragma mark Caching Static Rules
+
+- (void)updateStaticRules:(NSArray<NSDictionary *> *)staticRules {
+  if (![staticRules isKindOfClass:[NSArray class]]) {
+    self.cachedStaticRules = nil;
+    return;
+  }
+
+  NSMutableDictionary<NSString *, SNTRule *> *rules =
+      [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
+  for (id rule in staticRules) {
+    if (![rule isKindOfClass:[NSDictionary class]]) continue;
+    NSError *error;
+    SNTRule *r = [[SNTRule alloc] initStaticRuleWithDictionary:rule error:&error];
+    if (error) {
+      LOGE(@"Failed to initialize static rule %@: %@", rule, error);
+    }
+    if (!r) continue;
+
+    if (r.state == SNTRuleStateCEL && _celEvaluator) {
+      auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(r.celExpr));
+      if (!celExpr.ok()) {
+        LOGE(@"Failed to compile CEL expression for static rule %@: %s", r.identifier,
+             std::string(celExpr.status().message()).c_str());
+        continue;
+      }
+    }
+
+    rules[r.identifier] = r;
+  }
+  self.cachedStaticRules = [rules copy];
 }
 
 @end

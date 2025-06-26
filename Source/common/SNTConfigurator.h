@@ -73,10 +73,8 @@
 ///    </dict>
 ///  </array>
 ///
-///  The return of this property is a dictionary where the keys are the
-///  identifiers of each rule, with the SNTRule as a value
 ///
-@property(nullable, readonly, nonatomic) NSDictionary<NSString *, SNTRule *> *staticRules;
+@property(nullable, readonly, nonatomic) NSArray<NSDictionary *> *staticRules;
 
 ///
 ///  The regex of allowed paths. Regexes are specified in ICU format.

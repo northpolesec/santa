@@ -24,27 +24,27 @@
 ///
 ///  The hash of the object this rule is for
 ///
-@property(copy) NSString *identifier;
+@property(readonly, copy) NSString *identifier;
 
 ///
 ///  The state of this rule
 ///
-@property SNTRuleState state;
+@property(readonly) SNTRuleState state;
 
 ///
 ///  The type of object this rule is for (binary, certificate)
 ///
-@property SNTRuleType type;
+@property(readonly) SNTRuleType type;
 
 ///
 ///  A custom message that will be displayed if this rule blocks a binary from executing
 ///
-@property(copy) NSString *customMsg;
+@property(readonly, copy) NSString *customMsg;
 
 ///
 ///  A custom URL to take the user to when this binary is blocked from executing.
 ///
-@property(copy) NSString *customURL;
+@property(readonly, copy) NSString *customURL;
 
 ///
 ///  The time when this rule was last retrieved from the rules database, if rule is transitive.
@@ -55,12 +55,12 @@
 ///
 ///  A comment attached to this rule. This is intended only for local rules.
 ///
-@property(copy) NSString *comment;
+@property(readonly, copy) NSString *comment;
 
 ///
 ///  A CEL expression for this rule, required if the state is SNTRuleStateCEL.
 ///
-@property(copy) NSString *celExpr;
+@property(readonly, copy) NSString *celExpr;
 
 ///
 ///  Whether this rule is a static rule.
