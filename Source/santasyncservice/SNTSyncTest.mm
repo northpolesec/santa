@@ -874,9 +874,6 @@
 }
 
 - (void)testRuleDownloadCel {
-  auto celEvaluator = santa::cel::Evaluator::Create();
-  self.syncState.celEvaluator = celEvaluator->get();
-
   SNTSyncRuleDownload *sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
 
   NSData *respData = [self dataFromFixture:@"sync_ruledownload_with_cel_1.json"];
@@ -898,6 +895,7 @@
                                                                reply:([OCMArg invokeBlock])]);
   [sut sync];
 
+  // Both rules should get sent to the daemon. It will reject the second one.
   NSArray *rules = @[
     [[SNTRule alloc]
         initWithIdentifier:@"AAAAAAAAAA"
@@ -906,6 +904,12 @@
                  customMsg:nil
                  customURL:nil
                    celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"],
+    [[SNTRule alloc] initWithIdentifier:@"BBBBBBBBBB"
+                                  state:SNTRuleStateCEL
+                                   type:SNTRuleTypeTeamID
+                              customMsg:nil
+                              customURL:nil
+                                celExpr:@"this is an invalid expression"],
   ];
 
   OCMVerify([self.daemonConnRop databaseRuleAddRules:rules
