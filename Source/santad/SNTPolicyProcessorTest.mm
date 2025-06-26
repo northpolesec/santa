@@ -539,17 +539,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // Transitive allowlist rules
 - (void)testDecisionForTransitiveAllowlistRuleMatches {
-  NSMutableDictionary *d = [@{
-    @"rule_type" : @"BINARY",
-    @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-    @"policy" : @"ALLOWLIST"
-  } mutableCopy];
-
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:d error:nil];
-  XCTAssertNotNil(rule, "invalid test rule dictionary");
-
-  d[@"policy"] = @"ALLOWLIST_TRANSITIVE";
-  rule = [[SNTRule alloc] initWithDictionary:d error:nil];
+  SNTRule *rule = [[SNTRule alloc]
+      initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                   state:SNTRuleStateAllowTransitive
+                    type:SNTRuleTypeBinary];
 
   [self testRule:rule
        transitiveRules:YES

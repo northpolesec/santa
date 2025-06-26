@@ -170,7 +170,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     return NO;
   }
 
-  switch (rule.state) {
+  switch (state) {
     case SNTRuleStateSilentBlock: cd.silentBlock = YES; break;
     case SNTRuleStateAllowCompiler:
       if (!enableTransitiveRules) {
