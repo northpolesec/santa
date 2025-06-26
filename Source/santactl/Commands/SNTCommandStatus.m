@@ -213,9 +213,7 @@ REGISTER_COMMAND_NAME(@"status")
   if ([arguments containsObject:@"--json"]) {
     NSMutableDictionary *stats = [@{
       @"daemon" : @{
-        @"driver_connected" : @(YES),
         @"mode" : clientMode ?: @"null",
-        @"transitive_rules" : @(enableTransitiveRules),
         @"log_type" : eventLogType,
         @"file_logging" : @(fileLogging),
         @"watchdog_cpu_events" : @(cpuEvents),
@@ -225,33 +223,45 @@ REGISTER_COMMAND_NAME(@"status")
         @"block_usb" : @(blockUSBMount),
         @"remount_usb_mode" : (blockUSBMount && remountUSBMode.count ? remountUSBMode : @""),
         @"on_start_usb_options" : StartupOptionToString(configurator.onStartUSBOptions),
+        @"static_rules" : @(staticRuleCount),
       },
-      @"database" : @{
+      @"cache" : @{
+        @"root_cache_count" : @(rootCacheCount),
+        @"non_root_cache_count" : @(nonRootCacheCount),
+      },
+      @"transitive_allowlisting" : @{
+        @"enabled" : @(enableTransitiveRules),
+        @"compiler_rules" : @(ruleCounts.compiler),
+        @"transitive_rules" : @(ruleCounts.transitive),
+      },
+      @"rule_types" : @{
         @"binary_rules" : @(ruleCounts.binary),
         @"certificate_rules" : @(ruleCounts.certificate),
         @"teamid_rules" : @(ruleCounts.teamID),
         @"signingid_rules" : @(ruleCounts.signingID),
         @"cdhash_rules" : @(ruleCounts.cdhash),
-        @"compiler_rules" : @(ruleCounts.compiler),
-        @"transitive_rules" : @(ruleCounts.transitive),
-        @"events_pending_upload" : @(eventCount),
       },
-      @"static_rules" : @{
-        @"rule_count" : @(staticRuleCount),
-      },
-      @"sync" : @{
+    } mutableCopy];
+
+    if (syncURLStr.length) {
+      stats[@"sync"] = @{
+        @"enabled" : @(YES),
         @"server" : syncURLStr ?: @"null",
         @"clean_required" : @(syncCleanReqd),
         @"last_successful_full" : fullSyncLastSuccessStr ?: @"null",
         @"last_successful_rule" : ruleSyncLastSuccessStr ?: @"null",
         @"push_notifications" : pushNotifications,
         @"bundle_scanning" : @(enableBundles),
-      },
-    } mutableCopy];
+        @"events_pending_upload" : @(eventCount),
+      };
+    } else {
+      stats[@"sync"] = @{
+        @"enabled" : @(NO),
+      };
+    }
 
-    NSDictionary *watchItems;
     if (watchItemsEnabled) {
-      watchItems = @{
+      stats[@"watch_items"] = @{
         @"enabled" : @(watchItemsEnabled),
         @"rule_count" : @(watchItemsRuleCount),
         @"policy_version" : watchItemsPolicyVersion,
@@ -259,16 +269,22 @@ REGISTER_COMMAND_NAME(@"status")
         @"last_policy_update" : watchItemsLastUpdateStr ?: @"null",
       };
     } else {
-      watchItems = @{
+      stats[@"watch_items"] = @{
         @"enabled" : @(watchItemsEnabled),
       };
     }
-    stats[@"watch_items"] = watchItems;
 
-    stats[@"cache"] = @{
-      @"root_cache_count" : @(rootCacheCount),
-      @"non_root_cache_count" : @(nonRootCacheCount),
-    };
+    if (exportMetrics) {
+      stats[@"metrics"] = @{
+        @"enabled" : @(YES),
+        @"server" : [metricsURLStr absoluteString] ?: @"null",
+        @"export_interval_seconds" : @(metricExportInterval),
+      };
+    } else {
+      stats[@"metrics"] = @{
+        @"enabled" : @(NO),
+      };
+    }
 
     NSData *statsData = [NSJSONSerialization dataWithJSONObject:stats
                                                         options:NSJSONWritingPrettyPrinted
@@ -280,7 +296,6 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-25s | %s\n", "Mode", [clientMode UTF8String]);
     printf("  %-25s | %s\n", "Log Type", [eventLogType UTF8String]);
     printf("  %-25s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
-    printf("  %-25s | %s\n", "Transitive Rules", (enableTransitiveRules ? "Yes" : "No"));
     printf("  %-25s | %s\n", "USB Blocking", (blockUSBMount ? "Yes" : "No"));
     if (blockUSBMount && remountUSBMode.count > 0) {
       printf("  %-25s | %s\n", "USB Remounting Mode",
@@ -288,6 +303,7 @@ REGISTER_COMMAND_NAME(@"status")
     }
     printf("  %-25s | %s\n", "On Start USB Options",
            StartupOptionToString(configurator.onStartUSBOptions).UTF8String);
+    printf("  %-25s | %lld\n", "Static Rules", staticRuleCount);
     printf("  %-25s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
     printf("  %-25s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
 
@@ -295,18 +311,17 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-25s | %lld\n", "Root cache count", rootCacheCount);
     printf("  %-25s | %lld\n", "Non-root cache count", nonRootCacheCount);
 
-    printf(">>> Database Info\n");
+    printf(">>> Transitive Allowlisting\n");
+    printf("  %-25s | %s\n", "Enabled", (enableTransitiveRules ? "Yes" : "No"));
+    printf("  %-25s | %lld\n", "Compiler Rules", ruleCounts.compiler);
+    printf("  %-25s | %lld\n", "Transitive Rules", ruleCounts.transitive);
+
+    printf(">>> Rule Types\n");
     printf("  %-25s | %lld\n", "Binary Rules", ruleCounts.binary);
     printf("  %-25s | %lld\n", "Certificate Rules", ruleCounts.certificate);
     printf("  %-25s | %lld\n", "TeamID Rules", ruleCounts.teamID);
     printf("  %-25s | %lld\n", "SigningID Rules", ruleCounts.signingID);
     printf("  %-25s | %lld\n", "CDHash Rules", ruleCounts.cdhash);
-    printf("  %-25s | %lld\n", "Compiler Rules", ruleCounts.compiler);
-    printf("  %-25s | %lld\n", "Transitive Rules", ruleCounts.transitive);
-    printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
-
-    printf(">>> Static Rules\n");
-    printf("  %-25s | %lld\n", "Rules", staticRuleCount);
 
     printf(">>> Watch Items\n");
     printf("  %-25s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
@@ -326,6 +341,7 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
       printf("  %-25s | %s\n", "Push Notifications", [pushNotifications UTF8String]);
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
+      printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
     }
 
     printf(">>> Metrics\n");
