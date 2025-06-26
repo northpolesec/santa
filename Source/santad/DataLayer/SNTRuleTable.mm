@@ -472,7 +472,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
         auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
         if (!celExpr.ok()) {
           [SNTError populateError:&blockErr
-                         withCode:SNTErrorCodeRuleInvalid
+                         withCode:SNTErrorCodeRuleInvalidCELExpression
                           message:@"Rule array contained rule with invalid CEL expression"
                            detail:santa::StringToNSString(std::string(celExpr.status().message()))];
           continue;

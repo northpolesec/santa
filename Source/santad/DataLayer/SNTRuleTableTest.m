@@ -193,6 +193,18 @@
   XCTAssertEqual(error.code, SNTErrorCodeRuleInvalid);
 }
 
+- (void)testAddInvalidCELExpression {
+  SNTRule *r = [[SNTRule alloc] init];
+  r.identifier = @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258";
+  r.type = SNTRuleTypeCertificate;
+  r.state = SNTRuleStateCEL;
+  r.celExpr = @"this is an invalid expression";
+
+  NSError *error;
+  XCTAssertTrue([self.sut addRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error]);
+  XCTAssertEqual(error.code, SNTErrorCodeRuleInvalidCELExpression);
+}
+
 - (void)testFetchBinaryRule {
   [self.sut addRules:@[ [self _exampleBinaryRule], [self _exampleCertRule] ]
          ruleCleanup:SNTRuleCleanupNone
