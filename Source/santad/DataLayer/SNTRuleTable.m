@@ -525,8 +525,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
         // If the rule is a CEL rule, we need to check if it already exists in the database.
         // If it does not, or it does but the CEL expression is different, then flush the
         // cache to ensure that the new rule is honored.
-        if (![[db stringForQuery:@"SELECT cel_expr FROM rules WHERE identifier=? AND type=? AND state=? LIMIT 1",
-                                 rule.identifier, @(rule.type), @(rule.state)] isEqualToString:rule.celExpr]) {
+        if (![[db
+                stringForQuery:
+                    @"SELECT cel_expr FROM rules WHERE identifier=? AND type=? AND state=? LIMIT 1",
+                    rule.identifier, @(rule.type), @(rule.state)] isEqualToString:rule.celExpr]) {
           flushDecisionCache = YES;
           return;
         }
