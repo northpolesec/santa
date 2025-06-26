@@ -96,7 +96,10 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
                      forRule:(SNTRule *)rule
          withTransitiveRules:(BOOL)enableTransitiveRules
     andCELActivationCallback:(ActivationCallbackBlock)activationCallback {
-  if (rule.state == SNTRuleStateCEL && activationCallback) {
+  SNTRuleState state = rule.state;
+  SNTRuleType type = rule.type;
+
+  if (state == SNTRuleStateCEL && activationCallback) {
     auto activation = activationCallback();
     auto evalResult = self->celEvaluator_->CompileAndEvaluate(
         santa::NSStringToUTF8StringView(rule.celExpr), *activation);
@@ -117,14 +120,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     LOGD(@"Ran CEL program and received result: %d (cacheable %d)", returnValue,
          evalResult->second);
     switch (returnValue) {
-      case santa::cel::v1::ReturnValue::ALLOWLIST: rule.state = SNTRuleStateAllow; break;
+      case santa::cel::v1::ReturnValue::ALLOWLIST: state = SNTRuleStateAllow; break;
       case santa::cel::v1::ReturnValue::ALLOWLIST_COMPILER:
-        rule.state = SNTRuleStateAllowTransitive;
+        state = SNTRuleStateAllowTransitive;
         break;
-      case santa::cel::v1::ReturnValue::BLOCKLIST: rule.state = SNTRuleStateBlock; break;
-      case santa::cel::v1::ReturnValue::SILENT_BLOCKLIST:
-        rule.state = SNTRuleStateSilentBlock;
-        break;
+      case santa::cel::v1::ReturnValue::BLOCKLIST: state = SNTRuleStateBlock; break;
+      case santa::cel::v1::ReturnValue::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
       default: break;
     }
     if (!evalResult->second) {
@@ -158,14 +159,14 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
           {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
       };
 
-  auto iterator = decisions.find(std::pair<SNTRuleType, SNTRuleState>{rule.type, rule.state});
+  auto iterator = decisions.find(std::pair<SNTRuleType, SNTRuleState>{type, state});
   if (iterator != decisions.end()) {
     cd.decision = iterator->second;
   } else {
     // If we have an invalid state combination then either we have stale data in
     // the database or a programming error. We treat this as if the
     // corresponding rule was not found.
-    LOGE(@"Invalid rule type/state combination %ld/%ld", rule.type, rule.state);
+    LOGE(@"Invalid rule type/state combination %ld/%ld", type, state);
     return NO;
   }
 
@@ -180,11 +181,11 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
           default:
             // Programming error. Something's marked as a compiler that shouldn't
             // be.
-            LOGE(@"Invalid compiler rule type %ld", rule.type);
+            LOGE(@"Invalid compiler rule type %ld", type);
             [NSException
                  raise:@"Invalid compiler rule type"
                 format:@"decision:forRule:withTransitiveRules: Unexpected compiler rule type: %ld",
-                       rule.type];
+                       type];
             break;
         }
       }

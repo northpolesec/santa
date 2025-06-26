@@ -86,7 +86,7 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
 @property SNTEventTable *eventTable;
 @property SNTNotificationQueue *notifierQueue;
 @property SNTPolicyProcessor *policyProcessor;
-@property SNTRuleTable *ruleTable;
+@property(readwrite) SNTRuleTable *ruleTable;
 @property SNTSyncdQueue *syncdQueue;
 @property SNTMetricCounter *events;
 @property santa::ProcessControlBlock processControlBlock;

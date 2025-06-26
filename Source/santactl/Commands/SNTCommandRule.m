@@ -130,9 +130,10 @@ REGISTER_COMMAND_NAME(@"rule")
     exit(1);
   }
 
-  SNTRule *newRule = [[SNTRule alloc] init];
-  newRule.state = SNTRuleStateUnknown;
-  newRule.type = SNTRuleTypeBinary;
+  NSString *identifier;
+  SNTRuleState state = SNTRuleStateUnknown;
+  SNTRuleType type = SNTRuleTypeBinary;
+  NSString *celExpr, *customMsg, *customURL, *comment;
 
   NSString *path;
   NSString *jsonFilePath;
@@ -147,33 +148,33 @@ REGISTER_COMMAND_NAME(@"rule")
 
     if ([arg caseInsensitiveCompare:@"--allow"] == NSOrderedSame ||
         [arg caseInsensitiveCompare:@"--whitelist"] == NSOrderedSame) {
-      newRule.state = SNTRuleStateAllow;
+      state = SNTRuleStateAllow;
     } else if ([arg caseInsensitiveCompare:@"--block"] == NSOrderedSame ||
                [arg caseInsensitiveCompare:@"--blacklist"] == NSOrderedSame) {
-      newRule.state = SNTRuleStateBlock;
+      state = SNTRuleStateBlock;
     } else if ([arg caseInsensitiveCompare:@"--silent-block"] == NSOrderedSame ||
                [arg caseInsensitiveCompare:@"--silent-blacklist"] == NSOrderedSame) {
-      newRule.state = SNTRuleStateSilentBlock;
+      state = SNTRuleStateSilentBlock;
     } else if ([arg caseInsensitiveCompare:@"--compiler"] == NSOrderedSame) {
-      newRule.state = SNTRuleStateAllowCompiler;
+      state = SNTRuleStateAllowCompiler;
     } else if ([arg caseInsensitiveCompare:@"--cel"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--cel requires an argument"];
       }
-      newRule.state = SNTRuleStateCEL;
-      newRule.celExpr = arguments[i];
+      state = SNTRuleStateCEL;
+      celExpr = arguments[i];
     } else if ([arg caseInsensitiveCompare:@"--remove"] == NSOrderedSame) {
-      newRule.state = SNTRuleStateRemove;
+      state = SNTRuleStateRemove;
     } else if ([arg caseInsensitiveCompare:@"--check"] == NSOrderedSame) {
       check = YES;
     } else if ([arg caseInsensitiveCompare:@"--certificate"] == NSOrderedSame) {
-      newRule.type = SNTRuleTypeCertificate;
+      type = SNTRuleTypeCertificate;
     } else if ([arg caseInsensitiveCompare:@"--teamid"] == NSOrderedSame) {
-      newRule.type = SNTRuleTypeTeamID;
+      type = SNTRuleTypeTeamID;
     } else if ([arg caseInsensitiveCompare:@"--signingid"] == NSOrderedSame) {
-      newRule.type = SNTRuleTypeSigningID;
+      type = SNTRuleTypeSigningID;
     } else if ([arg caseInsensitiveCompare:@"--cdhash"] == NSOrderedSame) {
-      newRule.type = SNTRuleTypeCDHash;
+      type = SNTRuleTypeCDHash;
     } else if ([arg caseInsensitiveCompare:@"--path"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--path requires an argument"];
@@ -183,22 +184,22 @@ REGISTER_COMMAND_NAME(@"rule")
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--identifier requires an argument"];
       }
-      newRule.identifier = arguments[i];
+      identifier = arguments[i];
     } else if ([arg caseInsensitiveCompare:@"--sha256"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--sha256 requires an argument"];
       }
-      newRule.identifier = arguments[i];
+      identifier = arguments[i];
     } else if ([arg caseInsensitiveCompare:@"--message"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--message requires an argument"];
       }
-      newRule.customMsg = arguments[i];
+      customMsg = arguments[i];
     } else if ([arg caseInsensitiveCompare:@"--comment"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--comment requires an argument"];
       }
-      newRule.comment = arguments[i];
+      comment = arguments[i];
 #ifdef DEBUG
     } else if ([arg caseInsensitiveCompare:@"--force"] == NSOrderedSame) {
       // Don't do anything special.
@@ -255,12 +256,12 @@ REGISTER_COMMAND_NAME(@"rule")
 
   if (jsonFilePath.length > 0) {
     if (importRules) {
-      if (newRule.identifier != nil || path != nil || check) {
+      if (identifier != nil || path != nil || check) {
         [self printErrorUsageAndExit:@"--import can only be used by itself"];
       }
       [self importJSONFile:jsonFilePath with:cleanupType];
     } else if (exportRules) {
-      if (newRule.identifier != nil || path != nil || check) {
+      if (identifier != nil || path != nil || check) {
         [self printErrorUsageAndExit:@"--export can only be used by itself"];
       }
       [self exportJSONFile:jsonFilePath];
@@ -274,50 +275,59 @@ REGISTER_COMMAND_NAME(@"rule")
       [self printErrorUsageAndExit:@"Provided path was not a plain file"];
     }
 
-    if (newRule.type == SNTRuleTypeBinary) {
-      newRule.identifier = fi.SHA256;
-    } else if (newRule.type == SNTRuleTypeCertificate) {
+    if (type == SNTRuleTypeBinary) {
+      identifier = fi.SHA256;
+    } else if (type == SNTRuleTypeCertificate) {
       MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
-      newRule.identifier = cs.leafCertificate.SHA256;
-    } else if (newRule.type == SNTRuleTypeCDHash) {
+      identifier = cs.leafCertificate.SHA256;
+    } else if (type == SNTRuleTypeCDHash) {
       MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
-      newRule.identifier = cs.cdhash;
-    } else if (newRule.type == SNTRuleTypeTeamID) {
+      identifier = cs.cdhash;
+    } else if (type == SNTRuleTypeTeamID) {
       MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
-      newRule.identifier = cs.teamID;
-    } else if (newRule.type == SNTRuleTypeSigningID) {
+      identifier = cs.teamID;
+    } else if (type == SNTRuleTypeSigningID) {
       MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
       if (cs.teamID.length) {
-        newRule.identifier = [NSString stringWithFormat:@"%@:%@", cs.teamID, cs.signingID];
+        identifier = [NSString stringWithFormat:@"%@:%@", cs.teamID, cs.signingID];
       } else if (cs.platformBinary) {
-        newRule.identifier = [NSString stringWithFormat:@"platform:%@", cs.signingID];
+        identifier = [NSString stringWithFormat:@"platform:%@", cs.signingID];
       }
     }
 
-    if (!newRule.comment) {
-      newRule.comment = [NSString stringWithFormat:@"Rule created from %@", path];
+    if (!comment) {
+      comment = [NSString stringWithFormat:@"Rule created from %@", path];
     }
   }
 
-  if (newRule.type == SNTRuleTypeBinary || newRule.type == SNTRuleTypeCertificate ||
-      newRule.type == SNTRuleTypeCDHash) {
+  if (type == SNTRuleTypeBinary || type == SNTRuleTypeCertificate || type == SNTRuleTypeCDHash) {
     NSCharacterSet *nonHex =
         [[NSCharacterSet characterSetWithCharactersInString:@"0123456789ABCDEF"] invertedSet];
     NSUInteger length =
-        [[newRule.identifier uppercaseString] stringByTrimmingCharactersInSet:nonHex].length;
+        [[identifier uppercaseString] stringByTrimmingCharactersInSet:nonHex].length;
 
-    if ((newRule.type == SNTRuleTypeBinary || newRule.type == SNTRuleTypeCertificate) &&
+    if ((type == SNTRuleTypeBinary || type == SNTRuleTypeCertificate) &&
         length != CC_SHA256_DIGEST_LENGTH * 2) {
       [self printErrorUsageAndExit:@"BINARY or CERTIFICATE rules require a valid SHA-256"];
-    } else if (newRule.type == SNTRuleTypeCDHash && length != CS_CDHASH_LEN * 2) {
+    } else if (type == SNTRuleTypeCDHash && length != CS_CDHASH_LEN * 2) {
       [self printErrorUsageAndExit:
                 [NSString stringWithFormat:@"CDHASH rules require a valid hex string of length %d",
                                            CS_CDHASH_LEN * 2]];
     }
   }
 
+  SNTRule *newRule = [[SNTRule alloc] initWithIdentifier:identifier
+                                                   state:state
+                                                    type:type
+                                               customMsg:customMsg
+                                               customURL:customURL
+                                               timestamp:0
+                                                 comment:comment
+                                                 celExpr:celExpr
+                                                   error:nil];
+
   if (check) {
-    if (!newRule.identifier) return [self printErrorUsageAndExit:@"--check requires --identifier"];
+    if (!identifier) return [self printErrorUsageAndExit:@"--check requires --identifier"];
     return [self printStateOfRule:newRule daemonConnection:self.daemonConn];
   }
 

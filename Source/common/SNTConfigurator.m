@@ -48,9 +48,6 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 @property(atomic) NSDictionary *syncState;
 @property(atomic) NSMutableDictionary *configState;
 
-/// Holds the last processed hash of the static rules list.
-@property(atomic) NSDictionary *cachedStaticRules;
-
 @property(readonly, nonatomic) NSString *syncStateFilePath;
 @property(readonly, nonatomic) NSString *statsStateFilePath;
 
@@ -79,7 +76,7 @@ NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist
 static const CFStringRef kMobileConfigDomain = CFSTR("com.northpolesec.santa");
 
 /// The keys managed by a mobileconfig.
-static NSString *const kStaticRules = @"StaticRules";
+static NSString *const kStaticRulesKey = @"StaticRules";
 static NSString *const kSyncBaseURLKey = @"SyncBaseURL";
 static NSString *const kSyncEnableProtoTransfer = @"SyncEnableProtoTransfer";
 static NSString *const kSyncProxyConfigKey = @"SyncProxyConfiguration";
@@ -270,7 +267,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kModeNotificationStandalone : string,
       kEnableNotificationSilences : number,
       kFunFontsOnSpecificDays : number,
-      kStaticRules : array,
+      kStaticRulesKey : array,
       kSyncBaseURLKey : string,
       kSyncEnableProtoTransfer : number,
       kSyncEnableCleanSyncEventUpload : number,
@@ -335,7 +332,6 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
     [_defaults addSuiteNamed:@"com.northpolesec.santa"];
 
     _configState = [self readForcedConfig];
-    [self cacheStaticRules];
 
     _syncState = [self readSyncStateFromDisk] ?: [NSMutableDictionary dictionary];
     if ([self migrateDeprecatedSyncStateKeys]) {
@@ -430,12 +426,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingStaticRules {
-  static NSSet *set;
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    set = [NSSet setWithObject:NSStringFromSelector(@selector(cachedStaticRules))];
-  });
-  return set;
+  return [self configStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingSyncBaseURL {
@@ -849,8 +840,8 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 }
 
-- (NSDictionary<NSString *, SNTRule *> *)staticRules {
-  return self.cachedStaticRules;
+- (NSArray<NSDictionary *> *)staticRules {
+  return self.configState[kStaticRulesKey];
 }
 
 - (NSURL *)syncBaseURL {
@@ -1603,28 +1594,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 ///
 - (void)handleChange {
   self.configState = [self readForcedConfig];
-  [self cacheStaticRules];
-}
-
-///
-///  Processes the StaticRules key to create SNTRule objects and caches them for quick use
-///
-- (void)cacheStaticRules {
-  NSArray *staticRules = self.configState[kStaticRules];
-  if (![staticRules isKindOfClass:[NSArray class]]) {
-    self.cachedStaticRules = nil;
-    return;
-  }
-
-  NSMutableDictionary<NSString *, SNTRule *> *rules =
-      [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
-  for (id rule in staticRules) {
-    if (![rule isKindOfClass:[NSDictionary class]]) continue;
-    SNTRule *r = [[SNTRule alloc] initStaticRuleWithDictionary:rule error:nil];
-    if (!r) continue;
-    rules[r.identifier] = r;
-  }
-  self.cachedStaticRules = [rules copy];
 }
 
 #pragma mark - Config Validation
@@ -1664,7 +1633,7 @@ static SNTConfigurator *sharedConfigurator = nil;
     }
 
     // If the key is StaticRules, validate the passed in rules.
-    if ([key isEqualToString:kStaticRules]) {
+    if ([key isEqualToString:kStaticRulesKey]) {
       // We've already validated that `value` is an NSArray
       [errors addObjectsFromArray:[self validateStaticRules:(NSArray *)value]];
     }
