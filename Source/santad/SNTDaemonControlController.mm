@@ -116,12 +116,9 @@ double watchdogRAMPeak = 0;
   };
 
   // Update counts with data from StaticRules configuration
-  [[[SNTConfigurator configurator] staticRules]
-      enumerateObjectsUsingBlock:^(NSDictionary *rule, NSUInteger idx, BOOL *stop) {
-        SNTRule *r = [[SNTRule alloc] initStaticRuleWithDictionary:rule error:nil];
-        if (!r) return;
-
-        switch (r.type) {
+  [[rdb cachedStaticRules]
+      enumerateKeysAndObjectsUsingBlock:^(NSString *key, SNTRule *rule, BOOL *stop) {
+        switch (rule.type) {
           case SNTRuleTypeCDHash: ruleCounts.cdhash++; break;
           case SNTRuleTypeBinary: ruleCounts.binary++; break;
           case SNTRuleTypeSigningID: ruleCounts.signingID++; break;
@@ -131,7 +128,7 @@ double watchdogRAMPeak = 0;
         }
 
         // Note: Transitive rules cannot come from static rules
-        switch (r.state) {
+        switch (rule.state) {
           case SNTRuleStateAllowCompiler: ruleCounts.compiler++; break;
           default: break;
         }

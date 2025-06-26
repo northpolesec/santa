@@ -79,7 +79,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 @property NSDate *lastTransitiveRuleCulling;
 @property NSDictionary *criticalSystemBinaries;
 @property(readonly) NSArray *criticalSystemBinaryPaths;
-@property NSDictionary<NSString *, SNTRule *> *cachedStaticRules;
+@property(readwrite) NSDictionary<NSString *, SNTRule *> *cachedStaticRules;
 @end
 
 @implementation SNTRuleTable
