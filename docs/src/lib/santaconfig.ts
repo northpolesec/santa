@@ -871,6 +871,13 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       type: "string",
     },
     {
+      key: "MachineOwnerGroups",
+      description: `Groups the machine owner is a member of`,
+      type: "string",
+      repeated: true,
+      versionAdded: "2025.6",
+    },
+    {
       key: "MachineID",
       description: `The machine ID. Care should be taken if overriding the default value. Using it incorrectly
         with a sync server that implements progressive syncing could lead to incomplete rules.`,
@@ -887,6 +894,13 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       description: `The key to use on \`MachineOwnerPlist\``,
       type: "string",
       enableIf: (data) => data.MachineOwnerPlist !== "",
+    },
+    {
+      key: "MachineOwnerGroupsKey",
+      description: `The key to use on \`MachineOwnerPlist\` to access defined groups`,
+      type: "string",
+      enableIf: (data) => data.MachineOwnerPlist !== "",
+      versionAdded: "2025.6",
     },
     {
       key: "MachineIDPlist",
