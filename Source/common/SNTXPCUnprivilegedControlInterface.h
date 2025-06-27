@@ -71,7 +71,7 @@ struct RuleCounts {
 ///
 /// Metrics ops
 ///
-- (void)metrics:(void (^)(NSDictionary *))reply;
+- (void)metrics:(void (^)(NSDictionary<NSString *, id> *))reply;
 
 ///
 ///  GUI Ops

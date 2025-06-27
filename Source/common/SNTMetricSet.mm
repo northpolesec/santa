@@ -12,8 +12,8 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
-#import "SNTMetricSet.h"
-#import "SNTCommonEnums.h"
+#import "Source/common/SNTMetricSet.h"
+#import "Source/common/SNTCommonEnums.h"
 
 NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   NSString *typeStr;
@@ -641,7 +641,7 @@ NSString *SNTMetricStringFromMetricFormatType(SNTMetricFormatType format) {
   }
 }
 
-NSDictionary *SNTMetricConvertDatesToISO8601Strings(NSDictionary *metrics) {
+NSDictionary<NSString *, id> *SNTMetricConvertDatesToISO8601Strings(NSDictionary *metrics) {
   NSMutableDictionary *mutableMetrics = [metrics mutableCopy];
 
   NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];

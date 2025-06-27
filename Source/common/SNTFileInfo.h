@@ -88,7 +88,7 @@
 ///
 ///  @return The architectures included in this binary (e.g. x86_64, ppc).
 ///
-- (NSArray *)architectures;
+- (NSArray<NSString *> *)architectures;
 
 ///
 ///  @return YES if this file is a Mach-O file.

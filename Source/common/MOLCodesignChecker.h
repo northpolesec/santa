@@ -81,7 +81,7 @@
 @property(readonly) BOOL platformBinary;
 
 /** The entitlements encoded in this binary. */
-@property(readonly) NSDictionary *entitlements;
+@property(readonly) NSDictionary<NSString *, id> *entitlements;
 
 /** The timestamp of when the binary was signed.
 
