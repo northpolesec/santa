@@ -1,7 +1,7 @@
-name: 🚀 Feature Request / Question
-description: Request a new feature or ask a general question
-title: "[FEATURE/QUESTION] "
-labels: ["enhancement", "question"]
+name: 🚀 Feature Request / Enhancement
+description: Request a new feature or or enhancement
+labels: ["enhancement"]
+type: "Feature"
 assignees: []
 
 body:
@@ -27,15 +27,7 @@ body:
       description: Provide a detailed description of your feature request or question
       placeholder: |
         - What problem does this solve?
-        - How would this feature work?
         - Why is this important to you?
-        - Any additional context or examples?
+        - Any additional context, examples, or screenshots?
     validations:
       required: true
-
-  - type: textarea
-    id: additional_context
-    attributes:
-      label: Additional Context
-      description: Add any other context, screenshots, or examples that might be helpful
-      placeholder: Any additional information that might help us understand your request

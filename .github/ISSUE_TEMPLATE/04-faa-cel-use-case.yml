@@ -1,7 +1,7 @@
 name: 💡 FAA/CEL Cookbook Idea
 description: Submit a use case idea to add to the CEL and FAA cookbook
-title: "[CEL / FAA USE CASE] "
 labels: ["cookbook", "enhancement"]
+type: "Task"
 assignees: []
 
 body:
@@ -18,7 +18,6 @@ body:
       options:
         - FAA (File Access Authorization)
         - CEL (Common Expression Language)
-        - Both FAA and CEL
     validations:
       required: true
 
@@ -39,7 +38,7 @@ body:
       placeholder: |
         Please describe information such as:
         - The business problem or opportunity
-        - How this use case would benefit admins
+        - How this use case would benefit security
         - Any specific requirements or constraints
         - What are the limitations of your current approach?
     validations:
@@ -54,13 +53,3 @@ body:
         Provide either the FAA rule dictionary or CEL expression
     validations:
       required: true
-
-  - type: textarea
-    id: additional_context
-    attributes:
-      label: Additional Context
-      description: Any other relevant information
-      placeholder: |
-        - Related use cases or features
-        - Technical considerations
-        - Links to relevant resources
