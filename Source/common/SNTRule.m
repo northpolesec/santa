@@ -399,24 +399,25 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleTypeCertificate: return kRuleTypeCertificate;
     case SNTRuleTypeTeamID: return kRuleTypeTeamID;
     case SNTRuleTypeSigningID: return kRuleTypeSigningID;
+    case SNTRuleTypeCDHash: return kRuleTypeCDHash;
     // This should never be hit. If we have rule types of Unknown then there's a
     // coding error somewhere.
     default: return @"Unknown";
   }
 }
 
-// Returns an NSDictionary representation of the rule. Primarily use for
+// Returns an NSDictionary representation of the rule. Primarily used for
 // exporting rules.
 - (NSDictionary *)dictionaryRepresentation {
-  return @{
-    kRuleIdentifier : self.identifier,
-    kRulePolicy : [self ruleStateToPolicyString:self.state],
-    kRuleType : [self ruleTypeToString:self.type],
-    kRuleCustomMsg : self.customMsg ?: @"",
-    kRuleCustomURL : self.customURL ?: @"",
-    kRuleComment : self.comment ?: @"",
-    kRuleCELExpr : self.celExpr ?: @"",
-  };
+  NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+  dict[kRuleIdentifier] = self.identifier;
+  dict[kRulePolicy] = [self ruleStateToPolicyString:self.state];
+  dict[kRuleType] = [self ruleTypeToString:self.type];
+  if (self.customMsg) dict[kRuleCustomMsg] = self.customMsg;
+  if (self.customURL) dict[kRuleCustomURL] = self.customURL;
+  if (self.comment) dict[kRuleComment] = self.comment;
+  if (self.celExpr) dict[kRuleCELExpr] = self.celExpr;
+  return dict;
 }
 
 - (BOOL)isEqual:(id)other {

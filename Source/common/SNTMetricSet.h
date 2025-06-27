@@ -197,6 +197,6 @@ NSString *SNTMetricStringFromMetricFormatType(SNTMetricFormatType format);
 /** Normalizes dates in an exported dictionary to be ISO8601 timestamp strings in
  *  UTC time.
  */
-NSDictionary *SNTMetricConvertDatesToISO8601Strings(NSDictionary *metrics);
+NSDictionary<NSString *, id> *SNTMetricConvertDatesToISO8601Strings(NSDictionary *metrics);
 
 NS_ASSUME_NONNULL_END

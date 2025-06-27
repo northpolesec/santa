@@ -355,7 +355,7 @@ double watchdogRAMPeak = 0;
 
 #pragma mark Metrics Ops
 
-- (void)metrics:(void (^)(NSDictionary *))reply {
+- (void)metrics:(void (^)(NSDictionary<NSString *, id> *))reply {
   SNTMetricSet *metricSet = [SNTMetricSet sharedInstance];
   reply([metricSet export]);
 }
