@@ -193,7 +193,7 @@ function ConfigKey({
             <FormMessage />
           </div>
 
-          {configKey.possibleValues?.length > 0 || configKey.freeform ? (
+          {configKey.repeated && (configKey.enableIf?.(getValues()) ?? true) ? (
             <ConfigKeyList configKey={configKey} field={field} />
           ) : configKey.type === "string" || configKey.type === "integer" ? (
             <ConfigKeyString configKey={configKey} field={field} />
