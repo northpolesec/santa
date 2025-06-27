@@ -1,0 +1,79 @@
+name: 🐛 Issue / Bug Report
+description: Report a bug or unexpected behavior
+title: "[BUG] "
+labels: ["bug"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the information below to help us reproduce and fix the issue.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Bug Summary
+      description: A clear and concise description of the bug
+      placeholder: What went wrong?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe what you expected to occur
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed_behavior
+    attributes:
+      label: Observed Behavior
+      description: What actually happened?
+      placeholder: Describe what actually occurred, including any error messages
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Version Information
+      description: What version of Santa are you using?
+      placeholder: Copy output from `santactl version`
+    validations:
+      required: true
+
+  - type: input
+    id: operating_system
+    attributes:
+      label: Operating System
+      description: What macOS version are you using?
+      placeholder: Copy output from `sw_vers`
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem
+      placeholder: |
+        - Output from `santactl status`
+        - Screenshots or logs
+        - Workarounds you've tried
+        - Impact of the bug
