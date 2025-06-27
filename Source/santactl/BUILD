@@ -1,115 +1,40 @@
 load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
-load("@rules_cc//cc:defs.bzl", "objc_library")
-load("//:helper.bzl", "santa_unit_test")
+load("@rules_swift//swift:swift_library.bzl", "swift_library")
 
 licenses(["notice"])
 
-objc_library(
-    name = "santactl_cmd",
-    srcs = [
-        "SNTCommand.m",
-        "SNTCommandController.m",
-    ],
-    hdrs = [
-        "SNTCommand.h",
-        "SNTCommandController.h",
-    ],
-    deps = [
-        "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTLogging",
-        "//Source/common:SNTXPCControlInterface",
-    ],
-)
-
-objc_library(
-    name = "SNTCommandPrintLog",
-    srcs = ["Commands/SNTCommandPrintLog.mm"],
-    deps = [
-        ":santactl_cmd",
-        "//Source/common:SNTLogging",
-        "//Source/common:santa_cc_proto_library_wrapper",
-        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:binaryproto_cc_proto_library_wrapper",
-        "@protobuf//src/google/protobuf/json",
-    ],
-)
-
-objc_library(
-    name = "SNTCommandInstall",
-    srcs = ["Commands/SNTCommandInstall.mm"],
-    deps = [
-        ":santactl_cmd",
-        "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTLogging",
-        "//Source/common:SNTXPCControlInterface",
-    ],
-)
-
-objc_library(
-    name = "SNTCommandTelemetry",
-    srcs = ["Commands/SNTCommandTelemetry.mm"],
-    deps = [
-        ":santactl_cmd",
-        "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTLogging",
-        "//Source/common:SNTXPCControlInterface",
-    ],
-)
-
-objc_library(
+swift_library(
     name = "santactl_lib",
     srcs = [
-        "Commands/SNTCommandCheckCache.m",
-        "Commands/SNTCommandDoctor.mm",
-        "Commands/SNTCommandEventUpload.mm",
-        "Commands/SNTCommandFileInfo.m",
-        "Commands/SNTCommandFlushCache.m",
-        "Commands/SNTCommandMetrics.h",
-        "Commands/SNTCommandMetrics.m",
-        "Commands/SNTCommandRule.h",
-        "Commands/SNTCommandRule.m",
-        "Commands/SNTCommandStatus.m",
-        "Commands/SNTCommandSync.m",
-        "Commands/SNTCommandVersion.m",
-        "main.m",
-    ] + select({
-        "//:opt_build": [],
-        "//conditions:default": [
-            "Commands/SNTCommandBundleInfo.m",
-        ],
-    }),
-    sdk_dylibs = ["libz"],
-    sdk_frameworks = ["IOKit"],
+        "bundleinfo.swift",
+        "doctor.swift",
+        "eventupload.swift",
+        "fileinfo.swift",
+        "flushcache.swift",
+        "metrics.swift",
+        "printlog.swift",
+        "rule.swift",
+        "santactl.swift",
+        "status.swift",
+        "sync.swift",
+        "telemetry.swift",
+        "version.swift",
+    ],
     deps = [
-        ":SNTCommandInstall",
-        ":SNTCommandPrintLog",
-        ":SNTCommandTelemetry",
-        ":santactl_cmd",
         "//Source/common:CertificateHelpers",
-        "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTCachedDecision",
-        "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTFileInfo",
-        "//Source/common:SNTLogging",
-        "//Source/common:SNTMetricSet",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
-        "//Source/common:SNTStoredEvent",
-        "//Source/common:SNTStrengthify",
-        "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCBundleServiceInterface",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
-        "//Source/common:SNTXPCUnprivilegedControlInterface",
         "//Source/common:SigningIDHelpers",
-        "//Source/common:StoredEventHelpers",
-        "//Source/common:SystemResources",
-        "@FMDB",
-        "@abseil-cpp//absl/cleanup:cleanup",
+        "@swift_argument_parser//:ArgumentParser",
     ],
 )
 
@@ -134,60 +59,9 @@ macos_command_line_application(
     deps = [":santactl_lib"],
 )
 
-santa_unit_test(
-    name = "SNTCommandFileInfoTest",
-    srcs = [
-        "Commands/SNTCommandFileInfo.m",
-        "Commands/SNTCommandFileInfoTest.m",
-        "SNTCommand.h",
-        "SNTCommand.m",
-        "SNTCommandController.h",
-        "SNTCommandController.m",
-    ],
-    deps = [
-        "//Source/common:MOLCertificate",
-        "//Source/common:MOLCodesignChecker",
-        "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTCachedDecision",
-        "//Source/common:SNTFileInfo",
-        "//Source/common:SNTLogging",
-        "//Source/common:SNTRule",
-        "//Source/common:SNTRuleIdentifiers",
-        "//Source/common:SNTStoredEvent",
-        "//Source/common:SNTXPCBundleServiceInterface",
-        "//Source/common:SNTXPCControlInterface",
-        "//Source/common:SigningIDHelpers",
-        "@OCMock",
-    ],
-)
-
-santa_unit_test(
-    name = "SNTCommandMetricsTest",
-    srcs = [
-        "Commands/SNTCommandMetrics.h",
-        "Commands/SNTCommandMetricsTest.m",
-        "SNTCommand.h",
-        "SNTCommandController.h",
-    ],
-    structured_resources = glob(["Commands/testdata/*"]),
-    visibility = ["//:santa_package_group"],
-    deps = [
-        ":santactl_lib",
-        "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTCommonEnums",
-        "//Source/common:SNTConfigurator",
-        "//Source/common:SNTMetricSet",
-        "//Source/common:SNTXPCControlInterface",
-        "//Source/santametricservice/Formats:SNTMetricFormatTestHelper",
-        "@OCMock",
-    ],
-)
-
 test_suite(
     name = "unit_tests",
     tests = [
-        ":SNTCommandFileInfoTest",
-        ":SNTCommandMetricsTest",
     ],
     visibility = ["//:santa_package_group"],
 )

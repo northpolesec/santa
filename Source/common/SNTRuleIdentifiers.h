@@ -28,32 +28,40 @@
 #import "Source/common/SNTCommonEnums.h"
 
 struct RuleIdentifiers {
-  NSString *cdhash;
-  NSString *binarySHA256;
-  NSString *signingID;
-  NSString *certificateSHA256;
-  NSString *teamID;
+  NSString *_Nullable cdhash;
+  NSString *_Nullable binarySHA256;
+  NSString *_Nullable signingID;
+  NSString *_Nullable certificateSHA256;
+  NSString *_Nullable teamID;
 };
 
 @interface SNTRuleIdentifiers : NSObject <NSSecureCoding>
 
-@property(readonly) NSString *cdhash;
-@property(readonly) NSString *binarySHA256;
-@property(readonly) NSString *signingID;
-@property(readonly) NSString *certificateSHA256;
-@property(readonly) NSString *teamID;
+@property(readonly) NSString *_Nullable cdhash;
+@property(readonly) NSString *_Nullable binarySHA256;
+@property(readonly) NSString *_Nullable signingID;
+@property(readonly) NSString *_Nullable certificateSHA256;
+@property(readonly) NSString *_Nullable teamID;
 
 /// Please use `initWithRuleIdentifiers:` or `initWithRuleIdentifiers:andSigningStatus:`
-- (instancetype)init NS_UNAVAILABLE;
+- (nonnull instancetype)init NS_UNAVAILABLE;
 
 /// Initialize with a struct of rule identifiers.
-- (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)identifiers
+- (nonnull instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)identifiers
     NS_DESIGNATED_INITIALIZER;
 
 /// Initialize with a struct of rule identifiers and a signing status.
 /// Depending on the signing status, some identifiers may be omitted.
-- (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)fileInfo
-                       andSigningStatus:(SNTSigningStatus)signingStatus;
+- (nonnull instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)fileInfo
+                               andSigningStatus:(SNTSigningStatus)signingStatus;
+
+/// Initialize all values explicitly.
+- (nonnull instancetype)initWithBinarySHA256:(NSString *_Nullable)binarySHA256
+                           certificateSHA256:(NSString *_Nullable)certificateSHA256
+                                      cdhash:(NSString *_Nullable)cdhash
+                                   signingID:(NSString *_Nullable)signingID
+                                      teamID:(NSString *_Nullable)teamID
+                               signingStatus:(SNTSigningStatus)signingStatus;
 
 - (struct RuleIdentifiers)toStruct;
 

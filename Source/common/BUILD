@@ -439,6 +439,7 @@ objc_library(
     name = "SNTDropRootPrivs",
     srcs = ["SNTDropRootPrivs.m"],
     hdrs = ["SNTDropRootPrivs.h"],
+    module_name = "santa_common_SNTDropRootPrivs",
 )
 
 objc_library(
@@ -478,6 +479,7 @@ objc_library(
     name = "SNTRule",
     srcs = ["SNTRule.m"],
     hdrs = ["SNTRule.h"],
+    module_name = "santa_common_SNTRule",
     sdk_frameworks = [
         "Foundation",
     ],
@@ -504,6 +506,7 @@ objc_library(
     name = "SNTRuleIdentifiers",
     srcs = ["SNTRuleIdentifiers.m"],
     hdrs = ["SNTRuleIdentifiers.h"],
+    module_name = "santa_common_SNTRuleIdentifiers",
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
@@ -608,6 +611,7 @@ objc_library(
     name = "SNTXPCBundleServiceInterface",
     srcs = ["SNTXPCBundleServiceInterface.m"],
     hdrs = ["SNTXPCBundleServiceInterface.h"],
+    module_name = "santa_common_SNTXPCBundleServiceInterface",
     deps = [
         ":MOLXPCConnection",
         ":SNTStoredEvent",
@@ -631,6 +635,7 @@ objc_library(
         "//:adhoc_build": ["SANTAADHOC"],
         "//conditions:default": None,
     }),
+    module_name = "santa_common_SNTXPCControlInterface",
     deps = [
         ":MOLCodesignChecker",
         ":MOLXPCConnection",
@@ -672,6 +677,7 @@ objc_library(
         ":SNTCommonEnums",
         ":SNTStoredEvent",
     ],
+    alwayslink = True,
 )
 
 objc_library(
@@ -823,6 +829,7 @@ objc_library(
     name = "MOLCertificate",
     srcs = ["MOLCertificate.m"],
     hdrs = ["MOLCertificate.h"],
+    module_name = "santa_common_MOLCertificate",
     sdk_frameworks = [
         "Foundation",
         "Security",

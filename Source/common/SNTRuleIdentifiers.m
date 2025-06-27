@@ -79,6 +79,22 @@
                                        }];
 }
 
+- (instancetype)initWithBinarySHA256:(NSString *_Nullable)binarySHA256
+                   certificateSHA256:(NSString *_Nullable)certificateSHA256
+                              cdhash:(NSString *_Nullable)cdhash
+                           signingID:(NSString *_Nullable)signingID
+                              teamID:(NSString *_Nullable)teamID
+                       signingStatus:(SNTSigningStatus)signingStatus {
+  return [self initWithRuleIdentifiers:(struct RuleIdentifiers){
+                                           .cdhash = cdhash,
+                                           .binarySHA256 = binarySHA256,
+                                           .signingID = signingID,
+                                           .certificateSHA256 = certificateSHA256,
+                                           .teamID = teamID,
+                                       }
+                      andSigningStatus:signingStatus];
+}
+
 - (struct RuleIdentifiers)toStruct {
   return (struct RuleIdentifiers){.cdhash = self.cdhash,
                                   .binarySHA256 = self.binarySHA256,
