@@ -35,6 +35,9 @@ export type SantaConfigKey = {
   // A fixed set of possible values.
   possibleValues?: SantaPossibleValue[];
 
+  // Set to true enable user input for repeated fields.
+  freeform?: boolean;
+
   // If the type is "dict", this specifies the possible fields inside the dict.
   subFields?: SantaConfigKey[];
 
@@ -259,6 +262,7 @@ sequences will be replaced in the final URL:
         path (e.g. the file being written/removed/etc ) matches a prefix it will not be logged`,
       type: "string",
       repeated: true,
+      freeform: true,
     },
     {
       key: "Telemetry",
@@ -386,6 +390,7 @@ changes in the release notes of any future release that changes them.`,
       description: `Entitlement prefixes that should not be logged (for example: \`com.apple.private\`).`,
       type: "string",
       repeated: true,
+      freeform: true,
     },
     {
       key: "EntitlementsTeamIDFilter",
@@ -393,6 +398,7 @@ changes in the release notes of any future release that changes them.`,
         will not be logged. Use the value \`platform\` to filter entitlements from platform binaries.`,
       type: "string",
       repeated: true,
+      freeform: true,
     },
   ],
   faa: [
@@ -871,6 +877,14 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       type: "string",
     },
     {
+      key: "MachineOwnerGroups",
+      description: `Groups the machine owner is a member of`,
+      type: "string",
+      repeated: true,
+      freeform: true,
+      versionAdded: "2025.6",
+    },
+    {
       key: "MachineID",
       description: `The machine ID. Care should be taken if overriding the default value. Using it incorrectly
         with a sync server that implements progressive syncing could lead to incomplete rules.`,
@@ -887,6 +901,13 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       description: `The key to use on \`MachineOwnerPlist\``,
       type: "string",
       enableIf: (data) => data.MachineOwnerPlist !== "",
+    },
+    {
+      key: "MachineOwnerGroupsKey",
+      description: `The key to use on \`MachineOwnerPlist\` to access defined groups`,
+      type: "string",
+      enableIf: (data) => data.MachineOwnerPlist !== "",
+      versionAdded: "2025.6",
     },
     {
       key: "MachineIDPlist",
