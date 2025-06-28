@@ -2,7 +2,6 @@ name: 💡 FAA/CEL Cookbook Idea
 description: Submit a use case idea to add to the CEL and FAA cookbook
 labels: ["cookbook", "enhancement"]
 type: "Task"
-assignees: []
 
 body:
   - type: markdown

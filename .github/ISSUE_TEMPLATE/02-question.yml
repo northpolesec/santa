@@ -2,7 +2,6 @@ name: ❓ General Question
 description: Ask a general question about the project
 labels: ["question"]
 type: "Question"
-assignees: []
 
 body:
   - type: markdown
@@ -29,6 +28,5 @@ body:
         - What you're trying to accomplish
         - What you've already tried (if applicable)
         - Any specific context or constraints
-        - Why this information would be helpful to you
     validations:
       required: true

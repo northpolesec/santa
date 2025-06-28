@@ -2,7 +2,6 @@ name: 🐛 Issue / Bug Report
 description: Report a bug or unexpected behavior
 labels: ["bug"]
 type: "Bug"
-assignees: []
 
 body:
   - type: markdown
