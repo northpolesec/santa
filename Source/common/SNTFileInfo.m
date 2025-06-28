@@ -436,9 +436,20 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
   return [[self.infoPlist objectForKey:@"CFBundleIdentifier"] description];
 }
 
+///
+///  Return either CFBundleDisplayName or CFBundleName, or nil if those
+///  keys are not set or are empty strings.
+///
 - (NSString *)bundleName {
-  return [[self.infoPlist objectForKey:@"CFBundleDisplayName"] description]
-             ?: [[self.infoPlist objectForKey:@"CFBundleName"] description];
+  NSString *name = [[self.infoPlist objectForKey:@"CFBundleDisplayName"] description];
+  if (name.length == 0) {
+    name = [[self.infoPlist objectForKey:@"CFBundleName"] description];
+    if (name.length == 0) {
+      return nil;
+    }
+  }
+
+  return name;
 }
 
 - (NSString *)bundleVersion {
