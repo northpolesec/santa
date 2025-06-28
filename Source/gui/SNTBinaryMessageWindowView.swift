@@ -57,7 +57,7 @@ import santa_gui_SNTMessageView
 }
 
 func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
-  var s = "Santa blocked \(e?.fileBundleName ?? "an application:")"
+  var s = "Santa blocked \((e?.fileBundleName?.isEmpty == false) ? e!.fileBundleName! : "an application")"
   if let publisher = e?.publisherInfo {
     s += "\nPublisher  : \(publisher)"
   }
@@ -203,7 +203,7 @@ struct SNTBinaryMessageEventView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 10.0) {
-        if let bundleName = e?.fileBundleName {
+        if let bundleName = e?.fileBundleName, !bundleName.isEmpty {
           TextWithLimit(bundleName)
         } else if let filePath = e?.filePath {
           TextWithLimit((filePath as NSString).lastPathComponent)
