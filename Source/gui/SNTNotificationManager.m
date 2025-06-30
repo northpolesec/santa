@@ -455,16 +455,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 // XPC handler. The sync service requests the APNS token, by way of the daemon.
 - (void)requestAPNSToken:(void (^)(NSString *))reply {
-  if (self.APNSDeviceToken.length) {
-    reply(self.APNSDeviceToken);
-    return;
-  }
-
-  // If APNS is enabled, `-[NSApp registerForRemoteNotifications]` is run when the application
-  // finishes launching at startup. If APNS is enabled after startup, register now. Upon successful
-  // registration, the sync service will be notified that the token has changed.
-  [NSApp registerForRemoteNotifications];
-  reply(nil);
+  reply(self.APNSDeviceToken);
 }
 
 - (void)didRegisterForAPNS:(NSString *)deviceToken {
@@ -472,13 +463,17 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [self APNSTokenChanged];
 }
 
+- (void)didUnregisterForAPNS {
+  self.APNSDeviceToken = nil;
+  [self APNSTokenChanged];
+};
+
 - (void)APNSTokenChanged {
-  // Only message the sync service if a sync server is configured and APNS is enabled, otherwise the
-  // service will needlessly spin up.
-  // TODO: To realize changes to EnableAPNS, both the gui and sync service need to be restarted. Add
-  // KVO watching to allow APNS to be enabled or disabled without process restarts.
+  // Only message the sync service if a sync server is configured. The message
+  // is sent whether or not APNS is enabled so that the sync service can clear
+  // the token if EnableAPNS was toggled off.
   SNTConfigurator *config = [SNTConfigurator configurator];
-  if (!config.syncBaseURL || !config.enableAPNS) return;
+  if (!config.syncBaseURL) return;
   MOLXPCConnection *syncConn = [SNTXPCSyncServiceInterface configuredConnection];
   [syncConn resume];
   [[syncConn remoteObjectProxy] APNSTokenChanged];

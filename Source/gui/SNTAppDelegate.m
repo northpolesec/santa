@@ -18,6 +18,7 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -30,6 +31,7 @@
 @property SNTAboutWindowController *aboutWindowController;
 @property SNTNotificationManager *notificationManager;
 @property MOLXPCConnection *daemonListener;
+@property SNTKVOManager *kvoEnableAPNS;
 @end
 
 @implementation SNTAppDelegate
@@ -37,12 +39,33 @@
 #pragma mark App Delegate methods
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+  [self setupMenu];
+  self.notificationManager = [[SNTNotificationManager alloc] init];
+
   if ([SNTConfigurator configurator].enableAPNS) {
     [NSApp registerForRemoteNotifications];
   }
 
-  [self setupMenu];
-  self.notificationManager = [[SNTNotificationManager alloc] init];
+  // Watch for changes to the EnableAPNS configuration key
+  self.kvoEnableAPNS =
+      [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
+                                   selector:@selector(enableAPNS)
+                                       type:[NSNumber class]
+                                   callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                     BOOL oldBool = [oldValue boolValue];
+                                     BOOL newBool = [newValue boolValue];
+
+                                     if (oldBool == newBool) {
+                                       return;
+                                     }
+
+                                     if (newBool) {
+                                       [NSApp registerForRemoteNotifications];
+                                     } else {
+                                       [NSApp unregisterForRemoteNotifications];
+                                       [self.notificationManager didUnregisterForAPNS];
+                                     }
+                                   }];
 
   NSNotificationCenter *workspaceNotifications = [[NSWorkspace sharedWorkspace] notificationCenter];
 
