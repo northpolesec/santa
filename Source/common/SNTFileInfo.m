@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/xattr.h>
 
+#import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
@@ -836,9 +837,12 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
     }
   } else if (csc.signatureFlags & kSecCodeSignatureAdhoc) {
     return @"Yes, but ad-hoc";
-  } else {
-    return @"Yes";
+  } else if (csc.platformBinary) {
+    return @"Yes, platform binary";
+  } else if (!IsProductionSigningCert(csc.leafCertificate)) {
+    return @"Yes, but with development certificate";
   }
+  return @"Yes";
 }
 
 @end
