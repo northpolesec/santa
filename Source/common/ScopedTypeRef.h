@@ -25,7 +25,7 @@ namespace santa {
 template <typename ElementT, ElementT InvalidV, auto RetainFunc, auto ReleaseFunc>
 class ScopedTypeRef {
  public:
-  ScopedTypeRef() : object_(InvalidV) {}
+  ScopedTypeRef() : ScopedTypeRef(InvalidV) {}
 
   ScopedTypeRef(ScopedTypeRef &&other) : object_(other.object_) { other.object_ = InvalidV; }
 
@@ -34,7 +34,7 @@ class ScopedTypeRef {
       return *this;
     }
 
-    if (object_) {
+    if (object_ != InvalidV) {
       ReleaseFunc(object_);
     }
 
@@ -44,19 +44,25 @@ class ScopedTypeRef {
     return *this;
   }
 
-  ScopedTypeRef(const ScopedTypeRef &other) : object_(other.object_) { RetainFunc(object_); }
+  ScopedTypeRef(const ScopedTypeRef &other) : object_(other.object_) {
+    if (object_ != InvalidV) {
+      RetainFunc(object_);
+    }
+  }
 
   ScopedTypeRef &operator=(const ScopedTypeRef &rhs) {
     if (this == &rhs) {
       return *this;
     }
 
-    if (object_) {
+    if (object_ != InvalidV) {
       ReleaseFunc(object_);
     }
 
     object_ = rhs.object_;
-    RetainFunc(object_);
+    if (object_ != InvalidV) {
+      RetainFunc(object_);
+    }
 
     return *this;
   }
@@ -78,25 +84,24 @@ class ScopedTypeRef {
 
   // Retain and take ownership of a given object
   static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Retain(ElementT object) {
-    if (object) {
+    if (object != InvalidV) {
       RetainFunc(object);
     }
     return ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>(object);
   }
 
   ~ScopedTypeRef() {
-    if (object_) {
+    if (object_ != InvalidV) {
       ReleaseFunc(object_);
-      object_ = InvalidV;
     }
   }
 
-  explicit operator bool() { return object_ != InvalidV; }
+  explicit operator bool() const { return object_ != InvalidV; }
 
-  ElementT Unsafe() { return object_; }
+  ElementT Unsafe() const { return object_; }
 
   template <typename T>
-  T Bridge() {
+  T Bridge() const {
     return (__bridge T)object_;
   }
 
