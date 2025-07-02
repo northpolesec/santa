@@ -127,6 +127,7 @@ objc_library(
         "//Source/common:SNTDeviceEvent",
         "//Source/common:SNTFileAccessEvent",
         "//Source/common:SNTFileInfo",
+        "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStrengthify",
