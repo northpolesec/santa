@@ -17,11 +17,11 @@ bazel_dep(name = "xxhash", version = "0.8.2")
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2024",
-    versions = ["1.86.0"],
     extra_target_triples = [
-      "aarch64-apple-darwin",
-      "x86_64-apple-darwin",
+        "aarch64-apple-darwin",
+        "x86_64-apple-darwin",
     ],
+    versions = ["1.86.0"],
 )
 use_repo(rust, "rust_toolchains")
 

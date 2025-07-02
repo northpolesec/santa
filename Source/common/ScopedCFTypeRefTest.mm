@@ -12,12 +12,11 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#include "Source/common/ScopedCFTypeRef.h"
+
 #include <CoreFoundation/CoreFoundation.h>
 #include <Security/Security.h>
 #import <XCTest/XCTest.h>
-#include "XCTest/XCTest.h"
-
-#include "Source/common/ScopedCFTypeRef.h"
 
 using santa::ScopedCFTypeRef;
 
@@ -136,6 +135,90 @@ using santa::ScopedCFTypeRef;
 
   // Ensure the scoped object was initialized
   XCTAssertTrue(scopedCodeRef);
+}
+
+- (void)testBridge {
+  ScopedCFTypeRef<CFStringRef> scopedString = ScopedCFTypeRef<CFStringRef>::Retain(CFSTR("foo"));
+
+  NSString *s = scopedString.Bridge<NSString *>();
+  XCTAssertEqualObjects(s, @"foo");
+}
+
+- (void)testMoves {
+  ScopedCFTypeRef<CFStringRef> s1 = ScopedCFTypeRef<CFStringRef>::Retain(CFSTR("foo"));
+  ScopedCFTypeRef<CFStringRef> s2;
+  XCTAssertTrue(s1);
+  XCTAssertFalse(s2);
+  XCTAssertEqualObjects(s1.Bridge<NSString *>(), @"foo");
+
+  // Move assignment from s1 to s2, verify contents and that s1 was moved out of
+  s2 = std::move(s1);
+  XCTAssertFalse(s1);
+  XCTAssertTrue(s2);
+  XCTAssertEqualObjects(s2.Bridge<NSString *>(), @"foo");
+
+  // Move ctor from s2 into s3
+  ScopedCFTypeRef<CFStringRef> s3(std::move(s2));
+  XCTAssertFalse(s1);
+  XCTAssertFalse(s2);
+  XCTAssertTrue(s3);
+  XCTAssertEqualObjects(s3.Bridge<NSString *>(), @"foo");
+}
+
+- (void)testCopies {
+  ScopedCFTypeRef<CFStringRef> s1 = ScopedCFTypeRef<CFStringRef>::Retain(CFSTR("foo"));
+  ScopedCFTypeRef<CFStringRef> s2;
+  XCTAssertTrue(s1);
+  XCTAssertFalse(s2);
+  XCTAssertEqualObjects(s1.Bridge<NSString *>(), @"foo");
+
+  // Copy assignment from s1 to s2
+  s2 = s1;
+  XCTAssertTrue(s1);
+  XCTAssertTrue(s2);
+  XCTAssertEqualObjects(s1.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s2.Bridge<NSString *>(), @"foo");
+
+  // Copy ctor from s2 to s3
+  ScopedCFTypeRef<CFStringRef> s3(s2);
+  XCTAssertTrue(s1);
+  XCTAssertTrue(s2);
+  XCTAssertTrue(s3);
+  XCTAssertEqualObjects(s1.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s2.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s3.Bridge<NSString *>(), @"foo");
+}
+
+- (void)testAssumeFrom {
+  {
+    auto [ret, scopedStr] = ScopedCFTypeRef<CFStringRef>::AssumeFrom(^bool(CFStringRef *out) {
+      // Check expected memory of the out param
+      XCTAssertNotEqual(out, (CFStringRef *)NULL);
+      XCTAssertEqual(*out, (CFStringRef)NULL);
+
+      *out = CFStringCreateWithCString(kCFAllocatorDefault, "foo", kCFStringEncodingUTF8);
+
+      return true;
+    });
+
+    XCTAssertTrue(ret);
+    XCTAssertEqualObjects(scopedStr.Bridge<NSString *>(), @"foo");
+  }
+
+  {
+    auto [ret, scopedStr] = ScopedCFTypeRef<CFStringRef>::AssumeFrom(^int(CFStringRef *out) {
+      // Check expected memory of the out param
+      XCTAssertNotEqual(out, (CFStringRef *)NULL);
+      XCTAssertEqual(*out, (CFStringRef)NULL);
+
+      *out = CFStringCreateWithCString(kCFAllocatorDefault, "bar", kCFStringEncodingUTF8);
+
+      return 123;
+    });
+
+    XCTAssertEqual(ret, 123);
+    XCTAssertEqualObjects(scopedStr.Bridge<NSString *>(), @"bar");
+  }
 }
 
 @end
