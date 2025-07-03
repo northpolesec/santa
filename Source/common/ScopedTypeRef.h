@@ -16,53 +16,114 @@
 #define SANTA__COMMON__SCOPEDTYPEREF_H
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <Foundation/Foundation.h>
 #include <assert.h>
+
+#include <utility>
 
 namespace santa {
 
-template <typename ElementT, ElementT InvalidV, auto RetainFunc,
-          auto ReleaseFunc>
+template <typename ElementT, ElementT InvalidV, auto RetainFunc, auto ReleaseFunc>
 class ScopedTypeRef {
  public:
-  ScopedTypeRef() : object_(InvalidV) {}
+  ScopedTypeRef() : ScopedTypeRef(InvalidV) {}
 
-  // Can be implemented safely, but not currently needed
-  ScopedTypeRef(ScopedTypeRef&& other) = delete;
-  ScopedTypeRef& operator=(ScopedTypeRef&& rhs) = delete;
-  ScopedTypeRef(const ScopedTypeRef& other) = delete;
-  ScopedTypeRef& operator=(const ScopedTypeRef& other) = delete;
+  ScopedTypeRef(ScopedTypeRef &&other) : object_(other.object_) { other.object_ = InvalidV; }
+
+  ScopedTypeRef &operator=(ScopedTypeRef &&rhs) {
+    if (this == &rhs) {
+      return *this;
+    }
+
+    if (object_ != InvalidV) {
+      ReleaseFunc(object_);
+    }
+
+    object_ = rhs.object_;
+    rhs.object_ = InvalidV;
+
+    return *this;
+  }
+
+  ScopedTypeRef(const ScopedTypeRef &other) : object_(other.object_) {
+    if (object_ != InvalidV) {
+      RetainFunc(object_);
+    }
+  }
+
+  ScopedTypeRef &operator=(const ScopedTypeRef &rhs) {
+    if (this == &rhs) {
+      return *this;
+    }
+
+    if (object_ != InvalidV) {
+      ReleaseFunc(object_);
+    }
+
+    object_ = rhs.object_;
+    if (object_ != InvalidV) {
+      RetainFunc(object_);
+    }
+
+    return *this;
+  }
 
   // Take ownership of a given object
-  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Assume(
-      ElementT object) {
+  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Assume(ElementT object) {
     return ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>(object);
   }
 
+  // Take ownership of an out parameter
+  template <typename RetT>
+  static std::pair<RetT, ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>> AssumeFrom(
+      RetT (^block)(ElementT *object)) {
+    ElementT out = InvalidV;
+    RetT ret = block(&out);
+
+    return {ret, ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>::Assume(out)};
+  }
+
   // Retain and take ownership of a given object
-  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Retain(
-      ElementT object) {
-    if (object) {
+  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Retain(ElementT object) {
+    if (object != InvalidV) {
       RetainFunc(object);
     }
     return ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>(object);
   }
 
   ~ScopedTypeRef() {
-    if (object_) {
+    if (object_ != InvalidV) {
       ReleaseFunc(object_);
-      object_ = InvalidV;
     }
   }
 
-  explicit operator bool() { return object_ != InvalidV; }
+  explicit operator bool() const { return object_ != InvalidV; }
 
-  ElementT Unsafe() { return object_; }
+  ElementT Unsafe() const { return object_; }
+
+  template <typename T>
+  T Bridge() const {
+    return (__bridge T)object_;
+  }
+
+  template <typename T>
+    requires std::is_pointer_v<T> && std::is_convertible_v<id, T>
+  T BridgeRelease() {
+    T tmp = CFBridgingRelease(object_);
+    object_ = InvalidV;
+    return tmp;
+  }
+
+  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> BridgeRetain(id nsobj) {
+    ElementT obj = (ElementT)(CFBridgingRetain(nsobj));
+    return Assume(obj);
+  }
 
   // This is to be used only to take ownership of objects that are created by
   // pass-by-pointer create functions. The object must not already be valid.
   // In non-opt builds, this is enforced by an assert that will terminate the
   // process.
-  ElementT* InitializeInto() {
+  ElementT *InitializeInto() {
     assert(object_ == InvalidV);
     return &object_;
   }
