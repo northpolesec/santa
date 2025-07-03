@@ -16,6 +16,7 @@
 #define SANTA__COMMON__SCOPEDTYPEREF_H
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <Foundation/Foundation.h>
 #include <assert.h>
 
 #include <utility>
@@ -103,6 +104,19 @@ class ScopedTypeRef {
   template <typename T>
   T Bridge() const {
     return (__bridge T)object_;
+  }
+
+  template <typename T>
+    requires std::is_pointer_v<T> && std::is_convertible_v<id, T>
+  T BridgeRelease() {
+    T tmp = CFBridgingRelease(object_);
+    object_ = InvalidV;
+    return tmp;
+  }
+
+  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> BridgeRetain(id nsobj) {
+    ElementT obj = (ElementT)(CFBridgingRetain(nsobj));
+    return Assume(obj);
   }
 
   // This is to be used only to take ownership of objects that are created by

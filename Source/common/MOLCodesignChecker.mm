@@ -88,7 +88,10 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
       } else if (CFGetTypeID(codeRef) == SecCodeGetTypeID()) {
         return SecCodeCheckValidityWithErrors((SecCodeRef)codeRef, kSigningFlags, NULL, out);
       } else {
-        return errSecSuccess;
+        OSStatus status = errSecUnimplemented;
+        *out = (CFErrorRef)CFBridgingRetain([self errorWithCode:status
+                                                    description:@"Invalid code ref type"]);
+        return status;
       }
     });
 
@@ -102,14 +105,14 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
       if (infos) _universalSigningInformation = infos;
       if (infos && ![self allSigningInformationMatches:infos]) {
         status = errSecCSSignatureInvalid;
-        NSString *description = @"Signing is not consistent for all architectures.";
-        scopedError = ScopedCFError::Retain(
-            (__bridge CFErrorRef)[self errorWithCode:status description:description]);
+        scopedError = ScopedCFError::BridgeRetain([self
+            errorWithCode:status
+              description:@"Signing is not consistent for all architectures."]);
       }
     }
 
     // Do not set _signingInformation or _certificates for universal binaries with signing issues.
-    NSError *err = scopedError.Bridge<NSError *>();
+    NSError *err = scopedError.BridgeRelease<NSError *>();
     if (!([err.domain isEqualToString:kErrorDomain] && status == errSecCSSignatureInvalid)) {
       // Get CFDictionary of signing information for binary
       CFDictionaryRef signingDict = NULL;

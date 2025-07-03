@@ -142,6 +142,35 @@ using santa::ScopedCFTypeRef;
 
   NSString *s = scopedString.Bridge<NSString *>();
   XCTAssertEqualObjects(s, @"foo");
+
+  // Force s to nil to ensure no issues with overrelase.
+  // The pointer shouldn't have been moved into ARC.
+  s = nil;
+
+  XCTAssertTrue(scopedString);
+}
+
+- (void)testBridgeRelease {
+  ScopedCFTypeRef<CFStringRef> scopedString = ScopedCFTypeRef<CFStringRef>::Retain(CFSTR("foo"));
+
+  NSString *s = scopedString.BridgeRelease<NSString *>();
+  XCTAssertEqualObjects(s, @"foo");
+
+  // The scoped object should no longer be valid as it was moved into ARC
+  XCTAssertFalse(scopedString);
+}
+
+- (void)testBridgeRetain {
+  NSString *s = @"foo";
+
+  auto scopedString = ScopedCFTypeRef<CFStringRef>::BridgeRetain(s);
+  XCTAssertTrue(scopedString);
+  XCTAssertEqual(CFStringCompare(scopedString.Unsafe(), CFSTR("foo"), 0), kCFCompareEqualTo);
+
+  // Ensure changing s doesn't affect the scoped object
+  s = nil;
+  XCTAssertEqual(CFStringCompare(scopedString.Unsafe(), CFSTR("foo"), 0), kCFCompareEqualTo);
+  XCTAssertTrue(scopedString);
 }
 
 - (void)testMoves {
