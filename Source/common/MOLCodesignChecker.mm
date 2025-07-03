@@ -95,8 +95,8 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
       }
     });
 
-    // For static code checks, if it was valid, perform additional checks
-    if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID() && !scopedError) {
+    // For static code checks perform additional checks across all slices
+    if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
       // Ensure signing is consistent for all architectures.
       // Any issues found here take precedence over already found issues.
       if (!_binaryPath) _binaryPath = [self binaryPathForCodeRef:self.codeRef];
