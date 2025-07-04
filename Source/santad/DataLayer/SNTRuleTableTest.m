@@ -348,6 +348,9 @@
                error:&err];
   XCTAssertNil(err);
 
+  // This test is only concerend about sqlite's behavior. Ensure static rules are ignored.
+  [self.sut updateStaticRules:nil];
+
   // This test verifies that the implicit rule ordering we've been abusing is still working.
   // See the comment in SNTRuleTable#ruleForIdentifiers:
   SNTRule *r = [self.sut
