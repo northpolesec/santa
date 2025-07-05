@@ -170,8 +170,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     cd.cdhash = csInfo.cdhash;
     cd.secureSigningTime = csInfo.secureSigningTime;
     cd.signingTime = csInfo.signingTime;
-    cd.signingStatus = IsDevelopmentCert(csInfo.leafCertificate) ? SNTSigningStatusDevelopment
-                                                                 : SNTSigningStatusProduction;
+    cd.signingStatus = IsProductionSigningCert(csInfo.leafCertificate)
+                           ? SNTSigningStatusProduction
+                           : SNTSigningStatusDevelopment;
 
     // Normalized by the FormatSigningID function so this will always have a
     // prefix.

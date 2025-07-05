@@ -46,10 +46,10 @@ NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs) {
   return certArray;
 }
 
-BOOL IsDevelopmentCert(MOLCertificate *cert) {
-  // Development OID values defined by Apple and used by the Security Framework
-  // https://images.apple.com/certificateauthority/pdf/Apple_WWDR_CPS_v1.31.pdf
-  static NSArray *const keys = @[ @"1.2.840.113635.100.6.1.2", @"1.2.840.113635.100.6.1.12" ];
+BOOL IsProductionSigningCert(MOLCertificate *cert) {
+  // Production OID values defined by Apple and used by the Security Framework
+  // https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements#Xcode-designated-requirement-for-Developer-ID-code
+  static NSArray *const keys = @[ @"1.2.840.113635.100.6.1.9", @"1.2.840.113635.100.6.1.13" ];
 
   if (!cert || !cert.certRef) {
     return NO;
@@ -70,8 +70,10 @@ SNTSigningStatus SigningStatus(MOLCodesignChecker *csc, NSError *error) {
   }
   if (csc.signatureFlags & kSecCodeSignatureAdhoc) {
     return SNTSigningStatusAdhoc;
-  } else if (IsDevelopmentCert(csc.leafCertificate)) {
-    return SNTSigningStatusDevelopment;
+  } else if (csc.platformBinary) {
+    return SNTSigningStatusProduction;
+  } else if (IsProductionSigningCert(csc.leafCertificate)) {
+    return SNTSigningStatusProduction;
   }
-  return SNTSigningStatusProduction;
+  return SNTSigningStatusDevelopment;
 }
