@@ -3,6 +3,7 @@ build --define=apple.propagate_embedded_extra_outputs=yes
 
 build --copt=-Werror
 build --copt=-Wall
+build --copt=-Wformat-security
 build --copt=-Wno-error=deprecated-declarations
 build --copt=-Wno-error=nullability-completeness
 build --copt=-Wreorder-init-list

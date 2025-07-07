@@ -815,7 +815,7 @@ genrule(
     STABLE_GIT_COMMIT=$$(awk '/STABLE_GIT_COMMIT/ { print $$2 }' bazel-out/stable-status.txt)
     defaults write $${PWD}/$(@) SNTCommitHash -string $${STABLE_GIT_COMMIT:-unset}
     """,
-    local = 1,
+    local = True,
     message = "Generating CommitHash.plist",
     stamp = 1,
 )
@@ -842,14 +842,18 @@ santa_unit_test(
 
 objc_library(
     name = "MOLCodesignChecker",
-    srcs = ["MOLCodesignChecker.m"],
+    srcs = ["MOLCodesignChecker.mm"],
     hdrs = ["MOLCodesignChecker.h"],
     module_name = "santa_common_MOLCodesignChecker",
     sdk_frameworks = [
         "Foundation",
         "Security",
     ],
-    deps = [":MOLCertificate"],
+    deps = [
+        ":MOLCertificate",
+        "//Source/common:ScopedCFTypeRef",
+        "//Source/common:String",
+    ],
 )
 
 santa_unit_test(

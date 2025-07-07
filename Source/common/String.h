@@ -72,6 +72,10 @@ static inline std::string BufToHexString(const uint8_t *buf, size_t bufsize) {
   return hex_str;
 }
 
+static inline std::string BufToHexString(NSData *data) {
+  return BufToHexString(static_cast<const uint8_t *>(data.bytes), data.length);
+}
+
 }  // namespace santa
 
 #endif

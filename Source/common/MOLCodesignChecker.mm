@@ -12,8 +12,9 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
-#import "MOLCodesignChecker.h"
+#import "Source/common/MOLCodesignChecker.h"
 
+#include <CoreFoundation/CoreFoundation.h>
 #import <Security/Security.h>
 
 #include <mach-o/arch.h>
@@ -21,6 +22,10 @@
 #include <mach-o/utils.h>
 
 #import "Source/common/MOLCertificate.h"
+#include "Source/common/ScopedCFTypeRef.h"
+#include "Source/common/String.h"
+
+using ScopedCFError = santa::ScopedCFTypeRef<CFErrorRef>;
 
 /**
   kStaticSigningFlags are the flags used when validating signatures on disk.
@@ -77,12 +82,21 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
   self = [super init];
 
   if (self) {
-    OSStatus status = errSecSuccess;
-    CFErrorRef cfError = NULL;
+    auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef *out) {
+      if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
+        return SecStaticCodeCheckValidityWithErrors(codeRef, kStaticSigningFlags, NULL, out);
+      } else if (CFGetTypeID(codeRef) == SecCodeGetTypeID()) {
+        return SecCodeCheckValidityWithErrors((SecCodeRef)codeRef, kSigningFlags, NULL, out);
+      } else {
+        OSStatus status = errSecUnimplemented;
+        *out = (CFErrorRef)CFBridgingRetain([self errorWithCode:status
+                                                    description:@"Invalid code ref type"]);
+        return status;
+      }
+    });
 
-    // First check the signing is valid.
+    // For static code checks perform additional checks across all slices
     if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
-      status = SecStaticCodeCheckValidityWithErrors(codeRef, kStaticSigningFlags, NULL, &cfError);
       // Ensure signing is consistent for all architectures.
       // Any issues found here take precedence over already found issues.
       if (!_binaryPath) _binaryPath = [self binaryPathForCodeRef:self.codeRef];
@@ -91,15 +105,14 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
       if (infos) _universalSigningInformation = infos;
       if (infos && ![self allSigningInformationMatches:infos]) {
         status = errSecCSSignatureInvalid;
-        NSString *description = @"Signing is not consistent for all architectures.";
-        cfError = (__bridge_retained CFErrorRef)[self errorWithCode:status description:description];
+        scopedError = ScopedCFError::BridgeRetain([self
+            errorWithCode:status
+              description:@"Signing is not consistent for all architectures."]);
       }
-    } else if (CFGetTypeID(codeRef) == SecCodeGetTypeID()) {
-      status = SecCodeCheckValidityWithErrors((SecCodeRef)codeRef, kSigningFlags, NULL, &cfError);
     }
 
     // Do not set _signingInformation or _certificates for universal binaries with signing issues.
-    NSError *err = CFBridgingRelease(cfError);
+    NSError *err = scopedError.BridgeRelease<NSError *>();
     if (!([err.domain isEqualToString:kErrorDomain] && status == errSecCSSignatureInvalid)) {
       // Get CFDictionary of signing information for binary
       CFDictionaryRef signingDict = NULL;
@@ -272,14 +285,8 @@ static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
 }
 
 - (NSString *)cdhash {
-  NSData *d = (NSData *)self.signingInformation[(__bridge id)kSecCodeInfoUnique];
-  const unsigned char *buf = d.bytes;
-
-  NSMutableString *s = [NSMutableString stringWithCapacity:d.length * 2];
-  for (int i = 0; i < d.length; ++i) {
-    [s appendFormat:@"%02x", buf[i]];
-  }
-  return s;
+  return santa::StringToNSString(
+      santa::BufToHexString((NSData *)self.signingInformation[(__bridge id)kSecCodeInfoUnique]));
 }
 
 - (NSString *)teamID {
