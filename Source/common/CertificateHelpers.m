@@ -46,10 +46,30 @@ NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs) {
   return certArray;
 }
 
+// IsProductionSigningCert is a helper function to determine if a certificate used
+// for code-signing is a production certificate.
+//
+// Important: this does not check if the certificate was issued by Apple or that
+// the code signature is valid, it is intended to be used _after_ validating the
+// signature.
+//
+// It should also be noted that this is best-effort and should not be used for
+// runtime or security-critical checks. Runtime checks are handled by ES and the
+// status handed to us but the Security framework does not provide a way to
+// do the same checks statically.
 BOOL IsProductionSigningCert(MOLCertificate *cert) {
   // Production OID values defined by Apple and used by the Security Framework
   // https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements#Xcode-designated-requirement-for-Developer-ID-code
-  static NSArray *const keys = @[ @"1.2.840.113635.100.6.1.9", @"1.2.840.113635.100.6.1.13" ];
+  static NSArray *const keys = @[
+    // Mac App Store Application
+    @"1.2.840.113635.100.6.1.9",
+
+    // Developer ID Application
+    @"1.2.840.113635.100.6.1.13",
+
+    // iOS App Store Application (to support iOS apps running on Apple Silicon)
+    @"1.2.840.113635.100.6.1.3",
+  ];
 
   if (!cert || !cert.certRef) {
     return NO;
