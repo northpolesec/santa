@@ -447,6 +447,7 @@ objc_library(
     hdrs = ["SNTFileInfo.h"],
     module_name = "santa_common_SNTFileInfo",
     deps = [
+        ":CertificateHelpers",
         ":MOLCodesignChecker",
         ":SNTError",
         ":SNTLogging",

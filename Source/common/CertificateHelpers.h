@@ -46,13 +46,13 @@ NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID);
 NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs);
 
 /**
-  Test if the given certificate contains development OID values.
+  Test if the given certificate contains production OID values.
 
   @param cert The cert to test
 
-  @return True if any development OIDs exist, otherwise false.
+  @return True if any production OIDs exist, otherwise false.
 */
-BOOL IsDevelopmentCert(MOLCertificate *cert);
+BOOL IsProductionSigningCert(MOLCertificate *cert);
 
 /**
   Determine the signing status of a binary based on the signature flags and error.
