@@ -4,7 +4,22 @@ export function generatePlist(data: any) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-  <dict>
+<dict>
+  <key>PayloadDisplayName</key>
+  <string>Santa Configuration</string>
+  <key>PayloadEnabled</key>
+  <true/>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadScope</key>
+  <string>System</string>
+  <key>PayloadUUID</key>
+  <string>${crypto.randomUUID()}</string>
+  <key>PayloadIdentifier</key>
+  <string>${crypto.randomUUID()}</string>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
 ${Object.entries(data)
   .map(([key, value]) => {
     if (value == undefined || value === "") return undefined;
@@ -17,25 +32,35 @@ ${Object.entries(data)
       return undefined;
     }
 
-    const k = `    <key>${key}</key>\n`;
+    const k = `      <key>${key}</key>\n`;
     switch (typeof value) {
       case "boolean":
         if (value) {
-          return `${k}    <true/>`;
+          return `${k}      <true/>`;
         } else {
-          return `${k}    <false/>`;
+          return `${k}      <false/>`;
         }
       case "string":
-        return `${k}    <string>${value}</string>`;
+        return `${k}      <string>${value}</string>`;
       case "number":
-        return `${k}    <integer>${value}</integer>`;
+        return `${k}      <integer>${value}</integer>`;
       case "object":
-        return `${k}    <array>\n${value.map((v) => `      <string>${v}</string>`).join("\n")}\n    </array>`;
+        return `${k}      <array>\n${value.map((v) => `        <string>${v}</string>`).join("\n")}\n      </array>`;
     }
   })
   .filter((v) => v !== undefined)
   .join("\n")}
-  </dict>
+      <key>PayloadDisplayName</key>
+      <string>Santa</string>
+      <key>PayloadIdentifier</key>
+      <string>com.northpolesec.santa.${crypto.randomUUID()}</string>
+      <key>PayloadType</key>
+      <string>com.northpolesec.santa</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+    </dict>
+  </array>
+</dict>
 </plist>
 `;
 }
