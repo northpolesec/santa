@@ -61,7 +61,7 @@ static const SecCSFlags kStaticSigningFlags =
 */
 static const SecCSFlags kSigningFlags = kSecCSDefaultFlags;
 
-static NSString *const kErrorDomain = @"com.google.molcodesignchecker";
+static NSString *const kErrorDomain = @"com.northpolesec.santa.molcodesignchecker";
 
 @interface MOLCodesignChecker ()
 /// Cached designated requirement

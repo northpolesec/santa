@@ -827,9 +827,10 @@ extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
       case errSecCSInfoPlistFailed:
         return @"Yes, but can't validate as the Info.plist has been modified";
       case errSecCSSignatureInvalid:
-        if ([error.domain isEqualToString:@"com.northpolesec.molcodesignchecker"]) {
+        if ([error.domain isEqualToString:@"com.northpolesec.santa.molcodesignchecker"]) {
           return @"Yes, but signing is not consistent for all architectures";
         }
+        return @"Yes, but the signature is invalid";
       case CSSMERR_TP_CERT_REVOKED: return @"Yes, but the signing certificate was revoked";
       default: {
         return [NSString stringWithFormat:@"Yes, but failed to validate (%ld)", error.code];
