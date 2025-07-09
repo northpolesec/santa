@@ -703,7 +703,9 @@ santa_unit_test(
     resources = [
         "testdata/32bitplist",
         "testdata/bad_pagezero",
+        "testdata/cal-yikes-universal",
         "testdata/missing_pagezero",
+        "testdata/yikes-universal_adhoc",
     ],
     structured_resources = glob([
         "testdata/BundleExample.app/**",
