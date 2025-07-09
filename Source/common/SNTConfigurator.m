@@ -1609,6 +1609,13 @@ static SNTConfigurator *sharedConfigurator = nil;
     CFStringRef keyRef = (__bridge CFStringRef)key;
     if (!CFPreferencesAppValueIsForced(keyRef, kMobileConfigDomain)) return;
 
+    // If the key is a 'standard' configuration profile key, skip it.
+    static NSArray *profileKeys = @[
+      @"_manualProfile",
+      @"PayloadUUID",
+    ];
+    if ([profileKeys containsObject:key]) return;
+
     // Check that the key is known to us.
     id type = self.forcedConfigKeyTypes[key];
     if (!type) {
