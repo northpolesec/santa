@@ -61,7 +61,7 @@ static const SecCSFlags kStaticSigningFlags =
 */
 static const SecCSFlags kSigningFlags = kSecCSDefaultFlags;
 
-static NSString *const kErrorDomain = @"com.northpolesec.santa.molcodesignchecker";
+NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcodesignchecker";
 
 @interface MOLCodesignChecker ()
 /// Cached designated requirement
@@ -113,7 +113,8 @@ static NSString *const kErrorDomain = @"com.northpolesec.santa.molcodesignchecke
 
     // Do not set _signingInformation or _certificates for universal binaries with signing issues.
     NSError *err = scopedError.BridgeRelease<NSError *>();
-    if (!([err.domain isEqualToString:kErrorDomain] && status == errSecCSSignatureInvalid)) {
+    if (!([err.domain isEqualToString:kMOLCodesignCheckerErrorDomain] &&
+          status == errSecCSSignatureInvalid)) {
       // Get CFDictionary of signing information for binary
       CFDictionaryRef signingDict = NULL;
       SecCodeCopySigningInformation(codeRef, kSecCSSigningInformation, &signingDict);
@@ -334,7 +335,7 @@ static NSString *const kErrorDomain = @"com.northpolesec.santa.molcodesignchecke
   }
 
   NSDictionary *userInfo = @{NSLocalizedDescriptionKey : description ?: @""};
-  return [NSError errorWithDomain:kErrorDomain code:code userInfo:userInfo];
+  return [NSError errorWithDomain:kMOLCodesignCheckerErrorDomain code:code userInfo:userInfo];
 }
 
 - (NSError *)errorWithCode:(OSStatus)code {

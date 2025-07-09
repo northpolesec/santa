@@ -234,20 +234,22 @@
                                                                       ofType:@""];
     SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
     XCTAssertNotNil(sut);
-    XCTAssertEqualObjects([sut codesignStatus], @"Yes, but signing is not consistent for all architectures");
+    XCTAssertEqualObjects([sut codesignStatus],
+                          @"Yes, but signing is not consistent for all architectures");
   }
 
   {
     NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:@"32bitplist"
-                                                                    ofType:@""];
+                                                                      ofType:@""];
     SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects([sut codesignStatus], @"No");
   }
 
   {
-    NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:@"yikes-universal_adhoc"
-                                                                      ofType:@""];
+    NSString *path =
+        [[NSBundle bundleForClass:[self class]] pathForResource:@"yikes-universal_adhoc"
+                                                         ofType:@""];
     SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects([sut codesignStatus], @"Yes, but ad-hoc");
