@@ -7,8 +7,8 @@ licenses(["notice"])
 objc_library(
     name = "santactl_cmd",
     srcs = [
-        "SNTCommand.m",
-        "SNTCommandController.m",
+        "SNTCommand.mm",
+        "SNTCommandController.mm",
     ],
     hdrs = [
         "SNTCommand.h",
@@ -58,23 +58,23 @@ objc_library(
 objc_library(
     name = "santactl_lib",
     srcs = [
-        "Commands/SNTCommandCheckCache.m",
+        "Commands/SNTCommandCheckCache.mm",
         "Commands/SNTCommandDoctor.mm",
         "Commands/SNTCommandEventUpload.mm",
-        "Commands/SNTCommandFileInfo.m",
-        "Commands/SNTCommandFlushCache.m",
+        "Commands/SNTCommandFileInfo.mm",
+        "Commands/SNTCommandFlushCache.mm",
         "Commands/SNTCommandMetrics.h",
-        "Commands/SNTCommandMetrics.m",
+        "Commands/SNTCommandMetrics.mm",
         "Commands/SNTCommandRule.h",
-        "Commands/SNTCommandRule.m",
-        "Commands/SNTCommandStatus.m",
-        "Commands/SNTCommandSync.m",
-        "Commands/SNTCommandVersion.m",
-        "main.m",
+        "Commands/SNTCommandRule.mm",
+        "Commands/SNTCommandStatus.mm",
+        "Commands/SNTCommandSync.mm",
+        "Commands/SNTCommandVersion.mm",
+        "main.mm",
     ] + select({
         "//:opt_build": [],
         "//conditions:default": [
-            "Commands/SNTCommandBundleInfo.m",
+            "Commands/SNTCommandBundleInfo.mm",
         ],
     }),
     sdk_dylibs = ["libz"],
@@ -137,12 +137,12 @@ macos_command_line_application(
 santa_unit_test(
     name = "SNTCommandFileInfoTest",
     srcs = [
-        "Commands/SNTCommandFileInfo.m",
-        "Commands/SNTCommandFileInfoTest.m",
+        "Commands/SNTCommandFileInfo.mm",
+        "Commands/SNTCommandFileInfoTest.mm",
         "SNTCommand.h",
-        "SNTCommand.m",
+        "SNTCommand.mm",
         "SNTCommandController.h",
-        "SNTCommandController.m",
+        "SNTCommandController.mm",
     ],
     deps = [
         "//Source/common:MOLCertificate",
@@ -165,7 +165,7 @@ santa_unit_test(
     name = "SNTCommandMetricsTest",
     srcs = [
         "Commands/SNTCommandMetrics.h",
-        "Commands/SNTCommandMetricsTest.m",
+        "Commands/SNTCommandMetricsTest.mm",
         "SNTCommand.h",
         "SNTCommandController.h",
     ],

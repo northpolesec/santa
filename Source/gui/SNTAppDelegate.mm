@@ -213,7 +213,7 @@
 - (void)application:(NSApplication *)application
     didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)tokenData {
   NSMutableString *deviceToken = [NSMutableString stringWithCapacity:tokenData.length * 2];
-  const unsigned char *bytes = tokenData.bytes;
+  const unsigned char *bytes = static_cast<const unsigned char *>(tokenData.bytes);
   for (NSUInteger i = 0; i < tokenData.length; ++i) {
     [deviceToken appendFormat:@"%02x", bytes[i]];
   }

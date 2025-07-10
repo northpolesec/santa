@@ -12,15 +12,21 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "SNTSIPStatus.h"
+#import "Source/common/SNTSIPStatus.h"
 
-#import "SNTLogging.h"
+#include <sys/cdefs.h>
+
+#import "Source/common/SNTLogging.h"
+
+__BEGIN_DECLS
 
 // https://github.com/apple-oss-distributions/xnu/blob/8d741a5de7ff4191bf97d57b9f54c2f6d4a15585/bsd/sys/csr.h#L38
 typedef uint32_t csr_config_t;
 
 // https://github.com/apple-oss-distributions/xnu/blob/8d741a5de7ff4191bf97d57b9f54c2f6d4a15585/bsd/sys/csr.h#L104
 extern int csr_get_active_config(csr_config_t *) WEAK_IMPORT_ATTRIBUTE;
+
+__END_DECLS;
 
 @implementation SNTSIPStatus
 

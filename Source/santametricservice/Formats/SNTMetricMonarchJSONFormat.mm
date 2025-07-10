@@ -66,7 +66,7 @@ const NSString *kKey = @"key";
     return;
   }
 
-  switch ((SNTMetricType)[type intValue]) {
+  switch (static_cast<SNTMetricType>([type integerValue])) {
     case SNTMetricTypeConstantBool: monarchMetric[kValueType] = kBoolValueType; break;
     case SNTMetricTypeConstantString: monarchMetric[kValueType] = kStringValueType; break;
     case SNTMetricTypeConstantInt64: monarchMetric[kValueType] = kInt64ValueType; break;
@@ -92,8 +92,8 @@ const NSString *kKey = @"key";
       monarchMetric[kValueType] = kInt64ValueType;
       break;
     default:
-      LOGE(@"encountered unknown SNTMetricType - %ld for %@", (SNTMetricType)metric[@"type"],
-           metricName);
+      LOGE(@"encountered unknown SNTMetricType - %ld for %@",
+           static_cast<SNTMetricType>([metric[@"type"] integerValue]), metricName);
       break;
   }
 }

@@ -27,8 +27,8 @@
 #pragma mark OSSystemExtensionRequestDelegate
 
 - (OSSystemExtensionReplacementAction)request:(OSSystemExtensionRequest *)request
-                  actionForReplacingExtension:(OSSystemExtensionProperties *)old
-                                withExtension:(OSSystemExtensionProperties *)new {
+                  actionForReplacingExtension:(OSSystemExtensionProperties *)oldExt
+                                withExtension:(OSSystemExtensionProperties *)newExt {
   NSLog(@"SystemExtension \"%@\" request for replacement", request.identifier);
   return OSSystemExtensionReplacementActionReplace;
 }
