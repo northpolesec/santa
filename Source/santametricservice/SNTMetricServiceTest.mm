@@ -44,10 +44,10 @@ NSDictionary *validMetricsDict = nil;
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
 
   // create a temp dir
-  char template[] = "/tmp/sntmetricsservicetestdata.XXXXXXX";
-  char *tempPath = mkdtemp(template);
+  char dirTemplate[] = "/tmp/sntmetricsservicetestdata.XXXXXXX";
+  char *tempPath = mkdtemp(dirTemplate);
 
-  XCTAssertNotEqual(tempPath, NULL, @"Unable to make temp dir");
+  XCTAssertNotEqual(tempPath, nullptr, @"Unable to make temp dir");
 
   self.tempDir =
       [[NSFileManager defaultManager] stringWithFileSystemRepresentation:tempPath

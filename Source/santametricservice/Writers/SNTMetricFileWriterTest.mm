@@ -10,8 +10,8 @@
 
 - (void)setUp {
   // create a temp dir
-  char template[] = "/tmp/sntmetricfileoutputtest.XXXXXXX";
-  char *tempPath = mkdtemp(template);
+  char dirTemplate[] = "/tmp/sntmetricfileoutputtest.XXXXXXX";
+  char *tempPath = mkdtemp(dirTemplate);
 
   if (tempPath == NULL) {
     NSLog(@"Unable to make temp directory");

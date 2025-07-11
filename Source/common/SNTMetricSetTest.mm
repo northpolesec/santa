@@ -27,7 +27,7 @@
 @implementation NSDate (custom)
 
 + (instancetype)date {
-  NSDateFormatter *formatter = NSDateFormatter.new;
+  NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
   [formatter setDateFormat:@"yyyy-MM-dd HH:mm:ssZZZ"];
   return [formatter dateFromString:@"2021-08-05 13:00:10+0000"];
 }
@@ -667,7 +667,8 @@
   ];
 
   for (NSDictionary *test in tests) {
-    NSString *output = SNTMetricMakeStringFromMetricType([test[@"input"] integerValue]);
+    NSString *output = SNTMetricMakeStringFromMetricType(
+        static_cast<SNTMetricType>([test[@"input"] integerValue]));
     XCTAssertEqualObjects(test[@"expected"], output, @"expected %@ got %@", test[@"expected"],
                           output);
   }

@@ -387,9 +387,9 @@ REGISTER_COMMAND_NAME(@"rule")
   struct RuleIdentifiers identifiers = {
       .cdhash = (rule.type == SNTRuleTypeCDHash) ? rule.identifier : nil,
       .binarySHA256 = (rule.type == SNTRuleTypeBinary) ? rule.identifier : nil,
+      .signingID = (rule.type == SNTRuleTypeSigningID) ? rule.identifier : nil,
       .certificateSHA256 = (rule.type == SNTRuleTypeCertificate) ? rule.identifier : nil,
       .teamID = (rule.type == SNTRuleTypeTeamID) ? rule.identifier : nil,
-      .signingID = (rule.type == SNTRuleTypeSigningID) ? rule.identifier : nil,
   };
 
   [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
@@ -491,7 +491,7 @@ REGISTER_COMMAND_NAME(@"rule")
       exit(1);
     }
     // Write jsonData to the file
-    [outputStream write:jsonData.bytes maxLength:jsonData.length];
+    [outputStream write:static_cast<const uint8_t *>(jsonData.bytes) maxLength:jsonData.length];
     [outputStream close];
     exit(0);
   }];

@@ -15,8 +15,8 @@ def base_localization(write_out=False):
       f.as_posix() for f in pathlib.Path('Source/gui').glob('*.swift')
       if f.name not in ['SNTTestGUI.swift']
   ]
-  files_to_localize.append('Source/common/SNTBlockMessage.m')
-  files_to_localize.append('Source/gui/SNTNotificationManager.m')
+  files_to_localize.append('Source/common/SNTBlockMessage.mm')
+  files_to_localize.append('Source/gui/SNTNotificationManager.mm')
 
   subprocess.check_call(
       ['/usr/bin/genstrings', '-SwiftUI', '-u'] + files_to_localize

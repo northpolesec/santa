@@ -700,12 +700,12 @@ static SNTConfigurator *sharedConfigurator = nil;
 #pragma mark Public Interface
 
 - (SNTClientMode)clientMode {
-  SNTClientMode cm = [self.syncState[kClientModeKey] longLongValue];
+  SNTClientMode cm = static_cast<SNTClientMode>([self.syncState[kClientModeKey] integerValue]);
   if (cm == SNTClientModeMonitor || cm == SNTClientModeLockdown || cm == SNTClientModeStandalone) {
     return cm;
   }
 
-  cm = [self.configState[kClientModeKey] longLongValue];
+  cm = static_cast<SNTClientMode>([self.configState[kClientModeKey] integerValue]);
   if (cm == SNTClientModeMonitor || cm == SNTClientModeLockdown || cm == SNTClientModeStandalone) {
     return cm;
   }

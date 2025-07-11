@@ -8,7 +8,7 @@ objc_library(
     srcs = [
         "SNTBundleService.h",
         "SNTBundleService.mm",
-        "main.m",
+        "main.mm",
     ],
     deps = [
         "//Source/common:MOLCodesignChecker",

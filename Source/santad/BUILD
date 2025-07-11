@@ -10,7 +10,7 @@ licenses(["notice"])
 
 objc_library(
     name = "SNTDatabaseTable",
-    srcs = ["DataLayer/SNTDatabaseTable.m"],
+    srcs = ["DataLayer/SNTDatabaseTable.mm"],
     hdrs = ["DataLayer/SNTDatabaseTable.h"],
     deps = [
         "//Source/common:SNTLogging",
@@ -100,7 +100,7 @@ santa_unit_test(
 
 objc_library(
     name = "SNTEventTable",
-    srcs = ["DataLayer/SNTEventTable.m"],
+    srcs = ["DataLayer/SNTEventTable.mm"],
     hdrs = ["DataLayer/SNTEventTable.h"],
     deps = [
         ":SNTDatabaseTable",
@@ -111,7 +111,7 @@ objc_library(
 
 objc_library(
     name = "SNTDatabaseController",
-    srcs = ["SNTDatabaseController.m"],
+    srcs = ["SNTDatabaseController.mm"],
     hdrs = ["SNTDatabaseController.h"],
     deps = [
         ":SNTEventTable",
@@ -1087,10 +1087,10 @@ santa_unit_test(
     name = "SNTEventTableTest",
     srcs = [
         "DataLayer/SNTDatabaseTable.h",
-        "DataLayer/SNTDatabaseTable.m",
+        "DataLayer/SNTDatabaseTable.mm",
         "DataLayer/SNTEventTable.h",
-        "DataLayer/SNTEventTable.m",
-        "DataLayer/SNTEventTableTest.m",
+        "DataLayer/SNTEventTable.mm",
+        "DataLayer/SNTEventTableTest.mm",
     ],
     deps = [
         "//Source/common:MOLCertificate",
@@ -1106,10 +1106,10 @@ santa_unit_test(
     name = "SNTRuleTableTest",
     srcs = [
         "DataLayer/SNTDatabaseTable.h",
-        "DataLayer/SNTDatabaseTable.m",
+        "DataLayer/SNTDatabaseTable.mm",
         "DataLayer/SNTRuleTable.h",
         "DataLayer/SNTRuleTable.mm",
-        "DataLayer/SNTRuleTableTest.m",
+        "DataLayer/SNTRuleTableTest.mm",
     ],
     sdk_dylibs = [
         "EndpointSecurity",

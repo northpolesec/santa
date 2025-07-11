@@ -8,8 +8,8 @@ objc_library(
     name = "SNTMetricServiceLib",
     srcs = [
         "SNTMetricService.h",
-        "SNTMetricService.m",
-        "main.m",
+        "SNTMetricService.mm",
+        "main.mm",
     ],
     hdrs = [
         "SNTMetricService.h",
@@ -31,7 +31,7 @@ objc_library(
 
 santa_unit_test(
     name = "SNTMetricServiceTest",
-    srcs = ["SNTMetricServiceTest.m"],
+    srcs = ["SNTMetricServiceTest.mm"],
     structured_resources = ["//Source/santametricservice/Formats:testdata"],
     deps = [
         ":SNTMetricServiceLib",

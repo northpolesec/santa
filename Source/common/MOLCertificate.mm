@@ -304,7 +304,7 @@ static NSString *const kCertDataKey = @"certData";
                              [[NSMutableData alloc] initWithCapacity:CC_SHA1_DIGEST_LENGTH];
 
                          CC_SHA1([self.certData bytes], (CC_LONG)[self.certData length],
-                                 [SHA1Buffer mutableBytes]);
+                                 static_cast<unsigned char *>([SHA1Buffer mutableBytes]));
 
                          const unsigned char *bytes = (const unsigned char *)[SHA1Buffer bytes];
                          NSMutableString *hexDigest =

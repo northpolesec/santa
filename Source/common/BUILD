@@ -47,7 +47,7 @@ objc_library(
 
 objc_library(
     name = "SNTDeepCopy",
-    srcs = ["SNTDeepCopy.m"],
+    srcs = ["SNTDeepCopy.mm"],
     hdrs = ["SNTDeepCopy.h"],
 )
 
@@ -173,7 +173,7 @@ objc_library(
 
 objc_library(
     name = "CertificateHelpers",
-    srcs = ["CertificateHelpers.m"],
+    srcs = ["CertificateHelpers.mm"],
     hdrs = ["CertificateHelpers.h"],
     module_name = "santa_common_CertificateHelpers",
     deps = [
@@ -202,7 +202,7 @@ santa_unit_test(
 
 objc_library(
     name = "SigningIDHelpers",
-    srcs = ["SigningIDHelpers.m"],
+    srcs = ["SigningIDHelpers.mm"],
     hdrs = ["SigningIDHelpers.h"],
     module_name = "santa_common_SigningIDHelpers",
     deps = [
@@ -289,7 +289,7 @@ santa_unit_test(
 
 objc_library(
     name = "SNTBlockMessage",
-    srcs = ["SNTBlockMessage.m"],
+    srcs = ["SNTBlockMessage.mm"],
     hdrs = ["SNTBlockMessage.h"],
     deps = [
         ":SNTConfigurator",
@@ -303,7 +303,7 @@ objc_library(
 
 objc_library(
     name = "SNTBlockMessage_SantaGUI",
-    srcs = ["SNTBlockMessage.m"],
+    srcs = ["SNTBlockMessage.mm"],
     hdrs = ["SNTBlockMessage.h"],
     defines = ["SANTAGUI"],
     module_name = "santa_common_SNTBlockMessage",
@@ -329,7 +329,7 @@ objc_library(
 
 objc_library(
     name = "SNTDeviceEvent",
-    srcs = ["SNTDeviceEvent.m"],
+    srcs = ["SNTDeviceEvent.mm"],
     hdrs = ["SNTDeviceEvent.h"],
     module_name = "santa_common_SNTDeviceEvent",
     sdk_frameworks = [
@@ -343,7 +343,7 @@ objc_library(
 
 objc_library(
     name = "SNTFileAccessEvent",
-    srcs = ["SNTFileAccessEvent.m"],
+    srcs = ["SNTFileAccessEvent.mm"],
     hdrs = ["SNTFileAccessEvent.h"],
     module_name = "santa_common_SNTFileAccessEvent",
     sdk_frameworks = [
@@ -363,7 +363,7 @@ objc_library(
 
 objc_library(
     name = "SNTConfigurator",
-    srcs = ["SNTConfigurator.m"],
+    srcs = ["SNTConfigurator.mm"],
     hdrs = ["SNTConfigurator.h"],
     module_name = "santa_common_SNTConfigurator",
     sdk_frameworks = [
@@ -437,13 +437,13 @@ santa_unit_test(
 
 objc_library(
     name = "SNTDropRootPrivs",
-    srcs = ["SNTDropRootPrivs.m"],
+    srcs = ["SNTDropRootPrivs.mm"],
     hdrs = ["SNTDropRootPrivs.h"],
 )
 
 objc_library(
     name = "SNTFileInfo",
-    srcs = ["SNTFileInfo.m"],
+    srcs = ["SNTFileInfo.mm"],
     hdrs = ["SNTFileInfo.h"],
     module_name = "santa_common_SNTFileInfo",
     deps = [
@@ -477,7 +477,7 @@ objc_library(
 
 objc_library(
     name = "SNTRule",
-    srcs = ["SNTRule.m"],
+    srcs = ["SNTRule.mm"],
     hdrs = ["SNTRule.h"],
     sdk_frameworks = [
         "Foundation",
@@ -503,7 +503,7 @@ santa_unit_test(
 
 objc_library(
     name = "SNTRuleIdentifiers",
-    srcs = ["SNTRuleIdentifiers.m"],
+    srcs = ["SNTRuleIdentifiers.mm"],
     hdrs = ["SNTRuleIdentifiers.h"],
     deps = [
         ":CoderMacros",
@@ -519,7 +519,7 @@ objc_library(
 
 objc_library(
     name = "SNTStoredEvent",
-    srcs = ["SNTStoredEvent.m"],
+    srcs = ["SNTStoredEvent.mm"],
     hdrs = ["SNTStoredEvent.h"],
     module_name = "santa_common_SNTStoredEvent",
     deps = [
@@ -559,7 +559,7 @@ santa_unit_test(
 
 objc_library(
     name = "SNTConfigState",
-    srcs = ["SNTConfigState.m"],
+    srcs = ["SNTConfigState.mm"],
     hdrs = ["SNTConfigState.h"],
     module_name = "santa_common_SNTConfigState",
     deps = [
@@ -576,7 +576,7 @@ cc_library(
 
 objc_library(
     name = "SNTSyncConstants",
-    srcs = ["SNTSyncConstants.m"],
+    srcs = ["SNTSyncConstants.mm"],
     hdrs = ["SNTSyncConstants.h"],
     sdk_frameworks = [
         "Foundation",
@@ -585,7 +585,7 @@ objc_library(
 
 objc_library(
     name = "SNTSystemInfo",
-    srcs = ["SNTSystemInfo.m"],
+    srcs = ["SNTSystemInfo.mm"],
     hdrs = ["SNTSystemInfo.h"],
     sdk_frameworks = [
         "Foundation",
@@ -595,7 +595,7 @@ objc_library(
 
 objc_library(
     name = "SNTSIPStatus",
-    srcs = ["SNTSIPStatus.m"],
+    srcs = ["SNTSIPStatus.mm"],
     hdrs = ["SNTSIPStatus.h"],
     sdk_frameworks = [
         "Foundation",
@@ -607,7 +607,7 @@ objc_library(
 
 objc_library(
     name = "SNTXPCBundleServiceInterface",
-    srcs = ["SNTXPCBundleServiceInterface.m"],
+    srcs = ["SNTXPCBundleServiceInterface.mm"],
     hdrs = ["SNTXPCBundleServiceInterface.h"],
     deps = [
         ":MOLXPCConnection",
@@ -617,7 +617,7 @@ objc_library(
 
 objc_library(
     name = "SNTXPCMetricServiceInterface",
-    srcs = ["SNTXPCMetricServiceInterface.m"],
+    srcs = ["SNTXPCMetricServiceInterface.mm"],
     hdrs = ["SNTXPCMetricServiceInterface.h"],
     deps = [
         ":MOLXPCConnection",
@@ -626,7 +626,7 @@ objc_library(
 
 objc_library(
     name = "SNTXPCControlInterface",
-    srcs = ["SNTXPCControlInterface.m"],
+    srcs = ["SNTXPCControlInterface.mm"],
     hdrs = ["SNTXPCControlInterface.h"],
     defines = select({
         "//:adhoc_build": ["SANTAADHOC"],
@@ -647,7 +647,7 @@ objc_library(
 
 objc_library(
     name = "SNTXPCNotifierInterface",
-    srcs = ["SNTXPCNotifierInterface.m"],
+    srcs = ["SNTXPCNotifierInterface.mm"],
     hdrs = ["SNTXPCNotifierInterface.h"],
     deps = [
         ":SNTCommonEnums",
@@ -658,14 +658,14 @@ objc_library(
 
 objc_library(
     name = "SNTMetricSet",
-    srcs = ["SNTMetricSet.m"],
+    srcs = ["SNTMetricSet.mm"],
     hdrs = ["SNTMetricSet.h"],
     deps = [":SNTCommonEnums"],
 )
 
 objc_library(
     name = "SNTXPCSyncServiceInterface",
-    srcs = ["SNTXPCSyncServiceInterface.m"],
+    srcs = ["SNTXPCSyncServiceInterface.mm"],
     hdrs = ["SNTXPCSyncServiceInterface.h"],
     module_name = "santa_common_SNTXPCSyncServiceInterface",
     deps = [
@@ -677,7 +677,7 @@ objc_library(
 
 objc_library(
     name = "SNTXPCUnprivilegedControlInterface",
-    srcs = ["SNTXPCUnprivilegedControlInterface.m"],
+    srcs = ["SNTXPCUnprivilegedControlInterface.mm"],
     hdrs = ["SNTXPCUnprivilegedControlInterface.h"],
     deps = [
         ":MOLCertificate",
@@ -693,13 +693,13 @@ objc_library(
 
 objc_library(
     name = "SNTError",
-    srcs = ["SNTError.m"],
+    srcs = ["SNTError.mm"],
     hdrs = ["SNTError.h"],
 )
 
 santa_unit_test(
     name = "SNTFileInfoTest",
-    srcs = ["SNTFileInfoTest.m"],
+    srcs = ["SNTFileInfoTest.mm"],
     resources = [
         "testdata/32bitplist",
         "testdata/bad_pagezero",
@@ -725,7 +725,7 @@ santa_unit_test(
 
 santa_unit_test(
     name = "SNTMetricSetTest",
-    srcs = ["SNTMetricSetTest.m"],
+    srcs = ["SNTMetricSetTest.mm"],
     deps = [":SNTMetricSet"],
 )
 
@@ -741,7 +741,7 @@ santa_unit_test(
 
 santa_unit_test(
     name = "SNTBlockMessageTest",
-    srcs = ["SNTBlockMessageTest.m"],
+    srcs = ["SNTBlockMessageTest.mm"],
     sdk_frameworks = [
         "AppKit",
     ],
@@ -757,7 +757,7 @@ santa_unit_test(
 
 santa_unit_test(
     name = "SNTConfiguratorTest",
-    srcs = ["SNTConfiguratorTest.m"],
+    srcs = ["SNTConfiguratorTest.mm"],
     deps = [
         ":SNTCommonEnums",
         ":SNTConfigurator",
@@ -824,7 +824,7 @@ genrule(
 
 objc_library(
     name = "MOLCertificate",
-    srcs = ["MOLCertificate.m"],
+    srcs = ["MOLCertificate.mm"],
     hdrs = ["MOLCertificate.h"],
     sdk_frameworks = [
         "Foundation",
@@ -834,7 +834,7 @@ objc_library(
 
 santa_unit_test(
     name = "MOLCertificateTest",
-    srcs = ["MOLCertificateTest.m"],
+    srcs = ["MOLCertificateTest.mm"],
     resources = glob([
         "testdata/*.pem",
         "testdata/*.crt",
@@ -860,7 +860,7 @@ objc_library(
 
 santa_unit_test(
     name = "MOLCodesignCheckerTest",
-    srcs = ["MOLCodesignCheckerTest.m"],
+    srcs = ["MOLCodesignCheckerTest.mm"],
     resources = [
         "testdata/cal-yikes-universal",
         "testdata/cal-yikes-universal_adhoc",
@@ -875,7 +875,7 @@ santa_unit_test(
 
 objc_library(
     name = "MOLXPCConnection",
-    srcs = ["MOLXPCConnection.m"],
+    srcs = ["MOLXPCConnection.mm"],
     hdrs = ["MOLXPCConnection.h"],
     module_name = "santa_common_MOLXPCConnection",
     sdk_frameworks = ["Security"],
@@ -884,7 +884,7 @@ objc_library(
 
 santa_unit_test(
     name = "MOLXPCConnectionTest",
-    srcs = ["MOLXPCConnectionTest.m"],
+    srcs = ["MOLXPCConnectionTest.mm"],
     deps = [
         ":MOLXPCConnection",
         "@OCMock",
@@ -894,9 +894,9 @@ santa_unit_test(
 objc_library(
     name = "MOLAuthenticatingURLSession",
     srcs = [
-        "MOLAuthenticatingURLSession.m",
+        "MOLAuthenticatingURLSession.mm",
         "MOLDERDecoder.h",
-        "MOLDERDecoder.m",
+        "MOLDERDecoder.mm",
     ],
     hdrs = ["MOLAuthenticatingURLSession.h"],
     sdk_frameworks = ["Security"],
@@ -906,9 +906,9 @@ objc_library(
 santa_unit_test(
     name = "MOLAuthenticatingURLSessionTest",
     srcs = [
-        "MOLAuthenticatingURLSessionTest.m",
+        "MOLAuthenticatingURLSessionTest.mm",
         "MOLDERDecoder.h",
-        "MOLDERDecoderTest.m",
+        "MOLDERDecoderTest.mm",
     ],
     resources = [
         "testdata/dn.plist",

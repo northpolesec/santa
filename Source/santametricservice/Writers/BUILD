@@ -16,7 +16,7 @@ objc_library(
     name = "SNTMetricFileWriter",
     srcs = [
         "SNTMetricFileWriter.h",
-        "SNTMetricFileWriter.m",
+        "SNTMetricFileWriter.mm",
     ],
     hdrs = [
         "SNTMetricFileWriter.h",
@@ -30,7 +30,7 @@ objc_library(
 santa_unit_test(
     name = "SNTMetricFileWriterTest",
     srcs = [
-        "SNTMetricFileWriterTest.m",
+        "SNTMetricFileWriterTest.mm",
     ],
     deps = [
         ":SNTMetricFileWriter",
@@ -42,7 +42,7 @@ objc_library(
     name = "SNTMetricHTTPWriter",
     srcs = [
         "SNTMetricHTTPWriter.h",
-        "SNTMetricHTTPWriter.m",
+        "SNTMetricHTTPWriter.mm",
     ],
     hdrs = [
         "SNTMetricHTTPWriter.h",
@@ -58,7 +58,7 @@ objc_library(
 santa_unit_test(
     name = "SNTMetricHTTPWriterTest",
     srcs = [
-        "SNTMetricHTTPWriterTest.m",
+        "SNTMetricHTTPWriterTest.mm",
     ],
     deps = [
         ":SNTMetricHTTPWriter",

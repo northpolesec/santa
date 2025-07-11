@@ -15,7 +15,7 @@ objc_library(
 objc_library(
     name = "SNTMetricFormatTestHelper",
     srcs = [
-        "SNTMetricFormatTestHelper.m",
+        "SNTMetricFormatTestHelper.mm",
     ],
     hdrs = ["SNTMetricFormatTestHelper.h"],
     deps = [
@@ -28,7 +28,7 @@ objc_library(
     srcs = [
         "SNTMetricFormat.h",
         "SNTMetricRawJSONFormat.h",
-        "SNTMetricRawJSONFormat.m",
+        "SNTMetricRawJSONFormat.mm",
     ],
     hdrs = [
         "SNTMetricRawJSONFormat.h",
@@ -44,7 +44,7 @@ objc_library(
     srcs = [
         "SNTMetricFormat.h",
         "SNTMetricMonarchJSONFormat.h",
-        "SNTMetricMonarchJSONFormat.m",
+        "SNTMetricMonarchJSONFormat.mm",
     ],
     hdrs = [
         "SNTMetricMonarchJSONFormat.h",
@@ -59,7 +59,7 @@ objc_library(
 santa_unit_test(
     name = "SNTMetricRawJSONFormatTest",
     srcs = [
-        "SNTMetricRawJSONFormatTest.m",
+        "SNTMetricRawJSONFormatTest.mm",
     ],
     structured_resources = glob(["testdata/**"]),
     deps = [
@@ -71,7 +71,7 @@ santa_unit_test(
 santa_unit_test(
     name = "SNTMetricMonarchJSONFormatTest",
     srcs = [
-        "SNTMetricMonarchJSONFormatTest.m",
+        "SNTMetricMonarchJSONFormatTest.mm",
     ],
     structured_resources = [":testdata"],
     deps = [

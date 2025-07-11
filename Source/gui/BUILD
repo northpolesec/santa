@@ -86,20 +86,20 @@ objc_library(
     name = "SantaGUI_lib",
     srcs = [
         "SNTAboutWindowController.h",
-        "SNTAboutWindowController.m",
+        "SNTAboutWindowController.mm",
         "SNTAppDelegate.h",
-        "SNTAppDelegate.m",
+        "SNTAppDelegate.mm",
         "SNTBinaryMessageWindowController.h",
-        "SNTBinaryMessageWindowController.m",
+        "SNTBinaryMessageWindowController.mm",
         "SNTDeviceMessageWindowController.h",
-        "SNTDeviceMessageWindowController.m",
+        "SNTDeviceMessageWindowController.mm",
         "SNTFileAccessMessageWindowController.h",
-        "SNTFileAccessMessageWindowController.m",
+        "SNTFileAccessMessageWindowController.mm",
         "SNTMessageWindowController.h",
-        "SNTMessageWindowController.m",
+        "SNTMessageWindowController.mm",
         "SNTNotificationManager.h",
-        "SNTNotificationManager.m",
-        "main.m",
+        "SNTNotificationManager.mm",
+        "main.mm",
     ],
     hdrs = [
         "SNTNotificationManager.h",
@@ -210,7 +210,7 @@ macos_application(
 santa_unit_test(
     name = "SNTNotificationManagerTest",
     srcs = [
-        "SNTNotificationManagerTest.m",
+        "SNTNotificationManagerTest.mm",
     ],
     sdk_frameworks = [
         "Cocoa",

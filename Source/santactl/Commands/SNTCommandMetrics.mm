@@ -61,7 +61,8 @@ REGISTER_COMMAND_NAME(@"metrics")
     NSDictionary *metric = metrics[metricName];
     const char *metricNameStr = [metricName UTF8String];
     const char *description = [metric[@"description"] UTF8String];
-    NSString *metricType = SNTMetricMakeStringFromMetricType([metric[@"type"] integerValue]);
+    NSString *metricType = SNTMetricMakeStringFromMetricType(
+        static_cast<SNTMetricType>([metric[@"type"] integerValue]));
     const char *metricTypeStr = [metricType UTF8String];
 
     printf("  %-25s | %s\n", "Metric Name", metricNameStr);
