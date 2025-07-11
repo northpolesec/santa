@@ -108,7 +108,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
     es_string_token_t arg = esApi->ExecArg(&esMsg->event.exec, i);
 
     if (strnstr(arg.data, "com.northpolesec.santa.daemon", arg.length) != NULL) {
-      LOGW(@"Preventing attempt to kill Santa daemon");
+      LOGW(@"Preventing attempt to kill Santa daemon by launchctl");
       return {ES_AUTH_RESULT_DENY, false};
     }
 
@@ -205,9 +205,10 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 
     case ES_EVENT_TYPE_AUTH_SIGNAL: {
       // Only block signals sent to us and not from launchd.
-      if (audit_token_to_pid(esMsg->event.signal.target->audit_token) == getpid() &&
-          audit_token_to_pid(esMsg->process->audit_token) != 1) {
-        LOGW(@"Preventing attempt to kill Santa daemon");
+      pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
+      pid_t targetPid = audit_token_to_pid(esMsg->event.signal.target->audit_token);
+      if (targetPid == getpid() && sourcePid != 1) {
+        LOGW(@"Preventing attempt to kill Santa daemon by signal (from pid: %d)", sourcePid);
         result = ES_AUTH_RESULT_DENY;
       }
       break;
