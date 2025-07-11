@@ -27,7 +27,7 @@
 @implementation NSDate (custom)
 
 + (instancetype)date {
-  NSDateFormatter *formatter = [NSDateFormatter new];
+  NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
   [formatter setDateFormat:@"yyyy-MM-dd HH:mm:ssZZZ"];
   return [formatter dateFromString:@"2021-08-05 13:00:10+0000"];
 }
