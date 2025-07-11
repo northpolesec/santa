@@ -68,8 +68,6 @@
 
 @implementation SNTFileInfo
 
-extern NSString *const NSURLQuarantinePropertiesKey WEAK_IMPORT_ATTRIBUTE;
-
 - (instancetype)initWithResolvedPath:(NSString *)path error:(NSError **)error {
   struct stat fileStat;
   if (path.length) {
