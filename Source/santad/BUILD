@@ -1,5 +1,7 @@
+load("@northpolesec_santa_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_apple//apple:macos.bzl", "macos_bundle")
 load("@rules_cc//cc:defs.bzl", "objc_library")
+load("@rules_rust//rust:defs.bzl", "rust_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
@@ -7,6 +9,18 @@ package(
 )
 
 licenses(["notice"])
+
+rust_library(
+    name = "santa_rust_lib",
+    srcs = glob(["rust/*.rs"]),
+    edition = "2024",
+    proc_macro_deps = [
+        "@northpolesec_rednose//rednose/lib/rednose_macro:rednose_macro",
+    ] + all_crate_deps(proc_macro = True),
+    deps = [
+        "@northpolesec_santa_crate_index//:arrow",
+    ] + all_crate_deps(normal = True),
+)
 
 objc_library(
     name = "SNTDatabaseTable",

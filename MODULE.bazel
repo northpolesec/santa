@@ -25,6 +25,19 @@ rust.toolchain(
 )
 use_repo(rust, "rust_toolchains")
 
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+crate.from_cargo(
+    name = "northpolesec_santa_crate_index",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = [
+        "//:Cargo.toml",
+
+        # Keep this list in sync with the root Cargo.toml.
+        "//Source/santad:Cargo.toml",
+    ],
+)
+use_repo(crate, "northpolesec_santa_crate_index")
+
 # North Pole Protos
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
@@ -37,7 +50,7 @@ git_override(
 bazel_dep(name = "rednose", version = "1.0.0", repo_name = "northpolesec_rednose")
 git_override(
     module_name = "rednose",
-    commit = "cb35c2c65bba0a1799ade11fcece5f0c993f415c",
+    commit = "20358330121d997eee4ed2582f3741c3cccc2038",
     remote = "https://github.com/northpolesec/rednose",
 )
 
