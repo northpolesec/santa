@@ -93,7 +93,8 @@ using santa::NSStringToUTF8String;
   NSData *data = [NSData dataWithBytes:json.data() length:json.size()];
 
 #ifdef SANTA_STORE_SYNC_JSON
-  [self storeJSON:data withMessageType:santa::StringToNSString(message->GetTypeName())];
+  [self storeJSON:data
+      withMessageType:santa::StringToNSString(std::string(message->GetTypeName()))];
 #endif
 
   return [self requestWithData:data contentType:@"application/json"];
