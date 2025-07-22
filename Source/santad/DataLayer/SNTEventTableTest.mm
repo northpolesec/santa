@@ -16,6 +16,7 @@
 #import "Source/santad/DataLayer/SNTEventTable.h"
 
 #include <CommonCrypto/CommonDigest.h>
+#import <OCMock/OCMock.h>
 #import <Security/Security.h>
 #import <XCTest/XCTest.h>
 
@@ -43,6 +44,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 
   return hexString;
 }
+
+@interface SNTEventTable (Testing)
+- (SNTStoredEvent *)eventFromResultSet:(FMResultSet *)rs;
+@end
 
 /// This test case actually tests SNTEventTable and SNTStoredEvent.
 ///
@@ -179,6 +184,29 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
     }
     [rs close];
   }];
+}
+
+- (NSData *)dataFromFixture:(NSString *)file {
+  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
+  XCTAssertNotNil(path, @"failed to load testdata: %@", file);
+  return [NSData dataWithContentsOfFile:path];
+}
+
+- (void)testEventFromResultSet {
+  // Attempt to unarchive data. The first is an SNTStoredEvent which is no longer valid
+  // and it should fail. The second is a valid event and should succeed.
+  FMResultSet *rs = [[FMResultSet alloc] init];
+  id mockResultSet = OCMPartialMock(rs);
+
+  NSData *oldStoredEventData = [self dataFromFixture:@"old_sntstoredevent_archive.plist"];
+  OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(oldStoredEventData);
+
+  NSData *newStoredExecEventData =
+      [self dataFromFixture:@"new_sntstoredexecutionevent_archive.plist"];
+  OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(newStoredExecEventData);
+
+  XCTAssertNil([self.sut eventFromResultSet:mockResultSet]);
+  XCTAssertNotNil([self.sut eventFromResultSet:mockResultSet]);
 }
 
 @end

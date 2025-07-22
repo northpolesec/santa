@@ -119,6 +119,7 @@ objc_library(
     deps = [
         ":SNTDatabaseTable",
         "//Source/common:MOLCertificate",
+        "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
     ],
@@ -217,7 +218,7 @@ objc_library(
         "//Source/common:RingBuffer",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
     ],
@@ -259,7 +260,7 @@ santa_unit_test(
     srcs = ["SNTSyncdQueueTest.mm"],
     deps = [
         ":SNTSyncdQueue",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "@OCMock",
     ],
 )
@@ -355,7 +356,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTRule",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SantaVnode",
         "//Source/common:String",
         "//Source/common:Unit",
@@ -1108,6 +1109,9 @@ santa_unit_test(
         "DataLayer/SNTEventTable.mm",
         "DataLayer/SNTEventTableTest.mm",
     ],
+    structured_resources = [
+        "//Source/santad/testdata:archive_testdata",
+    ],
     deps = [
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
@@ -1116,6 +1120,7 @@ santa_unit_test(
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
         "@FMDB",
+        "@OCMock",
     ],
 )
 

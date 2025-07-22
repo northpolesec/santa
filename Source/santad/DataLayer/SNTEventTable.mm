@@ -16,6 +16,7 @@
 #import "Source/santad/DataLayer/SNTEventTable.h"
 
 #import "Source/common/MOLCertificate.h"
+#import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
@@ -84,10 +85,11 @@ static const uint32_t kEventTableCurrentVersion = 4;
 - (BOOL)isValidStoredEvent:(SNTStoredEvent *)event {
   if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
     SNTStoredExecutionEvent *se = (SNTStoredExecutionEvent *)event;
-    return [[se hashForEvent] length] && se.filePath.length && se.occurrenceDate && se.decision;
+    return se.idx && [[se hashForEvent] length] && se.filePath.length && se.occurrenceDate &&
+           se.decision;
   } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
     SNTStoredFileAccessEvent *se = (SNTStoredFileAccessEvent *)event;
-    return se.ruleVersion.length && se.ruleName.length && se.accessedPath.length &&
+    return se.idx && se.ruleVersion.length && se.ruleName.length && se.accessedPath.length &&
            se.process.filePath.length && [[se hashForEvent] length];
   } else {
     return NO;
@@ -101,16 +103,12 @@ static const uint32_t kEventTableCurrentVersion = 4;
       continue;
     }
 
-    NSData *eventData;
-    @try {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-      eventData = [NSKeyedArchiver archivedDataWithRootObject:event];
-#pragma clang diagnostic pop
-    } @catch (NSException *exception) {
-      continue;
+    NSData *eventData = [NSKeyedArchiver archivedDataWithRootObject:event
+                                              requiringSecureCoding:YES
+                                                              error:nil];
+    if (eventData) {
+      eventsData[eventData] = event;
     }
-    eventsData[eventData] = event;
   }
 
   __block BOOL success = NO;
@@ -163,18 +161,17 @@ static const uint32_t kEventTableCurrentVersion = 4;
   NSData *eventData = [rs dataForColumn:@"eventdata"];
   if (!eventData) return nil;
 
-  SNTStoredEvent *event;
+  NSError *err;
+  SNTStoredEvent *event = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTStoredExecutionEvent class]
+                                                            fromData:eventData
+                                                               error:&err];
 
-  @try {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    event = [NSKeyedUnarchiver unarchiveObjectWithData:eventData];
-#pragma clang diagnostic pop
-    event.idx = event.idx ?: @((uint32_t)[rs intForColumn:@"idx"]);
-  } @catch (NSException *exception) {
+  if (event && !err && [self isValidStoredEvent:event]) {
+    return event;
+  } else {
+    LOGW(@"Unable to unarchive stored event: %@", err);
+    return nil;
   }
-
-  return event;
 }
 
 #pragma mark Deleting

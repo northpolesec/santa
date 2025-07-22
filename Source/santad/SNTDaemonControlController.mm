@@ -181,7 +181,7 @@ double watchdogRAMPeak = 0;
   reply([[SNTDatabaseController eventTable] pendingEventsCount]);
 }
 
-- (void)databaseEventsPending:(void (^)(NSArray *events))reply {
+- (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent *> *events))reply {
   reply([[SNTDatabaseController eventTable] pendingEvents]);
 }
 

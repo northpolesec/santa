@@ -4,7 +4,7 @@ import santa_common_SNTConfigState
 import santa_common_SNTConfigurator
 import santa_common_SNTCommonEnums
 import santa_common_SNTDeviceEvent
-import santa_common_SNTStoredEvent
+import santa_common_SNTStoredExecutionEvent
 import Source_gui_SNTDeviceMessageWindowView
 import Source_gui_SNTBinaryMessageWindowView
 import Source_gui_SNTAboutWindowView
@@ -24,7 +24,7 @@ func ShowWindow(_ vc: NSViewController, _ window: NSWindow) {
   window.center()
 }
 
-class SNTDebugStoredEvent: SNTStoredEvent {
+class SNTDebugStoredEvent: SNTStoredExecutionEvent {
   let staticPublisher: String
 
   override var publisherInfo: String {

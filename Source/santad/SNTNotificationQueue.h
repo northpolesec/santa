@@ -20,7 +20,7 @@
 #include "Source/common/RingBuffer.h"
 #import "Source/common/SNTConfigState.h"
 
-@class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 @class MOLXPCConnection;
 
 using NotificationReplyBlock = void (^)(BOOL);
@@ -35,7 +35,7 @@ using NotificationReplyBlock = void (^)(BOOL);
 
 - (instancetype)init NS_UNAVAILABLE;
 
-- (void)addEvent:(SNTStoredEvent *)event
+- (void)addEvent:(SNTStoredExecutionEvent *)event
     withCustomMessage:(NSString *)message
             customURL:(NSString *)url
           configState:(SNTConfigState *)configState

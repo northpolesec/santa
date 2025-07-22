@@ -17,6 +17,8 @@
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 
+@class SNTStoredEvent;
+
 ///
 ///  Protocol implemented by santad and utilized by santactl (privileged operations)
 ///
@@ -38,7 +40,7 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                  ruleCleanup:(SNTRuleCleanup)cleanupType
                       source:(SNTRuleAddSource)source
                        reply:(void (^)(NSError *error))reply;
-- (void)databaseEventsPending:(void (^)(NSArray *events))reply;
+- (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent *> *events))reply;
 - (void)databaseRemoveEventsWithIDs:(NSArray *)ids;
 - (void)retrieveAllRules:(void (^)(NSArray<SNTRule *> *rules, NSError *error))reply;
 

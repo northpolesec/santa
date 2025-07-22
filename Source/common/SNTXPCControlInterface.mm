@@ -21,6 +21,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 NSString *const kBundleID = @"com.northpolesec.santa.daemon";
 
@@ -43,7 +44,8 @@ NSString *const kBundleID = @"com.northpolesec.santa.daemon";
 }
 
 + (void)initializeControlInterface:(NSXPCInterface *)r {
-  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil]
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
+                                      [SNTStoredExecutionEvent class], nil]
         forSelector:@selector(databaseEventsPending:)
       argumentIndex:0
             ofReply:YES];

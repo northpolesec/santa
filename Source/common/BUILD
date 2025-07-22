@@ -615,6 +615,7 @@ objc_library(
     deps = [
         ":MOLXPCConnection",
         ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
     ],
 )
 
@@ -644,6 +645,7 @@ objc_library(
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
         ":SNTXPCUnprivilegedControlInterface",
     ],
 )
@@ -675,6 +677,7 @@ objc_library(
         ":MOLXPCConnection",
         ":SNTCommonEnums",
         ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
     ],
 )
 
@@ -689,6 +692,7 @@ objc_library(
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
         ":SNTXPCBundleServiceInterface",
         ":SantaVnode",
     ],

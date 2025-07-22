@@ -3,7 +3,6 @@ import SwiftUI
 import santa_common_MOLXPCConnection
 import santa_common_SNTCommonEnums
 import santa_common_SNTConfigurator
-import santa_common_SNTStoredEvent
 import santa_common_SNTXPCSyncServiceInterface
 import santa_gui_SNTMessageView
 

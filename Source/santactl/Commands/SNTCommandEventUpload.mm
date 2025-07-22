@@ -205,7 +205,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
   }
 }
 
-- (void)updateCountsForEvent:(SNTStoredEvent *)event
+- (void)updateCountsForEvent:(SNTStoredExecutionEvent *)event
                  binaryCount:(uint64_t)binaryCount
                    fileCount:(uint64_t)fileCount
                  hashedCount:(uint64_t)hashedCount {

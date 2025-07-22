@@ -15,13 +15,15 @@
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 @implementation SNTXPCSyncServiceInterface
 
 + (NSXPCInterface *)syncServiceInterface {
   NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceXPC)];
 
-  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil]
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
+                                      [SNTStoredExecutionEvent class], nil]
         forSelector:@selector(postEventsToSyncServer:)
       argumentIndex:0
             ofReply:NO];
