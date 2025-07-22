@@ -171,6 +171,14 @@ objc_library(
     hdrs = ["String.h"],
 )
 
+santa_unit_test(
+    name = "StringTest",
+    srcs = ["StringTest.mm"],
+    deps = [
+        ":String",
+    ],
+)
+
 objc_library(
     name = "CertificateHelpers",
     srcs = ["CertificateHelpers.mm"],
@@ -788,6 +796,7 @@ test_suite(
         ":SantaSetCacheTest",
         ":ScopedCFTypeRefTest",
         ":ScopedIOObjectRefTest",
+        ":StringTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:CELTest",
     ],
