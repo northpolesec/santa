@@ -427,7 +427,7 @@ void FAAPolicyProcessor::LogTTY(SNTFileAccessEvent *event, URLTextPair link_info
 
   NSAttributedString *attrStr = [SNTBlockMessage
       attributedBlockMessageForFileAccessEvent:event
-                                 customMessage:OptionalStringToNSString(policy.custom_message)];
+                                 customMessage:OptionalUTF8StringToNSString(policy.custom_message)];
 
   NSMutableString *blockMsg = [NSMutableString stringWithCapacity:1024];
   // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
@@ -472,17 +472,17 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
       SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
       SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
 
-      event.accessedPath = StringToNSString(target.path);
-      event.ruleVersion = StringToNSString(policy->version);
-      event.ruleName = StringToNSString(policy->name);
+      event.accessedPath = UTF8StringToNSString(target.path);
+      event.ruleVersion = UTF8StringToNSString(policy->version);
+      event.ruleName = UTF8StringToNSString(policy->name);
       event.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
-      event.filePath = StringToNSString(msg->process->executable->path.data);
+      event.filePath = UTF8StringToNSString(msg->process->executable->path.data);
       event.teamID = cd.teamID ?: @"<unknown team id>";
       event.signingID = cd.signingID ?: @"<unknown signing id>";
       event.cdhash = cd.cdhash ?: @"<unknown CDHash>";
       event.pid = @(audit_token_to_pid(msg->process->audit_token));
       event.ppid = @(audit_token_to_pid(msg->process->parent_audit_token));
-      event.parentName = StringToNSString(msg.ParentProcessName());
+      event.parentName = UTF8StringToNSString(msg.ParentProcessName());
       event.signingChain = cd.certChain;
 
       struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
@@ -494,7 +494,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
       }
 
       if (ShouldShowUIForPolicy(policy)) {
-        file_access_denied_block(event, OptionalStringToNSString(policy->custom_message),
+        file_access_denied_block(event, OptionalUTF8StringToNSString(policy->custom_message),
                                  link_info.first, link_info.second);
       }
 

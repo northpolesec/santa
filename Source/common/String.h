@@ -33,20 +33,25 @@ static inline std::string NSStringToUTF8String(NSString *str) {
   return std::string(str.UTF8String, [str lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
 }
 
-static inline NSString *StringToNSString(const std::string &str) {
+static inline NSString *UTF8StringToNSString(const std::string &str) {
   return [NSString stringWithUTF8String:str.c_str()];
 }
 
-static inline NSString *StringToNSString(const char *str) {
+static inline NSString *UTF8StringToNSString(const char *str) {
   return [NSString stringWithUTF8String:str];
 }
 
-static inline NSString *OptionalStringToNSString(const std::optional<std::string> &optional_str) {
+static inline NSString *UTF8StringToNSString(std::string_view str) {
+  return [NSString stringWithUTF8String:str.data()];
+}
+
+static inline NSString *OptionalUTF8StringToNSString(
+    const std::optional<std::string> &optional_str) {
   std::string str = optional_str.value_or("");
   if (str.length() == 0) {
     return nil;
   } else {
-    return StringToNSString(str);
+    return UTF8StringToNSString(str);
   }
 }
 

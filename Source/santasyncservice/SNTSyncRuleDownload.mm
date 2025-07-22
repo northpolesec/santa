@@ -31,7 +31,7 @@
 namespace pbv1 = ::santa::sync::v1;
 
 using santa::NSStringToUTF8String;
-using santa::StringToNSString;
+using santa::UTF8StringToNSString;
 
 SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   switch (syncType) {
@@ -144,10 +144,10 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 }
 
 - (SNTRule *)ruleFromProtoRule:(::pbv1::Rule)rule {
-  NSString *identifier = StringToNSString(rule.identifier());
+  NSString *identifier = UTF8StringToNSString(rule.identifier());
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (!identifier.length) identifier = StringToNSString(rule.deprecated_sha256());
+  if (!identifier.length) identifier = UTF8StringToNSString(rule.deprecated_sha256());
 #pragma clang diagnostic pop
   if (!identifier.length) {
     LOGE(@"Failed to process rule with no identifier");
@@ -176,13 +176,13 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   }
 
   const std::string &custom_msg = rule.custom_msg();
-  NSString *customMsg = (!custom_msg.empty()) ? StringToNSString(custom_msg) : nil;
+  NSString *customMsg = (!custom_msg.empty()) ? UTF8StringToNSString(custom_msg) : nil;
 
   const std::string &custom_url = rule.custom_url();
-  NSString *customURL = (!custom_url.empty()) ? StringToNSString(custom_url) : nil;
+  NSString *customURL = (!custom_url.empty()) ? UTF8StringToNSString(custom_url) : nil;
 
   const std::string &cel_expr = rule.cel_expr();
-  NSString *celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
+  NSString *celExpr = (!cel_expr.empty()) ? UTF8StringToNSString(cel_expr) : nil;
 
   return [[SNTRule alloc] initWithIdentifier:identifier
                                        state:state
@@ -219,7 +219,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 - (void)processBundleNotificationsForRule:(SNTRule *)rule
                             fromProtoRule:(const ::pbv1::Rule *)protoRule {
   // Display a system notification if notification_app_name is set and this is not a clean sync.
-  NSString *appName = StringToNSString(protoRule->notification_app_name());
+  NSString *appName = UTF8StringToNSString(protoRule->notification_app_name());
   if (appName.length) {
     // If notification_app_name is set but this is a clean sync, return early. We don't want to
     // spam users with notifications for many apps that might be included in a clean sync, and
@@ -242,7 +242,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   if (rule.state == SNTRuleStateAllow || rule.state == SNTRuleStateAllowCompiler) {
     // primaryHash is the bundle hash if there was a bundle hash included in the rule, otherwise
     // it is simply the binary hash.
-    NSString *primaryHash = StringToNSString(protoRule->file_bundle_hash());
+    NSString *primaryHash = UTF8StringToNSString(protoRule->file_bundle_hash());
     if (primaryHash.length != 64) {
       primaryHash = rule.identifier;
     }

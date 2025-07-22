@@ -51,7 +51,7 @@ void TTYWriter::Write(const es_process_t *proc, NSString * (^messageCreator)(voi
 
   // Copy the data from the es_process_t so the ES message doesn't
   // need to be retained
-  NSString *tty = santa::StringToNSString(proc->tty->path.data);
+  NSString *tty = santa::UTF8StringToNSString(proc->tty->path.data);
   // Realize the message string before going async so as not to need to worry about
   // lifetimes of objects in the provided block.
   NSString *msg = messageCreator();
