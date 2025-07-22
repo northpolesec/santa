@@ -21,7 +21,7 @@
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTFileInfo.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 NSString *GenerateRandomHexStringWithSHA256Length() {
   // Create an array to hold random bytes
@@ -66,11 +66,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   self.sut = [[SNTEventTable alloc] initWithDatabaseQueue:self.dbq];
 }
 
-- (SNTStoredEvent *)createTestEvent {
+- (SNTStoredExecutionEvent *)createTestEvent {
   SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/false"];
   MOLCodesignChecker *csInfo = [binInfo codesignCheckerWithError:NULL];
-  SNTStoredEvent *event;
-  event = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *event = [[SNTStoredExecutionEvent alloc] init];
   event.idx = @(arc4random());
   event.filePath = @"/usr/bin/false";
   event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
@@ -92,7 +91,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 - (void)testUniqueIndex {
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
 
-  SNTStoredEvent *event = [self createTestEvent];
+  SNTStoredExecutionEvent *event = [self createTestEvent];
   XCTAssertTrue([self.sut addStoredEvent:event]);
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
@@ -115,10 +114,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 }
 
 - (void)testRetrieveEvent {
-  SNTStoredEvent *event = [self createTestEvent];
+  SNTStoredExecutionEvent *event = [self createTestEvent];
   [self.sut addStoredEvent:event];
 
-  SNTStoredEvent *storedEvent = [self.sut pendingEvents].firstObject;
+  SNTStoredExecutionEvent *storedEvent = [self.sut pendingEvents].firstObject;
   XCTAssertNotNil(storedEvent);
   XCTAssertEqualObjects(event.filePath, storedEvent.filePath);
   XCTAssertEqualObjects(event.signingChain, storedEvent.signingChain);
@@ -169,8 +168,8 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   }];
 
   NSArray *events = [self.sut pendingEvents];
-  for (SNTStoredEvent *event in events) {
-    if ([event.fileSHA256 isEqual:@"deadbeef"]) XCTFail("Received bad event");
+  if (events.count > 0) {
+    XCTFail("Received bad event");
   }
 
   [self.dbq inDatabase:^(FMDatabase *db) {

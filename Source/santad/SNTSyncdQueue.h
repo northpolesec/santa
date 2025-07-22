@@ -17,7 +17,7 @@
 #import "Source/common/SNTCommonEnums.h"
 
 @class SNTExportConfiguration;
-@class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 @class MOLXPCConnection;
 
 @interface SNTSyncdQueue : NSObject
@@ -25,8 +25,10 @@
 - (void)reassessSyncServiceConnection;
 - (void)reassessSyncServiceConnectionImmediately;
 
-- (void)addEvents:(NSArray<SNTStoredEvent *> *)events isFromBundle:(BOOL)isFromBundle;
-- (void)addBundleEvent:(SNTStoredEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
+- (void)addExecutionEvent:(SNTStoredExecutionEvent *)event;
+- (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent *> *)events
+         withBundleHash:(NSString *)bundleHash;
+- (void)addBundleEvent:(SNTStoredExecutionEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
 - (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
                    fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config

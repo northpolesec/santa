@@ -99,14 +99,14 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 #pragma mark SNTSyncServiceXPC methods
 
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events fromBundle:(BOOL)isFromBundle {
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
   SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     LOGE(@"Events upload failed to create sync state: %ld", status);
     return;
   }
-  if (isFromBundle) syncState.eventBatchSize = self.eventBatchSize;
+  syncState.eventBatchSize = self.eventBatchSize;
   SNTSyncEventUpload *p = [[SNTSyncEventUpload alloc] initWithState:syncState];
   if (events && [p uploadEvents:events]) {
     LOGD(@"Events upload complete");
@@ -119,7 +119,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   self.xsrfTokenHeader = syncState.xsrfTokenHeader;
 }
 
-- (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply {
   if (!event) {
     reply(SNTBundleEventActionDropEvents);

@@ -50,7 +50,7 @@ swift_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
     ],
 )
 
@@ -78,7 +78,7 @@ swift_library(
         ":SNTMessageView",
         "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigState",
-        "//Source/common:SNTFileAccessEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
     ],
 )
 
@@ -125,11 +125,11 @@ objc_library(
         "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
-        "//Source/common:SNTFileAccessEvent",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTXPCControlInterface",
@@ -217,7 +217,7 @@ santa_unit_test(
     ],
     deps = [
         ":SantaGUI_lib",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "@OCMock",
     ],
 )

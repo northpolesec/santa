@@ -82,7 +82,7 @@ class MockSerializer : public Empty {
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeAllowlist, (const Message &, const std::string_view));
 
-  MOCK_METHOD(std::vector<uint8_t>, SerializeBundleHashingEvent, (SNTStoredEvent *));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeBundleHashingEvent, (SNTStoredExecutionEvent *));
   MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary *));
   MOCK_METHOD(std::vector<uint8_t>, SerializeDiskDisappeared, (NSDictionary *));
 

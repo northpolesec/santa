@@ -12,17 +12,19 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/StoredEventHelpers.h"
+#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTFileInfo.h"
 
-@interface StoredEventHelpersTest : XCTestCase
+@interface StoredEventTest : XCTestCase
 @end
 
-@implementation StoredEventHelpersTest
+@implementation StoredEventTest
 
 - (NSString *)bundleExample {
   NSString *rp = [[NSBundle bundleForClass:[self class]] resourcePath];
@@ -36,7 +38,7 @@
 - (void)testBundleEvent {
   NSString *path = [self bundleExample];
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path];
-  SNTStoredEvent *sut = StoredEventFromFileInfo(fi);
+  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);
@@ -47,7 +49,7 @@
 - (void)testDeveloperSignedEvent {
   NSString *path = [self developerSignedExecutableExample];
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path];
-  SNTStoredEvent *sut = StoredEventFromFileInfo(fi);
+  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);
@@ -62,12 +64,27 @@
 
 - (void)testProductionSignedEvent {
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes"];
-  SNTStoredEvent *sut = StoredEventFromFileInfo(fi);
+  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);
   XCTAssertEqualObjects(sut.fileSHA256, fi.SHA256);
   XCTAssertEqual(sut.signingStatus, SNTSigningStatusProduction);
+}
+
+- (void)testFileSHA256Property {
+  // The base class should throw
+  SNTStoredEvent *baseEvent = [[SNTStoredEvent alloc] init];
+  XCTAssertThrows([baseEvent hashForEvent]);
+
+  // Derived classes should not throw
+  SNTStoredExecutionEvent *execEvent = [[SNTStoredExecutionEvent alloc] init];
+  execEvent.fileSHA256 = @"foo";
+  XCTAssertEqualObjects([execEvent hashForEvent], @"foo");
+
+  SNTStoredFileAccessEvent *faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  faaEvent.process.fileSHA256 = @"bar";
+  XCTAssertEqualObjects([faaEvent hashForEvent], @"bar");
 }
 
 @end

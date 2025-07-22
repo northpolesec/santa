@@ -21,6 +21,7 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTBlockMessage.h"
+#include "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/common/String.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 
@@ -419,7 +420,7 @@ bool FAAPolicyProcessor::HaveMessagedTTYForPolicy(const WatchItemPolicyBase &pol
                                  {policy.version, policy.name});
 }
 
-void FAAPolicyProcessor::LogTTY(SNTFileAccessEvent *event, URLTextPair link_info,
+void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent *event, URLTextPair link_info,
                                 const Message &msg, const WatchItemPolicyBase &policy) {
   if (HaveMessagedTTYForPolicy(policy, msg)) {
     return;
@@ -439,8 +440,9 @@ void FAAPolicyProcessor::LogTTY(SNTFileAccessEvent *event, URLTextPair link_info
                          @"\033[1mProcess Path: \033[0m %@\n"
                          @"\033[1mIdentifier:   \033[0m %@\n"
                          @"\033[1mParent:       \033[0m %@\n\n",
-                         event.accessedPath, event.ruleVersion, event.ruleName, event.filePath,
-                         event.fileSHA256, event.parentName];
+                         event.accessedPath, event.ruleVersion, event.ruleName,
+                         event.process.filePath, event.process.fileSHA256,
+                         StringToNSString(msg.ParentProcessName())];
 
   NSURL *detailURL = [SNTBlockMessage eventDetailURLForFileAccessEvent:event
                                                              customURL:link_info.first];
@@ -470,23 +472,23 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     if (ShouldNotifyUserDecision(decision) &&
         (ShouldShowUIForPolicy(policy) || ShouldMessageTTYForPolicy(policy, msg))) {
       SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
-      SNTFileAccessEvent *event = [[SNTFileAccessEvent alloc] init];
+      SNTStoredFileAccessEvent *event = [[SNTStoredFileAccessEvent alloc] init];
 
       event.accessedPath = StringToNSString(target.path);
       event.ruleVersion = StringToNSString(policy->version);
       event.ruleName = StringToNSString(policy->name);
-      event.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
-      event.filePath = StringToNSString(msg->process->executable->path.data);
-      event.teamID = cd.teamID ?: @"<unknown team id>";
-      event.signingID = cd.signingID ?: @"<unknown signing id>";
-      event.cdhash = cd.cdhash ?: @"<unknown CDHash>";
-      event.pid = @(audit_token_to_pid(msg->process->audit_token));
-      event.ppid = @(audit_token_to_pid(msg->process->parent_audit_token));
-      event.parentName = StringToNSString(msg.ParentProcessName());
-      event.signingChain = cd.certChain;
-
+      event.process.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
+      event.process.filePath = StringToNSString(msg->process->executable->path.data);
+      event.process.teamID = cd.teamID ?: @"<unknown team id>";
+      event.process.signingID = cd.signingID ?: @"<unknown signing id>";
+      event.process.cdhash = cd.cdhash ?: @"<unknown CDHash>";
+      event.process.pid = @(audit_token_to_pid(msg->process->audit_token));
+      event.process.signingChain = cd.certChain;
       struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
-      if (user) event.executingUser = @(user->pw_name);
+      if (user) event.process.executingUser = @(user->pw_name);
+      event.process.parent = [[SNTStoredFileAccessProcess alloc] init];
+      event.process.parent.pid = @(audit_token_to_pid(msg->process->parent_audit_token));
+      event.process.parent.filePath = StringToNSString(msg.ParentProcessPath());
 
       URLTextPair link_info;
       if (generate_event_detail_link_block_) {

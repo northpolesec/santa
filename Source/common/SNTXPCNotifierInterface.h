@@ -20,18 +20,18 @@
 #import "Source/common/SNTXPCBundleServiceInterface.h"
 
 @class SNTDeviceEvent;
-@class SNTFileAccessEvent;
-@class SNTStoredEvent;
+@class SNTStoredFileAccessEvent;
+@class SNTStoredExecutionEvent;
 
 /// Protocol implemented by SantaGUI and utilized by santad
 @protocol SNTNotifierXPC
-- (void)postBlockNotification:(SNTStoredEvent *)event
+- (void)postBlockNotification:(SNTStoredExecutionEvent *)event
             withCustomMessage:(NSString *)message
                     customURL:(NSString *)url
                   configState:(SNTConfigState *)configState
                      andReply:(void (^)(BOOL authenticated))reply;
 - (void)postUSBBlockNotification:(SNTDeviceEvent *)event;
-- (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event
+- (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent *)event
                           customMessage:(NSString *)message
                               customURL:(NSString *)url
                              customText:(NSString *)text

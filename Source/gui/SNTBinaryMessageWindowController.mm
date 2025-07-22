@@ -25,7 +25,7 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 @interface SNTBinaryMessageWindowController ()
 
@@ -39,7 +39,7 @@
 
 @implementation SNTBinaryMessageWindowController
 
-- (instancetype)initWithEvent:(SNTStoredEvent *)event
+- (instancetype)initWithEvent:(SNTStoredExecutionEvent *)event
                     customMsg:(NSString *)message
                     customURL:(NSString *)url
                   configState:(SNTConfigState *)configState
@@ -118,7 +118,8 @@
 
 #pragma mark Generated properties
 
-- (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash {
+- (void)updateBlockNotification:(SNTStoredExecutionEvent *)event
+                 withBundleHash:(NSString *)bundleHash {
   // UI updates must happen on the main thread.
   dispatch_async(dispatch_get_main_queue(), ^{
     if ([self.event.idx isEqual:event.idx]) {

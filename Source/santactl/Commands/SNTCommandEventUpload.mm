@@ -20,12 +20,11 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTXPCBundleServiceInterface.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #import "Source/common/SigningIDHelpers.h"
-#import "Source/common/StoredEventHelpers.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
@@ -118,7 +117,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
       continue;
     }
 
-    SNTStoredEvent *se = StoredEventFromFileInfo(fi);
+    SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
     se.decision = SNTEventStateBundleBinary;
     if (fi.bundle && enableBundles) {
       se.fileBundlePath = fi.bundlePath;
@@ -151,12 +150,13 @@ REGISTER_COMMAND_NAME(@"eventupload")
       [[bs synchronousRemoteObjectProxy]
           hashBundleBinariesForEvent:se
                             listener:al.endpoint
-                               reply:^(NSString *hash, NSArray<SNTStoredEvent *> *bundleEvents,
+                               reply:^(NSString *hash,
+                                       NSArray<SNTStoredExecutionEvent *> *bundleEvents,
                                        NSNumber *time) {
                                  printf("\tHashing time: %llu ms\n", time.unsignedLongLongValue);
                                  printf("\tEvents found: %lu\n", bundleEvents.count);
                                  printf("\tBundleHash: %s\n", hash.UTF8String);
-                                 for (SNTStoredEvent *e in bundleEvents) {
+                                 for (SNTStoredExecutionEvent *e in bundleEvents) {
                                    e.fileBundleHash = hash;
                                    e.fileBundleHashMilliseconds = time;
                                    e.fileBundleBinaryCount = @(bundleEvents.count);
@@ -177,7 +177,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
   };
   [ss resume];
   printf("Uploading %lu events...\n", events.count);
-  [[ss synchronousRemoteObjectProxy] postEventsToSyncServer:events fromBundle:events.count > 1];
+  [[ss synchronousRemoteObjectProxy] postEventsToSyncServer:events];
   printf("Done\n");
   exit(0);
 }

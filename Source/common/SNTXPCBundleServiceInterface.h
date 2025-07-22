@@ -17,10 +17,10 @@
 
 #import "Source/common/MOLXPCConnection.h"
 
-@class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 
 ///  A block that takes the calculated bundle hash, associated events and hashing time in ms.
-typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredEvent *> *, NSNumber *);
+typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredExecutionEvent *> *, NSNumber *);
 
 ///
 ///  Protocol implemented by the client of of SNTBundleServiceXPC. A listener of this type is passed
@@ -28,7 +28,7 @@ typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredEvent *> *, NSNu
 ///  will then message the listener with hashing progress.
 ///
 @protocol SNTBundleServiceProgressXPC
-- (void)updateCountsForEvent:(SNTStoredEvent *)event
+- (void)updateCountsForEvent:(SNTStoredExecutionEvent *)event
                  binaryCount:(uint64_t)binaryCount
                    fileCount:(uint64_t)fileCount
                  hashedCount:(uint64_t)hashedCount;
@@ -48,7 +48,7 @@ typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredEvent *> *, NSNu
 ///
 ///  @note If there is a current NSProgress when called this method will report back its progress.
 ///
-- (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event
+- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent *)event
                           listener:(NSXPCListenerEndpoint *)listener
                              reply:(SNTBundleHashBlock)reply;
 

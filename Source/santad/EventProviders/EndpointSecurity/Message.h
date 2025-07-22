@@ -1,16 +1,17 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #ifndef SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MESSAGE_H
 #define SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MESSAGE_H
@@ -52,6 +53,7 @@ class Message {
   std::shared_ptr<EndpointSecurityAPI> ESAPI() const { return esapi_; }
 
   std::string ParentProcessName() const;
+  std::string ParentProcessPath() const;
 
  private:
   std::shared_ptr<EndpointSecurityAPI> esapi_;
@@ -59,6 +61,7 @@ class Message {
   std::optional<santa::santad::process_tree::ProcessToken> process_token_;
 
   std::string GetProcessName(pid_t pid) const;
+  std::string GetProcessPath(audit_token_t* tok) const;
 };
 
 }  // namespace santa

@@ -17,6 +17,8 @@
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 
 static const uint32_t kEventTableCurrentVersion = 4;
 
@@ -39,39 +41,8 @@ static const uint32_t kEventTableCurrentVersion = 4;
   }
 
   if (version < 2) {
-    // Clean-up: Find events where the bundle details might not be strings and update them.
-    FMResultSet *rs = [db executeQuery:@"SELECT * FROM events"];
-    while ([rs next]) {
-      SNTStoredEvent *se = [self eventFromResultSet:rs];
-      if (!se) continue;
-
-      Class NSStringClass = [NSString class];
-      if ([se.fileBundleID class] != NSStringClass) {
-        se.fileBundleID = [se.fileBundleID description];
-      }
-      if ([se.fileBundleName class] != NSStringClass) {
-        se.fileBundleName = [se.fileBundleName description];
-      }
-      if ([se.fileBundleVersion class] != NSStringClass) {
-        se.fileBundleVersion = [se.fileBundleVersion description];
-      }
-      if ([se.fileBundleVersionString class] != NSStringClass) {
-        se.fileBundleVersionString = [se.fileBundleVersionString description];
-      }
-
-      NSData *eventData;
-      NSNumber *idx = [rs objectForColumn:@"idx"];
-      @try {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        eventData = [NSKeyedArchiver archivedDataWithRootObject:se];
-#pragma clang diagnostic pop
-        [db executeUpdate:@"UPDATE events SET eventdata=? WHERE idx=?", eventData, idx];
-      } @catch (NSException *exception) {
-        [db executeUpdate:@"DELETE FROM events WHERE idx=?", idx];
-      }
-    }
-    [rs close];
+    // We no longer attempt to migrate data that may have been in the event table from v1.
+    [db executeUpdate:@"DELETE FROM events;"];
     newVersion = 2;
   }
 
@@ -110,12 +81,25 @@ static const uint32_t kEventTableCurrentVersion = 4;
   return [self addStoredEvents:@[ event ]];
 }
 
+- (BOOL)isValidStoredEvent:(SNTStoredEvent *)event {
+  if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
+    SNTStoredExecutionEvent *se = (SNTStoredExecutionEvent *)event;
+    return [[se hashForEvent] length] && se.filePath.length && se.occurrenceDate && se.decision;
+  } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
+    SNTStoredFileAccessEvent *se = (SNTStoredFileAccessEvent *)event;
+    return se.ruleVersion.length && se.ruleName.length && se.accessedPath.length &&
+           se.process.filePath.length && [[se hashForEvent] length];
+  } else {
+    return NO;
+  }
+}
+
 - (BOOL)addStoredEvents:(NSArray<SNTStoredEvent *> *)events {
   NSMutableDictionary *eventsData = [NSMutableDictionary dictionaryWithCapacity:events.count];
   for (SNTStoredEvent *event in events) {
-    if (!event.idx || !event.fileSHA256 || !event.filePath || !event.occurrenceDate ||
-        !event.decision)
+    if (![self isValidStoredEvent:event]) {
       continue;
+    }
 
     NSData *eventData;
     @try {
@@ -136,7 +120,7 @@ static const uint32_t kEventTableCurrentVersion = 4;
           success = [db executeUpdate:@"INSERT INTO 'events' (idx, filesha256, eventdata) "
                                       @"VALUES (?, ?, ?) "
                                       @"ON CONFLICT(filesha256) DO NOTHING",
-                                      event.idx, event.fileSHA256, eventData];
+                                      event.idx, [event hashForEvent], eventData];
           if (!success) *stop = YES;
         }];
   }];

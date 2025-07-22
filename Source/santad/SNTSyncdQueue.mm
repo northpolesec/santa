@@ -21,7 +21,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
@@ -153,17 +153,34 @@
   [[self.syncConnection remoteObjectProxy] spindown];
 }
 
-- (void)addEvents:(NSArray<SNTStoredEvent *> *)events isFromBundle:(BOOL)isFromBundle {
-  if (!events.count) return;
-  SNTStoredEvent *first = events.firstObject;
-  NSString *hash = isFromBundle ? first.fileBundleHash : first.fileSHA256;
-  if ([self backoffForPrimaryHash:hash]) return;
+- (void)addExecutionEvent:(SNTStoredExecutionEvent *)event {
+  if (!event) {
+    return;
+  }
+  [self addEvents:@[ event ] withBackoffHashKey:event.fileSHA256];
+}
+
+- (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent *> *)events
+         withBundleHash:(NSString *)bundleHash {
+  if (!events.count) {
+    return;
+  }
+  [self addEvents:events withBackoffHashKey:bundleHash];
+}
+
+- (void)addEvents:(NSArray<SNTStoredExecutionEvent *> *)events
+    withBackoffHashKey:(NSString *)backoffHashKey {
+  if (!events.count || [self backoffForPrimaryHash:backoffHashKey]) {
+    return;
+  }
+
   [self dispatchBlockOnSyncdQueue:^{
-    [self.syncConnection.remoteObjectProxy postEventsToSyncServer:events fromBundle:isFromBundle];
+    [self.syncConnection.remoteObjectProxy postEventsToSyncServer:events];
   }];
 }
 
-- (void)addBundleEvent:(SNTStoredEvent *)event reply:(void (^)(SNTBundleEventAction))reply {
+- (void)addBundleEvent:(SNTStoredExecutionEvent *)event
+                 reply:(void (^)(SNTBundleEventAction))reply {
   if ([self backoffForPrimaryHash:event.fileBundleHash]) return;
   [self dispatchBlockOnSyncdQueue:^{
     [self.syncConnection.remoteObjectProxy

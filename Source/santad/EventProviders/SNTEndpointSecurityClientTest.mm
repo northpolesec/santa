@@ -23,6 +23,7 @@
 
 #include <memory>
 
+#include "Source/common/AuditUtilities.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SystemResources.h"
@@ -179,12 +180,14 @@ using santa::WatchItemPathType;
 }
 
 - (void)testPopulateAuditTokenSelf {
-  audit_token_t myAuditToken;
+  std::optional<audit_token_t> myAuditToken = santa::GetMyAuditToken();
+  if (!myAuditToken.has_value()) {
+    XCTFail(@"Failed to fetch this client's audit token.");
+    return;
+  }
 
-  [SNTEndpointSecurityClient populateAuditTokenSelf:&myAuditToken];
-
-  XCTAssertEqual(audit_token_to_pid(myAuditToken), getpid());
-  XCTAssertNotEqual(audit_token_to_pidversion(myAuditToken), 0);
+  XCTAssertEqual(santa::Pid(*myAuditToken), getpid());
+  XCTAssertNotEqual(santa::Pidversion(*myAuditToken), 0);
 }
 
 - (void)testMuteSelf {

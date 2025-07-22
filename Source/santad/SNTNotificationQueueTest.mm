@@ -22,7 +22,7 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigState.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/TestUtils.h"
 
@@ -54,7 +54,7 @@
 
 - (void)testAddEventBasic {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
   NSString *customMessage = @"custom msg";
   NSString *customURL = @"https://northpolesec.com";
 
@@ -115,10 +115,10 @@
   NSString *customMessage = @"custom msg";
   NSString *customURL = @"https://northpolesec.com";
 
-  SNTStoredEvent *se1 = [[SNTStoredEvent alloc] init];
-  SNTStoredEvent *se2 = [[SNTStoredEvent alloc] init];
-  SNTStoredEvent *se3 = [[SNTStoredEvent alloc] init];
-  SNTStoredEvent *se4 = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *se1 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent *se2 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent *se3 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent *se4 = [[SNTStoredExecutionEvent alloc] init];
 
   XCTestExpectation *reply1Expectation = [self expectationWithDescription:@"Reply 1 called"];
   XCTestExpectation *reply2Expectation = [self expectationWithDescription:@"Reply 2 called"];

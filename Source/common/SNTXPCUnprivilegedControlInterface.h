@@ -21,7 +21,7 @@
 #import "Source/common/SantaVnode.h"
 
 @class SNTRule;
-@class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 @class MOLXPCConnection;
 
 struct RuleCounts {
@@ -86,7 +86,8 @@ struct RuleCounts {
 ///
 ///  Bundle Ops
 ///
-- (void)syncBundleEvent:(SNTStoredEvent *)event relatedEvents:(NSArray<SNTStoredEvent *> *)events;
+- (void)syncBundleEvent:(SNTStoredExecutionEvent *)event
+          relatedEvents:(NSArray<SNTStoredExecutionEvent *> *)events;
 
 ///
 ///  Telemetry Ops

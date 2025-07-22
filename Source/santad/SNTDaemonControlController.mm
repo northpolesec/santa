@@ -30,7 +30,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
@@ -402,7 +402,8 @@ double watchdogRAMPeak = 0;
 ///  @param event The offending event, fileBundleHash & fileBundleBinaryCount need to be populated.
 ///  @param events Next bundle events.
 ///
-- (void)syncBundleEvent:(SNTStoredEvent *)event relatedEvents:(NSArray<SNTStoredEvent *> *)events {
+- (void)syncBundleEvent:(SNTStoredExecutionEvent *)event
+          relatedEvents:(NSArray<SNTStoredExecutionEvent *> *)events {
   SNTEventTable *eventTable = [SNTDatabaseController eventTable];
 
   // Delete the event cached by the execution controller.
@@ -428,7 +429,9 @@ double watchdogRAMPeak = 0;
                                   break;
                                 case SNTBundleEventActionSendEvents:
                                   [eventTable addStoredEvents:events];
-                                  [self.syncdQueue addEvents:events isFromBundle:YES];
+                                  [self.syncdQueue
+                                      addBundleEvents:events
+                                       withBundleHash:events.firstObject.fileBundleHash];
                                   break;
                               }
                             }];

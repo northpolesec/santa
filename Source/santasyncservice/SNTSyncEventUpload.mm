@@ -23,6 +23,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
@@ -100,8 +101,17 @@ using santa::NSStringToUTF8StringView;
     // from the database, even if not uploaded.
     if (event.idx) [eventIds addObject:event.idx];
 
-    std::optional<::pbv1::Event> e = [self messageForEvent:event withArena:pArena];
-    if (e.has_value()) uploadEvents->Add(*std::move(e));
+    if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
+      if (auto e = [self messageForEvent:(SNTStoredExecutionEvent *)event withArena:pArena];
+          e.has_value()) {
+        uploadEvents->Add(*std::move(e));
+      }
+    } else {
+      // This shouldn't be able to happen. But if it does, log a warning and continue. We still
+      // want to continue on in case this is the last event being enumerated so that anything in
+      // the batch still gets uploaded.
+      LOGW(@"Unexpected event type in event upload: %@", [event class]);
+    }
 
     if (uploadEvents->size() >= self.syncState.eventBatchSize || idx == finalIdx) {
       if (![self performRequest:req]) {
@@ -127,7 +137,7 @@ using santa::NSStringToUTF8StringView;
   return success;
 }
 
-- (std::optional<::pbv1::Event>)messageForEvent:(SNTStoredEvent *)event
+- (std::optional<::pbv1::Event>)messageForEvent:(SNTStoredExecutionEvent *)event
                                       withArena:(google::protobuf::Arena *)arena {
   auto e = google::protobuf::Arena::Create<::pbv1::Event>(arena);
 

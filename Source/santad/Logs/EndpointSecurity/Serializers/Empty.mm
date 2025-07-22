@@ -164,7 +164,7 @@ std::vector<uint8_t> Empty::SerializeAllowlist(const Message &msg, const std::st
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeBundleHashingEvent(SNTStoredEvent *event) {
+std::vector<uint8_t> Empty::SerializeBundleHashingEvent(SNTStoredExecutionEvent *event) {
   return {};
 }
 

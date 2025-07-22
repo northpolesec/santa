@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 
 @class MOLXPCConnection;
@@ -67,8 +68,8 @@
 ///
 ///  Handle SNTSyncServiceXPC messages forwarded from SNTSyncService.
 ///
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events fromBundle:(BOOL)isFromBundle;
-- (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events;
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 - (void)APNSTokenChanged;

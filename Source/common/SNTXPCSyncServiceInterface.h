@@ -21,14 +21,15 @@
 
 @class SNTExportConfiguration;
 @class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 
 ///
 ///  Protocol implemented by syncservice and utilized by daemon and ctl for communication with a
 ///  sync server.
 ///
 @protocol SNTSyncServiceXPC
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events fromBundle:(BOOL)fromBundle;
-- (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events;
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 - (void)exportTelemetryFile:(NSFileHandle *)fd

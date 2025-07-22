@@ -19,9 +19,9 @@
 #import <Foundation/Foundation.h>
 #endif
 
-@class SNTFileAccessEvent;
 @class SNTDeviceEvent;
-@class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
+@class SNTStoredFileAccessEvent;
 
 @interface SNTBlockMessage : NSObject
 
@@ -40,11 +40,11 @@ NS_ASSUME_NONNULL_BEGIN
 ///  if the rule that blocked this file included one, formatted using
 ///  +[SNTBlockMessage formatMessage].
 ///
-+ (NSAttributedString *)attributedBlockMessageForEvent:(nullable SNTStoredEvent *)event
++ (NSAttributedString *)attributedBlockMessageForEvent:(nullable SNTStoredExecutionEvent *)event
                                          customMessage:(nullable NSString *)customMessage;
 
 + (NSAttributedString *)attributedBlockMessageForFileAccessEvent:
-                            (nullable SNTFileAccessEvent *)event
+                            (nullable SNTStoredFileAccessEvent *)event
                                                    customMessage:(nullable NSString *)customMessage;
 
 + (NSAttributedString *)attributedBlockMessageForDeviceEvent:(nullable SNTDeviceEvent *)event;
@@ -53,9 +53,9 @@ NS_ASSUME_NONNULL_BEGIN
 ///  Return a URL generated from the EventDetailURL configuration key
 ///  after replacing templates in the URL with values from the event.
 ///
-+ (nullable NSURL *)eventDetailURLForEvent:(nullable SNTStoredEvent *)event
++ (nullable NSURL *)eventDetailURLForEvent:(nullable SNTStoredExecutionEvent *)event
                                  customURL:(nullable NSString *)url;
-+ (nullable NSURL *)eventDetailURLForFileAccessEvent:(nullable SNTFileAccessEvent *)event
++ (nullable NSURL *)eventDetailURLForFileAccessEvent:(nullable SNTStoredFileAccessEvent *)event
                                            customURL:(nullable NSString *)url;
 
 ///

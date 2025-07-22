@@ -19,20 +19,20 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @class SNTConfigState;
-@class SNTFileAccessEvent;
+@class SNTStoredFileAccessEvent;
 
 ///
 ///  Controller for a single message window.
 ///
 @interface SNTFileAccessMessageWindowController : SNTMessageWindowController <NSWindowDelegate>
 
-- (instancetype)initWithEvent:(SNTFileAccessEvent *)event
+- (instancetype)initWithEvent:(SNTStoredFileAccessEvent *)event
                 customMessage:(nullable NSString *)message
                     customURL:(nullable NSString *)url
                    customText:(nullable NSString *)text
                   configState:(nullable SNTConfigState *)configState;
 
-@property(readonly) SNTFileAccessEvent *event;
+@property(readonly) SNTStoredFileAccessEvent *event;
 
 @end
 
