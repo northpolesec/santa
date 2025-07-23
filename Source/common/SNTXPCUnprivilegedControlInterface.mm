@@ -18,11 +18,13 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 @implementation SNTXPCUnprivilegedControlInterface
 
 + (void)initializeControlInterface:(NSXPCInterface *)r {
-  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil]
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
+                                      [SNTStoredExecutionEvent class], nil]
         forSelector:@selector(syncBundleEvent:relatedEvents:)
       argumentIndex:1
             ofReply:NO];

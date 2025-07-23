@@ -18,20 +18,20 @@
 
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigState.h"
-#import "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 
 @interface SNTFileAccessMessageWindowController ()
 @property NSString *customMessage;
 @property NSString *customURL;
 @property NSString *customText;
 @property SNTConfigState *configState;
-@property SNTFileAccessEvent *event;
+@property SNTStoredFileAccessEvent *event;
 @end
 
 @implementation SNTFileAccessMessageWindowController
 
-- (instancetype)initWithEvent:(SNTFileAccessEvent *)event
+- (instancetype)initWithEvent:(SNTStoredFileAccessEvent *)event
                 customMessage:(nullable NSString *)message
                     customURL:(nullable NSString *)url
                    customText:(nullable NSString *)text
@@ -91,7 +91,7 @@
   // 2. The name of the rule that was violated
   // 3. The path of the process
   return [NSString stringWithFormat:@"%@|%@|%@", self.event.ruleVersion, self.event.ruleName,
-                                    self.event.filePath];
+                                    self.event.process.filePath];
 }
 
 @end

@@ -21,9 +21,9 @@
 #include "Source/common/PrefixTree.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
@@ -150,17 +150,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
           }];
   watch_items->RegisterDataClient(data_faa_client);
 
-  data_faa_client.fileAccessDeniedBlock =
-      ^(SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {
-        // TODO: The config state should be an argument to the block.
-        SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
-        [[notifier_queue.notifierConnection remoteObjectProxy]
-            postFileAccessBlockNotification:event
-                              customMessage:customMsg
-                                  customURL:customURL
-                                 customText:customText
-                                configState:cs];
-      };
+  data_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent *event, NSString *customMsg,
+                                            NSString *customURL, NSString *customText) {
+    // TODO: The config state should be an argument to the block.
+    SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+    [[notifier_queue.notifierConnection remoteObjectProxy]
+        postFileAccessBlockNotification:event
+                          customMessage:customMsg
+                              customURL:customURL
+                             customText:customText
+                            configState:cs];
+  };
 
   SNTEndpointSecurityProcessFileAccessAuthorizer *proc_faa_client =
       [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
@@ -174,17 +174,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   watch_items->RegisterProcessClient(proc_faa_client);
 
-  proc_faa_client.fileAccessDeniedBlock =
-      ^(SNTFileAccessEvent *event, NSString *customMsg, NSString *customURL, NSString *customText) {
-        // TODO: The config state should be an argument to the block.
-        SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
-        [[notifier_queue.notifierConnection remoteObjectProxy]
-            postFileAccessBlockNotification:event
-                              customMessage:customMsg
-                                  customURL:customURL
-                                 customText:customText
-                                configState:cs];
-      };
+  proc_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent *event, NSString *customMsg,
+                                            NSString *customURL, NSString *customText) {
+    // TODO: The config state should be an argument to the block.
+    SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+    [[notifier_queue.notifierConnection remoteObjectProxy]
+        postFileAccessBlockNotification:event
+                          customMessage:customMsg
+                              customURL:customURL
+                             customText:customText
+                            configState:cs];
+  };
 
   [authorizer_client registerAuthExecProbe:proc_faa_client];
 

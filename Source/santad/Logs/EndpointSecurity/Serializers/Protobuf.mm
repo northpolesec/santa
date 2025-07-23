@@ -34,7 +34,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #include "Source/common/SNTCommonEnums.h"
 #include "Source/common/SNTLogging.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/SNTSystemInfo.h"
 #import "Source/common/String.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
@@ -1390,7 +1390,7 @@ std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message &msg, const std:
   return FinalizeProto(santa_msg);
 }
 
-std::vector<uint8_t> Protobuf::SerializeBundleHashingEvent(SNTStoredEvent *event) {
+std::vector<uint8_t> Protobuf::SerializeBundleHashingEvent(SNTStoredExecutionEvent *event) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena);
 

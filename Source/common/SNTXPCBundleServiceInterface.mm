@@ -15,13 +15,15 @@
 #import "Source/common/SNTXPCBundleServiceInterface.h"
 
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 @implementation SNTXPCBundleServiceInterface
 
 + (NSXPCInterface *)bundleServiceInterface {
   NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTBundleServiceXPC)];
 
-  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil]
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
+                                      [SNTStoredExecutionEvent class], nil]
         forSelector:@selector(hashBundleBinariesForEvent:listener:reply:)
       argumentIndex:1
             ofReply:YES];

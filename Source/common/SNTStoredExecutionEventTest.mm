@@ -12,17 +12,17 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/StoredEventHelpers.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTFileInfo.h"
 
-@interface StoredEventHelpersTest : XCTestCase
+@interface StoredEventTest : XCTestCase
 @end
 
-@implementation StoredEventHelpersTest
+@implementation StoredEventTest
 
 - (NSString *)bundleExample {
   NSString *rp = [[NSBundle bundleForClass:[self class]] resourcePath];
@@ -36,7 +36,7 @@
 - (void)testBundleEvent {
   NSString *path = [self bundleExample];
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path];
-  SNTStoredEvent *sut = StoredEventFromFileInfo(fi);
+  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);
@@ -47,7 +47,7 @@
 - (void)testDeveloperSignedEvent {
   NSString *path = [self developerSignedExecutableExample];
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path];
-  SNTStoredEvent *sut = StoredEventFromFileInfo(fi);
+  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);
@@ -62,7 +62,7 @@
 
 - (void)testProductionSignedEvent {
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes"];
-  SNTStoredEvent *sut = StoredEventFromFileInfo(fi);
+  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);

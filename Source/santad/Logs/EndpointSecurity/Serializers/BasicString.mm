@@ -35,7 +35,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/String.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
@@ -1110,7 +1110,7 @@ std::vector<uint8_t> BasicString::SerializeAllowlist(const Message &msg,
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeBundleHashingEvent(SNTStoredEvent *event) {
+std::vector<uint8_t> BasicString::SerializeBundleHashingEvent(SNTStoredExecutionEvent *event) {
   std::string str = CreateDefaultString();
 
   str.append("action=BUNDLE|sha256=");

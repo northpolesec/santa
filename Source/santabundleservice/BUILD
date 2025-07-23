@@ -15,11 +15,10 @@ objc_library(
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTXPCBundleServiceInterface",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SigningIDHelpers",
-        "//Source/common:StoredEventHelpers",
         "@FMDB",
     ],
 )

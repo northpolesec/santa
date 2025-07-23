@@ -34,7 +34,7 @@
 struct XXH3_state_s;
 typedef XXH3_state_s XXH3_state_t;
 
-@class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 
 namespace santa {
 
@@ -106,7 +106,7 @@ class Serializer {
   virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message &,
                                                   const std::string_view) = 0;
 
-  virtual std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredEvent *) = 0;
+  virtual std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) = 0;
 
   virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *) = 0;
   virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) = 0;

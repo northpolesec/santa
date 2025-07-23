@@ -26,10 +26,9 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SigningIDHelpers.h"
-#import "Source/common/StoredEventHelpers.h"
 
 @interface SNTBundleService ()
 @property(nonatomic) dispatch_queue_t queue;
@@ -47,7 +46,7 @@
 
 #pragma mark SNTBundleServiceXPC Methods
 
-- (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event
+- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent *)event
                           listener:(NSXPCListenerEndpoint *)listener
                              reply:(SNTBundleHashBlock)reply {
   NSProgress *progress =
@@ -121,10 +120,11 @@
   Find binaries within a bundle given the bundle's event. It will run until a timeout occurs,
   or until the NSProgress is cancelled. Search is done within the bundle concurrently.
 
-  @param event The SNTStoredEvent to begin searching.
-  @return An NSDictionary object with keys of fileSHA256 and values of SNTStoredEvent objects.
+  @param event The SNTStoredExecutionEvent to begin searching.
+  @return An NSDictionary object with keys of fileSHA256 and values of SNTStoredExecutionEvent
+  objects.
 */
-- (NSDictionary *)findRelatedBinaries:(SNTStoredEvent *)event
+- (NSDictionary *)findRelatedBinaries:(SNTStoredExecutionEvent *)event
                              progress:(NSProgress *)progress
                        clientListener:(MOLXPCConnection *)clientListener {
   // Find all files and folders within the fileBundlePath
@@ -195,7 +195,7 @@
 }
 
 - (NSDictionary *)generateEventsFromBinaries:(NSArray *)fis
-                               blockingEvent:(SNTStoredEvent *)event
+                               blockingEvent:(SNTStoredExecutionEvent *)event
                                     progress:(NSProgress *)progress
                               clientListener:(MOLXPCConnection *)clientListener {
   if (progress.isCancelled) return nil;
@@ -215,7 +215,7 @@
 
       SNTFileInfo *fi = fis[i];
 
-      SNTStoredEvent *se = StoredEventFromFileInfo(fi);
+      SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
       se.decision = SNTEventStateBundleBinary;
       se.fileBundlePath = event.fileBundlePath;
       se.fileBundleExecutableRelPath = event.fileBundleExecutableRelPath;

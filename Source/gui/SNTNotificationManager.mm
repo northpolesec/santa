@@ -25,9 +25,9 @@
 #import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
-#import "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -204,19 +204,18 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)postFileAccessDistributedNotification:(SNTFileAccessMessageWindowController *)wc {
   NSDictionary *userInfo = @{
-    kFileSHA256 : wc.event.fileSHA256 ?: @"",
-    kFilePath : wc.event.filePath ?: @"",
-    kTeamID : wc.event.teamID ?: @"",
-    kExecutingUser : wc.event.executingUser ?: @"",
+    kFileSHA256 : wc.event.process.fileSHA256 ?: @"",
+    kFilePath : wc.event.process.filePath ?: @"",
+    kTeamID : wc.event.process.teamID ?: @"",
+    kExecutingUser : wc.event.process.executingUser ?: @"",
     kExecutionTime : @([wc.event.occurrenceDate timeIntervalSince1970]) ?: @0,
-    kPID : wc.event.pid ?: @0,
-    kPPID : wc.event.ppid ?: @0,
-    kParentName : wc.event.parentName ?: @"",
+    kPID : wc.event.process.pid ?: @0,
+    kPPID : wc.event.process.parent.pid ?: @0,
+    kParentName : wc.event.process.parent.filePath.lastPathComponent ?: @"",
 
     @"accessed_path" : wc.event.accessedPath ?: @"",
     @"rule_name" : wc.event.ruleName ?: @"",
     @"rule_version" : wc.event.ruleVersion ?: @"",
-    @"application" : wc.event.application ?: @"",
   };
 
   NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
@@ -250,7 +249,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   });
 }
 
-- (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event
+- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent *)event
                     withController:(SNTBinaryMessageWindowController *)withController {
   withController.bundleProgress.label = @"Searching for files...";
 
@@ -285,7 +284,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [[bc remoteObjectProxy]
       hashBundleBinariesForEvent:event
                         listener:al.endpoint
-                           reply:^(NSString *bh, NSArray<SNTStoredEvent *> *events, NSNumber *ms) {
+                           reply:^(NSString *bh, NSArray<SNTStoredExecutionEvent *> *events,
+                                   NSNumber *ms) {
                              // Revert to displaying the blockable event if we fail to calculate the
                              // bundle hash
                              if (!bh)
@@ -297,7 +297,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                              event.fileBundleHashMilliseconds = ms;
                              event.fileBundleExecutableRelPath =
                                  [events.firstObject fileBundleExecutableRelPath];
-                             for (SNTStoredEvent *se in events) {
+                             for (SNTStoredExecutionEvent *se in events) {
                                se.fileBundleHash = bh;
                                se.fileBundleBinaryCount = @(events.count);
                                se.fileBundleHashMilliseconds = ms;
@@ -402,7 +402,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [un addNotificationRequest:req withCompletionHandler:nil];
 }
 
-- (void)postBlockNotification:(SNTStoredEvent *)event
+- (void)postBlockNotification:(SNTStoredExecutionEvent *)event
             withCustomMessage:(NSString *)message
                     customURL:(NSString *)url
                   configState:(SNTConfigState *)configState
@@ -433,7 +433,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [self queueMessage:pendingMsg enableSilences:YES];
 }
 
-- (void)postFileAccessBlockNotification:(SNTFileAccessEvent *)event
+- (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent *)event
                           customMessage:(NSString *)message
                               customURL:(NSString *)url
                              customText:(NSString *)text
@@ -482,7 +482,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 #pragma mark SNTBundleServiceProgressXPC protocol methods
 
-- (void)updateCountsForEvent:(SNTStoredEvent *)event
+- (void)updateCountsForEvent:(SNTStoredExecutionEvent *)event
                  binaryCount:(uint64_t)binaryCount
                    fileCount:(uint64_t)fileCount
                  hashedCount:(uint64_t)hashedCount {

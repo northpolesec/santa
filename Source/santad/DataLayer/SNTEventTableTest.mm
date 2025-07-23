@@ -16,12 +16,13 @@
 #import "Source/santad/DataLayer/SNTEventTable.h"
 
 #include <CommonCrypto/CommonDigest.h>
+#import <OCMock/OCMock.h>
 #import <Security/Security.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTFileInfo.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 NSString *GenerateRandomHexStringWithSHA256Length() {
   // Create an array to hold random bytes
@@ -43,6 +44,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 
   return hexString;
 }
+
+@interface SNTEventTable (Testing)
+- (SNTStoredEvent *)eventFromResultSet:(FMResultSet *)rs;
+@end
 
 /// This test case actually tests SNTEventTable and SNTStoredEvent.
 ///
@@ -66,11 +71,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   self.sut = [[SNTEventTable alloc] initWithDatabaseQueue:self.dbq];
 }
 
-- (SNTStoredEvent *)createTestEvent {
+- (SNTStoredExecutionEvent *)createTestEvent {
   SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/false"];
   MOLCodesignChecker *csInfo = [binInfo codesignCheckerWithError:NULL];
-  SNTStoredEvent *event;
-  event = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *event = [[SNTStoredExecutionEvent alloc] init];
   event.idx = @(arc4random());
   event.filePath = @"/usr/bin/false";
   event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
@@ -92,7 +96,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 - (void)testUniqueIndex {
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
 
-  SNTStoredEvent *event = [self createTestEvent];
+  SNTStoredExecutionEvent *event = [self createTestEvent];
   XCTAssertTrue([self.sut addStoredEvent:event]);
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
@@ -115,10 +119,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 }
 
 - (void)testRetrieveEvent {
-  SNTStoredEvent *event = [self createTestEvent];
+  SNTStoredExecutionEvent *event = [self createTestEvent];
   [self.sut addStoredEvent:event];
 
-  SNTStoredEvent *storedEvent = [self.sut pendingEvents].firstObject;
+  SNTStoredExecutionEvent *storedEvent = [self.sut pendingEvents].firstObject;
   XCTAssertNotNil(storedEvent);
   XCTAssertEqualObjects(event.filePath, storedEvent.filePath);
   XCTAssertEqualObjects(event.signingChain, storedEvent.signingChain);
@@ -169,8 +173,8 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   }];
 
   NSArray *events = [self.sut pendingEvents];
-  for (SNTStoredEvent *event in events) {
-    if ([event.fileSHA256 isEqual:@"deadbeef"]) XCTFail("Received bad event");
+  if (events.count > 0) {
+    XCTFail("Received bad event");
   }
 
   [self.dbq inDatabase:^(FMDatabase *db) {
@@ -180,6 +184,29 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
     }
     [rs close];
   }];
+}
+
+- (NSData *)dataFromFixture:(NSString *)file {
+  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
+  XCTAssertNotNil(path, @"failed to load testdata: %@", file);
+  return [NSData dataWithContentsOfFile:path];
+}
+
+- (void)testEventFromResultSet {
+  // Attempt to unarchive data. The first is an SNTStoredEvent which is no longer valid
+  // and it should fail. The second is a valid event and should succeed.
+  FMResultSet *rs = [[FMResultSet alloc] init];
+  id mockResultSet = OCMPartialMock(rs);
+
+  NSData *oldStoredEventData = [self dataFromFixture:@"old_sntstoredevent_archive.plist"];
+  OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(oldStoredEventData);
+
+  NSData *newStoredExecEventData =
+      [self dataFromFixture:@"new_sntstoredexecutionevent_archive.plist"];
+  OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(newStoredExecEventData);
+
+  XCTAssertNil([self.sut eventFromResultSet:mockResultSet]);
+  XCTAssertNotNil([self.sut eventFromResultSet:mockResultSet]);
 }
 
 @end

@@ -18,7 +18,7 @@
 
 #import "Source/gui/SNTNotificationManager.h"
 
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 @class SNTBinaryMessageWindowController;
 
@@ -38,7 +38,7 @@
 }
 
 - (void)testPostBlockNotificationSendsDistributedNotification {
-  SNTStoredEvent *ev = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *ev = [[SNTStoredExecutionEvent alloc] init];
   ev.fileSHA256 = @"the-sha256";
   ev.filePath = @"/Applications/Safari.app/Contents/MacOS/Safari";
   ev.fileBundleName = @"Safari";

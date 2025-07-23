@@ -294,9 +294,9 @@ objc_library(
     deps = [
         ":SNTConfigurator",
         ":SNTDeviceEvent",
-        ":SNTFileAccessEvent",
         ":SNTLogging",
-        ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
+        ":SNTStoredFileAccessEvent",
         ":SNTSystemInfo",
     ],
 )
@@ -310,9 +310,9 @@ objc_library(
     deps = [
         ":SNTConfigurator",
         ":SNTDeviceEvent",
-        ":SNTFileAccessEvent",
         ":SNTLogging",
-        ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
+        ":SNTStoredFileAccessEvent",
         ":SNTSystemInfo",
     ],
 )
@@ -338,20 +338,6 @@ objc_library(
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
-    ],
-)
-
-objc_library(
-    name = "SNTFileAccessEvent",
-    srcs = ["SNTFileAccessEvent.mm"],
-    hdrs = ["SNTFileAccessEvent.h"],
-    module_name = "santa_common_SNTFileAccessEvent",
-    sdk_frameworks = [
-        "Foundation",
-    ],
-    deps = [
-        ":CoderMacros",
-        ":SNTStoredEvent",
     ],
 )
 
@@ -508,7 +494,6 @@ objc_library(
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
-        ":StoredEventHelpers",
     ],
 )
 
@@ -523,38 +508,65 @@ objc_library(
     hdrs = ["SNTStoredEvent.h"],
     module_name = "santa_common_SNTStoredEvent",
     deps = [
-        ":CertificateHelpers",
         ":CoderMacros",
-        ":MOLCertificate",
-        ":SNTCommonEnums",
     ],
 )
 
 objc_library(
-    name = "StoredEventHelpers",
-    srcs = ["StoredEventHelpers.mm"],
-    hdrs = ["StoredEventHelpers.h"],
-    module_name = "santa_common_StoredEventHelpers",
+    name = "SNTStoredExecutionEvent",
+    srcs = ["SNTStoredExecutionEvent.mm"],
+    hdrs = ["SNTStoredExecutionEvent.h"],
+    module_name = "santa_common_SNTStoredExecutionEvent",
     deps = [
         ":CertificateHelpers",
+        ":CoderMacros",
         ":MOLCertificate",
         ":MOLCodesignChecker",
+        ":SNTCommonEnums",
         ":SNTFileInfo",
         ":SNTStoredEvent",
         ":SigningIDHelpers",
     ],
 )
 
+objc_library(
+    name = "SNTStoredFileAccessEvent",
+    srcs = ["SNTStoredFileAccessEvent.mm"],
+    hdrs = ["SNTStoredFileAccessEvent.h"],
+    module_name = "santa_common_SNTStoredFileAccessEvent",
+    deps = [
+        ":CertificateHelpers",
+        ":CoderMacros",
+        ":MOLCertificate",
+        ":SNTCommonEnums",
+        ":SNTStoredEvent",
+    ],
+)
+
 santa_unit_test(
-    name = "StoredEventHelpersTest",
-    srcs = ["StoredEventHelpersTest.mm"],
+    name = "SNTStoredEventTest",
+    srcs = ["SNTStoredEventTest.mm"],
+    deps = [
+        ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
+        ":SNTStoredFileAccessEvent",
+    ],
+)
+
+
+santa_unit_test(
+    name = "SNTStoredExecutionEventTest",
+    srcs = ["SNTStoredExecutionEventTest.mm"],
     resources = [
         "testdata/signed-with-teamid",
     ],
     structured_resources = glob([
         "testdata/BundleExample.app/**",
     ]),
-    deps = [":StoredEventHelpers"],
+    deps = [
+        ":SNTFileInfo",
+        ":SNTStoredExecutionEvent",
+    ],
 )
 
 objc_library(
@@ -612,6 +624,7 @@ objc_library(
     deps = [
         ":MOLXPCConnection",
         ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
     ],
 )
 
@@ -641,6 +654,7 @@ objc_library(
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
         ":SNTXPCUnprivilegedControlInterface",
     ],
 )
@@ -672,6 +686,7 @@ objc_library(
         ":MOLXPCConnection",
         ":SNTCommonEnums",
         ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
     ],
 )
 
@@ -686,6 +701,7 @@ objc_library(
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
         ":SNTXPCBundleServiceInterface",
         ":SantaVnode",
     ],
@@ -748,8 +764,8 @@ santa_unit_test(
     deps = [
         ":SNTBlockMessage_SantaGUI",
         ":SNTConfigurator",
-        ":SNTFileAccessEvent",
-        ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
+        ":SNTStoredFileAccessEvent",
         ":SNTSystemInfo",
         "@OCMock",
     ],
@@ -784,6 +800,8 @@ test_suite(
         ":SNTKVOManagerTest",
         ":SNTMetricSetTest",
         ":SNTRuleTest",
+        ":SNTStoredEventTest",
+        ":SNTStoredExecutionEventTest",
         ":SantaCacheTest",
         ":SantaSetCacheTest",
         ":ScopedCFTypeRefTest",

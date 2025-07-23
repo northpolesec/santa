@@ -33,7 +33,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/santa_proto_include_wrapper.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
@@ -1760,7 +1760,7 @@ void SerializeAndCheckNonESEvents(
 }
 
 - (void)testSerializeBundleHashingEvent {
-  SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"file_hash";
   se.fileBundleHash = @"file_bundle_hash";

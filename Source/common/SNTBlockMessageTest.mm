@@ -17,8 +17,8 @@
 
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
-#include "Source/common/SNTFileAccessEvent.h"
-#include "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTSystemInfo.h"
 
 @interface SNTBlockMessageTest : XCTestCase
@@ -46,7 +46,7 @@
 }
 
 - (void)testEventDetailURLForEvent {
-  SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"my_fi";
   se.executingUser = @"my_un";
@@ -83,26 +83,25 @@
 }
 
 - (void)testEventDetailURLForFileAccessEvent {
-  SNTFileAccessEvent *fae = [[SNTFileAccessEvent alloc] init];
+  SNTStoredFileAccessEvent *fae = [[SNTStoredFileAccessEvent alloc] init];
 
   fae.ruleVersion = @"my_rv";
   fae.ruleName = @"my_rn";
-  fae.fileSHA256 = @"my_fi";
-  fae.fileBundleID = @"s.n.t";
-  fae.cdhash = @"abc";
-  fae.teamID = @"SNT";
-  fae.signingID = @"SNT:s.n.t";
+  fae.process.fileSHA256 = @"my_fi";
+  fae.process.cdhash = @"abc";
+  fae.process.teamID = @"SNT";
+  fae.process.signingID = @"SNT:s.n.t";
   fae.accessedPath = @"my_ap";
-  fae.executingUser = @"my_un";
+  fae.process.executingUser = @"my_un";
 
   NSString *url =
       @"http://"
       @"localhost?rv=%rule_version%&rn=%rule_name%&fi=%file_identifier%&"
-      @"fbid=%file_bundle_id%&ti=%team_id%&si=%signing_id%&ch=%cdhash%&"
+      @"ti=%team_id%&si=%signing_id%&ch=%cdhash%&"
       @"ap=%accessed_path%&un=%username%&mid=%machine_id%&hn=%hostname%&u=%uuid%&s=%serial%";
   NSString *wantUrl = @"http://"
                       @"localhost?rv=my_rv&rn=my_rn&fi=my_fi&"
-                      @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"
+                      @"ti=SNT&si=SNT:s.n.t&ch=abc&"
                       @"ap=my_ap&un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
   NSURL *gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:url];
@@ -114,7 +113,7 @@
 }
 
 - (void)testEventDetailURLMissingDetails {
-  SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"my_fi";
 

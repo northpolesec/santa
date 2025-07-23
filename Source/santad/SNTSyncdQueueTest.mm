@@ -18,7 +18,7 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 
 @interface SNTSyncdQueue (Testing)
 - (BOOL)backoffForPrimaryHash:(NSString *)hash;
@@ -76,14 +76,14 @@
   OCMStub([sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 
   // Add an event, it should be dispatched to the sync service for upload.
-  SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
   se.fileSHA256 = @"123";
-  [sut addEvents:@[ se ] isFromBundle:false];
+  [sut addExecutionEvent:se];
   OCMVerify(times(1), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 
   // Add the same event many times, they all should be dropped.
   for (int i = 0; i < 1000; ++i) {
-    [sut addEvents:@[ se ] isFromBundle:false];
+    [sut addExecutionEvent:se];
   }
   OCMVerify(times(1), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 }

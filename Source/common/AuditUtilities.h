@@ -17,6 +17,7 @@
 
 #include <bsm/libbsm.h>
 
+#include <optional>
 #include <utility>
 
 namespace santa {
@@ -63,6 +64,17 @@ static inline audit_token_t MakeStubAuditToken(pid_t pid, int pidver) {
               (unsigned int)pidver,
           },
   };
+}
+
+static inline std::optional<audit_token_t> GetMyAuditToken() {
+  audit_token_t tok;
+  mach_msg_type_number_t count = TASK_AUDIT_TOKEN_COUNT;
+  if (task_info(mach_task_self(), TASK_AUDIT_TOKEN, (task_info_t)&tok,
+                &count) != KERN_SUCCESS) {
+    return std::nullopt;
+  }
+
+  return std::make_optional(tok);
 }
 
 }  // namespace santa

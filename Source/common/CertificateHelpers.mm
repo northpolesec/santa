@@ -14,10 +14,11 @@
 /// limitations under the License.
 
 #import "Source/common/CertificateHelpers.h"
-#import "Source/common/MOLCertificate.h"
-#import "Source/common/MOLCodesignChecker.h"
 
 #include <Security/SecCertificate.h>
+
+#import "Source/common/MOLCertificate.h"
+#import "Source/common/MOLCodesignChecker.h"
 
 NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID) {
   MOLCertificate *leafCert = [certs firstObject];

@@ -27,6 +27,7 @@
 #include <string>
 #include <string_view>
 
+#include "Source/common/AuditUtilities.h"
 #include "Source/common/BranchPrediction.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -177,23 +178,14 @@ using santa::Processor;
   }
 }
 
-+ (bool)populateAuditTokenSelf:(audit_token_t *)tok {
-  mach_msg_type_number_t count = TASK_AUDIT_TOKEN_COUNT;
-  if (task_info(mach_task_self(), TASK_AUDIT_TOKEN, (task_info_t)tok, &count) != KERN_SUCCESS) {
+- (bool)muteSelf {
+  std::optional<audit_token_t> tok = santa::GetMyAuditToken();
+  if (!tok.has_value()) {
     LOGE(@"Failed to fetch this client's audit token.");
     return false;
   }
 
-  return true;
-}
-
-- (bool)muteSelf {
-  audit_token_t myAuditToken;
-  if (![SNTEndpointSecurityClient populateAuditTokenSelf:&myAuditToken]) {
-    return false;
-  }
-
-  if (!self->_esApi->MuteProcess(self->_esClient, &myAuditToken)) {
+  if (!self->_esApi->MuteProcess(self->_esClient, &*tok)) {
     LOGE(@"Failed to mute this client's process.");
     return false;
   }

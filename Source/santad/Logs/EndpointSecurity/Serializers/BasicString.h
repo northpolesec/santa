@@ -82,7 +82,7 @@ class BasicString : public Serializer {
 
   std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view) override;
 
-  std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredEvent *) override;
+  std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) override;
 
   std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *) override;
   std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) override;

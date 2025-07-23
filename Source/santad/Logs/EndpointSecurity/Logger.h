@@ -33,7 +33,7 @@
 
 // Forward declarations
 @class SNTExportConfiguration;
-@class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 @class SNTSyncdQueue;
 namespace santa {
 class LoggerPeer;
@@ -67,7 +67,7 @@ class Logger : public Timer<Logger> {
 
   void LogAllowlist(const santa::Message &msg, const std::string_view hash);
 
-  void LogBundleHashingEvents(NSArray<SNTStoredEvent *> *events);
+  void LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events);
 
   void LogDiskAppeared(NSDictionary *props);
   void LogDiskDisappeared(NSDictionary *props);

@@ -1,24 +1,25 @@
 /// Copyright 2016 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/common/SNTBlockMessage.h"
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
-#import "Source/common/SNTFileAccessEvent.h"
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTSystemInfo.h"
 
 static id ValueOrNull(id value) {
@@ -59,7 +60,7 @@ static id ValueOrNull(id value) {
 #endif
 }
 
-+ (NSAttributedString *)attributedBlockMessageForEvent:(SNTStoredEvent *)event
++ (NSAttributedString *)attributedBlockMessageForEvent:(SNTStoredExecutionEvent *)event
                                          customMessage:(NSString *)customMessage {
   NSString *defaultBlockedMessage = NSLocalizedString(
       @"The following application has been blocked from executing<br />because its trustworthiness "
@@ -82,7 +83,7 @@ static id ValueOrNull(id value) {
                 withFallback:defaultBannedMessage];
 }
 
-+ (NSAttributedString *)attributedBlockMessageForFileAccessEvent:(SNTFileAccessEvent *)event
++ (NSAttributedString *)attributedBlockMessageForFileAccessEvent:(SNTStoredFileAccessEvent *)event
                                                    customMessage:(NSString *)customMessage {
   NSString *defaultBlockedMesage =
       NSLocalizedString(@"Access to a file has been denied",
@@ -181,7 +182,7 @@ static id ValueOrNull(id value) {
 //   %uuid%                      - The machine's UUID.
 //   %serial%                    - The machine's serial number.
 //
-+ (NSDictionary *)eventDetailTemplateMappingForEvent:(SNTStoredEvent *)event {
++ (NSDictionary *)eventDetailTemplateMappingForEvent:(SNTStoredExecutionEvent *)event {
   SNTConfigurator *config = [SNTConfigurator configurator];
   return @{
     @"%file_sha%" : ValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
@@ -201,21 +202,37 @@ static id ValueOrNull(id value) {
 }
 
 //
-//   Everything from `+eventDetailTemplateMappingForEvent:` with the following file access
-//   specific templates.
+//   The following "format strings" will be replaced in the URL provided by
+//   `+eventDetailURLForEvent:customURL:templateMapping:`.
 //
 //   %rule_version%    - The version of the rule that was violated.
 //   %rule_name%       - The name of the rule that was violated.
 //   %accessed_path%   - The path accessed by the binary.
+//   %file_identifier% - The SHA-256 of the binary that performed the access operation.
+//   %username%        - The executing user's name.
+//   %team_id%         - The Team ID if present in the signature information.
+//   %signing_id%      - The Signing ID if present in the signature information.
+//   %cdhash%          - If signed, the CDHash.
+//   %machine_id%      - The configured machine ID for this host.
+//   %hostname%        - The machine's FQDN.
+//   %uuid%            - The machine's UUID.
+//   %serial%          - The machine's serial number.
 //
-+ (NSDictionary *)fileAccessEventDetailTemplateMappingForEvent:(SNTFileAccessEvent *)event {
-  NSMutableDictionary *d = [self eventDetailTemplateMappingForEvent:event].mutableCopy;
-  [d addEntriesFromDictionary:@{
++ (NSDictionary *)fileAccessEventDetailTemplateMappingForEvent:(SNTStoredFileAccessEvent *)event {
+  return @{
     @"%rule_version%" : ValueOrNull(event.ruleVersion),
     @"%rule_name%" : ValueOrNull(event.ruleName),
     @"%accessed_path%" : ValueOrNull(event.accessedPath),
-  }];
-  return d;
+    @"%file_identifier%" : ValueOrNull(event.process.fileSHA256),
+    @"%username%" : ValueOrNull(event.process.executingUser),
+    @"%team_id%" : ValueOrNull(event.process.teamID),
+    @"%signing_id%" : ValueOrNull(event.process.signingID),
+    @"%cdhash%" : ValueOrNull(event.process.cdhash),
+    @"%machine_id%" : ValueOrNull([[SNTConfigurator configurator] machineID]),
+    @"%hostname%" : ValueOrNull([SNTSystemInfo longHostname]),
+    @"%uuid%" : ValueOrNull([SNTSystemInfo hardwareUUID]),
+    @"%serial%" : ValueOrNull([SNTSystemInfo serialNumber]),
+  };
 }
 
 // Returns either the generated URL for the passed in event, or an NSURL from the passed in custom
@@ -248,13 +265,14 @@ static id ValueOrNull(id value) {
   return u;
 }
 
-+ (NSURL *)eventDetailURLForEvent:(SNTStoredEvent *)event customURL:(NSString *)url {
++ (NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event customURL:(NSString *)url {
   return [self eventDetailURLForEvent:event
                             customURL:url
                       templateMapping:[self eventDetailTemplateMappingForEvent:event]];
 }
 
-+ (NSURL *)eventDetailURLForFileAccessEvent:(SNTFileAccessEvent *)event customURL:(NSString *)url {
++ (NSURL *)eventDetailURLForFileAccessEvent:(SNTStoredFileAccessEvent *)event
+                                  customURL:(NSString *)url {
   return [self eventDetailURLForEvent:event
                             customURL:url
                       templateMapping:[self fileAccessEventDetailTemplateMappingForEvent:event]];

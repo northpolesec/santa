@@ -11,7 +11,7 @@
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>25</integer>
+				<integer>69</integer>
 			</dict>
 			<key>NS.objects</key>
 			<array>
@@ -21,7 +21,7 @@
 				</dict>
 				<dict>
 					<key>CF$UID</key>
-					<integer>30</integer>
+					<integer>38</integer>
 				</dict>
 			</array>
 		</dict>
@@ -29,32 +29,52 @@
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>29</integer>
+				<integer>37</integer>
 			</dict>
-			<key>currentSessions</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>26</integer>
-			</dict>
-			<key>decision</key>
+			<key>cdhash</key>
 			<dict>
 				<key>CF$UID</key>
 				<integer>19</integer>
 			</dict>
+			<key>codesigningFlags</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>20</integer>
+			</dict>
+			<key>currentSessions</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>35</integer>
+			</dict>
+			<key>decision</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>29</integer>
+			</dict>
+			<key>entitlements</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>22</integer>
+			</dict>
+			<key>entitlementsFiltered</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>8</integer>
+			</dict>
 			<key>executingUser</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>16</integer>
+				<integer>28</integer>
 			</dict>
 			<key>filePath</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>5</integer>
+				<integer>7</integer>
 			</dict>
 			<key>fileSHA256</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>4</integer>
+				<integer>6</integer>
 			</dict>
 			<key>idx</key>
 			<dict>
@@ -64,105 +84,144 @@
 			<key>loggedInUsers</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>23</integer>
+				<integer>33</integer>
+			</dict>
+			<key>needsBundleHash</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>8</integer>
 			</dict>
 			<key>occurrenceDate</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>17</integer>
+				<integer>4</integer>
 			</dict>
 			<key>parentName</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>22</integer>
+				<integer>32</integer>
 			</dict>
 			<key>pid</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>20</integer>
+				<integer>30</integer>
 			</dict>
 			<key>ppid</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>21</integer>
+				<integer>31</integer>
+			</dict>
+			<key>secureSigningTime</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>26</integer>
 			</dict>
 			<key>signingChain</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>6</integer>
-			</dict>
-			<key>teamID</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>39</integer>
+				<integer>9</integer>
 			</dict>
 			<key>signingID</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>40</integer>
+				<integer>18</integer>
 			</dict>
-			<key>cdhash</key>
+			<key>signingStatus</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>41</integer>
+				<integer>21</integer>
+			</dict>
+			<key>signingTime</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>27</integer>
 			</dict>
 		</dict>
-		<integer>14887</integer>
-		<string>ff98fa0c0a1095fedcbe4d388a9760e71399a5c3c017a847ffa545663b57929a</string>
-		<string>/usr/bin/yes</string>
+		<integer>648935665</integer>
 		<dict>
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>15</integer>
+				<integer>5</integer>
+			</dict>
+			<key>NS.time</key>
+			<real>774821215.67168999</real>
+		</dict>
+		<dict>
+			<key>$classes</key>
+			<array>
+				<string>NSDate</string>
+				<string>NSObject</string>
+			</array>
+			<key>$classname</key>
+			<string>NSDate</string>
+		</dict>
+		<string>741879b35b9fae5b235a7c9a88a6d20a136c6e27701f03dd32369c4ea0a6acaf</string>
+		<string>/usr/bin/yes</string>
+		<false/>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>17</integer>
 			</dict>
 			<key>NS.objects</key>
 			<array>
 				<dict>
 					<key>CF$UID</key>
-					<integer>7</integer>
-				</dict>
-				<dict>
-					<key>CF$UID</key>
-					<integer>11</integer>
+					<integer>10</integer>
 				</dict>
 				<dict>
 					<key>CF$UID</key>
 					<integer>13</integer>
 				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>15</integer>
+				</dict>
 			</array>
 		</dict>
 		<dict>
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>10</integer>
+				<integer>12</integer>
 			</dict>
 			<key>certData</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>8</integer>
+				<integer>11</integer>
 			</dict>
 		</dict>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>9</integer>
-			</dict>
-			<key>NS.data</key>
-			<data>MIIFOzCCBCOgAwIBAgIIKtpxuqe9F58wDQYJKoZIhvcNAQEFBQAwfzELMAkGA1UEBhMCVVMxEzARBgNVBAoMCkFwcGxlIEluYy4xJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MTMwMQYDVQQDDCpBcHBsZSBDb2RlIFNpZ25pbmcgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMTMwNDEyMjIzNDM1WhcNMjEwNDEyMjIzNDM1WjBWMQswCQYDVQQGEwJVUzETMBEGA1UECgwKQXBwbGUgSW5jLjEXMBUGA1UECwwOQXBwbGUgU29mdHdhcmUxGTAXBgNVBAMMEFNvZnR3YXJlIFNpZ25pbmcwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC/MLh0mE+uBguklG4xVG0J0TyjsDkQqdDmqmAiXdPkhKJAQZBkxmA9kWHaUqhFJ54sZMvkHqgkClI6s9PsFkF4wZ7RBuZ4JWMI89/KQeYd/jXpUVwTFYvp0Z1xe9HJqkuemdqPwCm4L5BvpLtlj4Bq1z1obeR4wqUSL/gy6X7JXVyMPhYgG9denRuGLQj3vBmkTQ5BpErbaxqARVAEqUyNFQfqaie9u4iePD+yUjmX47fI61RSmIovI1Zl5ekq2VG0I/oE3ffroN/VmvJeCPFfh/CxR2x1sbGM0RPjesHsYkF0poM08fladGQ5P1luzyzAYIMpPOfeT18N85M5XzCNAgMBAAGjggHiMIIB3jAdBgNVHQ4EFgQUxu0+Svsu6D8T1aAVs13Z57P3aDUwDAYDVR0TAQH/BAIwADAfBgNVHSMEGDAWgBSOaabEd0JOBKVWQpxRH4ba0iCPCTCCARwGA1UdIASCARMwggEPMIIBCwYJKoZIhvdjZAUBMIH9MDUGCCsGAQUFBwIBFilodHRwOi8vd3d3LmFwcGxlLmNvbS9jZXJ0aWZpY2F0ZWF1dGhvcml0eTCBwwYIKwYBBQUHAgIwgbYMgbNSZWxpYW5jZSBvbiB0aGlzIGNlcnRpZmljYXRlIGJ5IGFueSBwYXJ0eSBhc3N1bWVzIGFjY2VwdGFuY2Ugb2YgdGhlIHRoZW4gYXBwbGljYWJsZSBzdGFuZGFyZCB0ZXJtcyBhbmQgY29uZGl0aW9ucyBvZiB1c2UsIGNlcnRpZmljYXRlIHBvbGljeSBhbmQgY2VydGlmaWNhdGlvbiBwcmFjdGljZSBzdGF0ZW1lbnRzLjA1BgNVHR8ELjAsMCqgKKAmhiRodHRwOi8vY3JsLmFwcGxlLmNvbS9jb2Rlc2lnbmluZy5jcmwwDgYDVR0PAQH/BAQDAgeAMBYGA1UdJQEB/wQMMAoGCCsGAQUFBwMDMA8GCSqGSIb3Y2QGFgQCBQAwDQYJKoZIhvcNAQEFBQADggEBAFfUxSFXGxTaEjIsEQUMBA+VqtTi+vLEbWjeUlINInPIhXMd71FO8IpJsGiUZVEi3/1AjzW0aEBSuyWOzPrOfBJW2MDQVQW1SrG1YfyVfJFectEotB0rbdpLZ58F/ObnWUpDXh97hDe+/rqKKzMFlFCDuP6a2wO7jWLyGW13k+N1zzZZMV4IbV0BHGVTUpN2eJwXCxAelLw2kFZLRC6Y2aYxofAcZpSZVHMTtVE4vCSioDA7emWHrMC8FfReMMedoyoE38TPR4Rtn/3/RcOgGaw8u62PlPm5x8hxNhHt6AG6tHVIgqQqUxoFBZudxkcb9eggcqAbS+W+ZPw4DZr/Q0E=</data>
-		</dict>
-		<dict>
-			<key>$classes</key>
-			<array>
-				<string>NSMutableData</string>
-				<string>NSData</string>
-				<string>NSObject</string>
-			</array>
-			<key>$classname</key>
-			<string>NSMutableData</string>
-		</dict>
+		<data>
+		MIIEtDCCA5ygAwIBAgIIZO/q/sI56KUwDQYJKoZIhvcNAQEFBQAwfzELMAkG
+		A1UEBhMCVVMxEzARBgNVBAoMCkFwcGxlIEluYy4xJjAkBgNVBAsMHUFwcGxl
+		IENlcnRpZmljYXRpb24gQXV0aG9yaXR5MTMwMQYDVQQDDCpBcHBsZSBDb2Rl
+		IFNpZ25pbmcgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMjAxMDI5MTgz
+		MjM4WhcNMjYxMDI0MTczOTQxWjBWMQswCQYDVQQGEwJVUzETMBEGA1UECgwK
+		QXBwbGUgSW5jLjEXMBUGA1UECwwOQXBwbGUgU29mdHdhcmUxGTAXBgNVBAMM
+		EFNvZnR3YXJlIFNpZ25pbmcwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+		AoIBAQC/MLh0mE+uBguklG4xVG0J0TyjsDkQqdDmqmAiXdPkhKJAQZBkxmA9
+		kWHaUqhFJ54sZMvkHqgkClI6s9PsFkF4wZ7RBuZ4JWMI89/KQeYd/jXpUVwT
+		FYvp0Z1xe9HJqkuemdqPwCm4L5BvpLtlj4Bq1z1obeR4wqUSL/gy6X7JXVyM
+		PhYgG9denRuGLQj3vBmkTQ5BpErbaxqARVAEqUyNFQfqaie9u4iePD+yUjmX
+		47fI61RSmIovI1Zl5ekq2VG0I/oE3ffroN/VmvJeCPFfh/CxR2x1sbGM0RPj
+		esHsYkF0poM08fladGQ5P1luzyzAYIMpPOfeT18N85M5XzCNAgMBAAGjggFb
+		MIIBVzAMBgNVHRMBAf8EAjAAMB8GA1UdIwQYMBaAFI5ppsR3Qk4EpVZCnFEf
+		htrSII8JMIGWBgNVHSAEgY4wgYswgYgGCSqGSIb3Y2QFATB7MHkGCCsGAQUF
+		BwICMG0Ma1RoaXMgY2VydGlmaWNhdGUgaXMgdG8gYmUgdXNlZCBleGNsdXNp
+		dmVseSBmb3IgZnVuY3Rpb25zIGludGVybmFsIHRvIEFwcGxlIFByb2R1Y3Rz
+		IGFuZC9vciBBcHBsZSBwcm9jZXNzZXMuMBYGA1UdJQEB/wQMMAoGCCsGAQUF
+		BwMDMDUGA1UdHwQuMCwwKqAooCaGJGh0dHA6Ly9jcmwuYXBwbGUuY29tL2Nv
+		ZGVzaWduaW5nLmNybDAdBgNVHQ4EFgQUxu0+Svsu6D8T1aAVs13Z57P3aDUw
+		DgYDVR0PAQH/BAQDAgeAMA8GCSqGSIb3Y2QGFgQCBQAwDQYJKoZIhvcNAQEF
+		BQADggEBAImdqA6ANj/nAWa6c4Ijc5udq8taXsIwT5AlYJpJMQQJUja4xm5K
+		Zlc/Vazm9eTSdfdbz2WD+yj5lWkQSsmpwpz+iyAgipl+m2JBmp+mh7pI9nGw
+		lYwkAgg/PrkW8D74/mf+9tidOr6QwQLQSb+bzRoRGQAFOoAVTX0s4419xIyg
+		W2SwzhBvXDW5XhZPy/IdTtej2tN9ovsYgOBfN9okEUUes4byotjYEeFMNJSW
+		lchRoQhYM2BvvL3PjFYzdUgS5OZrTZjrVDE18DlIa8DPVeqoeE7C699Yb8dR
+		F9XYVUG8aVXco7QB9N80o0zagpmAQtoHMos3u8rh59zvNaFyVtE=
+		</data>
 		<dict>
 			<key>$classes</key>
 			<array>
@@ -176,28 +235,7 @@
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>10</integer>
-			</dict>
-			<key>certData</key>
-			<dict>
-				<key>CF$UID</key>
 				<integer>12</integer>
-			</dict>
-		</dict>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>9</integer>
-			</dict>
-			<key>NS.data</key>
-			<data>MIIEDjCCAvagAwIBAgIBITANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQGEwJVUzETMBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwHhcNMTExMDI0MTczOTQxWhcNMjYxMDI0MTczOTQxWjB/MQswCQYDVQQGEwJVUzETMBEGA1UECgwKQXBwbGUgSW5jLjEmMCQGA1UECwwdQXBwbGUgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkxMzAxBgNVBAMMKkFwcGxlIENvZGUgU2lnbmluZyBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKKoEXH/DvkLa/glDZiBXWtZvVobibPn5e7OOZgjNTlInyGrJ9nunCDwZDgIawynz9xQth0GxFvxXRqbVGWGcy9i5Ti9ARBkcm18aUdhnBAFJuPrhcIsJNxqwj+I/MysKUyhSXkRmnV25R640NIJtExTePvfGHahj6SpMsqRp7b6l705qs0bUBGIq2rt62bKIEusOy3vqufWyYgtacKkKmEv24cC86EhuUyfDvj52S3KcgR/Ha5u+j+Is8yjQO4XhxhRlrzP5C2twulZTl0cZTMnA6pno5Mkh8eHeQK5XZizDu7NaQg+jEiSJLJt1zC+z9jkyKeXgdAeI9w4mV9h/oUCAwEAAaOBsTCBrjAOBgNVHQ8BAf8EBAMCAYYwEwYDVR0lBAwwCgYIKwYBBQUHAwMwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUjmmmxHdCTgSlVkKcUR+G2tIgjwkwHwYDVR0jBBgwFoAUK9BpR5R2Cf70a40uQKb3R01/CF4wNgYDVR0fBC8wLTAroCmgJ4YlaHR0cDovL3d3dy5hcHBsZS5jb20vYXBwbGVjYS9yb290LmNybDANBgkqhkiG9w0BAQUFAAOCAQEAcHOt9lIVarcVGN6pKtGddpsesmmWx8LD4SvQ7wddcPjaPFpIR9s5bIDKc95iG7c6yqNaHuOH2iVKk5vvcxCTc13j9J1+3g+B9qmZwVhunPSJAL7PT/8C0w789fP0choysconDt6o05mPauaZ+2HJT/IXsRhn8DDAxgruyESBpIm78XlBw+6uyGtnfMxsSYZMAtPTam4YnPhcOMgwh5ow2mcouOKaedqfpTsfUWI7IvF+U3waC8PwTdxJRPKIiM46W7md6bK3W1KnxtVYiXK32MyzqBgdUJc/Hdpqrji/e3kxvmO594WFF+ltisTiGJQv129SpZmx3USbB3CSiCZ32w==</data>
-		</dict>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>10</integer>
 			</dict>
 			<key>certData</key>
 			<dict>
@@ -205,15 +243,557 @@
 				<integer>14</integer>
 			</dict>
 		</dict>
+		<data>
+		MIIEDjCCAvagAwIBAgIBITANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQGEwJV
+		UzETMBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlm
+		aWNhdGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwHhcN
+		MTExMDI0MTczOTQxWhcNMjYxMDI0MTczOTQxWjB/MQswCQYDVQQGEwJVUzET
+		MBEGA1UECgwKQXBwbGUgSW5jLjEmMCQGA1UECwwdQXBwbGUgQ2VydGlmaWNh
+		dGlvbiBBdXRob3JpdHkxMzAxBgNVBAMMKkFwcGxlIENvZGUgU2lnbmluZyBD
+		ZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEP
+		ADCCAQoCggEBAKKoEXH/DvkLa/glDZiBXWtZvVobibPn5e7OOZgjNTlInyGr
+		J9nunCDwZDgIawynz9xQth0GxFvxXRqbVGWGcy9i5Ti9ARBkcm18aUdhnBAF
+		JuPrhcIsJNxqwj+I/MysKUyhSXkRmnV25R640NIJtExTePvfGHahj6SpMsqR
+		p7b6l705qs0bUBGIq2rt62bKIEusOy3vqufWyYgtacKkKmEv24cC86EhuUyf
+		Dvj52S3KcgR/Ha5u+j+Is8yjQO4XhxhRlrzP5C2twulZTl0cZTMnA6pno5Mk
+		h8eHeQK5XZizDu7NaQg+jEiSJLJt1zC+z9jkyKeXgdAeI9w4mV9h/oUCAwEA
+		AaOBsTCBrjAOBgNVHQ8BAf8EBAMCAYYwEwYDVR0lBAwwCgYIKwYBBQUHAwMw
+		DwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUjmmmxHdCTgSlVkKcUR+G2tIg
+		jwkwHwYDVR0jBBgwFoAUK9BpR5R2Cf70a40uQKb3R01/CF4wNgYDVR0fBC8w
+		LTAroCmgJ4YlaHR0cDovL3d3dy5hcHBsZS5jb20vYXBwbGVjYS9yb290LmNy
+		bDANBgkqhkiG9w0BAQUFAAOCAQEAcHOt9lIVarcVGN6pKtGddpsesmmWx8LD
+		4SvQ7wddcPjaPFpIR9s5bIDKc95iG7c6yqNaHuOH2iVKk5vvcxCTc13j9J1+
+		3g+B9qmZwVhunPSJAL7PT/8C0w789fP0choysconDt6o05mPauaZ+2HJT/IX
+		sRhn8DDAxgruyESBpIm78XlBw+6uyGtnfMxsSYZMAtPTam4YnPhcOMgwh5ow
+		2mcouOKaedqfpTsfUWI7IvF+U3waC8PwTdxJRPKIiM46W7md6bK3W1KnxtVY
+		iXK32MyzqBgdUJc/Hdpqrji/e3kxvmO594WFF+ltisTiGJQv129SpZmx3USb
+		B3CSiCZ32w==
+		</data>
 		<dict>
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>9</integer>
+				<integer>12</integer>
 			</dict>
-			<key>NS.data</key>
-			<data>MIIEuzCCA6OgAwIBAgIBAjANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQGEwJVUzETMBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwHhcNMDYwNDI1MjE0MDM2WhcNMzUwMjA5MjE0MDM2WjBiMQswCQYDVQQGEwJVUzETMBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDkkakJH5HbHkdQ6wXtXnmELes2oldMVeyLGYne+Uts9QerIjAC6Bg++FAJ039BqJj50cpmnCRrEdCju+QbKsMflZ56DKRHi1vUFjczy8QPTc4UadHJGXL1XQ7Vf1+b8iUDulWPTV0N8WQ1IxVLFVkds5T39pyez1C6wVhQZ48ItCD3y6wsIG9wtj8BMIy3Q88PnT3zK0koGsj+zrW5DtleHNbLPbU6rfQPDgCSC7EhFi501TwN22IWq6NxkkdTVcGvL0Gz+PvjcM3mo0xFfh9Ma1CWQYnEdGILEINBhzOKgbEwWOxaBDKMaLOPHd5lc/9nXmW8Sdh2nzMUZaF3lMktAgMBAAGjggF6MIIBdjAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK9BpR5R2Cf70a40uQKb3R01/CF4wHwYDVR0jBBgwFoAUK9BpR5R2Cf70a40uQKb3R01/CF4wggERBgNVHSAEggEIMIIBBDCCAQAGCSqGSIb3Y2QFATCB8jAqBggrBgEFBQcCARYeaHR0cHM6Ly93d3cuYXBwbGUuY29tL2FwcGxlY2EvMIHDBggrBgEFBQcCAjCBthqBs1JlbGlhbmNlIG9uIHRoaXMgY2VydGlmaWNhdGUgYnkgYW55IHBhcnR5IGFzc3VtZXMgYWNjZXB0YW5jZSBvZiB0aGUgdGhlbiBhcHBsaWNhYmxlIHN0YW5kYXJkIHRlcm1zIGFuZCBjb25kaXRpb25zIG9mIHVzZSwgY2VydGlmaWNhdGUgcG9saWN5IGFuZCBjZXJ0aWZpY2F0aW9uIHByYWN0aWNlIHN0YXRlbWVudHMuMA0GCSqGSIb3DQEBBQUAA4IBAQBcNplMLXi37Yyb3PN3m/J20ncwT8EfhYOFG5k9RzfyqZtAjizUsZAS2L70c5vu0mQPy3lPNNiiPvl4/2vIB+x9OYOLUyDTOMSxv5pPCmv/K/xZpwUJfBdAVhEedNO3iyM7R6PVbyTi69G3cN8PReEnyvFteO3ntRcXqNx+IjXKJdXZD9Zr1KIkIxH3oayPc4FgxhtbCS+SsvhESPBgOJ4V9T0mZyCKM2r3DYLP3uujL/lTaltkwGMzd/c6ByxW69oPIQ7aunMZT7XZNn/Bh1XZp5m5MkL72NVxnn6hUrcbvZNCJBIqxw8dtk2cXmPIS4AXUKqK1drk/NAJBzewdXUh</data>
+			<key>certData</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>16</integer>
+			</dict>
 		</dict>
+		<data>
+		MIIEuzCCA6OgAwIBAgIBAjANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQGEwJV
+		UzETMBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlm
+		aWNhdGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwHhcN
+		MDYwNDI1MjE0MDM2WhcNMzUwMjA5MjE0MDM2WjBiMQswCQYDVQQGEwJVUzET
+		MBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNh
+		dGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwggEiMA0G
+		CSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDkkakJH5HbHkdQ6wXtXnmELes2
+		oldMVeyLGYne+Uts9QerIjAC6Bg++FAJ039BqJj50cpmnCRrEdCju+QbKsMf
+		lZ56DKRHi1vUFjczy8QPTc4UadHJGXL1XQ7Vf1+b8iUDulWPTV0N8WQ1IxVL
+		FVkds5T39pyez1C6wVhQZ48ItCD3y6wsIG9wtj8BMIy3Q88PnT3zK0koGsj+
+		zrW5DtleHNbLPbU6rfQPDgCSC7EhFi501TwN22IWq6NxkkdTVcGvL0Gz+Pvj
+		cM3mo0xFfh9Ma1CWQYnEdGILEINBhzOKgbEwWOxaBDKMaLOPHd5lc/9nXmW8
+		Sdh2nzMUZaF3lMktAgMBAAGjggF6MIIBdjAOBgNVHQ8BAf8EBAMCAQYwDwYD
+		VR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK9BpR5R2Cf70a40uQKb3R01/CF4w
+		HwYDVR0jBBgwFoAUK9BpR5R2Cf70a40uQKb3R01/CF4wggERBgNVHSAEggEI
+		MIIBBDCCAQAGCSqGSIb3Y2QFATCB8jAqBggrBgEFBQcCARYeaHR0cHM6Ly93
+		d3cuYXBwbGUuY29tL2FwcGxlY2EvMIHDBggrBgEFBQcCAjCBthqBs1JlbGlh
+		bmNlIG9uIHRoaXMgY2VydGlmaWNhdGUgYnkgYW55IHBhcnR5IGFzc3VtZXMg
+		YWNjZXB0YW5jZSBvZiB0aGUgdGhlbiBhcHBsaWNhYmxlIHN0YW5kYXJkIHRl
+		cm1zIGFuZCBjb25kaXRpb25zIG9mIHVzZSwgY2VydGlmaWNhdGUgcG9saWN5
+		IGFuZCBjZXJ0aWZpY2F0aW9uIHByYWN0aWNlIHN0YXRlbWVudHMuMA0GCSqG
+		SIb3DQEBBQUAA4IBAQBcNplMLXi37Yyb3PN3m/J20ncwT8EfhYOFG5k9Rzfy
+		qZtAjizUsZAS2L70c5vu0mQPy3lPNNiiPvl4/2vIB+x9OYOLUyDTOMSxv5pP
+		Cmv/K/xZpwUJfBdAVhEedNO3iyM7R6PVbyTi69G3cN8PReEnyvFteO3ntRcX
+		qNx+IjXKJdXZD9Zr1KIkIxH3oayPc4FgxhtbCS+SsvhESPBgOJ4V9T0mZyCK
+		M2r3DYLP3uujL/lTaltkwGMzd/c6ByxW69oPIQ7aunMZT7XZNn/Bh1XZp5m5
+		MkL72NVxnn6hUrcbvZNCJBIqxw8dtk2cXmPIS4AXUKqK1drk/NAJBzewdXUh
+		</data>
+		<dict>
+			<key>$classes</key>
+			<array>
+				<string>NSArray</string>
+				<string>NSObject</string>
+			</array>
+			<key>$classname</key>
+			<string>NSArray</string>
+		</dict>
+		<string>platform:com.apple.yes</string>
+		<string>18ddebfdb356b7ed575b063bbbbe40a2d0d92f23</string>
+		<integer>603980545</integer>
+		<integer>4</integer>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>25</integer>
+			</dict>
+			<key>NS.keys</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>23</integer>
+				</dict>
+			</array>
+			<key>NS.objects</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>24</integer>
+				</dict>
+			</array>
+		</dict>
+		<string>ent1</string>
+		<string>val1</string>
+		<dict>
+			<key>$classes</key>
+			<array>
+				<string>NSDictionary</string>
+				<string>NSObject</string>
+			</array>
+			<key>$classname</key>
+			<string>NSDictionary</string>
+		</dict>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>5</integer>
+			</dict>
+			<key>NS.time</key>
+			<real>773114646</real>
+		</dict>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>5</integer>
+			</dict>
+			<key>NS.time</key>
+			<real>773028246</real>
+		</dict>
+		<string>foo</string>
+		<integer>281474976710656</integer>
+		<integer>2222</integer>
+		<integer>1</integer>
+		<string>launchd</string>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>17</integer>
+			</dict>
+			<key>NS.objects</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>28</integer>
+				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>34</integer>
+				</dict>
+			</array>
+		</dict>
+		<string>bar</string>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>17</integer>
+			</dict>
+			<key>NS.objects</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>36</integer>
+				</dict>
+			</array>
+		</dict>
+		<string>nobody@console</string>
+		<dict>
+			<key>$classes</key>
+			<array>
+				<string>SNTStoredExecutionEvent</string>
+				<string>SNTStoredEvent</string>
+				<string>NSObject</string>
+			</array>
+			<key>$classname</key>
+			<string>SNTStoredExecutionEvent</string>
+		</dict>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>37</integer>
+			</dict>
+			<key>cdhash</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>52</integer>
+			</dict>
+			<key>codesigningFlags</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>53</integer>
+			</dict>
+			<key>currentSessions</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>67</integer>
+			</dict>
+			<key>decision</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>61</integer>
+			</dict>
+			<key>entitlements</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>55</integer>
+			</dict>
+			<key>entitlementsFiltered</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>8</integer>
+			</dict>
+			<key>executingUser</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>60</integer>
+			</dict>
+			<key>filePath</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>42</integer>
+			</dict>
+			<key>fileSHA256</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>41</integer>
+			</dict>
+			<key>idx</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>39</integer>
+			</dict>
+			<key>loggedInUsers</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>65</integer>
+			</dict>
+			<key>needsBundleHash</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>8</integer>
+			</dict>
+			<key>occurrenceDate</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>40</integer>
+			</dict>
+			<key>parentName</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>64</integer>
+			</dict>
+			<key>pid</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>62</integer>
+			</dict>
+			<key>ppid</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>63</integer>
+			</dict>
+			<key>secureSigningTime</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>58</integer>
+			</dict>
+			<key>signingChain</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>43</integer>
+			</dict>
+			<key>signingID</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>51</integer>
+			</dict>
+			<key>signingStatus</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>54</integer>
+			</dict>
+			<key>signingTime</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>59</integer>
+			</dict>
+			<key>teamID</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>50</integer>
+			</dict>
+		</dict>
+		<integer>2014435623</integer>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>5</integer>
+			</dict>
+			<key>NS.time</key>
+			<real>774821215.68116403</real>
+		</dict>
+		<string>47ef3c73ddbe04149d66c25ae1622e56b2ec05af3c66a1ee86a4320a6c47c985</string>
+		<string>/Applications/Santa.app/Contents/MacOS/Santa</string>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>17</integer>
+			</dict>
+			<key>NS.objects</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>44</integer>
+				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>46</integer>
+				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>48</integer>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>12</integer>
+			</dict>
+			<key>certData</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>45</integer>
+			</dict>
+		</dict>
+		<data>
+		MIIF0TCCBLmgAwIBAgIQVD/Ox7sfOEq19SZT7zeItzANBgkqhkiG9w0BAQsF
+		ADB1MUQwQgYDVQQDDDtBcHBsZSBXb3JsZHdpZGUgRGV2ZWxvcGVyIFJlbGF0
+		aW9ucyBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTELMAkGA1UECwwCRzMxEzAR
+		BgNVBAoMCkFwcGxlIEluYy4xCzAJBgNVBAYTAlVTMB4XDTI0MTEwODE5MjY1
+		MloXDTI1MTEwODE5MjY1MVowgZcxGjAYBgoJkiaJk/IsZAEBDApGWDYzQUFa
+		SjhQMTMwMQYDVQQDDCpBcHBsZSBEZXZlbG9wbWVudDogTWF0dCBXaGl0ZSAo
+		UU41MjI5SlRKUikxEzARBgNVBAsMClpNQ0c3TUxEVjkxIjAgBgNVBAoMGU5v
+		cnRoIFBvbGUgU2VjdXJpdHksIEluYy4xCzAJBgNVBAYTAlVTMIIBIjANBgkq
+		hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzkzYr9cA1dmf0bPFeLdXrjX4u3uT
+		p60D2HrWVKRCDHu2m6Xah7RV7Rzu3Dvp8Fi6+grfS9+FHy4br8YIhx8vgLmC
+		ZwtTxxc0K+OA5OPoH7zIS25t/YtVIi38scGoxBz+rlOZYN0i7eL0k6HQDiKj
+		Zn6gNZotxIi68UnD1rsyYi24WDA5yEgS0wsiO/jZkEjXrrL70WbULZH9WURT
+		S348bSBpfMsX7H6unkcwGqfZ7H3d4/jmFJKmiDKZdCt5uo62ZYbkgoMTIlLu
+		gBiCjq1uWoMsWgzJEOQMQzRG7FmOYsmXhwMvvL4OHuiiHBGvLYcykdAoUzwx
+		CWhfYAKO7ndAxwIDAQABo4ICODCCAjQwDAYDVR0TAQH/BAIwADAfBgNVHSME
+		GDAWgBQJ/sAVkPmvZAqSErkmKGMMl+ynsjBwBggrBgEFBQcBAQRkMGIwLQYI
+		KwYBBQUHMAKGIWh0dHA6Ly9jZXJ0cy5hcHBsZS5jb20vd3dkcmczLmRlcjAx
+		BggrBgEFBQcwAYYlaHR0cDovL29jc3AuYXBwbGUuY29tL29jc3AwMy13d2Ry
+		ZzMwNDCCAR4GA1UdIASCARUwggERMIIBDQYJKoZIhvdjZAUBMIH/MIHDBggr
+		BgEFBQcCAjCBtgyBs1JlbGlhbmNlIG9uIHRoaXMgY2VydGlmaWNhdGUgYnkg
+		YW55IHBhcnR5IGFzc3VtZXMgYWNjZXB0YW5jZSBvZiB0aGUgdGhlbiBhcHBs
+		aWNhYmxlIHN0YW5kYXJkIHRlcm1zIGFuZCBjb25kaXRpb25zIG9mIHVzZSwg
+		Y2VydGlmaWNhdGUgcG9saWN5IGFuZCBjZXJ0aWZpY2F0aW9uIHByYWN0aWNl
+		IHN0YXRlbWVudHMuMDcGCCsGAQUFBwIBFitodHRwczovL3d3dy5hcHBsZS5j
+		b20vY2VydGlmaWNhdGVhdXRob3JpdHkvMBYGA1UdJQEB/wQMMAoGCCsGAQUF
+		BwMDMB0GA1UdDgQWBBTMc/6zQlVEDNQYU76s2j+fBMx0kzAOBgNVHQ8BAf8E
+		BAMCB4AwEwYKKoZIhvdjZAYBAgEB/wQCBQAwEwYKKoZIhvdjZAYBDAEB/wQC
+		BQAwDQYJKoZIhvcNAQELBQADggEBACrEey04iqO/RJ2bUXb67BIhLdAQTGcK
+		daPHWoaPEJImCDVIr/opMIgUXjR1QZRyauxcmS1ReU2ZdQcdXuwOfh7LaVVn
+		TZhNN8JeXzasS8M4vX45A8ljWdVttHCJuys0N+H4YjOQqmCsJGNs0OTndDlZ
+		Zw/wSAHV4mXBCw8fGIiPUS4V7lcQ8y+5QJN4QoguDLXPgKSYmi/Su9lbr/Is
+		ly/ZONw4Cou9a9UMjzG5dO8sMTiZymS68Rz/HurKedKNzwhtLiq5wsIwNvX/
+		ZKiJ7JbsfB2a7GoSTbH7Y5IH6muJv8pi4QYH6EabOQeslwAexIplkxNV/wPF
+		rmWajoNcRjg=
+		</data>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>12</integer>
+			</dict>
+			<key>certData</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>47</integer>
+			</dict>
+		</dict>
+		<data>
+		MIIEUTCCAzmgAwIBAgIQfK9pCiW3Of57m0R6wXjF7jANBgkqhkiG9w0BAQsF
+		ADBiMQswCQYDVQQGEwJVUzETMBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UE
+		CxMdQXBwbGUgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFw
+		cGxlIFJvb3QgQ0EwHhcNMjAwMjE5MTgxMzQ3WhcNMzAwMjIwMDAwMDAwWjB1
+		MUQwQgYDVQQDDDtBcHBsZSBXb3JsZHdpZGUgRGV2ZWxvcGVyIFJlbGF0aW9u
+		cyBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTELMAkGA1UECwwCRzMxEzARBgNV
+		BAoMCkFwcGxlIEluYy4xCzAJBgNVBAYTAlVTMIIBIjANBgkqhkiG9w0BAQEF
+		AAOCAQ8AMIIBCgKCAQEA2PWJ/KhZC4fHTJEuLVaQ03gdpDDppUjvC0O/LYT7
+		JF1FG+XrWTYSXFRknmxiLbTGl8rMPPbWBpH85QKmHGq0edVny6zpPwcR4YS8
+		Rx1mjjmi6LRJ7TrS4RBgeo6TjMrA2gzAg9Dj+ZHWp4zIwXPirkbRYp2SqJBg
+		N31ols2N4Pyb+ni743uvLRfdW/6AWSN1F7gSwe0b5TTO/iK1nkmw5VW/j4Si
+		PKi6xYaVFuQAyZ8D0MyzOhZ71gVcnetHrg21LYwOaU1A0EtMOwSejSGxrC5D
+		VDDOwYqGlJhL32oNP/77HK6XF8J4CjDgXx9UO0m3JQAaN4LSVpelUkl8YDib
+		7wIDAQABo4HvMIHsMBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgwFoAU
+		K9BpR5R2Cf70a40uQKb3R01/CF4wRAYIKwYBBQUHAQEEODA2MDQGCCsGAQUF
+		BzABhihodHRwOi8vb2NzcC5hcHBsZS5jb20vb2NzcDAzLWFwcGxlcm9vdGNh
+		MC4GA1UdHwQnMCUwI6AhoB+GHWh0dHA6Ly9jcmwuYXBwbGUuY29tL3Jvb3Qu
+		Y3JsMB0GA1UdDgQWBBQJ/sAVkPmvZAqSErkmKGMMl+ynsjAOBgNVHQ8BAf8E
+		BAMCAQYwEAYKKoZIhvdjZAYCAQQCBQAwDQYJKoZIhvcNAQELBQADggEBAK1l
+		E+j24IF3RAJHQr5fpTkg6mKp/cWQyXMT1Z6b0KoPjY3L7QHPbChAW8dVJEH4
+		/M/BtSPp3Ozxb8qAHXfCxGFJJWevD8o5Ja3T43rMMygNDi6hV0Bz+uZcrgZR
+		Ke3jhQxPYdwyFot30ETKXXIDMUacrptAGvr04NM++i+MZp+XxFRZ79JI9AeZ
+		SWBZGcfdlNHAwWx/eCHvDOs7bJmCS1JgOLU5gm3sUjFTvg+RTElJdI+mUcuE
+		R04ddSduvfnSXPN/wmwLCTbiZOTCNwMUGdXqapSqqdv+9poIZ4vvK7iqF0mD
+		r8/LvOnP6pVxsLRFoszlh6oKw0E6eVzaUDSdlTs=
+		</data>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>12</integer>
+			</dict>
+			<key>certData</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>49</integer>
+			</dict>
+		</dict>
+		<data>
+		MIIEuzCCA6OgAwIBAgIBAjANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQGEwJV
+		UzETMBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlm
+		aWNhdGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwHhcN
+		MDYwNDI1MjE0MDM2WhcNMzUwMjA5MjE0MDM2WjBiMQswCQYDVQQGEwJVUzET
+		MBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNh
+		dGlvbiBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwggEiMA0G
+		CSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDkkakJH5HbHkdQ6wXtXnmELes2
+		oldMVeyLGYne+Uts9QerIjAC6Bg++FAJ039BqJj50cpmnCRrEdCju+QbKsMf
+		lZ56DKRHi1vUFjczy8QPTc4UadHJGXL1XQ7Vf1+b8iUDulWPTV0N8WQ1IxVL
+		FVkds5T39pyez1C6wVhQZ48ItCD3y6wsIG9wtj8BMIy3Q88PnT3zK0koGsj+
+		zrW5DtleHNbLPbU6rfQPDgCSC7EhFi501TwN22IWq6NxkkdTVcGvL0Gz+Pvj
+		cM3mo0xFfh9Ma1CWQYnEdGILEINBhzOKgbEwWOxaBDKMaLOPHd5lc/9nXmW8
+		Sdh2nzMUZaF3lMktAgMBAAGjggF6MIIBdjAOBgNVHQ8BAf8EBAMCAQYwDwYD
+		VR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK9BpR5R2Cf70a40uQKb3R01/CF4w
+		HwYDVR0jBBgwFoAUK9BpR5R2Cf70a40uQKb3R01/CF4wggERBgNVHSAEggEI
+		MIIBBDCCAQAGCSqGSIb3Y2QFATCB8jAqBggrBgEFBQcCARYeaHR0cHM6Ly93
+		d3cuYXBwbGUuY29tL2FwcGxlY2EvMIHDBggrBgEFBQcCAjCBthqBs1JlbGlh
+		bmNlIG9uIHRoaXMgY2VydGlmaWNhdGUgYnkgYW55IHBhcnR5IGFzc3VtZXMg
+		YWNjZXB0YW5jZSBvZiB0aGUgdGhlbiBhcHBsaWNhYmxlIHN0YW5kYXJkIHRl
+		cm1zIGFuZCBjb25kaXRpb25zIG9mIHVzZSwgY2VydGlmaWNhdGUgcG9saWN5
+		IGFuZCBjZXJ0aWZpY2F0aW9uIHByYWN0aWNlIHN0YXRlbWVudHMuMA0GCSqG
+		SIb3DQEBBQUAA4IBAQBcNplMLXi37Yyb3PN3m/J20ncwT8EfhYOFG5k9Rzfy
+		qZtAjizUsZAS2L70c5vu0mQPy3lPNNiiPvl4/2vIB+x9OYOLUyDTOMSxv5pP
+		Cmv/K/xZpwUJfBdAVhEedNO3iyM7R6PVbyTi69G3cN8PReEnyvFteO3ntRcX
+		qNx+IjXKJdXZD9Zr1KIkIxH3oayPc4FgxhtbCS+SsvhESPBgOJ4V9T0mZyCK
+		M2r3DYLP3uujL/lTaltkwGMzd/c6ByxW69oPIQ7aunMZT7XZNn/Bh1XZp5m5
+		MkL72NVxnn6hUrcbvZNCJBIqxw8dtk2cXmPIS4AXUKqK1drk/NAJBzewdXUh
+		</data>
+		<string>ZMCG7MLDV9</string>
+		<string>ZMCG7MLDV9:com.northpolesec.santa</string>
+		<string>710ba2afb4bc5629e9fe4728c2b0c226ceba0ab9</string>
+		<integer>536871681</integer>
+		<integer>3</integer>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>25</integer>
+			</dict>
+			<key>NS.keys</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>23</integer>
+				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>56</integer>
+				</dict>
+			</array>
+			<key>NS.objects</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>24</integer>
+				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>57</integer>
+				</dict>
+			</array>
+		</dict>
+		<string>ent2</string>
+		<string>val2</string>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>5</integer>
+			</dict>
+			<key>NS.time</key>
+			<real>770522646</real>
+		</dict>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>5</integer>
+			</dict>
+			<key>NS.time</key>
+			<real>770436246</real>
+		</dict>
+		<string>foo2</string>
+		<integer>140737488355328</integer>
+		<integer>3333</integer>
+		<integer>1111</integer>
+		<string>init</string>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>17</integer>
+			</dict>
+			<key>NS.objects</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>60</integer>
+				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>66</integer>
+				</dict>
+			</array>
+		</dict>
+		<string>bar2</string>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>17</integer>
+			</dict>
+			<key>NS.objects</key>
+			<array>
+				<dict>
+					<key>CF$UID</key>
+					<integer>68</integer>
+				</dict>
+			</array>
+		</dict>
+		<string>nobody2@console</string>
 		<dict>
 			<key>$classes</key>
 			<array>
@@ -224,193 +804,6 @@
 			<key>$classname</key>
 			<string>NSMutableArray</string>
 		</dict>
-		<string>root</string>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>18</integer>
-			</dict>
-			<key>NS.time</key>
-			<real>485894498.537635</real>
-		</dict>
-		<dict>
-			<key>$classes</key>
-			<array>
-				<string>NSDate</string>
-				<string>NSObject</string>
-			</array>
-			<key>$classname</key>
-			<string>NSDate</string>
-		</dict>
-		<integer>131072</integer>
-		<integer>11196</integer>
-		<integer>10760</integer>
-		<string>bash</string>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>25</integer>
-			</dict>
-			<key>NS.objects</key>
-			<array>
-				<dict>
-					<key>CF$UID</key>
-					<integer>24</integer>
-				</dict>
-			</array>
-		</dict>
-		<string>foouser</string>
-		<dict>
-			<key>$classes</key>
-			<array>
-				<string>NSArray</string>
-				<string>NSObject</string>
-			</array>
-			<key>$classname</key>
-			<string>NSArray</string>
-		</dict>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>25</integer>
-			</dict>
-			<key>NS.objects</key>
-			<array>
-				<dict>
-					<key>CF$UID</key>
-					<integer>27</integer>
-				</dict>
-				<dict>
-					<key>CF$UID</key>
-					<integer>28</integer>
-				</dict>
-			</array>
-		</dict>
-		<string>foouser@console</string>
-		<string>foouser@ttys000</string>
-		<dict>
-			<key>$classes</key>
-			<array>
-				<string>SNTStoredEvent</string>
-				<string>NSObject</string>
-			</array>
-			<key>$classname</key>
-			<string>SNTStoredEvent</string>
-		</dict>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>29</integer>
-			</dict>
-			<key>currentSessions</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>38</integer>
-			</dict>
-			<key>decision</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>35</integer>
-			</dict>
-			<key>executingUser</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>24</integer>
-			</dict>
-			<key>filePath</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>33</integer>
-			</dict>
-			<key>fileSHA256</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>32</integer>
-			</dict>
-			<key>idx</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>31</integer>
-			</dict>
-			<key>loggedInUsers</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>37</integer>
-			</dict>
-			<key>occurrenceDate</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>34</integer>
-			</dict>
-			<key>parentName</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>22</integer>
-			</dict>
-			<key>pid</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>36</integer>
-			</dict>
-			<key>ppid</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>21</integer>
-			</dict>
-		</dict>
-		<integer>14888</integer>
-		<string>2b3a38f4e4e981afc517b0c7903ffe2f79193c67e2329dd77cf2e74b046ca3a7</string>
-		<string>/usr/local/Cellar/hub/2.2.3/bin/hub</string>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>18</integer>
-			</dict>
-			<key>NS.time</key>
-			<real>485894568.928225</real>
-		</dict>
-		<integer>1</integer>
-		<integer>11427</integer>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>25</integer>
-			</dict>
-			<key>NS.objects</key>
-			<array>
-				<dict>
-					<key>CF$UID</key>
-					<integer>24</integer>
-				</dict>
-			</array>
-		</dict>
-		<dict>
-			<key>$class</key>
-			<dict>
-				<key>CF$UID</key>
-				<integer>25</integer>
-			</dict>
-			<key>NS.objects</key>
-			<array>
-				<dict>
-					<key>CF$UID</key>
-					<integer>27</integer>
-				</dict>
-				<dict>
-					<key>CF$UID</key>
-					<integer>28</integer>
-				</dict>
-			</array>
-		</dict>
-		<string>012345678910</string>
-		<string>signing.id</string>
-		<string>abc123</string>
 	</array>
 	<key>$top</key>
 	<dict>

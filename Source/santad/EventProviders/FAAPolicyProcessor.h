@@ -27,7 +27,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTFileAccessEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaSetCache.h"
 #include "Source/common/SantaVnode.h"
@@ -177,7 +177,7 @@ class FAAPolicyProcessor {
 
   void LogTelemetry(const WatchItemPolicyBase &policy, const PathTarget &target, const Message &msg,
                     FileAccessPolicyDecision decision);
-  void LogTTY(SNTFileAccessEvent *event, URLTextPair link_info, const Message &msg,
+  void LogTTY(SNTStoredFileAccessEvent *event, URLTextPair link_info, const Message &msg,
               const WatchItemPolicyBase &policy);
 };
 

@@ -26,7 +26,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTXPCBundleServiceInterface.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SigningIDHelpers.h"
@@ -735,7 +735,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     }
 
     if (self.bundleInfo) {
-      SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+      SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
       se.fileBundlePath = fileInfo.bundlePath;
 
       MOLXPCConnection *bc = [SNTXPCBundleServiceInterface configuredConnection];
@@ -751,13 +751,13 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       [[bc remoteObjectProxy]
           hashBundleBinariesForEvent:se
                             listener:nil
-                               reply:^(NSString *hash, NSArray<SNTStoredEvent *> *events,
+                               reply:^(NSString *hash, NSArray<SNTStoredExecutionEvent *> *events,
                                        NSNumber *time) {
                                  bundleInfo[kBundleHash] = hash;
 
                                  NSMutableArray *bundleHashes = [[NSMutableArray alloc] init];
 
-                                 for (SNTStoredEvent *event in events) {
+                                 for (SNTStoredExecutionEvent *event in events) {
                                    [bundleHashes addObject:@{
                                      kSHA256 : event.fileSHA256,
                                      kPath : event.filePath
