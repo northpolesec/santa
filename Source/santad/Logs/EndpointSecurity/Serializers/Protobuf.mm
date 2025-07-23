@@ -317,12 +317,14 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
 ::pbv1::Execution::Reason GetReasonEnum(SNTEventState event_state) {
   switch (event_state) {
     case SNTEventStateAllowBinary: return ::pbv1::Execution::REASON_BINARY;
+    case SNTEventStateAllowLocalBinary: return ::pbv1::Execution::REASON_BINARY;
     case SNTEventStateAllowCompilerBinary: return ::pbv1::Execution::REASON_BINARY;
     case SNTEventStateAllowTransitive: return ::pbv1::Execution::REASON_TRANSITIVE;
     case SNTEventStateAllowPendingTransitive: return ::pbv1::Execution::REASON_PENDING_TRANSITIVE;
     case SNTEventStateAllowCertificate: return ::pbv1::Execution::REASON_CERT;
     case SNTEventStateAllowScope: return ::pbv1::Execution::REASON_SCOPE;
     case SNTEventStateAllowTeamID: return ::pbv1::Execution::REASON_TEAM_ID;
+    case SNTEventStateAllowLocalSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
     case SNTEventStateAllowSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
     case SNTEventStateAllowCompilerSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
     case SNTEventStateAllowCDHash: return ::pbv1::Execution::REASON_CDHASH;
@@ -336,8 +338,13 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
     case SNTEventStateBlockCDHash: return ::pbv1::Execution::REASON_CDHASH;
     case SNTEventStateBlockLongPath: return ::pbv1::Execution::REASON_LONG_PATH;
     case SNTEventStateBlockUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
-    default: return ::pbv1::Execution::REASON_NOT_RUNNING;
+    case SNTEventStateUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
+    case SNTEventStateAllow: return ::pbv1::Execution::REASON_UNKNOWN;
+    case SNTEventStateBlock: return ::pbv1::Execution::REASON_UNKNOWN;
+    case SNTEventStateBundleBinary: return ::pbv1::Execution::REASON_UNKNOWN;
   }
+
+  return ::pbv1::Execution::REASON_UNKNOWN;
 }
 
 ::pbv1::Execution::Mode GetModeEnum(SNTClientMode mode) {
