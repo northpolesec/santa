@@ -78,12 +78,14 @@ std::string GetDecisionString(SNTEventState event_state) {
 std::string GetReasonString(SNTEventState event_state) {
   switch (event_state) {
     case SNTEventStateAllowBinary: return "BINARY";
+    case SNTEventStateAllowLocalBinary: return "BINARY";
     case SNTEventStateAllowCompilerBinary: return "BINARY";
     case SNTEventStateAllowTransitive: return "TRANSITIVE";
     case SNTEventStateAllowPendingTransitive: return "PENDING_TRANSITIVE";
     case SNTEventStateAllowCertificate: return "CERT";
     case SNTEventStateAllowScope: return "SCOPE";
     case SNTEventStateAllowTeamID: return "TEAMID";
+    case SNTEventStateAllowLocalSigningID: return "SIGNINGID";
     case SNTEventStateAllowSigningID: return "SIGNINGID";
     case SNTEventStateAllowCompilerSigningID: return "SIGNINGID";
     case SNTEventStateAllowCDHash: return "CDHASH";
@@ -97,8 +99,13 @@ std::string GetReasonString(SNTEventState event_state) {
     case SNTEventStateBlockCDHash: return "CDHASH";
     case SNTEventStateBlockLongPath: return "LONG_PATH";
     case SNTEventStateBlockUnknown: return "UNKNOWN";
-    default: return "NOTRUNNING";
+    case SNTEventStateUnknown: return "UNKNOWN";
+    case SNTEventStateAllow: return "UNKNOWN";
+    case SNTEventStateBlock: return "UNKNOWN";
+    case SNTEventStateBundleBinary: return "UNKNOWN";
   }
+
+  return "UNKNOWN";
 }
 
 std::string GetModeString(SNTClientMode mode) {

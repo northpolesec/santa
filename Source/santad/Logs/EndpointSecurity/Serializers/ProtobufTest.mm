@@ -519,34 +519,42 @@ void SerializeAndCheckNonESEvents(
 }
 
 - (void)testGetReasonEnum {
-  std::map<SNTEventState, ::pbv1::Execution::Reason> stateToReason = {
-      {SNTEventStateUnknown, ::pbv1::Execution::REASON_NOT_RUNNING},
-      {SNTEventStateBundleBinary, ::pbv1::Execution::REASON_NOT_RUNNING},
-      {SNTEventStateBlockUnknown, ::pbv1::Execution::REASON_UNKNOWN},
-      {SNTEventStateBlockBinary, ::pbv1::Execution::REASON_BINARY},
-      {SNTEventStateBlockCertificate, ::pbv1::Execution::REASON_CERT},
-      {SNTEventStateBlockScope, ::pbv1::Execution::REASON_SCOPE},
-      {SNTEventStateBlockTeamID, ::pbv1::Execution::REASON_TEAM_ID},
-      {SNTEventStateBlockSigningID, ::pbv1::Execution::REASON_SIGNING_ID},
-      {SNTEventStateBlockCDHash, ::pbv1::Execution::REASON_CDHASH},
-      {SNTEventStateBlockLongPath, ::pbv1::Execution::REASON_LONG_PATH},
-      {SNTEventStateAllowUnknown, ::pbv1::Execution::REASON_UNKNOWN},
-      {SNTEventStateAllowBinary, ::pbv1::Execution::REASON_BINARY},
-      {SNTEventStateAllowCertificate, ::pbv1::Execution::REASON_CERT},
-      {SNTEventStateAllowScope, ::pbv1::Execution::REASON_SCOPE},
-      {SNTEventStateAllowCompilerBinary, ::pbv1::Execution::REASON_BINARY},
-      {SNTEventStateAllowCompilerCDHash, ::pbv1::Execution::REASON_CDHASH},
-      {SNTEventStateAllowCompilerSigningID, ::pbv1::Execution::REASON_SIGNING_ID},
-      {SNTEventStateAllowTransitive, ::pbv1::Execution::REASON_TRANSITIVE},
-      {SNTEventStateAllowPendingTransitive, ::pbv1::Execution::REASON_PENDING_TRANSITIVE},
-      {SNTEventStateAllowTeamID, ::pbv1::Execution::REASON_TEAM_ID},
-      {SNTEventStateAllowSigningID, ::pbv1::Execution::REASON_SIGNING_ID},
-      {SNTEventStateAllowCDHash, ::pbv1::Execution::REASON_CDHASH},
-  };
+  for (uint64_t i = 0; i <= 64; i++) {
+    SNTEventState state = static_cast<SNTEventState>(i == 0 ? 0 : 1 << (i - 1));
+    ::pbv1::Execution::Reason want = ::pbv1::Execution::REASON_UNKNOWN;
+    switch (state) {
+      case SNTEventStateUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateBundleBinary: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateBlockUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateBlockBinary: want = ::pbv1::Execution::REASON_BINARY; break;
+      case SNTEventStateBlockCertificate: want = ::pbv1::Execution::REASON_CERT; break;
+      case SNTEventStateBlockScope: want = ::pbv1::Execution::REASON_SCOPE; break;
+      case SNTEventStateBlockTeamID: want = ::pbv1::Execution::REASON_TEAM_ID; break;
+      case SNTEventStateBlockLongPath: want = ::pbv1::Execution::REASON_LONG_PATH; break;
+      case SNTEventStateBlockSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
+      case SNTEventStateBlockCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
+      case SNTEventStateAllowUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateAllowBinary: want = ::pbv1::Execution::REASON_BINARY; break;
+      case SNTEventStateAllowCertificate: want = ::pbv1::Execution::REASON_CERT; break;
+      case SNTEventStateAllowScope: want = ::pbv1::Execution::REASON_SCOPE; break;
+      case SNTEventStateAllowCompilerBinary: want = ::pbv1::Execution::REASON_BINARY; break;
+      case SNTEventStateAllowTransitive: want = ::pbv1::Execution::REASON_TRANSITIVE; break;
+      case SNTEventStateAllowPendingTransitive:
+        want = ::pbv1::Execution::REASON_PENDING_TRANSITIVE;
+        break;
+      case SNTEventStateAllowTeamID: want = ::pbv1::Execution::REASON_TEAM_ID; break;
+      case SNTEventStateAllowSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
+      case SNTEventStateAllowCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
+      case SNTEventStateAllowLocalBinary: want = ::pbv1::Execution::REASON_BINARY; break;
+      case SNTEventStateAllowLocalSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
+      case SNTEventStateAllowCompilerSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
+      case SNTEventStateAllowCompilerCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
+      case SNTEventStateBlock: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateAllow: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+    }
 
-  for (const auto &kv : stateToReason) {
-    XCTAssertEqual(santa::GetReasonEnum(kv.first), kv.second, @"Bad reason for state: %llu",
-                   kv.first);
+    XCTAssertEqual(santa::GetReasonEnum(state), want, @"Bad reason for state: %llu (1 << %llu)",
+                   state, i == 0 ? 0 : (i - 1));
   }
 }
 
