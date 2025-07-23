@@ -57,7 +57,6 @@ pid_t AttemptToFindUnusedPID() {
 std::string GetProcessPath(pid_t pid) {
   char pathbuf[PROC_PIDPATHINFO_MAXSIZE] = {};
   int ret = proc_pidpath(pid, pathbuf, sizeof(pathbuf));
-  NSLog(@"got ret: %d, path buf: %s", ret, pathbuf);
   if (ret > 0) {
     return std::string(pathbuf);
   } else {

@@ -60,8 +60,7 @@
   return result;
 }
 
-- (NSString *)hashForEvent;
-{
+- (NSString *)hashForEvent {
   [self doesNotRecognizeSelector:_cmd];
   return nil;
 }

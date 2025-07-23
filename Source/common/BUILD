@@ -546,6 +546,17 @@ objc_library(
 santa_unit_test(
     name = "SNTStoredEventTest",
     srcs = ["SNTStoredEventTest.mm"],
+    deps = [
+        ":SNTStoredEvent",
+        ":SNTStoredExecutionEvent",
+        ":SNTStoredFileAccessEvent",
+    ],
+)
+
+
+santa_unit_test(
+    name = "SNTStoredExecutionEventTest",
+    srcs = ["SNTStoredExecutionEventTest.mm"],
     resources = [
         "testdata/signed-with-teamid",
     ],
@@ -554,9 +565,7 @@ santa_unit_test(
     ]),
     deps = [
         ":SNTFileInfo",
-        ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
-        ":SNTStoredFileAccessEvent",
     ],
 )
 
@@ -792,6 +801,7 @@ test_suite(
         ":SNTMetricSetTest",
         ":SNTRuleTest",
         ":SNTStoredEventTest",
+        ":SNTStoredExecutionEventTest",
         ":SantaCacheTest",
         ":SantaSetCacheTest",
         ":ScopedCFTypeRefTest",
