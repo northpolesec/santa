@@ -235,9 +235,9 @@
 }
 
 - (void)testClearAllPendingWithRepliesSerialized {
-  SNTStoredEvent *se1 = [[SNTStoredEvent alloc] init];
-  SNTStoredEvent *se2 = [[SNTStoredEvent alloc] init];
-  SNTStoredEvent *se3 = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *se1 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent *se2 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent *se3 = [[SNTStoredExecutionEvent alloc] init];
 
   // Setup expectations for reply blocks
   XCTestExpectation *reply1Expectation =
