@@ -286,7 +286,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (NSString *)cdhash {
-  return santa::StringToNSString(
+  return santa::UTF8StringToNSString(
       santa::BufToHexString((NSData *)self.signingInformation[(__bridge id)kSecCodeInfoUnique]));
 }
 

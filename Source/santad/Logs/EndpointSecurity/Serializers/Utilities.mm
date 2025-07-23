@@ -100,7 +100,7 @@ NSString *MountFromName(NSString *path) {
     return nil;
   }
 
-  NSString *mntFromName = santa::StringToNSString(sfs.f_mntfromname);
+  NSString *mntFromName = santa::UTF8StringToNSString(sfs.f_mntfromname);
 
   return mntFromName.length > 0 ? mntFromName : nil;
 }

@@ -153,7 +153,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
       }
 
       // Only log file changes that match the given regex
-      NSString *targetPath = santa::StringToNSString(targetFile->path.data);
+      NSString *targetPath = santa::UTF8StringToNSString(targetFile->path.data);
       if (![[self.configurator fileChangesRegex]
               numberOfMatchesInString:targetPath
                               options:0

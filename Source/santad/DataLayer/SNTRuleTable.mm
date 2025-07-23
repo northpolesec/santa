@@ -479,7 +479,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
           [SNTError populateError:&blockErr
                          withCode:SNTErrorCodeRuleInvalidCELExpression
                           message:@"Rule array contained rule with invalid CEL expression"
-                           detail:santa::StringToNSString(std::string(celExpr.status().message()))];
+                           detail:santa::UTF8StringToNSString(celExpr.status().message())];
           continue;
         }
       }

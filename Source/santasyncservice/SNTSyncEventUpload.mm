@@ -77,7 +77,7 @@ using santa::NSStringToUTF8StringView;
           [NSMutableArray arrayWithCapacity:response.event_upload_bundle_binaries_size()];
       for (const std::string &bundle_binary : response.event_upload_bundle_binaries()) {
         [(NSMutableArray *)self.syncState.bundleBinaryRequests
-            addObject:santa::StringToNSString(bundle_binary)];
+            addObject:santa::UTF8StringToNSString(bundle_binary)];
       }
     }
     SLOGI(@"Uploaded %d events", req->events_size());

@@ -34,7 +34,7 @@
 namespace pbv1 = ::santa::sync::v1;
 
 using santa::NSStringToUTF8String;
-using santa::StringToNSString;
+using santa::UTF8StringToNSString;
 
 // Ignoring warning regarding deprecated declarations because of large number of
 // reported issues due to checking deprecated proto fields.
@@ -199,15 +199,15 @@ The following table expands upon the above logic to list most of the permutation
   }
 
   if (resp.has_allowed_path_regex()) {
-    self.syncState.allowlistRegex = StringToNSString(resp.allowed_path_regex());
+    self.syncState.allowlistRegex = UTF8StringToNSString(resp.allowed_path_regex());
   } else if (resp.has_deprecated_whitelist_regex()) {
-    self.syncState.allowlistRegex = StringToNSString(resp.deprecated_whitelist_regex());
+    self.syncState.allowlistRegex = UTF8StringToNSString(resp.deprecated_whitelist_regex());
   }
 
   if (resp.has_blocked_path_regex()) {
-    self.syncState.blocklistRegex = StringToNSString(resp.blocked_path_regex());
+    self.syncState.blocklistRegex = UTF8StringToNSString(resp.blocked_path_regex());
   } else if (resp.has_deprecated_blacklist_regex()) {
-    self.syncState.blocklistRegex = StringToNSString(resp.deprecated_blacklist_regex());
+    self.syncState.blocklistRegex = UTF8StringToNSString(resp.deprecated_blacklist_regex());
   }
 
   if (resp.has_block_usb_mount()) {
@@ -215,7 +215,7 @@ The following table expands upon the above logic to list most of the permutation
 
     self.syncState.remountUSBMode = [NSMutableArray array];
     for (const std::string &mode : resp.remount_usb_mode()) {
-      [(NSMutableArray *)self.syncState.remountUSBMode addObject:StringToNSString(mode)];
+      [(NSMutableArray *)self.syncState.remountUSBMode addObject:UTF8StringToNSString(mode)];
     }
   }
 
@@ -237,19 +237,19 @@ The following table expands upon the above logic to list most of the permutation
       if (!protoAWS.access_key().empty() && !protoAWS.secret_access_key().empty() &&
           !protoAWS.session_token().empty() && !protoAWS.bucket_name().empty()) {
         self.syncState.exportConfig = [[SNTExportConfiguration alloc]
-            initWithAWSAccessKey:StringToNSString(protoAWS.access_key())
-                 secretAccessKey:StringToNSString(protoAWS.secret_access_key())
-                    sessionToken:StringToNSString(protoAWS.session_token())
-                      bucketName:StringToNSString(protoAWS.bucket_name())
-                 objectKeyPrefix:StringToNSString(protoAWS.object_key_prefix())];
+            initWithAWSAccessKey:UTF8StringToNSString(protoAWS.access_key())
+                 secretAccessKey:UTF8StringToNSString(protoAWS.secret_access_key())
+                    sessionToken:UTF8StringToNSString(protoAWS.session_token())
+                      bucketName:UTF8StringToNSString(protoAWS.bucket_name())
+                 objectKeyPrefix:UTF8StringToNSString(protoAWS.object_key_prefix())];
       }
     } else if (protoExportConfig.has_gcp_config()) {
       auto protoGCP = protoExportConfig.gcp_config();
       if (!protoGCP.bearer_token().empty() && !protoGCP.bucket_name().empty()) {
         self.syncState.exportConfig = [[SNTExportConfiguration alloc]
-            initWithGCPBearerToken:StringToNSString(protoGCP.bearer_token())
-                        bucketName:StringToNSString(protoGCP.bucket_name())
-                   objectKeyPrefix:StringToNSString(protoGCP.object_key_prefix())];
+            initWithGCPBearerToken:UTF8StringToNSString(protoGCP.bearer_token())
+                        bucketName:UTF8StringToNSString(protoGCP.bucket_name())
+                   objectKeyPrefix:UTF8StringToNSString(protoGCP.object_key_prefix())];
       }
     }
   }
