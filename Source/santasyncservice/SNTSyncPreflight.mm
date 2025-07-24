@@ -134,7 +134,7 @@ The following table expands upon the above logic to list most of the permutation
 
   // If user requested it or we've never had a successful sync, try from a clean slate.
   if (requestSyncType == SNTSyncTypeClean || requestSyncType == SNTSyncTypeCleanAll) {
-    SLOGD(@"%@ sync requested by user",
+    SLOGD(@"%@ sync requested by client",
           (requestSyncType == SNTSyncTypeCleanAll) ? @"Clean All" : @"Clean");
     req->set_request_clean_sync(true);
   }
