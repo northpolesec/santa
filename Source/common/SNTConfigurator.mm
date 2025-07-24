@@ -1017,6 +1017,9 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (SNTSyncType)syncTypeRequired {
+  if (self.syncState.count == 0) {
+    return SNTSyncTypeCleanAll;
+  }
   return (SNTSyncType)[self.syncState[kSyncTypeRequired] integerValue];
 }
 
