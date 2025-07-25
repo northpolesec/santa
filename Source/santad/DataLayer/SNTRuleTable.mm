@@ -689,8 +689,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       int state = [rs intForColumn:@"state"];
       int type = [rs intForColumn:@"type"];
 
-      hash.Update(identifier.UTF8String, identifier.length);
-      hash.Update(cel.UTF8String, cel.length);
+      hash.Update(identifier.UTF8String,
+                  [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+      hash.Update(cel.UTF8String, [cel lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
       hash.Update((const void *)&state, sizeof(state));
       hash.Update((const void *)&type, sizeof(type));
     }
