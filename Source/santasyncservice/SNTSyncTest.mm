@@ -174,6 +174,7 @@
       syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTSyncTypeNormal), nil])]);
   OCMStub([self.daemonConnRop
       clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
+  OCMStub([self.daemonConnRop databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", nil])]);
 }
 
 #pragma mark - SNTSyncStage Tests
@@ -926,7 +927,13 @@
   [self setupDefaultDaemonConnResponses];
   SNTSyncPostflight *sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
 
-  [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest *req) {
+            NSDictionary *requestDict = [self dictFromRequest:req];
+            return [requestDict[@"rules_hash"] isEqualToString:@"the-hash"];
+          }];
 
   XCTAssertTrue([sut sync]);
   OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);

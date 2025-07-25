@@ -28,6 +28,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTXxhash.h"
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
@@ -46,7 +47,6 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   es_new_client_result_t ret = es_new_client(&client, ^(es_client_t *c, const es_message_t *m){
                                                  // noop
                                              });
-
   if (ret != ES_NEW_CLIENT_RESULT_SUCCESS) {
     // Creating the client failed, so we cannot grab the current default mute set.
     LOGE(@"Failed to create client to grab default muted paths");
@@ -80,6 +80,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 @property NSDictionary *criticalSystemBinaries;
 @property(readonly) NSArray *criticalSystemBinaryPaths;
 @property(readwrite) NSDictionary<NSString *, SNTRule *> *cachedStaticRules;
+@property(atomic) NSString *rulesHash;
 @end
 
 @implementation SNTRuleTable
@@ -479,7 +480,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
           [SNTError populateError:&blockErr
                          withCode:SNTErrorCodeRuleInvalidCELExpression
                           message:@"Rule array contained rule with invalid CEL expression"
-                           detail:santa::StringToNSString(std::string(celExpr.status().message()))];
+                           detail:santa::StringToNSString(celExpr.status().message())];
           continue;
         }
       }
@@ -510,6 +511,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
         }
       }
     }
+
+    // Clear the rules hash
+    self.rulesHash = nil;
   }];
 
   if (blockErr && error) {
@@ -662,6 +666,42 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     rules[r.identifier] = r;
   }
   self.cachedStaticRules = [rules copy];
+}
+
+- (NSString *)hashOfHashes {
+  __block NSString *digest;
+  [self inDatabase:^(FMDatabase *db) {
+    // If santad has previously computed the hash and stored it in memory, return it.
+    // When a rule is added or removed the hash will be cleared so that the next
+    // request for the hash will recompute it.
+    if (self.rulesHash.length) {
+      digest = self.rulesHash;
+      return;
+    }
+
+    santa::Xxhash hash;
+
+    FMResultSet *rs =
+        [db executeQuery:@"SELECT identifier, state, type, cel_expr FROM rules WHERE state != ?",
+                         @(SNTRuleStateAllowTransitive)];
+    while ([rs next]) {
+      NSString *identifier = [rs stringForColumn:@"identifier"];
+      NSString *cel = [rs stringForColumn:@"cel_expr"];
+      int state = [rs intForColumn:@"state"];
+      int type = [rs intForColumn:@"type"];
+
+      hash.Update(identifier.UTF8String,
+                  [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+      hash.Update(cel.UTF8String, [cel lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+      hash.Update(static_cast<void *>(&state), sizeof(state));
+      hash.Update(static_cast<void *>(&type), sizeof(type));
+    }
+    [rs close];
+
+    digest = santa::StringToNSString(hash.Digest());
+    self.rulesHash = digest;
+  }];
+  return digest;
 }
 
 @end

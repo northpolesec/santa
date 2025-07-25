@@ -53,6 +53,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTXxhash",
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
@@ -651,8 +652,8 @@ objc_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTSystemInfo",
+        "//Source/common:SNTXxhash",
         "//Source/common:String",
-        "@xxhash",
     ],
 )
 
@@ -1127,16 +1128,13 @@ santa_unit_test(
 santa_unit_test(
     name = "SNTRuleTableTest",
     srcs = [
-        "DataLayer/SNTDatabaseTable.h",
-        "DataLayer/SNTDatabaseTable.mm",
-        "DataLayer/SNTRuleTable.h",
-        "DataLayer/SNTRuleTable.mm",
         "DataLayer/SNTRuleTableTest.mm",
     ],
     sdk_dylibs = [
         "EndpointSecurity",
     ],
     deps = [
+        ":SNTRuleTable",
         "//Source/common:CertificateHelpers",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",

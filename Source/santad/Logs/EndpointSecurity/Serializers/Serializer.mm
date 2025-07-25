@@ -24,9 +24,6 @@
 #import "Source/common/String.h"
 #import "Source/santad/SNTDecisionCache.h"
 
-#define XXH_STATIC_LINKING_ONLY
-#include "xxhash.h"
-
 namespace santa {
 
 Serializer::Serializer(SNTDecisionCache *decision_cache) : decision_cache_(decision_cache) {
@@ -36,14 +33,8 @@ Serializer::Serializer(SNTDecisionCache *decision_cache) : decision_cache_(decis
   UpdateMachineID();
 
   // Prime the xxHash state with invariant data
-  common_hash_state_ = XXH3_createState();
-  XXH3_128bits_reset(common_hash_state_);
   std::string_view uuid = NSStringToUTF8StringView([SNTSystemInfo bootSessionUUID]);
-  XXH3_128bits_update(common_hash_state_, uuid.data(), uuid.length());
-}
-
-Serializer::~Serializer() {
-  XXH3_freeState(common_hash_state_);
+  common_hash_state_.Update(uuid.data(), uuid.length());
 }
 
 void Serializer::UpdateMachineID() {
@@ -88,47 +79,6 @@ std::vector<uint8_t> Serializer::SerializeMessageTemplate(const santa::EnrichedE
   return SerializeMessage(msg, cd);
 }
 
-static inline void CanonicalHashToHex(const XXH128_canonical_t *canonical, char *output) {
-  static const char hex_digits[] = "0123456789abcdef";
-  const unsigned char *digest = canonical->digest;
-
-  // Fully unrolled loop for better performance
-  output[0] = hex_digits[digest[0] >> 4];
-  output[1] = hex_digits[digest[0] & 0xF];
-  output[2] = hex_digits[digest[1] >> 4];
-  output[3] = hex_digits[digest[1] & 0xF];
-  output[4] = hex_digits[digest[2] >> 4];
-  output[5] = hex_digits[digest[2] & 0xF];
-  output[6] = hex_digits[digest[3] >> 4];
-  output[7] = hex_digits[digest[3] & 0xF];
-  output[8] = hex_digits[digest[4] >> 4];
-  output[9] = hex_digits[digest[4] & 0xF];
-  output[10] = hex_digits[digest[5] >> 4];
-  output[11] = hex_digits[digest[5] & 0xF];
-  output[12] = hex_digits[digest[6] >> 4];
-  output[13] = hex_digits[digest[6] & 0xF];
-  output[14] = hex_digits[digest[7] >> 4];
-  output[15] = hex_digits[digest[7] & 0xF];
-  output[16] = hex_digits[digest[8] >> 4];
-  output[17] = hex_digits[digest[8] & 0xF];
-  output[18] = hex_digits[digest[9] >> 4];
-  output[19] = hex_digits[digest[9] & 0xF];
-  output[20] = hex_digits[digest[10] >> 4];
-  output[21] = hex_digits[digest[10] & 0xF];
-  output[22] = hex_digits[digest[11] >> 4];
-  output[23] = hex_digits[digest[11] & 0xF];
-  output[24] = hex_digits[digest[12] >> 4];
-  output[25] = hex_digits[digest[12] & 0xF];
-  output[26] = hex_digits[digest[13] >> 4];
-  output[27] = hex_digits[digest[13] & 0xF];
-  output[28] = hex_digits[digest[14] >> 4];
-  output[29] = hex_digits[digest[14] & 0xF];
-  output[30] = hex_digits[digest[15] >> 4];
-  output[31] = hex_digits[digest[15] & 0xF];
-
-  output[32] = '\0';
-}
-
 std::vector<uint8_t> Serializer::SerializeFileAccess(const std::string &policy_version,
                                                      const std::string &policy_name,
                                                      const santa::Message &msg,
@@ -154,24 +104,11 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(const std::string &policy_v
   };
 
   // Copy the invariant state
-  XXH3_state_t state;
-  XXH3_copyState(&state, common_hash_state_);
-
-  // Consume the variant data and create a digest
-  XXH3_128bits_update(&state, &operation_id_data, sizeof(operation_id_data));
-  XXH128_hash_t hash = XXH3_128bits_digest(&state);
-
-  // Convert to canonical representation
-  XXH128_canonical_t canonical_hash;
-  XXH128_canonicalFromHash(&canonical_hash, hash);
-
-  // Hex encode
-  static_assert(sizeof(XXH128_canonical_t) == 16);
-  char operation_id[sizeof(XXH128_canonical_t) * 2 + 1];
-  CanonicalHashToHex(&canonical_hash, operation_id);
+  Xxhash state(common_hash_state_);
+  state.Update(&operation_id_data, sizeof(operation_id_data));
 
   return SerializeFileAccess(policy_version, policy_name, msg, enriched_process, target, decision,
-                             std::string_view(operation_id, sizeof(XXH128_canonical_t) * 2));
+                             state.Digest());
 }
 
 };  // namespace santa
