@@ -480,7 +480,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
           [SNTError populateError:&blockErr
                          withCode:SNTErrorCodeRuleInvalidCELExpression
                           message:@"Rule array contained rule with invalid CEL expression"
-                           detail:santa::StringViewToNSString(celExpr.status().message())];
+                           detail:santa::StringToNSString(celExpr.status().message())];
           continue;
         }
       }
@@ -511,14 +511,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
         }
       }
     }
+
+    // Clear the rules hash
+    self.rulesHash = nil;
   }];
 
   if (blockErr && error) {
     *error = blockErr;
   }
-
-  // Clear the rules hash
-  self.rulesHash = nil;
 
   return !failed;
 }
@@ -669,15 +669,16 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 }
 
 - (NSString *)hashOfHashes {
-  // If santad has previously computed the hash and stored it in memory, return it.
-  // When a rule is added or removed the hash will be cleared so that the next
-  // request for the hash will recompute it.
-  if (self.rulesHash.length) {
-    return self.rulesHash;
-  }
-
   __block NSString *digest;
   [self inDatabase:^(FMDatabase *db) {
+    // If santad has previously computed the hash and stored it in memory, return it.
+    // When a rule is added or removed the hash will be cleared so that the next
+    // request for the hash will recompute it.
+    if (self.rulesHash.length) {
+      digest = self.rulesHash;
+      return;
+    }
+
     santa::Xxhash hash;
 
     FMResultSet *rs =
@@ -692,15 +693,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       hash.Update(identifier.UTF8String,
                   [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
       hash.Update(cel.UTF8String, [cel lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
-      hash.Update((const void *)&state, sizeof(state));
-      hash.Update((const void *)&type, sizeof(type));
+      hash.Update(static_cast<void *>(&state), sizeof(state));
+      hash.Update(static_cast<void *>(&type), sizeof(type));
     }
     [rs close];
 
-    digest = santa::StringViewToNSString(hash.Digest());
+    digest = santa::StringToNSString(hash.Digest());
+    self.rulesHash = digest;
   }];
-
-  self.rulesHash = digest;
   return digest;
 }
 
