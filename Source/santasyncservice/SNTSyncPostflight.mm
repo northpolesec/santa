@@ -50,8 +50,8 @@ using santa::NSStringToUTF8String;
   }
 
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-  [rop databaseRulesHash:^(NSString *hash){
-      // req->set_rules_hash(NSStringToUTF8String(hash));
+  [rop databaseRulesHash:^(NSString *hash) {
+    req->set_rules_hash(NSStringToUTF8String(hash));
   }];
 
   ::pbv1::PostflightResponse response;
