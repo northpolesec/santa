@@ -204,4 +204,6 @@
 */
 - (BOOL)validateWithRequirement:(SecRequirementRef)requirement;
 
+extern NSString *const kMOLCodesignCheckerErrorDomain;
+
 @end

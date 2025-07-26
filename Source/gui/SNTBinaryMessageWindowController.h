@@ -18,7 +18,7 @@
 #import "Source/common/SNTConfigState.h"
 #import "Source/gui/SNTMessageWindowController.h"
 
-@class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 @class SNTBundleProgress;
 
 ///
@@ -26,13 +26,14 @@
 ///
 @interface SNTBinaryMessageWindowController : SNTMessageWindowController
 
-- (instancetype)initWithEvent:(SNTStoredEvent *)event
+- (instancetype)initWithEvent:(SNTStoredExecutionEvent *)event
                     customMsg:(NSString *)message
                     customURL:(NSString *)url
                   configState:(SNTConfigState *)configState
                         reply:(void (^)(BOOL authenticated))replyBlock;
 
-- (void)updateBlockNotification:(SNTStoredEvent *)event withBundleHash:(NSString *)bundleHash;
+- (void)updateBlockNotification:(SNTStoredExecutionEvent *)event
+                 withBundleHash:(NSString *)bundleHash;
 
 ///  Reference to the "Bundle Hash" label in the XIB. Used to remove if application
 ///  doesn't have a bundle hash.
@@ -55,7 +56,7 @@
 ///
 ///  The execution event that this window is for
 ///
-@property(readonly) SNTStoredEvent *event;
+@property(readonly) SNTStoredExecutionEvent *event;
 
 ///
 ///  The reply block to call when the user has made a decision in standalone

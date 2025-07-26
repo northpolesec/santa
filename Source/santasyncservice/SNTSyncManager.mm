@@ -26,7 +26,6 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
-#include "Source/common/cel/Evaluator.h"
 #import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
@@ -63,9 +62,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 @end
 
-@implementation SNTSyncManager {
-  std::unique_ptr<santa::cel::Evaluator> _celEvaluator;
-}
+@implementation SNTSyncManager
 
 #pragma mark init
 
@@ -96,25 +93,20 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _syncLimiter = dispatch_semaphore_create(kMaxEnqueuedSyncs);
 
     _eventBatchSize = kDefaultEventBatchSize;
-
-    auto celEvaluator = santa::cel::Evaluator::Create();
-    if (celEvaluator.ok()) {
-      _celEvaluator = std::move(celEvaluator.value());
-    }
   }
   return self;
 }
 
 #pragma mark SNTSyncServiceXPC methods
 
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events fromBundle:(BOOL)isFromBundle {
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
   SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     LOGE(@"Events upload failed to create sync state: %ld", status);
     return;
   }
-  if (isFromBundle) syncState.eventBatchSize = self.eventBatchSize;
+  syncState.eventBatchSize = self.eventBatchSize;
   SNTSyncEventUpload *p = [[SNTSyncEventUpload alloc] initWithState:syncState];
   if (events && [p uploadEvents:events]) {
     LOGD(@"Events upload complete");
@@ -127,7 +119,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   self.xsrfTokenHeader = syncState.xsrfTokenHeader;
 }
 
-- (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply {
   if (!event) {
     reply(SNTBundleEventActionDropEvents);
@@ -448,8 +440,6 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   syncState.daemonConn = self.daemonConn;
   syncState.contentEncoding = config.syncClientContentEncoding;
   syncState.pushNotificationsToken = self.pushNotifications.token;
-
-  syncState.celEvaluator = _celEvaluator.get();
 
   return syncState;
 }

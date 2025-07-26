@@ -11,3 +11,9 @@ filegroup(
     srcs = glob(["protobuf/**/*.json"]),
     visibility = ["//:santa_package_group"],
 )
+
+filegroup(
+    name = "archive_testdata",
+    srcs = glob(["*.plist"]),
+    visibility = ["//:santa_package_group"],
+)

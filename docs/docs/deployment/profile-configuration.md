@@ -35,77 +35,61 @@ available.
 	<key>PayloadContent</key>
 	<array>
 		<dict>
-			<key>PayloadContent</key>
-			<dict>
-				<key>com.northpolesec.santa</key>
-				<dict>
-					<key>Forced</key>
-					<array>
-						<dict>
-							<key>mcx_preference_settings</key>
-							<dict>
 <!-- highlight-start -->
-								<key>ClientMode</key>
-								<integer>1</integer>
-								<key>EnableSilentMode</key>
-								<false/>
-								<key>EventDetailText</key>
-								<string>Open sync server</string>
-								<key>EventDetailURL</key>
-								<string>https://sync-server-hostname/blockables/%file_sha%</string>
-								<key>FileChangesRegex</key>
-								<string>^/(?!(?:private/tmp|Library/(?:Caches|Managed Installs/Logs|(?:Managed )?Preferences))/)</string>
-								<key>MachineIDKey</key>
-								<string>MachineUUID</string>
-								<key>MachineIDPlist</key>
-								<string>/Library/Preferences/com.company.machine-mapping.plist</string>
-								<key>MachineOwnerKey</key>
-								<string>Owner</string>
-								<key>MachineOwnerPlist</key>
-								<string>/Library/Preferences/com.company.machine-mapping.plist</string>
-								<key>ModeNotificationLockdown</key>
-								<string>Entering Lockdown mode</string>
-								<key>ModeNotificationMonitor</key>
-								<string>Entering Monitor mode&lt;br/&gt;Please be careful!</string>
-								<key>MoreInfoURL</key>
-								<string>https://sync-server-hostname/moreinfo</string>
-								<key>StaticRules</key>
-								<array>
-									<dict>
-										<!-- Always allow files signed by North Pole Security Inc -->
-										<key>identifier</key>
-										<string>ZMCG7MLDV9</string>
-										<key>policy</key>
-										<string>ALLOWLIST</string>
-										<key>rule_type</key>
-										<string>TEAMID</string>
-									</dict>
-									<dict>
-										<!-- Always BLOCK the BundleExample.app binary in Santa's testdata files, for testing -->
-										<key>identifier</key>
-										<string>b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670</string>
-										<key>policy</key>
-										<string>BLOCKLIST</string>
-										<key>rule_type</key>
-										<string>BINARY</string>
-									</dict>
-								</array>
-								<key>SyncBaseURL</key>
-								<string>https://sync-server-hostname/api/santa/</string>
-<!-- highlight-end -->
-							</dict>
-						</dict>
-					</array>
+			<key>ClientMode</key>
+			<integer>1</integer>
+			<key>EnableSilentMode</key>
+			<false/>
+			<key>EventDetailText</key>
+			<string>Open sync server</string>
+			<key>EventDetailURL</key>
+			<string>https://sync-server-hostname/blockables/%file_sha%</string>
+			<key>FileChangesRegex</key>
+			<string>^/(?!(?:private/tmp|Library/(?:Caches|Managed Installs/Logs|(?:Managed )?Preferences))/)</string>
+			<key>MachineIDKey</key>
+			<string>MachineUUID</string>
+			<key>MachineIDPlist</key>
+			<string>/Library/Preferences/com.company.machine-mapping.plist</string>
+			<key>MachineOwnerKey</key>
+			<string>Owner</string>
+			<key>MachineOwnerPlist</key>
+			<string>/Library/Preferences/com.company.machine-mapping.plist</string>
+			<key>ModeNotificationLockdown</key>
+			<string>Entering Lockdown mode</string>
+			<key>ModeNotificationMonitor</key>
+			<string>Entering Monitor mode&lt;br/&gt;Please be careful!</string>
+			<key>MoreInfoURL</key>
+			<string>https://sync-server-hostname/moreinfo</string>
+			<key>StaticRules</key>
+			<array>
+				<dict>
+					<!-- Always allow files signed by North Pole Security Inc -->
+					<key>identifier</key>
+					<string>ZMCG7MLDV9</string>
+					<key>policy</key>
+					<string>ALLOWLIST</string>
+					<key>rule_type</key>
+					<string>TEAMID</string>
 				</dict>
-			</dict>
-			<key>PayloadEnabled</key>
-			<true/>
+				<dict>
+					<!-- Always BLOCK the BundleExample.app binary in Santa's testdata files, for testing -->
+					<key>identifier</key>
+					<string>b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670</string>
+					<key>policy</key>
+					<string>BLOCKLIST</string>
+					<key>rule_type</key>
+					<string>BINARY</string>
+				</dict>
+			</array>
+			<key>SyncBaseURL</key>
+			<string>https://sync-server-hostname/api/santa/</string>
+<!-- highlight-end -->
+			<key>PayloadDisplayName</key>
+			<string>Santa Configuration</string>
 			<key>PayloadIdentifier</key>
 			<string>com.mycompany.santa.359E3C7D-396F-4C45-99E7-F429620B9B21</string>
 			<key>PayloadType</key>
-			<string>com.apple.ManagedClient.preferences</string>
-			<key>PayloadUUID</key>
-			<string>359E3C7D-396F-4C45-99E7-F429620B9B21</string>
+			<string>com.northpolesec.santa</string>
 			<key>PayloadVersion</key>
 			<integer>1</integer>
 		</dict>

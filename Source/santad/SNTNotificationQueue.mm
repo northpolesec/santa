@@ -20,7 +20,7 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/RingBuffer.h"
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 
@@ -47,7 +47,7 @@
   return self;
 }
 
-- (void)addEvent:(SNTStoredEvent *)event
+- (void)addEvent:(SNTStoredExecutionEvent *)event
     withCustomMessage:(NSString *)message
             customURL:(NSString *)url
           configState:(SNTConfigState *)configState

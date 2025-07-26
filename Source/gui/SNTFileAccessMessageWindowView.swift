@@ -17,13 +17,13 @@ import SwiftUI
 
 import santa_common_SNTBlockMessage
 import santa_common_SNTConfigState
-import santa_common_SNTFileAccessEvent
+import santa_common_SNTStoredFileAccessEvent
 import santa_gui_SNTMessageView
 
 @objc public class SNTFileAccessMessageWindowViewFactory: NSObject {
   @objc public static func createWith(
     window: NSWindow,
-    event: SNTFileAccessEvent,
+    event: SNTStoredFileAccessEvent,
     customMessage: NSString?,
     customURL: NSString?,
     customText: NSString?,
@@ -47,7 +47,7 @@ import santa_gui_SNTMessageView
 }
 
 struct MoreDetailsView: View {
-  let e: SNTFileAccessEvent
+  let e: SNTStoredFileAccessEvent
 
   @Environment(\.presentationMode) var presentationMode
 
@@ -73,12 +73,12 @@ struct MoreDetailsView: View {
 
         addLabel {
           Text("Binary Path").bold().font(Font.system(size: 12.0))
-          Text(e.filePath).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+          Text(e.process.filePath).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
         }
 
         Divider()
 
-        if let signingID = e.signingID {
+        if let signingID = e.process.signingID {
           addLabel {
             Text("Signing ID").bold().font(Font.system(size: 12.0))
             Text(signingID).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
@@ -86,7 +86,7 @@ struct MoreDetailsView: View {
           Divider()
         }
 
-        if let cdHash = e.cdhash {
+        if let cdHash = e.process.cdhash {
           addLabel {
             Text("CDHash").bold().font(Font.system(size: 12.0))
             Text(cdHash).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
@@ -97,7 +97,7 @@ struct MoreDetailsView: View {
         addLabel {
           Text("SHA-256").bold().font(Font.system(size: 12.0))
           // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
-          Text(e.fileSHA256).font(Font.system(size: 12.0).monospaced()).frame(width: 240)
+          Text(e.process.fileSHA256).font(Font.system(size: 12.0).monospaced()).frame(width: 240)
             .textSelection(.enabled)
         }
 
@@ -105,7 +105,11 @@ struct MoreDetailsView: View {
 
         addLabel {
           Text("Parent").bold().font(Font.system(size: 12.0))
-          Text(verbatim: "\(e.parentName ?? "") (\(e.ppid.stringValue))").font(
+          Text(
+            verbatim:
+              "\((e.process?.parent?.filePath as NSString?)?.lastPathComponent ?? "") (\(e.process?.parent?.pid?.stringValue ?? ""))"
+          )
+          .font(
             Font.system(size: 12.0).monospaced()
           ).textSelection(.enabled)
         }
@@ -129,7 +133,7 @@ struct MoreDetailsView: View {
 }
 
 struct Event: View {
-  let e: SNTFileAccessEvent
+  let e: SNTStoredFileAccessEvent
   let window: NSWindow?
 
   @State private var isShowingDetails = false
@@ -148,12 +152,8 @@ struct Event: View {
 
       VStack(alignment: .leading, spacing: 10.0) {
         TextWithLimit(e.accessedPath).textSelection(.enabled)
-        if let app = e.application {
-          TextWithLimit(app).textSelection(.enabled)
-        } else {
-          TextWithLimit((e.filePath as NSString).lastPathComponent).textSelection(.enabled)
-        }
-        TextWithLimit(e.executingUser ?? "unknown").textSelection(.enabled)
+        TextWithLimit((e.process?.parent?.filePath as NSString?)?.lastPathComponent ?? "").textSelection(.enabled)
+        TextWithLimit(e.process?.executingUser ?? "unknown").textSelection(.enabled)
         TextWithLimit(e.ruleName).textSelection(.enabled)
         TextWithLimit(e.ruleVersion).textSelection(.enabled)
 
@@ -172,7 +172,7 @@ struct Event: View {
 
 struct SNTFileAccessMessageWindowView: View {
   let window: NSWindow?
-  let event: SNTFileAccessEvent?
+  let event: SNTStoredFileAccessEvent?
   let customMessage: NSString?
   let customURL: String?
   let customText: String?

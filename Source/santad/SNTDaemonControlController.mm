@@ -30,7 +30,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
@@ -105,7 +105,7 @@ double watchdogRAMPeak = 0;
 
 - (void)databaseRuleCounts:(void (^)(RuleCounts ruleTypeCounts))reply {
   SNTRuleTable *rdb = [SNTDatabaseController ruleTable];
-  RuleCounts ruleCounts{
+  __block RuleCounts ruleCounts{
       .binary = [rdb binaryRuleCount],
       .certificate = [rdb certificateRuleCount],
       .compiler = [rdb compilerRuleCount],
@@ -114,6 +114,25 @@ double watchdogRAMPeak = 0;
       .signingID = [rdb signingIDRuleCount],
       .cdhash = [rdb cdhashRuleCount],
   };
+
+  // Update counts with data from StaticRules configuration
+  [[rdb cachedStaticRules]
+      enumerateKeysAndObjectsUsingBlock:^(NSString *key, SNTRule *rule, BOOL *stop) {
+        switch (rule.type) {
+          case SNTRuleTypeCDHash: ruleCounts.cdhash++; break;
+          case SNTRuleTypeBinary: ruleCounts.binary++; break;
+          case SNTRuleTypeSigningID: ruleCounts.signingID++; break;
+          case SNTRuleTypeCertificate: ruleCounts.certificate++; break;
+          case SNTRuleTypeTeamID: ruleCounts.teamID++; break;
+          default: break;
+        }
+
+        // Note: Transitive rules cannot come from static rules
+        switch (rule.state) {
+          case SNTRuleStateAllowCompiler: ruleCounts.compiler++; break;
+          default: break;
+        }
+      }];
 
   reply(ruleCounts);
 }
@@ -162,7 +181,7 @@ double watchdogRAMPeak = 0;
   reply([[SNTDatabaseController eventTable] pendingEventsCount]);
 }
 
-- (void)databaseEventsPending:(void (^)(NSArray *events))reply {
+- (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent *> *events))reply {
   reply([[SNTDatabaseController eventTable] pendingEvents]);
 }
 
@@ -195,6 +214,10 @@ double watchdogRAMPeak = 0;
 
   NSArray<SNTRule *> *rules = [[SNTDatabaseController ruleTable] retrieveAllRules];
   reply(rules, nil);
+}
+
+- (void)databaseRulesHash:(void (^)(NSString *hash))reply {
+  reply([[SNTDatabaseController ruleTable] hashOfHashes]);
 }
 
 #pragma mark Config Ops
@@ -383,7 +406,8 @@ double watchdogRAMPeak = 0;
 ///  @param event The offending event, fileBundleHash & fileBundleBinaryCount need to be populated.
 ///  @param events Next bundle events.
 ///
-- (void)syncBundleEvent:(SNTStoredEvent *)event relatedEvents:(NSArray<SNTStoredEvent *> *)events {
+- (void)syncBundleEvent:(SNTStoredExecutionEvent *)event
+          relatedEvents:(NSArray<SNTStoredExecutionEvent *> *)events {
   SNTEventTable *eventTable = [SNTDatabaseController eventTable];
 
   // Delete the event cached by the execution controller.
@@ -409,7 +433,9 @@ double watchdogRAMPeak = 0;
                                   break;
                                 case SNTBundleEventActionSendEvents:
                                   [eventTable addStoredEvents:events];
-                                  [self.syncdQueue addEvents:events isFromBundle:YES];
+                                  [self.syncdQueue
+                                      addBundleEvents:events
+                                       withBundleHash:events.firstObject.fileBundleHash];
                                   break;
                               }
                             }];

@@ -83,6 +83,4 @@
 
 - (bool)handleContextMessage:(santa::Message &)esMsg;
 
-+ (bool)populateAuditTokenSelf:(audit_token_t *)tok;
-
 @end

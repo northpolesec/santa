@@ -8,18 +8,17 @@ objc_library(
     srcs = [
         "SNTBundleService.h",
         "SNTBundleService.mm",
-        "main.m",
+        "main.mm",
     ],
     deps = [
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTXPCBundleServiceInterface",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SigningIDHelpers",
-        "//Source/common:StoredEventHelpers",
         "@FMDB",
     ],
 )

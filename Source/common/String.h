@@ -41,6 +41,10 @@ static inline NSString *StringToNSString(const char *str) {
   return [NSString stringWithUTF8String:str];
 }
 
+static inline NSString *StringToNSString(const std::string_view &str) {
+  return [NSString stringWithUTF8String:str.data()];
+}
+
 static inline NSString *OptionalStringToNSString(const std::optional<std::string> &optional_str) {
   std::string str = optional_str.value_or("");
   if (str.length() == 0) {
@@ -70,6 +74,10 @@ static inline std::string BufToHexString(const uint8_t *buf, size_t bufsize) {
   }
 
   return hex_str;
+}
+
+static inline std::string BufToHexString(NSData *data) {
+  return BufToHexString(static_cast<const uint8_t *>(data.bytes), data.length);
 }
 
 }  // namespace santa

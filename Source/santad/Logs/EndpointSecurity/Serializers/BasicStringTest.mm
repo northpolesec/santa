@@ -28,7 +28,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/TestUtils.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
@@ -1303,7 +1303,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 }
 
 - (void)testSerializeBundleHashingEvent {
-  SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"file_hash";
   se.fileBundleHash = @"file_bundle_hash";
@@ -1393,33 +1393,40 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 }
 
 - (void)testGetReasonString {
-  std::map<SNTEventState, std::string> stateToReason = {
-      {SNTEventStateUnknown, "NOTRUNNING"},
-      {SNTEventStateBundleBinary, "NOTRUNNING"},
-      {SNTEventStateBlockUnknown, "UNKNOWN"},
-      {SNTEventStateBlockBinary, "BINARY"},
-      {SNTEventStateBlockCertificate, "CERT"},
-      {SNTEventStateBlockScope, "SCOPE"},
-      {SNTEventStateBlockTeamID, "TEAMID"},
-      {SNTEventStateBlockSigningID, "SIGNINGID"},
-      {SNTEventStateBlockCDHash, "CDHASH"},
-      {SNTEventStateBlockLongPath, "LONG_PATH"},
-      {SNTEventStateAllowUnknown, "UNKNOWN"},
-      {SNTEventStateAllowBinary, "BINARY"},
-      {SNTEventStateAllowCertificate, "CERT"},
-      {SNTEventStateAllowScope, "SCOPE"},
-      {SNTEventStateAllowCompilerBinary, "BINARY"},
-      {SNTEventStateAllowCompilerCDHash, "CDHASH"},
-      {SNTEventStateAllowCompilerSigningID, "SIGNINGID"},
-      {SNTEventStateAllowTransitive, "TRANSITIVE"},
-      {SNTEventStateAllowPendingTransitive, "PENDING_TRANSITIVE"},
-      {SNTEventStateAllowTeamID, "TEAMID"},
-      {SNTEventStateAllowSigningID, "SIGNINGID"},
-      {SNTEventStateAllowCDHash, "CDHASH"},
-  };
+  std::string want;
+  for (uint64_t i = 0; i <= 64; i++) {
+    SNTEventState state = static_cast<SNTEventState>(i == 0 ? 0 : 1 << (i - 1));
+    std::string want = "UNKNOWN";
+    switch (state) {
+      case SNTEventStateUnknown: want = "UNKNOWN"; break;
+      case SNTEventStateBundleBinary: want = "UNKNOWN"; break;
+      case SNTEventStateBlockUnknown: want = "UNKNOWN"; break;
+      case SNTEventStateBlockBinary: want = "BINARY"; break;
+      case SNTEventStateBlockCertificate: want = "CERT"; break;
+      case SNTEventStateBlockScope: want = "SCOPE"; break;
+      case SNTEventStateBlockTeamID: want = "TEAMID"; break;
+      case SNTEventStateBlockLongPath: want = "LONG_PATH"; break;
+      case SNTEventStateBlockSigningID: want = "SIGNINGID"; break;
+      case SNTEventStateBlockCDHash: want = "CDHASH"; break;
+      case SNTEventStateAllowUnknown: want = "UNKNOWN"; break;
+      case SNTEventStateAllowBinary: want = "BINARY"; break;
+      case SNTEventStateAllowCertificate: want = "CERT"; break;
+      case SNTEventStateAllowScope: want = "SCOPE"; break;
+      case SNTEventStateAllowCompilerBinary: want = "BINARY"; break;
+      case SNTEventStateAllowTransitive: want = "TRANSITIVE"; break;
+      case SNTEventStateAllowPendingTransitive: want = "PENDING_TRANSITIVE"; break;
+      case SNTEventStateAllowTeamID: want = "TEAMID"; break;
+      case SNTEventStateAllowSigningID: want = "SIGNINGID"; break;
+      case SNTEventStateAllowCDHash: want = "CDHASH"; break;
+      case SNTEventStateAllowLocalBinary: want = "BINARY"; break;
+      case SNTEventStateAllowLocalSigningID: want = "SIGNINGID"; break;
+      case SNTEventStateAllowCompilerSigningID: want = "SIGNINGID"; break;
+      case SNTEventStateAllowCompilerCDHash: want = "CDHASH"; break;
+      case SNTEventStateBlock: want = "UNKNOWN"; break;
+      case SNTEventStateAllow: want = "UNKNOWN"; break;
+    }
 
-  for (const auto &kv : stateToReason) {
-    XCTAssertCppStringEqual(santa::GetReasonString(kv.first), kv.second);
+    XCTAssertCppStringEqual(santa::GetReasonString(state), want);
   }
 }
 

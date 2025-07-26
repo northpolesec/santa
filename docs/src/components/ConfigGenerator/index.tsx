@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@site/src/components/shadcn/select";
+import { Button } from "@site/src/components/shadcn/button";
 
 import { SantaConfigKey, SantaConfigAllKeys } from "@site/src/lib/santaconfig";
 
@@ -81,15 +82,58 @@ function ConfigKeyList({
   field: FieldRenderProps;
 }): ReactNode {
   if (configKey.repeated) {
+    // If possible values are defined, use MultiSelector
+    if (configKey.possibleValues && configKey.possibleValues.length > 0) {
+      return (
+        <MultiSelector
+          values={field.value || []}
+          onValuesChange={field.onChange}
+          options={configKey.possibleValues.map((value) => ({
+            value: value.value,
+            label: value.label ?? value.value,
+          }))}
+        />
+      );
+    }
+
+    // For custom values with no pre-defined options
     return (
-      <MultiSelector
-        values={field.value || []}
-        onValuesChange={field.onChange}
-        options={configKey.possibleValues.map((value) => ({
-          value: value.value,
-          label: value.label ?? value.value,
-        }))}
-      />
+      <div className="space-y-2">
+        {(field.value || []).map((value: string, index: number) => (
+          <div key={index} className="flex items-center gap-2">
+            <Input
+              value={value}
+              onChange={(e) => {
+                const newValues = [...(field.value || [])];
+                newValues[index] = e.target.value;
+                field.onChange(newValues);
+              }}
+              className="pl-4 flex-1"
+            />
+            <Button
+              type="button"
+              onClick={() => {
+                const newValues = [...(field.value || [])];
+                newValues.splice(index, 1);
+                field.onChange(newValues);
+              }}
+              className="p-2"
+              aria-label="Remove item"
+            >
+              ✕
+            </Button>
+          </div>
+        ))}
+        <Button
+          type="button"
+          onClick={() => {
+            field.onChange([...(field.value || []), ""]);
+          }}
+          className="p-2"
+        >
+          Add Item
+        </Button>
+      </div>
     );
   }
 
@@ -149,7 +193,7 @@ function ConfigKey({
             <FormMessage />
           </div>
 
-          {configKey.possibleValues?.length > 0 ? (
+          {configKey.repeated && (configKey.enableIf?.(getValues()) ?? true) ? (
             <ConfigKeyList configKey={configKey} field={field} />
           ) : configKey.type === "string" || configKey.type === "integer" ? (
             <ConfigKeyString configKey={configKey} field={field} />

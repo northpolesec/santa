@@ -50,7 +50,7 @@ swift_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
     ],
 )
 
@@ -78,7 +78,7 @@ swift_library(
         ":SNTMessageView",
         "//Source/common:SNTBlockMessage_SantaGUI",
         "//Source/common:SNTConfigState",
-        "//Source/common:SNTFileAccessEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
     ],
 )
 
@@ -86,20 +86,20 @@ objc_library(
     name = "SantaGUI_lib",
     srcs = [
         "SNTAboutWindowController.h",
-        "SNTAboutWindowController.m",
+        "SNTAboutWindowController.mm",
         "SNTAppDelegate.h",
-        "SNTAppDelegate.m",
+        "SNTAppDelegate.mm",
         "SNTBinaryMessageWindowController.h",
-        "SNTBinaryMessageWindowController.m",
+        "SNTBinaryMessageWindowController.mm",
         "SNTDeviceMessageWindowController.h",
-        "SNTDeviceMessageWindowController.m",
+        "SNTDeviceMessageWindowController.mm",
         "SNTFileAccessMessageWindowController.h",
-        "SNTFileAccessMessageWindowController.m",
+        "SNTFileAccessMessageWindowController.mm",
         "SNTMessageWindowController.h",
-        "SNTMessageWindowController.m",
+        "SNTMessageWindowController.mm",
         "SNTNotificationManager.h",
-        "SNTNotificationManager.m",
-        "main.m",
+        "SNTNotificationManager.mm",
+        "main.mm",
     ],
     hdrs = [
         "SNTNotificationManager.h",
@@ -125,10 +125,11 @@ objc_library(
         "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
-        "//Source/common:SNTFileAccessEvent",
         "//Source/common:SNTFileInfo",
+        "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTXPCControlInterface",
@@ -209,14 +210,14 @@ macos_application(
 santa_unit_test(
     name = "SNTNotificationManagerTest",
     srcs = [
-        "SNTNotificationManagerTest.m",
+        "SNTNotificationManagerTest.mm",
     ],
     sdk_frameworks = [
         "Cocoa",
     ],
     deps = [
         ":SantaGUI_lib",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "@OCMock",
     ],
 )

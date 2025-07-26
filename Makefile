@@ -4,7 +4,7 @@ fmt:
 	./Testing/fix.sh
 
 build:
-	bazel build -c opt //:release
+	bazel build -c opt //Source/gui:Santa
 
 test:
 	bazel test --define=SANTA_BUILD_TYPE=adhoc --test_output=errors //:unit_tests

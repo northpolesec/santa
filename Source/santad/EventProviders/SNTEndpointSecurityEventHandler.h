@@ -18,7 +18,7 @@
 #include <string>
 #include <vector>
 
-#import "Source/common/SNTFileAccessEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Metrics.h"
@@ -40,7 +40,7 @@
 /// Base protocol for FAA-related clients
 @protocol SNTFileAccessAuthorizer <NSObject>
 
-typedef void (^SNTFileAccessDeniedBlock)(SNTFileAccessEvent *event, NSString *customMsg,
+typedef void (^SNTFileAccessDeniedBlock)(SNTStoredFileAccessEvent *event, NSString *customMsg,
                                          NSString *customURL, NSString *customText);
 
 @property SNTFileAccessDeniedBlock fileAccessDeniedBlock;

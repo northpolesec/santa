@@ -21,7 +21,6 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
-#include "Source/common/cel/Evaluator.h"
 #import "Source/santasyncservice/SNTPushNotificationsTracker.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
@@ -97,8 +96,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
 // Downloads new rules from server and converts them into SNTRule.
 // Returns an array of all converted rules, or nil if there was a server problem.
-// Note that rules from the server are filtered.  We only keep those whose rule_type
-// is either BINARY or CERTIFICATE.  PACKAGE rules are dropped.
+// Note that rules from the server are filtered.
 - (NSArray<SNTRule *> *)downloadNewRulesFromServer {
   google::protobuf::Arena arena;
 
@@ -185,13 +183,6 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
   const std::string &cel_expr = rule.cel_expr();
   NSString *celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
-  if (celExpr && self.syncState.celEvaluator) {
-    auto result = self.syncState.celEvaluator->Compile(cel_expr);
-    if (!result.ok()) {
-      LOGE(@"Failed to compile CEL expression: %s", std::string(result.status().message()).c_str());
-      return nil;
-    }
-  }
 
   return [[SNTRule alloc] initWithIdentifier:identifier
                                        state:state
@@ -232,8 +223,9 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   if (appName.length) {
     // If notification_app_name is set but this is a clean sync, return early. We don't want to
     // spam users with notifications for many apps that might be included in a clean sync, and
-    // we don't want to fallback to the deprecated behavior.
-    if (self.syncState.syncType != SNTSyncTypeNormal) return;
+    // we don't want to fallback to the deprecated behavior. Also ignore app name if the rule state
+    // is remove.
+    if (self.syncState.syncType != SNTSyncTypeNormal || rule.state == SNTRuleStateRemove) return;
     [[SNTPushNotificationsTracker tracker]
         addNotification:[@{kFileName : appName, kFileBundleBinaryCount : @(0)} mutableCopy]
                 forHash:rule.identifier];

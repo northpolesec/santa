@@ -1,5 +1,7 @@
+load("@northpolesec_santa_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_apple//apple:macos.bzl", "macos_bundle")
 load("@rules_cc//cc:defs.bzl", "objc_library")
+load("@rules_rust//rust:defs.bzl", "rust_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
@@ -8,9 +10,21 @@ package(
 
 licenses(["notice"])
 
+rust_library(
+    name = "santa_rust_lib",
+    srcs = glob(["rust/*.rs"]),
+    edition = "2024",
+    proc_macro_deps = [
+        "@northpolesec_rednose//rednose/lib/rednose_macro:rednose_macro",
+    ] + all_crate_deps(proc_macro = True),
+    deps = [
+        "@northpolesec_santa_crate_index//:arrow",
+    ] + all_crate_deps(normal = True),
+)
+
 objc_library(
     name = "SNTDatabaseTable",
-    srcs = ["DataLayer/SNTDatabaseTable.m"],
+    srcs = ["DataLayer/SNTDatabaseTable.mm"],
     hdrs = ["DataLayer/SNTDatabaseTable.h"],
     deps = [
         "//Source/common:SNTLogging",
@@ -20,7 +34,7 @@ objc_library(
 
 objc_library(
     name = "SNTRuleTable",
-    srcs = ["DataLayer/SNTRuleTable.m"],
+    srcs = ["DataLayer/SNTRuleTable.mm"],
     hdrs = ["DataLayer/SNTRuleTable.h"],
     sdk_dylibs = [
         "EndpointSecurity",
@@ -39,7 +53,10 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTXxhash",
         "//Source/common:SigningIDHelpers",
+        "//Source/common:String",
+        "//Source/common/cel:CEL",
     ],
 )
 
@@ -98,18 +115,20 @@ santa_unit_test(
 
 objc_library(
     name = "SNTEventTable",
-    srcs = ["DataLayer/SNTEventTable.m"],
+    srcs = ["DataLayer/SNTEventTable.mm"],
     hdrs = ["DataLayer/SNTEventTable.h"],
     deps = [
         ":SNTDatabaseTable",
         "//Source/common:MOLCertificate",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
     ],
 )
 
 objc_library(
     name = "SNTDatabaseController",
-    srcs = ["SNTDatabaseController.m"],
+    srcs = ["SNTDatabaseController.mm"],
     hdrs = ["SNTDatabaseController.h"],
     deps = [
         ":SNTEventTable",
@@ -126,7 +145,7 @@ objc_library(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":WatchItemPolicy",
-        "//Source/common:SNTFileAccessEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
     ],
 )
 
@@ -200,7 +219,7 @@ objc_library(
         "//Source/common:RingBuffer",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
     ],
@@ -213,7 +232,7 @@ santa_unit_test(
         ":SNTNotificationQueue",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigState",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:TestUtils",
         "@OCMock",
@@ -230,7 +249,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:SantaCache",
         "//Source/common:String",
@@ -242,7 +261,7 @@ santa_unit_test(
     srcs = ["SNTSyncdQueueTest.mm"],
     deps = [
         ":SNTSyncdQueue",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "@OCMock",
     ],
 )
@@ -338,7 +357,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTRule",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SantaVnode",
         "//Source/common:String",
         "//Source/common:Unit",
@@ -371,6 +390,7 @@ objc_library(
         ":Metrics",
         ":SNTEndpointSecurityClientBase",
         ":WatchItemPolicy",
+        "//Source/common:AuditUtilities",
         "//Source/common:BranchPrediction",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -495,7 +515,7 @@ objc_library(
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTFileAccessEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SantaCache",
         "//Source/common:SantaSetCache",
         "//Source/common:SantaVnode",
@@ -632,8 +652,8 @@ objc_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTSystemInfo",
+        "//Source/common:SNTXxhash",
         "//Source/common:String",
-        "@xxhash",
     ],
 )
 
@@ -694,7 +714,7 @@ objc_library(
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:String",
     ],
 )
@@ -714,7 +734,7 @@ objc_library(
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTSystemInfo",
         "//Source/common:String",
         "//Source/common:santa_cc_proto_library_wrapper",
@@ -798,7 +818,7 @@ objc_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTSystemInfo",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Timer",
@@ -866,7 +886,7 @@ objc_library(
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
@@ -921,9 +941,9 @@ objc_library(
         "//Source/common:PrefixTree",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTFileAccessEvent",
         "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:TelemetryEventMap",
@@ -1085,34 +1105,36 @@ santa_unit_test(
     name = "SNTEventTableTest",
     srcs = [
         "DataLayer/SNTDatabaseTable.h",
-        "DataLayer/SNTDatabaseTable.m",
+        "DataLayer/SNTDatabaseTable.mm",
         "DataLayer/SNTEventTable.h",
-        "DataLayer/SNTEventTable.m",
-        "DataLayer/SNTEventTableTest.m",
+        "DataLayer/SNTEventTable.mm",
+        "DataLayer/SNTEventTableTest.mm",
+    ],
+    structured_resources = [
+        "//Source/santad/testdata:archive_testdata",
     ],
     deps = [
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
         "@FMDB",
+        "@OCMock",
     ],
 )
 
 santa_unit_test(
     name = "SNTRuleTableTest",
     srcs = [
-        "DataLayer/SNTDatabaseTable.h",
-        "DataLayer/SNTDatabaseTable.m",
-        "DataLayer/SNTRuleTable.h",
-        "DataLayer/SNTRuleTable.m",
-        "DataLayer/SNTRuleTableTest.m",
+        "DataLayer/SNTRuleTableTest.mm",
     ],
     sdk_dylibs = [
         "EndpointSecurity",
     ],
     deps = [
+        ":SNTRuleTable",
         "//Source/common:CertificateHelpers",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
@@ -1125,6 +1147,8 @@ santa_unit_test(
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SigningIDHelpers",
+        "//Source/common:String",
+        "//Source/common/cel:CEL",
         "@FMDB",
         "@OCMock",
     ],
@@ -1225,7 +1249,7 @@ santa_unit_test(
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:TestUtils",
         "@OCMock",
         "@googletest//:gtest",
@@ -1250,7 +1274,7 @@ santa_unit_test(
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTStoredEvent",
+        "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:TestUtils",
         "//Source/common:santa_cc_proto_library_wrapper",
         "@OCMock",
@@ -1383,6 +1407,7 @@ santa_unit_test(
     deps = [
         ":EndpointSecurityMessage",
         ":MockEndpointSecurityAPI",
+        "//Source/common:AuditUtilities",
         "//Source/common:TestUtils",
         "@OCMock",
         "@googletest//:gtest",
@@ -1438,6 +1463,7 @@ santa_unit_test(
         ":MockEndpointSecurityAPI",
         ":SNTEndpointSecurityClient",
         ":WatchItemPolicy",
+        "//Source/common:AuditUtilities",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SystemResources",

@@ -88,11 +88,11 @@
   return self;
 }
 
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events fromBundle:(BOOL)fromBundle {
-  [self.syncManager postEventsToSyncServer:events fromBundle:fromBundle];
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events {
+  [self.syncManager postEventsToSyncServer:events];
 }
 
-- (void)postBundleEventToSyncServer:(SNTStoredEvent *)event
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply {
   [self.syncManager postBundleEventToSyncServer:event reply:reply];
 }

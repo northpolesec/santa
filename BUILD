@@ -199,6 +199,22 @@ genrule(
         exit 1
       fi
 
+      # Cause a build failure if any of the binaries are not fat with both
+      # architectures included.
+      for f in \
+          MacOS/Santa MacOS/santabundleservice MacOS/santactl \
+          MacOS/santametricservice MacOS/santasyncservice \
+          Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension/Contents/MacOS/com.northpolesec.santa.daemon; do
+        if ! file $(@D)/binaries/Santa.app/Contents/$${f} | grep arm64; then
+          echo "ERROR: Missing arm64 slice"
+          exit 1
+        fi
+        if ! file $(@D)/binaries/Santa.app/Contents/$${f} | grep x86_64; then
+          echo "ERROR: Missing x86_64 slice"
+          exit 1
+        fi
+      done
+
       # Update all the timestamps to now. Bazel avoids timestamps to allow
       # builds to be hermetic and cacheable but for releases we want the
       # timestamps to be more-or-less correct.

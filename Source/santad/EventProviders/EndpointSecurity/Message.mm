@@ -1,21 +1,23 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 
 #include <bsm/libbsm.h>
 #include <libproc.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
@@ -56,12 +58,25 @@ std::string Message::ParentProcessName() const {
   return GetProcessName(es_msg_->process->ppid);
 }
 
+std::string Message::ParentProcessPath() const {
+  return GetProcessPath(&es_msg_->process->parent_audit_token);
+}
+
 std::string Message::GetProcessName(pid_t pid) const {
   // Note: proc_name() accesses the `pbi_name` field of `struct proc_bsdinfo`. The size of `pname`
   // here is meant to match the size of `pbi_name`, and one extra byte ensure zero-terminated.
   char pname[MAXCOMLEN * 2 + 1] = {};
   if (proc_name(pid, pname, sizeof(pname)) > 0) {
     return std::string(pname);
+  } else {
+    return std::string("");
+  }
+}
+
+std::string Message::GetProcessPath(audit_token_t *tok) const {
+  char path_buf[MAXPATHLEN] = {};
+  if (proc_pidpath_audittoken(tok, path_buf, sizeof(path_buf)) > 0) {
+    return std::string(path_buf);
   } else {
     return std::string("");
   }

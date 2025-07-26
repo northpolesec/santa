@@ -18,8 +18,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class SNTStoredEvent;
-
 ///
 ///  Controller for a single message window.
 ///

@@ -18,7 +18,7 @@ import santa_common_SNTBlockMessage
 import santa_common_SNTCommonEnums
 import santa_common_SNTConfigState
 import santa_common_SNTConfigurator
-import santa_common_SNTStoredEvent
+import santa_common_SNTStoredExecutionEvent
 import santa_gui_SNTMessageView
 
 // A small class that will ferry bundle hashing state from SNTBinaryMessageWindowController
@@ -32,7 +32,7 @@ import santa_gui_SNTMessageView
 @objc public class SNTBinaryMessageWindowViewFactory: NSObject {
   @objc public static func createWith(
     window: NSWindow,
-    event: SNTStoredEvent,
+    event: SNTStoredExecutionEvent,
     customMsg: NSString?,
     customURL: NSString?,
     configState: SNTConfigState,
@@ -56,8 +56,8 @@ import santa_gui_SNTMessageView
   }
 }
 
-func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
-  var s = "Santa blocked \(e?.fileBundleName ?? "an application:")"
+func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: String?) {
+  var s = "Santa blocked \((e?.fileBundleName?.isEmpty == false) ? e!.fileBundleName! : "an application")"
   if let publisher = e?.publisherInfo {
     s += "\nPublisher  : \(publisher)"
   }
@@ -86,7 +86,7 @@ func copyDetailsToClipboard(e: SNTStoredEvent?, customURL: String?) {
 }
 
 struct MoreDetailsView: View {
-  let e: SNTStoredEvent?
+  let e: SNTStoredExecutionEvent?
   let customURL: NSString?
 
   @Environment(\.presentationMode) var presentationMode
@@ -179,7 +179,7 @@ struct MoreDetailsView: View {
 }
 
 struct SNTBinaryMessageEventView: View {
-  let e: SNTStoredEvent?
+  let e: SNTStoredExecutionEvent?
   let customURL: NSString?
 
   @State private var isShowingDetails = false
@@ -203,7 +203,7 @@ struct SNTBinaryMessageEventView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 10.0) {
-        if let bundleName = e?.fileBundleName {
+        if let bundleName = e?.fileBundleName, !bundleName.isEmpty {
           TextWithLimit(bundleName)
         } else if let filePath = e?.filePath {
           TextWithLimit((filePath as NSString).lastPathComponent)
@@ -237,7 +237,7 @@ struct SNTBinaryMessageEventView: View {
 
 struct SNTBinaryMessageWindowView: View {
   let window: NSWindow?
-  let event: SNTStoredEvent?
+  let event: SNTStoredExecutionEvent?
   let customMsg: NSString?
   let customURL: NSString?
   let configState: SNTConfigState

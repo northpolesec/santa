@@ -51,6 +51,13 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   };
 };
 
+@interface SNTRule ()
+// Making these properties readwrite makes some tests much easier to write.
+@property(readwrite) SNTRuleState state;
+@property(readwrite) SNTRuleType type;
+@property(readwrite) NSString *customMsg;
+@end
+
 @interface SNTExecutionControllerTest : XCTestCase
 @property id mockDecisionCache;
 @property id mockConfigurator;

@@ -1,4 +1,5 @@
 /// Copyright 2024 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -52,7 +53,7 @@ struct RuleIdentifiers {
 
 /// Initialize with a struct of rule identifiers and a signing status.
 /// Depending on the signing status, some identifiers may be omitted.
-- (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)fileInfo
+- (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)ri
                        andSigningStatus:(SNTSigningStatus)signingStatus;
 
 - (struct RuleIdentifiers)toStruct;

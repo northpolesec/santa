@@ -23,6 +23,8 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSIPStatus.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -172,6 +174,7 @@
       syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTSyncTypeNormal), nil])]);
   OCMStub([self.daemonConnRop
       clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
+  OCMStub([self.daemonConnRop databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", nil])]);
 }
 
 #pragma mark - SNTSyncStage Tests
@@ -689,18 +692,16 @@
             NSDictionary *event = events[0];
             XCTAssertEqualObjects(
                 event[kFileSHA256],
-                @"ff98fa0c0a1095fedcbe4d388a9760e71399a5c3c017a847ffa545663b57929a");
+                @"741879b35b9fae5b235a7c9a88a6d20a136c6e27701f03dd32369c4ea0a6acaf");
             XCTAssertEqualObjects(event[kFileName], @"yes");
             XCTAssertEqualObjects(event[kFilePath], @"/usr/bin");
-            XCTAssertEqualObjects(event[kDecision], @"BLOCK_BINARY");
-            NSArray *sessions = @[ @"foouser@console", @"foouser@ttys000" ];
-            XCTAssertEqualObjects(event[kCurrentSessions], sessions);
-            NSArray *users = @[ @"foouser" ];
-            XCTAssertEqualObjects(event[kLoggedInUsers], users);
-            XCTAssertEqualObjects(event[kExecutingUser], @"root");
-            XCTAssertEqualObjects(event[kPID], @(11196));
-            XCTAssertEqualObjects(event[kPPID], @(10760));
-            XCTAssertEqualObjects(event[kExecutionTime], @(1464201698.537635));
+            XCTAssertEqualObjects(event[kDecision], @"ALLOW_SIGNINGID");
+            XCTAssertEqualObjects(event[kCurrentSessions], @[ @"nobody@console" ]);
+            XCTAssertEqualObjects(event[kLoggedInUsers], (@[ @"foo", @"bar" ]));
+            XCTAssertEqualObjects(event[kExecutingUser], @"foo");
+            XCTAssertEqualObjects(event[kPID], @(2222));
+            XCTAssertEqualObjects(event[kPPID], @(1));
+            XCTAssertEqualObjects(event[kExecutionTime], @(1753128415.67169));
 
             NSArray *certs = event[kSigningChain];
             XCTAssertEqual(certs.count, 3);
@@ -708,22 +709,24 @@
             NSDictionary *cert = [certs firstObject];
             XCTAssertEqualObjects(
                 cert[kCertSHA256],
-                @"2aa4b9973b7ba07add447ee4da8b5337c3ee2c3a991911e80e7282e8a751fc32");
+                @"d84db96af8c2e60ac4c851a21ec460f6f84e0235beb17d24a78712b9b021ed57");
             XCTAssertEqualObjects(cert[kCertCN], @"Software Signing");
             XCTAssertEqualObjects(cert[kCertOrg], @"Apple Inc.");
             XCTAssertEqualObjects(cert[kCertOU], @"Apple Software");
-            XCTAssertEqualObjects(cert[kCertValidFrom], @(1365806075));
-            XCTAssertEqualObjects(cert[kCertValidUntil], @(1618266875));
+            XCTAssertEqualObjects(cert[kCertValidFrom], @(1603996358));
+            XCTAssertEqualObjects(cert[kCertValidUntil], @(1792863581));
 
-            XCTAssertEqualObjects(event[kTeamID], @"012345678910");
-            XCTAssertEqualObjects(event[kSigningID], @"signing.id");
-            XCTAssertEqualObjects(event[kCDHash], @"abc123");
+            XCTAssertNil(event[kTeamID]);
+            XCTAssertEqualObjects(event[kSigningID], @"platform:com.apple.yes");
+            XCTAssertEqualObjects(event[kCDHash], @"18ddebfdb356b7ed575b063bbbbe40a2d0d92f23");
 
             event = events[1];
-            XCTAssertEqualObjects(event[kFileName], @"hub");
-            XCTAssertEqualObjects(event[kExecutingUser], @"foouser");
+            XCTAssertEqualObjects(event[kFileName], @"Santa");
+            XCTAssertEqualObjects(event[kExecutingUser], @"foo2");
             certs = event[kSigningChain];
-            XCTAssertEqual(certs.count, 0);
+            XCTAssertEqual(certs.count, 3);
+            XCTAssertEqualObjects(event[kTeamID], @"ZMCG7MLDV9");
+            XCTAssertEqualObjects(event[kSigningID], @"ZMCG7MLDV9:com.northpolesec.santa");
 
             return YES;
           }];
@@ -874,9 +877,6 @@
 }
 
 - (void)testRuleDownloadCel {
-  auto celEvaluator = santa::cel::Evaluator::Create();
-  self.syncState.celEvaluator = celEvaluator->get();
-
   SNTSyncRuleDownload *sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
 
   NSData *respData = [self dataFromFixture:@"sync_ruledownload_with_cel_1.json"];
@@ -898,6 +898,7 @@
                                                                reply:([OCMArg invokeBlock])]);
   [sut sync];
 
+  // Both rules should get sent to the daemon. It will reject the second one.
   NSArray *rules = @[
     [[SNTRule alloc]
         initWithIdentifier:@"AAAAAAAAAA"
@@ -906,6 +907,12 @@
                  customMsg:nil
                  customURL:nil
                    celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"],
+    [[SNTRule alloc] initWithIdentifier:@"BBBBBBBBBB"
+                                  state:SNTRuleStateCEL
+                                   type:SNTRuleTypeTeamID
+                              customMsg:nil
+                              customURL:nil
+                                celExpr:@"this is an invalid expression"],
   ];
 
   OCMVerify([self.daemonConnRop databaseRuleAddRules:rules
@@ -920,7 +927,13 @@
   [self setupDefaultDaemonConnResponses];
   SNTSyncPostflight *sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
 
-  [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest *req) {
+            NSDictionary *requestDict = [self dictFromRequest:req];
+            return [requestDict[@"rules_hash"] isEqualToString:@"the-hash"];
+          }];
 
   XCTAssertTrue([sut sync]);
   OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);

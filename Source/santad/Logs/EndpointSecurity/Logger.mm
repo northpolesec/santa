@@ -23,7 +23,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
 #include "Source/common/SNTLogging.h"
-#include "Source/common/SNTStoredEvent.h"
+#include "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/SNTSystemInfo.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
@@ -206,9 +206,9 @@ void Logger::LogAllowlist(const Message &msg, const std::string_view hash) {
   }
 }
 
-void Logger::LogBundleHashingEvents(NSArray<SNTStoredEvent *> *events) {
+void Logger::LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events) {
   if (ShouldLog(TelemetryEvent::kBundle)) {
-    for (SNTStoredEvent *se in events) {
+    for (SNTStoredExecutionEvent *se in events) {
       writer_->Write(serializer_->SerializeBundleHashingEvent(se));
     }
   }

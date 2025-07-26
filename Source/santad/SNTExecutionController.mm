@@ -43,7 +43,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/String.h"
@@ -86,7 +86,7 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
 @property SNTEventTable *eventTable;
 @property SNTNotificationQueue *notifierQueue;
 @property SNTPolicyProcessor *policyProcessor;
-@property SNTRuleTable *ruleTable;
+@property(readwrite) SNTRuleTable *ruleTable;
 @property SNTSyncdQueue *syncdQueue;
 @property SNTMetricCounter *events;
 @property santa::ProcessControlBlock processControlBlock;
@@ -362,7 +362,7 @@ static NSString *const kPrinterProxyPostMonterey =
   if (config.enableAllEventUpload ||
       (cd.decision == SNTEventStateAllowUnknown && !config.disableUnknownEventUpload) ||
       (cd.decision & SNTEventStateAllow) == 0) {
-    SNTStoredEvent *se = [[SNTStoredEvent alloc] init];
+    SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
     se.occurrenceDate = [[NSDate alloc] init];
     se.fileSHA256 = cd.sha256;
     se.filePath = binInfo.path;
@@ -427,7 +427,7 @@ static NSString *const kPrinterProxyPostMonterey =
         // So the server has something to show the user straight away, initiate an event
         // upload for the blocked binary rather than waiting for the next sync.
         dispatch_async(_eventQueue, ^{
-          [self.syncdQueue addEvents:@[ se ] isFromBundle:NO];
+          [self.syncdQueue addExecutionEvent:se];
         });
       }
 
@@ -588,7 +588,7 @@ static NSString *const kPrinterProxyPostMonterey =
 }
 
 // Creates a rule for the binary that was allowed by the user in standalone mode.
-- (void)createRuleForStandaloneModeEvent:(SNTStoredEvent *)se {
+- (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent *)se {
   SNTRuleType ruleType;
   NSString *ruleIdentifier;
   SNTRuleState newRuleState;
