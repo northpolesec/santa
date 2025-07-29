@@ -353,6 +353,10 @@ html[data-theme="dark"] {
 	}
 }
 
+.navbar-sidebar__back {
+	display: none;
+}
+
 pre {
 	tab-size: 2;
 }
