@@ -337,11 +337,20 @@ html[data-theme="dark"] {
 	font-size: 14px;
 }
 
-@media (min-width: 768px) {
- .theme-announcement-bar {
+@media (max-width: 890px) {
+	.announcement-bar-prefix {
+		display: none;
+	}
+	.announcement-bar-suffix {
+		display: none;
+	}
+}
+
+@media (min-width: 891px) {
+	.theme-announcement-bar {
 		font-size: 18px;
 		padding: 8px;
-  }
+	}
 }
 
 pre {

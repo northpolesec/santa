@@ -105,7 +105,7 @@ const config: Config = {
     announcementBar: {
       id: "workshop_announcement",
       content:
-        'Allowlisting that doesn\'t break business: <a href="https://northpole.security">Try Workshop</a> now.',
+        '<a href="https://northpole.security" class="no-underline"><span class="announcement-bar-prefix">Allowlisting that doesn\'t break business: </span>Manage Santa with <span class="underline">Workshop</span><span class="announcement-bar-suffix">, the official sync server from North Pole Security</span></a>',
       backgroundColor: "#FF5050",
       textColor: "#ffffff",
       isCloseable: true,
