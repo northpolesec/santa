@@ -96,10 +96,26 @@ const config: Config = {
   ],
 
   themeConfig: {
+    colorMode: {
+      defaultMode: "light",
+      disableSwitch: false,
+      respectPrefersColorScheme: true,
+    },
+
+    announcementBar: {
+      id: "workshop_announcement",
+      content:
+        '<a href="https://northpole.security" class="no-underline"><span class="announcement-bar-prefix">Allowlisting that doesn\'t break business: </span>Manage Santa with <span class="underline">Workshop</span><span class="announcement-bar-suffix">, the official sync server from North Pole Security</span></a>',
+      backgroundColor: "#FF5050",
+      textColor: "#ffffff",
+      isCloseable: true,
+    },
+
     navbar: {
       logo: {
-        alt: "NPS Santa logo",
-        src: "img/santa.svg",
+        alt: "Santa by North Pole Security",
+        src: "/img/santa-black.svg",
+        srcDark: "/img/santa-white.svg",
         height: 50,
         width: 176,
       },
@@ -120,11 +136,15 @@ const config: Config = {
           href: "https://northpole.security",
         },
         {
+          label: "GitHub",
+          href: "https://github.com/northpolesec/santa",
+        },
+        {
           label: "MacAdmins Slack",
           href: "https://macadmins.slack.com/archives/C0E1VRBGW",
         },
         {
-          label: "BlueSky",
+          label: "Bluesky",
           href: "https://bsky.app/profile/northpolesec.bsky.social",
         },
         {
