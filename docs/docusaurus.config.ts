@@ -96,10 +96,26 @@ const config: Config = {
   ],
 
   themeConfig: {
+    colorMode: {
+      defaultMode: "light",
+      disableSwitch: false,
+      respectPrefersColorScheme: true,
+    },
+
+    announcementBar: {
+      id: "workshop_announcement",
+      content:
+        'Allowlisting that doesn\'t break business: <a href="https://northpole.security">Try Workshop</a> now.',
+      backgroundColor: "#FF5050",
+      textColor: "#ffffff",
+      isCloseable: true,
+    },
+
     navbar: {
       logo: {
-        alt: "NPS Santa logo",
-        src: "img/santa.svg",
+        alt: "Santa by North Pole Security",
+        src: "/img/santa-black.svg",
+        srcDark: "/img/santa-white.svg",
         height: 50,
         width: 176,
       },

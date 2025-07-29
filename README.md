@@ -112,9 +112,14 @@ protect hosts in whatever other ways you see fit.
 
 # Sync Servers
 
-* The `santactl` command-line client includes a flag to synchronize with a
-  management server, which uploads events that have occurred on the machine and
-  downloads new rules. There are several open-source servers you can sync with:
+* Santa can synchronize its settings and policies with a management server,
+  allowing for very rapid configuration changes.
+
+  North Pole Security sells a sync server called
+  [Workshop](https://northpole.security), which implements all of the available
+  functionality in Santa.
+
+  There are also several open-source servers you can sync with:
 
     * [Moroz](https://github.com/groob/moroz) - A simple golang server that
       serves hardcoded rules from simple configuration files.
@@ -125,8 +130,9 @@ protect hosts in whatever other ways you see fit.
       centralized service that pulls data from multiple sources and deploy
       configurations to multiple services.
 
-* Alternatively, `santactl` can configure rules locally (without a sync
-  server).
+* Alternatively, rules can be configured locally using either the
+  [StaticRules](https://northpole.dev/configuration/keys#StaticRules) configuration
+  key or using the `santactl rule` command.
 
 # Screenshots
 
