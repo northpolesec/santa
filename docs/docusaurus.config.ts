@@ -136,11 +136,15 @@ const config: Config = {
           href: "https://northpole.security",
         },
         {
+          label: "GitHub",
+          href: "https://github.com/northpolesec/santa",
+        },
+        {
           label: "MacAdmins Slack",
           href: "https://macadmins.slack.com/archives/C0E1VRBGW",
         },
         {
-          label: "BlueSky",
+          label: "Bluesky",
           href: "https://bsky.app/profile/northpolesec.bsky.social",
         },
         {
