@@ -115,12 +115,11 @@ protect hosts in whatever other ways you see fit.
 * Santa can synchronize its settings and policies with a management server,
   allowing for very rapid configuration changes.
 
-  North Pole Security sells a sync server called
-  [Workshop](https://northpole.security), which implements all of the available
-  functionality in Santa.
+  There are several commercial and open-source servers available:
 
-  There are also several open-source servers you can sync with:
-
+    * [Workshop](https://northpole.security) - Workshop is the official sync
+      server offered by North Pole Security. It is fully-featured, fast,
+      scalable, and enterprise-ready.
     * [Moroz](https://github.com/groob/moroz) - A simple golang server that
       serves hardcoded rules from simple configuration files.
     * [Rudolph](https://github.com/airbnb/rudolph) - An AWS-based serverless sync service
