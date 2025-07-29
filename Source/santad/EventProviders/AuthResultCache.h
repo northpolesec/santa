@@ -27,6 +27,7 @@
 #include "Source/common/SantaCache.h"
 #import "Source/common/SantaVnode.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityClientBase.h"
 
 namespace santa {
 
@@ -75,6 +76,8 @@ class AuthResultCache {
 
   virtual NSArray<NSNumber *> *CacheCounts();
 
+  virtual void SetESClient(id<SNTEndpointSecurityClientBase> client);
+
  private:
   virtual SantaCache<SantaVnode, uint64_t> *CacheForVnodeID(SantaVnode vnode_id);
 
@@ -86,6 +89,7 @@ class AuthResultCache {
   uint64_t root_devno_;
   uint64_t cache_deny_time_ns_;
   dispatch_queue_t q_;
+  __weak id<SNTEndpointSecurityClientBase> es_client_;
 };
 
 }  // namespace santa
