@@ -932,7 +932,8 @@
                   error:nil
           validateBlock:^BOOL(NSURLRequest *req) {
             NSDictionary *requestDict = [self dictFromRequest:req];
-            return [requestDict[@"rules_hash"] isEqualToString:@"the-hash"];
+            XCTAssertEqualObjects(requestDict[@"rulesHash"], @"the-hash");
+            return YES;
           }];
 
   XCTAssertTrue([sut sync]);

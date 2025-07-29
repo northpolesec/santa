@@ -123,6 +123,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                            authResultCache:auth_result_cache
                                                  ttyWriter:tty_writer];
 
+  // While any client could be used, this implementation chooses to use the
+  // authorizer client as it is most concerned with the state of ES caches.
+  auth_result_cache->SetESClient(authorizer_client);
+
   SNTEndpointSecurityTamperResistance *tamper_client =
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:esapi
                                                          metrics:metrics

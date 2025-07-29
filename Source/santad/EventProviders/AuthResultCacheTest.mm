@@ -29,6 +29,7 @@
 #include "Source/common/TestUtils.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityClientBase.h"
 
 using santa::AuthResultCache;
 using santa::FlushCacheMode;
@@ -119,8 +120,12 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testFlushCache {
+  id<SNTEndpointSecurityClientBase> client =
+      OCMProtocolMock(@protocol(SNTEndpointSecurityClientBase));
+
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil);
+  cache->SetESClient(client);
 
   es_file_t rootFile = MakeCacheableFile(RootDevno(), 111);
   es_file_t nonrootFile = MakeCacheableFile(RootDevno() + 123, 111);
@@ -144,10 +149,12 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   // The call to ClearCache is asynchronous. Use a semaphore to
   // be notified when the mock is called.
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  EXPECT_CALL(*mockESApi, ClearCache).WillOnce(testing::InvokeWithoutArgs(^() {
-    dispatch_semaphore_signal(sema);
-    return true;
-  }));
+  OCMStub([client clearCache])
+      .andDo(^(NSInvocation *invocation) {
+        dispatch_semaphore_signal(sema);
+      })
+      .andReturn(true);
+
   cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kClientModeChanged);
 
   XCTAssertEqual(0,

@@ -593,6 +593,7 @@ objc_library(
     deps = [
         ":EndpointSecurityAPI",
         ":EndpointSecurityClient",
+        ":SNTEndpointSecurityClientBase",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
@@ -1293,6 +1294,7 @@ santa_unit_test(
     deps = [
         ":AuthResultCache",
         ":MockEndpointSecurityAPI",
+        ":SNTEndpointSecurityClientBase",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SantaVnode",
         "//Source/common:TestUtils",

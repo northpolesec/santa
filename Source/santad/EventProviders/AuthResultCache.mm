@@ -187,10 +187,12 @@ void AuthResultCache::FlushCache(FlushCacheMode mode, FlushCacheReason reason) {
     // Calling into ES should be done asynchronously since it could otherwise
     // potentially deadlock.
     auto shared_esapi = esapi_->shared_from_this();
-    dispatch_async(q_, ^{
-      // ES does not need a connected client to clear cache
-      shared_esapi->ClearCache(Client());
-    });
+    id<SNTEndpointSecurityClientBase> client = es_client_;
+    if (client) {
+      dispatch_async(q_, ^{
+        [client clearCache];
+      });
+    }
   }
 
   [flush_count_ incrementForFieldValues:@[ FlushCacheReasonToString(reason) ]];
@@ -198,6 +200,10 @@ void AuthResultCache::FlushCache(FlushCacheMode mode, FlushCacheReason reason) {
 
 NSArray<NSNumber *> *AuthResultCache::CacheCounts() {
   return @[ @(root_cache_->count()), @(nonroot_cache_->count()) ];
+}
+
+void AuthResultCache::SetESClient(id<SNTEndpointSecurityClientBase> client) {
+  es_client_ = client;
 }
 
 }  // namespace santa
