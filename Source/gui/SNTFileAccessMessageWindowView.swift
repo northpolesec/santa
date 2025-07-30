@@ -66,19 +66,19 @@ struct MoreDetailsView: View {
         Spacer()
         addLabel {
           Text("Accessed Path").bold().font(Font.system(size: 12.0))
-          Text(e.accessedPath).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+          Text(e.accessedPath ?? "").font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
         }
 
         Divider()
 
         addLabel {
           Text("Binary Path").bold().font(Font.system(size: 12.0))
-          Text(e.process.filePath).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+          Text(e.process?.filePath ?? "").font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
         }
 
         Divider()
 
-        if let signingID = e.process.signingID {
+        if let signingID = e.process?.signingID {
           addLabel {
             Text("Signing ID").bold().font(Font.system(size: 12.0))
             Text(signingID).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
@@ -86,7 +86,7 @@ struct MoreDetailsView: View {
           Divider()
         }
 
-        if let cdHash = e.process.cdhash {
+        if let cdHash = e.process?.cdhash {
           addLabel {
             Text("CDHash").bold().font(Font.system(size: 12.0))
             Text(cdHash).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
@@ -97,7 +97,7 @@ struct MoreDetailsView: View {
         addLabel {
           Text("SHA-256").bold().font(Font.system(size: 12.0))
           // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
-          Text(e.process.fileSHA256).font(Font.system(size: 12.0).monospaced()).frame(width: 240)
+          Text(e.process?.fileSHA256 ?? "").font(Font.system(size: 12.0).monospaced()).frame(width: 240)
             .textSelection(.enabled)
         }
 
@@ -151,11 +151,11 @@ struct Event: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 10.0) {
-        TextWithLimit(e.accessedPath).textSelection(.enabled)
-        TextWithLimit((e.process?.parent?.filePath as NSString?)?.lastPathComponent ?? "").textSelection(.enabled)
-        TextWithLimit(e.process?.executingUser ?? "unknown").textSelection(.enabled)
-        TextWithLimit(e.ruleName).textSelection(.enabled)
-        TextWithLimit(e.ruleVersion).textSelection(.enabled)
+        TextWithLimit(e.accessedPath ?? "<unknown>").textSelection(.enabled)
+        TextWithLimit((e.process?.filePath as NSString?)?.lastPathComponent ?? "").textSelection(.enabled)
+        TextWithLimit(e.process?.executingUser ?? "<unknown>").textSelection(.enabled)
+        TextWithLimit(e.ruleName ?? "<unknown>").textSelection(.enabled)
+        TextWithLimit(e.ruleVersion ?? "<unknown>").textSelection(.enabled)
 
       }
     }.sheet(isPresented: $isShowingDetails) {

@@ -19,13 +19,13 @@
 @interface SNTStoredEvent : NSObject <NSSecureCoding>
 
 /// The date and time the execution request was received by santad.
-@property NSDate *occurrenceDate;
+@property(nonnull) NSDate *occurrenceDate;
 
 /// An index for this event, randomly generated during initialization.
-@property NSNumber *idx;
+@property(nonnull) NSNumber *idx;
 
 // Subclasses are required to define: `hashForEvent`.
 // The base class implementation will throw an exception.
-- (NSString *)hashForEvent;
+- (nullable NSString *)hashForEvent;
 
 @end
