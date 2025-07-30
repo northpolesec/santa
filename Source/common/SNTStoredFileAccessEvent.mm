@@ -15,6 +15,7 @@
 #import "Source/common/SNTStoredFileAccessEvent.h"
 
 #import "Source/common/CoderMacros.h"
+#import "Source/common/MOLCertificate.h"
 
 @implementation SNTStoredFileAccessEvent
 
@@ -34,6 +35,7 @@
   ENCODE(coder, accessedPath);
   ENCODE(coder, ruleVersion);
   ENCODE(coder, ruleName);
+  ENCODE(coder, process);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -83,7 +85,7 @@
     DECODE(decoder, cdhash, NSString);
     DECODE(decoder, fileSHA256, NSString);
     DECODE(decoder, signingID, NSString);
-    DECODE(decoder, signingChain, NSString);
+    DECODE_ARRAY(decoder, signingChain, MOLCertificate);
     DECODE(decoder, teamID, NSString);
     DECODE(decoder, pid, NSNumber);
     DECODE(decoder, executingUser, NSString);

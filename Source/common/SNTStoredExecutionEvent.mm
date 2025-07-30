@@ -23,7 +23,7 @@
 
 @implementation SNTStoredExecutionEvent
 
-- (instancetype)initWithFileInfo:(SNTFileInfo *)fileInfo {
+- (nullable instancetype)initWithFileInfo:(nullable SNTFileInfo *)fileInfo {
   self = [super init];
   if (self) {
     _filePath = fileInfo.path;
