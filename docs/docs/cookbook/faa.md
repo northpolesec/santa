@@ -100,7 +100,7 @@ except sudo itself. With this installed, users will have to use
 ## Lockdown Spotlight Importers
 
 Spotlight importers have been used as [a persistence trick for a
-while](https://theevilbit.github.io/beyond/beyond_0011/), going back to [Patrick Wardle's](https://x.com/patrickwardle) [talks in 2015](https://www.blackhat.com/docs/us-15/materials/us-15-Wardle-Writing-Bad-A-Malware-For-OS-X.pdf). This was recently used in the
+while](https://theevilbit.github.io/beyond/beyond_0011/), going back to Patrick Wardle's [talks in 2015](https://www.blackhat.com/docs/us-15/materials/us-15-Wardle-Writing-Bad-A-Malware-For-OS-X.pdf). This was recently used in the
 [Sploitlight exploit](https://www.microsoft.com/en-us/security/blog/2025/07/28/sploitlight-analyzing-a-spotlight-based-macos-tcc-vulnerability/).
 
 ```xml
