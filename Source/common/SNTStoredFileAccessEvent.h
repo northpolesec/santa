@@ -23,46 +23,46 @@
 @interface SNTStoredFileAccessEvent : SNTStoredEvent <NSSecureCoding>
 
 /// The rule version that was violated.
-@property NSString *ruleVersion;
+@property(nullable) NSString *ruleVersion;
 
 /// The rule name that was violated.
-@property NSString *ruleName;
+@property(nullable) NSString *ruleName;
 
 /// The watched path that was accessed.
-@property NSString *accessedPath;
+@property(nullable) NSString *accessedPath;
 
-@property SNTStoredFileAccessProcess *process;
+@property(nullable) SNTStoredFileAccessProcess *process;
 
 @end
 
 @interface SNTStoredFileAccessProcess : NSObject <NSSecureCoding>
 
 /// The full path of the process's executable file.
-@property NSString *filePath;
+@property(nullable) NSString *filePath;
 
 /// If the process was signed, this is the CDHash of the binary.
-@property NSString *cdhash;
+@property(nullable) NSString *cdhash;
 
 /// The SHA-256 of the executed file.
-@property NSString *fileSHA256;
+@property(nullable) NSString *fileSHA256;
 
 /// If the process was signed, this is the Signing ID if present in the signature information.
-@property NSString *signingID;
+@property(nullable) NSString *signingID;
 
 /// If the executed file was signed, this is an NSArray of MOLCertificate's
 /// representing the signing chain.
-@property NSArray<MOLCertificate *> *signingChain;
+@property(nullable) NSArray<MOLCertificate *> *signingChain;
 
 /// If the process was signed, this is the Team ID if present in the signature information.
-@property NSString *teamID;
+@property(nullable) NSString *teamID;
 
 /// The process ID of the binary being executed.
-@property NSNumber *pid;
+@property(nullable) NSNumber *pid;
 
 /// The user who executed the binary.
-@property NSString *executingUser;
+@property(nullable) NSString *executingUser;
 
 /// Information about this process's parent
-@property SNTStoredFileAccessProcess *parent;
+@property(nullable) SNTStoredFileAccessProcess *parent;
 
 @end

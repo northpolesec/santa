@@ -74,7 +74,7 @@ func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: String?) {
     s += "\nCDHash     : \(cdhash)"
   }
   s += "\nSHA-256    : \(e?.fileSHA256 ?? "unknown")"
-  s += "\nParent     : \(e?.parentName ?? "") (\(String(format: "%d", e?.ppid.intValue ?? 0)))"
+  s += "\nParent     : \(e?.parentName ?? "") (\(String(format: "%d", e?.ppid?.intValue ?? 0)))"
 
   let url = SNTBlockMessage.eventDetailURL(for: e, customURL: customURL as String?)
   s += "\nURL        : \(url?.absoluteString ?? "unknown")"
@@ -148,7 +148,7 @@ struct MoreDetailsView: View {
 
         addLabel {
           Text("Parent").bold().font(Font.system(size: 12.0))
-          Text(verbatim: "\(e?.parentName ?? "") (\(e?.ppid.stringValue ?? "unknown"))")
+          Text(verbatim: "\(e?.parentName ?? "") (\(e?.ppid?.stringValue ?? "unknown"))")
             .textSelection(.enabled)
         }
 

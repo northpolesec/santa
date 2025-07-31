@@ -4,8 +4,8 @@ build --define=apple.propagate_embedded_extra_outputs=yes
 build --copt=-Werror
 build --copt=-Wall
 build --copt=-Wformat-security
+build --copt=-Wnullability-completeness
 build --copt=-Wno-error=deprecated-declarations
-build --copt=-Wno-error=nullability-completeness
 build --copt=-Wreorder-init-list
 build --copt=-Wsemicolon-before-method-body
 build --copt=-Wc99-designator
