@@ -65,6 +65,12 @@ Chrome Browser rule above because Slack is built with Electron.
 				<key>IsPrefix</key>
 				<true/>
 			</dict>
+			<dict>
+				<key>Path</key>
+				<string>/Users/*/Library/Application Support/Slack/StaleCookies</string>
+				<key>IsPrefix</key>
+				<true/>
+			</dict>
 		</array>
 		<key>Options</key>
 		<dict>
