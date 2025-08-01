@@ -48,6 +48,60 @@ process.
 </dict>
 ```
 
+## Slack Cookies
+
+This policy will prevent reads of cookies from the Slack app, except to Slack
+itself and the Spotlight indexing process. This is almost identical to the
+Chrome Browser rule above because Slack is built with Electron.
+
+The utility of this was highlighted by SpecterOps in their talk
+[Modern macOS Read Teaming Tactics](https://www.youtube.com/watch?v=t_L2bdbXkp0&t=2863s)
+
+```xml
+<key>SlackCookies</key>
+<dict>
+		<key>Paths</key>
+		<array>
+			<dict>
+				<key>Path</key>
+				<string>/Users/*/Library/Application Support/Slack/Cookies</string>
+				<key>IsPrefix</key>
+				<true/>
+			</dict>
+			<dict>
+				<key>Path</key>
+				<string>/Users/*/Library/Application Support/Slack/StaleCookies</string>
+				<key>IsPrefix</key>
+				<true/>
+			</dict>
+		</array>
+		<key>Options</key>
+		<dict>
+				<key>AllowReadAccess</key>
+				<false/>
+				<key>AuditOnly</key>
+				<false/>
+				<key>RuleType</key>
+				<string>PathsWithAllowedProcesses</string>
+		</dict>
+		<key>Processes</key>
+		<array>
+				<dict>
+					<key>SigningID</key>
+					<string>com.tinyspeck.slackmacgap</string>
+					<key>TeamID</key>
+					<string>BQR82RBBHL</string>
+				</dict>
+				<dict>
+					<key>SigningID</key>
+					<string>com.apple.mdworker_shared</string>
+					<key>PlatformBinary</key>
+					<true/>
+				</dict>
+		</array>
+</dict>
+```
+
 ## Sudoers
 
 This policy prevents the sudoers config file from being modified by any process
