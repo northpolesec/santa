@@ -54,6 +54,9 @@ This policy will prevent reads of cookies from the Slack app, except to Slack
 itself and the Spotlight indexing process. This is almost identical to the
 Chrome Browser rule above because Slack is built with Electron.
 
+The utility of this was highlighted by SpecterOps in their talk
+[Modern macOS Read Teaming Tactics](https://www.youtube.com/watch?v=t_L2bdbXkp0&t=2863s)
+
 ```xml
 <key>SlackCookies</key>
 <dict>
