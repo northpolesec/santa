@@ -113,11 +113,12 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
       // This will account for Flush failing above.
       // Use the more lenient threshold here in case the Flush failures are transitory.
       if (shared_this->accumulated_bytes_ < shared_this->spool_file_size_threshold_leniency_) {
-        shared_this->accumulated_bytes_ += moved_bytes.size();
-        // auto status = shared_this->log_batch_writer_.WriteMessage(any);
+        size_t bytes_written = moved_bytes.size();
         auto status = shared_this->log_batch_writer_.WriteMessage(std::move(moved_bytes));
         if (!status.ok()) {
           LOGE(@"ProtoEventLogger::LogProto failed with: %s", status.ToString().c_str());
+        } else {
+          shared_this->accumulated_bytes_ += bytes_written;
         }
       }
 
