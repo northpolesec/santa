@@ -25,13 +25,13 @@
 
 namespace santa {
 
-class SpoolPeer : public Spool {
+class SpoolPeer : public Spool<::fsspool::FsSpoolLogBatchWriter> {
  public:
   // Make constructors visible
   using Spool::FlushSerialized;
   using Spool::Spool;
 
-  std::string GetTypeUrl() { return type_url_; }
+  const ::fsspool::FsSpoolLogBatchWriter &LogBatchWriter() { return log_batch_writer_; };
 };
 
 }  // namespace santa
@@ -79,7 +79,7 @@ using santa::SpoolPeer;
   auto spool =
       std::make_shared<SpoolPeer>(self.q, self.timer, [self.baseDir UTF8String], 10240, 1024);
   std::string wantTypeUrl("type.googleapis.com/santa.pb.v1.SantaMessage");
-  XCTAssertCppStringEqual(spool->GetTypeUrl(), wantTypeUrl);
+  XCTAssertCppStringEqual(spool->LogBatchWriter().TypeURL(), wantTypeUrl);
 }
 
 - (void)testWrite {

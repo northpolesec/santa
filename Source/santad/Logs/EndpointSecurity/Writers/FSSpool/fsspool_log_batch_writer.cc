@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -18,14 +19,21 @@
 
 #include <string>
 
+#include "Source/common/santa_proto_include_wrapper.h"
 #include "absl/status/status.h"
+
+static const char *kTypeGoogleApisComPrefix = "type.googleapis.com/";
+static constexpr int kReservedBatchSize = 2048;
 
 namespace fsspool {
 
-FsSpoolLogBatchWriter::FsSpoolLogBatchWriter(FsSpoolWriter* fs_spool_writer,
-                                             size_t max_batch_size)
-    : writer_(fs_spool_writer), max_batch_size_(max_batch_size) {
-  cache_.mutable_records()->Reserve(max_batch_size_);
+FsSpoolLogBatchWriter::FsSpoolLogBatchWriter(
+    std::function<absl::Status(std::string)> flush_callback)
+    : flush_callback_(flush_callback) {
+  type_url_ =
+      absl::StrCat(kTypeGoogleApisComPrefix,
+                   ::santa::pb::v1::SantaMessage::descriptor()->full_name());
+  cache_.mutable_records()->Reserve(kReservedBatchSize);
 }
 
 FsSpoolLogBatchWriter::~FsSpoolLogBatchWriter() {
@@ -51,7 +59,7 @@ absl::Status FsSpoolLogBatchWriter::FlushNoLock() {
   }
   {
     absl::MutexLock lock(&writer_mutex_);
-    if (absl::Status status = writer_->WriteMessage(msg); !status.ok()) {
+    if (absl::Status status = flush_callback_(msg); !status.ok()) {
       return status;
     }
   }
@@ -61,19 +69,22 @@ absl::Status FsSpoolLogBatchWriter::FlushNoLock() {
   // memory allocations and in certain scenarios it keeps objects for a very
   // long time (forever?).
   cache_ = santa::fsspool::binaryproto::LogBatch();
-  cache_.mutable_records()->Reserve(max_batch_size_);
+  cache_.mutable_records()->Reserve(kReservedBatchSize);
   return absl::OkStatus();
 }
 
-absl::Status FsSpoolLogBatchWriter::WriteMessage(
-    const ::google::protobuf::Any& msg) {
+absl::Status FsSpoolLogBatchWriter::WriteMessage(std::vector<uint8_t> bytes) {
+  // Manually pack an `Any` with a pre-serialized SantaMessage
+  google::protobuf::Any any;
+#if SANTA_OPEN_SOURCE
+  any.set_value(bytes.data(), bytes.size());
+#else
+  any.set_value(absl::string_view((const char *)bytes.data(), bytes.size()));
+#endif
+  any.set_type_url(type_url_);
+
   absl::MutexLock lock(&cache_mutex_);
-  if (cache_.records_size() >= max_batch_size_) {
-    if (absl::Status status = FlushNoLock(); !status.ok()) {
-      return status;
-    }
-  }
-  *cache_.mutable_records()->Add() = msg;
+  *cache_.mutable_records()->Add() = any;
   return absl::OkStatus();
 }
 

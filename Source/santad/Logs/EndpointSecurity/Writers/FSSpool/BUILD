@@ -60,6 +60,7 @@ cc_library(
     deps = [
         ":binaryproto_cc_proto",
         ":fsspool",
+        "//Source/common:santa_cc_proto_library_wrapper",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/synchronization",
