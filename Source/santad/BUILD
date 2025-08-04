@@ -774,7 +774,6 @@ objc_library(
 
 objc_library(
     name = "EndpointSecurityWriterSpool",
-    srcs = ["Logs/EndpointSecurity/Writers/Spool.mm"],
     hdrs = ["Logs/EndpointSecurity/Writers/Spool.h"],
     deps = [
         ":EndpointSecurityWriter",
@@ -823,6 +822,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Timer",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
@@ -1372,6 +1372,7 @@ santa_unit_test(
         "//Source/common:SNTCommonEnums",
         "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
         "@OCMock",
         "@googletest//:gtest",
     ],

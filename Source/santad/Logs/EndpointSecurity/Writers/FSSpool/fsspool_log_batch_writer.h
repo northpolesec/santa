@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -31,34 +32,36 @@ namespace fsspool {
 // Example:
 //   FsSpoolWriter fsspool_writer(...);
 //   FsSpoolLogBatchWriter batch_writer(&fsspool_writer, 10);
-//   ASSERT_OK(batch_writer.WriteMessage(any_proto);
+//   ASSERT_OK(batch_writer.WriteMessage(vector_of_bytes);
 //
 // Automatic flush happens in the event of the object destruction.
 //
 // Flush() method is provided, so the users of this class can implement periodic
-// flushes. It is not necessary to call Flush() manually otherwise.
+// flushes or due to some external indicator.
 //
 // The class is thread-safe.
 class FsSpoolLogBatchWriter {
  public:
-  FsSpoolLogBatchWriter(FsSpoolWriter* fs_spool_writer, size_t max_batch_size);
+  FsSpoolLogBatchWriter(
+      std::function<absl::Status(std::string)> flush_callback);
   ~FsSpoolLogBatchWriter();
 
-  // Writes Any proto message to the FsSpool. The write is cached according to
-  // the object configuration.
-  //
-  // This may return an error if flushing is unsuccessful.
-  absl::Status WriteMessage(const ::google::protobuf::Any& msg);
+  // Wraps given bytes in an Any proto message and writes them to the FsSpool.
+  // The write is cached until flushed.
+  absl::Status WriteMessage(std::vector<uint8_t> bytes);
 
   // Flush internal FsSpoolLogBatchWriter cache to disk. Calling this method is
   // not necessary as the cache is flushed after max_batch_size limit is reached
   // or when the objects is destroyed.
   absl::Status Flush();
 
+  std::string TypeURL() const { return type_url_; }
+
  private:
   absl::Mutex writer_mutex_ ABSL_ACQUIRED_AFTER(cache_mutex_);
-  FsSpoolWriter* writer_ ABSL_PT_GUARDED_BY(writer_mutex_);
-  size_t max_batch_size_;
+  std::function<absl::Status(std::string)> flush_callback_
+      ABSL_GUARDED_BY(writer_mutex_);
+  std::string type_url_;
   absl::Mutex cache_mutex_;
   santa::fsspool::binaryproto::LogBatch cache_ ABSL_GUARDED_BY(cache_mutex_);
 

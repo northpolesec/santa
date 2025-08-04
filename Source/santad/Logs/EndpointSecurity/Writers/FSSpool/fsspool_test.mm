@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -197,25 +198,36 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
 - (void)testWriteMessageNoFlush {
   auto writer = std::make_unique<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
-  FsSpoolLogBatchWriter batch_writer(writer.get(), 10);
+  FsSpoolLogBatchWriter batch_writer(^(std::string) {
+    return absl::OkStatus();
+  });
 
   // Ensure that writing in batch mode doesn't flsuh on individual writes.
-  XCTAssertStatusOk(batch_writer.WriteMessage(TestAnyTimestamp(123, 456)));
+  XCTAssertStatusOk(batch_writer.WriteMessage({123}));
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.tmpDir]);
 }
 
-- (void)testWriteMessageFlushAtCapacity {
+- (void)testWriteMessageFlushOnDemand {
   static const int kCapacity = 5;
-  auto writer = std::make_unique<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
-  FsSpoolLogBatchWriter batch_writer(writer.get(), kCapacity);
+  auto writer = std::make_shared<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  FsSpoolLogBatchWriter batch_writer(^(std::string msg) {
+    dispatch_semaphore_signal(sema);
+    XCTAssertStatusOk(writer->WriteMessage(msg));
+    return absl::OkStatus();
+  });
 
   // Ensure batch flushed once capacity exceeded
   for (int i = 0; i < kCapacity + 1; i++) {
-    XCTAssertStatusOk(batch_writer.WriteMessage(TestAnyTimestamp(123, 456)));
+    XCTAssertStatusOk(batch_writer.WriteMessage({123}));
   }
+
+  XCTAssertStatusOk(batch_writer.Flush());
+  // Note: Test will crash if the semaphore is signaled more than once.
+  XCTAssertSemaTrue(sema, 5, "Failed to flush batch");
 
   NSError *err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
@@ -225,15 +237,21 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testWriteMessageMultipleFlush {
-  static const int kCapacity = 5;
   static const int kExpectedFlushes = 3;
 
-  auto writer = std::make_unique<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
-  FsSpoolLogBatchWriter batch_writer(writer.get(), kCapacity);
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  auto writer = std::make_shared<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
+  FsSpoolLogBatchWriter batch_writer(^(std::string msg) {
+    dispatch_semaphore_signal(sema);
+    XCTAssertStatusOk(writer->WriteMessage(msg));
+    return absl::OkStatus();
+  });
 
   // Ensure batch flushed expected number of times
-  for (int i = 0; i < kExpectedFlushes * kCapacity + 1; i++) {
-    XCTAssertStatusOk(batch_writer.WriteMessage(TestAnyTimestamp(123, 456)));
+  for (int i = 0; i < kExpectedFlushes; i++) {
+    XCTAssertStatusOk(batch_writer.WriteMessage({123}));
+    XCTAssertStatusOk(batch_writer.Flush());
+    XCTAssertSemaTrue(sema, 5, "Failed to flush batch");
   }
 
   NSError *err = nil;
@@ -245,16 +263,20 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testWriteMessageFlushOnDestroy {
-  static const int kCapacity = 10;
   static const int kNumberOfWrites = 7;
 
-  auto writer = std::make_unique<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  auto writer = std::make_shared<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
 
   {
     // Extra scope to enforce early destroy of batch_writer.
-    FsSpoolLogBatchWriter batch_writer(writer.get(), kCapacity);
+    FsSpoolLogBatchWriter batch_writer(^(std::string msg) {
+      dispatch_semaphore_signal(sema);
+      XCTAssertStatusOk(writer->WriteMessage(msg));
+      return absl::OkStatus();
+    });
     for (int i = 0; i < kNumberOfWrites; i++) {
-      XCTAssertStatusOk(batch_writer.WriteMessage(TestAnyTimestamp(123, 456)));
+      XCTAssertStatusOk(batch_writer.WriteMessage({123}));
     }
 
     // Ensure nothing was written yet
@@ -264,6 +286,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   }
 
   // Ensure the write happens when FsSpoolLogBatchWriter destructed
+  XCTAssertSemaTrue(sema, 5, "Failed to flush batch");
   NSError *err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
