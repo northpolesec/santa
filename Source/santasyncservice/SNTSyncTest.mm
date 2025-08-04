@@ -96,7 +96,9 @@
   @param resp The NSHTTPURLResponse to return. If nil, a basic 200 response will be sent.
   @param err The error object to return to the handler.
   @param validateBlock Use to validate the request is the one intended to be stubbed.
-      Returning NO means this stub is not applied.
+      You can also use this block to verify details of the request using XCTAssert*
+      macros but you must return YES to indicate the request is the one intended to
+      be stubbed. Returning NO means this stub is not applied.
 */
 - (void)stubRequestBody:(NSData *)respData
                response:(NSURLResponse *)resp
@@ -210,6 +212,8 @@
                response:resp
                   error:nil
           validateBlock:^BOOL(NSURLRequest *req) {
+            // Only return the 403 response if the request is the initial fetch
+            // without any attached token.
             return ([req.URL.absoluteString containsString:@"/a/"] &&
                     ![req valueForHTTPHeaderField:@"X-XSRF-TOKEN"]);
           }];
@@ -220,6 +224,7 @@
                response:resp
                   error:nil
           validateBlock:^BOOL(NSURLRequest *req) {
+            // Only return the XSRF token from the /xsrf/ handler.
             return [req.URL.absoluteString containsString:@"/xsrf/"];
           }];
 
@@ -229,6 +234,8 @@
              response:nil
                 error:nil
         validateBlock:^BOOL(NSURLRequest *req) {
+          // Only return the successful request at the original URL when the XSRF token
+          // is correctly attached.
           return ([req.URL.absoluteString containsString:@"/a/"] &&
                   [[req valueForHTTPHeaderField:@"X-XSRF-TOKEN"] isEqualToString:@"my-xsrf-token"]);
         }];
@@ -249,6 +256,8 @@
                response:resp
                   error:nil
           validateBlock:^BOOL(NSURLRequest *req) {
+            // Only return the 403 response if the request is the initial fetch
+            // without any attached token.
             return ([req.URL.absoluteString containsString:@"/a/"] &&
                     ![req valueForHTTPHeaderField:@"X-Client-Xsrf-Token"]);
           }];
@@ -263,6 +272,7 @@
                response:resp
                   error:nil
           validateBlock:^BOOL(NSURLRequest *req) {
+            // Only return the XSRF token from the /xsrf/ handler.
             return [req.URL.absoluteString containsString:@"/xsrf/"];
           }];
 
@@ -271,6 +281,8 @@
                response:nil
                   error:nil
           validateBlock:^BOOL(NSURLRequest *req) {
+            // Only return the successful request at the original URL when the XSRF token
+            // is correctly attached.
             return ([req.URL.absoluteString containsString:@"/a/"] &&
                     [[req valueForHTTPHeaderField:@"X-CLIENT-XSRF-TOKEN"]
                         isEqualToString:@"my-xsrf-token"]);
@@ -820,6 +832,8 @@
                   error:nil
           validateBlock:^BOOL(NSURLRequest *req) {
             NSDictionary *requestDict = [self dictFromRequest:req];
+            // Return the first batch of rules when the cursor is nil,
+            // this is the initial request.
             return requestDict[@"cursor"] == nil;
           }];
 
@@ -829,6 +843,8 @@
                   error:nil
           validateBlock:^BOOL(NSURLRequest *req) {
             NSDictionary *requestDict = [self dictFromRequest:req];
+            // Return the second batch of rules when the cursor is not nil,
+            // this is the subsequent request.
             return requestDict[@"cursor"] != nil;
           }];
 
@@ -880,13 +896,7 @@
   SNTSyncRuleDownload *sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
 
   NSData *respData = [self dataFromFixture:@"sync_ruledownload_with_cel_1.json"];
-  [self stubRequestBody:respData
-               response:nil
-                  error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
-            NSDictionary *requestDict = [self dictFromRequest:req];
-            return requestDict[@"cursor"] == nil;
-          }];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   // Stub out the call to invoke the block, verification of the input is later
   OCMStub([self.daemonConnRop
