@@ -27,8 +27,8 @@ objc_library(
     deps = [
         ":santactl_cmd",
         "//Source/common:SNTLogging",
-        "//Source/common:santa_cc_proto_library_wrapper",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:binaryproto_cc_proto_library_wrapper",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
     ],
 )

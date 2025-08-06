@@ -21,16 +21,17 @@
 #include <string>
 
 #include "Source/common/SNTLogging.h"
-#include "Source/common/santa_proto_include_wrapper.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/binaryproto_proto_include_wrapper.h"
 #include "google/protobuf/any.pb.h"
+#include "telemetry/v1.pb.h"
 
 using JsonPrintOptions = google::protobuf::json::PrintOptions;
 using google::protobuf::json::MessageToJsonString;
 using santa::fsspool::binaryproto::LogBatch;
-namespace pbv1 = ::santa::pb::v1;
+
+namespace pbv1 = ::santa::telemetry::v1;
 
 @interface SNTCommandPrintLog : SNTCommand <SNTCommandProtocol>
 @end
@@ -101,9 +102,13 @@ REGISTER_COMMAND_NAME(@"printlog")
 
     for (int i = 0; i < numRecords; i++) {
       const google::protobuf::Any &any = logBatch.records(i);
+
+      // Don't use any.UnpackTo() because it cares about the full descriptor
+      // name including the package and we need to be able to parse the proto
+      // whether it's santa.pb.v1 or santa.telemetry.v1.
       ::pbv1::SantaMessage santaMsg;
-      if (!any.UnpackTo(&santaMsg)) {
-        TEE_LOGE(@"Failed to unpack Any proto to SantaMessage in file '%@\n", path);
+      if (!santaMsg.ParseFromString(any.value())) {
+        TEE_LOGE(@"Failed to parse Any proto to SantaMessage in file '%@\n", path);
         break;
       }
 

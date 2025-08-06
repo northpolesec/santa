@@ -43,7 +43,7 @@ use_repo(crate, "northpolesec_santa_crate_index")
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    commit = "7086bc01ca96a9ac0893f9e757d91c70c1d6ec7c",
+    commit = "001590d67c86d090701c4d8189255e20e978d46f",
     remote = "https://github.com/northpolesec/protos",
 )
 
