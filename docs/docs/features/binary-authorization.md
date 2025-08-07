@@ -366,7 +366,7 @@ rule.
 For example if you instead wanted to block everything from the Acme company
 except for the company's cloud storage product you'd make a Team ID block rule
 for `ABCDEF1234` and a signing ID allow rule for the specific cloud storage
-product. 
+product.
 
 Using `santactl` this would look like the following:
 
