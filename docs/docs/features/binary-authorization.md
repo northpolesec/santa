@@ -122,6 +122,16 @@ Code-signed            : Yes
 Rule                   : Allowed (SigningID)
 ```
 
+:::note
+
+`SIGNINGID` rules only apply to applications signed with a production certificate.
+
+To target code signed with a development certificate, you can use:
+- A [`CDHASH`](#cdhash) or [`BINARY`](#binary) rule to target a specific executable
+- A [`CERTIFICATE`](#certificate) rule to target a broader set of applications
+
+:::
+
 #### Certificate
 
 Value: `CERTIFICATE`
@@ -193,6 +203,16 @@ request/rotate between multiple different signing certificates and entitlements.
 
 This is an even more powerful rule with broader reach than individual
 certificate rules and should be used with care.
+
+:::note
+
+`TEAMID` rules only apply to applications signed with a production certificate.
+
+To target code signed with a development certificate, you can use:
+- A [`CDHASH`](#cdhash) or [`BINARY`](#binary) rule to target a specific executable
+- A [`CERTIFICATE`](#certificate) rule to target a broader set of applications
+
+:::
 
 ```shell
 » santactl fileinfo /Applications/Santa.app
@@ -377,4 +397,3 @@ event/telemetry output this is the `UNKNOWN` case:
   either by using TouchID or entering their password. If they approve the
   execution the execution is allowed to continue (without requiring
   re-execution) and a local SigningID or SHA-256 rule is automatically created.
-
