@@ -35,7 +35,6 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
-#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_log_batch_writer.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/File.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Null.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"

@@ -32,16 +32,23 @@ cc_library(
 )
 
 cc_library(
-    name = "fsspool",
-    srcs = [
-        "fsspool.cc",
-        "fsspool_nowindows.cc",
+    name = "fsspool_nowindows",
+    srcs = ["fsspool_nowindows.cc"],
+    hdrs = ["fsspool_platform_specific.h"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
+)
+
+cc_library(
+    name = "fsspool",
     hdrs = [
         "fsspool.h",
-        "fsspool_platform_specific.h",
     ],
     deps = [
+        ":SpoolBatchers",
+        ":fsspool_nowindows",
         "@abseil-cpp//absl/cleanup",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/random",
@@ -54,15 +61,21 @@ cc_library(
 )
 
 cc_library(
-    name = "fsspool_log_batch_writer",
-    srcs = ["fsspool_log_batch_writer.cc"],
-    hdrs = ["fsspool_log_batch_writer.h"],
+    name = "SpoolBatchers",
+    srcs = [
+        "AnyBatcher.cc",
+        "StreamBatcher.cc",
+    ],
+    hdrs = [
+        "AnyBatcher.h",
+        "StreamBatcher.h",
+    ],
     deps = [
         ":binaryproto_cc_proto",
-        ":fsspool",
+        ":fsspool_nowindows",
         "//Source/common:santa_cc_proto_library_wrapper",
-        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/synchronization",
     ],
 )
@@ -72,7 +85,6 @@ santa_unit_test(
     srcs = ["fsspool_test.mm"],
     deps = [
         ":fsspool",
-        ":fsspool_log_batch_writer",
         "//Source/common:TestUtils",
         "@OCMock",
     ],

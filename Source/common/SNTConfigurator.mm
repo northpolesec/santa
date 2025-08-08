@@ -1080,6 +1080,8 @@ static SNTConfigurator *sharedConfigurator = nil;
   NSString *logType = [self.configState[kEventLogType] lowercaseString];
   if ([logType isEqualToString:@"protobuf"]) {
     return SNTEventLogTypeProtobuf;
+  } else if ([logType isEqualToString:@"protobufstream"]) {
+    return SNTEventLogTypeProtobufStream;
   } else if ([logType isEqualToString:@"syslog"]) {
     return SNTEventLogTypeSyslog;
   } else if ([logType isEqualToString:@"null"]) {

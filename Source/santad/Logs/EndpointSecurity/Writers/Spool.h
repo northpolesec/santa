@@ -28,7 +28,6 @@
 #import "Source/common/SNTLogging.h"
 #include "Source/common/santa_proto_include_wrapper.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
-#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_log_batch_writer.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -42,14 +41,7 @@ class SpoolPeer;
 
 namespace santa {
 
-template <typename T>
-concept BatcherInterface = std::constructible_from<T, std::function<absl::Status(std::string)>> &&
-                           requires(T t, std::vector<uint8_t> bytes) {
-                             { t.WriteMessage(std::move(bytes)) } -> std::same_as<absl::Status>;
-                             { t.Flush() } -> std::same_as<absl::Status>;
-                           };
-
-template <BatcherInterface T>
+template <::fsspool::BatcherInterface T>
 class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
  public:
   // Factory
@@ -76,9 +68,6 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
         timer_source_(timer_source),
         spool_reader_(absl::string_view(base_dir.data(), base_dir.length())),
         spool_writer_(absl::string_view(base_dir.data(), base_dir.length()), max_spool_disk_size),
-        log_batch_writer_(^absl::Status(std::string msg) {
-          return spool_writer_.WriteMessage(msg);
-        }),
         spool_file_size_threshold_(max_spool_file_size),
         spool_file_size_threshold_leniency_(spool_file_size_threshold_ *
                                             spool_file_size_threshold_leniency_factor_),
@@ -114,9 +103,15 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
       // Use the more lenient threshold here in case the Flush failures are transitory.
       if (shared_this->accumulated_bytes_ < shared_this->spool_file_size_threshold_leniency_) {
         size_t bytes_written = moved_bytes.size();
-        auto status = shared_this->log_batch_writer_.WriteMessage(std::move(moved_bytes));
+        auto status = shared_this->spool_writer_.Write(std::move(moved_bytes));
         if (!status.ok()) {
-          LOGE(@"ProtoEventLogger::LogProto failed with: %s", status.ToString().c_str());
+          if (absl::IsDataLoss(status)) {
+            // Nop for now. We haven't historically logged on drops as that would
+            // spam the console when the spool is filled and that isn't very useful.
+            // There will be periodic messages that the spool is full.
+          } else {
+            LOGE(@"Failed to log event: %s", status.ToString().c_str());
+          }
         } else {
           shared_this->accumulated_bytes_ += bytes_written;
         }
@@ -192,7 +187,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
 
  private:
   bool FlushSerialized() {
-    if (log_batch_writer_.Flush().ok()) {
+    if (spool_writer_.Flush().ok()) {
       accumulated_bytes_ = 0;
       return true;
     } else {
@@ -203,8 +198,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
   dispatch_queue_t q_ = NULL;
   dispatch_source_t timer_source_ = NULL;
   ::fsspool::FsSpoolReader spool_reader_;
-  ::fsspool::FsSpoolWriter spool_writer_;
-  T log_batch_writer_;
+  ::fsspool::FsSpoolWriter<T> spool_writer_;
   const size_t spool_file_size_threshold_;
   // Make a "leniency factor" of 20%. This will be used to allow some more
   // records to accumulate in the event flushing fails for some reason.

@@ -18,26 +18,43 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace fsspool {
 
 absl::string_view PathSeparator();
+std::string SpoolNewDirectory(absl::string_view base_dir);
+std::string SpoolTempDirectory(absl::string_view base_dir);
 bool IsAbsolutePath(absl::string_view path);
 bool IsDirectory(const std::string& d);
 int Close(int fd);
 int Open(const char* filename, int flags, mode_t mode);
+absl::Status RenameFile(const std::string& src, const std::string& dst);
+// Creates a directory if it doesn't exist.
+// It only accepts absolute paths.
+absl::Status MkDir(const std::string& path);
 int MkDir(const char* path, mode_t mode);
 bool StatIsDir(mode_t mode);
 bool StatIsReg(mode_t mode);
 int Unlink(const char* pathname);
 int Write(int fd, absl::string_view buf);
+// Writes a buffer to the given file descriptor.
+// Calls to write can result in a partially written file. Very rare cases in
+// which this could happen (since we're writing to a regular file) include
+// if we receive a signal during write or if the disk is full.
+// Retry writing until we've flushed everything, return an error if any write
+// fails.
+absl::Status WriteBuffer(int fd, absl::string_view msg);
 
 absl::Status IterateDirectory(
     const std::string& dir,
     std::function<void(const std::string&, bool*)> callback);
+
+absl::StatusOr<size_t> EstimateDirSize(const std::string& dir);
 
 }  // namespace fsspool
 
