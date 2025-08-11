@@ -125,7 +125,7 @@ class Serializer {
   std::shared_ptr<std::string> machine_id_;
   // Used to ensure a reference sticks around while no vended copies exists
   std::shared_ptr<std::string> saved_machine_id_;
-  Xxhash common_hash_state_;
+  Xxhash128 common_hash_state_;
 };
 
 }  // namespace santa
