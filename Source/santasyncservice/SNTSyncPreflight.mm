@@ -234,26 +234,19 @@ The following table expands upon the above logic to list most of the permutation
   }
 
   if (resp.has_export_configuration()) {
-    auto protoExportConfig = resp.export_configuration();
-    if (protoExportConfig.has_aws_config()) {
-      auto protoAWS = protoExportConfig.aws_config();
-      // Check required fields are set.
-      if (!protoAWS.access_key().empty() && !protoAWS.secret_access_key().empty() &&
-          !protoAWS.session_token().empty() && !protoAWS.bucket_name().empty()) {
-        self.syncState.exportConfig = [[SNTExportConfiguration alloc]
-            initWithAWSAccessKey:StringToNSString(protoAWS.access_key())
-                 secretAccessKey:StringToNSString(protoAWS.secret_access_key())
-                    sessionToken:StringToNSString(protoAWS.session_token())
-                      bucketName:StringToNSString(protoAWS.bucket_name())
-                 objectKeyPrefix:StringToNSString(protoAWS.object_key_prefix())];
+    auto exportConfig = resp.export_configuration().signed_post();
+    if (!exportConfig.url().empty() && !exportConfig.form_values().empty()) {
+      NSMutableDictionary *formValues =
+          [NSMutableDictionary dictionaryWithCapacity:exportConfig.form_values().size()];
+      for (const auto &pair : exportConfig.form_values()) {
+        formValues[StringToNSString(pair.first)] = StringToNSString(pair.second);
       }
-    } else if (protoExportConfig.has_gcp_config()) {
-      auto protoGCP = protoExportConfig.gcp_config();
-      if (!protoGCP.bearer_token().empty() && !protoGCP.bucket_name().empty()) {
-        self.syncState.exportConfig = [[SNTExportConfiguration alloc]
-            initWithGCPBearerToken:StringToNSString(protoGCP.bearer_token())
-                        bucketName:StringToNSString(protoGCP.bucket_name())
-                   objectKeyPrefix:StringToNSString(protoGCP.object_key_prefix())];
+      NSURL *url = [NSURL URLWithString:StringToNSString(exportConfig.url())];
+      if (url) {
+        self.syncState.exportConfig = [[SNTExportConfiguration alloc] initWithURL:url
+                                                                       formValues:formValues];
+      } else {
+        SLOGE(@"Invalid export configuration URL: %@", StringToNSString(exportConfig.url()));
       }
     }
   }

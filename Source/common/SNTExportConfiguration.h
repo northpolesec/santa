@@ -14,59 +14,11 @@
 
 #import <Foundation/Foundation.h>
 
-typedef NS_ENUM(NSInteger, SNTExportConfigurationType) {
-  SNTExportConfigurationTypeUnknown = 0,
-  SNTExportConfigurationTypeAWS,
-  SNTExportConfigurationTypeGCP,
-};
-
-/// Protocol required for valid configuration types
-@protocol SNTExportConfigurationProtocol <NSObject, NSSecureCoding>
-@end
-
-/// Configuration required for exporting to AWS
-@interface SNTExportConfigurationAWS : NSObject <SNTExportConfigurationProtocol>
-@property(readonly) NSString *accessKey;
-@property(readonly) NSString *secretAccessKey;
-@property(readonly) NSString *sessionToken;
-@property(readonly) NSString *bucketName;
-@property(readonly) NSString *objectKeyPrefix;
-- (instancetype)initWithAccessKey:(NSString *)accessKey
-                  secretAccessKey:(NSString *)secretAccessKey
-                     sessionToken:(NSString *)sessionToken
-                       bucketName:(NSString *)bucketName
-                  objectKeyPrefix:(NSString *)objectKeyPrefix;
-@end
-
-/// Configuration required for exporting to GCP
-@interface SNTExportConfigurationGCP : NSObject <SNTExportConfigurationProtocol>
-@property(readonly) NSString *bearerToken;
-@property(readonly) NSString *bucketName;
-@property(readonly) NSString *objectKeyPrefix;
-- (instancetype)initWithBearerToken:(NSString *)bearerToken
-                         bucketName:(NSString *)bucketName
-                    objectKeyPrefix:(NSString *)objectKeyPrefix;
-@end
-
-/// Lightweight container for holding the export configuration and its type
 @interface SNTExportConfiguration : NSObject <NSSecureCoding>
 
-@property(readonly) SNTExportConfigurationType configType;
-@property(readonly) id<SNTExportConfigurationProtocol> config;
+@property(readonly) NSURL *url;
+@property(readonly) NSDictionary *formValues;
 
-// AWS Initializer
-- (instancetype)initWithAWSAccessKey:(NSString *)accessKey
-                     secretAccessKey:(NSString *)secretAccessKey
-                        sessionToken:(NSString *)sessionToken
-                          bucketName:(NSString *)bucketName
-                     objectKeyPrefix:(NSString *)objectKeyPrefix;
-
-// GCP Initializer
-- (instancetype)initWithGCPBearerToken:(NSString *)bearerToken
-                            bucketName:(NSString *)bucketName
-                       objectKeyPrefix:(NSString *)objectKeyPrefix;
-
-- (NSData *)serialize;
-+ (instancetype)deserialize:(NSData *)data;
+- (instancetype)initWithURL:(NSURL *)url formValues:(NSDictionary *)formValues;
 
 @end

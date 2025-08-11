@@ -22,96 +22,37 @@
 
 @implementation SNTExportConfigurationTest
 
-- (void)testTypes {
-  SNTExportConfiguration *cfg =
-      [[SNTExportConfiguration alloc] initWithAWSAccessKey:@"MyAccessKey"
-                                           secretAccessKey:@"MySecretAccessKey"
-                                              sessionToken:@"MySessionToken"
-                                                bucketName:@"MyBucketName"
-                                           objectKeyPrefix:@"MyObjectKeyPrefix"];
-  XCTAssertEqual(cfg.configType, SNTExportConfigurationTypeAWS);
-  XCTAssertTrue([cfg.config isKindOfClass:[SNTExportConfigurationAWS class]]);
+- (void)testInitialization {
+  NSURL *url = [NSURL URLWithString:@"https://example.com/upload"];
+  NSDictionary *formValues = @{@"key1" : @"value1", @"key2" : @"value2"};
 
-  cfg = [[SNTExportConfiguration alloc] initWithGCPBearerToken:@"MyBearerToken"
-                                                    bucketName:@"MyBucketName"
-                                               objectKeyPrefix:@"MyObjectKeyPrefix"];
-  XCTAssertEqual(cfg.configType, SNTExportConfigurationTypeGCP);
-  XCTAssertTrue([cfg.config isKindOfClass:[SNTExportConfigurationGCP class]]);
+  SNTExportConfiguration *cfg = [[SNTExportConfiguration alloc] initWithURL:url
+                                                                 formValues:formValues];
+
+  XCTAssertEqualObjects(cfg.url, url);
+  XCTAssertEqualObjects(cfg.formValues[@"key1"], @"value1");
+  XCTAssertEqualObjects(cfg.formValues[@"key2"], @"value2");
 }
 
-- (void)testEncodeDecodeSerializeDeserialize {
-  // Encode and decode AWS config
-  SNTExportConfiguration *cfg =
-      [[SNTExportConfiguration alloc] initWithAWSAccessKey:@"MyAccessKey"
-                                           secretAccessKey:@"MySecretAccessKey"
-                                              sessionToken:@"MySessionToken"
-                                                bucketName:@"MyBucketName"
-                                           objectKeyPrefix:@"MyObjectKeyPrefix"];
+- (void)testEncodeDecodeSecureCoding {
+  NSURL *url = [NSURL URLWithString:@"https://example.com/upload"];
+  NSDictionary *formValues = @{@"key1" : @"value1", @"key2" : @"value2"};
 
+  SNTExportConfiguration *cfg = [[SNTExportConfiguration alloc] initWithURL:url
+                                                                 formValues:formValues];
   NSData *data = [NSKeyedArchiver archivedDataWithRootObject:cfg
                                        requiringSecureCoding:YES
                                                        error:nil];
+  XCTAssertNotNil(data);
 
-  // Ensure the serialize method returns the same bytes as NSKeyedArchiver
-  NSData *serializedData = [cfg serialize];
-  XCTAssertEqualObjects(data, serializedData);
-
-  NSSet *allowedClasses =
-      [NSSet setWithObjects:[SNTExportConfiguration class], [SNTExportConfigurationAWS class],
-                            [SNTExportConfigurationGCP class], nil];
-
+  NSSet *allowedClasses = [NSSet setWithObjects:[SNTExportConfiguration class], nil];
   id obj = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses fromData:data error:nil];
   XCTAssertTrue([obj isKindOfClass:[SNTExportConfiguration class]]);
-  XCTAssertTrue(
-      [((SNTExportConfiguration *)obj).config isKindOfClass:[SNTExportConfigurationAWS class]]);
-  SNTExportConfigurationAWS *awsConfig =
-      (SNTExportConfigurationAWS *)((SNTExportConfiguration *)obj).config;
-  XCTAssertEqualObjects(awsConfig.accessKey, @"MyAccessKey");
-  XCTAssertEqualObjects(awsConfig.secretAccessKey, @"MySecretAccessKey");
-  XCTAssertEqualObjects(awsConfig.sessionToken, @"MySessionToken");
-  XCTAssertEqualObjects(awsConfig.bucketName, @"MyBucketName");
-  XCTAssertEqualObjects(awsConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
 
-  // Ensure deserializing the serialized data results in an object with the
-  // same content as what is returned by NSKeyedUnarchiver
-  SNTExportConfiguration *deserializedObj = [SNTExportConfiguration deserialize:serializedData];
-  XCTAssertTrue([deserializedObj.config isKindOfClass:[SNTExportConfigurationAWS class]]);
-  awsConfig = (SNTExportConfigurationAWS *)(deserializedObj.config);
-  XCTAssertEqualObjects(awsConfig.accessKey, @"MyAccessKey");
-  XCTAssertEqualObjects(awsConfig.secretAccessKey, @"MySecretAccessKey");
-  XCTAssertEqualObjects(awsConfig.sessionToken, @"MySessionToken");
-  XCTAssertEqualObjects(awsConfig.bucketName, @"MyBucketName");
-  XCTAssertEqualObjects(awsConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
-
-  // Encode and decode GCP config
-  cfg = [[SNTExportConfiguration alloc] initWithGCPBearerToken:@"MyBearerToken"
-                                                    bucketName:@"MyBucketName"
-                                               objectKeyPrefix:@"MyObjectKeyPrefix"];
-
-  data = [NSKeyedArchiver archivedDataWithRootObject:cfg requiringSecureCoding:YES error:nil];
-  // Ensure the serialize method returns the same bytes as NSKeyedArchiver
-  serializedData = [cfg serialize];
-  XCTAssertEqualObjects(data, serializedData);
-
-  obj = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses fromData:data error:nil];
-  XCTAssertTrue([obj isKindOfClass:[SNTExportConfiguration class]]);
-  XCTAssertTrue(
-      [((SNTExportConfiguration *)obj).config isKindOfClass:[SNTExportConfigurationGCP class]]);
-
-  SNTExportConfigurationGCP *gcpConfig =
-      (SNTExportConfigurationGCP *)((SNTExportConfiguration *)obj).config;
-  XCTAssertEqualObjects(gcpConfig.bearerToken, @"MyBearerToken");
-  XCTAssertEqualObjects(gcpConfig.bucketName, @"MyBucketName");
-  XCTAssertEqualObjects(gcpConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
-
-  // Ensure deserializing the serialized data results in an object with the
-  // same content as what is returned by NSKeyedUnarchiver
-  deserializedObj = [SNTExportConfiguration deserialize:serializedData];
-  XCTAssertTrue([deserializedObj.config isKindOfClass:[SNTExportConfigurationGCP class]]);
-  gcpConfig = (SNTExportConfigurationGCP *)(deserializedObj.config);
-  XCTAssertEqualObjects(gcpConfig.bearerToken, @"MyBearerToken");
-  XCTAssertEqualObjects(gcpConfig.bucketName, @"MyBucketName");
-  XCTAssertEqualObjects(gcpConfig.objectKeyPrefix, @"MyObjectKeyPrefix");
+  SNTExportConfiguration *decodedConfig = (SNTExportConfiguration *)obj;
+  XCTAssertEqualObjects(decodedConfig.url, url);
+  XCTAssertEqualObjects(decodedConfig.formValues[@"key1"], @"value1");
+  XCTAssertEqualObjects(decodedConfig.formValues[@"key2"], @"value2");
 }
 
 @end

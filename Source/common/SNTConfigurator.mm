@@ -752,11 +752,19 @@ static SNTConfigurator *sharedConfigurator = nil;
   [self updateSyncStateForKey:kEnableBundlesKey value:@(enable)];
 }
 - (SNTExportConfiguration *)exportConfig {
-  return [SNTExportConfiguration deserialize:self.syncState[kExportConfigurationKey]];
+  NSError *error;
+  SNTExportConfiguration *config =
+      [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTExportConfiguration class]
+                                        fromData:self.syncState[kExportConfigurationKey]
+                                           error:&error];
+  return error ? nil : config;
 }
 
 - (void)setSyncServerExportConfig:(SNTExportConfiguration *)exportConfig {
-  [self updateSyncStateForKey:kExportConfigurationKey value:[exportConfig serialize]];
+  NSData *configData = [NSKeyedArchiver archivedDataWithRootObject:exportConfig
+                                             requiringSecureCoding:YES
+                                                             error:nil];
+  [self updateSyncStateForKey:kExportConfigurationKey value:configData];
 }
 
 - (NSRegularExpression *)allowedPathRegex {

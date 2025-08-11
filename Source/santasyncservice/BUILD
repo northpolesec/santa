@@ -222,10 +222,6 @@ objc_library(
         "SNTSyncService.mm",
         "main.mm",
     ],
-    defines = select({
-        "//:missing_xcode_16": ["MISSING_XCODE_16"],
-        "//conditions:default": [],
-    }),
     deps = [
         ":broadcaster_lib",
         ":sync_lib",
@@ -237,10 +233,7 @@ objc_library(
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
-    ] + select({
-        "//:missing_xcode_16": [],
-        "//conditions:default": ["@northpolesec_rednose//rednose:export_bridge"],
-    }),
+    ],
 )
 
 macos_command_line_application(

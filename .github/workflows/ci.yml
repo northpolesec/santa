@@ -49,7 +49,7 @@ jobs:
         run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym //Source/gui:Santa --define=SANTA_BUILD_TYPE=adhoc
       - name: Build Userspace 13
         if: matrix.os == 'macos-13'
-        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym //Source/gui:Santa --define=SANTA_BUILD_TYPE=adhoc --define=SANTA_XCODE_VERSION=missing_xcode_16
+        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym //Source/gui:Santa --define=SANTA_BUILD_TYPE=adhoc
   check_localization:
     runs-on: macos-latest
     steps:

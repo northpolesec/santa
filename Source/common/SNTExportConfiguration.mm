@@ -17,183 +17,42 @@
 #import "Source/common/CoderMacros.h"
 #import "Source/common/SNTLogging.h"
 
-@implementation SNTExportConfigurationAWS
-
-- (instancetype)initWithAccessKey:(NSString *)accessKey
-                  secretAccessKey:(NSString *)secretAccessKey
-                     sessionToken:(NSString *)sessionToken
-                       bucketName:(NSString *)bucketName
-                  objectKeyPrefix:(NSString *)objectKeyPrefix {
-  self = [super self];
-  if (self) {
-    _accessKey = accessKey;
-    _secretAccessKey = secretAccessKey;
-    _sessionToken = sessionToken;
-    _bucketName = bucketName;
-    _objectKeyPrefix = objectKeyPrefix;
-  }
-  return self;
-}
-
-+ (BOOL)supportsSecureCoding {
-  return YES;
-}
-
-- (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(coder, accessKey);
-  ENCODE(coder, secretAccessKey);
-  ENCODE(coder, sessionToken);
-  ENCODE(coder, bucketName);
-  ENCODE(coder, objectKeyPrefix);
-}
-
-- (instancetype)initWithCoder:(NSCoder *)decoder {
-  self = [super init];
-  if (self) {
-    DECODE(decoder, accessKey, NSString);
-    DECODE(decoder, secretAccessKey, NSString);
-    DECODE(decoder, sessionToken, NSString);
-    DECODE(decoder, bucketName, NSString);
-    DECODE(decoder, objectKeyPrefix, NSString);
-  }
-  return self;
-}
-
-@end
-
-@implementation SNTExportConfigurationGCP
-
-- (instancetype)initWithBearerToken:(NSString *)bearerToken
-                         bucketName:(NSString *)bucketName
-                    objectKeyPrefix:(NSString *)objectKeyPrefix {
-  self = [super self];
-  if (self) {
-    _bearerToken = bearerToken;
-    _bucketName = bucketName;
-    _objectKeyPrefix = objectKeyPrefix;
-  }
-  return self;
-}
-
-+ (BOOL)supportsSecureCoding {
-  return YES;
-}
-
-- (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(coder, bearerToken);
-  ENCODE(coder, bucketName);
-  ENCODE(coder, objectKeyPrefix);
-}
-
-- (instancetype)initWithCoder:(NSCoder *)decoder {
-  self = [super init];
-  if (self) {
-    DECODE(decoder, bearerToken, NSString);
-    DECODE(decoder, bucketName, NSString);
-    DECODE(decoder, objectKeyPrefix, NSString);
-  }
-  return self;
-}
-
+@interface SNTExportConfiguration ()
+@property NSURL *url;
+@property NSDictionary *formValues;
 @end
 
 @implementation SNTExportConfiguration
 
-- (instancetype)initWithAWSAccessKey:(NSString *)accessKey
-                     secretAccessKey:(NSString *)secretAccessKey
-                        sessionToken:(NSString *)sessionToken
-                          bucketName:(NSString *)bucketName
-                     objectKeyPrefix:(NSString *)objectKeyPrefix {
++ (BOOL)supportsSecureCoding {
+  return YES;
+}
+
+- (void)encodeWithCoder:(NSCoder *)coder {
+  ENCODE(coder, url);
+  ENCODE(coder, formValues);
+}
+
+- (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super init];
   if (self) {
-    _config = [[SNTExportConfigurationAWS alloc] initWithAccessKey:accessKey
-                                                   secretAccessKey:secretAccessKey
-                                                      sessionToken:sessionToken
-                                                        bucketName:bucketName
-                                                   objectKeyPrefix:objectKeyPrefix];
-    _configType = SNTExportConfigurationTypeAWS;
+    DECODE(decoder, url, NSURL);
+    DECODE_DICT(decoder, formValues);
   }
   return self;
 }
 
-- (instancetype)initWithGCPBearerToken:(NSString *)bearerToken
-                            bucketName:(NSString *)bucketName
-                       objectKeyPrefix:(NSString *)objectKeyPrefix {
+- (instancetype)initWithURL:(NSURL *)url formValues:(NSDictionary *)formValues {
   self = [super init];
   if (self) {
-    _config = [[SNTExportConfigurationGCP alloc] initWithBearerToken:bearerToken
-                                                          bucketName:bucketName
-                                                     objectKeyPrefix:objectKeyPrefix];
-    _configType = SNTExportConfigurationTypeGCP;
+    _url = url;
+    _formValues = [formValues copy];
   }
   return self;
 }
 
 - (NSString *)description {
-  return
-      [NSString stringWithFormat:@"SNTExportConfiguration: Type: %@",
-                                 self.configType == SNTExportConfigurationTypeAWS   ? @"AWS"
-                                 : self.configType == SNTExportConfigurationTypeGCP ? @"GCP"
-                                                                                    : @"UNKNOWN"];
-}
-
-+ (BOOL)supportsSecureCoding {
-  return YES;
-}
-
-- (void)encodeWithCoder:(NSCoder *)coder {
-  ENCODE(coder, config);
-  ENCODE_BOXABLE(coder, configType);
-}
-
-- (instancetype)initWithCoder:(NSCoder *)decoder {
-  self = [super init];
-  if (self) {
-    DECODE_SET(decoder, config,
-               ([NSSet setWithObjects:[SNTExportConfigurationAWS class],
-                                      [SNTExportConfigurationGCP class], nil]));
-    DECODE_SELECTOR(decoder, configType, NSNumber, integerValue);
-  }
-  return self;
-}
-
-- (NSData *)serialize {
-  NSError *error;
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self
-                                       requiringSecureCoding:YES
-                                                       error:&error];
-  if (error) {
-    LOGE(@"Export config serialization failed: %@", error.localizedDescription);
-    return nil;
-  }
-
-  return data;
-}
-
-+ (instancetype)deserialize:(NSData *)data {
-  if (!data) {
-    return nil;
-  }
-
-  NSSet *allowedClasses =
-      [NSSet setWithObjects:[SNTExportConfiguration class], [SNTExportConfigurationAWS class],
-                            [SNTExportConfigurationGCP class], nil];
-
-  NSError *error;
-  id object = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
-                                                  fromData:data
-                                                     error:&error];
-  if (error) {
-    LOGE(@"Export config deserialization failed: %@", error.localizedDescription);
-    return nil;
-  }
-
-  if (![object isKindOfClass:[SNTExportConfiguration class]]) {
-    LOGE(@"Unexpected export config type: %@", [object class]);
-    return nil;
-  }
-
-  return object;
+  return self.url.absoluteString;
 }
 
 @end
