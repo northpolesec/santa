@@ -1,6 +1,6 @@
 load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
@@ -60,11 +60,11 @@ cc_library(
     ],
 )
 
-cc_library(
+objc_library(
     name = "SpoolBatchers",
     srcs = [
-        "AnyBatcher.cc",
-        "StreamBatcher.cc",
+        "AnyBatcher.mm",
+        "StreamBatcher.mm",
     ],
     hdrs = [
         "AnyBatcher.h",

@@ -14,6 +14,8 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
 
+#include <climits>
+
 namespace fsspool {
 
 void StreamBatcher::InitializeBatch(int fd) {
@@ -28,11 +30,17 @@ bool StreamBatcher::NeedToOpenFile() {
 }
 
 absl::Status StreamBatcher::Write(std::vector<uint8_t> bytes) {
+  if (bytes.size() > INT_MAX) {
+    return absl::InternalError("Telemetry event size too large");
+  }
+
   coded_output_->WriteLittleEndian32(kStreamBatcherMagic);
   // TODO(mlw): This will be XXH3 64bit hash of the buffer
   coded_output_->WriteLittleEndian64(0);
-  coded_output_->WriteVarint32(bytes.size());
-  coded_output_->WriteRaw(bytes.data(), bytes.size());
+  // Note: Protobuf library is inconsistent on size parameters. Casts are
+  // intentionally for different types.
+  coded_output_->WriteVarint32(static_cast<uint32_t>(bytes.size()));
+  coded_output_->WriteRaw(bytes.data(), static_cast<int>(bytes.size()));
   return absl::OkStatus();
 }
 
