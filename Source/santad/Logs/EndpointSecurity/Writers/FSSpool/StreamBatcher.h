@@ -31,6 +31,7 @@ class StreamBatcher {
   StreamBatcher() = default;
 
   void InitializeBatch(int fd);
+  bool NeedToOpenFile();
   absl::Status Write(std::vector<uint8_t> bytes);
   absl::StatusOr<size_t> CompleteBatch(int fd);
 

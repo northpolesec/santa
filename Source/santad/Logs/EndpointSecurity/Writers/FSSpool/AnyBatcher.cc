@@ -32,6 +32,11 @@ void AnyBatcher::InitializeBatch(int fd) {
   }
 }
 
+bool AnyBatcher::NeedToOpenFile() {
+  // Only indicate a new file should be opened if there are records to write.
+  return cache_.records().size() > 0;
+}
+
 absl::Status AnyBatcher::Write(std::vector<uint8_t> bytes) {
   google::protobuf::Any any;
 #if SANTA_OPEN_SOURCE

@@ -1,4 +1,5 @@
 /// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -19,18 +20,17 @@
 #include <memory>
 
 #include "Source/common/TestUtils.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"
 
 namespace santa {
 
-class SpoolPeer : public Spool<::fsspool::FsSpoolLogBatchWriter> {
+template <typename T>
+class SpoolPeer : public Spool<T> {
  public:
-  // Make constructors visible
-  using Spool::FlushSerialized;
-  using Spool::Spool;
-
-  const ::fsspool::FsSpoolLogBatchWriter &LogBatchWriter() { return log_batch_writer_; };
+  using Spool<T>::FlushSerialized;
+  using Spool<T>::Spool;
 };
 
 }  // namespace santa
@@ -50,7 +50,6 @@ using santa::SpoolPeer;
 
 - (void)setUp {
   self.fileMgr = [NSFileManager defaultManager];
-  self.testDir = [NSString stringWithFormat:@"%@santa-spool-%d", NSTemporaryDirectory(), getpid()];
   self.testDir = [NSString stringWithFormat:@"%@fsspool-%d", NSTemporaryDirectory(), getpid()];
   self.baseDir = [NSString stringWithFormat:@"%@/base", self.testDir];
   self.spoolDir = [NSString stringWithFormat:@"%@/new", self.baseDir];
@@ -75,10 +74,10 @@ using santa::SpoolPeer;
 
 - (void)testTypeUrl {
   // Ensure the manually created type url isn't modified
-  auto spool =
-      std::make_shared<SpoolPeer>(self.q, self.timer, [self.baseDir UTF8String], 10240, 1024);
+  fsspool::AnyBatcher batcher;
+  batcher.InitializeBatch(-1);  // Fake fd, not needed
   std::string wantTypeUrl("type.googleapis.com/santa.pb.v1.SantaMessage");
-  XCTAssertCppStringEqual(spool->LogBatchWriter().TypeURL(), wantTypeUrl);
+  XCTAssertCppStringEqual(batcher.TypeURL(), wantTypeUrl);
 }
 
 - (void)testWrite {
@@ -90,7 +89,7 @@ using santa::SpoolPeer;
   dispatch_semaphore_t semaFlush = dispatch_semaphore_create(0);
   __block int flushCount = 0;
 
-  auto spool = std::make_shared<SpoolPeer>(
+  auto spool = std::make_shared<SpoolPeer<::fsspool::AnyBatcher>>(
       self.q, self.timer, [self.baseDir UTF8String], 10240, 1024,
       ^{
         dispatch_semaphore_signal(semaWrite);
@@ -111,15 +110,13 @@ using santa::SpoolPeer;
 
   spool->Write(std::vector<uint8_t>(writeSize, 'A'));
 
-  XCTAssertEqual(
-      0, dispatch_semaphore_wait(semaWrite, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-      "Second write didn't compelte within expected window");
+  XCTAssertSemaTrue(semaWrite, 5, "First write didn't compelte within expected window");
 
-  // Sleep for a short time. Nothing should happen, but want to help ensure that if somehow
-  // if somehow timers were active that would be caught and fail the test.
+  // Sleep for a short time. Nothing should happen, but want to help ensure that if
+  // somehow something did, timers were active that would be caught and fail the test.
   sleep(1);
 
-  // Ensure nothing exists yet because periodic flush been started
+  // Ensure nothing exists yet because periodic flush hasn't been started
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 0);
 
   // Manual Flush
@@ -131,9 +128,7 @@ using santa::SpoolPeer;
   // Start the periodic flush task
   spool->BeginFlushTask();
 
-  XCTAssertEqual(
-      0, dispatch_semaphore_wait(semaFlush, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-      "Initial flush task firing didn't occur within expected window");
+  XCTAssertSemaTrue(semaFlush, 5, "Initial flush task firing didn't occur within expected window");
 
   // Ensure no growth in the amount of data
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
@@ -141,13 +136,8 @@ using santa::SpoolPeer;
   // Write a second log entry and begin the period
   spool->Write(std::vector<uint8_t>(writeSize, 'B'));
 
-  XCTAssertEqual(
-      0, dispatch_semaphore_wait(semaWrite, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-      "Second write didn't compelte within expected window");
-
-  XCTAssertEqual(
-      0, dispatch_semaphore_wait(semaFlush, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-      "Initial flush task firing didn't occur within expected window");
+  XCTAssertSemaTrue(semaWrite, 5, "Second write didn't compelte within expected window");
+  XCTAssertSemaTrue(semaFlush, 5, "Initial flush task firing didn't occur within expected window");
 
   // Ensure the new log entry appears
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 2);

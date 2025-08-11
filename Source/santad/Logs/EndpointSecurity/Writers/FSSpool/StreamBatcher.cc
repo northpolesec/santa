@@ -22,6 +22,11 @@ void StreamBatcher::InitializeBatch(int fd) {
       raw_output_.get());
 }
 
+bool StreamBatcher::NeedToOpenFile() {
+  // The stream batcher has no precondition and always needs to open a new file.
+  return true;
+}
+
 absl::Status StreamBatcher::Write(std::vector<uint8_t> bytes) {
   coded_output_->WriteLittleEndian32(kStreamBatcherMagic);
   // TODO(mlw): This will be XXH3 64bit hash of the buffer

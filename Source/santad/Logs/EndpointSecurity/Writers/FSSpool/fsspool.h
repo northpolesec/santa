@@ -19,6 +19,7 @@
 // Namespace ::fsspool::fsspool implements a filesystem-backed message spool, to
 // use as a lock-free IPC mechanism.
 
+#include <fcntl.h>
 #include <sys/stat.h>
 
 #include <string>
@@ -38,6 +39,7 @@
 
 // Forward declarations
 namespace fsspool {
+template <typename T>
 class FsSpoolWriterPeer;
 }
 
@@ -48,6 +50,7 @@ concept BatcherInterface =
     requires(T batcher, int fd, std::vector<uint8_t> bytes) {
       T{};
       { batcher.InitializeBatch(fd) } -> std::same_as<void>;
+      { batcher.NeedToOpenFile() } -> std::same_as<bool>;
       { batcher.Write(bytes) } -> std::same_as<absl::Status>;
       { batcher.CompleteBatch(fd) } -> std::same_as<absl::StatusOr<size_t>>;
     };
@@ -75,6 +78,8 @@ class FsSpoolWriter {
         // recompute the actual spool size on the first write.
         spool_size_estimate_(max_spool_size + 1) {}
 
+  ~FsSpoolWriter() { (void)Flush(); };
+
   absl::Status SpaceAvailable() {
     if (spool_size_estimate_ > max_spool_size_) {
       absl::StatusOr<size_t> estimate = EstimateSpoolDirSize();
@@ -97,6 +102,10 @@ class FsSpoolWriter {
 
   absl::Status InitializeCurrentSpoolStateIfNeeded() {
     if (current_spool_state_.IsOpen()) {
+      return absl::OkStatus();
+    }
+
+    if (!batcher_.NeedToOpenFile()) {
       return absl::OkStatus();
     }
 
@@ -193,12 +202,7 @@ class FsSpoolWriter {
     return status;
   }
 
-  // Pushes the given byte array to the spool. The given maximum
-  // spool size will be enforced. Returns an error code. If the spool gets full,
-  // returns the UNAVAILABLE canonical code (which is retryable).
-  absl::Status WriteMessage(absl::string_view msg);
-
-  friend class fsspool::FsSpoolWriterPeer;
+  friend class fsspool::FsSpoolWriterPeer<T>;
 
  private:
   // Makes sure that all the required

@@ -28,8 +28,11 @@ class AnyBatcher {
   AnyBatcher() = default;
 
   void InitializeBatch(int fd);
+  bool NeedToOpenFile();
   absl::Status Write(std::vector<uint8_t> bytes);
   absl::StatusOr<size_t> CompleteBatch(int fd);
+
+  std::string TypeURL() { return type_url_; }
 
  private:
   std::string type_url_;

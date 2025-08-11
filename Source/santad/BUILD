@@ -1342,6 +1342,7 @@ santa_unit_test(
     deps = [
         ":EndpointSecurityWriterSpool",
         "//Source/common:TestUtils",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool",
     ],
 )
@@ -1370,6 +1371,7 @@ santa_unit_test(
         "//Source/common:SNTCommonEnums",
         "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
         "@OCMock",
         "@googletest//:gtest",
     ],

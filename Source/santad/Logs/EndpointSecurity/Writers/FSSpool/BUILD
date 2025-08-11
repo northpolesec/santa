@@ -84,6 +84,7 @@ santa_unit_test(
     name = "fsspool_test",
     srcs = ["fsspool_test.mm"],
     deps = [
+        ":SpoolBatchers",
         ":fsspool",
         "//Source/common:TestUtils",
         "@OCMock",

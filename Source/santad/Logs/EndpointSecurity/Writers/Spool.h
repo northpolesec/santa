@@ -36,6 +36,7 @@
 
 // Forward declarations
 namespace santa {
+template <typename T>
 class SpoolPeer;
 }
 
@@ -183,7 +184,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
   }
 
   // Peer class for testing
-  friend class santa::SpoolPeer;
+  friend class santa::SpoolPeer<T>;
 
  private:
   bool FlushSerialized() {

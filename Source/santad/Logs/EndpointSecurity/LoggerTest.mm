@@ -35,6 +35,8 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/File.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Null.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"
@@ -140,8 +142,15 @@ class MockWriter : public Null {
                                      SNTEventLogTypeProtobuf, nil, @"/tmp/temppy", @"/tmp/spool", 1,
                                      1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
-  XCTAssertNotEqual(
-      nullptr, std::dynamic_pointer_cast<Spool<::fsspool::FsSpoolLogBatchWriter>>(logger.writer_));
+  XCTAssertNotEqual(nullptr,
+                    std::dynamic_pointer_cast<Spool<::fsspool::AnyBatcher>>(logger.writer_));
+
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+                                     SNTEventLogTypeProtobufStream, nil, @"/tmp/temppy",
+                                     @"/tmp/spool", 1, 1, 1, 1));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
+  XCTAssertNotEqual(nullptr,
+                    std::dynamic_pointer_cast<Spool<::fsspool::StreamBatcher>>(logger.writer_));
 
   logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeJSON, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
