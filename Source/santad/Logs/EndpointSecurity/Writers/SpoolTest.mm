@@ -21,6 +21,7 @@
 
 #include "Source/common/TestUtils.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"
 
@@ -80,7 +81,7 @@ using santa::SpoolPeer;
   XCTAssertCppStringEqual(batcher.TypeURL(), wantTypeUrl);
 }
 
-- (void)testWrite {
+- (void)testWriteAnyBatcher {
   const size_t writeSize = 50;
   const uint64 periodicFlushMS = 400;
   NSError *err = nil;
@@ -90,6 +91,69 @@ using santa::SpoolPeer;
   __block int flushCount = 0;
 
   auto spool = std::make_shared<SpoolPeer<::fsspool::AnyBatcher>>(
+      self.q, self.timer, [self.baseDir UTF8String], 10240, 1024,
+      ^{
+        dispatch_semaphore_signal(semaWrite);
+      },
+      ^{
+        flushCount++;
+        if (flushCount <= 2) {
+          // The first flush is the initial fire.
+          // The second flush should flush the new contents to disk
+          // Afterwards, nothing else waits on the semaphore, so stop signaling
+          dispatch_semaphore_signal(semaFlush);
+        }
+      });
+
+  // Set a custom timer interval for this test
+  dispatch_source_set_timer(self.timer, dispatch_time(DISPATCH_TIME_NOW, 0),
+                            NSEC_PER_MSEC * periodicFlushMS, 0);
+
+  spool->Write(std::vector<uint8_t>(writeSize, 'A'));
+
+  XCTAssertSemaTrue(semaWrite, 5, "First write didn't compelte within expected window");
+
+  // Sleep for a short time. Nothing should happen, but want to help ensure that if
+  // somehow something did, timers were active that would be caught and fail the test.
+  sleep(1);
+
+  // Ensure nothing exists yet because periodic flush hasn't been started
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 0);
+
+  // Manual Flush
+  XCTAssertTrue(spool->FlushSerialized());
+
+  // A new log entry should exist
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+
+  // Start the periodic flush task
+  spool->BeginFlushTask();
+
+  XCTAssertSemaTrue(semaFlush, 5, "Initial flush task firing didn't occur within expected window");
+
+  // Ensure no growth in the amount of data
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+
+  // Write a second log entry and begin the period
+  spool->Write(std::vector<uint8_t>(writeSize, 'B'));
+
+  XCTAssertSemaTrue(semaWrite, 5, "Second write didn't compelte within expected window");
+  XCTAssertSemaTrue(semaFlush, 5, "Initial flush task firing didn't occur within expected window");
+
+  // Ensure the new log entry appears
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 2);
+}
+
+- (void)testWriteStreamBatcher {
+  const size_t writeSize = 50;
+  const uint64 periodicFlushMS = 400;
+  NSError *err = nil;
+
+  dispatch_semaphore_t semaWrite = dispatch_semaphore_create(0);
+  dispatch_semaphore_t semaFlush = dispatch_semaphore_create(0);
+  __block int flushCount = 0;
+
+  auto spool = std::make_shared<SpoolPeer<::fsspool::StreamBatcher>>(
       self.q, self.timer, [self.baseDir UTF8String], 10240, 1024,
       ^{
         dispatch_semaphore_signal(semaWrite);

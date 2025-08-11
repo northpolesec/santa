@@ -76,7 +76,9 @@ class FsSpoolWriter {
                                     std::numeric_limits<uint64_t>::max()))),
         // Guess that the spool is full during construction, so we will
         // recompute the actual spool size on the first write.
-        spool_size_estimate_(max_spool_size + 1) {}
+        spool_size_estimate_(max_spool_size + 1) {
+    // TODO(mlw): Delete contents of the tmp spool dir on startup
+  }
 
   ~FsSpoolWriter() { (void)Flush(); };
 

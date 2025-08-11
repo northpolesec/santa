@@ -20,8 +20,7 @@ namespace fsspool {
 
 void StreamBatcher::InitializeBatch(int fd) {
   raw_output_ = std::make_shared<google::protobuf::io::FileOutputStream>(fd);
-  coded_output_ = std::make_shared<google::protobuf::io::CodedOutputStream>(
-      raw_output_.get());
+  coded_output_ = std::make_shared<google::protobuf::io::CodedOutputStream>(raw_output_.get());
 }
 
 bool StreamBatcher::NeedToOpenFile() {
