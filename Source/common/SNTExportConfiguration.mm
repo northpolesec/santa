@@ -55,4 +55,34 @@
   return self.url.absoluteString;
 }
 
+- (NSData *)serialize {
+  NSError *error;
+  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self
+                                       requiringSecureCoding:YES
+                                                       error:&error];
+  if (error) {
+    LOGE(@"Export config serialization failed: %@", error.localizedDescription);
+    return nil;
+  }
+
+  return data;
+}
+
++ (instancetype)deserialize:(NSData *)data {
+  if (!data) {
+    return nil;
+  }
+
+  NSError *error;
+  id object = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTExportConfiguration class]
+                                                fromData:data
+                                                   error:&error];
+  if (error) {
+    LOGE(@"Export config deserialization failed: %@", error.localizedDescription);
+    return nil;
+  }
+
+  return object;
+}
+
 @end

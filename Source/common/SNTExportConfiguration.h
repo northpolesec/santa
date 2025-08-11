@@ -21,4 +21,7 @@
 
 - (instancetype)initWithURL:(NSURL *)url formValues:(NSDictionary *)formValues;
 
+- (NSData *)serialize;
++ (instancetype)deserialize:(NSData *)data;
+
 @end
