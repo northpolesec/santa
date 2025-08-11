@@ -27,6 +27,7 @@ class AnyBatcher {
  public:
   AnyBatcher() = default;
 
+  inline bool ShouldInitializeBeforeWrite() { return false; }
   void InitializeBatch(int fd);
   bool NeedToOpenFile();
   absl::Status Write(std::vector<uint8_t> bytes);

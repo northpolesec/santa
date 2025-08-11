@@ -30,6 +30,7 @@ class StreamBatcher {
 
   StreamBatcher() = default;
 
+  inline bool ShouldInitializeBeforeWrite() { return true; }
   void InitializeBatch(int fd);
   bool NeedToOpenFile();
   absl::Status Write(std::vector<uint8_t> bytes);

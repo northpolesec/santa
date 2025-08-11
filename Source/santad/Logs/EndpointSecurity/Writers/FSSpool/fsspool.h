@@ -49,6 +49,7 @@ template <typename T>
 concept BatcherInterface =
     requires(T batcher, int fd, std::vector<uint8_t> bytes) {
       T{};
+      { batcher.ShouldInitializeBeforeWrite() } -> std::same_as<bool>;
       { batcher.InitializeBatch(fd) } -> std::same_as<void>;
       { batcher.NeedToOpenFile() } -> std::same_as<bool>;
       { batcher.Write(bytes) } -> std::same_as<absl::Status>;
@@ -165,13 +166,14 @@ class FsSpoolWriter {
     return absl::OkStatus();
   }
 
-  // Returns ResourceExhaustedError the first time no space is available since
-  // last flush Returns DataLossError if writes weren't attempted due to a
-  // previous space check failure Otherwise returns OK or an appropriate failure
-  // status
+  // Returns ResourceExhaustedError the first time no space is available
+  // since last flush
+  // Returns DataLossError if writes weren't attempted due to a previous
+  // space check failure
+  // Otherwise returns OK or an appropriate failure status
   absl::Status Write(std::vector<uint8_t> bytes) {
-    // The StreamBatcher must be initialized before the first Write
-    if constexpr (std::is_same_v<T, ::fsspool::StreamBatcher>) {
+    // Initializer the batcher before write if required
+    if (batcher_.ShouldInitializeBeforeWrite()) {
       // Don't attempt initialization if a previous initialization check
       // indicated the spool was out of space.
       if (!space_check_failure_since_last_flush_) {
@@ -191,8 +193,9 @@ class FsSpoolWriter {
   }
 
   absl::Status Flush() {
-    // The AnyBatcher must be initialized upon Flush
-    if constexpr (std::is_same_v<T, ::fsspool::AnyBatcher>) {
+    // If the batcher wasn't initialized before Write, it must be initialized
+    // now
+    if (!batcher_.ShouldInitializeBeforeWrite()) {
       if (absl::Status status = InitializeCurrentSpoolStateIfNeeded();
           !status.ok()) {
         return status;
@@ -240,7 +243,7 @@ class FsSpoolWriter {
   }
 
   // Estimate the size of the spool directory. However, only recompute a new
-  // estimate if the spool directory has has a change to its modification time.
+  // estimate if the spool directory has had a change to its modification time.
   absl::StatusOr<size_t> EstimateSpoolDirSize() {
     struct stat stats;
     if (stat(spool_dir_.c_str(), &stats) < 0) {
