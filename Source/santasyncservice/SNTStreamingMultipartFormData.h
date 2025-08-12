@@ -28,7 +28,8 @@
 // The total content length, including the file to be streamed.
 @property(readonly, nonatomic) NSUInteger contentLength;
 
-// Creates a streaming HTTP multipart/form-data body. The form is built from the
+// Creates a streaming HTTP multipart/form-data body
+// (https://datatracker.ietf.org/doc/html/rfc7578). The form is built from the
 // passed in formParts. The file is then streamed after the form.
 - (instancetype)initWithFormParts:(NSDictionary<NSString *, NSString *> *)formParts
                              file:(NSFileHandle *)fd

@@ -56,7 +56,7 @@ static const NSUInteger kChunkSize = 256 * 1024;
                                    filename:@"upload"
                                 contentType:@"application/octet-stream"]];
 
-    // The form data is is not streamed, it will be written all in one go.
+    // The form data is not streamed, it will be written all in one go.
     if (formData.length > kChunkSize) {
       LOGE(@"Form data is too large: %li > %li", formData.length, kChunkSize);
       return nil;
@@ -74,8 +74,8 @@ static const NSUInteger kChunkSize = 256 * 1024;
     _streamQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.multipartstream",
                                          DISPATCH_QUEUE_SERIAL);
 
-    // Create a bonded stream. This object will write to one end, and a consumer
-    // will read from the other.
+    // Create a bounded stream. This object will write to one end, and a
+    // consumer will read from the other.
     NSInputStream *steam;
     NSOutputStream *output;
     [NSStream getBoundStreamsWithBufferSize:kChunkSize inputStream:&steam outputStream:&output];
@@ -163,18 +163,20 @@ static const NSUInteger kChunkSize = 256 * 1024;
   }
 
   NSUInteger bytesWritten = [self.output write:(const uint8_t *)data.bytes maxLength:data.length];
+
+  // There was a stream error.
   if (bytesWritten == -1) {
     [self closeWithError:self.output.streamError];
     return;
   }
 
-  // Happy path.
+  // A perfect write.
   if (bytesWritten == data.length) {
     return;
   }
 
-  // Partial write to stream, adjust the fd offset so the next write operation
-  // picks up where we left off.
+  // A partial write to stream has occurred, adjust the fd offset so the next
+  // write operation picks up where this partial write left off.
   uint64_t offset = 0;
   if (![self.fd getOffset:&offset error:&error]) {
     [self closeWithError:error];
