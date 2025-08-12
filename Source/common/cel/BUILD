@@ -42,9 +42,9 @@ objc_library(
         "@cel-cpp//eval/public/containers:container_backed_map_impl",
         "@cel-cpp//eval/public/containers:field_access",
         "@cel-cpp//eval/public/structs:cel_proto_wrapper",
+        "@cel-cpp//extensions:strings",
         "@cel-cpp//internal:status_macros",
         "@cel-cpp//parser",
-        "@cel-cpp//extensions:strings",
         "@northpolesec_protos//cel:v1_cc_proto",
     ],
 )
