@@ -111,7 +111,7 @@ using santa::SpoolPeer;
 
   spool->Write(std::vector<uint8_t>(writeSize, 'A'));
 
-  XCTAssertSemaTrue(semaWrite, 5, "First write didn't compelte within expected window");
+  XCTAssertSemaTrue(semaWrite, 5, "First write didn't complete within expected window");
 
   // Sleep for a short time. Nothing should happen, but want to help ensure that if
   // somehow something did, timers were active that would be caught and fail the test.
