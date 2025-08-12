@@ -61,12 +61,9 @@
   bundle.overrideFileAccessAction = @"disable";
   bundle.fullSyncLastSuccess = nowDate;
   bundle.ruleSyncLastSuccess = nowDate;
-  bundle.exportConfiguration =
-      [[SNTExportConfiguration alloc] initWithAWSAccessKey:@"MyAccessKey"
-                                           secretAccessKey:@"MySecretAccessKey"
-                                              sessionToken:@"MySessionToken"
-                                                bucketName:@"MyBucketName"
-                                           objectKeyPrefix:@"MyObjectKeyPrefix"];
+  bundle.exportConfiguration = [[SNTExportConfiguration alloc]
+      initWithURL:[NSURL URLWithString:@"https://example.com/upload"]
+       formValues:@{@"key1" : @"value1", @"key2" : @"value2"}];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -124,7 +121,9 @@
   }];
 
   [bundle exportConfiguration:^(SNTExportConfiguration *val) {
-    XCTAssertEqual(val.configType, SNTExportConfigurationTypeAWS);
+    XCTAssertEqualObjects(val.url, [NSURL URLWithString:@"https://example.com/upload"]);
+    XCTAssertEqualObjects(val.formValues[@"key1"], @"value1");
+    XCTAssertEqualObjects(val.formValues[@"key2"], @"value2");
     [exp fulfill];
   }];
 
@@ -204,7 +203,9 @@
   }];
 
   [bundle exportConfiguration:^(SNTExportConfiguration *val) {
-    XCTAssertEqual(val.configType, SNTExportConfigurationTypeAWS);
+    XCTAssertEqualObjects(val.url, [NSURL URLWithString:@"https://example.com/upload"]);
+    XCTAssertEqualObjects(val.formValues[@"key1"], @"value1");
+    XCTAssertEqualObjects(val.formValues[@"key2"], @"value2");
     [exp fulfill];
   }];
 
