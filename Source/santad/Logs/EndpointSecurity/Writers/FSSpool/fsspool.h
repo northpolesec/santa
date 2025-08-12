@@ -78,7 +78,19 @@ class FsSpoolWriter {
         // Guess that the spool is full during construction, so we will
         // recompute the actual spool size on the first write.
         spool_size_estimate_(max_spool_size + 1) {
-    // TODO(mlw): Delete contents of the tmp spool dir on startup
+    (void)IterateDirectory(
+        tmp_dir_, [this](const std::string& file_name, bool* stop) {
+          if (file_name == std::string(".") || file_name == std::string("..")) {
+            return;
+          }
+          std::string full_path =
+              absl::StrCat(tmp_dir_, PathSeparator(), file_name);
+          struct stat sb;
+          if (lstat(full_path.c_str(), &sb) == 0 &&
+              (S_ISLNK(sb.st_mode) || S_ISREG(sb.st_mode))) {
+            (void)Unlink(full_path.c_str());
+          }
+        });
   }
 
   ~FsSpoolWriter() { (void)Flush(); };
@@ -150,7 +162,7 @@ class FsSpoolWriter {
     current_spool_state_.tmp_fd = -1;
 
     if (!size_estimate.ok()) {
-      // TODO: delete tmp file
+      (void)Unlink(current_spool_state_.tmp_file.c_str());
       return size_estimate.status();
     }
 
@@ -159,7 +171,7 @@ class FsSpoolWriter {
     if (absl::Status status = RenameFile(current_spool_state_.tmp_file,
                                          current_spool_state_.spool_file);
         !status.ok()) {
-      // TODO: delete tmp file
+      (void)Unlink(current_spool_state_.tmp_file.c_str());
       return status;
     }
 
