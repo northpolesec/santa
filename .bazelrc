@@ -24,9 +24,6 @@ build --per_file_copt=.*cel-cpp.*@-Wno-deprecated-declarations
 build --per_file_copt=.*cel-cpp.*@-Wno-nullability-completeness
 build --per_file_copt=.*cel-cpp.*@-Wno-unused-function
 
-build --copt=-DSANTA_OPEN_SOURCE=1
-build --cxxopt=-DSANTA_OPEN_SOURCE=1
-
 # Many config options for sanitizers pulled from
 # https://github.com/protocolbuffers/protobuf/blob/main/.bazelrc
 build:san-common --strip=never

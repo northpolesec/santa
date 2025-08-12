@@ -38,11 +38,7 @@ bool AnyBatcher::NeedToOpenFile() {
 
 absl::Status AnyBatcher::Write(std::vector<uint8_t> bytes) {
   google::protobuf::Any any;
-#if SANTA_OPEN_SOURCE
-  any.set_value(bytes.data(), bytes.size());
-#else
   any.set_value(absl::string_view((const char *)bytes.data(), bytes.size()));
-#endif
   any.set_type_url(type_url_);
 
   *cache_.mutable_records()->Add() = any;
