@@ -15,9 +15,10 @@
 #ifndef SANTA__COMMON__XXHASH_H
 #define SANTA__COMMON__XXHASH_H
 
-#define XXH_STATIC_LINKING_ONLY
+#include <functional>
 #include <string>
 
+#define XXH_STATIC_LINKING_ONLY
 #include "xxhash.h"
 
 namespace santa {
@@ -64,7 +65,16 @@ class Xxhash {
     XxhashFuncPtrs::Update(&state_, data, size);
   }
 
-  std::string Digest() {
+  void Digest(std::function<void(const uint8_t *, size_t)> callback) {
+    hash_type hash = XxhashFuncPtrs::Digest(&state_);
+    canonical_type canonical_hash;
+    XxhashFuncPtrs::CanonicalFromHash(&canonical_hash, hash);
+
+    callback(reinterpret_cast<const uint8_t *>(&canonical_hash),
+             sizeof(canonical_hash));
+  }
+
+  std::string HexDigest() {
     hash_type hash = XxhashFuncPtrs::Digest(&state_);
     canonical_type canonical_hash;
     XxhashFuncPtrs::CanonicalFromHash(&canonical_hash, hash);
