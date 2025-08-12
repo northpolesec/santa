@@ -136,8 +136,6 @@ void Logger::ExportTelemetry() {
 }
 
 void Logger::ExportTelemetrySerialized() {
-  dispatch_group_t group = dispatch_group_create();
-
   // Get a copy of the current export config to be used for the entire export
   SNTExportConfiguration *export_config = get_export_config_block_();
   if (!export_config) {
@@ -175,7 +173,7 @@ void Logger::ExportTelemetrySerialized() {
     NSString *fileName = [NSString
         stringWithFormat:@"%@-%@", [SNTSystemInfo bootSessionUUID], [path lastPathComponent]];
 
-    dispatch_group_enter(group);
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     [syncd_queue_ exportTelemetryFile:handle
                              fileName:fileName
                                config:export_config
@@ -184,13 +182,13 @@ void Logger::ExportTelemetrySerialized() {
                       if (success) {
                         tracker_.AckCompleted(*file_to_export);
                       }
-                      dispatch_group_leave(group);
+                      dispatch_semaphore_signal(sema);
                     }];
-  }
-
-  if (dispatch_group_wait(
-          group, dispatch_time(DISPATCH_TIME_NOW, kMinTelemetryExportTimeoutSecs * NSEC_PER_SEC))) {
-    LOGW(@"Timed out waiting for telemetry to export.");
+    if (dispatch_semaphore_wait(
+            sema,
+            dispatch_time(DISPATCH_TIME_NOW, kMinTelemetryExportTimeoutSecs * NSEC_PER_SEC))) {
+      LOGW(@"Timed out waiting for telemetry to export.");
+    }
   }
 
   writer_->FilesExported(tracker_.Drain());

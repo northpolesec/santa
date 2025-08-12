@@ -23,6 +23,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santasyncservice/SNTPolaris.h"
+#import "Source/santasyncservice/SNTStreamingMultipartFormData.h"
 #import "Source/santasyncservice/SNTSyncBroadcaster.h"
 #import "Source/santasyncservice/SNTSyncManager.h"
 
@@ -102,8 +103,40 @@
                    fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
                       reply:(void (^)(BOOL))reply {
-  // TODO: Export telemetry.
-  reply(NO);
+  SNTStreamingMultipartFormData *stream =
+      [[SNTStreamingMultipartFormData alloc] initWithFormParts:config.formValues
+                                                          file:fd
+                                                      fileName:fileName];
+
+  NSURLSessionConfiguration *sessionConfig =
+      [NSURLSessionConfiguration ephemeralSessionConfiguration];
+  NSURLSession *session = [NSURLSession sessionWithConfiguration:sessionConfig];
+  NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:config.url];
+  request.HTTPBodyStream = stream.stream;
+  [request setValue:stream.contentType forHTTPHeaderField:@"Content-Type"];
+  [request setValue:[NSString stringWithFormat:@"%lu", stream.contentLength]
+      forHTTPHeaderField:@"Content-Length"];
+  [request setValue:@"santactl-telemetry/" forHTTPHeaderField:@"User-Agent"];
+  [request setHTTPMethod:@"POST"];
+
+  NSURLSessionDataTask *task = [session
+      dataTaskWithRequest:request
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+          // Capture stream to keep it alive until the upload has completed.
+          __unused SNTStreamingMultipartFormData *capturedStream = stream;
+
+          BOOL success = NO;
+          NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+          if (httpResponse.statusCode == 200 || httpResponse.statusCode == 204) {
+            success = YES;
+            LOGD(@"Successfully exported telemetry file: %@", fileName);
+          } else {
+            LOGE(@"Failed to export file: %@, status: %d: error: %@", fileName,
+                 static_cast<uint8_t>(httpResponse.statusCode), error.localizedDescription);
+          }
+          reply(success);
+        }];
+  [task resume];
 }
 
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
