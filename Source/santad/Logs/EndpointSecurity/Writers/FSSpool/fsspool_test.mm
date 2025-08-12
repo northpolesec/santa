@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
+#include <sys/stat.h>
 
 #include <memory>
 
@@ -90,6 +91,45 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
 - (void)tearDown {
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:nil]);
+}
+
+- (void)testCleanSpoolTempDir {
+  // Create the spool tmp dir
+  XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.tmpDir
+                        withIntermediateDirectories:YES
+                                         attributes:nil
+                                              error:nil]);
+
+  // Create a few different types of files
+  NSString *aaaFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"aaa.txt"];
+  NSString *bbbFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"bbb.txt"];
+  NSString *lnkFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"ccc.lnk"];
+  NSString *fifoFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"ddd.fifo"];
+  XCTAssertTrue([@"foo" writeToFile:aaaFile
+                         atomically:YES
+                           encoding:NSUTF8StringEncoding
+                              error:nil]);
+  XCTAssertTrue([@"bar" writeToFile:bbbFile
+                         atomically:YES
+                           encoding:NSUTF8StringEncoding
+                              error:nil]);
+  XCTAssertTrue([self.fileMgr createSymbolicLinkAtPath:lnkFile
+                                   withDestinationPath:bbbFile
+                                                 error:nil]);
+  XCTAssertEqual(mkfifo(fifoFile.UTF8String, 0400), 0);
+
+  NSError *err = nil;
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 4);
+  XCTAssertNil(err);
+
+  // Construct an fsspool object so the spool tmp dir is cleaned
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
+                                                                         kSpoolSize);
+
+  // Ensure only the fifo file was left
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 1);
+  XCTAssertNil(err);
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:fifoFile]);
 }
 
 - (void)testEstimateSpoolDirSizeAnyBatcher {
