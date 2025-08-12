@@ -30,7 +30,8 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
-#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_log_batch_writer.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/File.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Null.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"
@@ -81,7 +82,13 @@ std::unique_ptr<Logger> Logger::Create(
       break;
     case SNTEventLogTypeProtobuf:
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
-      writer = Spool<::fsspool::FsSpoolLogBatchWriter>::Create(
+      writer = Spool<::fsspool::AnyBatcher>::Create(
+          [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
+          spool_flush_timeout_ms);
+      break;
+    case SNTEventLogTypeProtobufStream:
+      serializer = Protobuf::Create(esapi, std::move(decision_cache));
+      writer = Spool<::fsspool::StreamBatcher>::Create(
           [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
           spool_flush_timeout_ms);
       break;

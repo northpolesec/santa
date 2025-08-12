@@ -679,7 +679,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       return;
     }
 
-    santa::Xxhash hash;
+    santa::Xxhash128 hash;
 
     FMResultSet *rs =
         [db executeQuery:@"SELECT identifier, state, type, cel_expr FROM rules WHERE state != ?",
@@ -698,7 +698,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     }
     [rs close];
 
-    digest = santa::StringToNSString(hash.Digest());
+    digest = santa::StringToNSString(hash.HexDigest());
     self.rulesHash = digest;
   }];
   return digest;

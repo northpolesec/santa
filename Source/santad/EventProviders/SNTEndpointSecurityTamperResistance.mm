@@ -204,11 +204,18 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
     }
 
     case ES_EVENT_TYPE_AUTH_SIGNAL: {
+      if (esMsg->event.signal.sig == 0) {
+        // Signal 0 doesn't actually get sent to the process, it is only used to
+        // check if the process exists. Because of this, we don't need to block it.
+        break;
+      }
+
       // Only block signals sent to us and not from launchd.
       pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
       pid_t targetPid = audit_token_to_pid(esMsg->event.signal.target->audit_token);
       if (targetPid == getpid() && sourcePid != 1) {
-        LOGW(@"Preventing attempt to kill Santa daemon by signal (from pid: %d)", sourcePid);
+        LOGW(@"Preventing attempt to signal Santa daemon: signal %d, sending pid: %d",
+             esMsg->event.signal.sig, sourcePid);
         result = ES_AUTH_RESULT_DENY;
       }
       break;

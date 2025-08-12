@@ -108,7 +108,7 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(const std::string &policy_v
   state.Update(&operation_id_data, sizeof(operation_id_data));
 
   return SerializeFileAccess(policy_version, policy_name, msg, enriched_process, target, decision,
-                             state.Digest());
+                             state.HexDigest());
 }
 
 };  // namespace santa

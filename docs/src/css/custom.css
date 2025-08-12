@@ -177,6 +177,8 @@
 	--ifm-heading-color: hsl(var(--foreground));
 	--docusaurus-announcement-bar-height: auto !important;
 
+	--ifm-h4-font-size: 18px;
+
 	--prism-background-color: #edefff;
 	--ifm-footer-background-color: #fff;
 	--ifm-footer-link-color: #333;
@@ -201,7 +203,7 @@
 	--ifm-navbar-shadow: none;
 	--ifm-navbar-padding-vertical: 24px;
 	--ifm-navbar-padding-horizontal: 24px;
-	--ifm-navbar-height: auto;
+	--ifm-navbar-height: 90px;
 	--ifm-navbar-item-padding-vertical: 0;
 	--navbar-border-color: #e4e4e7;
 
@@ -366,3 +368,4 @@ button {
 	padding-inline: 0;
 	border: none;
 }
+

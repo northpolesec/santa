@@ -122,6 +122,16 @@ Code-signed            : Yes
 Rule                   : Allowed (SigningID)
 ```
 
+:::note
+
+`SIGNINGID` rules only apply to applications signed with a production certificate.
+
+To target code signed with a development certificate, you can use:
+- A [`CDHASH`](#cdhash) or [`BINARY`](#binary) rule to target a specific executable
+- A [`CERTIFICATE`](#certificate) rule to target a broader set of applications
+
+:::
+
 #### Certificate
 
 Value: `CERTIFICATE`
@@ -193,6 +203,16 @@ request/rotate between multiple different signing certificates and entitlements.
 
 This is an even more powerful rule with broader reach than individual
 certificate rules and should be used with care.
+
+:::note
+
+`TEAMID` rules only apply to applications signed with a production certificate.
+
+To target code signed with a development certificate, you can use:
+- A [`CDHASH`](#cdhash) or [`BINARY`](#binary) rule to target a specific executable
+- A [`CERTIFICATE`](#certificate) rule to target a broader set of applications
+
+:::
 
 ```shell
 » santactl fileinfo /Applications/Santa.app
@@ -316,6 +336,48 @@ target.signing_time >= timestamp('2025-05-31T00:00:00Z')
 ! has(envs.DYLD_INSERT_LIBRARIES)
 ```
 
+## Rule Layering
+
+Since Santa is a first match system, there are some interesting ways you can
+layer rules to achieve different policies.
+
+For example if you want to allow all applications from a publisher (e.g. the
+Acme software company) you might start with an allow rule for the TeamID
+(ABCDEF1234) to allow all applications from that publisher.
+
+However if you then need to prevent a specific cloud-storage application
+written by the same provider, you can then use a higher precedence SigningID
+rule to block that company’s cloud storage product.
+
+Using `santactl` this would look like the following:
+
+```
+santactl rule --allow --teamid --identifier ABCDEF1234
+
+santactl rule --block \
+              --signingid \
+              --identifier ABCDEF1234:com.acme-example.cloud-storage
+```
+
+You could also do the inverse and block everything by a publisher but allow a
+specific application by having a TeamID block rule and a SigningID allow
+rule.
+
+For example if you instead wanted to block everything from the Acme company
+except for the company's cloud storage product you'd make a TeamID block rule
+for `ABCDEF1234` and a SigningID allow rule for the specific cloud storage
+product.
+
+Using `santactl` this would look like the following:
+
+```
+santactl rule --block --teamid --identifier ABCDEF1234
+
+santactl rule --allow \
+              --signingid \
+              --identifier ABCDEF1234:com.acme-example.cloud-storage
+```
+
 ## Scope
 
 In addition to rules, Santa can allow or block based on scopes. Currently, only
@@ -377,4 +439,3 @@ event/telemetry output this is the `UNKNOWN` case:
   either by using TouchID or entering their password. If they approve the
   execution the execution is allowed to continue (without requiring
   re-execution) and a local SigningID or SHA-256 rule is automatically created.
-

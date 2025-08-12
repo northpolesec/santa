@@ -766,7 +766,6 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:santa_cc_proto_library_wrapper",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool",
-        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/strings",
@@ -808,7 +807,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Timer",
-        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
@@ -1329,8 +1328,8 @@ santa_unit_test(
     deps = [
         ":EndpointSecurityWriterSpool",
         "//Source/common:TestUtils",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool",
-        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
     ],
 )
 
@@ -1358,7 +1357,7 @@ santa_unit_test(
         "//Source/common:SNTCommonEnums",
         "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
-        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_log_batch_writer",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
         "@OCMock",
         "@googletest//:gtest",
     ],

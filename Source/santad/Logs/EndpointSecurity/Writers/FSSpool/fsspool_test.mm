@@ -16,33 +16,35 @@
 #import <Foundation/Foundation.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
+#include <sys/stat.h>
 
 #include <memory>
 
 #include "Source/common/TestUtils.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
-#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_log_batch_writer.h"
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/timestamp.pb.h"
 
 namespace fsspool {
 
-class FsSpoolWriterPeer : public FsSpoolWriter {
+template <typename T>
+class FsSpoolWriterPeer : public FsSpoolWriter<T> {
  public:
   // Constructors
-  using FsSpoolWriter::FsSpoolWriter;
+  using FsSpoolWriter<T>::FsSpoolWriter;
 
   // Private Methods
-  using FsSpoolWriter::BuildDirectoryStructureIfNeeded;
-  using FsSpoolWriter::EstimateSpoolDirSize;
+  using FsSpoolWriter<T>::BuildDirectoryStructureIfNeeded;
+  using FsSpoolWriter<T>::EstimateSpoolDirSize;
 
   // Private member variables
-  using FsSpoolWriter::spool_size_estimate_;
+  using FsSpoolWriter<T>::spool_size_estimate_;
 };
 
 }  // namespace fsspool
 
-using fsspool::FsSpoolLogBatchWriter;
 using fsspool::FsSpoolWriterPeer;
 
 static constexpr size_t kSpoolSize = 1048576;
@@ -91,12 +93,52 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:nil]);
 }
 
-- (void)testEstimateSpoolDirSize {
+- (void)testCleanSpoolTempDir {
+  // Create the spool tmp dir
+  XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.tmpDir
+                        withIntermediateDirectories:YES
+                                         attributes:nil
+                                              error:nil]);
+
+  // Create a few different types of files
+  NSString *aaaFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"aaa.txt"];
+  NSString *bbbFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"bbb.txt"];
+  NSString *lnkFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"ccc.lnk"];
+  NSString *fifoFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"ddd.fifo"];
+  XCTAssertTrue([@"foo" writeToFile:aaaFile
+                         atomically:YES
+                           encoding:NSUTF8StringEncoding
+                              error:nil]);
+  XCTAssertTrue([@"bar" writeToFile:bbbFile
+                         atomically:YES
+                           encoding:NSUTF8StringEncoding
+                              error:nil]);
+  XCTAssertTrue([self.fileMgr createSymbolicLinkAtPath:lnkFile
+                                   withDestinationPath:bbbFile
+                                                 error:nil]);
+  XCTAssertEqual(mkfifo(fifoFile.UTF8String, 0400), 0);
+
+  NSError *err = nil;
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 4);
+  XCTAssertNil(err);
+
+  // Construct an fsspool object so the spool tmp dir is cleaned
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
+                                                                         kSpoolSize);
+
+  // Ensure only the fifo file was left
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 1);
+  XCTAssertNil(err);
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:fifoFile]);
+}
+
+- (void)testEstimateSpoolDirSizeAnyBatcher {
   NSString *testData = @"What a day for some testing!";
   NSString *largeTestData = RepeatedString(@"A", 10240);
   NSString *path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
   NSString *emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
-  auto writer = std::make_unique<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
+                                                                         kSpoolSize);
 
   // Create the spool dir structure and ensure no files exist
   XCTAssertStatusOk(writer->BuildDirectoryStructureIfNeeded());
@@ -148,15 +190,75 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertGreaterThanOrEqual(*status, testData.length + largeTestData.length);
 }
 
-- (void)testSimpleWrite {
-  auto writer = std::make_unique<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
+- (void)testEstimateSpoolDirSizeStreamBatcher {
+  NSString *testData = @"What a day for some testing!";
+  NSString *largeTestData = RepeatedString(@"A", 10240);
+  NSString *path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
+  NSString *emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
+      [self.baseDir UTF8String], kSpoolSize);
+
+  // Create the spool dir structure and ensure no files exist
+  XCTAssertStatusOk(writer->BuildDirectoryStructureIfNeeded());
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 0);
+
+  // Ensure that the initial spool dir estimate is 0
+  auto status = writer->EstimateSpoolDirSize();
+  XCTAssertStatusOk(status);
+  XCTAssertEqual(*status, 0);
+
+  // Force the current estimate to be 0 since we're not recomputing on first write.
+  writer->spool_size_estimate_ = *status;
+
+  XCTAssertTrue([testData writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil]);
+
+  // Ensure the test file was created
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 1);
+
+  // Ensure the spool size estimate has grown at least as much as the content length
+  status = writer->EstimateSpoolDirSize();
+  XCTAssertStatusOk(status);
+  // Update the current estimate
+  writer->spool_size_estimate_ = *status;
+  XCTAssertGreaterThanOrEqual(writer->spool_size_estimate_, testData.length);
+
+  // Modify file contents without modifying spool directory mtime
+  NSFileHandle *fileHandle = [NSFileHandle fileHandleForWritingAtPath:path];
+  [fileHandle seekToEndOfFile];
+  [fileHandle writeData:[largeTestData dataUsingEncoding:NSUTF8StringEncoding]];
+  [fileHandle closeFile];
+
+  // Ensure only one file still exists
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 1);
+
+  // Ensure that the returned estimate is the same as the old since mtime didn't change
+  status = writer->EstimateSpoolDirSize();
+  XCTAssertStatusOk(status);
+  // Check that the current estimate is the same as the old estimate
+  XCTAssertEqual(*status, writer->spool_size_estimate_);
+
+  // Create a second file in the spool dir to bump mtime
+  XCTAssertTrue([@"" writeToFile:emptyPath atomically:YES encoding:NSUTF8StringEncoding error:nil]);
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 2);
+
+  status = writer->EstimateSpoolDirSize();
+  XCTAssertStatusOk(status);
+
+  // Ensure the newly returned size is appropriate
+  XCTAssertGreaterThanOrEqual(*status, testData.length + largeTestData.length);
+}
+
+- (void)testSimpleWriteAnyBatcher {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
+                                                                         kSpoolSize);
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.tmpDir]);
 
   std::string testData = "Good morning. This is some nice test data.";
-  XCTAssertStatusOk(writer->WriteMessage(testData));
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
 
   NSError *err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
@@ -165,16 +267,37 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertNil(err);
 }
 
-- (void)testSpoolFull {
-  auto writer = std::make_unique<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
-  const std::string largeMessage(kSpoolSize + 1, '\x42');
+- (void)testSimpleWriteStreamBatcher {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
+      [self.baseDir UTF8String], kSpoolSize);
+
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.tmpDir]);
+
+  std::string testData = "Good morning. This is some nice test data.";
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
+
+  NSError *err = nil;
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
+  XCTAssertNil(err);
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  XCTAssertNil(err);
+}
+
+- (void)testSpoolFullAnyBatcher {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
+                                                                         kSpoolSize);
+  std::vector<uint8_t> largeMessage(kSpoolSize + 1, '\x42');
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.tmpDir]);
 
   // Write the first message. This will make the spool directory larger than the max.
-  XCTAssertStatusOk(writer->WriteMessage(largeMessage));
+  XCTAssertStatusOk(writer->Write(largeMessage));
+  XCTAssertStatusOk(writer->Flush());
 
   // Ensure the files are created
   XCTAssertTrue([self.fileMgr fileExistsAtPath:self.baseDir]);
@@ -188,7 +311,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertNil(err);
 
   // Try to write again, but expect failure. File counts shouldn't change.
-  XCTAssertStatusNotOk(writer->WriteMessage(largeMessage));
+  XCTAssertStatusOk(writer->Write(largeMessage));
+  XCTAssertStatusNotOk(writer->Flush());
 
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
@@ -196,38 +320,79 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertNil(err);
 }
 
-- (void)testWriteMessageNoFlush {
-  auto writer = std::make_unique<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
-  FsSpoolLogBatchWriter batch_writer(^(std::string) {
-    return absl::OkStatus();
-  });
+- (void)testSpoolFullStreamBatcher {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
+      [self.baseDir UTF8String], kSpoolSize);
+  std::vector<uint8_t> largeMessage(kSpoolSize + 1, '\x42');
+
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.tmpDir]);
+
+  // Write the first message. This will make the spool directory larger than the max.
+  XCTAssertStatusOk(writer->Write(largeMessage));
+  XCTAssertStatusOk(writer->Flush());
+
+  // Ensure the files are created
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:self.baseDir]);
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:self.spoolDir]);
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:self.tmpDir]);
+
+  NSError *err = nil;
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
+  XCTAssertNil(err);
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  XCTAssertNil(err);
+
+  // Try to write again, but expect failure. File counts shouldn't change.
+  XCTAssertStatusNotOk(writer->Write(largeMessage));
+  XCTAssertStatusOk(writer->Flush());
+
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
+  XCTAssertNil(err);
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  XCTAssertNil(err);
+}
+
+- (void)testWriteMessageNoFlushAnyBatcher {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
+                                                                         kSpoolSize);
 
   // Ensure that writing in batch mode doesn't flsuh on individual writes.
-  XCTAssertStatusOk(batch_writer.WriteMessage({123}));
+  XCTAssertStatusOk(writer->Write({123}));
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.tmpDir]);
 }
 
-- (void)testWriteMessageFlushOnDemand {
+- (void)testWriteMessageNoFlushStreamBatcher {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
+      [self.baseDir UTF8String], kSpoolSize);
+
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:self.tmpDir]);
+
+  // Writing to the StreamBatcher will trigger file creation even without a flush
+  XCTAssertStatusOk(writer->Write({123}));
+
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:self.baseDir]);
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:self.spoolDir]);
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:self.tmpDir]);
+}
+
+- (void)testWriteMessageFlushOnDemandAnyBatcher {
   static const int kCapacity = 5;
-  auto writer = std::make_shared<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  FsSpoolLogBatchWriter batch_writer(^(std::string msg) {
-    dispatch_semaphore_signal(sema);
-    XCTAssertStatusOk(writer->WriteMessage(msg));
-    return absl::OkStatus();
-  });
+  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
+                                                                         kSpoolSize);
 
   // Ensure batch flushed once capacity exceeded
   for (int i = 0; i < kCapacity + 1; i++) {
-    XCTAssertStatusOk(batch_writer.WriteMessage({123}));
+    XCTAssertStatusOk(writer->Write({123}));
   }
 
-  XCTAssertStatusOk(batch_writer.Flush());
-  // Note: Test will crash if the semaphore is signaled more than once.
-  XCTAssertSemaTrue(sema, 5, "Failed to flush batch");
+  XCTAssertStatusOk(writer->Flush());
 
   NSError *err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
@@ -236,22 +401,34 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertNil(err);
 }
 
-- (void)testWriteMessageMultipleFlush {
-  static const int kExpectedFlushes = 3;
+- (void)testWriteMessageFlushOnDemandStreamBatcher {
+  static const int kCapacity = 5;
+  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
+      [self.baseDir UTF8String], kSpoolSize);
 
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  auto writer = std::make_shared<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
-  FsSpoolLogBatchWriter batch_writer(^(std::string msg) {
-    dispatch_semaphore_signal(sema);
-    XCTAssertStatusOk(writer->WriteMessage(msg));
-    return absl::OkStatus();
-  });
+  // Ensure batch flushed once capacity exceeded
+  for (int i = 0; i < kCapacity + 1; i++) {
+    XCTAssertStatusOk(writer->Write({123}));
+  }
+
+  XCTAssertStatusOk(writer->Flush());
+
+  NSError *err = nil;
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
+  XCTAssertNil(err);
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  XCTAssertNil(err);
+}
+
+- (void)testWriteMessageMultipleFlushAnyBatcher {
+  static const int kExpectedFlushes = 3;
+  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
+                                                                         kSpoolSize);
 
   // Ensure batch flushed expected number of times
   for (int i = 0; i < kExpectedFlushes; i++) {
-    XCTAssertStatusOk(batch_writer.WriteMessage({123}));
-    XCTAssertStatusOk(batch_writer.Flush());
-    XCTAssertSemaTrue(sema, 5, "Failed to flush batch");
+    XCTAssertStatusOk(writer->Write({123}));
+    XCTAssertStatusOk(writer->Flush());
   }
 
   NSError *err = nil;
@@ -262,21 +439,34 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertNil(err);
 }
 
-- (void)testWriteMessageFlushOnDestroy {
+- (void)testWriteMessageMultipleFlushStreamBatcher {
+  static const int kExpectedFlushes = 3;
+  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
+      [self.baseDir UTF8String], kSpoolSize);
+
+  // Ensure batch flushed expected number of times
+  for (int i = 0; i < kExpectedFlushes; i++) {
+    XCTAssertStatusOk(writer->Write({123}));
+    XCTAssertStatusOk(writer->Flush());
+  }
+
+  NSError *err = nil;
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
+  XCTAssertNil(err);
+  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count],
+                 kExpectedFlushes);
+  XCTAssertNil(err);
+}
+
+- (void)testWriteMessageFlushOnDestroyAnyBatcher {
   static const int kNumberOfWrites = 7;
 
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  auto writer = std::make_shared<FsSpoolWriterPeer>([self.baseDir UTF8String], kSpoolSize);
-
   {
-    // Extra scope to enforce early destroy of batch_writer.
-    FsSpoolLogBatchWriter batch_writer(^(std::string msg) {
-      dispatch_semaphore_signal(sema);
-      XCTAssertStatusOk(writer->WriteMessage(msg));
-      return absl::OkStatus();
-    });
+    auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+        [self.baseDir UTF8String], kSpoolSize);
+
     for (int i = 0; i < kNumberOfWrites; i++) {
-      XCTAssertStatusOk(batch_writer.WriteMessage({123}));
+      XCTAssertStatusOk(writer->Write({123}));
     }
 
     // Ensure nothing was written yet
@@ -286,7 +476,6 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   }
 
   // Ensure the write happens when FsSpoolLogBatchWriter destructed
-  XCTAssertSemaTrue(sema, 5, "Failed to flush batch");
   NSError *err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
