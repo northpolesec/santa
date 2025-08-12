@@ -44,6 +44,7 @@ objc_library(
         "@cel-cpp//eval/public/structs:cel_proto_wrapper",
         "@cel-cpp//internal:status_macros",
         "@cel-cpp//parser",
+        "@cel-cpp//extensions:strings",
         "@northpolesec_protos//cel:v1_cc_proto",
     ],
 )

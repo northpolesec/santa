@@ -18,6 +18,7 @@
 #include "absl/status/statusor.h"
 #include "cel/expr/checked.pb.h"
 #include "cel/expr/syntax.pb.h"
+#include "extensions/strings.h"
 #include "common/ast_proto.h"
 #include "compiler/compiler_factory.h"
 #include "compiler/standard_library.h"
@@ -48,6 +49,11 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
 
   // Add the standard library.
   if (auto result = builder->AddLibrary(::cel::StandardCompilerLibrary()); !result.ok()) {
+    return result;
+  }
+
+  // Add the extensions for string operations list join
+  if (auto result = builder->AddLibrary(::cel::extensions::StringsCompilerLibrary()); !result.ok()) {
     return result;
   }
 
@@ -114,6 +120,12 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile
   if (auto result = RegisterBuiltinFunctions(builder->GetRegistry(), options); !result.ok()) {
     return result;
   }
+
+  // Register string extension functions for runtime
+  if (auto result = ::cel::extensions::RegisterStringsFunctions(builder->GetRegistry(), options); !result.ok()) {
+    return result;
+  }
+
 
   // Create an expression plan with the checked expression.
   absl::StatusOr<std::unique_ptr<cel_runtime::CelExpression>> expression_plan =
