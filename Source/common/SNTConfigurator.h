@@ -188,6 +188,8 @@
 ///      format. Use spoolDirectory to specify a path. Use spoolDirectoryFileSizeThresholdKB,
 ///      spoolDirectorySizeThresholdMB and spoolDirectoryEventMaxFlushTimeSec to configure
 ///      additional settings.
+///    SNTEventLogTypeProtobufStream "protobufstream": Similar to "protobuf", but formatted as a
+///      coded output stream.
 ///    Defaults to SNTEventLogTypeFilelog.
 ///    For mobileconfigs use EventLogType as the key and syslog or filelog strings as the value.
 ///
