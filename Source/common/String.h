@@ -22,6 +22,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace santa {
 
@@ -78,6 +79,27 @@ static inline std::string BufToHexString(const uint8_t *buf, size_t bufsize) {
 
 static inline std::string BufToHexString(NSData *data) {
   return BufToHexString(static_cast<const uint8_t *>(data.bytes), data.length);
+}
+
+static inline std::vector<uint8_t> HexStringToBuf(std::string_view str) {
+  std::vector<uint8_t> bytes;
+  bytes.reserve(str.length() / 2);
+
+  char cur_byte[3];
+  cur_byte[2] = '\0';
+
+  for (int i = 0; i < str.length() / 2; i++) {
+    cur_byte[0] = str[i * 2];
+    cur_byte[1] = str[i * 2 + 1];
+
+    bytes.push_back(std::strtoul(cur_byte, nullptr, 16));
+  }
+
+  return bytes;
+}
+
+static inline std::vector<uint8_t> HexStringToBuf(NSString *str) {
+  return HexStringToBuf(NSStringToUTF8StringView(str));
 }
 
 }  // namespace santa
