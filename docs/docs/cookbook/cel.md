@@ -19,3 +19,23 @@ Create a signing ID rule for `platform:com.apple.spctl` and attach the following
 ```clike
 ['--global-disable', '--master-disable','--disable', '--add', '--remove'].exists(flag, flag in args) ? BLOCKLIST : ALLOWLIST
 ```
+
+## Prevent users from enabling remote access via SSH on the command line
+
+
+systemsetup can be used to enable Remote Apple Events. Set whether the system responds to events sent by other computers (such as AppleScripts).
+
+
+
+## Prevent Users from enabling remote apple events
+
+You can use `systemsetup` can be used to enable Remote Apple Events from other
+computers. This can be blocked with a CEL rule.
+
+First set a signing ID `platform:com.apple.systemsetup`
+
+```clike
+args.exists(i, args[i] == "-setremotelogin" && 
+             args[i+1:].exists(arg, arg == "on"))
+```
+
