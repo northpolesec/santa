@@ -205,10 +205,10 @@
   });
 }
 
-- (void)exportTelemetryFile:(NSArray<NSFileHandle *> *)telemetryFiles
-                   fileName:(NSString *)fileName
-                     config:(SNTExportConfiguration *)config
-          completionHandler:(void (^)(NSArray<NSNumber *> *))completionHandler {
+- (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)telemetryFiles
+                    fileName:(NSString *)fileName
+                      config:(SNTExportConfiguration *)config
+           completionHandler:(void (^)(NSArray<NSNumber *> *))completionHandler {
   [self dispatchBlockOnSyncdQueue:^{
     if (self.syncConnection.isConnected) {
       [self.syncConnection.remoteObjectProxy exportTelemetryFiles:telemetryFiles

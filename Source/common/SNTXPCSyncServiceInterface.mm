@@ -14,9 +14,6 @@
 
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 
-#import "Source/common/SNTStoredEvent.h"
-#import "Source/common/SNTStoredExecutionEvent.h"
-
 @implementation SNTXPCSyncServiceInterface
 
 + (NSXPCInterface *)syncServiceInterface {

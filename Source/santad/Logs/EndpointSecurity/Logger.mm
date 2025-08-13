@@ -182,16 +182,16 @@ void Logger::ExportTelemetrySerialized() {
 
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     // TODO: Support multiple telemetry files.
-    [syncd_queue_ exportTelemetryFile:@[ handle ]
-                             fileName:fileName
-                               config:export_config
-                    completionHandler:^(NSArray<NSNumber *> *successes) {
-                      [handle closeFile];
-                      if (successes.count) {
-                        tracker_.AckCompleted(*file_to_export);
-                      }
-                      dispatch_semaphore_signal(sema);
-                    }];
+    [syncd_queue_ exportTelemetryFiles:@[ handle ]
+                              fileName:fileName
+                                config:export_config
+                     completionHandler:^(NSArray<NSNumber *> *successes) {
+                       [handle closeFile];
+                       if (successes.count) {
+                         tracker_.AckCompleted(*file_to_export);
+                       }
+                       dispatch_semaphore_signal(sema);
+                     }];
     if (dispatch_semaphore_wait(
             sema,
             dispatch_time(DISPATCH_TIME_NOW, kMinTelemetryExportTimeoutSecs * NSEC_PER_SEC))) {

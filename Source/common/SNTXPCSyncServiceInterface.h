@@ -18,12 +18,9 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
-
-@class SNTExportConfiguration;
-@class SNTStoredEvent;
-@class SNTStoredExecutionEvent;
 
 ///
 ///  Protocol implemented by syncservice and utilized by daemon and ctl for communication with a
