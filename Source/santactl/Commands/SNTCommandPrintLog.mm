@@ -23,6 +23,7 @@
 #include <string>
 
 #include "Source/common/SNTLogging.h"
+#import "Source/common/SNTXxhash.h"
 #include "Source/common/santa_proto_include_wrapper.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
@@ -100,14 +101,14 @@ class StreamMessageSource : public MessageSource {
     auto coded_input = std::make_unique<google::protobuf::io::CodedInputStream>(file_input.get());
 
     return std::unique_ptr<StreamMessageSource>(
-        new StreamMessageSource(fd, std::move(coded_input), std::move(file_input)));
+        new StreamMessageSource(fd, std::move(file_input), std::move(coded_input)));
   }
 
-  StreamMessageSource(int fd, std::unique_ptr<google::protobuf::io::CodedInputStream> coded_input,
-                      std::unique_ptr<google::protobuf::io::FileInputStream> file_input)
+  StreamMessageSource(int fd, std::unique_ptr<google::protobuf::io::FileInputStream> file_input,
+                      std::unique_ptr<google::protobuf::io::CodedInputStream> coded_input)
       : MessageSource(fd),
-        coded_input_(std::move(coded_input)),
-        file_input_(std::move(file_input)) {}
+        file_input_(std::move(file_input)),
+        coded_input_(std::move(coded_input)) {}
 
   absl::StatusOr<::pbv1::SantaMessage> Next() override {
     // Check the magic value
@@ -121,9 +122,8 @@ class StreamMessageSource : public MessageSource {
     }
 
     // Check the hash
-    // TODO(mlw): Verify the hash
-    uint64_t hash;
-    if (!coded_input_->ReadLittleEndian64(&hash)) {
+    uint64_t expected_hash;
+    if (!coded_input_->ReadRaw(&expected_hash, sizeof(expected_hash))) {
       return absl::InternalError("Failed to parse hash data");
     }
 
@@ -133,23 +133,36 @@ class StreamMessageSource : public MessageSource {
       return absl::InternalError("Failed to parse message length");
     }
 
-    // Use a ScopedLimit to ensure we don't read past the end of the message.
-    google::protobuf::io::CodedInputStream::Limit limit = coded_input_->PushLimit(message_length);
-
     // Read the raw message data
-    ::pbv1::SantaMessage santa_msg;
-    if (!santa_msg.ParseFromCodedStream(coded_input_.get())) {
-      return absl::InternalError("Failed to parse message data");
+    std::vector<uint8_t> msg_buf(message_length);
+    if (!coded_input_->ReadRaw(msg_buf.data(), message_length)) {
+      return absl::InternalError("Failed to read message buffer");
     }
 
-    coded_input_->PopLimit(limit);
+    if (expected_hash != 0) {
+      santa::Xxhash64 xxhash;
+      xxhash.Update(msg_buf.data(), msg_buf.size());
+      __block uint64_t got_hash;
+      xxhash.Digest(^(const uint8_t *buf, size_t size) {
+        memcpy(&got_hash, buf, sizeof(got_hash));
+      });
+
+      if (got_hash != expected_hash) {
+        return absl::InternalError("Message corruption detected");
+      }
+    }
+
+    ::pbv1::SantaMessage santa_msg;
+    if (!santa_msg.ParseFromArray(msg_buf.data(), (int)msg_buf.size())) {
+      return absl::InternalError("Failed to parse message data");
+    }
 
     return santa_msg;
   }
 
  private:
-  std::unique_ptr<google::protobuf::io::CodedInputStream> coded_input_;
   std::unique_ptr<google::protobuf::io::FileInputStream> file_input_;
+  std::unique_ptr<google::protobuf::io::CodedInputStream> coded_input_;
 };
 
 absl::StatusOr<std::unique_ptr<MessageSource>> MessageSource::Create(NSString *path) {

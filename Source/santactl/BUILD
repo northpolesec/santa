@@ -27,6 +27,7 @@ objc_library(
     deps = [
         ":santactl_cmd",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTXxhash",
         "//Source/common:santa_cc_proto_library_wrapper",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:binaryproto_cc_proto_library_wrapper",
