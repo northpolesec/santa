@@ -64,6 +64,9 @@ static const NSUInteger kChunkSize = 256 * 1024;
       return nil;
     }
 
+    // Form data will be written once the stream is opened.
+    _formData = formData;
+
     // TODO: Avoid the stat and get the file size from the daemon.
     struct stat fileStat;
     if (fstat([_fd fileDescriptor], &fileStat) != 0) {
@@ -71,9 +74,6 @@ static const NSUInteger kChunkSize = 256 * 1024;
       return nil;
     }
     _contentLength = formData.length + fileStat.st_size + _closingBoundary.length;
-
-    // Form data will be written once the stream is opened.
-    _formData = formData;
 
     // The queue where the NSStreamDelegate methods will be called.
     _streamQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.multipartstream",
@@ -135,10 +135,8 @@ static const NSUInteger kChunkSize = 256 * 1024;
       error = self.output.streamError;
     }
   }
-  // When tearing down, do the inverse order of creation.
-  // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Streams/Articles/WritingOutputStreams.html#//apple_ref/doc/uid/20002274-1002103
-  [self.output close];
   CFWriteStreamSetDispatchQueue((__bridge CFWriteStreamRef)self.output, NULL);
+  [self.output close];
   if (error) {
     LOGE(@"Stream error: %@", error);
   }

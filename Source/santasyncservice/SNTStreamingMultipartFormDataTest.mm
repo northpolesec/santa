@@ -42,18 +42,17 @@
 - (void)stream:(NSStream *)aStream handleEvent:(NSStreamEvent)eventCode {
   switch (eventCode) {
     case NSStreamEventHasBytesAvailable: {
-      while (1) {
-        uint8_t buffer[256];
-        NSInteger bytesRead = [self.stream read:buffer maxLength:sizeof(buffer)];
-        if (bytesRead <= 0) {
-          break;
-        }
-        [self.data appendBytes:buffer length:bytesRead];
+      uint8_t buffer[256];
+      NSInteger bytesRead = [self.stream read:buffer maxLength:sizeof(buffer)];
+      if (bytesRead <= 0) {
+        break;
       }
-    } break;
+      [self.data appendBytes:buffer length:bytesRead];
+      break;
+    }
     case NSStreamEventEndEncountered: {
-      [self.stream close];
       CFReadStreamSetDispatchQueue((__bridge CFReadStreamRef)self.stream, NULL);
+      [self.stream close];
       self.reply();
       break;
     }
