@@ -85,16 +85,53 @@ static const NSUInteger kChunkSize = 256 * 1024;
     NSOutputStream *output;
     [NSStream getBoundStreamsWithBufferSize:kChunkSize inputStream:&steam outputStream:&output];
     _stream = steam;
-    // Open before scheduling the stream.
-    // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Streams/Articles/WritingOutputStreams.html#//apple_ref/doc/uid/20002274-1002103
-    // The first implementation used the run loop to pump delegate messages, as the very old
-    // documentation suggests. This model is inflexible and I was happy to come across this post
-    // about using CFWriteStreamSetDispatchQueue.
-    // https://stackoverflow.com/questions/31306642/how-to-deal-with-concurrency-issues-brought-by-nsstream-run-loop-scheduling-usin
-    [output setDelegate:self];
-    CFWriteStreamSetDispatchQueue((__bridge CFWriteStreamRef)output, _streamQueue);
-    [output open];
     _output = output;
+
+    // Sample Apple code [0] shows that initialization should be on the same serial queue where the
+    // stream will handle events. This makes sense. Otherwise the stream's delegate could start
+    // executing while the stream was still being opened. Here is a crash from a flakey test when
+    // opening the stream from the main thread:
+    //
+    // clang-format off
+    //
+    // Thread 0::  Dispatch queue: com.apple.main-thread
+    // 0   libsystem_kernel.dylib        	       0x185a7cc54 __psynch_mutexdrop + 8
+    // 1   libsystem_pthread.dylib       	       0x185ab80d0 _pthread_mutex_firstfit_wake + 28
+    // 2   libsystem_pthread.dylib       	       0x185ab5cac _pthread_mutex_firstfit_unlock_slow + 244
+    // 3   CoreFoundation                	       0x185b7dee4 CFRunLoopWakeUp + 376
+    // 4   CoreFoundation                	       0x185bf00cc _wakeUpRunLoop + 76
+    // 5   CoreFoundation                	       0x185bc5ba0 _CFStreamSignalEvent + 552
+    // 6   CoreFoundation                	       0x185c7b110 boundPairWriteOpen + 68
+    // 7   CoreFoundation                	       0x185b6ba5c _CFStreamOpen + 140
+    // 8   SNTStreamingMultipartFormDataTest	       0x10768ce4c -[SNTStreamingMultipartFormData initWithFormParts:file:fileName:] + 2180
+    // ...
+    // Thread 1 Crashed::  Dispatch queue: com.northpolesec.santa.syncservice.multipartstream
+    // 0   libsystem_pthread.dylib       	       0x185ab54f8 pthread_mutex_lock + 12
+    // 1   CoreFoundation                	       0x185c0f484 _CFStreamSetDispatchQueue + 244
+    // 2   SNTStreamingMultipartFormDataTest	       0x10768d9cc -[SNTStreamingMultipartFormData closeWithError:] + 776
+    // 3   SNTStreamingMultipartFormDataTest	       0x10768e82c -[SNTStreamingMultipartFormData stream:handleEvent:] + 1244
+    // 4   CoreFoundation                	       0x185bc5ec8 _outputStreamCallbackFunc + 76
+    //
+    // clang-format on
+    //
+    // The example code also shows an order for initialization:
+    // 1. Set the delegate
+    // 2. Set the GCD queue
+    // 3. The finally open the stream.
+    //
+    // [0]
+    // https://developer.apple.com/library/archive/samplecode/sc1236/Listings/TLSTool_TLSToolCommon_m.html
+    dispatch_sync(_streamQueue, ^{
+      // The first implementation used the run loop to pump delegate messages, as the very old
+      // documentation [0] suggests. This model is inflexible and I was happy to come across
+      // this post [1] about using CFWriteStreamSetDispatchQueue. [0]
+      // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Streams/Articles/WritingOutputStreams.html#//apple_ref/doc/uid/20002274-1002103
+      // [1]
+      // https://stackoverflow.com/questions/31306642/how-to-deal-with-concurrency-issues-brought-by-nsstream-run-loop-scheduling-usin
+      [output setDelegate:self];
+      CFWriteStreamSetDispatchQueue((__bridge CFWriteStreamRef)output, _streamQueue);
+      [output open];
+    });
   }
   return self;
 }
@@ -135,6 +172,7 @@ static const NSUInteger kChunkSize = 256 * 1024;
       error = self.output.streamError;
     }
   }
+  self.output.delegate = nil;
   CFWriteStreamSetDispatchQueue((__bridge CFWriteStreamRef)self.output, NULL);
   [self.output close];
   if (error) {

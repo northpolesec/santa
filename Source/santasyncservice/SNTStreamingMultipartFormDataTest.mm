@@ -32,9 +32,11 @@
     _data = [NSMutableData data];
     _reply = reply;
     _q = dispatch_queue_create("com.northpolesec.santa.test.streamreader", DISPATCH_QUEUE_SERIAL);
-    [stream setDelegate:self];
-    CFReadStreamSetDispatchQueue((__bridge CFReadStreamRef)stream, _q);
-    [stream open];
+    dispatch_sync(_q, ^{
+      [stream setDelegate:self];
+      CFReadStreamSetDispatchQueue((__bridge CFReadStreamRef)stream, _q);
+      [stream open];
+    });
   }
   return self;
 }
@@ -51,6 +53,7 @@
       break;
     }
     case NSStreamEventEndEncountered: {
+      self.stream.delegate = nil;
       CFReadStreamSetDispatchQueue((__bridge CFReadStreamRef)self.stream, NULL);
       [self.stream close];
       self.reply();
