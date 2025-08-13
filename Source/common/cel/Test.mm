@@ -154,6 +154,16 @@ namespace pbv1 = ::santa::cel::v1;
     }
     XCTAssertEqual(argsCallCount, 1);
   }
+  {
+    // Test args.join(' ') - joining arguments with space
+    auto result = sut.value()->CompileAndEvaluate("args.join(' ') == 'hello world'", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().second, false);
+    }
+  }
 }
 
 @end

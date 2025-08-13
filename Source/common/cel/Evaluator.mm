@@ -26,6 +26,7 @@
 #include "eval/public/cel_expr_builder_factory.h"
 #include "eval/public/cel_function_adapter.h"
 #include "eval/public/transform_utility.h"
+#include "extensions/strings.h"
 #include "parser/parser.h"
 
 #include "Source/common/cel/Activation.h"
@@ -48,6 +49,12 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
 
   // Add the standard library.
   if (auto result = builder->AddLibrary(::cel::StandardCompilerLibrary()); !result.ok()) {
+    return result;
+  }
+
+  // Add the extensions for string operations like list join
+  if (auto result = builder->AddLibrary(::cel::extensions::StringsCompilerLibrary());
+      !result.ok()) {
     return result;
   }
 
@@ -112,6 +119,12 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile
 
   // Register the builtin functions.
   if (auto result = RegisterBuiltinFunctions(builder->GetRegistry(), options); !result.ok()) {
+    return result;
+  }
+
+  // Register string extension functions for runtime
+  if (auto result = ::cel::extensions::RegisterStringsFunctions(builder->GetRegistry(), options);
+      !result.ok()) {
     return result;
   }
 
