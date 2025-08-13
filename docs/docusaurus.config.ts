@@ -66,6 +66,19 @@ const config: Config = {
         ],
       },
     ],
+    [
+      "docusaurus-plugin-llms",
+      {
+        title: "Santa Documentation",
+        description:
+          "Documentation for Santa, a binary and file access authorization system for macOS from North Pole Security",
+        generateLLMsTxt: true,
+        generateLLMsFullTxt: true,
+        docsDir: "docs",
+        excludeImports: true,
+        removeDuplicateHeadings: true,
+      },
+    ],
   ],
 
   // Even if you don't use internationalization, you can use this field to set
