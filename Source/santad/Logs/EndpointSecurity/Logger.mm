@@ -181,12 +181,13 @@ void Logger::ExportTelemetrySerialized() {
         stringWithFormat:@"%@-%@", [SNTSystemInfo bootSessionUUID], [path lastPathComponent]];
 
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    [syncd_queue_ exportTelemetryFile:handle
+    // TODO: Support multiple telemetry files.
+    [syncd_queue_ exportTelemetryFile:@[ handle ]
                              fileName:fileName
                                config:export_config
-                    completionHandler:^(BOOL success) {
+                    completionHandler:^(NSArray<NSNumber *> *successes) {
                       [handle closeFile];
-                      if (success) {
+                      if (successes.count) {
                         tracker_.AckCompleted(*file_to_export);
                       }
                       dispatch_semaphore_signal(sema);

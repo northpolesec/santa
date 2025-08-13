@@ -205,19 +205,19 @@
   });
 }
 
-- (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
+- (void)exportTelemetryFile:(NSArray<NSFileHandle *> *)telemetryFiles
                    fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
-          completionHandler:(void (^)(BOOL))completionHandler {
+          completionHandler:(void (^)(NSArray<NSNumber *> *))completionHandler {
   [self dispatchBlockOnSyncdQueue:^{
     if (self.syncConnection.isConnected) {
-      [self.syncConnection.remoteObjectProxy exportTelemetryFile:telemetryFile
-                                                        fileName:fileName
-                                                          config:config
-                                                           reply:completionHandler];
+      [self.syncConnection.remoteObjectProxy exportTelemetryFiles:telemetryFiles
+                                                         fileName:fileName
+                                                           config:config
+                                                            reply:completionHandler];
     } else {
       // Unable to send to sync service, but still must call the completion handler
-      completionHandler(NO);
+      completionHandler(nil);
     }
   }];
 }

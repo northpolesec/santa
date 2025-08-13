@@ -34,10 +34,14 @@
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
-- (void)exportTelemetryFile:(NSFileHandle *)fd
-                   fileName:(NSString *)fileName
-                     config:(SNTExportConfiguration *)config
-                      reply:(void (^)(BOOL))reply;
+
+// Array of telemetry files to export. Reply contains an array of indicies (corresponding to the
+// input array) indicating successful exports. The files will be exported as a single file under the
+// provided file name.
+- (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
+                    fileName:(NSString *)fileName
+                      config:(SNTExportConfiguration *)config
+                       reply:(void (^)(NSArray<NSNumber *> *))reply;
 
 // The syncservice regularly syncs with a configured sync server. Use this method to sync out of
 // band. The syncservice ensures syncs do not run concurrently.

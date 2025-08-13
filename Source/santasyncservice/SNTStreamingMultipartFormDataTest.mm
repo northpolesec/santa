@@ -112,11 +112,12 @@
   XCTAssertEqual(stream.contentLength, 386);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
-  __unused SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
-                                                                      reply:^{
-                                                                        [expectation fulfill];
-                                                                      }];
+  SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
+                                                             reply:^{
+                                                               [expectation fulfill];
+                                                             }];
   [self waitForExpectationsWithTimeout:10.0 handler:nil];
+  XCTAssertEqual(stream.contentLength, c.data.length);
 }
 
 - (void)testEmptyNonEmptyFile {
@@ -134,11 +135,12 @@
   XCTAssertEqual(stream.contentLength, 391);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
-  __unused SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
-                                                                      reply:^{
-                                                                        [expectation fulfill];
-                                                                      }];
+  SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
+                                                             reply:^{
+                                                               [expectation fulfill];
+                                                             }];
   [self waitForExpectationsWithTimeout:10.0 handler:nil];
+  XCTAssertEqual(stream.contentLength, c.data.length);
 }
 
 - (void)testBigFile {
@@ -159,11 +161,12 @@
   XCTAssertEqual(stream.contentLength, 1048962);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
-  __unused SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
-                                                                      reply:^{
-                                                                        [expectation fulfill];
-                                                                      }];
+  SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
+                                                             reply:^{
+                                                               [expectation fulfill];
+                                                             }];
   [self waitForExpectationsWithTimeout:10.0 handler:nil];
+  XCTAssertEqual(stream.contentLength, c.data.length);
 }
 
 @end

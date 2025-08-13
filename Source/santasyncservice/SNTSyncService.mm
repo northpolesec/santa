@@ -99,13 +99,14 @@
   [self.syncManager pushNotificationStatus:reply];
 }
 
-- (void)exportTelemetryFile:(NSFileHandle *)fd
-                   fileName:(NSString *)fileName
-                     config:(SNTExportConfiguration *)config
-                      reply:(void (^)(BOOL))reply {
+- (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
+                    fileName:(NSString *)fileName
+                      config:(SNTExportConfiguration *)config
+                       reply:(void (^)(NSArray<NSNumber *> *))reply {
+  // TODO: Support multiple telemetry files.
   SNTStreamingMultipartFormData *stream =
       [[SNTStreamingMultipartFormData alloc] initWithFormParts:config.formValues
-                                                          file:fd
+                                                          file:fds.firstObject
                                                       fileName:fileName];
 
   NSURLSessionConfiguration *sessionConfig =
@@ -116,7 +117,6 @@
   [request setValue:stream.contentType forHTTPHeaderField:@"Content-Type"];
   [request setValue:[NSString stringWithFormat:@"%lu", stream.contentLength]
       forHTTPHeaderField:@"Content-Length"];
-  [request setValue:@"santactl-telemetry/" forHTTPHeaderField:@"User-Agent"];
   [request setHTTPMethod:@"POST"];
 
   NSURLSessionDataTask *task = [session
@@ -134,7 +134,7 @@
             LOGE(@"Failed to export file: %@, status: %d: error: %@", fileName,
                  static_cast<uint8_t>(httpResponse.statusCode), error.localizedDescription);
           }
-          reply(success);
+          reply(success ? @[ @(0) ] : nil);
         }];
   [task resume];
 }

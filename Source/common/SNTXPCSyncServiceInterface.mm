@@ -28,6 +28,16 @@
       argumentIndex:0
             ofReply:NO];
 
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [NSFileHandle class], nil]
+        forSelector:@selector(exportTelemetryFiles:fileName:config:reply:)
+      argumentIndex:0
+            ofReply:NO];
+
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [NSNumber class], nil]
+        forSelector:@selector(exportTelemetryFiles:fileName:config:reply:)
+      argumentIndex:0
+            ofReply:YES];
+
   return r;
 }
 

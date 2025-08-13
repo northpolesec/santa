@@ -15,12 +15,14 @@
 #import "Source/santasyncservice/SNTStreamingMultipartFormData.h"
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 #import "Source/common/SNTLogging.h"
 
 static const NSUInteger kChunkSize = 256 * 1024;
 
 @interface SNTStreamingMultipartFormData () <NSStreamDelegate>
+@property(atomic) NSData *formData;
 @property(readonly) NSString *boundary;
 @property(readonly) NSData *closingBoundary;
 @property(readonly) NSFileHandle *fd;
@@ -70,6 +72,9 @@ static const NSUInteger kChunkSize = 256 * 1024;
     }
     _contentLength = formData.length + fileStat.st_size + _closingBoundary.length;
 
+    // Form data will be written once the stream is opened.
+    _formData = formData;
+
     // The queue where the NSStreamDelegate methods will be called.
     _streamQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.multipartstream",
                                          DISPATCH_QUEUE_SERIAL);
@@ -90,14 +95,6 @@ static const NSUInteger kChunkSize = 256 * 1024;
     CFWriteStreamSetDispatchQueue((__bridge CFWriteStreamRef)output, _streamQueue);
     [output open];
     _output = output;
-
-    // Load up the stream with form data. This should never block since it is
-    // smaller than the buffer.
-    if ([output write:(const uint8_t *)formData.bytes
-            maxLength:formData.length] != formData.length) {
-      LOGE(@"Failed to write form data: %@", output.streamError);
-      return nil;
-    };
   }
   return self;
 }
@@ -147,7 +144,7 @@ static const NSUInteger kChunkSize = 256 * 1024;
   }
 }
 
-- (void)writeNextChunk {
+- (void)writeNextFileChunk {
   NSError *error;
   NSData *data = [self.fd readDataUpToLength:kChunkSize error:&error];
   if (error) {
@@ -177,13 +174,14 @@ static const NSUInteger kChunkSize = 256 * 1024;
 
   // A partial write to stream has occurred, adjust the fd offset so the next
   // write operation picks up where this partial write left off.
-  uint64_t offset = 0;
-  if (![self.fd getOffset:&offset error:&error]) {
-    [self closeWithError:error];
-    return;
-  }
-  if (![self.fd seekToOffset:offset - (data.length - bytesWritten) error:&error]) {
-    [self closeWithError:error];
+  if (lseek(self.fd.fileDescriptor, -(data.length - bytesWritten), SEEK_CUR) == -1) {
+    NSError *posixError = [NSError
+        errorWithDomain:NSPOSIXErrorDomain
+                   code:errno
+               userInfo:@{
+                 NSLocalizedDescriptionKey : [NSString stringWithUTF8String:strerror(errno)]
+               }];
+    [self closeWithError:posixError];
     return;
   }
 }
@@ -192,7 +190,26 @@ static const NSUInteger kChunkSize = 256 * 1024;
 - (void)stream:(NSStream *)aStream handleEvent:(NSStreamEvent)eventCode {
   switch (eventCode) {
     case NSStreamEventHasSpaceAvailable: {
-      [self writeNextChunk];
+      if (self.formData) {
+        // Load up the stream with form data. This does not need to be chunked
+        // since it is the first bit of data that is written and it is smaller
+        // than the buffer.
+        if ([self.output write:(const uint8_t *)self.formData.bytes
+                     maxLength:self.formData.length] != self.formData.length) {
+          LOGE(@"Failed to write form data: %@", self.output.streamError);
+          [self closeWithError:self.output.streamError];
+          break;
+        };
+
+        // Once the form data is sent we can free it. On the next delegate
+        // invocation we will start writing the file payload. This is safe
+        // because we are on a serial queue.
+        self.formData = nil;
+
+        // We need to wait for the next delegate invocation to write again.
+        break;
+      }
+      [self writeNextFileChunk];
       break;
     }
     case NSStreamEventErrorOccurred: {
