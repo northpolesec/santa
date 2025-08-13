@@ -698,7 +698,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     }
     [rs close];
 
-    digest = santa::StringToNSString(hash.Digest());
+    digest = santa::StringToNSString(hash.HexDigest());
     self.rulesHash = digest;
   }];
   return digest;

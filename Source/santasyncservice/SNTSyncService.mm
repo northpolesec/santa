@@ -25,9 +25,6 @@
 #import "Source/santasyncservice/SNTPolaris.h"
 #import "Source/santasyncservice/SNTSyncBroadcaster.h"
 #import "Source/santasyncservice/SNTSyncManager.h"
-#ifndef MISSING_XCODE_16
-#include "rednose/src/export/bridge.rs.h"
-#endif
 
 @interface SNTSyncService ()
 @property(nonatomic, readonly) SNTSyncManager *syncManager;
@@ -105,42 +102,8 @@
                    fileName:(NSString *)fileName
                      config:(SNTExportConfiguration *)config
                       reply:(void (^)(BOOL))reply {
-#if MISSING_XCODE_16
+  // TODO: Export telemetry.
   reply(NO);
-  return;
-#else
-  BOOL success = NO;
-  rednose::ExportStatus status;
-  if (config.configType == SNTExportConfigurationTypeAWS &&
-      [config.config isKindOfClass:[SNTExportConfigurationAWS class]]) {
-    SNTExportConfigurationAWS *aws = (SNTExportConfigurationAWS *)config.config;
-    status = rednose::export_file_aws(fd.fileDescriptor, aws.accessKey.UTF8String,
-                                      aws.secretAccessKey.UTF8String, aws.sessionToken.UTF8String,
-                                      aws.bucketName.UTF8String, aws.objectKeyPrefix.UTF8String,
-                                      fileName.UTF8String);
-  } else if (config.configType == SNTExportConfigurationTypeGCP &&
-             [config.config isKindOfClass:[SNTExportConfigurationGCP class]]) {
-    SNTExportConfigurationGCP *gcp = (SNTExportConfigurationGCP *)config.config;
-    status = rednose::export_file_gcp(fd.fileDescriptor, gcp.bearerToken.UTF8String,
-                                      gcp.bucketName.UTF8String, gcp.objectKeyPrefix.UTF8String,
-                                      fileName.UTF8String);
-  } else {
-    status = rednose::ExportStatus{
-        .code = rednose::ExportCode::InvalidParam,
-        .error = "Invalid export configuration",
-    };
-  }
-
-  if (status.code == rednose::ExportCode::Success) {
-    success = YES;
-    LOGD(@"Successfully exported telemetry file: %@", fileName);
-  } else {
-    LOGE(@"Failed to export file: %@, status: %d: error: %s", fileName,
-         static_cast<uint8_t>(status.code), status.error.c_str());
-  }
-
-  reply(success);
-#endif
 }
 
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener

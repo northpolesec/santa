@@ -291,6 +291,7 @@ santa_unit_test(
     srcs = ["SNTXxhashTest.mm"],
     deps = [
         ":SNTXxhash",
+        ":String",
         ":TestUtils",
     ],
 )

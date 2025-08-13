@@ -115,27 +115,6 @@ bool ConfirmValidHexString(NSString *str, size_t expected_length) {
   return true;
 }
 
-static std::vector<uint8_t> HexStringToBytes(NSString *str) {
-  if (!str) {
-    return std::vector<uint8_t>{};
-  }
-
-  std::vector<uint8_t> bytes;
-  bytes.reserve(str.length / 2);
-
-  char cur_byte[3];
-  cur_byte[2] = '\0';
-
-  for (int i = 0; i < str.length / 2; i++) {
-    cur_byte[0] = [str characterAtIndex:(i * 2)];
-    cur_byte[1] = [str characterAtIndex:(i * 2 + 1)];
-
-    bytes.push_back(std::strtoul(cur_byte, nullptr, 16));
-  }
-
-  return bytes;
-}
-
 static inline bool GetBoolValue(NSDictionary *options, NSString *key, bool default_value) {
   return options[key] ? [options[key] boolValue] : default_value;
 }
@@ -406,7 +385,7 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesBinaryPath] ?: @""),
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesSigningID] ?: @""),
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesTeamID] ?: @""),
-                HexStringToBytes(process[kWatchItemConfigKeyProcessesCDHash]),
+                HexStringToBuf(process[kWatchItemConfigKeyProcessesCDHash]),
                 NSStringToUTF8String(process[kWatchItemConfigKeyProcessesCertificateSha256] ?: @""),
                 process[kWatchItemConfigKeyProcessesPlatformBinary]
                     ? std::make_optional(
