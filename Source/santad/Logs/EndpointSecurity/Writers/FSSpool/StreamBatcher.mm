@@ -16,6 +16,8 @@
 
 #include <climits>
 
+#import "Source/common/SNTXxhash.h"
+
 namespace fsspool {
 
 void StreamBatcher::InitializeBatch(int fd) {
@@ -34,8 +36,14 @@ absl::Status StreamBatcher::Write(std::vector<uint8_t> bytes) {
   }
 
   coded_output_->WriteLittleEndian32(kStreamBatcherMagic);
-  // TODO(mlw): This will be XXH3 64bit hash of the buffer
-  coded_output_->WriteLittleEndian64(0);
+
+  santa::Xxhash64 hash;
+  hash.Update(bytes.data(), bytes.size());
+  hash.Digest([&](const uint8_t *buf, size_t length) {
+    assert(length == sizeof(uint64_t));
+    coded_output_->WriteRaw(buf, (int)length);
+  });
+
   // Note: Protobuf library is inconsistent on size parameters. Casts are
   // intentionally for different types.
   coded_output_->WriteVarint32(static_cast<uint32_t>(bytes.size()));

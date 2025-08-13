@@ -73,6 +73,7 @@ objc_library(
     deps = [
         ":binaryproto_cc_proto",
         ":fsspool_nowindows",
+        "//Source/common:SNTXxhash",
         "//Source/common:santa_cc_proto_library_wrapper",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
