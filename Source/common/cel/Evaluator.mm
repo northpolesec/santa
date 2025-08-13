@@ -52,7 +52,7 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
     return result;
   }
 
-  // Add the extensions for string operations list join
+  // Add the extensions for string operations like list join
   if (auto result = builder->AddLibrary(::cel::extensions::StringsCompilerLibrary());
       !result.ok()) {
     return result;
