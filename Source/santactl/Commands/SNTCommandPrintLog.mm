@@ -136,7 +136,7 @@ class StreamMessageSource : public MessageSource {
     // Read the raw message data
     std::vector<uint8_t> msg_buf(message_length);
     if (!coded_input_->ReadRaw(msg_buf.data(), message_length)) {
-      return absl::InternalError("Failed to read message buffer");
+      return absl::InternalError("Failed to read message into buffer");
     }
 
     if (expected_hash != 0) {
@@ -144,7 +144,7 @@ class StreamMessageSource : public MessageSource {
       xxhash.Update(msg_buf.data(), msg_buf.size());
       __block uint64_t got_hash;
       xxhash.Digest(^(const uint8_t *buf, size_t size) {
-        memcpy(&got_hash, buf, sizeof(got_hash));
+        got_hash = *(uint64_t*)buf;
       });
 
       if (got_hash != expected_hash) {
