@@ -14,6 +14,8 @@ const config: Config = {
   // Set the /<baseUrl>/ pathname under which your site is served
   baseUrl: "/",
 
+  trailingSlash: true,
+
   // GitHub pages deployment config.
   organizationName: "northpolesec",
   projectName: "santa",
