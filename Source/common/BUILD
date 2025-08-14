@@ -702,6 +702,7 @@ objc_library(
     deps = [
         ":MOLXPCConnection",
         ":SNTCommonEnums",
+        ":SNTExportConfiguration",
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
     ],

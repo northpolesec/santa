@@ -29,9 +29,9 @@
 - (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent *> *)events
          withBundleHash:(NSString *)bundleHash;
 - (void)addBundleEvent:(SNTStoredExecutionEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
-- (void)exportTelemetryFile:(NSFileHandle *)telemetryFile
-                   fileName:(NSString *)fileName
-                     config:(SNTExportConfiguration *)config
-          completionHandler:(void (^)(BOOL))completionHandler;
-
+- (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)telemetryFiles
+                    fileName:(NSString *)fileName
+                   totalSize:(NSUInteger)totalSize
+                      config:(SNTExportConfiguration *)config
+                       reply:(void (^)(BOOL))reply;
 @end

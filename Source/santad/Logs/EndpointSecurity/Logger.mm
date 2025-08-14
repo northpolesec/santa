@@ -143,8 +143,6 @@ void Logger::ExportTelemetry() {
 }
 
 void Logger::ExportTelemetrySerialized() {
-  dispatch_group_t group = dispatch_group_create();
-
   // Get a copy of the current export config to be used for the entire export
   SNTExportConfiguration *export_config = get_export_config_block_();
   if (!export_config) {
@@ -182,22 +180,24 @@ void Logger::ExportTelemetrySerialized() {
     NSString *fileName = [NSString
         stringWithFormat:@"%@-%@", [SNTSystemInfo bootSessionUUID], [path lastPathComponent]];
 
-    dispatch_group_enter(group);
-    [syncd_queue_ exportTelemetryFile:handle
-                             fileName:fileName
-                               config:export_config
-                    completionHandler:^(BOOL success) {
-                      [handle closeFile];
-                      if (success) {
-                        tracker_.AckCompleted(*file_to_export);
-                      }
-                      dispatch_group_leave(group);
-                    }];
-  }
-
-  if (dispatch_group_wait(
-          group, dispatch_time(DISPATCH_TIME_NOW, kMinTelemetryExportTimeoutSecs * NSEC_PER_SEC))) {
-    LOGW(@"Timed out waiting for telemetry to export.");
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    // TODO: Support multiple telemetry files.
+    [syncd_queue_ exportTelemetryFiles:@[ handle ]
+                              fileName:fileName
+                             totalSize:sb.st_size
+                                config:export_config
+                                 reply:^(BOOL success) {
+                                   [handle closeFile];
+                                   if (success) {
+                                     tracker_.AckCompleted(*file_to_export);
+                                   }
+                                   dispatch_semaphore_signal(sema);
+                                 }];
+    if (dispatch_semaphore_wait(
+            sema,
+            dispatch_time(DISPATCH_TIME_NOW, kMinTelemetryExportTimeoutSecs * NSEC_PER_SEC))) {
+      LOGW(@"Timed out waiting for telemetry to export.");
+    }
   }
 
   writer_->FilesExported(tracker_.Drain());

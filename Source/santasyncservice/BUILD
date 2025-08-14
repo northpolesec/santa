@@ -79,6 +79,8 @@ objc_library(
         "SNTPushNotifications.h",
         "SNTPushNotificationsTracker.h",
         "SNTPushNotificationsTracker.mm",
+        "SNTStreamingMultipartFormData.h",
+        "SNTStreamingMultipartFormData.mm",
         "SNTSyncEventUpload.h",
         "SNTSyncEventUpload.mm",
         "SNTSyncLogging.h",
@@ -205,6 +207,17 @@ santa_unit_test(
     sdk_dylibs = ["libz"],
 )
 
+santa_unit_test(
+    name = "SNTStreamingMultipartFormDataTest",
+    srcs = [
+        "SNTStreamingMultipartFormDataTest.mm",
+    ],
+    deps = [
+        ":sync_lib",
+        "//Source/common:SNTLogging",
+    ],
+)
+
 objc_library(
     name = "broadcaster_lib",
     srcs = ["SNTSyncBroadcaster.mm"],
@@ -258,6 +271,7 @@ test_suite(
     name = "unit_tests",
     tests = [
         ":NSDataZlibTest",
+        ":SNTStreamingMultipartFormDataTest",
         ":SNTSyncConfigBundleTest",
         ":SNTSyncTest",
     ],

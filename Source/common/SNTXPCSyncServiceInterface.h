@@ -18,12 +18,9 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
-
-@class SNTExportConfiguration;
-@class SNTStoredEvent;
-@class SNTStoredExecutionEvent;
 
 ///
 ///  Protocol implemented by syncservice and utilized by daemon and ctl for communication with a
@@ -34,10 +31,16 @@
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
-- (void)exportTelemetryFile:(NSFileHandle *)fd
-                   fileName:(NSString *)fileName
-                     config:(SNTExportConfiguration *)config
-                      reply:(void (^)(BOOL))reply;
+
+// Array of telemetry files to export. Files will be exported as a single stream to the destination
+// provided in the config. The streamed files will be listed under the the provided file name. The
+// total size, in bytes, of all files must be provided. The reply block responds YES if all files
+// were exported, and NO if any failures occurred.
+- (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
+                    fileName:(NSString *)fileName
+                   totalSize:(NSUInteger)totalSize
+                      config:(SNTExportConfiguration *)config
+                       reply:(void (^)(BOOL))reply;
 
 // The syncservice regularly syncs with a configured sync server. Use this method to sync out of
 // band. The syncservice ensures syncs do not run concurrently.
