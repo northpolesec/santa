@@ -14,6 +14,7 @@ on:
 
 jobs:
   lint:
+    name: "Lint"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
@@ -26,31 +27,9 @@ jobs:
           clang-format --version
       - name: Run linters
         run: ./Testing/lint.sh
-  build_userspace:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-13, macos-14, macos-15]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8 # ratchet:bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ matrix.os }}
-          repository-cache: true
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # ratchet:maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-      - name: Build Userspace
-        if: matrix.os != 'macos-13'
-        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym //Source/gui:Santa --define=SANTA_BUILD_TYPE=adhoc
-      - name: Build Userspace 13
-        if: matrix.os == 'macos-13'
-        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym //Source/gui:Santa --define=SANTA_BUILD_TYPE=adhoc
+
   check_localization:
+    name: "Check Localization"
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
@@ -64,19 +43,30 @@ jobs:
             echo "and commit any changes it makes."
             exit 1 # return an error if localization.py made changes
           fi
-  unit_tests:
+
+  build-and-test:
+    name: "Build and Test"
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
         os: [macos-13, macos-14, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8 # ratchet:bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true
           disk-cache: ${{ matrix.os }}
           repository-cache: true
-      - name: Run All Tests
-        run: bazel test :unit_tests --verbose_failures --sandbox_debug --define=SANTA_BUILD_TYPE=adhoc --test_output=errors
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # ratchet:maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Build
+        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym //Source/gui:Santa --define=SANTA_BUILD_TYPE=adhoc
+
+      - name: Test
+        run: bazel test :unit_tests --test_output=errors --verbose_failures --sandbox_debug --define=SANTA_BUILD_TYPE=adhoc
