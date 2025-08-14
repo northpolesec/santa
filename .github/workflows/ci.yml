@@ -47,6 +47,9 @@ jobs:
   build-and-test:
     name: "Build and Test"
     needs: lint
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -55,18 +58,39 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - name: Auth to GCP
+        id: auth
+        uses: 'google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f' # ratchet:google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/131531281042/locations/global/workloadIdentityPools/github/providers/github'
+          project_id: 'santa-build-cache'
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8 # ratchet:bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true
-          disk-cache: ${{ matrix.os }}
+          disk-cache: false
           repository-cache: true
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # ratchet:maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
       - name: Build
-        run: bazel build --verbose_failures --sandbox_debug --apple_generate_dsym //Source/gui:Santa --define=SANTA_BUILD_TYPE=adhoc
-
+        run: |
+          bazel build \
+            --verbose_failures \
+            --sandbox_debug \
+            --apple_generate_dsym \
+            --define=SANTA_BUILD_TYPE=adhoc \
+            --remote_cache=https://storage.googleapis.com/santa-build-cache \
+            --google_default_credentials \
+            //Source/gui:Santa
       - name: Test
-        run: bazel test :unit_tests --test_output=errors --verbose_failures --sandbox_debug --define=SANTA_BUILD_TYPE=adhoc
+        run: |
+          bazel test \
+            --test_output=errors \
+            --verbose_failures \
+            --sandbox_debug \
+            --define=SANTA_BUILD_TYPE=adhoc \
+            --remote_cache=https://storage.googleapis.com/santa-build-cache \
+            --google_default_credentials \
+            :unit_tests
