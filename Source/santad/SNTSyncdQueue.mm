@@ -207,17 +207,19 @@
 
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)telemetryFiles
                     fileName:(NSString *)fileName
+                   totalSize:(NSUInteger)totalSize
                       config:(SNTExportConfiguration *)config
-           completionHandler:(void (^)(NSArray<NSNumber *> *))completionHandler {
+                       reply:(void (^)(BOOL))reply {
   [self dispatchBlockOnSyncdQueue:^{
     if (self.syncConnection.isConnected) {
       [self.syncConnection.remoteObjectProxy exportTelemetryFiles:telemetryFiles
                                                          fileName:fileName
+                                                        totalSize:totalSize
                                                            config:config
-                                                            reply:completionHandler];
+                                                            reply:reply];
     } else {
       // Unable to send to sync service, but still must call the completion handler
-      completionHandler(nil);
+      reply(NO);
     }
   }];
 }

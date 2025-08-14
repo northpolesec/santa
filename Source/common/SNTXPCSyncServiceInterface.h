@@ -32,13 +32,15 @@
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 
-// Array of telemetry files to export. Reply contains an array of indicies (corresponding to the
-// input array) indicating successful exports. The files will be exported as a single file under the
-// provided file name.
+// Array of telemetry files to export. Files will be exported as a single stream to the destination
+// provided in the config. The streamed files will be listed under the the provided file name. The
+// total size, in bytes, of all files must be provided. The reply block responds YES if all files
+// were exported, and NO if any failures occurred.
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
                     fileName:(NSString *)fileName
+                   totalSize:(NSUInteger)totalSize
                       config:(SNTExportConfiguration *)config
-                       reply:(void (^)(NSArray<NSNumber *> *))reply;
+                       reply:(void (^)(BOOL))reply;
 
 // The syncservice regularly syncs with a configured sync server. Use this method to sync out of
 // band. The syncservice ensures syncs do not run concurrently.

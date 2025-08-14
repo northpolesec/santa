@@ -31,7 +31,7 @@
 - (void)addBundleEvent:(SNTStoredExecutionEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)telemetryFiles
                     fileName:(NSString *)fileName
+                   totalSize:(NSUInteger)totalSize
                       config:(SNTExportConfiguration *)config
-           completionHandler:(void (^)(NSArray<NSNumber *> *))completionHandler;
-
+                       reply:(void (^)(BOOL))reply;
 @end

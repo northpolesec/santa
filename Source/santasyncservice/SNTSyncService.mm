@@ -101,9 +101,10 @@
 
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
                     fileName:(NSString *)fileName
+                   totalSize:(NSUInteger)totalSize
                       config:(SNTExportConfiguration *)config
-                       reply:(void (^)(NSArray<NSNumber *> *))reply {
-  // TODO: Support multiple telemetry files.
+                       reply:(void (^)(BOOL))reply {
+  // TODO: Support multiple telemetry files and make use of totalSize.
   SNTStreamingMultipartFormData *stream =
       [[SNTStreamingMultipartFormData alloc] initWithFormParts:config.formValues
                                                           file:fds.firstObject
@@ -134,7 +135,7 @@
             LOGE(@"Failed to export file: %@, status: %d: error: %@", fileName,
                  static_cast<uint8_t>(httpResponse.statusCode), error.localizedDescription);
           }
-          reply(success ? @[ @(0) ] : nil);
+          reply(success);
         }];
   [task resume];
 }
