@@ -208,6 +208,7 @@
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)telemetryFiles
                     fileName:(NSString *)fileName
                    totalSize:(NSUInteger)totalSize
+                 contentType:(NSString *)contentType
                       config:(SNTExportConfiguration *)config
                        reply:(void (^)(BOOL))reply {
   [self dispatchBlockOnSyncdQueue:^{
@@ -215,6 +216,7 @@
       [self.syncConnection.remoteObjectProxy exportTelemetryFiles:telemetryFiles
                                                          fileName:fileName
                                                         totalSize:totalSize
+                                                      contentType:contentType
                                                            config:config
                                                             reply:reply];
     } else {

@@ -39,6 +39,7 @@
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
                     fileName:(NSString *)fileName
                    totalSize:(NSUInteger)totalSize
+                 contentType:(NSString *)contentType
                       config:(SNTExportConfiguration *)config
                        reply:(void (^)(BOOL))reply;
 
