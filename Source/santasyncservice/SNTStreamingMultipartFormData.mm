@@ -89,28 +89,28 @@ static const NSUInteger kChunkSize = 256 * 1024;
 
     // Sample Apple code [0] shows that initialization should be on the same serial queue where the
     // stream will handle events. This makes sense. Otherwise the stream's delegate could start
-    // executing while the stream was still being opened. Here is a crash from a flakey test when
+    // executing while the stream was still being opened. Here is a crash from a flaky test when
     // opening the stream from the main thread:
     //
     // clang-format off
     //
     // Thread 0::  Dispatch queue: com.apple.main-thread
-    // 0   libsystem_kernel.dylib        	       0x185a7cc54 __psynch_mutexdrop + 8
-    // 1   libsystem_pthread.dylib       	       0x185ab80d0 _pthread_mutex_firstfit_wake + 28
-    // 2   libsystem_pthread.dylib       	       0x185ab5cac _pthread_mutex_firstfit_unlock_slow + 244
-    // 3   CoreFoundation                	       0x185b7dee4 CFRunLoopWakeUp + 376
-    // 4   CoreFoundation                	       0x185bf00cc _wakeUpRunLoop + 76
-    // 5   CoreFoundation                	       0x185bc5ba0 _CFStreamSignalEvent + 552
-    // 6   CoreFoundation                	       0x185c7b110 boundPairWriteOpen + 68
-    // 7   CoreFoundation                	       0x185b6ba5c _CFStreamOpen + 140
-    // 8   SNTStreamingMultipartFormDataTest	       0x10768ce4c -[SNTStreamingMultipartFormData initWithFormParts:file:fileName:] + 2180
+    // 0   libsystem_kernel.dylib                0x185a7cc54 __psynch_mutexdrop + 8
+    // 1   libsystem_pthread.dylib               0x185ab80d0 _pthread_mutex_firstfit_wake + 28
+    // 2   libsystem_pthread.dylib               0x185ab5cac _pthread_mutex_firstfit_unlock_slow + 244
+    // 3   CoreFoundation                        0x185b7dee4 CFRunLoopWakeUp + 376
+    // 4   CoreFoundation                        0x185bf00cc _wakeUpRunLoop + 76
+    // 5   CoreFoundation                        0x185bc5ba0 _CFStreamSignalEvent + 552
+    // 6   CoreFoundation                        0x185c7b110 boundPairWriteOpen + 68
+    // 7   CoreFoundation                        0x185b6ba5c _CFStreamOpen + 140
+    // 8   SNTStreamingMultipartFormDataTest     0x10768ce4c -[SNTStreamingMultipartFormData initWithFormParts:file:fileName:] + 2180
     // ...
     // Thread 1 Crashed::  Dispatch queue: com.northpolesec.santa.syncservice.multipartstream
-    // 0   libsystem_pthread.dylib       	       0x185ab54f8 pthread_mutex_lock + 12
-    // 1   CoreFoundation                	       0x185c0f484 _CFStreamSetDispatchQueue + 244
-    // 2   SNTStreamingMultipartFormDataTest	       0x10768d9cc -[SNTStreamingMultipartFormData closeWithError:] + 776
-    // 3   SNTStreamingMultipartFormDataTest	       0x10768e82c -[SNTStreamingMultipartFormData stream:handleEvent:] + 1244
-    // 4   CoreFoundation                	       0x185bc5ec8 _outputStreamCallbackFunc + 76
+    // 0   libsystem_pthread.dylib               0x185ab54f8 pthread_mutex_lock + 12
+    // 1   CoreFoundation                        0x185c0f484 _CFStreamSetDispatchQueue + 244
+    // 2   SNTStreamingMultipartFormDataTest     0x10768d9cc -[SNTStreamingMultipartFormData closeWithError:] + 776
+    // 3   SNTStreamingMultipartFormDataTest     0x10768e82c -[SNTStreamingMultipartFormData stream:handleEvent:] + 1244
+    // 4   CoreFoundation                        0x185bc5ec8 _outputStreamCallbackFunc + 76
     //
     // clang-format on
     //
