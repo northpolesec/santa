@@ -1,13 +1,22 @@
 name: continuous
 on:
   schedule:
-    - cron: '0 11 * * *' # Every day at 11:00 UTC
-  workflow_dispatch:  # Allows you to run this workflow manually from the Actions tab
+    - cron: '0 7 * * *' # Every day at 7:00 UTC (3:00 EST)
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
 jobs:
   preqs:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Checks for flaky tests
-        run: bazel test --test_strategy=exclusive --test_output=errors --runs_per_test 50 -t- :unit_tests --define=SANTA_BUILD_TYPE=adhoc
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
+
+      - name: Check for flaky tests
+        run: |
+          bazel test \
+            --test_strategy=exclusive \
+            --test_output=errors \
+            --runs_per_test 50 \
+            --define=SANTA_BUILD_TYPE=adhoc \
+            -t- \
+            :unit_tests
+
