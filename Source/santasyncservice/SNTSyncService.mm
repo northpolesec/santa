@@ -102,12 +102,14 @@
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
                     fileName:(NSString *)fileName
                    totalSize:(NSUInteger)totalSize
+                 contentType:(NSString *)contentType
                       config:(SNTExportConfiguration *)config
                        reply:(void (^)(BOOL))reply {
-  // TODO: Support multiple telemetry files and make use of totalSize.
   SNTStreamingMultipartFormData *stream =
       [[SNTStreamingMultipartFormData alloc] initWithFormParts:config.formValues
-                                                          file:fds.firstObject
+                                                         files:fds
+                                                filesTotalSize:totalSize
+                                              filesContentType:contentType
                                                       fileName:fileName];
 
   NSURLSessionConfiguration *sessionConfig =

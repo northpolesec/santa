@@ -185,6 +185,7 @@ void Logger::ExportTelemetrySerialized() {
     [syncd_queue_ exportTelemetryFiles:@[ handle ]
                               fileName:fileName
                              totalSize:sb.st_size
+                           contentType:@"application/octet-stream"  // TODO: Update when compressing
                                 config:export_config
                                  reply:^(BOOL success) {
                                    [handle closeFile];

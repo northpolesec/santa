@@ -19,31 +19,34 @@
 
 #import "Source/common/SNTLogging.h"
 
-static const NSUInteger kChunkSize = 256 * 1024;
+static const NSUInteger kChunkSize = 256 * 1024;  // 256 KiB
 
 @interface SNTStreamingMultipartFormData () <NSStreamDelegate>
 @property(atomic) NSData *formData;
 @property(readonly) NSString *boundary;
 @property(readonly) NSData *closingBoundary;
-@property(readonly) NSFileHandle *fd;
+@property(readonly) NSArray<NSFileHandle *> *fds;
 @property(readonly) NSOutputStream *output;
-@property dispatch_queue_t streamQueue;
+@property(readonly) dispatch_queue_t streamQueue;
+@property NSUInteger currentFileIndex;
 @end
 
 @implementation SNTStreamingMultipartFormData
 
 - (instancetype)initWithFormParts:(NSDictionary<NSString *, NSString *> *)formParts
-                             file:(NSFileHandle *)fd
+                            files:(NSArray<NSFileHandle *> *)fds
+                   filesTotalSize:(NSUInteger)filesTotalSize
+                 filesContentType:(NSString *)filesContentType
                          fileName:(NSString *)fileName {
   self = [super init];
   if (self) {
-    if (!fd || !fileName.length) {
+    if (!fds.count || !fileName.length) {
       return nil;
     }
     _boundary = [[NSUUID UUID] UUIDString];
     _closingBoundary = [[NSString stringWithFormat:@"\r\n--%@--\r\n", _boundary]
         dataUsingEncoding:NSUTF8StringEncoding];
-    _fd = fd;
+    _fds = [fds copy];
 
     NSMutableData *formData = [NSMutableData data];
     [formParts enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSString *value, BOOL *stop) {
@@ -56,7 +59,7 @@ static const NSUInteger kChunkSize = 256 * 1024;
     }];
     [formData appendData:[self partWithName:@"file"
                                    filename:@"upload"
-                                contentType:@"application/octet-stream"]];
+                                contentType:filesContentType ?: @"application/octet-stream"]];
 
     // The form data is not streamed, it will be written all in one go.
     if (formData.length > kChunkSize) {
@@ -67,13 +70,7 @@ static const NSUInteger kChunkSize = 256 * 1024;
     // Form data will be written once the stream is opened.
     _formData = formData;
 
-    // TODO: Avoid the stat and get the file size from the daemon.
-    struct stat fileStat;
-    if (fstat([_fd fileDescriptor], &fileStat) != 0) {
-      LOGE(@"Failed to get file size: %s", strerror(errno));
-      return nil;
-    }
-    _contentLength = formData.length + fileStat.st_size + _closingBoundary.length;
+    _contentLength = formData.length + filesTotalSize + _closingBoundary.length;
 
     // The queue where the NSStreamDelegate methods will be called.
     _streamQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.multipartstream",
@@ -153,7 +150,7 @@ static const NSUInteger kChunkSize = 256 * 1024;
   [partString appendFormat:@"--%@\r\n", self.boundary];
   [partString appendFormat:@"Content-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\n",
                            name, filename];
-  if (contentType && contentType.length > 0) {
+  if (contentType.length) {
     [partString appendFormat:@"Content-Type: %@\r\n", contentType];
   }
   [partString appendString:@"\r\n"];
@@ -182,15 +179,21 @@ static const NSUInteger kChunkSize = 256 * 1024;
 
 - (void)writeNextFileChunk {
   NSError *error;
-  NSData *data = [self.fd readDataUpToLength:kChunkSize error:&error];
+  NSData *data = [self.fds[self.currentFileIndex] readDataUpToLength:kChunkSize error:&error];
   if (error) {
     LOGE(@"Failed to read from file: %@", error);
     [self closeWithError:error];
     return;
   }
 
-  // End of file.
+  // End of the current file.
   if (data.length == 0) {
+    // If there is another file, start streaming it.
+    if (self.currentFileIndex + 1 < self.fds.count) {
+      ++self.currentFileIndex;
+      return [self writeNextFileChunk];
+    }
+    // Otherwise end the stream.
     [self closeWithError:nil];
     return;
   }
@@ -210,7 +213,8 @@ static const NSUInteger kChunkSize = 256 * 1024;
 
   // A partial write to stream has occurred, adjust the fd offset so the next
   // write operation picks up where this partial write left off.
-  if (lseek(self.fd.fileDescriptor, -(data.length - bytesWritten), SEEK_CUR) == -1) {
+  if (lseek(self.fds[self.currentFileIndex].fileDescriptor, -(data.length - bytesWritten),
+            SEEK_CUR) == -1) {
     NSError *posixError = [NSError
         errorWithDomain:NSPOSIXErrorDomain
                    code:errno
