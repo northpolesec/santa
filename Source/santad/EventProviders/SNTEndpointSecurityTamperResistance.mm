@@ -156,7 +156,8 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
       if ([SNTEndpointSecurityTamperResistance
               isProtectedPath:esMsg->event.unlink.target->path.data]) {
         result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt to delete important Santa files!");
+        pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
+        LOGW(@"Preventing attempt (by PID %d) to delete important Santa files!", sourcePid);
       }
       break;
     }
@@ -165,7 +166,8 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
       if ([SNTEndpointSecurityTamperResistance
               isProtectedPath:esMsg->event.rename.source->path.data]) {
         result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt to rename important Santa files!");
+        pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
+        LOGW(@"Preventing attempt (by PID %d) to rename important Santa files!", sourcePid);
         break;
       }
 
@@ -173,7 +175,8 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
         if ([SNTEndpointSecurityTamperResistance
                 isProtectedPath:esMsg->event.rename.destination.existing_file->path.data]) {
           result = ES_AUTH_RESULT_DENY;
-          LOGW(@"Preventing attempt to overwrite important Santa files!");
+          pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
+          LOGW(@"Preventing attempt (by PID %d) to overwrite important Santa files!", sourcePid);
           break;
         }
       }
@@ -184,13 +187,17 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
     case ES_EVENT_TYPE_AUTH_OPEN: {
       if ((esMsg->event.open.fflag & FWRITE) &&
           [SNTEndpointSecurityTamperResistance isProtectedPath:esMsg->event.open.file->path.data]) {
-        LOGW(@"Preventing attempt to open important Santa files as writable!");
+        pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
+        LOGW(@"Preventing attempt (by PID %d) to open important Santa files as writable!",
+             sourcePid);
         result = ES_AUTH_RESULT_DENY;
         break;
       }
       if ([SNTEndpointSecurityTamperResistance
               isLiteralProtectedPath:esMsg->event.open.file->path.data]) {
-        LOGW(@"Preventing attempt to open sensitive Santa files as readable!");
+        pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
+        LOGW(@"Preventing attempt (by PID %d) to open sensitive Santa files as readable!",
+             sourcePid);
         result = ES_AUTH_RESULT_DENY;
         break;
       }
