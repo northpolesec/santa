@@ -28,6 +28,7 @@
 #include <unordered_set>
 
 #import "Source/common/SNTLogging.h"
+#import "Source/common/String.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Metrics.h"
@@ -157,7 +158,9 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
               isProtectedPath:esMsg->event.unlink.target->path.data]) {
         result = ES_AUTH_RESULT_DENY;
         pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
-        LOGW(@"Preventing attempt (by PID %d) to delete important Santa files!", sourcePid);
+        NSString *procName = santa::StringTokenToNSString(esMsg->process->executable->path);
+        LOGW(@"Preventing attempt (by PID %d, %@) to delete important Santa files!", sourcePid,
+             procName);
       }
       break;
     }
@@ -167,7 +170,9 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
               isProtectedPath:esMsg->event.rename.source->path.data]) {
         result = ES_AUTH_RESULT_DENY;
         pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
-        LOGW(@"Preventing attempt (by PID %d) to rename important Santa files!", sourcePid);
+        NSString *procName = santa::StringTokenToNSString(esMsg->process->executable->path);
+        LOGW(@"Preventing attempt (by PID %d, %@) to rename important Santa files!", sourcePid,
+             procName);
         break;
       }
 
@@ -176,7 +181,9 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
                 isProtectedPath:esMsg->event.rename.destination.existing_file->path.data]) {
           result = ES_AUTH_RESULT_DENY;
           pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
-          LOGW(@"Preventing attempt (by PID %d) to overwrite important Santa files!", sourcePid);
+          NSString *procName = santa::StringTokenToNSString(esMsg->process->executable->path);
+          LOGW(@"Preventing attempt (by PID %d, %@) to overwrite important Santa files!", sourcePid,
+               procName);
           break;
         }
       }
@@ -188,16 +195,18 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
       if ((esMsg->event.open.fflag & FWRITE) &&
           [SNTEndpointSecurityTamperResistance isProtectedPath:esMsg->event.open.file->path.data]) {
         pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
-        LOGW(@"Preventing attempt (by PID %d) to open important Santa files as writable!",
-             sourcePid);
+        NSString *procName = santa::StringTokenToNSString(esMsg->process->executable->path);
+        LOGW(@"Preventing attempt (by PID %d, %@) to open important Santa files as writable!",
+             sourcePid, procName);
         result = ES_AUTH_RESULT_DENY;
         break;
       }
       if ([SNTEndpointSecurityTamperResistance
               isLiteralProtectedPath:esMsg->event.open.file->path.data]) {
         pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
-        LOGW(@"Preventing attempt (by PID %d) to open sensitive Santa files as readable!",
-             sourcePid);
+        NSString *procName = santa::StringTokenToNSString(esMsg->process->executable->path);
+        LOGW(@"Preventing attempt (by PID %d, %@) to open sensitive Santa files as readable!",
+             sourcePid, procName);
         result = ES_AUTH_RESULT_DENY;
         break;
       }
@@ -221,8 +230,10 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
       pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
       pid_t targetPid = audit_token_to_pid(esMsg->event.signal.target->audit_token);
       if (targetPid == getpid() && sourcePid != 1) {
-        LOGW(@"Preventing attempt to signal Santa daemon: signal %d, sending pid: %d",
-             esMsg->event.signal.sig, sourcePid);
+        NSString *procName = santa::StringTokenToNSString(esMsg->process->executable->path);
+        LOGW(@"Preventing attempt to signal Santa daemon: signal %d, sending pid: %d, sending "
+             @"process: %@",
+             esMsg->event.signal.sig, sourcePid, procName);
         result = ES_AUTH_RESULT_DENY;
       }
       break;
