@@ -1,6 +1,7 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import docusaurusPluginLLMs from "docusaurus-plugin-llms/src";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -69,7 +70,7 @@ const config: Config = {
       },
     ],
     [
-      "docusaurus-plugin-llms",
+      docusaurusPluginLLMs,
       {
         title: "Santa Documentation",
         description:
@@ -79,6 +80,7 @@ const config: Config = {
         docsDir: "docs",
         excludeImports: true,
         removeDuplicateHeadings: true,
+        generateMarkdownFiles: true,
       },
     ],
   ],
