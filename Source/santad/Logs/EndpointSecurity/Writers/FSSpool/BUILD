@@ -84,10 +84,21 @@ objc_library(
         ":binaryproto_cc_proto",
         ":fsspool_nowindows",
         "//Source/common:SNTXxhash",
+        "//Source/common:Unit",
         "//Source/common:santa_cc_proto_library_wrapper",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+santa_unit_test(
+    name = "StreamBatchersTest",
+    srcs = ["StreamBatcherTest.mm"],
+    deps = [
+        ":SpoolBatchers",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 

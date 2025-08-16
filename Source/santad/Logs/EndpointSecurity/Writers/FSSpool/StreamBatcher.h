@@ -17,6 +17,8 @@
 
 #include <vector>
 
+#include "Source/common/SNTXxhash.h"
+#include "Source/common/Unit.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/ZstdOutputStream.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -83,10 +85,8 @@ class StreamBatcher {
   std::shared_ptr<google::protobuf::io::CodedOutputStream> coded_output_;
 };
 
-struct Uncompressed {};
-
 template <>
-class StreamBatcher<Uncompressed> {
+class StreamBatcher<::santa::Unit> {
  public:
   StreamBatcher() = default;
 
@@ -134,7 +134,7 @@ class StreamBatcher<Uncompressed> {
 // Convenience type aliases
 using GzipStreamBatcher = StreamBatcher<google::protobuf::io::GzipOutputStream>;
 using ZstdStreamBatcher = StreamBatcher<fsspool::ZstdOutputStream>;
-using UncompressedStreamBatcher = StreamBatcher<Uncompressed>;
+using UncompressedStreamBatcher = StreamBatcher<::santa::Unit>;
 
 }  // namespace fsspool
 

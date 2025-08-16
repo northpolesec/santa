@@ -89,7 +89,7 @@ void ZstdOutputStream::BackUp(int count) {
 }
 
 int64_t ZstdOutputStream::ByteCount() const {
-  return byte_count_ - input_available_;
+  return byte_count_;
 }
 
 bool ZstdOutputStream::Flush() {
