@@ -11,7 +11,7 @@ jobs:
       matrix:
         sanitizer: [asan, tsan, ubsan]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
       - name: ${{ matrix.sanitizer }}
         run: |
           CLANG_VERSION=$(clang --version | head -n 1 | cut -d' ' -f 4)
@@ -23,7 +23,7 @@ jobs:
             --runs_per_test 5 -t- :unit_tests \
             --define=SANTA_BUILD_TYPE=adhoc
       - name: Upload logs
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # ratchet:actions/upload-artifact@v4.4.0
         if: failure()
         with:
           name: logs
