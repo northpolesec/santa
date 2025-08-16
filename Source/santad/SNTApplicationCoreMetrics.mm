@@ -62,6 +62,12 @@ static void RegisterEventLogType(SNTMetricSet *metricSet) {
     switch ([[SNTConfigurator configurator] eventLogType]) {
       case SNTEventLogTypeProtobuf: [logType set:@"protobuf" forFieldValues:@[]]; break;
       case SNTEventLogTypeProtobufStream: [logType set:@"protobufstream" forFieldValues:@[]]; break;
+      case SNTEventLogTypeProtobufStreamGzip:
+        [logType set:@"protobufstreamgzip" forFieldValues:@[]];
+        break;
+      case SNTEventLogTypeProtobufStreamZstd:
+        [logType set:@"protobufstreamzstd" forFieldValues:@[]];
+        break;
       case SNTEventLogTypeSyslog: [logType set:@"syslog" forFieldValues:@[]]; break;
       case SNTEventLogTypeNull: [logType set:@"null" forFieldValues:@[]]; break;
       case SNTEventLogTypeFilelog: [logType set:@"file" forFieldValues:@[]]; break;

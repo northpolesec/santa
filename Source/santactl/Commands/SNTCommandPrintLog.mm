@@ -117,7 +117,7 @@ class StreamMessageSource : public MessageSource {
     if (!coded_input_->ReadLittleEndian32(&magic)) {
       return absl::OutOfRangeError("No more data");
     }
-    if (magic != ::fsspool::StreamBatcher::kStreamBatcherMagic) {
+    if (magic != ::fsspool::kStreamBatcherMagic) {
       return absl::InternalError("Invalid magic value");
     }
 
@@ -190,7 +190,7 @@ absl::StatusOr<std::unique_ptr<MessageSource>> MessageSource::Create(NSString *p
   }
 
   // Determine which derived class to instantiate based on magic number
-  if (magic_number == ::fsspool::StreamBatcher::kStreamBatcherMagic) {
+  if (magic_number == ::fsspool::kStreamBatcherMagic) {
     return StreamMessageSource::Create(fd);
   } else {
     return AnyMessageSource::Create(fd);

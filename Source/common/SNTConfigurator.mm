@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/common/SNTConfigurator.h"
+#include "Source/common/SNTCommonEnums.h"
 
 #include <sys/stat.h>
 
@@ -1082,6 +1083,10 @@ static SNTConfigurator *sharedConfigurator = nil;
     return SNTEventLogTypeProtobuf;
   } else if ([logType isEqualToString:@"protobufstream"]) {
     return SNTEventLogTypeProtobufStream;
+  } else if ([logType isEqualToString:@"protobufstreamgzip"]) {
+    return SNTEventLogTypeProtobufStreamGzip;
+  } else if ([logType isEqualToString:@"protobufstreamzstd"]) {
+    return SNTEventLogTypeProtobufStreamZstd;
   } else if ([logType isEqualToString:@"syslog"]) {
     return SNTEventLogTypeSyslog;
   } else if ([logType isEqualToString:@"null"]) {

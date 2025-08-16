@@ -17,29 +17,124 @@
 
 #include <vector>
 
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/ZstdOutputStream.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/io/gzip_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 
 namespace fsspool {
 
+static constexpr uint32_t kStreamBatcherMagic = 0x21544E53;
+
+template <typename T>
 class StreamBatcher {
  public:
-  static constexpr uint32_t kStreamBatcherMagic = 0x21544E53;
+  template <typename F>
+  StreamBatcher(F &&factory) : factory_(std::forward<F>(factory)) {}
 
+  inline bool ShouldInitializeBeforeWrite() { return true; }
+
+  void InitializeBatch(int fd) {
+    raw_output_ = std::make_shared<google::protobuf::io::FileOutputStream>(fd);
+    compressed_output_ = factory_(raw_output_.get());
+    coded_output_ = std::make_shared<google::protobuf::io::CodedOutputStream>(
+        compressed_output_.get());
+  }
+
+  inline bool NeedToOpenFile() { return true; }
+
+  absl::Status Write(std::vector<uint8_t> bytes) {
+    if (bytes.size() > INT_MAX) {
+      return absl::InternalError("Telemetry event size too large");
+    }
+
+    coded_output_->WriteLittleEndian32(kStreamBatcherMagic);
+
+    santa::Xxhash64 hash;
+    hash.Update(bytes.data(), bytes.size());
+    hash.Digest([&](const uint8_t *buf, size_t length) {
+      assert(length == sizeof(uint64_t));
+      coded_output_->WriteRaw(buf, (int)length);
+    });
+
+    // Note: Protobuf library is inconsistent on size parameters. Casts are
+    // intentionally for different types.
+    coded_output_->WriteVarint32(static_cast<uint32_t>(bytes.size()));
+    coded_output_->WriteRaw(bytes.data(), static_cast<int>(bytes.size()));
+    return absl::OkStatus();
+  }
+
+  absl::StatusOr<size_t> CompleteBatch(int fd) {
+    int bytes_written = coded_output_->ByteCount();
+    coded_output_.reset();
+    compressed_output_.reset();
+    raw_output_.reset();
+    return bytes_written;
+  }
+
+ private:
+  std::function<std::shared_ptr<T>(
+      google::protobuf::io::ZeroCopyOutputStream *)>
+      factory_;
+  std::shared_ptr<google::protobuf::io::ZeroCopyOutputStream> raw_output_;
+  std::shared_ptr<T> compressed_output_;
+  std::shared_ptr<google::protobuf::io::CodedOutputStream> coded_output_;
+};
+
+struct Uncompressed {};
+
+template <>
+class StreamBatcher<Uncompressed> {
+ public:
   StreamBatcher() = default;
 
   inline bool ShouldInitializeBeforeWrite() { return true; }
-  void InitializeBatch(int fd);
-  bool NeedToOpenFile();
-  absl::Status Write(std::vector<uint8_t> bytes);
-  absl::StatusOr<size_t> CompleteBatch(int fd);
+
+  void InitializeBatch(int fd) {
+    raw_output_ = std::make_shared<google::protobuf::io::FileOutputStream>(fd);
+    coded_output_ = std::make_shared<google::protobuf::io::CodedOutputStream>(
+        raw_output_.get());
+  }
+
+  inline bool NeedToOpenFile() { return true; }
+
+  absl::Status Write(std::vector<uint8_t> bytes) {
+    if (bytes.size() > INT_MAX) {
+      return absl::InternalError("Telemetry event size too large");
+    }
+
+    coded_output_->WriteLittleEndian32(kStreamBatcherMagic);
+
+    santa::Xxhash64 hash;
+    hash.Update(bytes.data(), bytes.size());
+    hash.Digest([&](const uint8_t *buf, size_t length) {
+      assert(length == sizeof(uint64_t));
+      coded_output_->WriteRaw(buf, (int)length);
+    });
+
+    coded_output_->WriteVarint32(static_cast<uint32_t>(bytes.size()));
+    coded_output_->WriteRaw(bytes.data(), static_cast<int>(bytes.size()));
+    return absl::OkStatus();
+  }
+
+  absl::StatusOr<size_t> CompleteBatch(int fd) {
+    int bytes_written = coded_output_->ByteCount();
+    coded_output_.reset();
+    raw_output_.reset();
+    return bytes_written;
+  }
 
  private:
   std::shared_ptr<google::protobuf::io::ZeroCopyOutputStream> raw_output_;
   std::shared_ptr<google::protobuf::io::CodedOutputStream> coded_output_;
 };
+
+// Convenience type aliases
+using GzipStreamBatcher = StreamBatcher<google::protobuf::io::GzipOutputStream>;
+using ZstdStreamBatcher = StreamBatcher<fsspool::ZstdOutputStream>;
+using UncompressedStreamBatcher = StreamBatcher<Uncompressed>;
 
 }  // namespace fsspool
 

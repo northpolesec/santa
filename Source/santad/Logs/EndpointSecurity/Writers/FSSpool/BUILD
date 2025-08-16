@@ -61,16 +61,26 @@ cc_library(
 )
 
 objc_library(
-    name = "SpoolBatchers",
-    srcs = [
-        "AnyBatcher.mm",
-        "StreamBatcher.mm",
+    name = "ZstdOutputStream",
+    srcs = ["ZstdOutputStream.mm"],
+    hdrs = ["ZstdOutputStream.h"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@protobuf//src/google/protobuf/io",
+        "@zstd",
     ],
+)
+
+objc_library(
+    name = "SpoolBatchers",
+    srcs = ["AnyBatcher.mm"],
     hdrs = [
         "AnyBatcher.h",
         "StreamBatcher.h",
     ],
     deps = [
+        ":ZstdOutputStream",
         ":binaryproto_cc_proto",
         ":fsspool_nowindows",
         "//Source/common:SNTXxhash",

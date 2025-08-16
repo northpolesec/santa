@@ -47,8 +47,9 @@ namespace fsspool {
 
 template <typename T>
 concept BatcherInterface =
-    requires(T batcher, int fd, std::vector<uint8_t> bytes) {
-      T{};
+    (std::default_initializable<T> || requires {
+      T{std::declval<std::function<void()>>()};
+    }) && requires(T batcher, int fd, std::vector<uint8_t> bytes) {
       { batcher.ShouldInitializeBeforeWrite() } -> std::same_as<bool>;
       { batcher.InitializeBatch(fd) } -> std::same_as<void>;
       { batcher.NeedToOpenFile() } -> std::same_as<bool>;
@@ -65,8 +66,9 @@ class FsSpoolWriter {
   // The base, spool, and temporary directory will be created as needed on the
   // first call to Write() - however the base directory can be created into an
   // existing path (i.e. this class will not do an `mkdir -p`).
-  FsSpoolWriter(absl::string_view base_dir, size_t max_spool_size)
-      : base_dir_(base_dir),
+  FsSpoolWriter(T batcher, absl::string_view base_dir, size_t max_spool_size)
+      : batcher_(std::move(batcher)),
+        base_dir_(base_dir),
         spool_dir_(SpoolNewDirectory(base_dir)),
         tmp_dir_(SpoolTempDirectory(base_dir)),
         space_check_failure_since_last_flush_(false),
@@ -286,10 +288,10 @@ class FsSpoolWriter {
     int tmp_fd;
   };
 
+  T batcher_;
   const std::string base_dir_;
   const std::string spool_dir_;
   const std::string tmp_dir_;
-  T batcher_;
   struct timespec spool_dir_last_mtime_;
   CurrentSpoolState current_spool_state_;
 
