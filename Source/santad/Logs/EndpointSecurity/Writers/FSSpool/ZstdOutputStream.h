@@ -42,10 +42,6 @@ class ZstdOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
   void BackUp(int count) override;
   int64_t ByteCount() const override;
 
-  // Flush any remaining compressed data to the underlying stream
-  // Must be called before destroying the stream or the data may be incomplete
-  bool Flush();
-
  private:
   bool CompressAndFlush(ZSTD_EndDirective end_directive);
   bool FlushOutput(size_t bytes_to_write);
@@ -62,7 +58,6 @@ class ZstdOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
   std::vector<uint8_t> output_buffer_;
 
   int64_t byte_count_;
-  bool closed_;
 };
 
 }  // namespace fsspool

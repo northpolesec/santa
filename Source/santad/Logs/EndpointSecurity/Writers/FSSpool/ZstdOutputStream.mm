@@ -44,23 +44,14 @@ ZstdOutputStream::ZstdOutputStream(google::protobuf::io::ZeroCopyOutputStream *o
       input_position_(0),
       input_available_(0),
       output_buffer_(buffer_size),
-      byte_count_(0),
-      closed_(false) {}
+      byte_count_(0) {}
 
 ZstdOutputStream::~ZstdOutputStream() {
-  if (!closed_) {
-    Flush();
-  }
-  if (cstream_) {
-    ZSTD_freeCStream(cstream_);
-  }
+  CompressAndFlush(ZSTD_e_end);
+  ZSTD_freeCStream(cstream_);
 }
 
 bool ZstdOutputStream::Next(void **data, int *size) {
-  if (closed_) {
-    return false;
-  }
-
   // If we have pending compressed data, flush it first
   if (input_available_ > 0) {
     if (!CompressAndFlush(ZSTD_e_continue)) {
@@ -80,7 +71,7 @@ bool ZstdOutputStream::Next(void **data, int *size) {
 }
 
 void ZstdOutputStream::BackUp(int count) {
-  if (closed_ || count < 0 || static_cast<size_t>(count) > input_available_) {
+  if (count < 0 || static_cast<size_t>(count) > input_available_) {
     return;
   }
 
@@ -90,17 +81,6 @@ void ZstdOutputStream::BackUp(int count) {
 
 int64_t ZstdOutputStream::ByteCount() const {
   return byte_count_;
-}
-
-bool ZstdOutputStream::Flush() {
-  if (closed_) {
-    return false;
-  }
-
-  // Compress any remaining data and end the stream
-  bool success = CompressAndFlush(ZSTD_e_end);
-  closed_ = true;
-  return success;
 }
 
 bool ZstdOutputStream::CompressAndFlush(ZSTD_EndDirective end_directive) {
