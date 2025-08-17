@@ -45,6 +45,20 @@
   XCTAssertEqualObjects([sut gzipCompressed], want);
 }
 
+- (void)testZlibDecompressed {
+  NSData *sut = [self dataFromFixture:@"compression_test_zlib.z"];
+  NSData *want = [self dataFromFixture:@"compression_test_uncompressed.json"];
+
+  XCTAssertEqualObjects([sut zlibDecompressed], want);
+}
+
+- (void)testGzipDecommpressed {
+  NSData *sut = [self dataFromFixture:@"compression_test_gzip.gz"];
+  NSData *want = [self dataFromFixture:@"compression_test_uncompressed.json"];
+
+  XCTAssertEqualObjects([sut gzipDecompressed], want);
+}
+
 - (void)testCompressEmpty {
   NSData *sut = [NSData data];
   XCTAssertNil([sut zlibCompressed]);
