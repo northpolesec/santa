@@ -38,11 +38,15 @@ class StreamBatcher {
 
   inline bool ShouldInitializeBeforeWrite() { return true; }
 
-  void InitializeBatch(int fd) {
+  absl::Status InitializeBatch(int fd) {
     raw_output_ = std::make_shared<google::protobuf::io::FileOutputStream>(fd);
     compressed_output_ = factory_(raw_output_.get());
+    if (!compressed_output_) {
+      return absl::InternalError("Creating compressed stream batcher failed");
+    }
     coded_output_ = std::make_shared<google::protobuf::io::CodedOutputStream>(
         compressed_output_.get());
+    return absl::OkStatus();
   }
 
   inline bool NeedToOpenFile() { return true; }
@@ -92,10 +96,11 @@ class StreamBatcher<::santa::Unit> {
 
   inline bool ShouldInitializeBeforeWrite() { return true; }
 
-  void InitializeBatch(int fd) {
+  absl::Status InitializeBatch(int fd) {
     raw_output_ = std::make_shared<google::protobuf::io::FileOutputStream>(fd);
     coded_output_ = std::make_shared<google::protobuf::io::CodedOutputStream>(
         raw_output_.get());
+    return absl::OkStatus();
   }
 
   inline bool NeedToOpenFile() { return true; }

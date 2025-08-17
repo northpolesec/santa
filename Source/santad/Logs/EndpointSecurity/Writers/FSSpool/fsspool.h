@@ -51,7 +51,7 @@ concept BatcherInterface =
       T{std::declval<std::function<void()>>()};
     }) && requires(T batcher, int fd, std::vector<uint8_t> bytes) {
       { batcher.ShouldInitializeBeforeWrite() } -> std::same_as<bool>;
-      { batcher.InitializeBatch(fd) } -> std::same_as<void>;
+      { batcher.InitializeBatch(fd) } -> std::same_as<absl::Status>;
       { batcher.NeedToOpenFile() } -> std::same_as<bool>;
       { batcher.Write(bytes) } -> std::same_as<absl::Status>;
       { batcher.CompleteBatch(fd) } -> std::same_as<absl::StatusOr<size_t>>;
@@ -148,9 +148,7 @@ class FsSpoolWriter {
       return absl::ErrnoToStatus(errno, "open() failed");
     }
 
-    batcher_.InitializeBatch(current_spool_state_.tmp_fd);
-
-    return absl::OkStatus();
+    return batcher_.InitializeBatch(current_spool_state_.tmp_fd);
   }
 
   absl::Status CompleteCurrentSpoolState() {

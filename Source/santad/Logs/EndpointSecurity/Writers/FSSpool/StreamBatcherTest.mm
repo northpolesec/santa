@@ -95,9 +95,9 @@
   XCTAssertNotNil(zstdHandle);
 
   // Initialize all the streams
-  uncompressedStream.InitializeBatch(uncompressedHandle.fileDescriptor);
-  gzipStream.InitializeBatch(gzipHandle.fileDescriptor);
-  zstdStream.InitializeBatch(zstdHandle.fileDescriptor);
+  XCTAssertTrue(uncompressedStream.InitializeBatch(uncompressedHandle.fileDescriptor).ok());
+  XCTAssertTrue(gzipStream.InitializeBatch(gzipHandle.fileDescriptor).ok());
+  XCTAssertTrue(zstdStream.InitializeBatch(zstdHandle.fileDescriptor).ok());
 
   // Write random-sized "messages" of random bytes until the batch size is reached.
   size_t currentBytes = 0;
@@ -180,9 +180,9 @@
   XCTAssertNotNil(zstdHandle);
 
   // Re-initiallize all the streams
-  uncompressedStream.InitializeBatch(uncompressedHandle.fileDescriptor);
-  gzipStream.InitializeBatch(gzipHandle.fileDescriptor);
-  zstdStream.InitializeBatch(zstdHandle.fileDescriptor);
+  XCTAssertTrue(uncompressedStream.InitializeBatch(uncompressedHandle.fileDescriptor).ok());
+  XCTAssertTrue(gzipStream.InitializeBatch(gzipHandle.fileDescriptor).ok());
+  XCTAssertTrue(zstdStream.InitializeBatch(zstdHandle.fileDescriptor).ok());
 
   // Write random-sized "messages" of random bytes until the batch size is reached.
   currentBytes = 0;

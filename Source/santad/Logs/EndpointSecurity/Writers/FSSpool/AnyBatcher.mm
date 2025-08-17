@@ -23,12 +23,13 @@ static constexpr int kReservedBatchSize = 2048;
 
 namespace fsspool {
 
-void AnyBatcher::InitializeBatch(int fd) {
+absl::Status AnyBatcher::InitializeBatch(int fd) {
   tmp_fd_ = fd;
   if (type_url_.empty()) {
     type_url_ = absl::StrCat(kTypeGoogleApisComPrefix,
                              ::santa::pb::v1::SantaMessage::descriptor()->full_name());
   }
+  return absl::OkStatus();
 }
 
 bool AnyBatcher::NeedToOpenFile() {
