@@ -20,6 +20,7 @@
 
 #include <sys/stat.h>
 
+#import "Source/common/NSData+Zlib.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
 #include "absl/status/statusor.h"
@@ -163,6 +164,15 @@
     XCTAssertEqual(uncompressedData.length, sbUncompressed.st_size);  // sanity check
     XCTAssertEqual(
         0, memcmp(zstdDecompressed.data(), uncompressedData.bytes, uncompressedData.length));
+
+    // Decompress the
+    NSData *gzipData = [NSData dataWithContentsOfFile:gzipFile];
+    NSData *gzipDecompressed = [gzipData gzipDecompressed];
+    // Uncompressed file size should match number of decompressed bytes
+    XCTAssertEqual(gzipDecompressed.length, sbUncompressed.st_size);
+
+    // Compare the decompressed gzip data with the uncompressed data
+    XCTAssertEqualObjects(uncompressedData, gzipDecompressed);
   }
 }
 
