@@ -12,7 +12,7 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
-#import "NSData+Zlib.h"
+#import "Source/common/NSData+Zlib.h"
 
 #include <zlib.h>
 

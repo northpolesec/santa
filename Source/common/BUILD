@@ -46,6 +46,27 @@ objc_library(
 )
 
 objc_library(
+    name = "NSData+Zlib",
+    srcs = ["NSData+Zlib.mm"],
+    hdrs = ["NSData+Zlib.h"],
+    deps = [
+        ":SNTLogging",
+    ],
+)
+
+santa_unit_test(
+    name = "NSDataZlibTest",
+    srcs = [
+        "NSDataZlibTest.mm",
+    ],
+    resources = glob(["testdata/compression_test_*.*"]),
+    sdk_dylibs = ["libz"],
+    deps = [
+        ":NSData+Zlib",
+    ],
+)
+
+objc_library(
     name = "SNTDeepCopy",
     srcs = ["SNTDeepCopy.mm"],
     hdrs = ["SNTDeepCopy.h"],
@@ -807,6 +828,7 @@ test_suite(
         ":MOLCertificateTest",
         ":MOLCodesignCheckerTest",
         ":MOLXPCConnectionTest",
+        ":NSDataZlibTest",
         ":PrefixTreeTest",
         ":RingBufferTest",
         ":SNTBlockMessageTest",

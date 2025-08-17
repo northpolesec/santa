@@ -14,7 +14,7 @@
 
 #import <XCTest/XCTest.h>
 
-#import "Source/santasyncservice/NSData+Zlib.h"
+#import "Source/common/NSData+Zlib.h"
 
 @interface NSDataZlibTest : XCTestCase
 @end
@@ -32,15 +32,15 @@
 }
 
 - (void)testZlibCompressed {
-  NSData *sut = [self dataFromFixture:@"sync_preflight_basic.json"];
-  NSData *want = [self dataFromFixture:@"sync_preflight_basic.z"];
+  NSData *sut = [self dataFromFixture:@"compression_test_uncompressed.json"];
+  NSData *want = [self dataFromFixture:@"compression_test_zlib.z"];
 
   XCTAssertEqualObjects([sut zlibCompressed], want);
 }
 
 - (void)testGzipCompressed {
-  NSData *sut = [self dataFromFixture:@"sync_preflight_basic.json"];
-  NSData *want = [self dataFromFixture:@"sync_preflight_basic.gz"];
+  NSData *sut = [self dataFromFixture:@"compression_test_uncompressed.json"];
+  NSData *want = [self dataFromFixture:@"compression_test_gzip.gz"];
 
   XCTAssertEqualObjects([sut gzipCompressed], want);
 }

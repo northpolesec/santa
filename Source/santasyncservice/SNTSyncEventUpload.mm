@@ -18,6 +18,7 @@
 #include "Source/common/EncodeEntitlements.h"
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/NSData+Zlib.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
@@ -27,7 +28,6 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
-#import "Source/santasyncservice/NSData+Zlib.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
