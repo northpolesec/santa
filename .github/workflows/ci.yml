@@ -78,21 +78,39 @@ jobs:
           xcode-version: latest-stable
       - name: Build
         run: |
-          bazel build \
-            --verbose_failures \
-            --sandbox_debug \
-            --apple_generate_dsym \
-            --define=SANTA_BUILD_TYPE=adhoc \
-            --remote_cache=https://storage.googleapis.com/santa-build-cache \
-            --google_default_credentials \
-            //Source/gui:Santa
+          if [[ "${{ steps.auth.outcome }}" == "success" ]]; then
+            bazel build \
+              --verbose_failures \
+              --sandbox_debug \
+              --apple_generate_dsym \
+              --define=SANTA_BUILD_TYPE=adhoc \
+              --remote_cache=https://storage.googleapis.com/santa-build-cache \
+              --google_default_credentials \
+              //Source/gui:Santa
+          else
+            bazel build \
+              --verbose_failures \
+              --sandbox_debug \
+              --apple_generate_dsym \
+              --define=SANTA_BUILD_TYPE=adhoc \
+              //Source/gui:Santa
+          fi
       - name: Test
         run: |
-          bazel test \
-            --test_output=errors \
-            --verbose_failures \
-            --sandbox_debug \
-            --define=SANTA_BUILD_TYPE=adhoc \
-            --remote_cache=https://storage.googleapis.com/santa-build-cache \
-            --google_default_credentials \
-            :unit_tests
+          if [[ "${{ steps.auth.outcome }}" == "success" ]]; then
+            bazel test \
+              --test_output=errors \
+              --verbose_failures \
+              --sandbox_debug \
+              --define=SANTA_BUILD_TYPE=adhoc \
+              --remote_cache=https://storage.googleapis.com/santa-build-cache \
+              --google_default_credentials \
+              :unit_tests
+          else
+            bazel test \
+              --test_output=errors \
+              --verbose_failures \
+              --sandbox_debug \
+              --define=SANTA_BUILD_TYPE=adhoc \
+              :unit_tests
+          fi
