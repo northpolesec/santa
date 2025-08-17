@@ -77,169 +77,93 @@
         return ::fsspool::ZstdOutputStream::Create(raw_stream);
       });
 
-  // Create and open the test files
-  NSString *uncompressedFile = [NSString stringWithFormat:@"%@/%@", self.testDir, @"uncomp.bin"];
-  NSString *gzipFile = [NSString stringWithFormat:@"%@/%@", self.testDir, @"gzip.bin"];
-  NSString *zstdFile = [NSString stringWithFormat:@"%@/%@", self.testDir, @"zstd.bin"];
+  // Check that completing and re-initialization produces expected content across multiple rounds
+  static constexpr int kRounds = 10;
+  for (int i = 0; i < kRounds; i++) {
+    // Create and open the test files
+    NSString *uncompressedFile =
+        [NSString stringWithFormat:@"%@/%@-%d", self.testDir, @"uncomp.bin", i];
+    NSString *gzipFile = [NSString stringWithFormat:@"%@/%@-%d", self.testDir, @"gzip.bin", i];
+    NSString *zstdFile = [NSString stringWithFormat:@"%@/%@-%d", self.testDir, @"zstd.bin", i];
 
-  XCTAssertTrue([self.fileMgr createFileAtPath:uncompressedFile contents:nil attributes:nil]);
-  XCTAssertTrue([self.fileMgr createFileAtPath:gzipFile contents:nil attributes:nil]);
-  XCTAssertTrue([self.fileMgr createFileAtPath:zstdFile contents:nil attributes:nil]);
+    XCTAssertTrue([self.fileMgr createFileAtPath:uncompressedFile contents:nil attributes:nil]);
+    XCTAssertTrue([self.fileMgr createFileAtPath:gzipFile contents:nil attributes:nil]);
+    XCTAssertTrue([self.fileMgr createFileAtPath:zstdFile contents:nil attributes:nil]);
 
-  NSFileHandle *uncompressedHandle = [NSFileHandle fileHandleForWritingAtPath:uncompressedFile];
-  NSFileHandle *gzipHandle = [NSFileHandle fileHandleForWritingAtPath:gzipFile];
-  NSFileHandle *zstdHandle = [NSFileHandle fileHandleForWritingAtPath:zstdFile];
+    NSFileHandle *uncompressedHandle = [NSFileHandle fileHandleForWritingAtPath:uncompressedFile];
+    NSFileHandle *gzipHandle = [NSFileHandle fileHandleForWritingAtPath:gzipFile];
+    NSFileHandle *zstdHandle = [NSFileHandle fileHandleForWritingAtPath:zstdFile];
 
-  XCTAssertNotNil(uncompressedHandle);
-  XCTAssertNotNil(gzipHandle);
-  XCTAssertNotNil(zstdHandle);
+    XCTAssertNotNil(uncompressedHandle);
+    XCTAssertNotNil(gzipHandle);
+    XCTAssertNotNil(zstdHandle);
 
-  // Initialize all the streams
-  XCTAssertTrue(uncompressedStream.InitializeBatch(uncompressedHandle.fileDescriptor).ok());
-  XCTAssertTrue(gzipStream.InitializeBatch(gzipHandle.fileDescriptor).ok());
-  XCTAssertTrue(zstdStream.InitializeBatch(zstdHandle.fileDescriptor).ok());
+    // Initialize all the streams
+    XCTAssertTrue(uncompressedStream.InitializeBatch(uncompressedHandle.fileDescriptor).ok());
+    XCTAssertTrue(gzipStream.InitializeBatch(gzipHandle.fileDescriptor).ok());
+    XCTAssertTrue(zstdStream.InitializeBatch(zstdHandle.fileDescriptor).ok());
 
-  // Write random-sized "messages" of random bytes until the batch size is reached.
-  size_t currentBytes = 0;
-  do {
-    size_t numBytes = sizeDist(rng);
-    std::vector<uint8_t> buf;
-    buf.reserve(numBytes);
-    for (size_t i = 0; i < numBytes; ++i) {
-      buf.push_back(byteDist(rng));
-    }
+    // Write random-sized "messages" of random bytes until the batch size is reached.
+    size_t currentBytes = 0;
+    do {
+      size_t numBytes = sizeDist(rng);
+      std::vector<uint8_t> buf;
+      buf.reserve(numBytes);
+      for (size_t i = 0; i < numBytes; ++i) {
+        buf.push_back(byteDist(rng));
+      }
 
-    XCTAssertTrue(uncompressedStream.Write(buf).ok());
-    XCTAssertTrue(gzipStream.Write(buf).ok());
-    XCTAssertTrue(zstdStream.Write(buf).ok());
+      XCTAssertTrue(uncompressedStream.Write(buf).ok());
+      XCTAssertTrue(gzipStream.Write(buf).ok());
+      XCTAssertTrue(zstdStream.Write(buf).ok());
 
-    currentBytes += numBytes;
-  } while (currentBytes < kFileSize);
+      currentBytes += numBytes;
+    } while (currentBytes < kFileSize);
 
-  // Close out all the streams
-  absl::StatusOr<size_t> statusOrSizeUncompressed =
-      uncompressedStream.CompleteBatch(uncompressedHandle.fileDescriptor);
-  XCTAssertTrue(statusOrSizeUncompressed.ok());
+    // Close out all the streams
+    absl::StatusOr<size_t> statusOrSizeUncompressed =
+        uncompressedStream.CompleteBatch(uncompressedHandle.fileDescriptor);
+    XCTAssertTrue(statusOrSizeUncompressed.ok());
 
-  absl::StatusOr<size_t> statusOrSizeGzip = gzipStream.CompleteBatch(gzipHandle.fileDescriptor);
-  XCTAssertTrue(statusOrSizeGzip.ok());
+    absl::StatusOr<size_t> statusOrSizeGzip = gzipStream.CompleteBatch(gzipHandle.fileDescriptor);
+    XCTAssertTrue(statusOrSizeGzip.ok());
 
-  absl::StatusOr<size_t> statusOrSizeZstd = zstdStream.CompleteBatch(zstdHandle.fileDescriptor);
-  XCTAssertTrue(statusOrSizeZstd.ok());
+    absl::StatusOr<size_t> statusOrSizeZstd = zstdStream.CompleteBatch(zstdHandle.fileDescriptor);
+    XCTAssertTrue(statusOrSizeZstd.ok());
 
-  // Number of bytes written should be the same
-  XCTAssertEqual(*statusOrSizeUncompressed, *statusOrSizeGzip);
-  XCTAssertEqual(*statusOrSizeUncompressed, *statusOrSizeZstd);
+    // Number of bytes written should be the same
+    XCTAssertEqual(*statusOrSizeUncompressed, *statusOrSizeGzip);
+    XCTAssertEqual(*statusOrSizeUncompressed, *statusOrSizeZstd);
 
-  [uncompressedHandle closeFile];
-  [gzipHandle closeFile];
-  [zstdHandle closeFile];
+    [uncompressedHandle closeFile];
+    [gzipHandle closeFile];
+    [zstdHandle closeFile];
 
-  // Stat files, ensure compression happened
-  struct stat sbUncompressed, sbGzip, sbZstd;
-  XCTAssertEqual(0, stat(uncompressedFile.UTF8String, &sbUncompressed));
-  XCTAssertEqual(0, stat(gzipFile.UTF8String, &sbGzip));
-  XCTAssertEqual(0, stat(zstdFile.UTF8String, &sbZstd));
+    // Stat files, ensure compression happened
+    struct stat sbUncompressed, sbGzip, sbZstd;
+    XCTAssertEqual(0, stat(uncompressedFile.UTF8String, &sbUncompressed));
+    XCTAssertEqual(0, stat(gzipFile.UTF8String, &sbGzip));
+    XCTAssertEqual(0, stat(zstdFile.UTF8String, &sbZstd));
 
-  XCTAssertLessThan(sbGzip.st_size, sbUncompressed.st_size);
-  XCTAssertLessThan(sbZstd.st_size, sbUncompressed.st_size);
+    XCTAssertLessThan(sbGzip.st_size, sbUncompressed.st_size);
+    XCTAssertLessThan(sbZstd.st_size, sbUncompressed.st_size);
 
-  NSData *zstdData = [NSData dataWithContentsOfFile:zstdFile];
-  std::vector<uint8_t> zstdDecompressed(kDstBuffSize);
-  size_t bytesDecompressed = ZSTD_decompress(zstdDecompressed.data(), zstdDecompressed.size(),
-                                             zstdData.bytes, zstdData.length);
-  XCTAssertFalse(ZSTD_isError(bytesDecompressed), "Decompression error: %d: %s",
-                 ZSTD_getErrorCode(bytesDecompressed), ZSTD_getErrorName(bytesDecompressed));
+    NSData *zstdData = [NSData dataWithContentsOfFile:zstdFile];
+    std::vector<uint8_t> zstdDecompressed(kDstBuffSize);
+    size_t bytesDecompressed = ZSTD_decompress(zstdDecompressed.data(), zstdDecompressed.size(),
+                                               zstdData.bytes, zstdData.length);
+    XCTAssertFalse(ZSTD_isError(bytesDecompressed), "Decompression error: %d: %s",
+                   ZSTD_getErrorCode(bytesDecompressed), ZSTD_getErrorName(bytesDecompressed));
 
-  // Uncompressed file size should match number of decompressed bytes
-  XCTAssertEqual(bytesDecompressed, sbUncompressed.st_size);
+    // Uncompressed file size should match number of decompressed bytes
+    XCTAssertEqual(bytesDecompressed, sbUncompressed.st_size);
 
-  // Compare the decompressed zstd data with the uncompressed data
-  NSData *uncompressedData = [NSData dataWithContentsOfFile:uncompressedFile];
-  XCTAssertEqual(uncompressedData.length, sbUncompressed.st_size);  // sanity check
-  XCTAssertEqual(0,
-                 memcmp(zstdDecompressed.data(), uncompressedData.bytes, uncompressedData.length));
-
-  //
-  // Now do it again! Check that completing and then re-initialization produces expected content
-  //
-  uncompressedFile = [NSString stringWithFormat:@"%@/%@", self.testDir, @"uncomp2.bin"];
-  gzipFile = [NSString stringWithFormat:@"%@/%@", self.testDir, @"gzip2.bin"];
-  zstdFile = [NSString stringWithFormat:@"%@/%@", self.testDir, @"zstd2.bin"];
-
-  XCTAssertTrue([self.fileMgr createFileAtPath:uncompressedFile contents:nil attributes:nil]);
-  XCTAssertTrue([self.fileMgr createFileAtPath:gzipFile contents:nil attributes:nil]);
-  XCTAssertTrue([self.fileMgr createFileAtPath:zstdFile contents:nil attributes:nil]);
-
-  uncompressedHandle = [NSFileHandle fileHandleForWritingAtPath:uncompressedFile];
-  gzipHandle = [NSFileHandle fileHandleForWritingAtPath:gzipFile];
-  zstdHandle = [NSFileHandle fileHandleForWritingAtPath:zstdFile];
-
-  XCTAssertNotNil(uncompressedHandle);
-  XCTAssertNotNil(gzipHandle);
-  XCTAssertNotNil(zstdHandle);
-
-  // Re-initiallize all the streams
-  XCTAssertTrue(uncompressedStream.InitializeBatch(uncompressedHandle.fileDescriptor).ok());
-  XCTAssertTrue(gzipStream.InitializeBatch(gzipHandle.fileDescriptor).ok());
-  XCTAssertTrue(zstdStream.InitializeBatch(zstdHandle.fileDescriptor).ok());
-
-  // Write random-sized "messages" of random bytes until the batch size is reached.
-  currentBytes = 0;
-  do {
-    size_t numBytes = sizeDist(rng);
-    std::vector<uint8_t> buf;
-    buf.reserve(numBytes);
-    for (size_t i = 0; i < numBytes; ++i) {
-      buf.push_back(byteDist(rng));
-    }
-
-    XCTAssertTrue(uncompressedStream.Write(buf).ok());
-    XCTAssertTrue(gzipStream.Write(buf).ok());
-    XCTAssertTrue(zstdStream.Write(buf).ok());
-
-    currentBytes += numBytes;
-  } while (currentBytes < kFileSize);
-
-  // Close out all the streams
-  statusOrSizeUncompressed = uncompressedStream.CompleteBatch(uncompressedHandle.fileDescriptor);
-  XCTAssertTrue(statusOrSizeUncompressed.ok());
-
-  statusOrSizeGzip = gzipStream.CompleteBatch(gzipHandle.fileDescriptor);
-  XCTAssertTrue(statusOrSizeGzip.ok());
-
-  statusOrSizeZstd = zstdStream.CompleteBatch(zstdHandle.fileDescriptor);
-  XCTAssertTrue(statusOrSizeZstd.ok());
-
-  // Number of bytes written should be the same
-  XCTAssertEqual(*statusOrSizeUncompressed, *statusOrSizeGzip);
-  XCTAssertEqual(*statusOrSizeUncompressed, *statusOrSizeZstd);
-
-  [uncompressedHandle closeFile];
-  [gzipHandle closeFile];
-  [zstdHandle closeFile];
-
-  XCTAssertEqual(0, stat(uncompressedFile.UTF8String, &sbUncompressed));
-  XCTAssertEqual(0, stat(gzipFile.UTF8String, &sbGzip));
-  XCTAssertEqual(0, stat(zstdFile.UTF8String, &sbZstd));
-
-  XCTAssertLessThan(sbGzip.st_size, sbUncompressed.st_size);
-  XCTAssertLessThan(sbZstd.st_size, sbUncompressed.st_size);
-
-  zstdData = [NSData dataWithContentsOfFile:zstdFile];
-  bytesDecompressed = ZSTD_decompress(zstdDecompressed.data(), zstdDecompressed.size(),
-                                      zstdData.bytes, zstdData.length);
-  XCTAssertFalse(ZSTD_isError(bytesDecompressed), "Decompression error: %d: %s",
-                 ZSTD_getErrorCode(bytesDecompressed), ZSTD_getErrorName(bytesDecompressed));
-
-  // Uncompressed file size should match number of decompressed bytes
-  XCTAssertEqual(bytesDecompressed, sbUncompressed.st_size);
-
-  // Compare the decompressed zstd data with the uncompressed data
-  uncompressedData = [NSData dataWithContentsOfFile:uncompressedFile];
-  XCTAssertEqual(uncompressedData.length, sbUncompressed.st_size);  // sanity check
-  XCTAssertEqual(0,
-                 memcmp(zstdDecompressed.data(), uncompressedData.bytes, uncompressedData.length));
+    // Compare the decompressed zstd data with the uncompressed data
+    NSData *uncompressedData = [NSData dataWithContentsOfFile:uncompressedFile];
+    XCTAssertEqual(uncompressedData.length, sbUncompressed.st_size);  // sanity check
+    XCTAssertEqual(
+        0, memcmp(zstdDecompressed.data(), uncompressedData.bytes, uncompressedData.length));
+  }
 }
 
 @end
