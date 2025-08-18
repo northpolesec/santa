@@ -92,13 +92,10 @@ class ScopedFile {
   }
 
   ScopedFile &operator=(ScopedFile &&rhs) {
-    if (this == &rhs) {
-      return *this;
+    if (this != &rhs) {
+      fd_ = rhs.fd_;
+      rhs.fd_ = -1;
     }
-
-    fd_ = rhs.fd_;
-    rhs.fd_ = -1;
-
     return *this;
   }
 
