@@ -16,11 +16,38 @@
 
 #include <Foundation/Foundation.h>
 #include <XCTest/XCTest.h>
+#include <errno.h>
+
+#include "Source/common/TestUtils.h"
+#include "absl/status/statusor.h"
+
+namespace santa {
+
+class ScopedFilePeer : public ScopedFile {
+ public:
+  using ScopedFile::fd_;
+};
+
+}  // namespace santa
 
 @interface ScopedFileTest : XCTestCase
 @end
 
 @implementation ScopedFileTest
+
+- (void)testCloseOnDestruct {
+  int savedFD;
+  {
+    auto file = santa::ScopedFile::CreateTemporary();
+    XCTAssertStatusOk(file);
+
+    santa::ScopedFilePeer *peer = static_cast<santa::ScopedFilePeer *>(&(*file));
+    savedFD = peer->fd_;
+  }
+
+  XCTAssertLessThan(close(savedFD), 0);
+  XCTAssertEqual(errno, EBADF);
+}
 
 - (void)testCreateTemporary {
   NSString *prefix = @"foo/bar";
@@ -35,7 +62,7 @@
   XCTAssertFalse([fileMgr fileExistsAtPath:fullPath]);
 
   auto file = santa::ScopedFile::CreateTemporary(prefix, uuid);
-  XCTAssertTrue(file != nullptr);
+  XCTAssertStatusOk(file);
 
   // The path still shouldn't exist after getting a handle
   XCTAssertFalse([fileMgr fileExistsAtPath:fullPath]);

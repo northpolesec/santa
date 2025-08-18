@@ -169,6 +169,7 @@ objc_library(
     hdrs = ["ScopedFile.h"],
     deps = [
         ":SNTLogging",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -177,6 +178,7 @@ santa_unit_test(
     srcs = ["ScopedFileTest.mm"],
     deps = [
         ":ScopedFile",
+        ":TestUtils",
     ],
 )
 

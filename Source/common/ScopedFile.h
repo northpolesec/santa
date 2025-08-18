@@ -22,15 +22,21 @@
 #include <memory>
 
 #import "Source/common/SNTLogging.h"
+#include "absl/status/statusor.h"
+
+// Forward declarations
+namespace santa {
+class ScopedFilePeer;
+}  // namespace santa
 
 namespace santa {
 
 class ScopedFile {
  public:
-  static std::unique_ptr<ScopedFile> CreateTemporary(
+  static absl::StatusOr<ScopedFile> CreateTemporary(
       NSString *path_prefix = nil, NSString *filename_template = @"santa_test_XXXXXX") {
     if (filename_template.length == 0) {
-      return nullptr;
+      return absl::FailedPreconditionError("No temp file template provided");
     }
 
     NSString *path = NSTemporaryDirectory();
@@ -41,8 +47,7 @@ class ScopedFile {
                                      withIntermediateDirectories:YES
                                                       attributes:nil
                                                            error:&err]) {
-        LOGE(@"Failed to create intermediate dir");
-        return nullptr;
+        return absl::FailedPreconditionError("Failed to create intermediate dir");
       }
     }
 
@@ -50,16 +55,13 @@ class ScopedFile {
 
     char *mutable_path = strdup(path.UTF8String);
     if (!mutable_path) {
-      LOGE(@"Failed to allocate memory for temp file path");
-      return nullptr;
+      return absl::InternalError("Failed to allocate memory for temp file path");
     }
 
-    NSLog(@"About to create temporary: %s", mutable_path);
     int fd = mkstemp(mutable_path);
     if (fd < 0) {
-      LOGE(@"Failed to create temp file: %d: %s", errno, strerror(errno));
       free(mutable_path);
-      return nullptr;
+      return absl::ErrnoToStatus(errno, "Failed to create temp file");
     }
 
     path = [NSString stringWithCString:mutable_path encoding:NSUTF8StringEncoding];
@@ -70,15 +72,35 @@ class ScopedFile {
       LOGW(@"Unable to unlink backing temp file: %@. Error: %d: %s", path, errno, strerror(errno));
     }
 
-    return std::make_unique<ScopedFile>(fd);
+    return ScopedFile(fd);
   }
 
   ScopedFile(int fd) : fd_(fd) {}
 
-  ~ScopedFile() { close(fd_); }
+  ~ScopedFile() {
+    if (fd_ >= 0) {
+      close(fd_);
+    }
+  }
 
   ScopedFile(const ScopedFile &) = delete;
   ScopedFile &operator=(const ScopedFile &) = delete;
+
+  ScopedFile(ScopedFile &&other) {
+    fd_ = other.fd_;
+    other.fd_ = -1;
+  }
+
+  ScopedFile &operator=(ScopedFile &&rhs) {
+    if (this == &rhs) {
+      return *this;
+    }
+
+    fd_ = rhs.fd_;
+    rhs.fd_ = -1;
+
+    return *this;
+  }
 
   NSFileHandle *Reader() const {
     return [[NSFileHandle alloc] initWithFileDescriptor:dup(fd_) closeOnDealloc:YES];
@@ -87,6 +109,8 @@ class ScopedFile {
   NSFileHandle *Writer() const {
     return [[NSFileHandle alloc] initWithFileDescriptor:dup(fd_) closeOnDealloc:YES];
   }
+
+  friend class ScopedFilePeer;
 
  private:
   int fd_ = -1;
