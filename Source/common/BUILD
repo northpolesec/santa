@@ -165,6 +165,22 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "ScopedFile",
+    hdrs = ["ScopedFile.h"],
+    deps = [
+        ":SNTLogging",
+    ],
+)
+
+santa_unit_test(
+    name = "ScopedFileTest",
+    srcs = ["ScopedFileTest.mm"],
+    deps = [
+        ":ScopedFile",
+    ],
+)
+
+objc_library(
     name = "BranchPrediction",
     hdrs = ["BranchPrediction.h"],
 )
@@ -845,6 +861,7 @@ test_suite(
         ":SantaCacheTest",
         ":SantaSetCacheTest",
         ":ScopedCFTypeRefTest",
+        ":ScopedFileTest",
         ":ScopedIOObjectRefTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:CELTest",
