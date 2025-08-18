@@ -16,14 +16,18 @@
 #import <Foundation/Foundation.h>
 #include <google/protobuf/json/json.h>
 #include <stdlib.h>
-#include <cstring>
+#include <sys/stat.h>
 
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
+#import "Source/common/NSData+Zlib.h"
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTXxhash.h"
+#include "Source/common/ScopedFile.h"
 #include "Source/common/santa_proto_include_wrapper.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
@@ -31,14 +35,24 @@
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/binaryproto_proto_include_wrapper.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_format.h"
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 
+#define ZSTD_STATIC_LINKING_ONLY
+#include "zstd.h"
+
 using JsonPrintOptions = google::protobuf::json::PrintOptions;
 using google::protobuf::json::MessageToJsonString;
+using santa::ScopedFile;
 using santa::fsspool::binaryproto::LogBatch;
 namespace pbv1 = ::santa::pb::v1;
+
+// Semi-arbitrary max compressed file size that will be operated upon.
+// The current implementation decompresses in memory. This variable
+// is used to keep memory requirements semi-reasonable.
+static constexpr size_t kMaxCompressedSize = 1024 * 1024 * 250;
 
 class MessageSource {
  public:
@@ -46,7 +60,7 @@ class MessageSource {
   // on the type of the log file being parsed.
   static absl::StatusOr<std::unique_ptr<MessageSource>> Create(NSString *path);
 
-  virtual ~MessageSource() { close(fd_); };
+  virtual ~MessageSource() = default;
 
   // Not copyable
   MessageSource(const MessageSource &) = delete;
@@ -55,25 +69,25 @@ class MessageSource {
   virtual absl::StatusOr<::pbv1::SantaMessage> Next() = 0;
 
  protected:
-  MessageSource(int fd) : fd_(fd) {}
+  MessageSource(ScopedFile scoped_file) : scoped_file_(std::move(scoped_file)) {}
 
  private:
-  int fd_;
+  ScopedFile scoped_file_;
 };
 
 class AnyMessageSource : public MessageSource {
  public:
-  static std::unique_ptr<AnyMessageSource> Create(int fd) {
+  static std::unique_ptr<AnyMessageSource> Create(ScopedFile scoped_file) {
     LogBatch batch;
-    if (!batch.ParseFromFileDescriptor(fd)) {
+    if (!batch.ParseFromFileDescriptor(scoped_file.UnsafeFD())) {
       return nullptr;
     }
 
-    return std::make_unique<AnyMessageSource>(fd, std::move(batch));
+    return std::make_unique<AnyMessageSource>(std::move(scoped_file), std::move(batch));
   }
 
-  AnyMessageSource(int fd, LogBatch batch)
-      : MessageSource(fd), batch_(std::move(batch)), current_index_(0) {}
+  AnyMessageSource(ScopedFile scoped_file, LogBatch batch)
+      : MessageSource(std::move(scoped_file)), batch_(std::move(batch)), current_index_(0) {}
 
   absl::StatusOr<::pbv1::SantaMessage> Next() override {
     // Check if we've reached the end of the batch
@@ -96,17 +110,19 @@ class AnyMessageSource : public MessageSource {
 
 class StreamMessageSource : public MessageSource {
  public:
-  static std::unique_ptr<StreamMessageSource> Create(int fd) {
-    auto file_input = std::make_unique<google::protobuf::io::FileInputStream>(fd);
+  static std::unique_ptr<StreamMessageSource> Create(ScopedFile scoped_file) {
+    auto file_input =
+        std::make_unique<google::protobuf::io::FileInputStream>(scoped_file.UnsafeFD());
     auto coded_input = std::make_unique<google::protobuf::io::CodedInputStream>(file_input.get());
 
-    return std::unique_ptr<StreamMessageSource>(
-        new StreamMessageSource(fd, std::move(file_input), std::move(coded_input)));
+    return std::unique_ptr<StreamMessageSource>(new StreamMessageSource(
+        std::move(scoped_file), std::move(file_input), std::move(coded_input)));
   }
 
-  StreamMessageSource(int fd, std::unique_ptr<google::protobuf::io::FileInputStream> file_input,
+  StreamMessageSource(ScopedFile scoped_file,
+                      std::unique_ptr<google::protobuf::io::FileInputStream> file_input,
                       std::unique_ptr<google::protobuf::io::CodedInputStream> coded_input)
-      : MessageSource(fd),
+      : MessageSource(std::move(scoped_file)),
         file_input_(std::move(file_input)),
         coded_input_(std::move(coded_input)) {}
 
@@ -165,12 +181,102 @@ class StreamMessageSource : public MessageSource {
   std::unique_ptr<google::protobuf::io::CodedInputStream> coded_input_;
 };
 
+absl::Status CanProcessFile(const ScopedFile &scoped_file) {
+  struct stat sb;
+  if (fstat(scoped_file.UnsafeFD(), &sb) != 0) {
+    return absl::ErrnoToStatus(errno, "Unable to stat file");
+  }
+
+  if (sb.st_size > kMaxCompressedSize) {
+    return absl::OutOfRangeError(absl::StrFormat(
+        "Compressed file too large. Please decompress first. (Max allowed compressed size: %zu",
+        kMaxCompressedSize));
+  }
+
+  return absl::OkStatus();
+}
+
+absl::StatusOr<std::unique_ptr<MessageSource>> CreateStreamSource(NSData *buffer) {
+  auto temp_file = santa::ScopedFile::CreateTemporary();
+  if (!temp_file.ok()) {
+    return temp_file.status();
+  }
+
+  NSFileHandle *temp_handle = temp_file->Writer();
+  NSError *err;
+  if (![temp_handle writeData:buffer error:&err]) {
+    return absl::InternalError(absl::StrFormat("Failed to write decompressed data to temp file: %s",
+                                               err.localizedDescription.UTF8String));
+  }
+
+  // Reset back to the beginning for reading
+  [temp_handle seekToFileOffset:0];
+
+  return StreamMessageSource::Create(std::move(*temp_file));
+}
+
+absl::StatusOr<std::unique_ptr<MessageSource>> HandleGzipFileSource(ScopedFile scoped_file) {
+  if (absl::Status status = CanProcessFile(scoped_file); !status.ok()) {
+    return status;
+  }
+
+  NSFileHandle *handle = scoped_file.Reader();
+  NSError *err;
+  NSData *compressed = [handle readDataToEndOfFileAndReturnError:&err];
+  if (err) {
+    return absl::InternalError(
+        absl::StrFormat("Failed to read compressed file: %s", err.localizedDescription.UTF8String));
+  }
+
+  NSData *decompressed = [compressed gzipDecompressed];
+  if (!decompressed) {
+    return absl::InternalError("Failed to decompress file");
+  }
+
+  return CreateStreamSource(decompressed);
+}
+
+absl::StatusOr<std::unique_ptr<MessageSource>> HandleZstdFileSource(ScopedFile scoped_file) {
+  if (absl::Status status = CanProcessFile(scoped_file); !status.ok()) {
+    return status;
+  }
+
+  NSFileHandle *handle = scoped_file.Reader();
+  NSError *err;
+  NSData *compressed = [handle readDataToEndOfFileAndReturnError:&err];
+  if (err) {
+    return absl::InternalError(
+        absl::StrFormat("Failed to read compressed file: %s", err.localizedDescription.UTF8String));
+  }
+
+  uint64_t max_size = ZSTD_decompressBound(compressed.bytes, compressed.length);
+  if (max_size == ZSTD_CONTENTSIZE_ERROR) {
+    return absl::OutOfRangeError("Failed to calculate decompressed size");
+  }
+
+  NSMutableData *decompressed = [[NSMutableData alloc] initWithCapacity:max_size];
+  decompressed.length = max_size;
+
+  size_t bytes_decompressed =
+      ZSTD_decompress(decompressed.mutableBytes, max_size, compressed.bytes, compressed.length);
+  if (ZSTD_isError(bytes_decompressed)) {
+    return absl::InternalError(absl::StrFormat("Failed to decompress zstd file: %d: %s",
+                                               ZSTD_getErrorCode(bytes_decompressed),
+                                               ZSTD_getErrorName(bytes_decompressed)));
+  }
+
+  return CreateStreamSource(decompressed);
+}
+
 absl::StatusOr<std::unique_ptr<MessageSource>> MessageSource::Create(NSString *path) {
   // Open the file
   int fd = open(path.UTF8String, O_RDONLY);
   if (fd < 0) {
     return absl::InvalidArgumentError("Failed to open file");
   }
+
+  // Ensure the file gets closed appropriately
+  ScopedFile scoped_file(fd);
 
   // Read the first 4 bytes to check for the stream protobuf magic number
   uint32_t magic_number = 0;
@@ -179,21 +285,25 @@ absl::StatusOr<std::unique_ptr<MessageSource>> MessageSource::Create(NSString *p
 
   // Note: Allow "parsing" of empty files so it isn't treated as an error
   if (bytes_read != 0 && bytes_read != sizeof(magic_number)) {
-    close(fd);
     return absl::InvalidArgumentError("Failed to determine file type");
   }
 
   // Reset file position back to the beginning
   if (lseek(fd, 0, SEEK_SET) != 0) {
-    close(fd);
     return absl::InternalError("Failed to reset file position for reading");
   }
 
   // Determine which derived class to instantiate based on magic number
   if (magic_number == ::fsspool::kStreamBatcherMagic) {
-    return StreamMessageSource::Create(fd);
+    return StreamMessageSource::Create(std::move(scoped_file));
+  } else if (magic_number == 0xfd2fb528) {
+    return HandleZstdFileSource(std::move(scoped_file));
+  } else if ((magic_number & 0xffff) == 0x8b1f) {
+    return HandleGzipFileSource(std::move(scoped_file));
+  } else if ((magic_number & 0xff) == 0x0a) {
+    return AnyMessageSource::Create(std::move(scoped_file));
   } else {
-    return AnyMessageSource::Create(fd);
+    return absl::InvalidArgumentError("Unsupported file type");
   }
 }
 

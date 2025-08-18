@@ -24,11 +24,6 @@
 #import "Source/common/SNTLogging.h"
 #include "absl/status/statusor.h"
 
-// Forward declarations
-namespace santa {
-class ScopedFilePeer;
-}  // namespace santa
-
 namespace santa {
 
 class ScopedFile {
@@ -75,7 +70,7 @@ class ScopedFile {
     return ScopedFile(fd);
   }
 
-  ScopedFile(int fd) : fd_(fd) {}
+  explicit ScopedFile(int fd) : fd_(fd) {}
 
   ~ScopedFile() {
     if (fd_ >= 0) {
@@ -107,7 +102,10 @@ class ScopedFile {
     return [[NSFileHandle alloc] initWithFileDescriptor:dup(fd_) closeOnDealloc:YES];
   }
 
-  friend class ScopedFilePeer;
+  // Some consumers need access to the raw file descriptor. But usaage must be
+  // carefully evaluated to ensure usage of the returned file descriptor
+  // doesn't outlast the lifetime of this object.
+  int UnsafeFD() const { return fd_; }
 
  private:
   int fd_ = -1;
