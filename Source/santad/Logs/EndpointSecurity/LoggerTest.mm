@@ -149,8 +149,22 @@ class MockWriter : public Null {
                                      SNTEventLogTypeProtobufStream, nil, @"/tmp/temppy",
                                      @"/tmp/spool", 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Spool<::fsspool::UncompressedStreamBatcher>>(
+                                 logger.writer_));
+
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+                                     SNTEventLogTypeProtobufStreamGzip, nil, @"/tmp/temppy",
+                                     @"/tmp/spool", 1, 1, 1, 1));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr,
-                    std::dynamic_pointer_cast<Spool<::fsspool::StreamBatcher>>(logger.writer_));
+                    std::dynamic_pointer_cast<Spool<::fsspool::GzipStreamBatcher>>(logger.writer_));
+
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+                                     SNTEventLogTypeProtobufStreamZstd, nil, @"/tmp/temppy",
+                                     @"/tmp/spool", 1, 1, 1, 1));
+  XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
+  XCTAssertNotEqual(nullptr,
+                    std::dynamic_pointer_cast<Spool<::fsspool::ZstdStreamBatcher>>(logger.writer_));
 
   logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeJSON, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,

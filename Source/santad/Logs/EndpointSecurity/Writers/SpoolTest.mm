@@ -76,7 +76,7 @@ using santa::SpoolPeer;
 - (void)testTypeUrl {
   // Ensure the manually created type url isn't modified
   fsspool::AnyBatcher batcher;
-  batcher.InitializeBatch(-1);  // Fake fd, not needed
+  XCTAssertTrue(batcher.InitializeBatch(-1).ok());  // Fake fd, not needed
   std::string wantTypeUrl("type.googleapis.com/santa.pb.v1.SantaMessage");
   XCTAssertCppStringEqual(batcher.TypeURL(), wantTypeUrl);
 }
@@ -91,7 +91,7 @@ using santa::SpoolPeer;
   __block int flushCount = 0;
 
   auto spool = std::make_shared<SpoolPeer<::fsspool::AnyBatcher>>(
-      self.q, self.timer, [self.baseDir UTF8String], 10240, 1024,
+      self.q, self.timer, ::fsspool::AnyBatcher(), [self.baseDir UTF8String], 10240, 1024,
       ^{
         dispatch_semaphore_signal(semaWrite);
       },
@@ -153,8 +153,9 @@ using santa::SpoolPeer;
   dispatch_semaphore_t semaFlush = dispatch_semaphore_create(0);
   __block int flushCount = 0;
 
-  auto spool = std::make_shared<SpoolPeer<::fsspool::StreamBatcher>>(
-      self.q, self.timer, [self.baseDir UTF8String], 10240, 1024,
+  auto spool = std::make_shared<SpoolPeer<::fsspool::UncompressedStreamBatcher>>(
+      self.q, self.timer, ::fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], 10240,
+      1024,
       ^{
         dispatch_semaphore_signal(semaWrite);
       },

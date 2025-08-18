@@ -32,6 +32,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/ZstdOutputStream.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/File.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Null.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"
@@ -83,12 +84,30 @@ std::unique_ptr<Logger> Logger::Create(
     case SNTEventLogTypeProtobuf:
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
       writer = Spool<::fsspool::AnyBatcher>::Create(
-          [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
-          spool_flush_timeout_ms);
+          ::fsspool::AnyBatcher(), [spool_log_path UTF8String], spool_dir_size_threshold,
+          spool_file_size_threshold, spool_flush_timeout_ms);
       break;
     case SNTEventLogTypeProtobufStream:
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
-      writer = Spool<::fsspool::StreamBatcher>::Create(
+      writer = Spool<::fsspool::UncompressedStreamBatcher>::Create(
+          ::fsspool::UncompressedStreamBatcher(), [spool_log_path UTF8String],
+          spool_dir_size_threshold, spool_file_size_threshold, spool_flush_timeout_ms);
+      break;
+    case SNTEventLogTypeProtobufStreamGzip:
+      serializer = Protobuf::Create(esapi, std::move(decision_cache));
+      writer = Spool<::fsspool::GzipStreamBatcher>::Create(
+          ::fsspool::GzipStreamBatcher(^(google::protobuf::io::ZeroCopyOutputStream *raw_stream) {
+            return std::make_shared<google::protobuf::io::GzipOutputStream>(raw_stream);
+          }),
+          [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
+          spool_flush_timeout_ms);
+      break;
+    case SNTEventLogTypeProtobufStreamZstd:
+      serializer = Protobuf::Create(esapi, std::move(decision_cache));
+      writer = Spool<::fsspool::ZstdStreamBatcher>::Create(
+          ::fsspool::ZstdStreamBatcher(^(google::protobuf::io::ZeroCopyOutputStream *raw_stream) {
+            return ::fsspool::ZstdOutputStream::Create(raw_stream);
+          }),
           [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
           spool_flush_timeout_ms);
       break;

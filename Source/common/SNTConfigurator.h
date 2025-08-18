@@ -190,6 +190,10 @@
 ///      additional settings.
 ///    SNTEventLogTypeProtobufStream "protobufstream": Similar to "protobuf", but formatted as a
 ///      coded output stream.
+///    SNTEventLogTypeProtobufStreamGzip "protobufstreamgzip": Similar to "protobufstream", but
+///      output is compressed as gzip.
+///    SNTEventLogTypeProtobufStreamZstd "protobufstreamzstd": Similar to "protobufstream", but
+///      output is compressed as zstd.
 ///    Defaults to SNTEventLogTypeFilelog.
 ///    For mobileconfigs use EventLogType as the key and syslog or filelog strings as the value.
 ///

@@ -11,6 +11,7 @@ bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 bazel_dep(name = "rules_shell", version = "0.5.0")
 bazel_dep(name = "rules_swift", version = "2.9.0")
 bazel_dep(name = "xxhash", version = "0.8.3")
+bazel_dep(name = "zstd", version = "1.5.7")
 
 # North Pole Protos
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")

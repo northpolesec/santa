@@ -46,29 +46,31 @@ template <::fsspool::BatcherInterface T>
 class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
  public:
   // Factory
-  static std::shared_ptr<Spool<T>> Create(std::string_view base_dir, size_t max_spool_disk_size,
-                                          size_t max_spool_batch_size, uint64_t flush_timeout_ms) {
+  static std::shared_ptr<Spool<T>> Create(T batcher, std::string_view base_dir,
+                                          size_t max_spool_disk_size, size_t max_spool_batch_size,
+                                          uint64_t flush_timeout_ms) {
     dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.file_base_q",
                                                DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
     dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
     dispatch_source_set_timer(timer_source, dispatch_time(DISPATCH_TIME_NOW, 0),
                               NSEC_PER_MSEC * flush_timeout_ms, 0);
 
-    auto spool_writer = std::make_shared<Spool<T>>(q, timer_source, base_dir, max_spool_disk_size,
-                                                   max_spool_batch_size);
+    auto spool_writer = std::make_shared<Spool<T>>(q, timer_source, std::move(batcher), base_dir,
+                                                   max_spool_disk_size, max_spool_batch_size);
 
     spool_writer->BeginFlushTask();
 
     return spool_writer;
   }
 
-  Spool(dispatch_queue_t q, dispatch_source_t timer_source, std::string_view base_dir,
+  Spool(dispatch_queue_t q, dispatch_source_t timer_source, T batcher, std::string_view base_dir,
         size_t max_spool_disk_size, size_t max_spool_file_size,
         void (^write_complete_f)(void) = nullptr, void (^flush_task_complete_f)(void) = nullptr)
       : q_(q),
         timer_source_(timer_source),
         spool_reader_(absl::string_view(base_dir.data(), base_dir.length())),
-        spool_writer_(absl::string_view(base_dir.data(), base_dir.length()), max_spool_disk_size),
+        spool_writer_(std::move(batcher), absl::string_view(base_dir.data(), base_dir.length()),
+                      max_spool_disk_size),
         spool_file_size_threshold_(max_spool_file_size),
         spool_file_size_threshold_leniency_(spool_file_size_threshold_ *
                                             spool_file_size_threshold_leniency_factor_),
