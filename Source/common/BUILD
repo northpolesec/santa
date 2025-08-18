@@ -165,6 +165,24 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "ScopedFile",
+    hdrs = ["ScopedFile.h"],
+    deps = [
+        ":SNTLogging",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+santa_unit_test(
+    name = "ScopedFileTest",
+    srcs = ["ScopedFileTest.mm"],
+    deps = [
+        ":ScopedFile",
+        ":TestUtils",
+    ],
+)
+
+objc_library(
     name = "BranchPrediction",
     hdrs = ["BranchPrediction.h"],
 )
@@ -845,6 +863,7 @@ test_suite(
         ":SantaCacheTest",
         ":SantaSetCacheTest",
         ":ScopedCFTypeRefTest",
+        ":ScopedFileTest",
         ":ScopedIOObjectRefTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:CELTest",

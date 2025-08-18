@@ -49,9 +49,6 @@ using fsspool::FsSpoolWriterPeer;
 
 static constexpr size_t kSpoolSize = 1048576;
 
-#define XCTAssertStatusOk(s) XCTAssertTrue((s).ok())
-#define XCTAssertStatusNotOk(s) XCTAssertFalse((s).ok())
-
 google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   google::protobuf::Timestamp v;
   v.set_seconds(s);

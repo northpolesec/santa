@@ -202,6 +202,7 @@ santa_unit_test(
     deps = [
         ":sync_lib",
         "//Source/common:SNTLogging",
+        "//Source/common:ScopedFile",
     ],
 )
 
