@@ -122,23 +122,23 @@
       forHTTPHeaderField:@"Content-Length"];
   [request setHTTPMethod:@"POST"];
 
-  NSURLSessionDataTask *task = [session
-      dataTaskWithRequest:request
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-          // Capture stream to keep it alive until the upload has completed.
-          __unused SNTStreamingMultipartFormData *capturedStream = stream;
+  NSURLSessionDataTask *task =
+      [session dataTaskWithRequest:request
+                 completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                   // Capture stream to keep it alive until the upload has completed.
+                   __unused SNTStreamingMultipartFormData *capturedStream = stream;
 
-          BOOL success = NO;
-          NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
-          if (httpResponse.statusCode == 200 || httpResponse.statusCode == 204) {
-            success = YES;
-            LOGD(@"Successfully exported telemetry file: %@", fileName);
-          } else {
-            LOGE(@"Failed to export file: %@, status: %d: error: %@", fileName,
-                 static_cast<uint8_t>(httpResponse.statusCode), error.localizedDescription);
-          }
-          reply(success);
-        }];
+                   BOOL success = NO;
+                   NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+                   if (httpResponse.statusCode == 200 || httpResponse.statusCode == 204) {
+                     success = YES;
+                     LOGD(@"Successfully exported telemetry file: %@", fileName);
+                   } else {
+                     LOGE(@"Failed to export file: %@, status: %ld: error: %@", fileName,
+                          httpResponse.statusCode, error.localizedDescription);
+                   }
+                   reply(success);
+                 }];
   [task resume];
 }
 
