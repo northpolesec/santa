@@ -265,6 +265,9 @@ absl::StatusOr<std::unique_ptr<MessageSource>> HandleZstdFileSource(ScopedFile s
                                                ZSTD_getErrorName(bytes_decompressed)));
   }
 
+  // Clamp the length now that we know the true size
+  decompressed.length = bytes_decompressed;
+
   return CreateStreamSource(decompressed);
 }
 
