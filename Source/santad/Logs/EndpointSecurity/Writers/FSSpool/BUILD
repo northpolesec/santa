@@ -97,6 +97,7 @@ santa_unit_test(
     srcs = ["StreamBatcherTest.mm"],
     deps = [
         ":SpoolBatchers",
+        "//Source/common:NSData+Zlib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
     ],
