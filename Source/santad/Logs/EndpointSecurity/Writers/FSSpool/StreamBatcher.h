@@ -89,6 +89,12 @@ class StreamBatcher {
   std::shared_ptr<google::protobuf::io::CodedOutputStream> coded_output_;
 };
 
+// Note: This is a specialization of the StreamBatcher class template when no
+// compression is desired. Its implementation is near-identical to the generic
+// template, aside from InitializeBatch and CompleteBatch. This could have been
+// written instead with a generic base class to dedupe the logic in the `Write`
+// method, but would come at a cost of a vtable lookup at runtime within this
+// hot path.
 template <>
 class StreamBatcher<::santa::Unit> {
  public:
