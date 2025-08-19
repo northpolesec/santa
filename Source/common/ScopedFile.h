@@ -102,7 +102,7 @@ class ScopedFile {
     return [[NSFileHandle alloc] initWithFileDescriptor:dup(fd_) closeOnDealloc:YES];
   }
 
-  // Some consumers need access to the raw file descriptor. But usaage must be
+  // Some consumers need access to the raw file descriptor. But usage must be
   // carefully evaluated to ensure usage of the returned file descriptor
   // doesn't outlast the lifetime of this object.
   int UnsafeFD() const { return fd_; }
