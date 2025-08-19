@@ -21,15 +21,6 @@
 #include "Source/common/TestUtils.h"
 #include "absl/status/statusor.h"
 
-namespace santa {
-
-class ScopedFilePeer : public ScopedFile {
- public:
-  using ScopedFile::fd_;
-};
-
-}  // namespace santa
-
 @interface ScopedFileTest : XCTestCase
 @end
 
@@ -41,8 +32,7 @@ class ScopedFilePeer : public ScopedFile {
     auto file = santa::ScopedFile::CreateTemporary();
     XCTAssertStatusOk(file);
 
-    santa::ScopedFilePeer *peer = static_cast<santa::ScopedFilePeer *>(&(*file));
-    savedFD = peer->fd_;
+    savedFD = file->UnsafeFD();
   }
 
   XCTAssertLessThan(close(savedFD), 0);
