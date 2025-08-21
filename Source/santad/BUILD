@@ -1341,7 +1341,6 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":EndpointSecuritySerializer",
@@ -1354,7 +1353,9 @@ santa_unit_test(
         ":EndpointSecurityWriterSpool",
         ":EndpointSecurityWriterSyslog",
         ":MockEndpointSecurityAPI",
+        ":SNTSyncdQueue",
         "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTExportConfiguration",
         "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",

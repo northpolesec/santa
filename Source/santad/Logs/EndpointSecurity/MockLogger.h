@@ -29,8 +29,8 @@ class MockLogger : public santa::Logger {
   using Logger::Logger;
 
   MockLogger()
-      : Logger(nil, nil, santa::TelemetryEvent::kEverything, nullptr, nullptr) {
-  }
+      : Logger(nil, nil, santa::TelemetryEvent::kEverything, 0, 0, 0, nullptr,
+               nullptr) {}
 
   MOCK_METHOD(void, Log, (std::unique_ptr<santa::EnrichedMessage>));
 
