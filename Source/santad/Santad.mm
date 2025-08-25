@@ -569,6 +569,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    [syncd_queue reassessSyncServiceConnection];
 
                                    if (newBool) {
+                                     LOGW(@"WARNING - Telemetry export is currently in beta. "
+                                          @"Configuration and format are subject to change.");
                                      logger->StartTimer();
                                    } else {
                                      logger->StopTimer();
@@ -648,6 +650,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   [device_client enable];
 
   if ([configurator enableTelemetryExport]) {
+    LOGW(@"WARNING - Telemetry export is currently in beta. Configuration and format are subject "
+         @"to change.");
     logger->StartTimer();
   }
 
