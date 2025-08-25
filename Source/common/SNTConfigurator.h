@@ -268,12 +268,42 @@
 @property(readonly) BOOL enableTelemetryExport;
 
 ///
-///  If enableTelemetryExport is true, this defined how often telemetry export is performed.
+///  If enableTelemetryExport is true, this defines how often telemetry export is performed.
 ///  Defaults to 900 (15 minutes). Minimum allowed value is 60.
 ///
 ///  @note: This property is KVO compliant.
 ///
 @property(readonly) uint32_t telemetryExportIntervalSec;
+
+///
+///  When exporting telemetry, this defines how long Santa will wait for a given batch to upload.
+///  Defaults to 300 (5 minutes). Minimum allowed value is 60.
+///
+///  @note: This property is KVO compliant.
+///
+@property(readonly) uint32_t telemetryExportTimeoutSec;
+
+///
+///  This configuration key sets the threshold size in megabytes for grouping telemetry files
+///  into export batches. When the accumulated size of files in a batch reaches or exceeds
+///  this threshold, the batch is considered complete and ready for export.
+///  Note: All files in a batch are written as a single combined file at the destination.
+///  See also: TelemetryExportMaxFilesPerBatch
+///  Defaults to 500.
+///
+///  @note: This property is KVO compliant.
+///
+@property(readonly) uint32_t telemetryExportBatchThresholdSizeMB;
+
+///
+///  Sets the maximum number of individual telemetry files that can be grouped into a single
+///  export batch.
+///  Note: All files in a batch are written as a single combined file at the destination.
+///  See also: TelemetryExportBatchThresholdSizeMB
+///
+///  @note: This property is KVO compliant.
+///
+@property(readonly) uint32_t telemetryExportMaxFilesPerBatch;
 
 ///
 ///  If set, contains the filesystem access policy configuration.

@@ -139,7 +139,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
       TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
       [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
       [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,
-      spool_flush_timeout_ms, telemetry_export_frequency_secs);
+      spool_flush_timeout_ms, telemetry_export_frequency_secs,
+      [configurator telemetryExportTimeoutSec], [configurator telemetryExportBatchThresholdSizeMB],
+      [configurator telemetryExportMaxFilesPerBatch]);
   if (!logger) {
     LOGE(@"Failed to create logger.");
     exit(EXIT_FAILURE);
