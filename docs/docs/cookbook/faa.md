@@ -88,7 +88,7 @@ The utility of this was highlighted by SpecterOps in their talk
 		<array>
 				<dict>
 					<key>SigningID</key>
-					<string>com.tinyspeck.slackmacgap</string>
+					<string>com.tinyspeck.slackmacgap*</string>
 					<key>TeamID</key>
 					<string>BQR82RBBHL</string>
 				</dict>
