@@ -1,0 +1,32 @@
+name: ❓ General Question
+description: Ask a general question about the project
+labels: ["question"]
+type: "Question"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your question! Please provide as much context as possible to help us give you the best answer.
+
+  - type: input
+    id: question_summary
+    attributes:
+      label: Question Summary
+      description: Brief summary of your question
+      placeholder: What would you like to know?
+    validations:
+      required: true
+
+  - type: textarea
+    id: detailed_question
+    attributes:
+      label: Detailed Question
+      description: Provide more details about your question
+      placeholder: |
+        Please include:
+        - What you're trying to accomplish
+        - What you've already tried (if applicable)
+        - Any specific context or constraints
+    validations:
+      required: true
