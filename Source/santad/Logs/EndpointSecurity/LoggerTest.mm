@@ -570,6 +570,33 @@ class MockWriter : public santa::Writer {
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
+- (void)testExportFilesExportedCalledIfNoneUploaded {
+  // This test ensures that FilesExported is always called even when there were no files to export.
+  // This makes sure cases such as a spool full of unsupported files can be cleared to make room for
+  // handled types.
+  auto mockWriter = std::make_shared<MockWriter>();
+
+  // Both f1 and f2 are unsupported file types.
+  NSString *f1 = [self createTestFile:@"f1" contentSize:5];
+  NSString *f2 = [self createTestFile:@"f2" contentSize:10];
+
+  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
+               nullptr, mockWriter);
+
+  EXPECT_CALL(*mockWriter, NextFileToExport)
+      .WillOnce(Return(f1.UTF8String))
+      .WillOnce(Return(f2.UTF8String))
+      .WillOnce(Return(std::nullopt));
+
+  EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f1.UTF8String, true),
+                                                              Pair(f2.UTF8String, true))));
+
+  l.ExportTelemetrySerialized();
+
+  XCTAssertTrue(OCMVerifyAll(self.mockSyncdQueue));
+  XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
+}
+
 - (void)testExportMaxBatchSize {
   auto mockWriter = std::make_shared<MockWriter>();
 

@@ -329,6 +329,8 @@ void Logger::ExportTelemetrySerialized() {
 
     if (pathsToHandles.count == 0) {
       // Nothing left to process
+      // Drain the tracker in case there were non-uploadable files encountered
+      writer_->FilesExported(tracker_.Drain());
       break;
     }
 
