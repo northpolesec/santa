@@ -70,6 +70,9 @@ BOOL IsProductionSigningCert(MOLCertificate *cert) {
 
     // iOS App Store Application (to support iOS apps running on Apple Silicon)
     @"1.2.840.113635.100.6.1.3",
+
+    // Apple software signing for its own binaries
+    @"1.2.840.113635.100.6.22",
   ];
 
   if (!cert || !cert.certRef) {
