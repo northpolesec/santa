@@ -98,7 +98,7 @@ using santa::ScopedFile;
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 386);
+  XCTAssertEqual(stream.contentLength, 467);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
@@ -126,7 +126,7 @@ using santa::ScopedFile;
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 391);
+  XCTAssertEqual(stream.contentLength, 472);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
@@ -158,7 +158,7 @@ using santa::ScopedFile;
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 1048962);
+  XCTAssertEqual(stream.contentLength, 1049043);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
@@ -200,7 +200,7 @@ using santa::ScopedFile;
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 1048962);
+  XCTAssertEqual(stream.contentLength, 1049043);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
@@ -228,7 +228,7 @@ using santa::ScopedFile;
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 383);
+  XCTAssertEqual(stream.contentLength, 464);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
