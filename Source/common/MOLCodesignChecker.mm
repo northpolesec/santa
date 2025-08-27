@@ -153,9 +153,15 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
                              error:(NSError **)error {
   OSStatus status = errSecSuccess;
   SecStaticCodeRef codeRef = NULL;
+  NSString *pathToUse = binaryPath;
+
+  if (fileDescriptor != -1) {
+    // Use existing file descriptor to avoid race condition
+    pathToUse = [NSString stringWithFormat:@"/dev/fd/%d", fileDescriptor];
+  }
 
   // Get SecStaticCodeRef for binary
-  status = SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:binaryPath],
+  status = SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:pathToUse],
                                        kSecCSDefaultFlags, &codeRef);
   if (status != errSecSuccess) {
     if (error) {
@@ -442,7 +448,8 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (NSDictionary *)architectureAndOffsetsForUniversalBinaryPath:(NSString *)path {
-  int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
+  int fd = (_binaryFileDescriptor != -1) ? _binaryFileDescriptor
+                                         : open(path.UTF8String, O_RDONLY | O_CLOEXEC);
   if (fd == -1) return nil;
   NSDictionary *offsets = [self architectureAndOffsetsForFileDescriptor:fd];
   close(fd);

@@ -796,7 +796,10 @@
 - (MOLCodesignChecker *)codesignCheckerWithError:(NSError **)error {
   if (!self.cachedCodesignChecker && !self.codesignCheckerError) {
     NSError *e;
-    self.cachedCodesignChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:self.path error:&e];
+    self.cachedCodesignChecker =
+        [[MOLCodesignChecker alloc] initWithBinaryPath:self.path
+                                        fileDescriptor:self.fileHandle.fileDescriptor
+                                                 error:&e];
     self.codesignCheckerError = e;
   }
   if (error) *error = self.codesignCheckerError;
