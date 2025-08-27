@@ -234,9 +234,9 @@ Logger::ExportLogType Logger::GetLogType(NSFileHandle *handle, NSString *path) {
 
 std::pair<NSString *, NSString *> Logger::GetContentTypeAndExtension(ExportLogType log_type) {
   switch (log_type) {
-    case ExportLogType::kUncompressedStream: return {@"application/octet-stream", @".stream"};
-    case ExportLogType::kGzipStream: return {@"application/gzip", @".gz"};
-    case ExportLogType::kZstdStream: return {@"application/zstd", @".zst"};
+    case ExportLogType::kUncompressedStream: return {@"application/octet-stream", @"stream"};
+    case ExportLogType::kGzipStream: return {@"application/gzip", @"gz"};
+    case ExportLogType::kZstdStream: return {@"application/zstd", @"zst"};
     default: return {nil, nil};
   }
 }

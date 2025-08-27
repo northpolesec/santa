@@ -652,15 +652,15 @@ class MockWriter : public santa::Writer {
 
   typeAndExt = Logger::GetContentTypeAndExtension(ExportLogType::kUncompressedStream);
   XCTAssertEqualObjects(typeAndExt.first, @"application/octet-stream");
-  XCTAssertEqualObjects(typeAndExt.second, @".stream");
+  XCTAssertEqualObjects(typeAndExt.second, @"stream");
 
   typeAndExt = Logger::GetContentTypeAndExtension(ExportLogType::kGzipStream);
   XCTAssertEqualObjects(typeAndExt.first, @"application/gzip");
-  XCTAssertEqualObjects(typeAndExt.second, @".gz");
+  XCTAssertEqualObjects(typeAndExt.second, @"gz");
 
   typeAndExt = Logger::GetContentTypeAndExtension(ExportLogType::kZstdStream);
   XCTAssertEqualObjects(typeAndExt.first, @"application/zstd");
-  XCTAssertEqualObjects(typeAndExt.second, @".zst");
+  XCTAssertEqualObjects(typeAndExt.second, @"zst");
 }
 
 - (void)testExportSettingsClamp {
