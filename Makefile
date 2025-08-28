@@ -9,6 +9,9 @@ build:
 test:
 	bazel test --define=SANTA_BUILD_TYPE=adhoc --test_output=errors //:unit_tests
 
+devrelease:
+	bazel build -c opt --apple_generate_dsym --macos_cpus=arm64,x86_64 //:release
+
 reload:
 	bazel run //:reload
 
