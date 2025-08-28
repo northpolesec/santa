@@ -671,9 +671,14 @@
     if (__builtin_add_overflow(range.location, range.length, &size) || size > self.fileSize) {
       return nil;
     }
-    [self.fileHandle seekToFileOffset:range.location];
-    NSData *d = [self.fileHandle readDataOfLength:range.length];
-    if (d.length != range.length) return nil;
+    void *buffer = malloc(range.length);
+    if (!buffer) return nil;
+    ssize_t bytesRead = pread(self.fileHandle.fileDescriptor, buffer, range.length, range.location);
+    if (bytesRead != (ssize_t)range.length) {
+      free(buffer);
+      return nil;
+    }
+    NSData *d = [NSData dataWithBytesNoCopy:buffer length:range.length freeWhenDone:YES];
     return d;
   } @catch (NSException *e) {
     return nil;

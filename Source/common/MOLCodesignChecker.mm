@@ -402,8 +402,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 - (NSDictionary *)architectureAndOffsetsForFileDescriptor:(int)fd {
   size_t len = sizeof(struct fat_header);
   const uint8 *headerBytes = (const uint8 *)alloca(len);
-  lseek(fd, 0, SEEK_SET);
-  if (read(fd, (void *)headerBytes, len) != len) return nil;
+  if (pread(fd, (void *)headerBytes, len, 0) != len) return nil;
   struct fat_header *fh = (struct fat_header *)headerBytes;
   uint32_t m = fh->magic;
   if (!(m == FAT_MAGIC || m == FAT_CIGAM || m == FAT_MAGIC_64 || m == FAT_CIGAM_64)) return nil;
@@ -416,7 +415,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
   len = use64 ? sizeof(struct fat_arch_64) * archCount : sizeof(struct fat_arch) * archCount;
   const uint8 *archBytes = (const uint8 *)alloca(len);
-  if (read(fd, (void *)archBytes, len) != len) return nil;
+  if (pread(fd, (void *)archBytes, len, sizeof(struct fat_header)) != len) return nil;
 
   NSMutableDictionary *offsets = [NSMutableDictionary dictionaryWithCapacity:archCount];
   if (use64) {
