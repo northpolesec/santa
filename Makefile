@@ -27,4 +27,4 @@ compile_commands:
 	bazel build //Source/...
 	bazel run :refresh_compile_commands
 
-.PHONY: fmt build test reload clean realclean compile_commands
+.PHONY: fmt build test devrelease reload clean realclean compile_commands
