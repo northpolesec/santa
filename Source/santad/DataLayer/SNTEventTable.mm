@@ -162,9 +162,11 @@ static const uint32_t kEventTableCurrentVersion = 4;
   if (!eventData) return nil;
 
   NSError *err;
-  SNTStoredEvent *event = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTStoredExecutionEvent class]
-                                                            fromData:eventData
-                                                               error:&err];
+  SNTStoredEvent *event = [NSKeyedUnarchiver
+      unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTStoredExecutionEvent class],
+                                                      [SNTStoredFileAccessEvent class], nil]
+                       fromData:eventData
+                          error:&err];
 
   if (event && !err && [self isValidStoredEvent:event]) {
     return event;

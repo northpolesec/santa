@@ -39,4 +39,50 @@
   XCTAssertEqualObjects([faaEvent hashForEvent], @"bar");
 }
 
+- (void)testEncodeDecode {
+  SNTStoredExecutionEvent *execEvent = [[SNTStoredExecutionEvent alloc] init];
+  execEvent.fileSHA256 = @"foo";
+
+  SNTStoredFileAccessEvent *faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  faaEvent.process.fileSHA256 = @"bar";
+
+  faaEvent.process.parent = [[SNTStoredFileAccessProcess alloc] init];
+  faaEvent.process.parent.pid = @(123);
+
+  NSData *archivedExecEvent = [NSKeyedArchiver archivedDataWithRootObject:execEvent
+                                                    requiringSecureCoding:YES
+                                                                    error:nil];
+  NSData *archivedFaaEvent = [NSKeyedArchiver archivedDataWithRootObject:faaEvent
+                                                   requiringSecureCoding:YES
+                                                                   error:nil];
+
+  XCTAssertNotNil(archivedExecEvent);
+  XCTAssertNotNil(archivedFaaEvent);
+
+  SNTStoredEvent *unarchivedExecEvent = [NSKeyedUnarchiver
+      unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTStoredExecutionEvent class],
+                                                      [SNTStoredFileAccessEvent class], nil]
+                       fromData:archivedExecEvent
+                          error:nil];
+
+  XCTAssertNotNil(unarchivedExecEvent);
+  XCTAssertTrue([unarchivedExecEvent isKindOfClass:[SNTStoredExecutionEvent class]]);
+  XCTAssertEqualObjects(((SNTStoredExecutionEvent *)unarchivedExecEvent).fileSHA256, @"foo");
+
+  SNTStoredEvent *unarchivedFaaEvent = [NSKeyedUnarchiver
+      unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTStoredExecutionEvent class],
+                                                      [SNTStoredFileAccessEvent class], nil]
+                       fromData:archivedFaaEvent
+                          error:nil];
+
+  XCTAssertNotNil(unarchivedFaaEvent);
+  XCTAssertTrue([unarchivedFaaEvent isKindOfClass:[SNTStoredFileAccessEvent class]]);
+  XCTAssertEqualObjects(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.fileSHA256,
+                        @"bar");
+  XCTAssertNotNil(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.parent);
+  XCTAssertEqualObjects(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.parent.pid,
+                        @(123));
+  XCTAssertNil(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.parent.parent);
+}
+
 @end

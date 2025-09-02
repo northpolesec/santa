@@ -25,6 +25,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
@@ -93,6 +94,8 @@ using santa::NSStringToUTF8StringView;
   auto req = google::protobuf::Arena::Create<::pbv1::EventUploadRequest>(&arena);
   req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
   google::protobuf::RepeatedPtrField<::pbv1::Event> *uploadEvents = req->mutable_events();
+  google::protobuf::RepeatedPtrField<::pbv1::FileAccessEvent> *uploadFAAEvents =
+      req->mutable_file_access_events();
   __block BOOL success = YES;
   NSUInteger finalIdx = (events.count - 1);
 
@@ -102,9 +105,16 @@ using santa::NSStringToUTF8StringView;
     if (event.idx) [eventIds addObject:event.idx];
 
     if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
-      if (auto e = [self messageForEvent:(SNTStoredExecutionEvent *)event withArena:pArena];
+      if (auto e = [self messageForExecutionEvent:(SNTStoredExecutionEvent *)event
+                                        withArena:pArena];
           e.has_value()) {
         uploadEvents->Add(*std::move(e));
+      }
+    } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
+      if (auto e = [self messageForFileAccessEvent:(SNTStoredFileAccessEvent *)event
+                                         withArena:pArena];
+          e.has_value()) {
+        uploadFAAEvents->Add(*std::move(e));
       }
     } else {
       // This shouldn't be able to happen. But if it does, log a warning and continue. We still
@@ -113,7 +123,8 @@ using santa::NSStringToUTF8StringView;
       LOGW(@"Unexpected event type in event upload: %@", [event class]);
     }
 
-    if (uploadEvents->size() >= self.syncState.eventBatchSize || idx == finalIdx) {
+    if ((uploadEvents->size() + uploadFAAEvents->size()) >= self.syncState.eventBatchSize ||
+        idx == finalIdx) {
       if (![self performRequest:req]) {
         success = NO;
         *stop = YES;
@@ -137,8 +148,8 @@ using santa::NSStringToUTF8StringView;
   return success;
 }
 
-- (std::optional<::pbv1::Event>)messageForEvent:(SNTStoredExecutionEvent *)event
-                                      withArena:(google::protobuf::Arena *)arena {
+- (std::optional<::pbv1::Event>)messageForExecutionEvent:(SNTStoredExecutionEvent *)event
+                                               withArena:(google::protobuf::Arena *)arena {
   auto e = google::protobuf::Arena::Create<::pbv1::Event>(arena);
 
   e->set_file_sha256(NSStringToUTF8String(event.fileSHA256));
@@ -251,6 +262,60 @@ using santa::NSStringToUTF8StringView;
 
   // TODO: Add support the for Standalone Approval field so that a sync service
   // can be notified that a user self approved a binary.
+
+  return std::make_optional(*e);
+}
+
+- (std::optional<::pbv1::FileAccessEvent>)
+    messageForFileAccessEvent:(SNTStoredFileAccessEvent *)event
+                    withArena:(google::protobuf::Arena *)arena {
+  auto e = google::protobuf::Arena::Create<::pbv1::FileAccessEvent>(arena);
+
+  e->set_rule_version(NSStringToUTF8StringView(event.ruleVersion));
+  e->set_rule_name(NSStringToUTF8StringView(event.ruleName));
+  e->set_target(NSStringToUTF8StringView(event.accessedPath));
+
+  SNTStoredFileAccessProcess *p = event.process;
+  ::pbv1::Process *proc = nullptr;
+  while (p) {
+    proc = (proc == nullptr ? e->mutable_process() : proc->mutable_parent());
+
+    if (p.filePath) {
+      proc->set_file_path(NSStringToUTF8StringView(p.filePath));
+    }
+
+    if (p.fileSHA256) {
+      proc->set_file_sha256(NSStringToUTF8StringView(p.fileSHA256));
+    }
+
+    if (p.cdhash) {
+      proc->set_cdhash(NSStringToUTF8StringView(p.cdhash));
+    }
+
+    if (p.signingID) {
+      proc->set_signing_id(NSStringToUTF8StringView(p.signingID));
+    }
+
+    if (p.teamID) {
+      proc->set_team_id(NSStringToUTF8StringView(p.teamID));
+    }
+
+    if (p.pid) {
+      proc->set_pid([p.pid intValue]);
+    }
+
+    for (MOLCertificate *cert in p.signingChain) {
+      ::pbv1::Certificate *c = proc->add_signing_chain();
+      c->set_sha256(NSStringToUTF8String(cert.SHA256));
+      c->set_cn(NSStringToUTF8String(cert.commonName));
+      c->set_org(NSStringToUTF8String(cert.orgName));
+      c->set_ou(NSStringToUTF8String(cert.orgUnit));
+      c->set_valid_from([cert.validFrom timeIntervalSince1970]);
+      c->set_valid_until([cert.validUntil timeIntervalSince1970]);
+    }
+
+    p = p.parent;
+  }
 
   return std::make_optional(*e);
 }

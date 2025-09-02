@@ -120,6 +120,7 @@ objc_library(
         "//Source/common:SNTSIPStatus",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
