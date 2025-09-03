@@ -388,7 +388,8 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
 
 void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const PathTarget &target,
                                       const Message &msg, FileAccessPolicyDecision decision) {
-  RateLimiter::Decision rate_limit_decision = rate_limiter_.Decide(msg->mach_time);
+  RateLimiter::Decision rate_limit_decision =
+      rate_limiter_.Decide(msg->mach_time, policy.version, policy.name);
   metrics_->SetFileAccessEventMetrics(policy.version, policy.name,
                                       (rate_limit_decision == RateLimiter::Decision::kAllowed)
                                           ? FileAccessMetricStatus::kOK

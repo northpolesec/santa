@@ -63,6 +63,7 @@ using FileAccessMetricsPolicyName = std::string;
 using FileAccessEventCountTuple =
     std::tuple<FileAccessMetricsPolicyVersion, FileAccessMetricsPolicyName, FileAccessMetricStatus,
                es_event_type_t, FileAccessPolicyDecision>;
+using RateLimitCountTuple = std::tuple<FileAccessMetricsPolicyVersion, FileAccessMetricsPolicyName>;
 
 NSString *const EventTypeToString(es_event_type_t eventType);
 
@@ -92,7 +93,7 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
   void SetEventMetrics(Processor processor, EventDisposition event_disposition, int64_t nanos,
                        const santa::Message &msg);
 
-  void AddRateLimitingMetrics(int64_t events_rate_limited_count);
+  void AddRateLimitingMetrics(std::string policy_version, std::string rule_name);
 
   void SetFileAccessEventMetrics(std::string policy_version, std::string rule_name,
                                  FileAccessMetricStatus status, es_event_type_t event_type,
@@ -132,7 +133,7 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
   // Small caches for storing event metrics between metrics export operations
   std::map<EventCountTuple, int64_t> event_counts_cache_;
   std::map<EventTimesTuple, int64_t> event_times_cache_;
-  std::atomic<int64_t> rate_limit_counts_cache_;
+  std::map<RateLimitCountTuple, int64_t> rate_limit_counts_cache_;
   std::map<FileAccessEventCountTuple, int64_t> faa_event_counts_cache_;
   std::map<EventStatsTuple, SequenceStats> drop_cache_;
 };

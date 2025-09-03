@@ -50,14 +50,16 @@ class RateLimiter {
     kAllowed,
   };
 
-  Decision Decide(uint64_t cur_mach_time);
+  Decision Decide(uint64_t cur_mach_time, std::string policy_version,
+                  std::string rule_name);
 
   friend class santa::RateLimiterPeer;
 
  private:
   bool ShouldRateLimitSerialized();
   size_t EventsRateLimitedSerialized();
-  void TryResetSerialized(uint64_t cur_mach_time);
+  void TryResetSerialized(uint64_t cur_mach_time, std::string policy_version,
+                          std::string rule_name);
 
   static constexpr NSTimeInterval kDefaultResetDuration = 15.0;
 

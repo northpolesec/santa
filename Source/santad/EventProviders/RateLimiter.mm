@@ -51,10 +51,11 @@ size_t RateLimiter::EventsRateLimitedSerialized() {
   }
 }
 
-void RateLimiter::TryResetSerialized(uint64_t cur_mach_time) {
+void RateLimiter::TryResetSerialized(uint64_t cur_mach_time, std::string policy_version,
+                                     std::string rule_name) {
   if (cur_mach_time > reset_mach_time_) {
     if (metrics_) {
-      metrics_->AddRateLimitingMetrics(EventsRateLimitedSerialized());
+      metrics_->AddRateLimitingMetrics(policy_version, rule_name);
     }
 
     log_count_total_ = 0;
@@ -62,11 +63,12 @@ void RateLimiter::TryResetSerialized(uint64_t cur_mach_time) {
   }
 }
 
-RateLimiter::Decision RateLimiter::Decide(uint64_t cur_mach_time) {
+RateLimiter::Decision RateLimiter::Decide(uint64_t cur_mach_time, std::string policy_version,
+                                          std::string rule_name) {
   __block RateLimiter::Decision decision;
 
   dispatch_sync(q_, ^{
-    TryResetSerialized(cur_mach_time);
+    TryResetSerialized(cur_mach_time, policy_version, rule_name);
 
     ++log_count_total_;
 

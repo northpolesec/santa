@@ -231,7 +231,7 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
 
   SNTMetricCounter *rate_limit_counts =
       [metric_set counterWithName:@"/santa/rate_limit_count"
-                       fieldNames:@[]
+                       fieldNames:@[ @"config_version", @"rule_id" ]
                          helpText:@"Number of FAA events rate limited"];
 
   SNTMetricCounter *faa_event_counts = [metric_set
@@ -280,8 +280,7 @@ Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t in
       faa_event_counts_(faa_event_counts),
       drop_counts_(drop_counts),
       metric_set_(metric_set),
-      run_on_first_start_(run_on_first_start),
-      rate_limit_counts_cache_(0) {
+      run_on_first_start_(run_on_first_start) {
   SetInterval(interval_);
 
   events_q_ = dispatch_queue_create("com.northpolesec.santa.santametricsservice.events_q",
@@ -339,10 +338,11 @@ void Metrics::FlushMetrics() {
       [event_processing_times_ set:kv.second forFieldValues:@[ processorName, eventName ]];
     }
 
-    // NB: Must use exchange here to atomically fetch the old value and reset the count. Doing
-    // both operations atomically means a dispatch queue is not needed in AddRateLimitingMetrics().
-    [rate_limit_counts_ incrementBy:rate_limit_counts_cache_.exchange(0, std::memory_order_relaxed)
-                     forFieldValues:@[]];
+    for (const auto &kv : rate_limit_counts_cache_) {
+      NSString *policyVersion = @(std::get<0>(kv.first).c_str());  // FileAccessMetricsPolicyVersion
+      NSString *policyName = @(std::get<1>(kv.first).c_str());     // FileAccessMetricsPolicyName
+      [rate_limit_counts_ incrementBy:kv.second forFieldValues:@[ policyVersion, policyName ]];
+    }
 
     for (const auto &kv : faa_event_counts_cache_) {
       NSString *policyVersion = @(std::get<0>(kv.first).c_str());  // FileAccessMetricsPolicyVersion
@@ -378,6 +378,7 @@ void Metrics::FlushMetrics() {
     event_counts_cache_ = {};
     event_times_cache_ = {};
     faa_event_counts_cache_ = {};
+    rate_limit_counts_cache_ = {};
   });
 }
 
@@ -463,8 +464,11 @@ void Metrics::UpdateEventStats(Processor processor, const es_message_t *msg) {
   });
 }
 
-void Metrics::AddRateLimitingMetrics(int64_t events_rate_limited_count) {
-  rate_limit_counts_cache_.fetch_add(events_rate_limited_count, std::memory_order_relaxed);
+void Metrics::AddRateLimitingMetrics(std::string policy_version, std::string rule_name) {
+  dispatch_sync(events_q_, ^{
+    rate_limit_counts_cache_[RateLimitCountTuple{std::move(policy_version),
+                                                 std::move(rule_name)}]++;
+  });
 }
 
 void Metrics::SetFileAccessEventMetrics(std::string policy_version, std::string rule_name,
