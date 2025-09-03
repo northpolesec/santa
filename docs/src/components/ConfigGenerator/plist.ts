@@ -54,6 +54,8 @@ ${Object.entries(data)
       <string>Santa</string>
       <key>PayloadIdentifier</key>
       <string>com.northpolesec.santa.${crypto.randomUUID()}</string>
+      <key>PayloadUUID</key>
+      <string>${crypto.randomUUID()}</string>
       <key>PayloadType</key>
       <string>com.northpolesec.santa</string>
       <key>PayloadVersion</key>
