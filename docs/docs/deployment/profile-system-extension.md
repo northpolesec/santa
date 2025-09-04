@@ -34,8 +34,12 @@ system extensions".
 :::
 
 Your MDM _may_ also have options to prevent removal of the system extension,
-either by itself or by a user. If these are available you should strongly
-consider enabling them.
+either by itself or by a user (`NonRemovableSystemExtensions` or
+`NonRemovableFromUISystemExtensions` keys). If these are available you should
+strongly consider enabling them; they make it much more difficult for both users
+and malicious scripts from bypassing Santa. If you decide at some later point to
+uninstall Santa, you will need to remove the system extension profile before
+attempting to uninstall.
 
 ## Example Profile
 
