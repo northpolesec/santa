@@ -274,21 +274,20 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
     // isn't the framework will not give us any useful feedback. So, pull the private key from the
     // identity and attempt to sign some random data with it. This is replicating what will happen
     // during the mTLS handshake.
-    OSStatus status;
-    ScopedSecKeyRef scopedPrivateKey;
-    std::tie(status, scopedPrivateKey) = ScopedSecKeyRef::AssumeFrom(^OSStatus(SecKeyRef *out) {
+    auto [status, scopedPrivateKey] = ScopedSecKeyRef::AssumeFrom(^OSStatus(SecKeyRef *out) {
       return SecIdentityCopyPrivateKey(foundIdentity, out);
     });
     if (status != errSecSuccess) {
       // This should never really happen if we've managed to find an identity.
-      [self log:@"[Client Trust] Failed to copy private key, authentication will likely fail: %d",
+      [self log:@"[Client Trust] Failed to access private key, authentication will likely fail: %d",
                 status];
     } else {
       NSData *dataToSign = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
-      auto [scopedDataRef, scopedErrorRef] = ScopedCFError::AssumeFrom(^CFDataRef(CFErrorRef *out) {
-        return SecKeyCreateSignature(scopedPrivateKey.Unsafe(), kSecKeyAlgorithmRSASignatureRaw,
-                                     (__bridge CFDataRef)dataToSign, out);
-      });
+      auto [scopedDataRef, scopedErrorRef] =
+          ScopedCFError::AssumeFrom((std::function<CFDataRef(CFErrorRef *)>)[&](CFErrorRef * out) {
+            return SecKeyCreateSignature(scopedPrivateKey.Unsafe(), kSecKeyAlgorithmRSASignatureRaw,
+                                         (__bridge CFDataRef)dataToSign, out);
+          });
 
       NSError *err = scopedErrorRef.BridgeRelease<NSError *>();
       switch (err.code) {
