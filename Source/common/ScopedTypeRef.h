@@ -1,4 +1,5 @@
 /// Copyright 2023 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -19,16 +20,20 @@
 #include <Foundation/Foundation.h>
 #include <assert.h>
 
+#include <functional>
 #include <utility>
 
 namespace santa {
 
-template <typename ElementT, ElementT InvalidV, auto RetainFunc, auto ReleaseFunc>
+template <typename ElementT, ElementT InvalidV, auto RetainFunc,
+          auto ReleaseFunc>
 class ScopedTypeRef {
  public:
   ScopedTypeRef() : ScopedTypeRef(InvalidV) {}
 
-  ScopedTypeRef(ScopedTypeRef &&other) : object_(other.object_) { other.object_ = InvalidV; }
+  ScopedTypeRef(ScopedTypeRef &&other) : object_(other.object_) {
+    other.object_ = InvalidV;
+  }
 
   ScopedTypeRef &operator=(ScopedTypeRef &&rhs) {
     if (this == &rhs) {
@@ -69,22 +74,27 @@ class ScopedTypeRef {
   }
 
   // Take ownership of a given object
-  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Assume(ElementT object) {
+  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Assume(
+      ElementT object) {
     return ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>(object);
   }
 
   // Take ownership of an out parameter
-  template <typename RetT>
-  static std::pair<RetT, ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>> AssumeFrom(
-      RetT (^block)(ElementT *object)) {
+  template <typename Callable>
+  static std::pair<std::invoke_result_t<Callable, ElementT *>,
+                   ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>>
+  AssumeFrom(Callable &&callable) {
     ElementT out = InvalidV;
-    RetT ret = block(&out);
+    auto ret = callable(&out);
 
-    return {ret, ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>::Assume(out)};
+    return {ret,
+            ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>::Assume(
+                out)};
   }
 
   // Retain and take ownership of a given object
-  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Retain(ElementT object) {
+  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> Retain(
+      ElementT object) {
     if (object != InvalidV) {
       RetainFunc(object);
     }
@@ -114,7 +124,8 @@ class ScopedTypeRef {
     return tmp;
   }
 
-  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc> BridgeRetain(id nsobj) {
+  static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>
+  BridgeRetain(id nsobj) {
     ElementT obj = (ElementT)(CFBridgingRetain(nsobj));
     return Assume(obj);
   }
