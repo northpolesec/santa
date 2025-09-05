@@ -283,11 +283,10 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
                 status];
     } else {
       NSData *dataToSign = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
-      auto [scopedDataRef, scopedErrorRef] =
-          ScopedCFError::AssumeFrom((std::function<CFDataRef(CFErrorRef *)>)[&](CFErrorRef * out) {
-            return SecKeyCreateSignature(scopedPrivateKey.Unsafe(), kSecKeyAlgorithmRSASignatureRaw,
-                                         (__bridge CFDataRef)dataToSign, out);
-          });
+      auto [scopedDataRef, scopedErrorRef] = ScopedCFError::AssumeFrom([&](CFErrorRef *out) {
+        return SecKeyCreateSignature(scopedPrivateKey.Unsafe(), kSecKeyAlgorithmRSASignatureRaw,
+                                     (__bridge CFDataRef)dataToSign, out);
+      });
 
       NSError *err = scopedErrorRef.BridgeRelease<NSError *>();
       switch (err.code) {
