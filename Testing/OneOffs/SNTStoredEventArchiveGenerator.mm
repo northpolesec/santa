@@ -35,7 +35,7 @@
 #include "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/SNTStoredFileAccessEvent.h"
 
-static NSString * const kOutputPath = @"/tmp/stored_event_archive.plist";
+static NSString *const kOutputPath = @"/tmp/stored_event_archive.plist";
 
 int main(int argc, const char *argv[]) {
   NSMutableArray<SNTStoredEvent *> *storedEvents = [[NSMutableArray alloc] init];
@@ -54,17 +54,18 @@ int main(int argc, const char *argv[]) {
   event.signingStatus = SNTSigningStatusProduction;
   event.executingUser = @"foo";
   event.decision = SNTEventStateAllowSigningID;
-  event.loggedInUsers = @[@"foo", @"bar"];
-  event.currentSessions = @[@"nobody@console"];
+  event.loggedInUsers = @[ @"foo", @"bar" ];
+  event.currentSessions = @[ @"nobody@console" ];
   event.pid = @(2222);
   event.ppid = @(1);
   event.parentName = @"launchd";
-  event.entitlements = @{@"ent1": @"val1"};
+  event.entitlements = @{@"ent1" : @"val1"};
   event.secureSigningTime = [NSDate dateWithTimeIntervalSince1970:1751421846];
   event.signingTime = [NSDate dateWithTimeIntervalSince1970:1751335446];
   [storedEvents addObject:event];
 
-  fi = [[SNTFileInfo alloc] initWithPath:@"/Applications/Santa.app/Contents/MacOS/Santa" error:&err];
+  fi = [[SNTFileInfo alloc] initWithPath:@"/Applications/Santa.app/Contents/MacOS/Santa"
+                                   error:&err];
   if (!fi) {
     NSLog(@"Failed to grab file info for \"Santa\": %@", err);
     exit(EXIT_FAILURE);
@@ -77,12 +78,12 @@ int main(int argc, const char *argv[]) {
   event.signingStatus = SNTSigningStatusDevelopment;
   event.executingUser = @"foo2";
   event.decision = SNTEventStateAllowTeamID;
-  event.loggedInUsers = @[@"foo2", @"bar2"];
-  event.currentSessions = @[@"nobody2@console"];
+  event.loggedInUsers = @[ @"foo2", @"bar2" ];
+  event.currentSessions = @[ @"nobody2@console" ];
   event.pid = @(3333);
   event.ppid = @(1111);
   event.parentName = @"init";
-  event.entitlements = @{@"ent1": @"val1", @"ent2": @"val2"};
+  event.entitlements = @{@"ent1" : @"val1", @"ent2" : @"val2"};
   event.secureSigningTime = [NSDate dateWithTimeIntervalSince1970:1748829846];
   event.signingTime = [NSDate dateWithTimeIntervalSince1970:1748743446];
   [storedEvents addObject:event];

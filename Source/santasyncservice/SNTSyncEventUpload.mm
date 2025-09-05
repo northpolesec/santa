@@ -58,7 +58,8 @@ using santa::NSStringToUTF8StringView;
 }
 
 - (BOOL)performRequest:(::pbv1::EventUploadRequest *)req {
-  int eventsInBatch = req->events_size() + req->file_access_events_size() + req->audit_events_size();
+  int eventsInBatch =
+      req->events_size() + req->file_access_events_size() + req->audit_events_size();
   if (eventsInBatch == 0) {
     return YES;
   }

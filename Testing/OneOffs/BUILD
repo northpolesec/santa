@@ -1,5 +1,5 @@
-load("@rules_cc//cc:defs.bzl", "objc_library")
 load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
+load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
@@ -12,25 +12,25 @@ objc_library(
     name = "SNTStoredEventArchiveGenerator",
     srcs = ["SNTStoredEventArchiveGenerator.mm"],
     deps = [
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
-        "//Source/common:SNTCommonEnums",
-        "//Source/common:MOLCodesignChecker",
     ],
 )
 
 santa_unit_test(
-  name = "SNTStoredEventArchiveGeneratorTest",
-  deps = [
-      ":SNTStoredEventArchiveGenerator",
-  ],
+    name = "SNTStoredEventArchiveGeneratorTest",
+    deps = [
+        ":SNTStoredEventArchiveGenerator",
+    ],
 )
 
 test_suite(
-  name = "BuildOnly",
-  tests = [
-    ":SNTStoredEventArchiveGeneratorTest",
-  ]
+    name = "BuildOnly",
+    tests = [
+        ":SNTStoredEventArchiveGeneratorTest",
+    ],
 )
 
 macos_command_line_application(
