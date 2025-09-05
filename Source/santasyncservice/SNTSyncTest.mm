@@ -746,14 +746,15 @@
             XCTAssertEqual(events.count, 1);
 
             event = events[0];
-            XCTAssertEqualObjects(event[@"ruleName"], @"MyRule");
-            XCTAssertEqualObjects(event[@"ruleVersion"], @"MyRuleVersion");
+            XCTAssertEqualObjects(event[@"rule_name"], @"MyRule");
+            XCTAssertEqualObjects(event[@"rule_version"], @"MyRuleVersion");
             XCTAssertEqualObjects(event[@"target"], @"/you/are/being/watched");
             XCTAssertEqualObjects(event[@"process"][kFilePath], @"/bin/mkdir");
             XCTAssertEqualObjects(event[@"process"][kCDHash], @"03191543caa9b9c0cd18ff9e3eae319c85e82ebd");
             XCTAssertEqualObjects(event[@"process"][kPID], @(123));
             XCTAssertEqualObjects(event[@"process"][@"parent"][kPID], @(456));
             XCTAssertEqual([event[@"process"][kSigningChain] count], 3);
+            XCTAssertEqualObjects(event[@"access_time"], @(1753333333));
 
             return YES;
           }];

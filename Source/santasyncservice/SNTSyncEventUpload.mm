@@ -277,6 +277,7 @@ using santa::NSStringToUTF8StringView;
   e->set_rule_version(NSStringToUTF8StringView(event.ruleVersion));
   e->set_rule_name(NSStringToUTF8StringView(event.ruleName));
   e->set_target(NSStringToUTF8StringView(event.accessedPath));
+  e->set_access_time([event.occurrenceDate timeIntervalSince1970]);
 
   SNTStoredFileAccessProcess *p = event.process;
   ::pbv1::Process *proc = nullptr;
