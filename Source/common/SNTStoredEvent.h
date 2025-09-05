@@ -24,8 +24,8 @@
 /// An index for this event, randomly generated during initialization.
 @property(nonnull) NSNumber *idx;
 
-// Subclasses are required to define: `hashForEvent`.
+// Subclasses are required to define: `uniqueID`.
 // The base class implementation will throw an exception.
-- (nullable NSString *)hashForEvent;
+- (nullable NSString *)uniqueID;
 
 @end

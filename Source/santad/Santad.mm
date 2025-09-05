@@ -27,6 +27,7 @@
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
+#include "Source/santad/DataLayer/SNTEventTable.h"
 #include "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/DataLayer/WatchItemPolicy.h"
 #include "Source/santad/DataLayer/WatchItems.h"
@@ -42,6 +43,7 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/SNTDaemonControlController.h"
+#include "Source/santad/SNTDatabaseController.h"
 #include "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -137,6 +139,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
       ^santa::FAAPolicyProcessor::URLTextPair(
           const std::shared_ptr<santa::WatchItemPolicyBase> &policy) {
         return watch_items->EventDetailLinkInfo(policy);
+      },
+      ^(SNTStoredFileAccessEvent *event) {
+        [[SNTDatabaseController eventTable] addStoredEvent:event];
       });
 
   SNTEndpointSecurityDataFileAccessAuthorizer *data_faa_client =

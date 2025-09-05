@@ -167,7 +167,7 @@
   return CertificateChain(self.signingChain);
 }
 
-- (NSString *)hashForEvent {
+- (NSString *)uniqueID {
   return self.fileSHA256;
 }
 

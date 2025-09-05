@@ -50,12 +50,14 @@
 }
 
 - (NSString *)description {
-  return [NSString stringWithFormat:@"SNTStoredFileAccessEvent: Accessed: %@, By: %@",
+  return [NSString stringWithFormat:@"SNTStoredFileAccessEvent[%@]: Accessed: %@, By: %@", self.idx,
                                     self.accessedPath, self.process];
 }
 
-- (NSString *)hashForEvent {
-  return _process.fileSHA256;
+- (NSString *)uniqueID {
+  // NB: Not using `accessedPath` as part of the uniqe ID to prevent a noisy
+  // rule from generating a large number of events to upload.
+  return [NSString stringWithFormat:@"%@|%@|%@", _ruleName, _ruleVersion, _process.fileSHA256];
 }
 
 @end

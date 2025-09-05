@@ -153,13 +153,15 @@ es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t
 FAAPolicyProcessor::FAAPolicyProcessor(
     SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
     std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
-    std::shared_ptr<Metrics> metrics, GenerateEventDetailLinkBlock generate_event_detail_link_block)
+    std::shared_ptr<Metrics> metrics, GenerateEventDetailLinkBlock generate_event_detail_link_block,
+    StoreAccessEventBlock store_access_event_block)
     : decision_cache_(decision_cache),
       enricher_(std::move(enricher)),
       logger_(std::move(logger)),
       tty_writer_(std::move(tty_writer)),
       metrics_(std::move(metrics)),
       generate_event_detail_link_block_(generate_event_detail_link_block),
+      store_access_event_block_(store_access_event_block),
       reads_cache_(kNumProcesses, kPerProcessSetCapacity),
       tty_message_cache_(kNumProcesses, kPerProcessSetCapacity),
       rate_limiter_(RateLimiter::Create(metrics_, kDefaultRateLimitQPS)) {
@@ -469,38 +471,40 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
 
     LogTelemetry(*policy, target, msg, decision);
 
-    if (ShouldNotifyUserDecision(decision) &&
-        (ShouldShowUIForPolicy(policy) || ShouldMessageTTYForPolicy(policy, msg))) {
-      SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
-      SNTStoredFileAccessEvent *event = [[SNTStoredFileAccessEvent alloc] init];
+    SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
+    SNTStoredFileAccessEvent *event = [[SNTStoredFileAccessEvent alloc] init];
 
-      event.accessedPath = StringToNSString(target.path);
-      event.ruleVersion = StringToNSString(policy->version);
-      event.ruleName = StringToNSString(policy->name);
-      event.process.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
-      event.process.filePath = StringToNSString(msg->process->executable->path.data);
-      event.process.teamID = cd.teamID ?: @"<unknown team id>";
-      event.process.signingID = cd.signingID ?: @"<unknown signing id>";
-      event.process.cdhash = cd.cdhash ?: @"<unknown CDHash>";
-      event.process.pid = @(audit_token_to_pid(msg->process->audit_token));
-      event.process.signingChain = cd.certChain;
-      struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
-      if (user) event.process.executingUser = @(user->pw_name);
-      event.process.parent = [[SNTStoredFileAccessProcess alloc] init];
-      event.process.parent.pid = @(audit_token_to_pid(msg->process->parent_audit_token));
-      event.process.parent.filePath = StringToNSString(msg.ParentProcessPath());
+    event.accessedPath = StringToNSString(target.path);
+    event.ruleVersion = StringToNSString(policy->version);
+    event.ruleName = StringToNSString(policy->name);
+    event.process.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
+    event.process.filePath = StringToNSString(msg->process->executable->path.data);
+    event.process.teamID = cd.teamID ?: @"<unknown team id>";
+    event.process.signingID = cd.signingID ?: @"<unknown signing id>";
+    event.process.cdhash = cd.cdhash ?: @"<unknown CDHash>";
+    event.process.pid = @(audit_token_to_pid(msg->process->audit_token));
+    event.process.signingChain = cd.certChain;
+    struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
+    if (user) event.process.executingUser = @(user->pw_name);
+    event.process.parent = [[SNTStoredFileAccessProcess alloc] init];
+    event.process.parent.pid = @(audit_token_to_pid(msg->process->parent_audit_token));
+    event.process.parent.filePath = StringToNSString(msg.ParentProcessPath());
 
-      URLTextPair link_info;
-      if (generate_event_detail_link_block_) {
-        link_info = generate_event_detail_link_block_(policy);
-      }
+    URLTextPair link_info;
+    if (generate_event_detail_link_block_) {
+      link_info = generate_event_detail_link_block_(policy);
+    }
 
+    if (store_access_event_block_) {
+      store_access_event_block_(event);
+    }
+
+    if (ShouldNotifyUserDecision(decision)) {
       if (ShouldShowUIForPolicy(policy)) {
         file_access_denied_block(event, OptionalStringToNSString(policy->custom_message),
                                  link_info.first, link_info.second);
       }
 
-      // TODO: TTY message cache
       if (ShouldMessageTTYForPolicy(policy, msg)) {
         LogTTY(event, link_info, msg, *policy);
       }
