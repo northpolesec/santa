@@ -14,11 +14,17 @@
 
 #import "MOLAuthenticatingURLSession.h"
 
+#include <tuple>
+
 #import <Foundation/Foundation.h>
 #include <Security/Security.h>
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLDERDecoder.h"
+#include "Source/common/ScopedCFTypeRef.h"
+
+using ScopedCFError = santa::ScopedCFTypeRef<CFErrorRef>;
+using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
 
 @interface MOLAuthenticatingURLSession ()
 @property NSURLSessionConfiguration *sessionConfig;
@@ -263,6 +269,38 @@
     MOLCertificate *clientCert = [[MOLCertificate alloc] initWithSecCertificateRef:certificate];
     if (certificate) CFRelease(certificate);
     if (clientCert) [self log:@"[Client Trust] Certificate: %@", clientCert];
+
+    // We have an identity but we don't know whether the private key is accessible to us, and if it
+    // isn't the framework will not give us any useful feedback. So, pull the private key from the
+    // identity and attempt to sign some random data with it. This is replicating what will happen
+    // during the mTLS handshake.
+    OSStatus status;
+    ScopedSecKeyRef scopedPrivateKey;
+    std::tie(status, scopedPrivateKey) = ScopedSecKeyRef::AssumeFrom(^OSStatus(SecKeyRef *out) {
+      return SecIdentityCopyPrivateKey(foundIdentity, out);
+    });
+    if (status != errSecSuccess) {
+      // This should never really happen if we've managed to find an identity.
+      [self log:@"[Client Trust] Failed to copy private key, authentication will likely fail: %d",
+                status];
+    } else {
+      NSData *dataToSign = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
+      auto [scopedDataRef, scopedErrorRef] = ScopedCFError::AssumeFrom(^CFDataRef(CFErrorRef *out) {
+        return SecKeyCreateSignature(scopedPrivateKey.Unsafe(), kSecKeyAlgorithmRSASignatureRaw,
+                                     (__bridge CFDataRef)dataToSign, out);
+      });
+
+      NSError *err = scopedErrorRef.BridgeRelease<NSError *>();
+      switch (err.code) {
+        case errSecInteractionNotAllowed:
+          [self log:@"[Client Trust] Private key is inaccessible, authentication will likely fail"];
+          break;
+        case errSecSuccess: break;
+        default:
+          [self log:@"[Client Trust] Failed to sign data with private key: %d", err.code];
+          break;
+      }
+    }
 
     NSArray *intermediates = [self locateIntermediatesForCertificate:clientCert inArray:allCerts];
 
