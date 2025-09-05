@@ -24,19 +24,22 @@
 
 @implementation StoredEventTest
 
-- (void)testHashForEvent {
+- (void)testUniqueID {
   // The base class should throw
   SNTStoredEvent *baseEvent = [[SNTStoredEvent alloc] init];
-  XCTAssertThrows([baseEvent hashForEvent]);
+  XCTAssertThrows([baseEvent uniqueID]);
 
   // Derived classes should not throw
   SNTStoredExecutionEvent *execEvent = [[SNTStoredExecutionEvent alloc] init];
   execEvent.fileSHA256 = @"foo";
-  XCTAssertEqualObjects([execEvent hashForEvent], @"foo");
+  XCTAssertEqualObjects([execEvent uniqueID], @"foo");
 
   SNTStoredFileAccessEvent *faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  faaEvent.ruleName = @"MyRule";
+  faaEvent.ruleVersion = @"MyVersion";
+  faaEvent.accessedPath = @"/not/included";
   faaEvent.process.fileSHA256 = @"bar";
-  XCTAssertEqualObjects([faaEvent hashForEvent], @"bar");
+  XCTAssertEqualObjects([faaEvent uniqueID], @"MyRule|MyVersion|bar");
 }
 
 - (void)testEncodeDecode {

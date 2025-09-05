@@ -689,6 +689,7 @@
                                                         fromData:eventData
                                                            error:&err];
   XCTAssertNil(err);
+  XCTAssertEqual(events.count, 3);
 
   OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
 
@@ -713,7 +714,7 @@
             XCTAssertEqualObjects(event[kExecutingUser], @"foo");
             XCTAssertEqualObjects(event[kPID], @(2222));
             XCTAssertEqualObjects(event[kPPID], @(1));
-            XCTAssertEqualObjects(event[kExecutionTime], @(1753128415.67169));
+            XCTAssertEqualObjects(event[kExecutionTime], @(1751111111));
 
             NSArray *certs = event[kSigningChain];
             XCTAssertEqual(certs.count, 3);
@@ -739,6 +740,20 @@
             XCTAssertEqual(certs.count, 3);
             XCTAssertEqualObjects(event[kTeamID], @"ZMCG7MLDV9");
             XCTAssertEqualObjects(event[kSigningID], @"ZMCG7MLDV9:com.northpolesec.santa");
+            XCTAssertEqualObjects(event[kExecutionTime], @(1752222222));
+
+            events = requestDict[@"file_access_events"];
+            XCTAssertEqual(events.count, 1);
+
+            event = events[0];
+            XCTAssertEqualObjects(event[@"ruleName"], @"MyRule");
+            XCTAssertEqualObjects(event[@"ruleVersion"], @"MyRuleVersion");
+            XCTAssertEqualObjects(event[@"target"], @"/you/are/being/watched");
+            XCTAssertEqualObjects(event[@"process"][kFilePath], @"/bin/mkdir");
+            XCTAssertEqualObjects(event[@"process"][kCDHash], @"03191543caa9b9c0cd18ff9e3eae319c85e82ebd");
+            XCTAssertEqualObjects(event[@"process"][kPID], @(123));
+            XCTAssertEqualObjects(event[@"process"][@"parent"][kPID], @(456));
+            XCTAssertEqual([event[@"process"][kSigningChain] count], 3);
 
             return YES;
           }];
@@ -818,7 +833,7 @@
 
   [sut sync];
 
-  XCTAssertEqual(requestCount, 2);
+  XCTAssertEqual(requestCount, 3);
 }
 
 #pragma mark - SNTSyncRuleDownload Tests

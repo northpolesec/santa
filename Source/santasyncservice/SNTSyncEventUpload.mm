@@ -58,7 +58,8 @@ using santa::NSStringToUTF8StringView;
 }
 
 - (BOOL)performRequest:(::pbv1::EventUploadRequest *)req {
-  if (req->events_size() == 0) {
+  int eventsInBatch = req->events_size() + req->file_access_events_size() + req->audit_events_size();
+  if (eventsInBatch == 0) {
     return YES;
   }
 
@@ -82,7 +83,7 @@ using santa::NSStringToUTF8StringView;
             addObject:santa::StringToNSString(bundle_binary)];
       }
     }
-    SLOGI(@"Uploaded %d events", req->events_size());
+    SLOGI(@"Uploaded %d events", eventsInBatch);
   }
   return YES;
 }
@@ -136,6 +137,8 @@ using santa::NSStringToUTF8StringView;
 
       [eventIds removeAllObjects];
       req->clear_events();
+      req->clear_file_access_events();
+      req->clear_audit_events();
     }
   }];
 

@@ -60,7 +60,7 @@
   return result;
 }
 
-- (NSString *)hashForEvent {
+- (NSString *)uniqueID {
   [self doesNotRecognizeSelector:_cmd];
   return nil;
 }

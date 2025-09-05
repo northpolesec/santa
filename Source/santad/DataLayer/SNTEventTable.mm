@@ -21,7 +21,7 @@
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
 
-static const uint32_t kEventTableCurrentVersion = 4;
+static const uint32_t kEventTableCurrentVersion = 5;
 
 @implementation SNTEventTable
 
@@ -73,6 +73,15 @@ static const uint32_t kEventTableCurrentVersion = 4;
     newVersion = 4;
   }
 
+  if (version < 5) {
+    // Rename the filesha256 column to uniqueid because different stored event types
+    // contain different content for determining uniqueness.
+    [db executeUpdate:@"ALTER TABLE events RENAME COLUMN filesha256 TO uniqueid"];
+    [db executeUpdate:@"DROP INDEX filesha256"];
+    [db executeUpdate:@"CREATE UNIQUE INDEX uniqueid ON events (uniqueid)"];
+    newVersion = 4;
+  }
+
   return newVersion;
 }
 
@@ -85,12 +94,12 @@ static const uint32_t kEventTableCurrentVersion = 4;
 - (BOOL)isValidStoredEvent:(SNTStoredEvent *)event {
   if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
     SNTStoredExecutionEvent *se = (SNTStoredExecutionEvent *)event;
-    return se.idx && [[se hashForEvent] length] && se.filePath.length && se.occurrenceDate &&
+    return se.idx && [[se uniqueID] length] && se.filePath.length && se.occurrenceDate &&
            se.decision;
   } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
     SNTStoredFileAccessEvent *se = (SNTStoredFileAccessEvent *)event;
     return se.idx && se.ruleVersion.length && se.ruleName.length && se.accessedPath.length &&
-           se.process.filePath.length && [[se hashForEvent] length];
+           se.process.filePath.length && [[se uniqueID] length];
   } else {
     return NO;
   }
@@ -115,10 +124,10 @@ static const uint32_t kEventTableCurrentVersion = 4;
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
     [eventsData
         enumerateKeysAndObjectsUsingBlock:^(NSData *eventData, SNTStoredEvent *event, BOOL *stop) {
-          success = [db executeUpdate:@"INSERT INTO 'events' (idx, filesha256, eventdata) "
+          success = [db executeUpdate:@"INSERT INTO 'events' (idx, uniqueid, eventdata) "
                                       @"VALUES (?, ?, ?) "
-                                      @"ON CONFLICT(filesha256) DO NOTHING",
-                                      event.idx, [event hashForEvent], eventData];
+                                      @"ON CONFLICT(uniqueid) DO NOTHING",
+                                      event.idx, [event uniqueID], eventData];
           if (!success) *stop = YES;
         }];
   }];
