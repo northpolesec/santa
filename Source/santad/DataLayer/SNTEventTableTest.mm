@@ -92,7 +92,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   SNTStoredFileAccessEvent *event = [[SNTStoredFileAccessEvent alloc] init];
   event.ruleName = @"MyTestRule";
   event.ruleVersion = @"MyTestVersion";
-  event.accessedPath = @"/this/oath/was/accessed";
+  event.accessedPath = @"/this/path/was/accessed";
   event.process.filePath = @"/usr/bin/false";
   event.process.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
   event.process.signingChain = [csInfo certificates];
