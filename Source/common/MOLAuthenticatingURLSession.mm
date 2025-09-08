@@ -13,6 +13,7 @@
 ///    limitations under the License.
 
 #import "MOLAuthenticatingURLSession.h"
+#include <Security/SecKey.h>
 
 #include <tuple>
 
@@ -284,7 +285,12 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
     } else {
       NSData *dataToSign = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
       auto [scopedDataRef, scopedErrorRef] = ScopedCFError::AssumeFrom([&](CFErrorRef *out) {
-        return SecKeyCreateSignature(scopedPrivateKey.Unsafe(), kSecKeyAlgorithmRSASignatureRaw,
+        SecKeyAlgorithm algorithm = kSecKeyAlgorithmRSASignatureRaw;
+        if (!SecKeyIsAlgorithmSupported(scopedPrivateKey.Unsafe(), kSecKeyOperationTypeSign,
+                                        algorithm)) {
+          algorithm = kSecKeyAlgorithmECDSASignatureMessageX962SHA256;
+        }
+        return SecKeyCreateSignature(scopedPrivateKey.Unsafe(), algorithm,
                                      (__bridge CFDataRef)dataToSign, out);
       });
 
@@ -292,6 +298,11 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
       switch (err.code) {
         case errSecInteractionNotAllowed:
           [self log:@"[Client Trust] Private key is inaccessible, authentication will likely fail"];
+          break;
+        case errSecParam:
+          [self log:@"[Client Trust] Neither kSecKeyAlgorithmRSASignatureRaw nor "
+                    @"kSecKeyAlgorithmECDSASignatureMessageX962SHA256 are supported, unable to "
+                    @"verify key accessibility"];
           break;
         case errSecSuccess: break;
         default:
