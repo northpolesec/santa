@@ -109,11 +109,6 @@ bool ShouldLogDecision(FileAccessPolicyDecision decision) {
   }
 }
 
-/// The user should be notified whenever the policy will be logged (as long as it's not audit only)
-bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision) {
-  return IsBlockDecision(decision);
-}
-
 static inline bool ShouldShowUIForPolicy(const std::shared_ptr<WatchItemPolicyBase> &policy) {
   return !policy->silent;
 }
@@ -497,10 +492,10 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     }
 
     if (store_access_event_block_) {
-      store_access_event_block_(event);
+      store_access_event_block_(event, IsBlockDecision(decision));
     }
 
-    if (ShouldNotifyUserDecision(decision)) {
+    if (IsBlockDecision(decision)) {
       if (ShouldShowUIForPolicy(policy)) {
         file_access_denied_block(event, OptionalStringToNSString(policy->custom_message),
                                  link_info.first, link_info.second);

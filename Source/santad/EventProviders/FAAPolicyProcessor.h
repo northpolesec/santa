@@ -88,7 +88,7 @@ class FAAPolicyProcessor {
       URLTextPair (^)(const std::shared_ptr<WatchItemPolicyBase> &watch_item);
 
   using ReadsCacheKey = std::tuple<pid_t, int, FAAClientType>;
-  using StoreAccessEventBlock = void (^)(SNTStoredFileAccessEvent *);
+  using StoreAccessEventBlock = void (^)(SNTStoredFileAccessEvent *, bool);
 
   // Friend classes that can call private methods requiring FAAClientType parameters
   friend class DataFAAPolicyProcessorProxy;

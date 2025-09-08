@@ -20,7 +20,8 @@
   NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceXPC)];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
-                                      [SNTStoredExecutionEvent class], nil]
+                                      [SNTStoredExecutionEvent class],
+                                      [SNTStoredFileAccessEvent class], nil]
         forSelector:@selector(postEventsToSyncServer:)
       argumentIndex:0
             ofReply:NO];
