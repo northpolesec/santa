@@ -76,8 +76,8 @@ static const uint32_t kEventTableCurrentVersion = 5;
   if (version < 5) {
     // Rename the filesha256 column to uniqueid because different stored event types
     // contain different content for determining uniqueness.
-    [db executeUpdate:@"ALTER TABLE events RENAME COLUMN filesha256 TO uniqueid"];
     [db executeUpdate:@"DROP INDEX filesha256"];
+    [db executeUpdate:@"ALTER TABLE events RENAME COLUMN filesha256 TO uniqueid"];
     [db executeUpdate:@"CREATE UNIQUE INDEX uniqueid ON events (uniqueid)"];
     newVersion = 4;
   }
