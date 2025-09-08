@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-/// This utility isused to generate a plist contain SNTStoredEvent objects.
+/// This utility is used to generate a plist containing SNTStoredEvent objects.
 /// The output can be used to update test input files, e.g.for "event upload" testing.
 ///
 /// To run:
