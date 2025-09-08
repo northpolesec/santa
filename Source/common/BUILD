@@ -977,7 +977,10 @@ objc_library(
     ],
     hdrs = ["MOLAuthenticatingURLSession.h"],
     sdk_frameworks = ["Security"],
-    deps = [":MOLCertificate"],
+    deps = [
+        ":MOLCertificate",
+        ":ScopedCFTypeRef",
+    ],
 )
 
 santa_unit_test(
