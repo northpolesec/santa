@@ -21,11 +21,11 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
-#import "Source/common/SNTStoredExecutionEvent.h"
-#import "Source/common/SNTStoredFileAccessEvent.h"
 
 @interface SNTSyncdQueue ()
 @property dispatch_queue_t syncdQueue;
