@@ -141,6 +141,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         return watch_items->EventDetailLinkInfo(policy);
       },
       ^(SNTStoredFileAccessEvent *event, bool sendImmediately) {
+        // Only store FAA events if a sync server is configured.
         if (configurator.syncBaseURL) {
           [[SNTDatabaseController eventTable] addStoredEvent:event];
 
