@@ -705,7 +705,7 @@
             NSDictionary *event = events[0];
             XCTAssertEqualObjects(
                 event[kFileSHA256],
-                @"741879b35b9fae5b235a7c9a88a6d20a136c6e27701f03dd32369c4ea0a6acaf");
+                @"c242e98be0b2f297430ab37f6ec83a380fa108551d27e3ff35892bb0b58b2f23");
             XCTAssertEqualObjects(event[kFileName], @"yes");
             XCTAssertEqualObjects(event[kFilePath], @"/usr/bin");
             XCTAssertEqualObjects(event[kDecision], @"ALLOW_SIGNINGID");
@@ -731,7 +731,7 @@
 
             XCTAssertNil(event[kTeamID]);
             XCTAssertEqualObjects(event[kSigningID], @"platform:com.apple.yes");
-            XCTAssertEqualObjects(event[kCDHash], @"18ddebfdb356b7ed575b063bbbbe40a2d0d92f23");
+            XCTAssertEqualObjects(event[kCDHash], @"c15b76ca2885fbb54adbfe041536f1c65af94feb");
 
             event = events[1];
             XCTAssertEqualObjects(event[kFileName], @"Santa");
@@ -751,7 +751,7 @@
             XCTAssertEqualObjects(event[@"target"], @"/you/are/being/watched");
             XCTAssertEqualObjects(event[@"process"][kFilePath], @"/bin/mkdir");
             XCTAssertEqualObjects(event[@"process"][kCDHash],
-                                  @"03191543caa9b9c0cd18ff9e3eae319c85e82ebd");
+                                  @"0e923b9487572b38d65ff68f9c2919a4118318e0");
             XCTAssertEqualObjects(event[@"process"][kPID], @(123));
             XCTAssertEqualObjects(event[@"process"][@"parent"][kPID], @(456));
             XCTAssertEqual([event[@"process"][kSigningChain] count], 3);
