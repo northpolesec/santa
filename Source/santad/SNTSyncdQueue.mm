@@ -24,6 +24,8 @@
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 
 @interface SNTSyncdQueue ()
 @property dispatch_queue_t syncdQueue;
@@ -152,14 +154,7 @@
   [[self.syncConnection remoteObjectProxy] spindown];
 }
 
-- (void)addExecutionEvent:(SNTStoredExecutionEvent *)event {
-  if (!event) {
-    return;
-  }
-  [self addEvents:@[ event ] withBackoffHashKey:event.fileSHA256];
-}
-
-- (void)addFileAccessEvent:(SNTStoredFileAccessEvent *)event {
+- (void)addStoredEvent:(SNTStoredEvent *)event {
   if (!event) {
     return;
   }

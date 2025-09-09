@@ -145,7 +145,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
           [[SNTDatabaseController eventTable] addStoredEvent:event];
 
           if (sendImmediately) {
-            [syncd_queue addFileAccessEvent:event];
+            [syncd_queue addStoredEvent:event];
           }
         }
       });

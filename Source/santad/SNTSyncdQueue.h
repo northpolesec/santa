@@ -15,8 +15,8 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
-#import "Source/common/SNTStoredFileAccessEvent.h"
 
 @class SNTExportConfiguration;
 @class MOLXPCConnection;
@@ -26,8 +26,7 @@
 - (void)reassessSyncServiceConnection;
 - (void)reassessSyncServiceConnectionImmediately;
 
-- (void)addExecutionEvent:(SNTStoredExecutionEvent *)event;
-- (void)addFileAccessEvent:(SNTStoredFileAccessEvent *)event;
+- (void)addStoredEvent:(SNTStoredEvent *)event;
 - (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent *> *)events
          withBundleHash:(NSString *)bundleHash;
 - (void)addBundleEvent:(SNTStoredExecutionEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
