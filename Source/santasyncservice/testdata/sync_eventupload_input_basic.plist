@@ -11,7 +11,7 @@
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>93</integer>
+				<integer>94</integer>
 			</dict>
 			<key>NS.objects</key>
 			<array>
@@ -141,7 +141,7 @@
 				<integer>27</integer>
 			</dict>
 		</dict>
-		<integer>1309831667</integer>
+		<integer>162266856</integer>
 		<dict>
 			<key>$class</key>
 			<dict>
@@ -160,7 +160,7 @@
 			<key>$classname</key>
 			<string>NSDate</string>
 		</dict>
-		<string>741879b35b9fae5b235a7c9a88a6d20a136c6e27701f03dd32369c4ea0a6acaf</string>
+		<string>c242e98be0b2f297430ab37f6ec83a380fa108551d27e3ff35892bb0b58b2f23</string>
 		<string>/usr/bin/yes</string>
 		<false/>
 		<dict>
@@ -324,7 +324,7 @@
 			<string>NSArray</string>
 		</dict>
 		<string>platform:com.apple.yes</string>
-		<string>18ddebfdb356b7ed575b063bbbbe40a2d0d92f23</string>
+		<string>c15b76ca2885fbb54adbfe041536f1c65af94feb</string>
 		<integer>603980545</integer>
 		<integer>4</integer>
 		<dict>
@@ -543,7 +543,7 @@
 				<integer>50</integer>
 			</dict>
 		</dict>
-		<integer>2599841275</integer>
+		<integer>4232856234</integer>
 		<dict>
 			<key>$class</key>
 			<dict>
@@ -553,7 +553,7 @@
 			<key>NS.time</key>
 			<real>773915022</real>
 		</dict>
-		<string>429e6648c5d076169d0e1cfbd22b9877b0d8884ab6ec6ef9a7dbd49554e788cc</string>
+		<string>111cf106c21f8963ca6126eed03862447e4167f055b03cfe5f2fc6ce83248ab0</string>
 		<string>/Applications/Santa.app/Contents/MacOS/Santa</string>
 		<dict>
 			<key>$class</key>
@@ -707,7 +707,7 @@
 		</data>
 		<string>ZMCG7MLDV9</string>
 		<string>ZMCG7MLDV9:com.northpolesec.santa</string>
-		<string>09bca9f7019b6b5ba61380c998ebc1e9f89d8804</string>
+		<string>2204178bc2869d3cbbbecea6b1527d2882a220f1</string>
 		<integer>536871681</integer>
 		<integer>3</integer>
 		<dict>
@@ -802,12 +802,17 @@
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>92</integer>
+				<integer>93</integer>
 			</dict>
 			<key>accessedPath</key>
 			<dict>
 				<key>CF$UID</key>
 				<integer>72</integer>
+			</dict>
+			<key>decision</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>92</integer>
 			</dict>
 			<key>idx</key>
 			<dict>
@@ -835,7 +840,7 @@
 				<integer>73</integer>
 			</dict>
 		</dict>
-		<integer>1047033690</integer>
+		<integer>3848961960</integer>
 		<dict>
 			<key>$class</key>
 			<dict>
@@ -896,8 +901,8 @@
 			</dict>
 		</dict>
 		<string>/bin/mkdir</string>
-		<string>03191543caa9b9c0cd18ff9e3eae319c85e82ebd</string>
-		<string>02ed047b9994adf6b1cf3f9e3be635f04bab77c14f3c9db99b2b1f44ceb1349c</string>
+		<string>0e923b9487572b38d65ff68f9c2919a4118318e0</string>
+		<string>e0ebb9a221e2a70c43c887ee04c5e710faac4ec3bb8f43deb608074695364ccf</string>
 		<string>com.apple.mkdir</string>
 		<dict>
 			<key>$class</key>
@@ -1065,6 +1070,7 @@
 			<key>$classname</key>
 			<string>SNTStoredFileAccessProcess</string>
 		</dict>
+		<integer>1</integer>
 		<dict>
 			<key>$classes</key>
 			<array>

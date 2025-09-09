@@ -11,12 +11,17 @@
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>29</integer>
+				<integer>30</integer>
 			</dict>
 			<key>accessedPath</key>
 			<dict>
 				<key>CF$UID</key>
 				<integer>5</integer>
+			</dict>
+			<key>decision</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>29</integer>
 			</dict>
 			<key>idx</key>
 			<dict>
@@ -44,7 +49,7 @@
 				<integer>6</integer>
 			</dict>
 		</dict>
-		<integer>1306836299</integer>
+		<integer>1893129164</integer>
 		<dict>
 			<key>$class</key>
 			<dict>
@@ -52,7 +57,7 @@
 				<integer>4</integer>
 			</dict>
 			<key>NS.time</key>
-			<real>778730081.69385505</real>
+			<real>779124956.58414495</real>
 		</dict>
 		<dict>
 			<key>$classes</key>
@@ -119,8 +124,8 @@
 			</dict>
 		</dict>
 		<string>/bin/mkdir</string>
-		<string>03191543caa9b9c0cd18ff9e3eae319c85e82ebd</string>
-		<string>02ed047b9994adf6b1cf3f9e3be635f04bab77c14f3c9db99b2b1f44ceb1349c</string>
+		<string>0e923b9487572b38d65ff68f9c2919a4118318e0</string>
+		<string>e0ebb9a221e2a70c43c887ee04c5e710faac4ec3bb8f43deb608074695364ccf</string>
 		<string>platform:com.apple.mkdir</string>
 		<dict>
 			<key>$class</key>
@@ -283,7 +288,7 @@
 			<string>NSArray</string>
 		</dict>
 		<string>&lt;unknown team id&gt;</string>
-		<integer>92007</integer>
+		<integer>4626</integer>
 		<string>mlw</string>
 		<dict>
 			<key>$class</key>
@@ -303,7 +308,7 @@
 			</dict>
 		</dict>
 		<string>/bin/zsh</string>
-		<integer>974</integer>
+		<integer>4094</integer>
 		<dict>
 			<key>$classes</key>
 			<array>
@@ -313,6 +318,7 @@
 			<key>$classname</key>
 			<string>SNTStoredFileAccessProcess</string>
 		</dict>
+		<integer>1</integer>
 		<dict>
 			<key>$classes</key>
 			<array>

@@ -105,6 +105,7 @@ int main(int argc, const char *argv[]) {
   faaEvent.ruleName = @"MyRule";
   faaEvent.ruleVersion = @"MyRuleVersion";
   faaEvent.accessedPath = @"/you/are/being/watched";
+  faaEvent.decision = FileAccessPolicyDecision::kDenied;
   faaEvent.process.filePath = fi.path;
   faaEvent.process.fileSHA256 = fi.SHA256;
   faaEvent.process.cdhash = csc.cdhash;

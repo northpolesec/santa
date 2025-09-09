@@ -18,6 +18,9 @@ build --per_file_copt=.*\.mm\$@-std=c++20
 build --cxxopt=-std=c++20
 build --host_cxxopt=-std=c++20
 
+# Enable C++ interoperability in Swift
+build --@rules_swift//swift:copt=-cxx-interoperability-mode=default
+
 # cel-cpp has lots of warnings that we don't need to see (and definitely don't
 # want to be treated as errors).
 build --per_file_copt=.*cel-cpp.*@-Wno-deprecated-declarations
