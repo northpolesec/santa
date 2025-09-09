@@ -280,6 +280,22 @@ using santa::NSStringToUTF8StringView;
   e->set_target(NSStringToUTF8StringView(event.accessedPath));
   e->set_access_time([event.occurrenceDate timeIntervalSince1970]);
 
+  switch (event.decision) {
+    case FileAccessPolicyDecision::kDenied:
+      e->set_decision(::pbv1::FILE_ACCESS_DECISION_DENIED);
+      break;
+    case FileAccessPolicyDecision::kDeniedInvalidSignature:
+      e->set_decision(::pbv1::FILE_ACCESS_DECISION_DENIED_INVALID_SIGNATURE);
+      break;
+    case FileAccessPolicyDecision::kAllowedAuditOnly:
+      e->set_decision(::pbv1::FILE_ACCESS_DECISION_AUDIT_ONLY);
+      break;
+    case FileAccessPolicyDecision::kNoPolicy: return std::nullopt;
+    case FileAccessPolicyDecision::kAllowed: return std::nullopt;
+    case FileAccessPolicyDecision::kAllowedReadAccess: return std::nullopt;
+    default: return std::nullopt;
+  }
+
   SNTStoredFileAccessProcess *p = event.process;
   ::pbv1::Process *proc = nullptr;
   while (p) {

@@ -23,11 +23,23 @@
     }                                       \
   } while (0)
 
+// Helper function to appropriately box a value based on underlying type. At
+// compile time, check if the type T is an enumeration. If so, cast it to its
+// underlying integer type before boxing. Otherwise, box it directly.
+template <typename T>
+static inline constexpr id SmartBoxVaue(T value) {
+  if constexpr (std::is_enum_v<T>) {
+    return @(static_cast<std::underlying_type_t<T>>(value));
+  } else {
+    return @(value);
+  }
+}
+
 /// Encode the property (by first boxing the value) keyed
 /// by the property name.
 #define ENCODE_BOXABLE(c, o)                   \
   do {                                         \
-    id local_obj__ = @(self.o);                \
+    id local_obj__ = SmartBoxVaue(self.o);     \
     [c encodeObject:local_obj__ forKey:@(#o)]; \
   } while (0)
 

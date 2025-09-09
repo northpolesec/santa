@@ -14,6 +14,7 @@
 
 #import <Foundation/Foundation.h>
 
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTStoredEvent.h"
 
 @class MOLCertificate;
@@ -31,7 +32,11 @@
 /// The watched path that was accessed.
 @property(nullable) NSString *accessedPath;
 
+/// Information about the process that performed the access.
 @property(nullable) SNTStoredFileAccessProcess *process;
+
+/// The decision made by Santa about the access operation.
+@property FileAccessPolicyDecision decision;
 
 @end
 
