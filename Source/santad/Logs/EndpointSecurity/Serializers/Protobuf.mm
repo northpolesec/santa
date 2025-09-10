@@ -200,11 +200,6 @@ static inline void EncodeAnnotations(std::function<::pbv1::process_tree::Annotat
   }
 }
 
-#if !HAVE_MACOS_15
-// Note: This type alias did not exist until the macOS 15 SDK.
-typedef uint8_t es_cdhash_t[20];
-#endif
-
 void EncodeCodeSignature(::pbv1::CodeSignature *pb_code_sig, const es_cdhash_t cdhash,
                          es_string_token_t sid, es_string_token_t tid,
                          NSDate *secure_signing_time = nil, NSDate *signing_time = nil) {
