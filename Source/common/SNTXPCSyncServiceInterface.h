@@ -21,6 +21,7 @@
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 
 ///
 ///  Protocol implemented by syncservice and utilized by daemon and ctl for communication with a

@@ -427,7 +427,7 @@ static NSString *const kPrinterProxyPostMonterey =
         // So the server has something to show the user straight away, initiate an event
         // upload for the blocked binary rather than waiting for the next sync.
         dispatch_async(_eventQueue, ^{
-          [self.syncdQueue addExecutionEvent:se];
+          [self.syncdQueue addStoredEvent:se];
         });
       }
 

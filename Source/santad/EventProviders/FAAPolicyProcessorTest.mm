@@ -46,7 +46,6 @@ extern es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_r
 extern es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision);
 extern bool IsBlockDecision(FileAccessPolicyDecision decision);
 extern bool ShouldLogDecision(FileAccessPolicyDecision decision);
-extern bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision);
 }  // namespace santa
 
 // Helper to reset a policy to an empty state
@@ -121,22 +120,6 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
 
   for (const auto &kv : policyDecisionToShouldLog) {
     XCTAssertEqual(santa::ShouldLogDecision(kv.first), kv.second);
-  }
-}
-
-- (void)testShouldNotifyUserDecision {
-  std::map<FileAccessPolicyDecision, bool> policyDecisionToShouldLog = {
-      {FileAccessPolicyDecision::kNoPolicy, false},
-      {FileAccessPolicyDecision::kDenied, true},
-      {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
-      {FileAccessPolicyDecision::kAllowed, false},
-      {FileAccessPolicyDecision::kAllowedReadAccess, false},
-      {FileAccessPolicyDecision::kAllowedAuditOnly, false},
-      {(FileAccessPolicyDecision)123, false},
-  };
-
-  for (const auto &kv : policyDecisionToShouldLog) {
-    XCTAssertEqual(santa::ShouldNotifyUserDecision(kv.first), kv.second);
   }
 }
 

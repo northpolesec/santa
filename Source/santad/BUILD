@@ -236,6 +236,7 @@ objc_library(
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:SantaCache",
         "//Source/common:String",

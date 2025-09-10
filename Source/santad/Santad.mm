@@ -140,8 +140,15 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
           const std::shared_ptr<santa::WatchItemPolicyBase> &policy) {
         return watch_items->EventDetailLinkInfo(policy);
       },
-      ^(SNTStoredFileAccessEvent *event) {
-        [[SNTDatabaseController eventTable] addStoredEvent:event];
+      ^(SNTStoredFileAccessEvent *event, bool sendImmediately) {
+        // Only store FAA events if a sync server is configured.
+        if (configurator.syncBaseURL) {
+          [[SNTDatabaseController eventTable] addStoredEvent:event];
+
+          if (sendImmediately) {
+            [syncd_queue addStoredEvent:event];
+          }
+        }
       });
 
   SNTEndpointSecurityDataFileAccessAuthorizer *data_faa_client =

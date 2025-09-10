@@ -744,6 +744,7 @@ objc_library(
         ":SNTExportConfiguration",
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
+        ":SNTStoredFileAccessEvent",
     ],
 )
 

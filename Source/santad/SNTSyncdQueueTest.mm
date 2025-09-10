@@ -19,6 +19,7 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 
 @interface SNTSyncdQueue (Testing)
 - (BOOL)backoffForPrimaryHash:(NSString *)hash;
@@ -78,14 +79,29 @@
   // Add an event, it should be dispatched to the sync service for upload.
   SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
   se.fileSHA256 = @"123";
-  [sut addExecutionEvent:se];
+  [sut addStoredEvent:se];
   OCMVerify(times(1), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 
   // Add the same event many times, they all should be dropped.
-  for (int i = 0; i < 1000; ++i) {
-    [sut addExecutionEvent:se];
+  for (int i = 0; i < 10; ++i) {
+    [sut addStoredEvent:se];
   }
   OCMVerify(times(1), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
+
+  // Do it all again for SNTStoredFileAccessEvent
+  SNTStoredFileAccessEvent *fe = [[SNTStoredFileAccessEvent alloc] init];
+  fe.ruleName = @"MyRule";
+  fe.ruleVersion = @"MyVersion";
+  fe.process.fileSHA256 = @"123";
+
+  [sut addStoredEvent:fe];
+  OCMVerify(times(2), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
+
+  // Add the same event many times, they all should be dropped.
+  for (int i = 0; i < 10; ++i) {
+    [sut addStoredEvent:fe];
+  }
+  OCMVerify(times(2), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 }
 
 @end
