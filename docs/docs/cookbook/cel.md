@@ -48,7 +48,10 @@ args.exists(arg, arg in [
 ]) && args.join(" ").contains("Library/Launch") ? BLOCKLIST : ALLOWLIST
 ```
 
-Note this will not stop using the system calls directly or otherwise programmatically modifying the timestamps.
+Note this will not stop using the system calls directly or otherwise
+programmatically modifying the timestamps. Also this won't cover modifications
+if the process' current working directory is already in the LaunchDaemons /
+LaunchAgents directories.
 
 ## Prevent OSAScript From Popping Password Dialogs
 
@@ -75,3 +78,27 @@ Cloud SDK installer and AI tools like claude code use osascript.
 
 Also if you're using osascript to do this legitimately this will break your
 usage.
+
+## Prevent users from enabling SSH (Santa 2025.8+)
+
+As called out in [loobins](https://www.loobins.io/binaries/systemsetup/) the
+systemsetup command can be used to enable SSH.
+
+To block this create a signing ID rule for `platform:com.apple.systemsetup` and
+attach the following CEL program:
+
+```clike
+args.join(" ").contains("-setremotelogin on")
+```
+
+## Prevent users from enabling Remote Apple Event (Santa 2025.8+)
+
+As called out in [loobins](https://www.loobins.io/binaries/systemsetup/) the
+systemsetup command can be used to enable Remote Apple Events.
+
+To block this create a signing ID rule for `platform:com.apple.systemsetup` and
+attach the following CEL program:
+
+```clike
+args.join(" ").contains("-setremoteappleevents on")
+```
