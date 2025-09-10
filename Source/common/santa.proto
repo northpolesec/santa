@@ -337,14 +337,12 @@ message Execution {
   // The secure timestamp of when this binary was signed, as provided by the
   // timestamp service. Not populated for unsigned or ad-hoc signed binaries,
   // or if the secure timestamp is missing.
-  // Number of seconds since UNIX epoch.
-  uint32 secure_signing_time = 32;
+  optional google.protobuf.Timestamp secure_signing_time = 17;
 
   // The timestamp provided by the developer when this binary was signed.
   // It is possible for developers to set this to whatever they wish when signing
   // unlike the secure_signing_time.
-  // Number of seconds since UNIX epoch.
-  uint32 signing_time = 33;
+  optional google.protobuf.Timestamp signing_time = 18;
 }
 
 // Information about a fork event

@@ -70,6 +70,14 @@ static inline void EncodeTimestamp(Timestamp *timestamp, struct timeval tv) {
   EncodeTimestamp(timestamp, (struct timespec){tv.tv_sec, tv.tv_usec * 1000});
 }
 
+static inline void EncodeTimestamp(Timestamp *timestamp, NSDate *date) {
+  NSTimeInterval interval = [date timeIntervalSince1970];
+  double seconds;
+  double fractional = modf(interval, &seconds);
+  timestamp->set_seconds((int64_t)seconds);
+  timestamp->set_nanos((int32_t)(fractional * 1e9));
+}
+
 static inline void EncodeProcessID(pbv1::ProcessID *proc_id, const audit_token_t &tok) {
   proc_id->set_pid(Pid(tok));
   proc_id->set_pidversion(Pidversion(tok));
@@ -569,11 +577,11 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg, SNTCach
   pb_exec->set_mode(GetModeEnum(cd.decisionClientMode));
 
   if (cd.secureSigningTime) {
-    pb_exec->set_secure_signing_time([cd.secureSigningTime timeIntervalSince1970]);
+    EncodeTimestamp(pb_exec->mutable_secure_signing_time(), cd.secureSigningTime);
   }
 
   if (cd.signingTime) {
-    pb_exec->set_signing_time([cd.signingTime timeIntervalSince1970]);
+    EncodeTimestamp(pb_exec->mutable_signing_time(), cd.signingTime);
   }
 
   if (cd.certSHA256 || cd.certCommonName) {

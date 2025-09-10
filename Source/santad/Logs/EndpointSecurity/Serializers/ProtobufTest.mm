@@ -744,9 +744,16 @@ void SerializeAndCheckNonESEvents(
     XCTAssertTrue(santa_msg.has_execution());
 
     const ::pbv1::Execution &execution = santa_msg.execution();
-    XCTAssertEqual(execution.secure_signing_time(), 1699376402U,
-                   @"Secure signing time should be populated");
-    XCTAssertEqual(execution.signing_time(), 1699376000U, @"Signing time should be populated");
+    XCTAssertTrue(execution.has_secure_signing_time(), @"Should have secure signing time");
+    XCTAssertEqual(execution.secure_signing_time().seconds(), 1699376402,
+                   @"Secure signing time seconds should be populated");
+    XCTAssertEqual(execution.secure_signing_time().nanos(), 0,
+                   @"Secure signing time nanos should be 0 for whole seconds");
+    XCTAssertTrue(execution.has_signing_time(), @"Should have signing time");
+    XCTAssertEqual(execution.signing_time().seconds(), 1699376000,
+                   @"Signing time seconds should be populated");
+    XCTAssertEqual(execution.signing_time().nanos(), 0,
+                   @"Signing time nanos should be 0 for whole seconds");
   }
 
   // Test 2: No signing times (nil values)
@@ -769,9 +776,9 @@ void SerializeAndCheckNonESEvents(
     XCTAssertTrue(santa_msg.has_execution());
 
     const ::pbv1::Execution &execution = santa_msg.execution();
-    XCTAssertEqual(execution.secure_signing_time(), 0U,
-                   @"Secure signing time should be 0 when nil");
-    XCTAssertEqual(execution.signing_time(), 0U, @"Signing time should be 0 when nil");
+    XCTAssertFalse(execution.has_secure_signing_time(),
+                   @"Should not have secure signing time when nil");
+    XCTAssertFalse(execution.has_signing_time(), @"Should not have signing time when nil");
   }
 
   // Test 3: Only one signing time present
@@ -794,10 +801,47 @@ void SerializeAndCheckNonESEvents(
     XCTAssertTrue(santa_msg.has_execution());
 
     const ::pbv1::Execution &execution = santa_msg.execution();
-    XCTAssertEqual(execution.secure_signing_time(), 0U,
-                   @"Secure signing time should be 0 when nil");
-    XCTAssertEqual(execution.signing_time(), 1699376123U,
-                   @"Signing time should be populated when present");
+    XCTAssertFalse(execution.has_secure_signing_time(),
+                   @"Should not have secure signing time when nil");
+    XCTAssertTrue(execution.has_signing_time(), @"Should have signing time when present");
+    XCTAssertEqual(execution.signing_time().seconds(), 1699376123,
+                   @"Signing time seconds should be populated when present");
+    XCTAssertEqual(execution.signing_time().nanos(), 0,
+                   @"Signing time nanos should be 0 for whole seconds");
+  }
+
+  // Test 4: Fractional seconds in timestamps
+  {
+    SNTCachedDecision *testDecisionWithFractionalTime = [[SNTCachedDecision alloc] init];
+    testDecisionWithFractionalTime.decision = SNTEventStateAllowBinary;
+    testDecisionWithFractionalTime.decisionClientMode = SNTClientModeLockdown;
+    testDecisionWithFractionalTime.sha256 = @"test_hash";
+    testDecisionWithFractionalTime.secureSigningTime =
+        [NSDate dateWithTimeIntervalSince1970:1699376402.123456];
+    testDecisionWithFractionalTime.signingTime =
+        [NSDate dateWithTimeIntervalSince1970:1699376000.987654];
+
+    auto enrichedMsg = Enricher{}.Enrich(Message(mockESApi, &esMsg));
+    auto *enrichedExec = std::get_if<santa::EnrichedExec>(&enrichedMsg->GetEnrichedMessage());
+    XCTAssertTrue(enrichedExec != nullptr, @"Should have EnrichedExec");
+    std::vector<uint8_t> result =
+        serializer->SerializeMessage(*enrichedExec, testDecisionWithFractionalTime);
+
+    ::pbv1::SantaMessage santa_msg;
+    XCTAssertTrue(santa_msg.ParseFromArray(result.data(), (int)result.size()));
+    XCTAssertTrue(santa_msg.has_execution());
+
+    const ::pbv1::Execution &execution = santa_msg.execution();
+    XCTAssertTrue(execution.has_secure_signing_time(), @"Should have secure signing time");
+    XCTAssertEqual(execution.secure_signing_time().seconds(), 1699376402,
+                   @"Secure signing time seconds should be populated");
+    XCTAssertTrue(abs(execution.secure_signing_time().nanos() - 123456000) <= 1,
+                  @"Secure signing time nanos should preserve fractional seconds (within 1ns)");
+    XCTAssertTrue(execution.has_signing_time(), @"Should have signing time");
+    XCTAssertEqual(execution.signing_time().seconds(), 1699376000,
+                   @"Signing time seconds should be populated");
+    XCTAssertTrue(abs(execution.signing_time().nanos() - 987654000) <= 30,
+                  @"Signing time nanos should preserve fractional seconds (within 30ns)");
   }
 }
 
