@@ -697,6 +697,110 @@ void SerializeAndCheckNonESEvents(
                           json:YES];
 }
 
+- (void)testSigningTimesSerialization {
+  // Test signing time field population directly by creating protobuf messages
+  // and calling SerializeMessage with different cached decisions
+
+  std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  auto serializer = Protobuf::Create(mockESApi, self.mockDecisionCache, false);
+
+  es_file_t procFileTarget = MakeESFile("test_app", MakeStat(300));
+  es_process_t procTarget =
+      MakeESProcess(&procFileTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+  es_file_t fileCwd = MakeESFile("cwd", MakeStat(400));
+
+  procTarget.codesigning_flags = CS_SIGNED | CS_HARD | CS_KILL;
+  memset(procTarget.cdhash, 'A', sizeof(procTarget.cdhash));
+  procTarget.signing_id = MakeESStringToken("com.northpolesec.testapp");
+  procTarget.team_id = MakeESStringToken("TEAMID123");
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &procTarget);
+  esMsg.event.exec.target = &procTarget;
+  esMsg.event.exec.cwd = &fileCwd;
+
+  EXPECT_CALL(*mockESApi, ExecArgCount).WillRepeatedly(testing::Return(1));
+  EXPECT_CALL(*mockESApi, ExecArg)
+      .WillRepeatedly(testing::Return(MakeESStringToken("/Applications/TestApp.app")));
+  EXPECT_CALL(*mockESApi, ExecEnvCount).WillRepeatedly(testing::Return(0));
+
+  // Test 1: Both signing times present
+  {
+    SNTCachedDecision *testDecisionWithBothTimes = [[SNTCachedDecision alloc] init];
+    testDecisionWithBothTimes.decision = SNTEventStateAllowBinary;
+    testDecisionWithBothTimes.decisionClientMode = SNTClientModeLockdown;
+    testDecisionWithBothTimes.sha256 = @"test_hash";
+    testDecisionWithBothTimes.secureSigningTime =
+        [NSDate dateWithTimeIntervalSince1970:1699376402.0];
+    testDecisionWithBothTimes.signingTime = [NSDate dateWithTimeIntervalSince1970:1699376000.0];
+
+    auto enrichedMsg = Enricher{}.Enrich(Message(mockESApi, &esMsg));
+    auto *enrichedExec = std::get_if<santa::EnrichedExec>(&enrichedMsg->GetEnrichedMessage());
+    XCTAssertTrue(enrichedExec != nullptr, @"Should have EnrichedExec");
+    std::vector<uint8_t> result =
+        serializer->SerializeMessage(*enrichedExec, testDecisionWithBothTimes);
+
+    ::pbv1::SantaMessage santa_msg;
+    XCTAssertTrue(santa_msg.ParseFromArray(result.data(), (int)result.size()));
+    XCTAssertTrue(santa_msg.has_execution());
+
+    const ::pbv1::Execution &execution = santa_msg.execution();
+    XCTAssertEqual(execution.secure_signing_time(), 1699376402U,
+                   @"Secure signing time should be populated");
+    XCTAssertEqual(execution.signing_time(), 1699376000U, @"Signing time should be populated");
+  }
+
+  // Test 2: No signing times (nil values)
+  {
+    SNTCachedDecision *testDecisionWithoutTimes = [[SNTCachedDecision alloc] init];
+    testDecisionWithoutTimes.decision = SNTEventStateAllowBinary;
+    testDecisionWithoutTimes.decisionClientMode = SNTClientModeLockdown;
+    testDecisionWithoutTimes.sha256 = @"test_hash";
+    testDecisionWithoutTimes.secureSigningTime = nil;
+    testDecisionWithoutTimes.signingTime = nil;
+
+    auto enrichedMsg = Enricher{}.Enrich(Message(mockESApi, &esMsg));
+    auto *enrichedExec = std::get_if<santa::EnrichedExec>(&enrichedMsg->GetEnrichedMessage());
+    XCTAssertTrue(enrichedExec != nullptr, @"Should have EnrichedExec");
+    std::vector<uint8_t> result =
+        serializer->SerializeMessage(*enrichedExec, testDecisionWithoutTimes);
+
+    ::pbv1::SantaMessage santa_msg;
+    XCTAssertTrue(santa_msg.ParseFromArray(result.data(), (int)result.size()));
+    XCTAssertTrue(santa_msg.has_execution());
+
+    const ::pbv1::Execution &execution = santa_msg.execution();
+    XCTAssertEqual(execution.secure_signing_time(), 0U,
+                   @"Secure signing time should be 0 when nil");
+    XCTAssertEqual(execution.signing_time(), 0U, @"Signing time should be 0 when nil");
+  }
+
+  // Test 3: Only one signing time present
+  {
+    SNTCachedDecision *testDecisionWithPartialTimes = [[SNTCachedDecision alloc] init];
+    testDecisionWithPartialTimes.decision = SNTEventStateAllowBinary;
+    testDecisionWithPartialTimes.decisionClientMode = SNTClientModeLockdown;
+    testDecisionWithPartialTimes.sha256 = @"test_hash";
+    testDecisionWithPartialTimes.secureSigningTime = nil;  // No secure timestamp
+    testDecisionWithPartialTimes.signingTime = [NSDate dateWithTimeIntervalSince1970:1699376123.0];
+
+    auto enrichedMsg = Enricher{}.Enrich(Message(mockESApi, &esMsg));
+    auto *enrichedExec = std::get_if<santa::EnrichedExec>(&enrichedMsg->GetEnrichedMessage());
+    XCTAssertTrue(enrichedExec != nullptr, @"Should have EnrichedExec");
+    std::vector<uint8_t> result =
+        serializer->SerializeMessage(*enrichedExec, testDecisionWithPartialTimes);
+
+    ::pbv1::SantaMessage santa_msg;
+    XCTAssertTrue(santa_msg.ParseFromArray(result.data(), (int)result.size()));
+    XCTAssertTrue(santa_msg.has_execution());
+
+    const ::pbv1::Execution &execution = santa_msg.execution();
+    XCTAssertEqual(execution.secure_signing_time(), 0U,
+                   @"Secure signing time should be 0 when nil");
+    XCTAssertEqual(execution.signing_time(), 1699376123U,
+                   @"Signing time should be populated when present");
+  }
+}
+
 - (void)testEncodeEntitlements {
   int kMaxEncodeObjectEntries = 64;  // From Protobuf.mm
   // Test basic encoding without filtered entitlements

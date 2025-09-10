@@ -568,6 +568,14 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg, SNTCach
   pb_exec->set_reason(GetReasonEnum(cd.decision));
   pb_exec->set_mode(GetModeEnum(cd.decisionClientMode));
 
+  if (cd.secureSigningTime) {
+    pb_exec->set_secure_signing_time([cd.secureSigningTime timeIntervalSince1970]);
+  }
+
+  if (cd.signingTime) {
+    pb_exec->set_signing_time([cd.signingTime timeIntervalSince1970]);
+  }
+
   if (cd.certSHA256 || cd.certCommonName) {
     EncodeCertificateInfo(pb_exec->mutable_certificate_info(), cd.certSHA256, cd.certCommonName);
   }
