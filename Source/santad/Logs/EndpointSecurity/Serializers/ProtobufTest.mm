@@ -62,6 +62,9 @@ using santa::Serializer;
 namespace pbv1 = ::santa::pb::v1;
 
 namespace santa {
+extern void EncodeCodeSignature(::pbv1::CodeSignature *pb_code_sig, const es_cdhash_t cdhash,
+                                es_string_token_t sid, es_string_token_t tid,
+                                NSDate *secure_signing_time = nil, NSDate *signing_time = nil);
 extern void EncodeExitStatus(::pbv1::Exit *pbExit, int exitStatus);
 extern void EncodeEntitlements(::pbv1::Execution *pb_exec, SNTCachedDecision *cd);
 extern ::pbv1::Execution::Decision GetDecisionEnum(SNTEventState event_state);
@@ -86,6 +89,7 @@ extern ::pbv1::TCCModification::AuthorizationReason GetTCCAuthorizationReason(
 #endif  // HAVE_MACOS_15_4
 }  // namespace santa
 
+using santa::EncodeCodeSignature;
 using santa::EncodeEntitlements;
 using santa::EncodeExitStatus;
 
@@ -176,6 +180,12 @@ NSString *LoadTestJson(NSString *jsonFileName, uint32_t version) {
 
 bool CompareTime(const Timestamp &timestamp, struct timespec ts) {
   return timestamp.seconds() == ts.tv_sec && timestamp.nanos() == ts.tv_nsec;
+}
+
+NSDate *NSDateFromProtobuf(const Timestamp &timestamp) {
+  NSTimeInterval timeInterval = static_cast<NSTimeInterval>(timestamp.seconds());
+  timeInterval += static_cast<NSTimeInterval>(timestamp.nanos()) / NSEC_PER_SEC;
+  return [NSDate dateWithTimeIntervalSince1970:timeInterval];
 }
 
 const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &santaMsg) {
@@ -411,6 +421,8 @@ void SerializeAndCheckNonESEvents(
   self.testCachedDecision.quarantineURL = @"google.com";
   self.testCachedDecision.certSHA256 = @"5678_cert_hash";
   self.testCachedDecision.decisionClientMode = SNTClientModeLockdown;
+  self.testCachedDecision.secureSigningTime = [NSDate dateWithTimeIntervalSince1970:1751111111];
+  self.testCachedDecision.signingTime = [NSDate dateWithTimeIntervalSince1970:1752222222];
   self.testCachedDecision.entitlements = @{
     @"key_with_str_val" : @"bar",
     @"key_with_num_val" : @(1234),
@@ -758,6 +770,46 @@ void SerializeAndCheckNonESEvents(
     XCTAssertEqual(kMaxEncodeObjectEntries, pbExec.entitlement_info().entitlements_size());
     XCTAssertTrue(pbExec.entitlement_info().has_entitlements_filtered());
     XCTAssertTrue(pbExec.entitlement_info().entitlements_filtered());
+  }
+}
+
+- (void)testEncodeCodeSignature {
+  es_cdhash_t cdhash;
+  memset(cdhash, 'A', sizeof(cdhash));
+  es_string_token_t sid = MakeESStringToken("my.sid");
+  es_string_token_t tid = MakeESStringToken("my.tid");
+  NSDate *secSigningTime = [NSDate dateWithTimeIntervalSince1970:1753333333.123];
+  NSDate *signingTime = [NSDate dateWithTimeIntervalSince1970:1754444444.456];
+
+  // Encode with no signing times specified
+  {
+    ::pbv1::CodeSignature cs;
+    EncodeCodeSignature(&cs, cdhash, sid, tid);
+    XCTAssertCppStringEqual(cs.cdhash(),
+                            std::string(reinterpret_cast<const char *>(cdhash), sizeof(cdhash)));
+    XCTAssertCppStringEqual(cs.signing_id(), sid.data);
+    XCTAssertCppStringEqual(cs.team_id(), tid.data);
+    XCTAssertFalse(cs.has_secure_signing_time());
+    XCTAssertFalse(cs.has_signing_time());
+  }
+
+  // Encode with a single signing time specified
+  {
+    ::pbv1::CodeSignature cs;
+    EncodeCodeSignature(&cs, cdhash, sid, tid, secSigningTime);
+    NSDate *got = NSDateFromProtobuf(cs.secure_signing_time());
+    XCTAssertEqualObjects(got, secSigningTime);
+    XCTAssertFalse(cs.has_signing_time());
+  }
+
+  // Encode with both signing times specified
+  {
+    ::pbv1::CodeSignature cs;
+    EncodeCodeSignature(&cs, cdhash, sid, tid, secSigningTime, signingTime);
+    NSDate *got = NSDateFromProtobuf(cs.secure_signing_time());
+    XCTAssertEqualObjects(got, secSigningTime);
+    got = NSDateFromProtobuf(cs.signing_time());
+    XCTAssertEqualObjects(got, signingTime);
   }
 }
 

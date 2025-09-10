@@ -70,6 +70,14 @@ static inline void EncodeTimestamp(Timestamp *timestamp, struct timeval tv) {
   EncodeTimestamp(timestamp, (struct timespec){tv.tv_sec, tv.tv_usec * 1000});
 }
 
+static inline void EncodeTimestamp(Timestamp *timestamp, NSDate *date) {
+  NSTimeInterval timeInterval = [date timeIntervalSince1970];
+  const int64_t seconds = (int64_t)timeInterval;
+
+  EncodeTimestamp(timestamp, {.tv_sec = seconds,
+                              .tv_nsec = (int32_t)((timeInterval - seconds) * NSEC_PER_SEC)});
+}
+
 static inline void EncodeProcessID(pbv1::ProcessID *proc_id, const audit_token_t &tok) {
   proc_id->set_pid(Pid(tok));
   proc_id->set_pidversion(Pidversion(tok));
@@ -192,16 +200,18 @@ static inline void EncodeAnnotations(std::function<::pbv1::process_tree::Annotat
   }
 }
 
-#if !HAVE_MACOS_15
-// Note: This type alias did not exist until the macOS 15 SDK.
-typedef uint8_t es_cdhash_t[20];
-#endif
-
-static inline void EncodeCodeSignature(::pbv1::CodeSignature *pb_code_sig, const es_cdhash_t cdhash,
-                                       es_string_token_t sid, es_string_token_t tid) {
+void EncodeCodeSignature(::pbv1::CodeSignature *pb_code_sig, const es_cdhash_t cdhash,
+                         es_string_token_t sid, es_string_token_t tid,
+                         NSDate *secure_signing_time = nil, NSDate *signing_time = nil) {
   pb_code_sig->set_cdhash(cdhash, sizeof(es_cdhash_t));
   EncodeStringToken([pb_code_sig] { return pb_code_sig->mutable_signing_id(); }, sid);
   EncodeStringToken([pb_code_sig] { return pb_code_sig->mutable_team_id(); }, tid);
+  if (secure_signing_time) {
+    EncodeTimestamp(pb_code_sig->mutable_secure_signing_time(), secure_signing_time);
+  }
+  if (signing_time) {
+    EncodeTimestamp(pb_code_sig->mutable_signing_time(), signing_time);
+  }
 }
 
 static inline void EncodeProcessInfoLight(::pbv1::ProcessInfoLight *pb_proc_info,
@@ -261,7 +271,8 @@ static inline void EncodeProcessInfo(::pbv1::ProcessInfo *pb_proc_info, uint32_t
 
   if (es_proc->codesigning_flags & CS_SIGNED) {
     EncodeCodeSignature(pb_proc_info->mutable_code_signature(), es_proc->cdhash,
-                        es_proc->signing_id, es_proc->team_id);
+                        es_proc->signing_id, es_proc->team_id, cd.secureSigningTime,
+                        cd.signingTime);
   }
 
   pb_proc_info->set_cs_flags(es_proc->codesigning_flags);

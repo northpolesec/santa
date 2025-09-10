@@ -65,7 +65,9 @@
   "code_signature": {
    "cdhash": "QUFBQUFBQUFBQUFBQUFBQUFBQUE=",
    "signing_id": "my_signing_id",
-   "team_id": "my_team_id"
+   "team_id": "my_team_id",
+   "secure_signing_time": "2025-06-28T11:45:11Z",
+   "signing_time": "2025-07-11T08:23:42Z"
   },
   "cs_flags": 536871680,
   "executable": {

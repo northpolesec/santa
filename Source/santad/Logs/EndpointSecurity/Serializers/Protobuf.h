@@ -29,6 +29,11 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #import "Source/santad/SNTDecisionCache.h"
 
+#if !HAVE_MACOS_15
+// Note: This type alias did not exist until the macOS 15 SDK.
+typedef uint8_t es_cdhash_t[20];
+#endif
+
 namespace santa {
 
 class Protobuf : public Serializer {
