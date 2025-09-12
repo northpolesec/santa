@@ -36,7 +36,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTStrengthify.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 
@@ -99,8 +99,14 @@ using santa::Message;
     return;
   }
 
-  std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs =
-      self.findPoliciesForTargetsBlock(FAAPolicyProcessor::PathTargets(msg));
+  __block std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
+  __block auto pathTargets = FAAPolicyProcessor::PathTargets(msg);
+
+  self.findPoliciesForTargetsBlock(^(santa::LookupPolicyBlock lookupPolicyBlock) {
+    for (const auto &target : pathTargets) {
+      targetPolicyPairs.emplace_back(target, lookupPolicyBlock(target.path.c_str()));
+    }
+  });
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,

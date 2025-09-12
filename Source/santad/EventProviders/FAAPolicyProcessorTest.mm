@@ -27,7 +27,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
 #include "Source/common/TestUtils.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/MockFAAPolicyProcessor.h"

@@ -868,6 +868,7 @@ test_suite(
         ":ScopedIOObjectRefTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:CELTest",
+        "//Source/common/faa:unit_tests",
     ],
     visibility = ["//:santa_package_group"],
 )

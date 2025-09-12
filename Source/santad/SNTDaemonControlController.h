@@ -17,7 +17,7 @@
 #include <memory>
 
 #import "Source/common/SNTXPCControlInterface.h"
-#include "Source/santad/DataLayer/WatchItems.h"
+#include "Source/common/faa/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/Logs/EndpointSecurity/Logger.h"
 
