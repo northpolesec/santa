@@ -27,10 +27,10 @@
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
+#include "Source/common/faa/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItems.h"
 #include "Source/santad/DataLayer/SNTEventTable.h"
 #include "Source/santad/DataLayer/SNTRuleTable.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
-#include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
@@ -160,11 +160,15 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                    faaPolicyProcessor:std::make_shared<santa::DataFAAPolicyProcessorProxy>(
                                           faaPolicyProcessor)
                             ttyWriter:tty_writer
-          findPoliciesForTargetsBlock:^std::vector<santa::FAAPolicyProcessor::TargetPolicyPair>(
-              const std::vector<santa::FAAPolicyProcessor::PathTarget> &targets) {
-            return watch_items->FindPoliciesForTargets(targets);
+          findPoliciesForTargetsBlock:^(santa::IterateTargetsBlock iterateBlock) {
+            watch_items->FindPoliciesForTargets(iterateBlock);
           }];
-  watch_items->RegisterDataClient(data_faa_client);
+
+  watch_items->RegisterDataWatchItemsUpdatedCallback(
+      ^(size_t count, const santa::SetPairPathAndType &new_paths,
+        const santa::SetPairPathAndType &removed_paths) {
+        [data_faa_client watchItemsCount:count newPaths:new_paths removedPaths:removed_paths];
+      });
 
   data_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent *event, NSString *customMsg,
                                             NSString *customURL, NSString *customText) {
@@ -188,7 +192,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             watch_items->IterateProcessPolicies(checkPolicyBlock);
           }];
 
-  watch_items->RegisterProcessClient(proc_faa_client);
+  watch_items->RegisterProcWatchItemsUpdatedCallback(^(size_t count) {
+    [proc_faa_client processWatchItemsCount:count];
+  });
 
   proc_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent *event, NSString *customMsg,
                                             NSString *customURL, NSString *customText) {

@@ -29,9 +29,7 @@
 #include <vector>
 
 #include "Source/common/PrefixTree.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/FAAPolicyProcessor.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "absl/container/flat_hash_set.h"
 
 extern NSString *const kWatchItemConfigKeyVersion;
@@ -68,8 +66,17 @@ class WatchItemsPeer;
 // process policy.
 using CheckPolicyBlock = bool (^)(std::shared_ptr<ProcessWatchItemPolicy>);
 using IterateProcessPoliciesBlock = void (^)(CheckPolicyBlock);
-using FindPoliciesForTargetsBlock = std::vector<FAAPolicyProcessor::TargetPolicyPair> (^)(
-    const std::vector<FAAPolicyProcessor::PathTarget> &targets);
+
+// The nesting is required so as to not tightly couple WatchItems with how
+// external callers might structure their data. In the past,
+// FAAPolicyProcessor types were used directly to make the code easier to read
+// However this made things complicated when WatchItems was restructured.
+// Allowing callers to define their own structures simplifies this code at the
+// cost of making it a little harder to read.
+using LookupPolicyBlock =
+    std::optional<std::shared_ptr<WatchItemPolicyBase>> (^)(const std::string &);
+using IterateTargetsBlock = void (^)(LookupPolicyBlock);
+using FindPoliciesForTargetsBlock = void (^)(IterateTargetsBlock);
 
 struct WatchItemsState {
   uint64_t rule_count;
@@ -102,8 +109,7 @@ class DataWatchItems {
   bool Build(SetSharedDataWatchItemPolicy data_policies);
   size_t Count() const { return paths_.size(); }
 
-  std::vector<FAAPolicyProcessor::TargetPolicyPair> FindPolicies(
-      const std::vector<FAAPolicyProcessor::PathTarget> &targets) const;
+  void FindPolicies(IterateTargetsBlock iterateTargetsBlock) const;
 
  private:
   std::unique_ptr<santa::PrefixTree<std::shared_ptr<DataWatchItemPolicy>>> tree_;
@@ -135,6 +141,11 @@ class ProcessWatchItems {
 
 class WatchItems : public std::enable_shared_from_this<WatchItems> {
  public:
+  // Type aliases
+  using DataWatchItemsUpdatedBlock = std::function<void(
+      size_t count, const SetPairPathAndType &new_paths, const SetPairPathAndType &removed_paths)>;
+  using ProcWatchItemsUpdatedBlock = std::function<void(size_t count)>;
+
   // Factory methods
   static std::shared_ptr<WatchItems> Create(NSString *config_path,
                                             uint64_t reapply_config_frequency_secs);
@@ -150,14 +161,13 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
 
   void BeginPeriodicTask();
 
-  void RegisterDataClient(id<SNTDataFileAccessAuthorizer> client);
-  void RegisterProcessClient(id<SNTProcessFileAccessAuthorizer> client);
+  void RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback);
+  void RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback);
 
   void SetConfigPath(NSString *config_path);
   void SetConfig(NSDictionary *config);
 
-  std::vector<FAAPolicyProcessor::TargetPolicyPair> FindPoliciesForTargets(
-      const std::vector<FAAPolicyProcessor::PathTarget> &targets);
+  void FindPoliciesForTargets(IterateTargetsBlock iterateTargetsBlock);
 
   void IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock);
 
@@ -191,8 +201,8 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   NSDictionary *current_config_ ABSL_GUARDED_BY(lock_);
   NSTimeInterval last_update_time_ ABSL_GUARDED_BY(lock_);
   std::string policy_version_ ABSL_GUARDED_BY(lock_);
-  id<SNTDataFileAccessAuthorizer> registered_data_client_ ABSL_GUARDED_BY(lock_);
-  id<SNTProcessFileAccessAuthorizer> registered_proc_client_ ABSL_GUARDED_BY(lock_);
+  DataWatchItemsUpdatedBlock data_watch_items_updated_callback_ ABSL_GUARDED_BY(lock_);
+  ProcWatchItemsUpdatedBlock proc_watch_items_updated_callback_ ABSL_GUARDED_BY(lock_);
   bool periodic_task_started_ = false;
   NSString *policy_event_detail_url_ ABSL_GUARDED_BY(lock_);
   NSString *policy_event_detail_text_ ABSL_GUARDED_BY(lock_);

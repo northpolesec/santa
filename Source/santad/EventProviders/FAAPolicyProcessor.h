@@ -31,7 +31,7 @@
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaSetCache.h"
 #include "Source/common/SantaVnode.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/RateLimiter.h"

@@ -23,7 +23,7 @@
 #include <sys/stat.h>
 
 #import "Source/common/SNTCachedDecision.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
