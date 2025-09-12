@@ -79,7 +79,7 @@ static const uint32_t kEventTableCurrentVersion = 5;
     [db executeUpdate:@"DROP INDEX filesha256"];
     [db executeUpdate:@"ALTER TABLE events RENAME COLUMN filesha256 TO uniqueid"];
     [db executeUpdate:@"CREATE UNIQUE INDEX uniqueid ON events (uniqueid)"];
-    newVersion = 4;
+    newVersion = 5;
   }
 
   return newVersion;
