@@ -45,6 +45,8 @@ extern NSString *const kWatchItemConfigKeyOptionsRuleType;
 extern NSString *const kWatchItemConfigKeyOptionsEnableSilentMode;
 extern NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode;
 extern NSString *const kWatchItemConfigKeyOptionsCustomMessage;
+extern NSString *const kWatchItemConfigKeyOptionsEventDetailText;
+extern NSString *const kWatchItemConfigKeyOptionsEventDetailURL;
 extern NSString *const kWatchItemConfigKeyProcesses;
 extern NSString *const kWatchItemConfigKeyProcessesBinaryPath;
 extern NSString *const kWatchItemConfigKeyProcessesCertificateSha256;

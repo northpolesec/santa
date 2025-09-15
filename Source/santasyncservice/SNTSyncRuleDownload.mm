@@ -14,20 +14,24 @@
 ///    limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncRuleDownload.h"
-#include "Source/santasyncservice/SNTPushNotificationsTracker.h"
+
+#include <Foundation/Foundation.h>
+#include <google/protobuf/arena.h>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
+#import "Source/common/faa/WatchItemPolicy.h"
+#import "Source/common/faa/WatchItems.h"
 #import "Source/santasyncservice/SNTPushNotificationsTracker.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
-
-#include <google/protobuf/arena.h>
 #include "sync/v1.pb.h"
+
 namespace pbv1 = ::santa::sync::v1;
 
 using santa::NSStringToUTF8String;
@@ -102,6 +106,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
   self.syncState.rulesReceived = 0;
   NSMutableArray<SNTRule *> *newRules = [NSMutableArray array];
+  NSMutableArray<SNTFileAccessRule *> *newWatchItems = [NSMutableArray array];
   std::string cursor;
 
   do {
@@ -132,6 +137,15 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         [newRules addObject:r];
       }
 
+      for (const ::pbv1::FileAccessRule &watchItem : response.file_access_rules()) {
+        SNTFileAccessRule *rule = [self faaWatchItemFromProtoWatchItem:watchItem];
+        if (!rule) {
+          SLOGD(@"Ignoring bad watch item: %s", watchItem.Utf8DebugString().c_str());
+          continue;
+        }
+        [newWatchItems addObject:rule];
+      }
+
       cursor = response.cursor();
       SLOGI(@"Received %lu rules", (unsigned long)response.rules_size());
       self.syncState.rulesReceived += response.rules_size();
@@ -143,7 +157,153 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   return newRules;
 }
 
-- (SNTRule *)ruleFromProtoRule:(::pbv1::Rule)rule {
+- (NSArray *)pathsFromProtoFAARulePaths:
+    (const google::protobuf::RepeatedPtrField<::pbv1::FileAccessRule::Path> &)pbPaths {
+  NSMutableArray *watchPaths = [NSMutableArray array];
+
+  for (const ::pbv1::FileAccessRule::Path &path : pbPaths) {
+    NSMutableDictionary *pathDict = [NSMutableDictionary dictionary];
+    pathDict[kWatchItemConfigKeyPathsPath] = StringToNSString(path.path());
+
+    switch (path.path_type()) {
+      // Note: If unspecified, using kWatchItemPolicyDefaultPathType (WatchItemPathType::kLiteral)
+      case ::pbv1::FileAccessRule::Path::PATH_TYPE_UNSPECIFIED: [[clang::fallthrough]];
+      case ::pbv1::FileAccessRule::Path::PATH_TYPE_LITERAL:
+        pathDict[kWatchItemConfigKeyPathsIsPrefix] = @(NO);
+        break;
+      case ::pbv1::FileAccessRule::Path::PATH_TYPE_PREFIX:
+        pathDict[kWatchItemConfigKeyPathsIsPrefix] = @(YES);
+        break;
+      default: return nil;
+    }
+
+    [watchPaths addObject:pathDict];
+  }
+
+  return watchPaths;
+}
+
+- (NSDictionary *)optionsFromProtoFAARuleAdd:(const ::pbv1::FileAccessRule::Add &)pbAddRule {
+  NSMutableDictionary *optionsDict = [NSMutableDictionary dictionary];
+
+  switch (pbAddRule.rule_type()) {
+    case ::pbv1::FileAccessRule::RULE_TYPE_UNSPECIFIED:
+    case ::pbv1::FileAccessRule::RULE_TYPE_PATHS_WITH_ALLOWED_PROCESSES:
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] =
+          @(static_cast<int>(santa::WatchItemRuleType::kPathsWithAllowedProcesses));
+      break;
+    case ::pbv1::FileAccessRule::RULE_TYPE_PATHS_WITH_DENIED_PROCESSES:
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] =
+          @(static_cast<int>(santa::WatchItemRuleType::kPathsWithDeniedProcesses));
+      break;
+    case ::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_ALLOWED_PATHS:
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] =
+          @(static_cast<int>(santa::WatchItemRuleType::kProcessesWithAllowedPaths));
+      break;
+    case ::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS:
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] =
+          @(static_cast<int>(santa::WatchItemRuleType::kProcessesWithDeniedPaths));
+      break;
+    default: return nil;
+  }
+
+  optionsDict[kWatchItemConfigKeyOptionsAllowReadAccess] = @(pbAddRule.allow_read_access());
+  optionsDict[kWatchItemConfigKeyOptionsAuditOnly] = @(!pbAddRule.block_violations());
+  optionsDict[kWatchItemConfigKeyOptionsEnableSilentMode] = @(pbAddRule.enable_silent_mode());
+  optionsDict[kWatchItemConfigKeyOptionsEnableSilentTTYMode] =
+      @(pbAddRule.enable_silent_tty_mode());
+  optionsDict[kWatchItemConfigKeyOptionsCustomMessage] =
+      pbAddRule.block_message().length() > 0 ? StringToNSString(pbAddRule.block_message()) : nil;
+  optionsDict[kWatchItemConfigKeyOptionsEventDetailText] =
+      pbAddRule.event_detail_text().length() > 0 ? StringToNSString(pbAddRule.event_detail_text())
+                                                 : nil;
+  optionsDict[kWatchItemConfigKeyOptionsEventDetailURL] =
+      pbAddRule.event_detail_url().length() > 0 ? StringToNSString(pbAddRule.event_detail_url())
+                                                : nil;
+
+  return optionsDict;
+}
+
+- (NSArray *)processesFromProtoFAARuleProcesses:
+    (const google::protobuf::RepeatedPtrField<::pbv1::FileAccessRule::Process> &)pbProcesses {
+  NSMutableArray *processes = [NSMutableArray array];
+
+  for (const ::pbv1::FileAccessRule::Process &process : pbProcesses) {
+    NSMutableDictionary *processDict = [NSMutableDictionary dictionary];
+
+    switch (process.identifier_case()) {
+      case ::pbv1::FileAccessRule::Process::kBinaryPath:
+        processDict[kWatchItemConfigKeyProcessesBinaryPath] =
+            StringToNSString(process.binary_path());
+        break;
+      case ::pbv1::FileAccessRule::Process::kCdHash:
+        processDict[kWatchItemConfigKeyProcessesCDHash] = StringToNSString(process.cd_hash());
+        break;
+      case ::pbv1::FileAccessRule::Process::kSigningId:
+        processDict[kWatchItemConfigKeyProcessesSigningID] = StringToNSString(process.signing_id());
+        break;
+      case ::pbv1::FileAccessRule::Process::kCertificateSha256:
+        processDict[kWatchItemConfigKeyProcessesCertificateSha256] =
+            StringToNSString(process.certificate_sha256());
+        break;
+      case ::pbv1::FileAccessRule::Process::kTeamId:
+        processDict[kWatchItemConfigKeyProcessesTeamID] = StringToNSString(process.team_id());
+        break;
+      default: return nil;
+    }
+
+    [processes addObject:processDict];
+  }
+
+  return processes;
+}
+
+- (SNTFileAccessRule *)faaRuleFromProtoFAARuleAdd:(const ::pbv1::FileAccessRule::Add &)pbAddRule {
+  SNTFileAccessRule *faa = [[SNTFileAccessRule alloc] initWithState:SNTFileAccessRuleStateAdd];
+  faa.name = StringToNSString(pbAddRule.name());
+
+  NSMutableDictionary *details = [NSMutableDictionary dictionary];
+
+  NSArray *paths = [self pathsFromProtoFAARulePaths:pbAddRule.paths()];
+  if (!paths) {
+    return nil;
+  }
+  details[kWatchItemConfigKeyPaths] = paths;
+
+  NSDictionary *optionsDict = [self optionsFromProtoFAARuleAdd:pbAddRule];
+  if (!optionsDict) {
+    return nil;
+  }
+  details[kWatchItemConfigKeyOptions] = optionsDict;
+
+  NSArray *processes = [self processesFromProtoFAARuleProcesses:pbAddRule.processes()];
+  if (!paths) {
+    return nil;
+  }
+  details[kWatchItemConfigKeyProcesses] = processes;
+
+  faa.details = details;
+  return faa;
+}
+
+- (SNTFileAccessRule *)faaRuleFromProtoFAARuleRemove:
+    (const ::pbv1::FileAccessRule::Remove &)pbRemoveRule {
+  SNTFileAccessRule *faa = [[SNTFileAccessRule alloc] initWithState:SNTFileAccessRuleStateRemove];
+  faa.name = StringToNSString(pbRemoveRule.name());
+  return faa;
+}
+
+- (SNTFileAccessRule *)faaWatchItemFromProtoWatchItem:(const ::pbv1::FileAccessRule &)wi {
+  switch (wi.action_case()) {
+    case ::pbv1::FileAccessRule::kAdd: return [self faaRuleFromProtoFAARuleAdd:wi.add()];
+    case ::pbv1::FileAccessRule::kRemove: {
+      return [self faaRuleFromProtoFAARuleRemove:wi.remove()];
+      default: return nil;
+    };
+  }
+}
+
+- (SNTRule *)ruleFromProtoRule:(const ::pbv1::Rule &)rule {
   NSString *identifier = StringToNSString(rule.identifier());
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
