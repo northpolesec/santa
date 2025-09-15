@@ -24,9 +24,9 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #include "Source/common/TelemetryEventMap.h"
+#include "Source/common/faa/WatchItems.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-#include "Source/santad/DataLayer/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/ProcessTree/annotations/originator.h"
 #include "Source/santad/ProcessTree/process_tree.h"
@@ -139,7 +139,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
       TelemetryConfigToBitmask([configurator telemetry], [configurator enableAllEventUpload]),
       [configurator eventLogType], [SNTDecisionCache sharedCache], [configurator eventLogPath],
       [configurator spoolDirectory], spool_dir_threshold_bytes, spool_file_threshold_bytes,
-      spool_flush_timeout_ms, telemetry_export_frequency_secs);
+      spool_flush_timeout_ms, telemetry_export_frequency_secs,
+      [configurator telemetryExportTimeoutSec], [configurator telemetryExportBatchThresholdSizeMB],
+      [configurator telemetryExportMaxFilesPerBatch]);
   if (!logger) {
     LOGE(@"Failed to create logger.");
     exit(EXIT_FAILURE);

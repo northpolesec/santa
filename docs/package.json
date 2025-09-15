@@ -14,43 +14,48 @@
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc"
   },
+  "pnpm": {
+    "overrides": {
+      "webpack-dev-server": "^5.2.1"
+    }
+  },
   "dependencies": {
     "@docusaurus/core": "3.8.1",
     "@docusaurus/plugin-client-redirects": "^3.8.1",
     "@docusaurus/preset-classic": "3.8.1",
     "@docusaurus/theme-mermaid": "^3.8.1",
-    "@hookform/resolvers": "^5.0.1",
-    "@mdx-js/react": "^3.0.0",
-    "@radix-ui/react-checkbox": "^1.3.1",
-    "@radix-ui/react-label": "^2.1.2",
-    "@radix-ui/react-select": "^2.1.6",
-    "@radix-ui/react-separator": "^1.1.2",
-    "@radix-ui/react-slot": "^1.1.2",
-    "@radix-ui/react-switch": "^1.2.4",
-    "@tailwindcss/postcss": "^4.1.3",
+    "@hookform/resolvers": "^5.2.1",
+    "@mdx-js/react": "^3.1.1",
+    "@radix-ui/react-checkbox": "^1.3.3",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@tailwindcss/postcss": "^4.1.13",
     "class-variance-authority": "^0.7.1",
-    "clsx": "^2.0.0",
-    "docusaurus-plugin-llms": "^0.1.5",
+    "clsx": "^2.1.1",
+    "docusaurus-plugin-llms": "github:northpolesec/docusaurus-plugin-llms",
     "lucide-react": "^0.487.0",
-    "postcss": "^8.5.3",
-    "prism-react-renderer": "^2.3.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-hook-form": "^7.55.0",
+    "postcss": "^8.5.6",
+    "prism-react-renderer": "^2.4.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-hook-form": "^7.62.0",
     "react-markdown": "^10.1.0",
-    "react-select": "^5.10.1",
+    "react-select": "^5.10.2",
     "remark-gfm": "^4.0.1",
-    "tailwind-merge": "^3.2.0",
-    "tailwindcss": "^4.1.3",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.13",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.24.2"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.7.0",
     "@docusaurus/tsconfig": "3.7.0",
     "@docusaurus/types": "3.7.0",
     "prettier": "3.5.1",
-    "typescript": "~5.6.2"
+    "typescript": "~5.6.3"
   },
   "browserslist": {
     "production": [

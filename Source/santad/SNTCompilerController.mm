@@ -169,12 +169,17 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
                                                     state:SNTRuleStateAllowTransitive
                                                      type:SNTRuleTypeBinary];
 
-      // Add the new rule to the rules database.
-      NSError *err;
-      if (![ruleTable addRules:@[ rule ] ruleCleanup:SNTRuleCleanupNone error:&err]) {
-        LOGE(@"unable to add new transitive rule to database: %@", err.localizedDescription);
+      if (!rule) {
+        LOGW(@"Failed to create transitive rule: %@ (SHA-256: %@)", targetFile.path,
+             targetFile.SHA256);
       } else {
-        logger->LogAllowlist(esMsg, [targetFile.SHA256 UTF8String]);
+        // Add the new rule to the rules database.
+        NSError *err;
+        if (![ruleTable addRules:@[ rule ] ruleCleanup:SNTRuleCleanupNone error:&err]) {
+          LOGE(@"Unable to add new transitive rule to database: %@", err.localizedDescription);
+        } else {
+          logger->LogAllowlist(esMsg, [targetFile.SHA256 UTF8String]);
+        }
       }
     }
   }

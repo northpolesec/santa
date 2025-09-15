@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/santad/DataLayer/WatchItems.h"
+#include "Source/common/faa/WatchItems.h"
 
 #include <CommonCrypto/CommonDigest.h>
 #include <Kernel/kern/cs_blobs.h>
@@ -38,7 +38,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/String.h"
 #import "Source/common/Unit.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 
 NSString *const kWatchItemConfigKeyVersion = @"Version";
 NSString *const kWatchItemConfigKeyEventDetailURL = @"EventDetailURL";
@@ -681,16 +681,11 @@ bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
   return true;
 }
 
-std::vector<FAAPolicyProcessor::TargetPolicyPair> DataWatchItems::FindPolicies(
-    const std::vector<FAAPolicyProcessor::PathTarget> &targets) const {
-  std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs;
-
-  for (const auto &target : targets) {
-    target_policy_pairs.push_back(
-        {target, tree_->LookupLongestMatchingPrefix(target.path.c_str())});
-  }
-
-  return target_policy_pairs;
+void DataWatchItems::FindPolicies(IterateTargetsBlock iterateTargetsBlock) const {
+  iterateTargetsBlock(
+      ^std::optional<std::shared_ptr<WatchItemPolicyBase>>(const std::string &path) {
+        return tree_->LookupLongestMatchingPrefix(path);
+      });
 }
 
 #pragma mark ProcessWatchItems
@@ -773,17 +768,17 @@ WatchItems::~WatchItems() {
   }
 }
 
-void WatchItems::RegisterDataClient(id<SNTDataFileAccessAuthorizer> client) {
+void WatchItems::RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback) {
   absl::MutexLock lock(&lock_);
-  if (!registered_data_client_) {
-    registered_data_client_ = client;
+  if (!data_watch_items_updated_callback_) {
+    data_watch_items_updated_callback_ = std::move(callback);
   }
 }
 
-void WatchItems::RegisterProcessClient(id<SNTProcessFileAccessAuthorizer> client) {
+void WatchItems::RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback) {
   absl::MutexLock lock(&lock_);
-  if (!registered_proc_client_) {
-    registered_proc_client_ = client;
+  if (!proc_watch_items_updated_callback_) {
+    proc_watch_items_updated_callback_ = std::move(callback);
   }
 }
 
@@ -833,21 +828,20 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
 
     LOGD(@"Changes to watch items detected, notifying registered clients.");
 
-    if (registered_data_client_) {
+    if (data_watch_items_updated_callback_) {
       // Note: Enable clients on an async queue in case they perform any
       // synchronous work that could trigger ES events. Otherwise they might
       // trigger AUTH ES events that would attempt to re-enter this object and
       // potentially deadlock.
       dispatch_async(q_, ^{
-        [registered_data_client_ watchItemsCount:data_watch_items_.Count()
-                                        newPaths:paths_to_watch
-                                    removedPaths:paths_to_stop_watching];
+        data_watch_items_updated_callback_(data_watch_items_.Count(), paths_to_watch,
+                                           paths_to_stop_watching);
       });
     }
 
-    if (registered_proc_client_) {
+    if (proc_watch_items_updated_callback_) {
       dispatch_async(q_, ^{
-        [registered_proc_client_ processWatchItemsCount:proc_watch_items_.Count()];
+        proc_watch_items_updated_callback_(proc_watch_items_.Count());
       });
     }
   } else {
@@ -912,10 +906,9 @@ void WatchItems::BeginPeriodicTask() {
   periodic_task_started_ = true;
 }
 
-std::vector<FAAPolicyProcessor::TargetPolicyPair> WatchItems::FindPoliciesForTargets(
-    const std::vector<FAAPolicyProcessor::PathTarget> &targets) {
+void WatchItems::FindPoliciesForTargets(IterateTargetsBlock iterateTargetsBlock) {
   absl::ReaderMutexLock lock(&lock_);
-  return data_watch_items_.FindPolicies(targets);
+  data_watch_items_.FindPolicies(iterateTargetsBlock);
 }
 
 void WatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {

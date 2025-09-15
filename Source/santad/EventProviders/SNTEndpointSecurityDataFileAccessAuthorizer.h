@@ -17,7 +17,7 @@
 
 #include <memory>
 
-#include "Source/santad/DataLayer/WatchItems.h"
+#include "Source/common/faa/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"

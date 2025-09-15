@@ -46,6 +46,27 @@ objc_library(
 )
 
 objc_library(
+    name = "NSData+Zlib",
+    srcs = ["NSData+Zlib.mm"],
+    hdrs = ["NSData+Zlib.h"],
+    deps = [
+        ":SNTLogging",
+    ],
+)
+
+santa_unit_test(
+    name = "NSDataZlibTest",
+    srcs = [
+        "NSDataZlibTest.mm",
+    ],
+    resources = glob(["testdata/compression_test_*.*"]),
+    sdk_dylibs = ["libz"],
+    deps = [
+        ":NSData+Zlib",
+    ],
+)
+
+objc_library(
     name = "SNTDeepCopy",
     srcs = ["SNTDeepCopy.mm"],
     hdrs = ["SNTDeepCopy.h"],
@@ -140,6 +161,24 @@ santa_unit_test(
     deps = [
         ":ScopedIOObjectRef",
         "//Source/santad:EndpointSecuritySerializerUtilities",
+    ],
+)
+
+objc_library(
+    name = "ScopedFile",
+    hdrs = ["ScopedFile.h"],
+    deps = [
+        ":SNTLogging",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+santa_unit_test(
+    name = "ScopedFileTest",
+    srcs = ["ScopedFileTest.mm"],
+    deps = [
+        ":ScopedFile",
+        ":TestUtils",
     ],
 )
 
@@ -705,6 +744,7 @@ objc_library(
         ":SNTExportConfiguration",
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
+        ":SNTStoredFileAccessEvent",
     ],
 )
 
@@ -807,6 +847,7 @@ test_suite(
         ":MOLCertificateTest",
         ":MOLCodesignCheckerTest",
         ":MOLXPCConnectionTest",
+        ":NSDataZlibTest",
         ":PrefixTreeTest",
         ":RingBufferTest",
         ":SNTBlockMessageTest",
@@ -823,9 +864,11 @@ test_suite(
         ":SantaCacheTest",
         ":SantaSetCacheTest",
         ":ScopedCFTypeRefTest",
+        ":ScopedFileTest",
         ":ScopedIOObjectRefTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:CELTest",
+        "//Source/common/faa:unit_tests",
     ],
     visibility = ["//:santa_package_group"],
 )
@@ -936,7 +979,10 @@ objc_library(
     ],
     hdrs = ["MOLAuthenticatingURLSession.h"],
     sdk_frameworks = ["Security"],
-    deps = [":MOLCertificate"],
+    deps = [
+        ":MOLCertificate",
+        ":ScopedCFTypeRef",
+    ],
 )
 
 santa_unit_test(

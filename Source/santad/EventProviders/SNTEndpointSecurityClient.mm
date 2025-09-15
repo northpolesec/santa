@@ -33,7 +33,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SystemResources.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Client.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"

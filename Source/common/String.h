@@ -59,6 +59,10 @@ static inline std::string_view StringTokenToStringView(es_string_token_t es_str)
   return std::string_view(es_str.data, es_str.length);
 }
 
+static inline NSString *StringTokenToNSString(es_string_token_t es_str) {
+  return StringToNSString(es_str.data);
+}
+
 static inline std::string BufToHexString(const uint8_t *buf, size_t bufsize) {
   static constexpr char hex_chars[] = "0123456789abcdef";
 

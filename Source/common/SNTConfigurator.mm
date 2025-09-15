@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/common/SNTConfigurator.h"
+#include "Source/common/SNTCommonEnums.h"
 
 #include <sys/stat.h>
 
@@ -141,6 +142,10 @@ static NSString *const kFileAccessPolicyUpdateIntervalSec = @"FileAccessPolicyUp
 
 static NSString *const kEnableTelemetryExport = @"EnableTelemetryExport";
 static NSString *const kTelemetryExportIntervalSec = @"TelemetryExportIntervalSec";
+static NSString *const kTelemetryExportTimeoutSec = @"TelemetryExportTimeoutSec";
+static NSString *const kTelemetryExportBatchThresholdSizeMB =
+    @"TelemetryExportBatchThresholdSizeMB";
+static NSString *const kTelemetryExportMaxFilesPerBatch = @"TelemetryExportMaxFilesPerBatch";
 
 static NSString *const kEnableMachineIDDecoration = @"EnableMachineIDDecoration";
 
@@ -302,6 +307,9 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFileAccessPolicyUpdateIntervalSec : number,
       kEnableTelemetryExport : number,
       kTelemetryExportIntervalSec : number,
+      kTelemetryExportTimeoutSec : number,
+      kTelemetryExportBatchThresholdSizeMB : number,
+      kTelemetryExportMaxFilesPerBatch : number,
       kEnableMachineIDDecoration : number,
       kEnableForkAndExitLogging : number,
       kIgnoreOtherEndpointSecurityClients : number,
@@ -686,6 +694,18 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingTelemetryExportIntervalSec {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingTelemetryExportTimeoutSec {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingTelemetryExportBatchThresholdSizeMB {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingTelemetryExportMaxFilesPerBatch {
   return [self configStateSet];
 }
 
@@ -1082,6 +1102,10 @@ static SNTConfigurator *sharedConfigurator = nil;
     return SNTEventLogTypeProtobuf;
   } else if ([logType isEqualToString:@"protobufstream"]) {
     return SNTEventLogTypeProtobufStream;
+  } else if ([logType isEqualToString:@"protobufstreamgzip"]) {
+    return SNTEventLogTypeProtobufStreamGzip;
+  } else if ([logType isEqualToString:@"protobufstreamzstd"]) {
+    return SNTEventLogTypeProtobufStreamZstd;
   } else if ([logType isEqualToString:@"syslog"]) {
     return SNTEventLogTypeSyslog;
   } else if ([logType isEqualToString:@"null"]) {
@@ -1149,18 +1173,31 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (BOOL)enableTelemetryExport {
-  // Temporarily only enable for debug builds
-#ifdef DEBUG
   return [self.configState[kEnableTelemetryExport] boolValue];
-#else
-  return NO;
-#endif
 }
 
 - (uint32_t)telemetryExportIntervalSec {
   return self.configState[kTelemetryExportIntervalSec]
              ? [self.configState[kTelemetryExportIntervalSec] unsignedIntValue]
              : 60 * 15;
+}
+
+- (uint32_t)telemetryExportTimeoutSec {
+  return self.configState[kTelemetryExportTimeoutSec]
+             ? [self.configState[kTelemetryExportTimeoutSec] unsignedIntValue]
+             : (5 * 60);
+}
+
+- (uint32_t)telemetryExportMaxFileUploadSizeMB {
+  return self.configState[kTelemetryExportBatchThresholdSizeMB]
+             ? [self.configState[kTelemetryExportBatchThresholdSizeMB] unsignedIntValue]
+             : 500;
+}
+
+- (uint32_t)telemetryExportMaxOpenedFiles {
+  return self.configState[kTelemetryExportMaxFilesPerBatch]
+             ? [self.configState[kTelemetryExportMaxFilesPerBatch] unsignedIntValue]
+             : 50;
 }
 
 - (BOOL)enableMachineIDDecoration {

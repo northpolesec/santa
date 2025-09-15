@@ -22,6 +22,7 @@
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
@@ -153,11 +154,11 @@
   [[self.syncConnection remoteObjectProxy] spindown];
 }
 
-- (void)addExecutionEvent:(SNTStoredExecutionEvent *)event {
+- (void)addStoredEvent:(SNTStoredEvent *)event {
   if (!event) {
     return;
   }
-  [self addEvents:@[ event ] withBackoffHashKey:event.fileSHA256];
+  [self addEvents:@[ event ] withBackoffHashKey:[event uniqueID]];
 }
 
 - (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent *> *)events
@@ -168,7 +169,7 @@
   [self addEvents:events withBackoffHashKey:bundleHash];
 }
 
-- (void)addEvents:(NSArray<SNTStoredExecutionEvent *> *)events
+- (void)addEvents:(NSArray<SNTStoredEvent *> *)events
     withBackoffHashKey:(NSString *)backoffHashKey {
   if (!events.count || [self backoffForPrimaryHash:backoffHashKey]) {
     return;

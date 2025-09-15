@@ -47,59 +47,6 @@ objc_library(
 )
 
 objc_library(
-    name = "WatchItemPolicy",
-    hdrs = ["DataLayer/WatchItemPolicy.h"],
-    deps = [
-        "//Source/common:Glob",
-        "//Source/common:PrefixTree",
-        "//Source/common:Unit",
-        "@abseil-cpp//absl/container:flat_hash_set",
-    ],
-)
-
-santa_unit_test(
-    name = "WatchItemPolicyTest",
-    srcs = ["DataLayer/WatchItemPolicyTest.mm"],
-    deps = [
-        ":WatchItemPolicy",
-        "@abseil-cpp//absl/container:flat_hash_set",
-    ],
-)
-
-objc_library(
-    name = "WatchItems",
-    srcs = ["DataLayer/WatchItems.mm"],
-    hdrs = ["DataLayer/WatchItems.h"],
-    deps = [
-        ":FAAPolicyProcessor",
-        ":SNTEndpointSecurityEventHandler",
-        ":WatchItemPolicy",
-        "//Source/common:Glob",
-        "//Source/common:PrefixTree",
-        "//Source/common:SNTError",
-        "//Source/common:SNTLogging",
-        "//Source/common:String",
-        "//Source/common:Unit",
-        "@abseil-cpp//absl/container:flat_hash_set",
-    ],
-)
-
-santa_unit_test(
-    name = "WatchItemsTest",
-    srcs = ["DataLayer/WatchItemsTest.mm"],
-    deps = [
-        ":FAAPolicyProcessor",
-        ":WatchItemPolicy",
-        ":WatchItems",
-        "//Source/common:PrefixTree",
-        "//Source/common:TestUtils",
-        "//Source/common:Unit",
-        "@OCMock",
-        "@abseil-cpp//absl/container:flat_hash_set",
-    ],
-)
-
-objc_library(
     name = "SNTEventTable",
     srcs = ["DataLayer/SNTEventTable.mm"],
     hdrs = ["DataLayer/SNTEventTable.h"],
@@ -130,8 +77,8 @@ objc_library(
     deps = [
         ":EndpointSecurityMessage",
         ":Metrics",
-        ":WatchItemPolicy",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common/faa:WatchItemPolicy",
     ],
 )
 
@@ -236,6 +183,7 @@ objc_library(
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:SantaCache",
         "//Source/common:String",
@@ -360,7 +308,7 @@ objc_library(
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",
         ":Metrics",
-        ":WatchItemPolicy",
+        "//Source/common/faa:WatchItemPolicy",
     ],
 )
 
@@ -375,13 +323,13 @@ objc_library(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":SNTEndpointSecurityClientBase",
-        ":WatchItemPolicy",
         "//Source/common:AuditUtilities",
         "//Source/common:BranchPrediction",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:SystemResources",
+        "//Source/common/faa:WatchItemPolicy",
     ],
 )
 
@@ -453,8 +401,8 @@ objc_library(
         ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
-        ":WatchItemPolicy",
         "//Source/common:SNTLogging",
+        "//Source/common/faa:WatchItemPolicy",
     ],
 )
 
@@ -493,7 +441,6 @@ objc_library(
         ":SNTDecisionCache",
         ":SNTEndpointSecurityEventHandler",
         ":TTYWriter",
-        ":WatchItemPolicy",
         "//Source/common:AuditUtilities",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
@@ -506,6 +453,7 @@ objc_library(
         "//Source/common:SantaSetCache",
         "//Source/common:SantaVnode",
         "//Source/common:String",
+        "//Source/common/faa:WatchItemPolicy",
     ],
 )
 
@@ -524,12 +472,12 @@ objc_library(
         ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
-        ":WatchItemPolicy",
-        ":WatchItems",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTStrengthify",
+        "//Source/common/faa:WatchItemPolicy",
+        "//Source/common/faa:WatchItems",
     ],
 )
 
@@ -544,12 +492,12 @@ objc_library(
         ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
-        ":WatchItemPolicy",
-        ":WatchItems",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTLogging",
         "//Source/common:SantaCache",
         "//Source/common:SantaSetCache",
+        "//Source/common/faa:WatchItemPolicy",
+        "//Source/common/faa:WatchItems",
     ],
 )
 
@@ -822,8 +770,8 @@ objc_library(
     hdrs = ["EventProviders/EndpointSecurity/Message.h"],
     deps = [
         ":EndpointSecurityClient",
-        ":WatchItemPolicy",
         "//Source/common:String",
+        "//Source/common/faa:WatchItemPolicy",
         "//Source/santad/ProcessTree:process_tree",
     ],
 )
@@ -843,8 +791,8 @@ objc_library(
     deps = [
         ":EndpointSecurityClient",
         ":EndpointSecurityMessage",
-        ":WatchItemPolicy",
         "//Source/common:Platform",
+        "//Source/common/faa:WatchItemPolicy",
     ],
 )
 
@@ -861,7 +809,6 @@ objc_library(
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
-        ":WatchItems",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCachedDecision",
@@ -877,6 +824,7 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
+        "//Source/common/faa:WatchItems",
         "@FMDB",
     ],
 )
@@ -910,6 +858,7 @@ objc_library(
         ":Metrics",
         ":SNTCompilerController",
         ":SNTDaemonControlController",
+        ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTEndpointSecurityDataFileAccessAuthorizer",
@@ -917,12 +866,12 @@ objc_library(
         ":SNTEndpointSecurityProcessFileAccessAuthorizer",
         ":SNTEndpointSecurityRecorder",
         ":SNTEndpointSecurityTamperResistance",
+        ":SNTEventTable",
         ":SNTExecutionController",
         ":SNTNotificationQueue",
+        ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":TTYWriter",
-        ":WatchItemPolicy",
-        ":WatchItems",
         "//Source/common:MOLXPCConnection",
         "//Source/common:PrefixTree",
         "//Source/common:SNTCommonEnums",
@@ -934,6 +883,8 @@ objc_library(
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
+        "//Source/common/faa:WatchItemPolicy",
+        "//Source/common/faa:WatchItems",
         "//Source/santad/ProcessTree:process_tree",
     ],
 )
@@ -958,7 +909,6 @@ objc_library(
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":TTYWriter",
-        ":WatchItems",
         "//Source/common:MOLXPCConnection",
         "//Source/common:PrefixTree",
         "//Source/common:RingBuffer",
@@ -970,6 +920,7 @@ objc_library(
         "//Source/common:SNTXPCUnprivilegedControlInterface",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
+        "//Source/common/faa:WatchItems",
         "//Source/santad/ProcessTree:process_tree",
         "//Source/santad/ProcessTree/annotations:originator",
     ],
@@ -1050,7 +1001,7 @@ objc_library(
         ":EndpointSecurityAPI",
         ":EndpointSecurityClient",
         ":EndpointSecurityMessage",
-        ":WatchItemPolicy",
+        "//Source/common/faa:WatchItemPolicy",
         "@googletest//:gtest",
     ],
 )
@@ -1068,8 +1019,8 @@ objc_library(
         ":Metrics",
         ":SNTDecisionCache",
         ":TTYWriter",
-        ":WatchItemPolicy",
         "//Source/common:SNTCachedDecision",
+        "//Source/common/faa:WatchItemPolicy",
         "@googletest//:gtest",
     ],
 )
@@ -1341,7 +1292,6 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":EndpointSecuritySerializer",
@@ -1354,7 +1304,9 @@ santa_unit_test(
         ":EndpointSecurityWriterSpool",
         ":EndpointSecurityWriterSyslog",
         ":MockEndpointSecurityAPI",
+        ":SNTSyncdQueue",
         "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTExportConfiguration",
         "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
@@ -1450,12 +1402,12 @@ santa_unit_test(
         ":Metrics",
         ":MockEndpointSecurityAPI",
         ":SNTEndpointSecurityClient",
-        ":WatchItemPolicy",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SystemResources",
         "//Source/common:TestUtils",
+        "//Source/common/faa:WatchItemPolicy",
         "@OCMock",
         "@googletest//:gtest",
     ],
@@ -1541,8 +1493,8 @@ santa_unit_test(
         ":MockEndpointSecurityAPI",
         ":MockFAAPolicyProcessor",
         ":SNTEndpointSecurityProcessFileAccessAuthorizer",
-        ":WatchItemPolicy",
         "//Source/common:TestUtils",
+        "//Source/common/faa:WatchItemPolicy",
         "@OCMock",
     ],
 )
@@ -1556,11 +1508,11 @@ santa_unit_test(
         ":MockEndpointSecurityAPI",
         ":MockFAAPolicyProcessor",
         ":SNTDecisionCache",
-        ":WatchItemPolicy",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTCachedDecision",
         "//Source/common:TestUtils",
+        "//Source/common/faa:WatchItemPolicy",
         "@OCMock",
         "@googletest//:gtest",
     ],
@@ -1578,9 +1530,9 @@ santa_unit_test(
         ":Metrics",
         ":MockEndpointSecurityAPI",
         ":SNTEndpointSecurityTamperResistance",
-        ":WatchItemPolicy",
         "//Source/common:SNTLogging",
         "//Source/common:TestUtils",
+        "//Source/common/faa:WatchItemPolicy",
         "@OCMock",
         "@googletest//:gtest",
     ],
@@ -1696,8 +1648,6 @@ test_suite(
         ":SNTRuleTableTest",
         ":SNTSyncdQueueTest",
         ":SantadTest",
-        ":WatchItemPolicyTest",
-        ":WatchItemsTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
         "//Source/santad/ProcessTree:process_tree_test",
         "//Source/santad/ProcessTree/annotations:originator_test",

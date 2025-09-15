@@ -241,6 +241,10 @@ test_suite(
         "//Source/santad:unit_tests",
         "//Source/santametricservice:unit_tests",
         "//Source/santasyncservice:unit_tests",
+
+        # Trigger a build of one-off utils. This won't run anything but helps ensure
+        # code changes don't break them.
+        "//Testing/OneOffs:BuildOnly",
     ],
 )
 

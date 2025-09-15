@@ -57,9 +57,11 @@ static const NSUInteger kChunkSize = 256 * 1024;  // 256 KiB
       }
       [formData appendData:[self partWithName:key value:value]];
     }];
-    [formData appendData:[self partWithName:@"file"
-                                   filename:@"upload"
-                                contentType:filesContentType ?: @"application/octet-stream"]];
+    // Content-Type needs to be its own form field.
+    [formData appendData:[self partWithName:@"Content-Type"
+                                      value:filesContentType ?: @"application/octet-stream"]];
+    // The file field needs to be the last field on the form.
+    [formData appendData:[self partWithName:@"file" filename:@"upload"]];
 
     // The form data is not streamed, it will be written all in one go.
     if (formData.length > kChunkSize) {
@@ -143,16 +145,11 @@ static const NSUInteger kChunkSize = 256 * 1024;  // 256 KiB
   return [partString dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-- (NSData *)partWithName:(NSString *)name
-                filename:(NSString *)filename
-             contentType:(NSString *)contentType {
+- (NSData *)partWithName:(NSString *)name filename:(NSString *)filename {
   NSMutableString *partString = [[NSMutableString alloc] init];
   [partString appendFormat:@"--%@\r\n", self.boundary];
   [partString appendFormat:@"Content-Disposition: form-data; name=\"%@\"; filename=\"%@\"\r\n",
                            name, filename];
-  if (contentType.length) {
-    [partString appendFormat:@"Content-Type: %@\r\n", contentType];
-  }
   [partString appendString:@"\r\n"];
   return [partString dataUsingEncoding:NSUTF8StringEncoding];
 }

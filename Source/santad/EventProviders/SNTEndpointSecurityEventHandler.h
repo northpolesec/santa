@@ -19,7 +19,7 @@
 #include <vector>
 
 #import "Source/common/SNTStoredFileAccessEvent.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Metrics.h"
 

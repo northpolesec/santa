@@ -92,6 +92,9 @@
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
     uint32_t currentVersion = [db userVersion];
     uint32_t newVersion = [self initializeDatabase:db fromVersion:currentVersion];
+    // For debug builds, assert that the returned new version matches what is expected.
+    // Version 0 is allowed since that means no upgrade was necessary.
+    assert(newVersion == 0 || newVersion == [self currentSupportedVersion]);
     if (newVersion < 1) return;
 
     LOGI(@"Updated %@ from version %d to %d", [self className], currentVersion, newVersion);

@@ -74,6 +74,18 @@ The utility of this was highlighted by SpecterOps in their talk
 				<key>IsPrefix</key>
 				<true/>
 			</dict>
+			<dict>
+				<key>Path</key>
+				<string>/Users/*/Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Cookies</string>
+				<key>IsPrefix</key>
+				<true/>
+			</dict>
+			<dict>
+				<key>Path</key>
+				<string>/Users/*/Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/StaleCookies</string>
+				<key>IsPrefix</key>
+				<true/>
+			</dict>
 		</array>
 		<key>Options</key>
 		<dict>
@@ -88,7 +100,7 @@ The utility of this was highlighted by SpecterOps in their talk
 		<array>
 				<dict>
 					<key>SigningID</key>
-					<string>com.tinyspeck.slackmacgap</string>
+					<string>com.tinyspeck.slackmacgap*</string>
 					<key>TeamID</key>
 					<string>BQR82RBBHL</string>
 				</dict>

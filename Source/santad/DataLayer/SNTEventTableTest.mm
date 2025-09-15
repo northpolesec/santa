@@ -23,6 +23,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 
 NSString *GenerateRandomHexStringWithSHA256Length() {
   // Create an array to hold random bytes
@@ -75,15 +76,30 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/false"];
   MOLCodesignChecker *csInfo = [binInfo codesignCheckerWithError:NULL];
   SNTStoredExecutionEvent *event = [[SNTStoredExecutionEvent alloc] init];
-  event.idx = @(arc4random());
   event.filePath = @"/usr/bin/false";
   event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
   event.signingChain = [csInfo certificates];
   event.executingUser = @"nobody";
   event.loggedInUsers = @[ @"nobody" ];
   event.currentSessions = @[ @"nobody@ttys000", @"nobody@console" ];
-  event.occurrenceDate = [NSDate date];
   event.decision = SNTEventStateAllowBinary;
+  return event;
+}
+
+- (SNTStoredFileAccessEvent *)createTestFileAccessEvent {
+  SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/false"];
+  MOLCodesignChecker *csInfo = [binInfo codesignCheckerWithError:NULL];
+  SNTStoredFileAccessEvent *event = [[SNTStoredFileAccessEvent alloc] init];
+  event.ruleName = @"MyTestRule";
+  event.ruleVersion = @"MyTestVersion";
+  event.accessedPath = @"/this/path/was/accessed";
+  event.process.filePath = @"/usr/bin/false";
+  event.process.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
+  event.process.signingChain = [csInfo certificates];
+  event.process.executingUser = @"nobody";
+  event.process.pid = @(1234);
+  event.process.parent = [[SNTStoredFileAccessProcess alloc] init];
+  event.process.parent.pid = @(4567);
   return event;
 }
 
@@ -91,6 +107,8 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
   XCTAssert([self.sut addStoredEvent:[self createTestEvent]]);
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  XCTAssert([self.sut addStoredEvent:[self createTestFileAccessEvent]]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 2);
 }
 
 - (void)testUniqueIndex {
@@ -116,9 +134,30 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
   XCTAssertFalse([self.sut addStoredEvent:event]);
   XCTAssertEqual(self.sut.pendingEventsCount, 2);
+
+  // Now for FAA Events...
+  SNTStoredFileAccessEvent *faaEvent = [self createTestFileAccessEvent];
+  XCTAssertTrue([self.sut addStoredEvent:faaEvent]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 3);
+
+  // Attempt to add an event with the same file hash succeeds despite
+  // non-unique filehash256 column
+  faaEvent.idx = @(arc4random());
+  XCTAssertTrue([self.sut addStoredEvent:faaEvent]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 3);
+
+  // Create a new hash and re-insert
+  faaEvent.process.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
+  XCTAssertTrue([self.sut addStoredEvent:faaEvent]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 4);
+
+  // Attempting to add an event with a non-unique idx fails
+  faaEvent.process.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
+  XCTAssertFalse([self.sut addStoredEvent:faaEvent]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 4);
 }
 
-- (void)testRetrieveEvent {
+- (void)testRetrieveExecutionEvent {
   SNTStoredExecutionEvent *event = [self createTestEvent];
   [self.sut addStoredEvent:event];
 
@@ -131,6 +170,24 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   XCTAssertEqual(event.decision, storedEvent.decision);
 }
 
+- (void)testRetrieveFAAEvent {
+  SNTStoredFileAccessEvent *event = [self createTestFileAccessEvent];
+  [self.sut addStoredEvent:event];
+
+  SNTStoredFileAccessEvent *storedEvent = [self.sut pendingEvents].firstObject;
+  XCTAssertNotNil(storedEvent);
+  XCTAssertEqualObjects(event.ruleName, storedEvent.ruleName);
+  XCTAssertEqualObjects(event.ruleVersion, storedEvent.ruleVersion);
+  XCTAssertEqualObjects(event.accessedPath, storedEvent.accessedPath);
+  XCTAssertEqualObjects(event.process.filePath, storedEvent.process.filePath);
+  XCTAssertEqualObjects(event.process.fileSHA256, storedEvent.process.fileSHA256);
+  XCTAssertEqualObjects(event.process.signingChain, storedEvent.process.signingChain);
+  XCTAssertEqualObjects(event.process.executingUser, storedEvent.process.executingUser);
+  XCTAssertEqualObjects(event.process.pid, storedEvent.process.pid);
+  XCTAssertEqualObjects(event.process.parent.pid, storedEvent.process.parent.pid);
+  XCTAssertEqualObjects(event.occurrenceDate, storedEvent.occurrenceDate);
+}
+
 - (void)testDeleteEventWithId {
   SNTStoredEvent *newEvent = [self createTestEvent];
   [self.sut addStoredEvent:newEvent];
@@ -138,12 +195,20 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 
   [self.sut deleteEventWithId:newEvent.idx];
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  SNTStoredEvent *newEvent2 = [self createTestFileAccessEvent];
+  [self.sut addStoredEvent:newEvent2];
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+
+  [self.sut deleteEventWithId:newEvent2.idx];
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
 }
 
 - (void)testDeleteEventsWithIds {
-  // Add 50 events to the database
+  // Add 50 exec and faa events to the database
   for (int i = 0; i < 50; ++i) {
-    SNTStoredEvent *newEvent = [self createTestEvent];
+    SNTStoredEvent *newEvent =
+        (i % 2 == 0) ? [self createTestEvent] : [self createTestFileAccessEvent];
     [self.sut addStoredEvent:newEvent];
   }
 
@@ -205,7 +270,12 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
       [self dataFromFixture:@"new_sntstoredexecutionevent_archive.plist"];
   OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(newStoredExecEventData);
 
+  NSData *newStoredFileAccessEventData =
+      [self dataFromFixture:@"sntstoredfileaccessevent_archive.plist"];
+  OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(newStoredFileAccessEventData);
+
   XCTAssertNil([self.sut eventFromResultSet:mockResultSet]);
+  XCTAssertNotNil([self.sut eventFromResultSet:mockResultSet]);
   XCTAssertNotNil([self.sut eventFromResultSet:mockResultSet]);
 }
 

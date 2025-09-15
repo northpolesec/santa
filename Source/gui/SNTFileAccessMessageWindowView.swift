@@ -35,7 +35,7 @@ import santa_gui_SNTMessageView
         window: window,
         event: event,
         customMessage: customMessage,
-        customURL: customURL as String?,
+        customURL: customURL,
         customText: customText as String?,
         configState: configState,
         uiStateCallback: uiStateCallback
@@ -46,8 +46,35 @@ import santa_gui_SNTMessageView
   }
 }
 
+func copyDetailsToClipboard(e: SNTStoredFileAccessEvent?, customURL: String?) {
+  var s =
+    "Santa blocked access to \(e?.accessedPath ?? "<unknown>") by \((e?.process?.filePath as NSString?)?.lastPathComponent ?? "<unknown>")"
+  s += "\nRule Name      : \(e?.ruleName ?? "<unknown>")"
+  s += "\nRule Version   : \(e?.ruleVersion ?? "<unknown>")"
+  s += "\nAccessed Path  : \(e?.accessedPath ?? "<unknown>")"
+  s += "\nProcess:"
+  s += "\n  User         : \(e?.process?.executingUser ?? "<unknown>")"
+  s += "\n  Path         : \(e?.process?.filePath ?? "<unknown>")"
+  s += "\n  SHA-256      : \(e?.process?.fileSHA256 ?? "<unknown>")"
+  if let cdhash = e?.process?.cdhash {
+    s += "\n  CDHash       : \(cdhash)"
+  }
+  if let signingID = e?.process?.signingID {
+    s += "\n  SigningID    : \(signingID)"
+  }
+  if let url = SNTBlockMessage.eventDetailURL(for: e, customURL: customURL) {
+    s += "\nURL            : \(url.absoluteString)"
+  }
+  s += "\n"
+
+  let pasteboard = NSPasteboard.general
+  pasteboard.clearContents()
+  pasteboard.setString(s, forType: .string)
+}
+
 struct MoreDetailsView: View {
-  let e: SNTStoredFileAccessEvent
+  let e: SNTStoredFileAccessEvent?
+  let customURL: NSString?
 
   @Environment(\.presentationMode) var presentationMode
 
@@ -66,19 +93,21 @@ struct MoreDetailsView: View {
         Spacer()
         addLabel {
           Text("Accessed Path").bold().font(Font.system(size: 12.0))
-          Text(e.accessedPath ?? "").font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+          Text(e?.accessedPath ?? "unknown").font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
         }
 
         Divider()
 
-        addLabel {
-          Text("Binary Path").bold().font(Font.system(size: 12.0))
-          Text(e.process?.filePath ?? "").font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+        if let filePath = e?.process?.filePath {
+          addLabel {
+            Text("Binary Path").bold().font(Font.system(size: 12.0))
+            Text(filePath).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+          }
         }
 
         Divider()
 
-        if let signingID = e.process?.signingID {
+        if let signingID = e?.process?.signingID {
           addLabel {
             Text("Signing ID").bold().font(Font.system(size: 12.0))
             Text(signingID).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
@@ -86,7 +115,7 @@ struct MoreDetailsView: View {
           Divider()
         }
 
-        if let cdHash = e.process?.cdhash {
+        if let cdHash = e?.process?.cdhash {
           addLabel {
             Text("CDHash").bold().font(Font.system(size: 12.0))
             Text(cdHash).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
@@ -94,37 +123,47 @@ struct MoreDetailsView: View {
           Divider()
         }
 
-        addLabel {
-          Text("SHA-256").bold().font(Font.system(size: 12.0))
-          // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
-          Text(e.process?.fileSHA256 ?? "").font(Font.system(size: 12.0).monospaced()).frame(width: 240)
-            .textSelection(.enabled)
+        if let fileSHA256 = e?.process?.fileSHA256 {
+          addLabel {
+            Text("SHA-256").bold().font(Font.system(size: 12.0))
+            // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
+            Text(fileSHA256).font(Font.system(size: 12.0).monospaced()).frame(width: 240)
+              .textSelection(.enabled)
+          }
         }
 
         Divider()
 
-        addLabel {
-          Text("Parent").bold().font(Font.system(size: 12.0))
-          Text(
-            verbatim:
-              "\((e.process?.parent?.filePath as NSString?)?.lastPathComponent ?? "") (\(e.process?.parent?.pid?.stringValue ?? ""))"
-          )
-          .font(
-            Font.system(size: 12.0).monospaced()
-          ).textSelection(.enabled)
+        if let parentFilePath = e?.process?.parent?.filePath {
+          addLabel {
+            Text("Parent").bold().font(Font.system(size: 12.0))
+            Text(
+              verbatim:
+                "\((parentFilePath as NSString).lastPathComponent) (\(e?.process?.parent?.pid?.stringValue ?? "unknown PID"))"
+            )
+            .font(
+              Font.system(size: 12.0).monospaced()
+            ).textSelection(.enabled)
+          }
         }
 
         Spacer()
 
-        Button(action: { presentationMode.wrappedValue.dismiss() }) {
-          HStack(spacing: 2.0) {
-            Text("Dismiss", comment: "Dismiss button in more details dialog").foregroundColor(.blue)
-            Image(systemName: "xmark.circle").foregroundColor(.blue)
+        HStack {
+          CopyDetailsButton(action: {
+            copyDetailsToClipboard(e: e, customURL: customURL as String?)
+          })
+
+          Button(action: { presentationMode.wrappedValue.dismiss() }) {
+            HStack(spacing: 2.0) {
+              Text("Dismiss", comment: "Dismiss button in more details dialog").foregroundColor(.blue)
+              Image(systemName: "xmark.circle").foregroundColor(.blue)
+            }
           }
+          .buttonStyle(ScalingButtonStyle())
+          .keyboardShortcut(.escape, modifiers: .command)
+          .help("⌘ Esc")
         }
-        .buttonStyle(ScalingButtonStyle())
-        .keyboardShortcut(.escape, modifiers: .command)
-        .help("⌘ Esc")
 
         Spacer()
       }.frame(maxWidth: MAX_OUTER_VIEW_WIDTH - 20).fixedSize()
@@ -133,7 +172,8 @@ struct MoreDetailsView: View {
 }
 
 struct Event: View {
-  let e: SNTStoredFileAccessEvent
+  let e: SNTStoredFileAccessEvent?
+  let customURL: NSString?
   let window: NSWindow?
 
   @State private var isShowingDetails = false
@@ -151,20 +191,28 @@ struct Event: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 10.0) {
-        TextWithLimit(e.accessedPath ?? "<unknown>").textSelection(.enabled)
-        TextWithLimit((e.process?.filePath as NSString?)?.lastPathComponent ?? "").textSelection(.enabled)
-        TextWithLimit(e.process?.executingUser ?? "<unknown>").textSelection(.enabled)
-        TextWithLimit(e.ruleName ?? "<unknown>").textSelection(.enabled)
-        TextWithLimit(e.ruleVersion ?? "<unknown>").textSelection(.enabled)
+        TextWithLimit(e?.accessedPath ?? "<unknown>").textSelection(.enabled)
+        TextWithLimit((e?.process?.filePath as NSString?)?.lastPathComponent ?? "<unknown>").textSelection(.enabled)
+        TextWithLimit(e?.process?.executingUser ?? "<unknown>").textSelection(.enabled)
+        TextWithLimit(e?.ruleName ?? "<unknown>").textSelection(.enabled)
+        TextWithLimit(e?.ruleVersion ?? "<unknown>").textSelection(.enabled)
 
       }
     }.sheet(isPresented: $isShowingDetails) {
-      MoreDetailsView(e: e)
+      MoreDetailsView(e: e, customURL: customURL)
     }
 
     VStack(spacing: 2.0) {
       Spacer()
-      MoreDetailsButton($isShowingDetails)
+
+      HStack {
+        MoreDetailsButton($isShowingDetails)
+
+        CopyDetailsButton(action: {
+          copyDetailsToClipboard(e: e, customURL: customURL as String?)
+        })
+      }
+
       Spacer()
     }
   }
@@ -174,7 +222,7 @@ struct SNTFileAccessMessageWindowView: View {
   let window: NSWindow?
   let event: SNTStoredFileAccessEvent?
   let customMessage: NSString?
-  let customURL: String?
+  let customURL: NSString?
   let customText: String?
   let configState: SNTConfigState
   let uiStateCallback: ((TimeInterval) -> Void)?
@@ -188,7 +236,7 @@ struct SNTFileAccessMessageWindowView: View {
     SNTMessageView(
       SNTBlockMessage.attributedBlockMessage(for: event, customMessage: customMessage as String?)
     ) {
-      Event(e: event!, window: window)
+      Event(e: event, customURL: customURL, window: window)
 
       VStack(spacing: 15.0) {
         if configState.enableNotificationSilences {

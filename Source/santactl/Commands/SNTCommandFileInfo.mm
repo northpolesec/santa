@@ -107,7 +107,7 @@ NSString *formattedStringForKeyArray(NSArray<NSString *> *array) {
 @property(nonatomic) BOOL daemonUnavailable;
 
 // Common date formatter
-@property(nonatomic) NSDateFormatter *dateFormatter;
+@property(nonatomic) NSISO8601DateFormatter *dateFormatter;
 
 // Maximum length of output key name, used for formatting
 @property(nonatomic) NSUInteger maxKeyWidth;
@@ -254,8 +254,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 - (instancetype)initWithDaemonConnection:(MOLXPCConnection *)daemonConn {
   self = [super initWithDaemonConnection:daemonConn];
   if (self) {
-    _dateFormatter = [[NSDateFormatter alloc] init];
-    _dateFormatter.dateFormat = @"yyyy/MM/dd HH:mm:ss Z";
+    _dateFormatter = [[NSISO8601DateFormatter alloc] init];
     _dateFormatter.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
 
     _propertyMap = @{

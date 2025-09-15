@@ -61,23 +61,45 @@ cc_library(
 )
 
 objc_library(
-    name = "SpoolBatchers",
-    srcs = [
-        "AnyBatcher.mm",
-        "StreamBatcher.mm",
+    name = "ZstdOutputStream",
+    srcs = ["ZstdOutputStream.mm"],
+    hdrs = ["ZstdOutputStream.h"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@protobuf//src/google/protobuf/io",
+        "@zstd",
     ],
+)
+
+objc_library(
+    name = "SpoolBatchers",
+    srcs = ["AnyBatcher.mm"],
     hdrs = [
         "AnyBatcher.h",
         "StreamBatcher.h",
     ],
     deps = [
+        ":ZstdOutputStream",
         ":binaryproto_cc_proto",
         ":fsspool_nowindows",
         "//Source/common:SNTXxhash",
+        "//Source/common:Unit",
         "//Source/common:santa_cc_proto_library_wrapper",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+santa_unit_test(
+    name = "StreamBatchersTest",
+    srcs = ["StreamBatcherTest.mm"],
+    deps = [
+        ":SpoolBatchers",
+        "//Source/common:NSData+Zlib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 

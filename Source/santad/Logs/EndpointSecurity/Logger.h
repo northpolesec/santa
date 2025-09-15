@@ -18,6 +18,7 @@
 
 #import <Foundation/Foundation.h>
 
+#include <atomic>
 #include <memory>
 #include <string_view>
 
@@ -45,23 +46,34 @@ using GetExportConfigBlock = SNTExportConfiguration * (^)(void);
 
 class Logger : public Timer<Logger> {
  public:
+  enum class ExportLogType {
+    kUnknown = 0,
+    kUncompressedStream,
+    kGzipStream,
+    kZstdStream,
+  };
+
   static std::unique_ptr<Logger> Create(
       std::shared_ptr<santa::EndpointSecurityAPI> esapi, SNTSyncdQueue *syncd_queue,
       GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
       SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
       NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
-      uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds);
+      uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds,
+      uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
+      uint32_t telemetry_export_max_files_per_batch);
 
   Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock getExportConfigBlock,
-         TelemetryEvent telemetry_mask, std::shared_ptr<santa::Serializer> serializer,
-         std::shared_ptr<santa::Writer> writer);
+         TelemetryEvent telemetry_mask, uint32_t telemetry_export_timeout_seconds,
+         uint32_t telemetry_export_batch_threshold_size_mb,
+         uint32_t telemetry_export_max_files_per_batch,
+         std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer);
 
   virtual ~Logger() = default;
 
   Logger(Logger &&) = default;
   Logger &operator=(Logger &&rhs) = default;
-  Logger(Logger &) = default;
-  Logger &operator=(Logger &rhs) = default;
+  Logger(Logger &) = delete;
+  Logger &operator=(Logger &rhs) = delete;
 
   virtual void Log(std::unique_ptr<santa::EnrichedMessage> msg);
 
@@ -89,6 +101,13 @@ class Logger : public Timer<Logger> {
 
   /// Export existing telemetry files.
   void ExportTelemetry();
+
+  void SetBatchThresholdSizeMB(uint32_t val);
+  void SetMaxFilesPerBatch(uint32_t val);
+  void SetTelmetryExportTimeoutSecs(uint32_t val);
+
+  static ExportLogType GetLogType(NSFileHandle *handle, NSString *path);
+  static std::pair<NSString *, NSString *> GetContentTypeAndExtension(ExportLogType log_type);
 
   friend class santa::LoggerPeer;
 
@@ -147,6 +166,9 @@ class Logger : public Timer<Logger> {
   std::shared_ptr<santa::Serializer> serializer_;
   std::shared_ptr<santa::Writer> writer_;
   ExportTracker tracker_;
+  std::unique_ptr<std::atomic_uint64_t> export_batch_threshold_size_bytes_;
+  std::unique_ptr<std::atomic_uint32_t> export_max_files_per_batch_;
+  std::unique_ptr<std::atomic_uint32_t> export_timeout_secs_;
   dispatch_queue_t export_queue_;
 };
 

@@ -11,12 +11,13 @@ bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 bazel_dep(name = "rules_shell", version = "0.5.0")
 bazel_dep(name = "rules_swift", version = "2.9.0")
 bazel_dep(name = "xxhash", version = "0.8.3")
+bazel_dep(name = "zstd", version = "1.5.7")
 
 # North Pole Protos
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    commit = "ad45e21f3c36e81f20837195b2eab8bca91c7e9e",
+    commit = "429df45de80663d29103568c15bb75d38fa921c4",
     remote = "https://github.com/northpolesec/protos",
 )
 

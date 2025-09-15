@@ -36,6 +36,7 @@
   ENCODE(coder, ruleVersion);
   ENCODE(coder, ruleName);
   ENCODE(coder, process);
+  ENCODE_BOXABLE(coder, decision);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -45,17 +46,20 @@
     DECODE(decoder, ruleName, NSString);
     DECODE(decoder, accessedPath, NSString);
     DECODE(decoder, process, SNTStoredFileAccessProcess);
+    DECODE_SELECTOR(decoder, decision, NSNumber, intValue);
   }
   return self;
 }
 
 - (NSString *)description {
-  return [NSString stringWithFormat:@"SNTStoredFileAccessEvent: Accessed: %@, By: %@",
+  return [NSString stringWithFormat:@"SNTStoredFileAccessEvent[%@]: Accessed: %@, By: %@", self.idx,
                                     self.accessedPath, self.process];
 }
 
-- (NSString *)hashForEvent {
-  return _process.fileSHA256;
+- (NSString *)uniqueID {
+  // NB: Not using `accessedPath` as part of the uniqe ID to prevent a noisy
+  // rule from generating a large number of events to upload.
+  return [NSString stringWithFormat:@"%@|%@|%@", _ruleName, _ruleVersion, _process.fileSHA256];
 }
 
 @end

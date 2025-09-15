@@ -689,6 +689,7 @@
                                                         fromData:eventData
                                                            error:&err];
   XCTAssertNil(err);
+  XCTAssertEqual(events.count, 3);
 
   OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
 
@@ -704,7 +705,7 @@
             NSDictionary *event = events[0];
             XCTAssertEqualObjects(
                 event[kFileSHA256],
-                @"741879b35b9fae5b235a7c9a88a6d20a136c6e27701f03dd32369c4ea0a6acaf");
+                @"c242e98be0b2f297430ab37f6ec83a380fa108551d27e3ff35892bb0b58b2f23");
             XCTAssertEqualObjects(event[kFileName], @"yes");
             XCTAssertEqualObjects(event[kFilePath], @"/usr/bin");
             XCTAssertEqualObjects(event[kDecision], @"ALLOW_SIGNINGID");
@@ -713,7 +714,7 @@
             XCTAssertEqualObjects(event[kExecutingUser], @"foo");
             XCTAssertEqualObjects(event[kPID], @(2222));
             XCTAssertEqualObjects(event[kPPID], @(1));
-            XCTAssertEqualObjects(event[kExecutionTime], @(1753128415.67169));
+            XCTAssertEqualObjects(event[kExecutionTime], @(1751111111));
 
             NSArray *certs = event[kSigningChain];
             XCTAssertEqual(certs.count, 3);
@@ -730,7 +731,7 @@
 
             XCTAssertNil(event[kTeamID]);
             XCTAssertEqualObjects(event[kSigningID], @"platform:com.apple.yes");
-            XCTAssertEqualObjects(event[kCDHash], @"18ddebfdb356b7ed575b063bbbbe40a2d0d92f23");
+            XCTAssertEqualObjects(event[kCDHash], @"c15b76ca2885fbb54adbfe041536f1c65af94feb");
 
             event = events[1];
             XCTAssertEqualObjects(event[kFileName], @"Santa");
@@ -739,6 +740,22 @@
             XCTAssertEqual(certs.count, 3);
             XCTAssertEqualObjects(event[kTeamID], @"ZMCG7MLDV9");
             XCTAssertEqualObjects(event[kSigningID], @"ZMCG7MLDV9:com.northpolesec.santa");
+            XCTAssertEqualObjects(event[kExecutionTime], @(1752222222));
+
+            events = requestDict[@"file_access_events"];
+            XCTAssertEqual(events.count, 1);
+
+            event = events[0];
+            XCTAssertEqualObjects(event[@"rule_name"], @"MyRule");
+            XCTAssertEqualObjects(event[@"rule_version"], @"MyRuleVersion");
+            XCTAssertEqualObjects(event[@"target"], @"/you/are/being/watched");
+            XCTAssertEqualObjects(event[@"process"][kFilePath], @"/bin/mkdir");
+            XCTAssertEqualObjects(event[@"process"][kCDHash],
+                                  @"0e923b9487572b38d65ff68f9c2919a4118318e0");
+            XCTAssertEqualObjects(event[@"process"][kPID], @(123));
+            XCTAssertEqualObjects(event[@"process"][@"parent"][kPID], @(456));
+            XCTAssertEqual([event[@"process"][kSigningChain] count], 3);
+            XCTAssertEqualObjects(event[@"access_time"], @(1753333333));
 
             return YES;
           }];
@@ -818,7 +835,7 @@
 
   [sut sync];
 
-  XCTAssertEqual(requestCount, 2);
+  XCTAssertEqual(requestCount, 3);
 }
 
 #pragma mark - SNTSyncRuleDownload Tests

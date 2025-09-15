@@ -59,11 +59,7 @@ class PrefixTree {
     return HasPrefixLocked(input);
   }
 
-  std::optional<ValueT> LookupLongestMatchingPrefix(const char *input) {
-    if (!input) {
-      return std::nullopt;
-    }
-
+  std::optional<ValueT> LookupLongestMatchingPrefix(const std::string &input) {
     absl::ReaderMutexLock lock(&lock_);
     return LookupLongestMatchingPrefixLocked(input);
   }
@@ -191,10 +187,10 @@ class PrefixTree {
   }
 
   ABSL_SHARED_LOCKS_REQUIRED(lock_)
-  std::optional<ValueT> LookupLongestMatchingPrefixLocked(const char *input) {
+  std::optional<ValueT> LookupLongestMatchingPrefixLocked(const std::string &input) {
     TreeNode *node = root_;
     TreeNode *match = nullptr;
-    const char *p = input;
+    const char *p = input.c_str();
 
     while (*p) {
       node = node->children_[(uint8_t)*p++];

@@ -31,7 +31,7 @@
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaSetCache.h"
 #include "Source/common/SantaVnode.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/RateLimiter.h"
@@ -88,6 +88,7 @@ class FAAPolicyProcessor {
       URLTextPair (^)(const std::shared_ptr<WatchItemPolicyBase> &watch_item);
 
   using ReadsCacheKey = std::tuple<pid_t, int, FAAClientType>;
+  using StoreAccessEventBlock = void (^)(SNTStoredFileAccessEvent *, bool);
 
   // Friend classes that can call private methods requiring FAAClientType parameters
   friend class DataFAAPolicyProcessorProxy;
@@ -99,7 +100,8 @@ class FAAPolicyProcessor {
   FAAPolicyProcessor(SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
                      std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
                      std::shared_ptr<Metrics> metrics,
-                     GenerateEventDetailLinkBlock generate_event_detail_link_block);
+                     GenerateEventDetailLinkBlock generate_event_detail_link_block,
+                     StoreAccessEventBlock store_access_event_block);
 
   virtual ~FAAPolicyProcessor() = default;
 
@@ -117,6 +119,7 @@ class FAAPolicyProcessor {
   std::shared_ptr<TTYWriter> tty_writer_;
   std::shared_ptr<Metrics> metrics_;
   GenerateEventDetailLinkBlock generate_event_detail_link_block_;
+  StoreAccessEventBlock store_access_event_block_;
   santa::SantaSetCache<ReadsCacheKey, std::pair<dev_t, ino_t>> reads_cache_;
   santa::SantaSetCache<std::pair<pid_t, int>, std::pair<std::string, std::string>>
       tty_message_cache_;

@@ -13,36 +13,14 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <XCTest/XCTest.h>
 #import "Source/santasyncservice/SNTStreamingMultipartFormData.h"
 
+#import <XCTest/XCTest.h>
 #include <unistd.h>
 
-class TemporaryFile {
- public:
-  TemporaryFile() {
-    char temp[] = "/tmp/santa_test_XXXXXX";
-    fd_ = mkstemp(temp);
-    XCTAssertFalse(fd_ == -1, "%s", strerror(errno));
-    unlink(temp);  // The fd remains open
-  }
+#include "Source/common/ScopedFile.h"
 
-  ~TemporaryFile() { close(fd_); }
-
-  TemporaryFile(const TemporaryFile &) = delete;
-  TemporaryFile &operator=(const TemporaryFile &) = delete;
-
-  NSFileHandle *reader() const {
-    return [[NSFileHandle alloc] initWithFileDescriptor:dup(fd_) closeOnDealloc:YES];
-  }
-
-  NSFileHandle *writer() const {
-    return [[NSFileHandle alloc] initWithFileDescriptor:dup(fd_) closeOnDealloc:YES];
-  }
-
- private:
-  int fd_ = -1;
-};
+using santa::ScopedFile;
 
 // Reads data off a stream until it closes.
 @interface SNTStreamConsumer : NSObject <NSStreamDelegate>
@@ -110,17 +88,17 @@ class TemporaryFile {
 
 - (void)testEmptyFile {
   NSDictionary *formParts = @{@"field1" : @"value1", @"key" : @"object-"};
-  TemporaryFile file;
+  auto file = ScopedFile::CreateTemporary();
   SNTStreamingMultipartFormData *stream =
       [[SNTStreamingMultipartFormData alloc] initWithFormParts:formParts
-                                                         files:@[ file.reader() ]
+                                                         files:@[ file->Reader() ]
                                                 filesTotalSize:0
                                               filesContentType:nil
                                                       fileName:@"test"];
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 386);
+  XCTAssertEqual(stream.contentLength, 467);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
@@ -133,22 +111,22 @@ class TemporaryFile {
 
 - (void)testEmptyNonEmptyFile {
   NSDictionary *formParts = @{@"field1" : @"value1", @"key" : @"object-"};
-  TemporaryFile file;
-  NSFileHandle *writer = file.writer();
+  auto file = ScopedFile::CreateTemporary();
+  NSFileHandle *writer = file->Writer();
   NSError *error;
   [writer writeData:[@"hello" dataUsingEncoding:NSUTF8StringEncoding] error:&error];
   [writer seekToFileOffset:0];
   XCTAssertNil(error);
   SNTStreamingMultipartFormData *stream =
       [[SNTStreamingMultipartFormData alloc] initWithFormParts:formParts
-                                                         files:@[ file.reader() ]
+                                                         files:@[ file->Reader() ]
                                                 filesTotalSize:5
                                               filesContentType:nil
                                                       fileName:@"test"];
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 391);
+  XCTAssertEqual(stream.contentLength, 472);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
@@ -161,8 +139,8 @@ class TemporaryFile {
 
 - (void)testBigFile {
   NSDictionary *formParts = @{@"field1" : @"value1", @"key" : @"object-"};
-  TemporaryFile file;
-  NSFileHandle *writer = file.writer();
+  auto file = ScopedFile::CreateTemporary();
+  NSFileHandle *writer = file->Writer();
   NSString *bigString = [@"A" stringByPaddingToLength:1024 * 1024
                                            withString:@"A"
                                       startingAtIndex:0];
@@ -173,14 +151,14 @@ class TemporaryFile {
   XCTAssertNil(error);
   SNTStreamingMultipartFormData *stream =
       [[SNTStreamingMultipartFormData alloc] initWithFormParts:formParts
-                                                         files:@[ file.reader() ]
+                                                         files:@[ file->Reader() ]
                                                 filesTotalSize:1024 * 1024
                                               filesContentType:nil
                                                       fileName:@"test"];
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 1048962);
+  XCTAssertEqual(stream.contentLength, 1049043);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
@@ -197,10 +175,10 @@ class TemporaryFile {
   NSString *bigString = [@"A" stringByPaddingToLength:1024 * 512 withString:@"A" startingAtIndex:0];
   NSData *bigData = [bigString dataUsingEncoding:NSUTF8StringEncoding];
 
-  TemporaryFile file1;
-  TemporaryFile file2;
-  NSFileHandle *writer1 = file1.writer();
-  NSFileHandle *writer2 = file2.writer();
+  auto file1 = ScopedFile::CreateTemporary();
+  auto file2 = ScopedFile::CreateTemporary();
+  NSFileHandle *writer1 = file1->Writer();
+  NSFileHandle *writer2 = file2->Writer();
 
   [writer1 writeData:bigData error:&error];
   XCTAssertNil(error);
@@ -213,8 +191,8 @@ class TemporaryFile {
   SNTStreamingMultipartFormData *stream =
       [[SNTStreamingMultipartFormData alloc] initWithFormParts:formParts
                                                          files:@[
-                                                           file1.reader(),
-                                                           file2.reader(),
+                                                           file1->Reader(),
+                                                           file2->Reader(),
                                                          ]
                                                 filesTotalSize:1024 * 1024
                                               filesContentType:nil
@@ -222,7 +200,7 @@ class TemporaryFile {
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 1048962);
+  XCTAssertEqual(stream.contentLength, 1049043);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream
@@ -235,22 +213,22 @@ class TemporaryFile {
 
 - (void)testFileContentType {
   NSDictionary *formParts = @{@"field1" : @"value1", @"key" : @"object-"};
-  TemporaryFile file;
-  NSFileHandle *writer = file.writer();
+  auto file = ScopedFile::CreateTemporary();
+  NSFileHandle *writer = file->Writer();
   NSError *error;
   [writer writeData:[@"hello" dataUsingEncoding:NSUTF8StringEncoding] error:&error];
   [writer seekToFileOffset:0];
   XCTAssertNil(error);
   SNTStreamingMultipartFormData *stream =
       [[SNTStreamingMultipartFormData alloc] initWithFormParts:formParts
-                                                         files:@[ file.reader() ]
+                                                         files:@[ file->Reader() ]
                                                 filesTotalSize:5
                                               filesContentType:@"application/test"
                                                       fileName:@"test"];
   XCTAssertNotNil(stream);
   XCTAssertNotNil(stream.stream);
   XCTAssertTrue([stream.contentType containsString:@"multipart/form-data"]);
-  XCTAssertEqual(stream.contentLength, 383);
+  XCTAssertEqual(stream.contentLength, 464);
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"stream complete"];
   SNTStreamConsumer *c = [[SNTStreamConsumer alloc] initWithStream:stream.stream

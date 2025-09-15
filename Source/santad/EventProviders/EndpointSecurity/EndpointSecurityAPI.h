@@ -21,7 +21,7 @@
 #include <set>
 #include <string_view>
 
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Client.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 

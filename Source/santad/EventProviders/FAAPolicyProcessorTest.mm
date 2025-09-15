@@ -27,7 +27,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
 #include "Source/common/TestUtils.h"
-#include "Source/santad/DataLayer/WatchItemPolicy.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/MockFAAPolicyProcessor.h"
@@ -46,7 +46,6 @@ extern es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_r
 extern es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision);
 extern bool IsBlockDecision(FileAccessPolicyDecision decision);
 extern bool ShouldLogDecision(FileAccessPolicyDecision decision);
-extern bool ShouldNotifyUserDecision(FileAccessPolicyDecision decision);
 }  // namespace santa
 
 // Helper to reset a policy to an empty state
@@ -121,22 +120,6 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
 
   for (const auto &kv : policyDecisionToShouldLog) {
     XCTAssertEqual(santa::ShouldLogDecision(kv.first), kv.second);
-  }
-}
-
-- (void)testShouldNotifyUserDecision {
-  std::map<FileAccessPolicyDecision, bool> policyDecisionToShouldLog = {
-      {FileAccessPolicyDecision::kNoPolicy, false},
-      {FileAccessPolicyDecision::kDenied, true},
-      {FileAccessPolicyDecision::kDeniedInvalidSignature, true},
-      {FileAccessPolicyDecision::kAllowed, false},
-      {FileAccessPolicyDecision::kAllowedReadAccess, false},
-      {FileAccessPolicyDecision::kAllowedAuditOnly, false},
-      {(FileAccessPolicyDecision)123, false},
-  };
-
-  for (const auto &kv : policyDecisionToShouldLog) {
-    XCTAssertEqual(santa::ShouldNotifyUserDecision(kv.first), kv.second);
   }
 }
 
@@ -225,7 +208,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   auto policy = std::make_shared<santa::WatchItemPolicyBase>("foo_policy", "ver", "/foo");
   FAAPolicyProcessor::PathTarget target = {.path = "/some/random/path", .is_readable = true};
 
-  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, nil);
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, nil,
+                                            nil);
 
   EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
       .WillRepeatedly([&faaPolicyProcessor](const Message &msg,
@@ -325,7 +309,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, nil);
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, nil,
+                                            nil);
   EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
       .WillRepeatedly(testing::Return(false));
 
@@ -510,7 +495,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   NSString *want;
   id certMock = OCMClassMock([MOLCertificate class]);
 
-  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, nil);
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, nil,
+                                            nil);
 
   EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
       .WillRepeatedly([&faaPolicyProcessor](const es_file_t *es_file) {
@@ -597,7 +583,8 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.certSHA256 = @(instigatingCertHash);
 
-  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, nil);
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, nil,
+                                            nil);
 
   EXPECT_CALL(faaPolicyProcessor, PolicyMatchesProcess)
       .WillRepeatedly([&faaPolicyProcessor](const WatchItemProcess &policy_proc,

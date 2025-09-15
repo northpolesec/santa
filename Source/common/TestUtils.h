@@ -61,6 +61,9 @@
     0, dispatch_semaphore_wait((s), DISPATCH_TIME_NOW), m)
 // clang-format on
 
+#define XCTAssertStatusOk(s) XCTAssertTrue((s).ok())
+#define XCTAssertStatusNotOk(s) XCTAssertFalse((s).ok())
+
 // Helper to ensure at least `ms` milliseconds are slept, even if the sleep
 // function returns early due to interrupts.
 void SleepMS(long ms);

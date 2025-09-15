@@ -137,6 +137,8 @@ typedef NS_ENUM(NSInteger, SNTEventLogType) {
   SNTEventLogTypeFilelog,
   SNTEventLogTypeProtobuf,
   SNTEventLogTypeProtobufStream,
+  SNTEventLogTypeProtobufStreamGzip,
+  SNTEventLogTypeProtobufStreamZstd,
   SNTEventLogTypeJSON,
   SNTEventLogTypeNull,
 };
@@ -210,8 +212,6 @@ typedef NS_ENUM(NSInteger, SNTPushNotificationStatus) {
   SNTPushNotificationStatusConnected,
 };
 
-#ifdef __cplusplus
-
 enum class FileAccessPolicyDecision {
   kNoPolicy,
   kDenied,
@@ -220,8 +220,6 @@ enum class FileAccessPolicyDecision {
   kAllowedReadAccess,
   kAllowedAuditOnly,
 };
-
-#endif
 
 static const char *kSantaDPath =
     "/Applications/Santa.app/Contents/Library/SystemExtensions/"

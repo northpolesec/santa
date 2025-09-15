@@ -25,10 +25,10 @@ namespace fsspool {
 
 class AnyBatcher {
  public:
-  AnyBatcher() = default;
+  AnyBatcher();
 
   inline bool ShouldInitializeBeforeWrite() { return false; }
-  void InitializeBatch(int fd);
+  absl::Status InitializeBatch(int fd);
   bool NeedToOpenFile();
   absl::Status Write(std::vector<uint8_t> bytes);
   absl::StatusOr<size_t> CompleteBatch(int fd);
@@ -38,7 +38,6 @@ class AnyBatcher {
  private:
   std::string type_url_;
   santa::fsspool::binaryproto::LogBatch cache_;
-  int tmp_fd_;
 };
 
 }  // namespace fsspool

@@ -49,9 +49,6 @@ using fsspool::FsSpoolWriterPeer;
 
 static constexpr size_t kSpoolSize = 1048576;
 
-#define XCTAssertStatusOk(s) XCTAssertTrue((s).ok())
-#define XCTAssertStatusNotOk(s) XCTAssertFalse((s).ok())
-
 google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   google::protobuf::Timestamp v;
   v.set_seconds(s);
@@ -123,8 +120,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertNil(err);
 
   // Construct an fsspool object so the spool tmp dir is cleaned
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
-                                                                         kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   // Ensure only the fifo file was left
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 1);
@@ -137,8 +134,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   NSString *largeTestData = RepeatedString(@"A", 10240);
   NSString *path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
   NSString *emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
-                                                                         kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   // Create the spool dir structure and ensure no files exist
   XCTAssertStatusOk(writer->BuildDirectoryStructureIfNeeded());
@@ -195,8 +192,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   NSString *largeTestData = RepeatedString(@"A", 10240);
   NSString *path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
   NSString *emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
-      [self.baseDir UTF8String], kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::UncompressedStreamBatcher>>(
+      fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   // Create the spool dir structure and ensure no files exist
   XCTAssertStatusOk(writer->BuildDirectoryStructureIfNeeded());
@@ -249,8 +246,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testSimpleWriteAnyBatcher {
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
-                                                                         kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
@@ -268,8 +265,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testSimpleWriteStreamBatcher {
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
-      [self.baseDir UTF8String], kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::UncompressedStreamBatcher>>(
+      fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
@@ -287,8 +284,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testSpoolFullAnyBatcher {
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
-                                                                         kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
   std::vector<uint8_t> largeMessage(kSpoolSize + 1, '\x42');
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
@@ -321,8 +318,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testSpoolFullStreamBatcher {
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
-      [self.baseDir UTF8String], kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::UncompressedStreamBatcher>>(
+      fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], kSpoolSize);
   std::vector<uint8_t> largeMessage(kSpoolSize + 1, '\x42');
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
@@ -355,8 +352,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testWriteMessageNoFlushAnyBatcher {
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
-                                                                         kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   // Ensure that writing in batch mode doesn't flsuh on individual writes.
   XCTAssertStatusOk(writer->Write({123}));
@@ -367,8 +364,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testWriteMessageNoFlushStreamBatcher {
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
-      [self.baseDir UTF8String], kSpoolSize);
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::UncompressedStreamBatcher>>(
+      fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.baseDir]);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:self.spoolDir]);
@@ -384,8 +381,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
 - (void)testWriteMessageFlushOnDemandAnyBatcher {
   static const int kCapacity = 5;
-  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
-                                                                         kSpoolSize);
+  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   // Ensure batch flushed once capacity exceeded
   for (int i = 0; i < kCapacity + 1; i++) {
@@ -403,8 +400,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
 - (void)testWriteMessageFlushOnDemandStreamBatcher {
   static const int kCapacity = 5;
-  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
-      [self.baseDir UTF8String], kSpoolSize);
+  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::UncompressedStreamBatcher>>(
+      fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   // Ensure batch flushed once capacity exceeded
   for (int i = 0; i < kCapacity + 1; i++) {
@@ -422,8 +419,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
 - (void)testWriteMessageMultipleFlushAnyBatcher {
   static const int kExpectedFlushes = 3;
-  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::AnyBatcher>>([self.baseDir UTF8String],
-                                                                         kSpoolSize);
+  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   // Ensure batch flushed expected number of times
   for (int i = 0; i < kExpectedFlushes; i++) {
@@ -441,8 +438,8 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
 - (void)testWriteMessageMultipleFlushStreamBatcher {
   static const int kExpectedFlushes = 3;
-  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::StreamBatcher>>(
-      [self.baseDir UTF8String], kSpoolSize);
+  auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::UncompressedStreamBatcher>>(
+      fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
   // Ensure batch flushed expected number of times
   for (int i = 0; i < kExpectedFlushes; i++) {
@@ -463,7 +460,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
   {
     auto writer = std::make_shared<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
-        [self.baseDir UTF8String], kSpoolSize);
+        fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
     for (int i = 0; i < kNumberOfWrites; i++) {
       XCTAssertStatusOk(writer->Write({123}));

@@ -53,6 +53,16 @@ message CodeSignature {
 
   // The team id of the code signature
   optional string team_id = 3;
+
+  // The secure timestamp of when this binary was signed, as provided by the
+  // timestamp service. Not populated for unsigned or ad-hoc signed binaries,
+  // or if the secure timestamp is missing.
+  optional google.protobuf.Timestamp secure_signing_time = 4;
+
+  // The timestamp provided by the developer when this binary was signed.
+  // It is possible for developers to set this to whatever they wish when signing
+  // unlike the secure_signing_time.
+  optional google.protobuf.Timestamp signing_time = 5;
 }
 
 // Stat information for a file

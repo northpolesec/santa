@@ -70,8 +70,6 @@ config_setting(
 objc_library(
     name = "sync_lib",
     srcs = [
-        "NSData+Zlib.h",
-        "NSData+Zlib.mm",
         "SNTPushClientAPNS.h",
         "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
@@ -112,6 +110,7 @@ objc_library(
         "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:NSData+Zlib",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
@@ -121,6 +120,7 @@ objc_library(
         "//Source/common:SNTSIPStatus",
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
@@ -138,8 +138,6 @@ objc_library(
 santa_unit_test(
     name = "SNTSyncTest",
     srcs = [
-        "NSData+Zlib.h",
-        "NSData+Zlib.mm",
         "SNTPushClientAPNS.h",
         "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
@@ -175,6 +173,7 @@ santa_unit_test(
         "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:NSData+Zlib",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDropRootPrivs",
@@ -197,17 +196,6 @@ santa_unit_test(
 )
 
 santa_unit_test(
-    name = "NSDataZlibTest",
-    srcs = [
-        "NSData+Zlib.h",
-        "NSData+Zlib.mm",
-        "NSDataZlibTest.mm",
-    ],
-    resources = glob(["testdata/sync_preflight_basic.*"]),
-    sdk_dylibs = ["libz"],
-)
-
-santa_unit_test(
     name = "SNTStreamingMultipartFormDataTest",
     srcs = [
         "SNTStreamingMultipartFormDataTest.mm",
@@ -215,6 +203,7 @@ santa_unit_test(
     deps = [
         ":sync_lib",
         "//Source/common:SNTLogging",
+        "//Source/common:ScopedFile",
     ],
 )
 
@@ -270,7 +259,6 @@ macos_command_line_application(
 test_suite(
     name = "unit_tests",
     tests = [
-        ":NSDataZlibTest",
         ":SNTStreamingMultipartFormDataTest",
         ":SNTSyncConfigBundleTest",
         ":SNTSyncTest",
