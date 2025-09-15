@@ -2,6 +2,11 @@
 
 This page lists well-known and/or community-contributed CEL expressions.
 
+CEL ([Common Expression Language](https://cel.dev/)) rules allow for more
+complex policies than would normally be possible. Read how to configure CEL
+rules in the [Binary Authorization](/features/binary-authorization#cel)
+documentation.
+
 ## Apps signed since X
 
 This will prevent executions of an app where the specific binary was signed
