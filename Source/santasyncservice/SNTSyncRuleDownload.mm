@@ -106,7 +106,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
   self.syncState.rulesReceived = 0;
   NSMutableArray<SNTRule *> *newRules = [NSMutableArray array];
-  NSMutableArray<SNTFileAccessRule *> *newWatchItems = [NSMutableArray array];
+  NSMutableArray<SNTFileAccessRule *> *newFileAccessRules = [NSMutableArray array];
   std::string cursor;
 
   do {
@@ -137,13 +137,13 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         [newRules addObject:r];
       }
 
-      for (const ::pbv1::FileAccessRule &watchItem : response.file_access_rules()) {
-        SNTFileAccessRule *rule = [self faaWatchItemFromProtoWatchItem:watchItem];
+      for (const ::pbv1::FileAccessRule &faaRule : response.file_access_rules()) {
+        SNTFileAccessRule *rule = [self fileAccessRuleFromProtoFileAccessRule:faaRule];
         if (!rule) {
-          SLOGD(@"Ignoring bad watch item: %s", watchItem.Utf8DebugString().c_str());
+          SLOGD(@"Ignoring bad file access rule: %s", faaRule.Utf8DebugString().c_str());
           continue;
         }
-        [newWatchItems addObject:rule];
+        [newFileAccessRules addObject:rule];
       }
 
       cursor = response.cursor();
@@ -293,7 +293,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   return faa;
 }
 
-- (SNTFileAccessRule *)faaWatchItemFromProtoWatchItem:(const ::pbv1::FileAccessRule &)wi {
+- (SNTFileAccessRule *)fileAccessRuleFromProtoFileAccessRule:(const ::pbv1::FileAccessRule &)wi {
   switch (wi.action_case()) {
     case ::pbv1::FileAccessRule::kAdd: return [self faaRuleFromProtoFAARuleAdd:wi.add()];
     case ::pbv1::FileAccessRule::kRemove: {

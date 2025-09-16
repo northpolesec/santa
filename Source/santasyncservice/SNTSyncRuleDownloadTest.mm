@@ -34,7 +34,7 @@ namespace pbv1 = ::santa::sync::v1;
 - (NSDictionary *)optionsFromProtoFAARuleAdd:(const ::pbv1::FileAccessRule::Add &)pbAddRule;
 - (NSArray *)processesFromProtoFAARuleProcesses:
     (const google::protobuf::RepeatedPtrField<::pbv1::FileAccessRule::Process> &)pbProcesses;
-- (SNTFileAccessRule *)faaWatchItemFromProtoWatchItem:(const ::pbv1::FileAccessRule &)wi;
+- (SNTFileAccessRule *)fileAccessRuleFromProtoFileAccessRule:(const ::pbv1::FileAccessRule &)wi;
 @end
 
 @interface SNTSyncRuleDownloadTest : XCTestCase
@@ -184,7 +184,7 @@ namespace pbv1 = ::santa::sync::v1;
   XCTAssertNil(procs);
 }
 
-- (void)testFaaWatchItemFromProtoWatchItemAdd {
+- (void)testFileAccessRuleFromProtoFileAccessRuleAdd {
   ::pbv1::FileAccessRule wi;
   ::pbv1::FileAccessRule::Add *addRule = wi.mutable_add();
   ::pbv1::FileAccessRule::Path *path = addRule->add_paths();
@@ -210,7 +210,7 @@ namespace pbv1 = ::santa::sync::v1;
   proc = addRule->add_processes();
   proc->set_binary_path("/my/path/");
 
-  SNTFileAccessRule *rule = [self.sut faaWatchItemFromProtoWatchItem:wi];
+  SNTFileAccessRule *rule = [self.sut fileAccessRuleFromProtoFileAccessRule:wi];
   XCTAssertEqual(rule.state, SNTFileAccessRuleStateAdd);
 
   // Spot check
@@ -222,12 +222,12 @@ namespace pbv1 = ::santa::sync::v1;
       rule.details[kWatchItemConfigKeyProcesses][0][kWatchItemConfigKeyProcessesTeamID], @"my.tid");
 }
 
-- (void)testFaaWatchItemFromProtoWatchItemRemove {
+- (void)testFileAccessRuleFromProtoFileAccessRuleRemove {
   ::pbv1::FileAccessRule wi;
   ::pbv1::FileAccessRule::Remove *pbRemove = wi.mutable_remove();
   pbRemove->set_name("foo");
 
-  SNTFileAccessRule *rule = [self.sut faaWatchItemFromProtoWatchItem:wi];
+  SNTFileAccessRule *rule = [self.sut fileAccessRuleFromProtoFileAccessRule:wi];
 
   XCTAssertEqual(rule.state, SNTFileAccessRuleStateRemove);
   XCTAssertEqualObjects(rule.name, @"foo");
