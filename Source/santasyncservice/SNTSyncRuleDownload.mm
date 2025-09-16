@@ -37,6 +37,24 @@ namespace pbv1 = ::santa::sync::v1;
 using santa::NSStringToUTF8String;
 using santa::StringToNSString;
 
+// Small local object to more easily return the different sets of downloaded rules.
+@interface SNTDownloadedRuleSets : NSObject
+@property(readonly) NSArray<SNTRule *> *executionRules;
+@property(readonly) NSArray<SNTFileAccessRule *> *fileAccessRules;
+@end
+
+@implementation SNTDownloadedRuleSets
+- (instancetype)initWithExecutionRules:(NSArray<SNTRule *> *)executionRules
+                       fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules {
+  self = [super init];
+  if (self) {
+    _executionRules = executionRules;
+    _fileAccessRules = fileAccessRules;
+  }
+  return self;
+}
+@end
+
 SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   switch (syncType) {
     case SNTSyncTypeNormal: return SNTRuleCleanupNone;
@@ -55,22 +73,29 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
 - (BOOL)sync {
   // Grab the new rules from server
-  NSArray<SNTRule *> *newRules = [self downloadNewRulesFromServer];
-  if (!newRules) return NO;         // encountered a problem with the download
-  if (!newRules.count) return YES;  // successfully completed request, but no new rules
+  SNTDownloadedRuleSets *newRules = [self downloadNewRulesFromServer];
+  // `downloadNewRulesFromServer` returns nil if there was a problem with the download
+  if (!newRules) {
+    return NO;
+  }
+  // If the request was successfully completed, but no new rules received, just return
+  if (!newRules.executionRules.count && !newRules.fileAccessRules.count) {
+    return YES;
+  }
 
   // Tell santad to add the new rules to the database.
   // Wait until finished or until 5 minutes pass.
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   __block NSError *error;
   [[self.daemonConn remoteObjectProxy]
-      databaseRuleAddRules:newRules
-               ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
-                    source:SNTRuleAddSourceSyncService
-                     reply:^(NSError *e) {
-                       error = e;
-                       dispatch_semaphore_signal(sema);
-                     }];
+      databaseRuleAddExecutionRules:newRules.executionRules
+                    fileAccessRules:newRules.fileAccessRules
+                        ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
+                             source:SNTRuleAddSourceSyncService
+                              reply:^(NSError *e) {
+                                error = e;
+                                dispatch_semaphore_signal(sema);
+                              }];
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_SEC))) {
     SLOGE(@"Failed to add rule(s) to database: timeout sending rules to daemon");
     return NO;
@@ -90,18 +115,24 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
                                                     }];
   dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
 
-  SLOGI(@"Processed %lu rules", newRules.count);
+  if (newRules.executionRules.count) {
+    SLOGI(@"Processed %lu execution rules", newRules.executionRules.count);
+  }
+
+  if (newRules.fileAccessRules.count) {
+    SLOGI(@"Processed %lu file access rules", newRules.fileAccessRules.count);
+  }
 
   // Send out push notifications about any newly allowed binaries
   // that had been previously blocked by santad.
-  [self announceUnblockingRules:newRules];
+  [self announceUnblockingRules:newRules.executionRules];
   return YES;
 }
 
 // Downloads new rules from server and converts them into SNTRule.
 // Returns an array of all converted rules, or nil if there was a server problem.
 // Note that rules from the server are filtered.
-- (NSArray<SNTRule *> *)downloadNewRulesFromServer {
+- (SNTDownloadedRuleSets *)downloadNewRulesFromServer {
   google::protobuf::Arena arena;
 
   self.syncState.rulesReceived = 0;
@@ -154,7 +185,8 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
   self.syncState.rulesProcessed = newRules.count;
 
-  return newRules;
+  return [[SNTDownloadedRuleSets alloc] initWithExecutionRules:newRules
+                                               fileAccessRules:newFileAccessRules];
 }
 
 - (NSArray *)pathsFromProtoFAARulePaths:
@@ -355,6 +387,11 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 // Send out push notifications for allowed bundles/binaries whose rule download was preceded by
 // an associated announcing FCM message.
 - (void)announceUnblockingRules:(NSArray<SNTRule *> *)newRules {
+  if (newRules.count == 0) {
+    // No new execution rules received
+    return;
+  }
+
   NSMutableArray *processed = [NSMutableArray array];
   SNTPushNotificationsTracker *tracker = [SNTPushNotificationsTracker tracker];
   [[tracker all]
@@ -398,6 +435,8 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
 - (void)processDeprecatedBundleNotificationsForRule:(SNTRule *)rule
                                       fromProtoRule:(const ::pbv1::Rule *)protoRule {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   // Check rule for extra notification related info.
   if (rule.state == SNTRuleStateAllow || rule.state == SNTRuleStateAllowCompiler) {
     // primaryHash is the bundle hash if there was a bundle hash included in the rule, otherwise
@@ -413,6 +452,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         decrementPendingRulesForHash:primaryHash
                       totalRuleCount:@(protoRule->file_bundle_binary_count())];
   }
+#pragma clang diagnostic push
 }
 
 @end

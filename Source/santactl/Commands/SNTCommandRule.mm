@@ -244,13 +244,15 @@ REGISTER_COMMAND_NAME(@"rule")
 
   if (!importRules && cleanupType != SNTRuleCleanupNone) {
     [[self.daemonConn remoteObjectProxy]
-        databaseRuleAddRules:@[]
-                 ruleCleanup:cleanupType
-                      source:SNTRuleAddSourceSantactl
-                       reply:^(NSError *error) {
-                         TEE_LOGE(@"Failed to delete rules: %@\n", error.localizedDescription);
-                         exit(EXIT_FAILURE);
-                       }];
+        databaseRuleAddExecutionRules:@[]
+                      fileAccessRules:nil
+                          ruleCleanup:cleanupType
+                               source:SNTRuleAddSourceSantactl
+                                reply:^(NSError *error) {
+                                  TEE_LOGE(@"Failed to delete rules: %@\n",
+                                           error.localizedDescription);
+                                  exit(EXIT_FAILURE);
+                                }];
     exit(EXIT_SUCCESS);
   }
 
@@ -339,45 +341,49 @@ REGISTER_COMMAND_NAME(@"rule")
   }
 
   [[self.daemonConn remoteObjectProxy]
-      databaseRuleAddRules:@[ newRule ]
-               ruleCleanup:SNTRuleCleanupNone
-                    source:SNTRuleAddSourceSantactl
-                     reply:^(NSError *error) {
-                       if (error) {
-                         TEE_LOGE(@"Failed to modify rules: %@", error.localizedFailureReason);
-                         exit(1);
-                       } else {
-                         NSString *ruleType;
-                         switch (newRule.type) {
-                           case SNTRuleTypeCertificate: ruleType = @"Certificate SHA-256"; break;
-                           case SNTRuleTypeBinary: {
-                             ruleType = @"SHA-256";
-                             break;
-                           }
-                           case SNTRuleTypeTeamID: {
-                             ruleType = @"Team ID";
-                             break;
-                           }
-                           case SNTRuleTypeSigningID: {
-                             ruleType = @"Signing ID";
-                             break;
-                           }
-                           case SNTRuleTypeCDHash: {
-                             ruleType = @"CDHash";
-                             break;
-                           }
-                           default: ruleType = @"(Unknown type)";
-                         }
-                         if (newRule.state == SNTRuleStateRemove) {
-                           printf("Removed rule for %s: %s.\n", [ruleType UTF8String],
-                                  [newRule.identifier UTF8String]);
-                         } else {
-                           printf("Added rule for %s: %s.\n", [ruleType UTF8String],
-                                  [newRule.identifier UTF8String]);
-                         }
-                         exit(0);
-                       }
-                     }];
+      databaseRuleAddExecutionRules:@[ newRule ]
+                    fileAccessRules:nil
+                        ruleCleanup:SNTRuleCleanupNone
+                             source:SNTRuleAddSourceSantactl
+                              reply:^(NSError *error) {
+                                if (error) {
+                                  TEE_LOGE(@"Failed to modify rules: %@",
+                                           error.localizedFailureReason);
+                                  exit(1);
+                                } else {
+                                  NSString *ruleType;
+                                  switch (newRule.type) {
+                                    case SNTRuleTypeCertificate:
+                                      ruleType = @"Certificate SHA-256";
+                                      break;
+                                    case SNTRuleTypeBinary: {
+                                      ruleType = @"SHA-256";
+                                      break;
+                                    }
+                                    case SNTRuleTypeTeamID: {
+                                      ruleType = @"Team ID";
+                                      break;
+                                    }
+                                    case SNTRuleTypeSigningID: {
+                                      ruleType = @"Signing ID";
+                                      break;
+                                    }
+                                    case SNTRuleTypeCDHash: {
+                                      ruleType = @"CDHash";
+                                      break;
+                                    }
+                                    default: ruleType = @"(Unknown type)";
+                                  }
+                                  if (newRule.state == SNTRuleStateRemove) {
+                                    printf("Removed rule for %s: %s.\n", [ruleType UTF8String],
+                                           [newRule.identifier UTF8String]);
+                                  } else {
+                                    printf("Added rule for %s: %s.\n", [ruleType UTF8String],
+                                           [newRule.identifier UTF8String]);
+                                  }
+                                  exit(0);
+                                }
+                              }];
 }
 
 - (void)printStateOfRule:(SNTRule *)rule daemonConnection:(MOLXPCConnection *)daemonConn {
@@ -439,16 +445,18 @@ REGISTER_COMMAND_NAME(@"rule")
   }
 
   [[self.daemonConn remoteObjectProxy]
-      databaseRuleAddRules:parsedRules
-               ruleCleanup:cleanupType
-                    source:SNTRuleAddSourceSantactl
-                     reply:^(NSError *error) {
-                       if (error) {
-                         TEE_LOGE(@"Failed to modify rules: %@", error.localizedFailureReason);
-                         exit(1);
-                       }
-                       exit(0);
-                     }];
+      databaseRuleAddExecutionRules:parsedRules
+                    fileAccessRules:nil
+                        ruleCleanup:cleanupType
+                             source:SNTRuleAddSourceSantactl
+                              reply:^(NSError *error) {
+                                if (error) {
+                                  TEE_LOGE(@"Failed to modify rules: %@",
+                                           error.localizedFailureReason);
+                                  exit(1);
+                                }
+                                exit(0);
+                              }];
 }
 
 - (void)exportJSONFile:(NSString *)jsonFilePath {

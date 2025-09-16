@@ -14,6 +14,8 @@
 
 #include "Source/common/SNTFileAccessRule.h"
 
+#import "Source/common/CoderMacros.h"
+
 @implementation SNTFileAccessRule
 
 - (instancetype)initWithState:(SNTFileAccessRuleState)state {
@@ -24,6 +26,26 @@
   self = [super init];
   if (self) {
     _state = state;
+  }
+  return self;
+}
+
++ (BOOL)supportsSecureCoding {
+  return YES;
+}
+
+- (void)encodeWithCoder:(NSCoder *)coder {
+  ENCODE_BOXABLE(coder, state);
+  ENCODE(coder, name);
+  ENCODE(coder, details);
+}
+
+- (instancetype)initWithCoder:(NSCoder *)decoder {
+  self = [super init];
+  if (self) {
+    DECODE_SELECTOR(decoder, state, NSNumber, intValue);
+    DECODE(decoder, name, NSString);
+    DECODE_DICT(decoder, details);
   }
   return self;
 }

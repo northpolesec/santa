@@ -867,10 +867,11 @@
 
   // Stub out the call to invoke the block, verification of the input is later
   OCMStub([self.daemonConnRop
-      databaseRuleAddRules:OCMOCK_ANY
-               ruleCleanup:SNTRuleCleanupNone
-                    source:SNTRuleAddSourceSyncService
-                     reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
+      databaseRuleAddExecutionRules:OCMOCK_ANY
+                    fileAccessRules:OCMOCK_ANY
+                        ruleCleanup:SNTRuleCleanupNone
+                             source:SNTRuleAddSourceSyncService
+                              reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
   [sut sync];
@@ -902,10 +903,11 @@
                                 celExpr:nil],
   ];
 
-  OCMVerify([self.daemonConnRop databaseRuleAddRules:rules
-                                         ruleCleanup:SNTRuleCleanupNone
-                                              source:SNTRuleAddSourceSyncService
-                                               reply:OCMOCK_ANY]);
+  OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
+                                              fileAccessRules:OCMOCK_ANY
+                                                  ruleCleanup:SNTRuleCleanupNone
+                                                       source:SNTRuleAddSourceSyncService
+                                                        reply:OCMOCK_ANY]);
   OCMVerify([self.daemonConnRop postRuleSyncNotificationForApplication:@"yes" reply:OCMOCK_ANY]);
 }
 
@@ -917,10 +919,11 @@
 
   // Stub out the call to invoke the block, verification of the input is later
   OCMStub([self.daemonConnRop
-      databaseRuleAddRules:OCMOCK_ANY
-               ruleCleanup:SNTRuleCleanupNone
-                    source:SNTRuleAddSourceSyncService
-                     reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
+      databaseRuleAddExecutionRules:OCMOCK_ANY
+                    fileAccessRules:OCMOCK_ANY
+                        ruleCleanup:SNTRuleCleanupNone
+                             source:SNTRuleAddSourceSyncService
+                              reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
   [sut sync];
@@ -942,10 +945,11 @@
                                 celExpr:@"this is an invalid expression"],
   ];
 
-  OCMVerify([self.daemonConnRop databaseRuleAddRules:rules
-                                         ruleCleanup:SNTRuleCleanupNone
-                                              source:SNTRuleAddSourceSyncService
-                                               reply:OCMOCK_ANY]);
+  OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
+                                              fileAccessRules:OCMOCK_ANY
+                                                  ruleCleanup:SNTRuleCleanupNone
+                                                       source:SNTRuleAddSourceSyncService
+                                                        reply:OCMOCK_ANY]);
 }
 
 #pragma mark - SNTSyncPostflight Tests

@@ -26,6 +26,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
@@ -137,10 +138,11 @@ double watchdogRAMPeak = 0;
   reply(ruleCounts);
 }
 
-- (void)databaseRuleAddRules:(NSArray *)rules
-                 ruleCleanup:(SNTRuleCleanup)cleanupType
-                      source:(SNTRuleAddSource)source
-                       reply:(void (^)(NSError *error))reply {
+- (void)databaseRuleAddExecutionRules:(NSArray<SNTRule *> *)executionRules
+                      fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+                          ruleCleanup:(SNTRuleCleanup)cleanupType
+                               source:(SNTRuleAddSource)source
+                                reply:(void (^)(NSError *error))reply {
 #ifndef DEBUG
   SNTConfigurator *config = [SNTConfigurator configurator];
   if (source == SNTRuleAddSourceSantactl && (config.syncBaseURL || config.staticRules.count > 0)) {
@@ -159,11 +161,11 @@ double watchdogRAMPeak = 0;
   // If any rules are added that are not plain allowlist rules, then flush decision cache.
   // In particular, the addition of allowlist compiler rules should cause a cache flush.
   // We also flush cache if a allowlist compiler rule is replaced with a allowlist rule.
-  BOOL flushCache =
-      ((cleanupType != SNTRuleCleanupNone) || [ruleTable addedRulesShouldFlushDecisionCache:rules]);
+  BOOL flushCache = ((cleanupType != SNTRuleCleanupNone) ||
+                     [ruleTable addedRulesShouldFlushDecisionCache:executionRules]);
 
   NSError *error;
-  [ruleTable addRules:rules ruleCleanup:cleanupType error:&error];
+  [ruleTable addRules:executionRules ruleCleanup:cleanupType error:&error];
 
   // Whenever we add rules, we can also check for and remove outdated transitive rules.
   [ruleTable removeOutdatedTransitiveRules];

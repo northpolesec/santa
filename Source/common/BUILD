@@ -537,6 +537,9 @@ objc_library(
     name = "SNTFileAccessRule",
     srcs = ["SNTFileAccessRule.mm"],
     hdrs = ["SNTFileAccessRule.h"],
+    deps = [
+        ":CoderMacros",
+    ],
 )
 
 santa_unit_test(
@@ -713,6 +716,7 @@ objc_library(
         ":SNTCommonEnums",
         ":SNTConfigBundle",
         ":SNTConfigurator",
+        ":SNTFileAccessRule",
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",
