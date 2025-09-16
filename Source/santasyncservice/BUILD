@@ -68,6 +68,83 @@ config_setting(
 )
 
 objc_library(
+    name = "SNTSyncLogging",
+    srcs = ["SNTSyncLogging.mm"],
+    hdrs = ["SNTSyncLogging.h"],
+    deps = [
+        ":broadcaster_lib",
+        "//Source/common:SNTLogging",
+    ],
+)
+
+objc_library(
+    name = "SNTSyncStage",
+    srcs = ["SNTSyncStage.mm"],
+    hdrs = ["SNTSyncStage.h"],
+    deps = [
+        ":SNTSyncLogging",
+        ":SNTSyncState",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:NSData+Zlib",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTSyncConstants",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:String",
+        "@protobuf//src/google/protobuf/json",
+    ],
+)
+
+objc_library(
+    name = "SNTPushNotificationsTracker",
+    srcs = ["SNTPushNotificationsTracker.mm"],
+    hdrs = ["SNTPushNotificationsTracker.h"],
+    deps = [
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTSyncConstants",
+    ],
+)
+
+objc_library(
+    name = "SNTSyncRuleDownload",
+    srcs = ["SNTSyncRuleDownload.mm"],
+    hdrs = ["SNTSyncRuleDownload.h"],
+    deps = [
+        ":SNTPushNotificationsTracker",
+        ":SNTSyncConfigBundle",
+        ":SNTSyncLogging",
+        ":SNTSyncStage",
+        ":SNTSyncState",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTFileAccessRule",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTSyncConstants",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:String",
+        "//Source/common/faa:WatchItemPolicy",
+        "//Source/common/faa:WatchItems",
+        "@northpolesec_protos//sync:v1_cc_proto",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTSyncRuleDownloadTest",
+    srcs = [
+        "SNTSyncRuleDownloadTest.mm",
+    ],
+    deps = [
+        ":SNTSyncRuleDownload",
+        "//Source/common:SNTFileAccessRule",
+        "//Source/common:TestUtils",
+        "//Source/common/faa:WatchItemPolicy",
+        "//Source/common/faa:WatchItems",
+        "@northpolesec_protos//sync:v1_cc_proto",
+    ],
+)
+
+objc_library(
     name = "sync_lib",
     srcs = [
         "SNTPushClientAPNS.h",
@@ -75,23 +152,15 @@ objc_library(
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
-        "SNTPushNotificationsTracker.h",
-        "SNTPushNotificationsTracker.mm",
         "SNTStreamingMultipartFormData.h",
         "SNTStreamingMultipartFormData.mm",
         "SNTSyncEventUpload.h",
         "SNTSyncEventUpload.mm",
-        "SNTSyncLogging.h",
-        "SNTSyncLogging.mm",
         "SNTSyncManager.mm",
         "SNTSyncPostflight.h",
         "SNTSyncPostflight.mm",
         "SNTSyncPreflight.h",
         "SNTSyncPreflight.mm",
-        "SNTSyncRuleDownload.h",
-        "SNTSyncRuleDownload.mm",
-        "SNTSyncStage.h",
-        "SNTSyncStage.mm",
     ],
     hdrs = ["SNTSyncManager.h"],
     defines = select({
@@ -102,7 +171,11 @@ objc_library(
     sdk_frameworks = ["Network"],
     deps = [
         ":FCM_lib",
+        ":SNTPushNotificationsTracker",
         ":SNTSyncConfigBundle",
+        ":SNTSyncLogging",
+        ":SNTSyncRuleDownload",
+        ":SNTSyncStage",
         ":SNTSyncState",
         ":broadcaster_lib",
         ":polaris_lib",
@@ -143,20 +216,12 @@ santa_unit_test(
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
-        "SNTPushNotificationsTracker.h",
-        "SNTPushNotificationsTracker.mm",
         "SNTSyncEventUpload.h",
         "SNTSyncEventUpload.mm",
-        "SNTSyncLogging.h",
-        "SNTSyncLogging.mm",
         "SNTSyncPostflight.h",
         "SNTSyncPostflight.mm",
         "SNTSyncPreflight.h",
         "SNTSyncPreflight.mm",
-        "SNTSyncRuleDownload.h",
-        "SNTSyncRuleDownload.mm",
-        "SNTSyncStage.h",
-        "SNTSyncStage.mm",
         "SNTSyncTest.mm",
     ],
     resources = glob([
@@ -166,7 +231,11 @@ santa_unit_test(
     sdk_dylibs = ["libz"],
     deps = [
         ":FCM_lib",
+        ":SNTPushNotificationsTracker",
         ":SNTSyncConfigBundle",
+        ":SNTSyncLogging",
+        ":SNTSyncRuleDownload",
+        ":SNTSyncStage",
         ":SNTSyncState",
         ":broadcaster_lib",
         "//Source/common:EncodeEntitlements",
@@ -261,6 +330,7 @@ test_suite(
     tests = [
         ":SNTStreamingMultipartFormDataTest",
         ":SNTSyncConfigBundleTest",
+        ":SNTSyncRuleDownloadTest",
         ":SNTSyncTest",
     ],
     visibility = ["//:santa_package_group"],

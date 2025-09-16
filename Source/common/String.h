@@ -42,7 +42,7 @@ static inline NSString *StringToNSString(const char *str) {
   return [NSString stringWithUTF8String:str];
 }
 
-static inline NSString *StringToNSString(const std::string_view &str) {
+static inline NSString *StringToNSString(std::string_view str) {
   return [NSString stringWithUTF8String:str.data()];
 }
 

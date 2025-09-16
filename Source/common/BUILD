@@ -533,6 +533,12 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SNTFileAccessRule",
+    srcs = ["SNTFileAccessRule.mm"],
+    hdrs = ["SNTFileAccessRule.h"],
+)
+
 santa_unit_test(
     name = "SNTRuleTest",
     srcs = ["SNTRuleTest.mm"],
