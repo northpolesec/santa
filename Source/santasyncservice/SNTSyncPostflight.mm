@@ -42,6 +42,10 @@ using santa::NSStringToUTF8String;
   req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
   req->set_rules_received(static_cast<uint32_t>(self.syncState.rulesReceived));
   req->set_rules_processed(static_cast<uint32_t>(self.syncState.rulesProcessed));
+  req->set_file_access_rules_received(
+      static_cast<uint32_t>(self.syncState.fileAccessRulesReceived));
+  req->set_file_access_rules_processed(
+      static_cast<uint32_t>(self.syncState.fileAccessRulesProcessed));
 
   switch (self.syncState.syncType) {
     case SNTSyncTypeNormal: req->set_sync_type(::pbv1::NORMAL); break;

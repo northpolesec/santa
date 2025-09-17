@@ -86,9 +86,11 @@
 /// The content-encoding to use for the client uploads during the sync session.
 @property SNTSyncContentEncoding contentEncoding;
 
-/// Counts of rules received and processed during rule download.
+/// Counts of execution and file access rules received and processed during rule download.
 @property NSUInteger rulesReceived;
 @property NSUInteger rulesProcessed;
+@property NSUInteger fileAccessRulesReceived;
+@property NSUInteger fileAccessRulesProcessed;
 
 @property BOOL preflightOnly;
 @property BOOL pushNotificationSync;

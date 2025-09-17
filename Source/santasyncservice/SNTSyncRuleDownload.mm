@@ -136,6 +136,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   google::protobuf::Arena arena;
 
   self.syncState.rulesReceived = 0;
+  self.syncState.fileAccessRulesReceived = 0;
   NSMutableArray<SNTRule *> *newRules = [NSMutableArray array];
   NSMutableArray<SNTFileAccessRule *> *newFileAccessRules = [NSMutableArray array];
   std::string cursor;
@@ -180,10 +181,12 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
       cursor = response.cursor();
       SLOGI(@"Received %lu rules", (unsigned long)response.rules_size());
       self.syncState.rulesReceived += response.rules_size();
+      self.syncState.fileAccessRulesReceived += response.file_access_rules_size();
     }
   } while (!cursor.empty());
 
   self.syncState.rulesProcessed = newRules.count;
+  self.syncState.fileAccessRulesProcessed = newFileAccessRules.count;
 
   return [[SNTDownloadedRuleSets alloc] initWithExecutionRules:newRules
                                                fileAccessRules:newFileAccessRules];
