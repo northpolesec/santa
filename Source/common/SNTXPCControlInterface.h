@@ -14,6 +14,8 @@
 /// limitations under the License.
 
 #import "Source/common/SNTConfigBundle.h"
+#import "Source/common/SNTFileAccessRule.h"
+#import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 
@@ -36,10 +38,11 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
   SNTRuleAddSourceSyncService,
   SNTRuleAddSourceSantactl,
 };
-- (void)databaseRuleAddRules:(NSArray *)rules
-                 ruleCleanup:(SNTRuleCleanup)cleanupType
-                      source:(SNTRuleAddSource)source
-                       reply:(void (^)(NSError *error))reply;
+- (void)databaseRuleAddExecutionRules:(NSArray<SNTRule *> *)executionRules
+                      fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+                          ruleCleanup:(SNTRuleCleanup)cleanupType
+                               source:(SNTRuleAddSource)source
+                                reply:(void (^)(NSError *error))reply;
 - (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent *> *events))reply;
 - (void)databaseRemoveEventsWithIDs:(NSArray *)ids;
 - (void)retrieveAllRules:(void (^)(NSArray<SNTRule *> *rules, NSError *error))reply;

@@ -20,7 +20,7 @@ typedef NS_ENUM(NSInteger, SNTFileAccessRuleState) {
   SNTFileAccessRuleStateRemove,
 };
 
-@interface SNTFileAccessRule : NSObject
+@interface SNTFileAccessRule : NSObject <NSSecureCoding>
 
 @property SNTFileAccessRuleState state;
 @property(copy) NSString *name;
