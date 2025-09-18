@@ -41,8 +41,8 @@ void RateLimiter::ModifySettingsSerialized(uint32_t logs_per_sec, uint32_t windo
   // Semi-arbitrary window size limit of 1 hour
   if (window_size_sec > max_window_size_) {
     window_size_sec = max_window_size_;
-    LOGW(@"FileAccessGlobalWindowSizeSec must be between 0 and %u. Clamped to: %u",
-         max_window_size_, window_size_sec);
+    LOGW(@"Window size must be between 0 and %u. Clamped to: %u", max_window_size_,
+         window_size_sec);
   }
 
   if (logs_per_sec == 0 || window_size_sec == 0) {
