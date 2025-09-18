@@ -28,8 +28,8 @@ RateLimiter RateLimiter::Create(std::shared_ptr<santa::Metrics> metrics, uint32_
 }
 
 RateLimiter::RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint32_t logs_per_sec,
-                         uint32_t window_size_sec)
-    : metrics_(std::move(metrics)) {
+                         uint32_t window_size_sec, uint32_t max_window_size)
+    : metrics_(std::move(metrics)), max_window_size_(max_window_size) {
   q_ = dispatch_queue_create(
       "com.northpolesec.santa.daemon.rate_limiter",
       dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
@@ -39,10 +39,10 @@ RateLimiter::RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint32_t logs_
 
 void RateLimiter::ModifySettingsSerialized(uint32_t logs_per_sec, uint32_t window_size_sec) {
   // Semi-arbitrary window size limit of 1 hour
-  if (window_size_sec > 3600) {
-    window_size_sec = 3600;
-    LOGW(@"FileAccessGlobalWindowSizeSec must be between 0 and 3600. Clamped to: %u",
-         window_size_sec);
+  if (window_size_sec > max_window_size_) {
+    window_size_sec = max_window_size_;
+    LOGW(@"FileAccessGlobalWindowSizeSec must be between 0 and %u. Clamped to: %u",
+         max_window_size_, window_size_sec);
   }
 
   if (logs_per_sec == 0 || window_size_sec == 0) {

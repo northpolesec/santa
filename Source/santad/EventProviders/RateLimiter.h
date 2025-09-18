@@ -41,7 +41,7 @@ class RateLimiter {
                             uint32_t logs_per_sec, uint32_t window_size_sec);
 
   RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint32_t logs_per_sec,
-              uint32_t window_size_sec);
+              uint32_t window_size_sec, uint32_t max_window_size = 3600);
 
   enum class Decision {
     kRateLimited = 0,
@@ -62,6 +62,7 @@ class RateLimiter {
   void TryResetSerialized(uint64_t cur_mach_time);
 
   std::shared_ptr<santa::Metrics> metrics_;
+  const uint32_t max_window_size_;
   size_t log_count_total_ = 0;
   size_t max_log_count_total_;
   uint64_t reset_mach_time_;
