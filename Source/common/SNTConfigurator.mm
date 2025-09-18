@@ -139,6 +139,8 @@ static NSString *const kFileAccessPolicy = @"FileAccessPolicy";
 static NSString *const kFileAccessPolicyPlist = @"FileAccessPolicyPlist";
 static NSString *const kFileAccessBlockMessage = @"FileAccessBlockMessage";
 static NSString *const kFileAccessPolicyUpdateIntervalSec = @"FileAccessPolicyUpdateIntervalSec";
+static NSString *const kFileAccessGlobalLogsPerSec = @"FileAccessGlobalLogsPerSec";
+static NSString *const kFileAccessGlobalWindowSizeSec = @"FileAccessGlobalWindowSizeSec";
 
 static NSString *const kEnableTelemetryExport = @"EnableTelemetryExport";
 static NSString *const kTelemetryExportIntervalSec = @"TelemetryExportIntervalSec";
@@ -305,6 +307,8 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFileAccessPolicyPlist : string,
       kFileAccessBlockMessage : string,
       kFileAccessPolicyUpdateIntervalSec : number,
+      kFileAccessGlobalWindowSizeSec : number,
+      kFileAccessGlobalLogsPerSec : number,
       kEnableTelemetryExport : number,
       kTelemetryExportIntervalSec : number,
       kTelemetryExportTimeoutSec : number,
@@ -602,6 +606,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingFileAccessPolicyUpdateIntervalSec {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingFileAccessGlobalLogsPerSec {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingFileAccessGlobalWindowSizeSec {
   return [self configStateSet];
 }
 
@@ -1170,6 +1182,18 @@ static SNTConfigurator *sharedConfigurator = nil;
   return self.configState[kFileAccessPolicyUpdateIntervalSec]
              ? [self.configState[kFileAccessPolicyUpdateIntervalSec] unsignedIntValue]
              : 60 * 10;
+}
+
+- (uint32_t)fileAccessGlobalLogsPerSec {
+  return self.configState[kFileAccessGlobalLogsPerSec]
+             ? [self.configState[kFileAccessGlobalLogsPerSec] unsignedIntValue]
+             : 60;
+}
+
+- (uint32_t)fileAccessGlobalWindowSizeSec {
+  return self.configState[kFileAccessGlobalWindowSizeSec]
+             ? [self.configState[kFileAccessGlobalWindowSizeSec] unsignedIntValue]
+             : 15;
 }
 
 - (BOOL)enableTelemetryExport {

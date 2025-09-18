@@ -14,29 +14,53 @@
 
 #include "Source/santad/EventProviders/RateLimiter.h"
 
-#include "Source/common/BranchPrediction.h"
-#include "Source/common/SystemResources.h"
+#include <limits>
 
-using santa::Metrics;
-using santa::Processor;
+#include "Source/common/BranchPrediction.h"
+#include "Source/common/SNTLogging.h"
+#include "Source/common/SystemResources.h"
 
 namespace santa {
 
-RateLimiter RateLimiter::Create(std::shared_ptr<Metrics> metrics, uint16_t max_qps,
-                                NSTimeInterval reset_duration) {
-  return RateLimiter(std::move(metrics), max_qps, reset_duration);
+RateLimiter RateLimiter::Create(std::shared_ptr<santa::Metrics> metrics, uint32_t logs_per_sec,
+                                uint32_t window_size_sec) {
+  return RateLimiter(std::move(metrics), logs_per_sec, window_size_sec);
 }
 
-RateLimiter::RateLimiter(std::shared_ptr<Metrics> metrics, uint16_t max_qps,
-                         NSTimeInterval reset_duration)
-    : metrics_(std::move(metrics)),
-      max_log_count_total_(reset_duration * max_qps),
-      reset_mach_time_(0),
-      reset_duration_ns_(reset_duration * NSEC_PER_SEC) {
+RateLimiter::RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint32_t logs_per_sec,
+                         uint32_t window_size_sec, uint32_t max_window_size)
+    : metrics_(std::move(metrics)), max_window_size_(max_window_size) {
   q_ = dispatch_queue_create(
       "com.northpolesec.santa.daemon.rate_limiter",
       dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
                                               QOS_CLASS_USER_INTERACTIVE, 0));
+  ModifySettingsSerialized(logs_per_sec, window_size_sec);
+}
+
+void RateLimiter::ModifySettingsSerialized(uint32_t logs_per_sec, uint32_t window_size_sec) {
+  // Semi-arbitrary window size limit of 1 hour
+  if (window_size_sec > max_window_size_) {
+    window_size_sec = max_window_size_;
+    LOGW(@"Window size must be between 0 and %u. Clamped to: %u", max_window_size_,
+         window_size_sec);
+  }
+
+  if (logs_per_sec == 0 || window_size_sec == 0) {
+    // If either setting is 0, rate limiting is disabled.
+    // Max out these values to ensure never to return RateLimiter::Decision::kRateLimited;
+    max_log_count_total_ = std::numeric_limits<decltype(max_log_count_total_)>::max();
+    reset_mach_time_ = std::numeric_limits<decltype(reset_mach_time_)>::max();
+  } else {
+    max_log_count_total_ = logs_per_sec * window_size_sec;
+    reset_duration_ns_ = window_size_sec * NSEC_PER_SEC;
+    reset_mach_time_ = 0;
+  }
+}
+
+void RateLimiter::ModifySettings(uint32_t logs_per_sec, uint32_t window_size_sec) {
+  dispatch_sync(q_, ^{
+    ModifySettingsSerialized(logs_per_sec, window_size_sec);
+  });
 }
 
 bool RateLimiter::ShouldRateLimitSerialized() {

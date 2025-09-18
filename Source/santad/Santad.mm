@@ -136,6 +136,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   auto faaPolicyProcessor = std::make_shared<santa::FAAPolicyProcessor>(
       [SNTDecisionCache sharedCache], enricher, logger, tty_writer, metrics,
+      configurator.fileAccessGlobalLogsPerSec, configurator.fileAccessGlobalWindowSizeSec,
       ^santa::FAAPolicyProcessor::URLTextPair(
           const std::shared_ptr<santa::WatchItemPolicyBase> &policy) {
         return watch_items->EventDetailLinkInfo(policy);
@@ -635,6 +636,40 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      watch_items->SetConfig(newValue);
                                    }
                                  }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(fileAccessGlobalLogsPerSec)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   uint32_t oldLogPerSec = [oldValue unsignedIntValue];
+                                   uint32_t newLogPerSec = [newValue unsignedIntValue];
+
+                                   if ((!oldValue && !newValue) || (oldLogPerSec == newLogPerSec)) {
+                                     return;
+                                   }
+
+                                   LOGI(@"FileAccessGlobalLogsPerSec changed: %u -> %u",
+                                        oldLogPerSec, newLogPerSec);
+                                   faaPolicyProcessor->ModifyRateLimiterSettings(
+                                       newLogPerSec, configurator.fileAccessGlobalWindowSizeSec);
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(fileAccessGlobalWindowSizeSec)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   uint32_t oldWindowSizeSec = [oldValue unsignedIntValue];
+                                   uint32_t newWindowSizeSec = [newValue unsignedIntValue];
+
+                                   if ((!oldValue && !newValue) ||
+                                       (oldWindowSizeSec == newWindowSizeSec)) {
+                                     return;
+                                   }
+
+                                   LOGI(@"FileAccessGlobalWindowSizeSec changed: %u -> %u",
+                                        oldWindowSizeSec, newWindowSizeSec);
+                                   faaPolicyProcessor->ModifyRateLimiterSettings(
+                                       configurator.fileAccessGlobalLogsPerSec, newWindowSizeSec);
+                                 }],
+
   ]];
 
   // Make the compiler happy. The variable is only used to ensure proper lifetime

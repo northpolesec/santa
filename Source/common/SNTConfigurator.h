@@ -343,6 +343,30 @@
 @property(readonly, nonatomic) uint32_t fileAccessPolicyUpdateIntervalSec;
 
 ///
+///  Sets the average logs per second that will be emitted by File Access
+///  Authorization rule violations.
+///  @note: Set to 0 to disable log rate limiting.
+///  @note: Rate limiting only applies to logging. FAA rules that are not
+///         audit only will still block operations that violate the rule.
+///  @note: This property is KVO compliant.
+///  See also: FileAccessGlobalWindowSizeSec
+///  Defaults to 60.
+///
+@property(readonly) uint32_t fileAccessGlobalLogsPerSec;
+
+///
+///  Sets the window size over which the fileAccessGlobalLogsPerSec
+///  setting is applied in order to allow for burts of logs.
+///  @note: Set to 0 to disable log rate limiting.
+///  @note: Rate limiting only applies to logging. FAA rules that are not
+///         audit only will still block operations that violate the rule.
+///  @note: This property is KVO compliant.
+///  See also: FileAccessGlobalLogsPerSec
+///  Defaults to 15.
+///
+@property(readonly) uint32_t fileAccessGlobalWindowSizeSec;
+
+///
 /// Enabling this appends the Santa machine ID to the end of each log line. If nothing
 /// has been overridden, this is the host's UUID.
 /// Defaults to NO.

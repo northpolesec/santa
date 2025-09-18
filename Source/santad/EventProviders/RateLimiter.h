@@ -17,7 +17,6 @@
 
 #import <Foundation/Foundation.h>
 
-#include <atomic>
 #include <memory>
 
 #include "Source/santad/Metrics.h"
@@ -38,12 +37,11 @@ namespace santa {
 class RateLimiter {
  public:
   // Factory
-  static RateLimiter Create(
-      std::shared_ptr<santa::Metrics> metrics, uint16_t max_qps,
-      NSTimeInterval reset_duration = kDefaultResetDuration);
+  static RateLimiter Create(std::shared_ptr<santa::Metrics> metrics,
+                            uint32_t logs_per_sec, uint32_t window_size_sec);
 
-  RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint16_t max_qps,
-              NSTimeInterval reset_duration);
+  RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint32_t logs_per_sec,
+              uint32_t window_size_sec, uint32_t max_window_size = 3600);
 
   enum class Decision {
     kRateLimited = 0,
@@ -52,16 +50,19 @@ class RateLimiter {
 
   Decision Decide(uint64_t cur_mach_time);
 
+  void ModifySettings(uint32_t logs_per_sec, uint32_t window_size_sec);
+
   friend class santa::RateLimiterPeer;
 
  private:
+  void ModifySettingsSerialized(uint32_t logs_per_sec,
+                                uint32_t window_size_sec);
   bool ShouldRateLimitSerialized();
   size_t EventsRateLimitedSerialized();
   void TryResetSerialized(uint64_t cur_mach_time);
 
-  static constexpr NSTimeInterval kDefaultResetDuration = 15.0;
-
   std::shared_ptr<santa::Metrics> metrics_;
+  const uint32_t max_window_size_;
   size_t log_count_total_ = 0;
   size_t max_log_count_total_;
   uint64_t reset_mach_time_;

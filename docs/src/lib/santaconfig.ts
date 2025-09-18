@@ -630,6 +630,24 @@ changes in the release notes of any future release that changes them.`,
         },
       ],
     },
+    {
+      key: "FileAccessGlobalLogsPerSec",
+      description: `Sets the average logs per second that will be emitted by File Access
+        Authorization rule violations. Setting to 0 will disable log rate limiting. Rate
+        limiting only applies to logging. FAA rules that are not audit only will still
+        block operations that violate the rule.`,
+      type: "integer",
+      defaultValue: 60,
+    },
+    {
+      key: "FileAccessGlobalWindowSizeSec",
+      description: `Sets the window size over which the FileAccessGlobalLogsPerSec setting
+        is applied in order to allow for burts of logs. Setting to 0 will disable log rate
+        limiting. Rate limiting only applies to logging. FAA rules that are not audit only
+        will still block operations that violate the rule.`,
+      type: "integer",
+      defaultValue: 15,
+    },
   ],
   usb: [
     {
