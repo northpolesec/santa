@@ -38,8 +38,6 @@ namespace santa {
 static constexpr size_t kNumProcesses = 2048;
 static constexpr size_t kPerProcessSetCapacity = 128;
 
-static constexpr uint16_t kDefaultRateLimitQPS = 60;
-
 static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 
 static inline std::string Path(const es_file_t *esFile) {
@@ -148,7 +146,9 @@ es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t
 FAAPolicyProcessor::FAAPolicyProcessor(
     SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
     std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
-    std::shared_ptr<Metrics> metrics, GenerateEventDetailLinkBlock generate_event_detail_link_block,
+    std::shared_ptr<Metrics> metrics, uint32_t rate_limit_logs_per_sec,
+    uint32_t rate_limit_window_size_sec,
+    GenerateEventDetailLinkBlock generate_event_detail_link_block,
     StoreAccessEventBlock store_access_event_block)
     : decision_cache_(decision_cache),
       enricher_(std::move(enricher)),
@@ -159,9 +159,15 @@ FAAPolicyProcessor::FAAPolicyProcessor(
       store_access_event_block_(store_access_event_block),
       reads_cache_(kNumProcesses, kPerProcessSetCapacity),
       tty_message_cache_(kNumProcesses, kPerProcessSetCapacity),
-      rate_limiter_(RateLimiter::Create(metrics_, kDefaultRateLimitQPS)) {
+      rate_limiter_(
+          RateLimiter::Create(metrics_, rate_limit_logs_per_sec, rate_limit_window_size_sec)) {
   configurator_ = [SNTConfigurator configurator];
   queue_ = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
+}
+
+void FAAPolicyProcessor::ModifyRateLimiterSettings(uint32_t logs_per_sec,
+                                                   uint32_t window_size_sec) {
+  rate_limiter_.ModifySettings(logs_per_sec, window_size_sec);
 }
 
 NSString *FAAPolicyProcessor::GetCertificateHash(const es_file_t *es_file) {

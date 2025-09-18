@@ -37,10 +37,12 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
   MockFAAPolicyProcessor(
       SNTDecisionCache *dc, std::shared_ptr<Enricher> enricher, std::shared_ptr<Logger> logger,
       std::shared_ptr<TTYWriter> tty_writer, std::shared_ptr<Metrics> metrics,
+      uint32_t rate_limit_logs_per_sec, uint32_t rate_limit_window_size_sec,
       FAAPolicyProcessor::GenerateEventDetailLinkBlock generate_event_detail_link_block,
       FAAPolicyProcessor::StoreAccessEventBlock store_access_event_block)
       : FAAPolicyProcessor(dc, std::move(enricher), std::move(logger), std::move(tty_writer),
-                           std::move(metrics), std::move(generate_event_detail_link_block),
+                           std::move(metrics), rate_limit_logs_per_sec, rate_limit_window_size_sec,
+                           std::move(generate_event_detail_link_block),
                            std::move(store_access_event_block)) {}
   virtual ~MockFAAPolicyProcessor() {}
 

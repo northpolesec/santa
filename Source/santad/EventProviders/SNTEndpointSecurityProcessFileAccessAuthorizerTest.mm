@@ -72,8 +72,8 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
                  .WillOnce(testing::Return(true)))
       .WillOnce(testing::Return(true));
 
-  auto mockFAA =
-      std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nullptr, nil, nil);
+  auto mockFAA = std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nullptr,
+                                                          0, 0, nil, nil);
   auto mockFAAProxy = std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(mockFAA);
 
   SNTEndpointSecurityProcessFileAccessAuthorizer *procFAAClient =
@@ -105,8 +105,8 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   SetExpectationsForProcessFileAccessAuthorizerInit(mockESApi);
 
   // First call will not match, second call will match
-  auto mockFAA =
-      std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nullptr, nil, nil);
+  auto mockFAA = std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nullptr,
+                                                          0, 0, nil, nil);
   EXPECT_CALL(*mockFAA, PolicyMatchesProcess)
       .WillOnce(testing::Return(false))
       .WillOnce(testing::Return(true));

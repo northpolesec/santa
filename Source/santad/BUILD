@@ -543,6 +543,7 @@ objc_library(
     deps = [
         ":Metrics",
         "//Source/common:BranchPrediction",
+        "//Source/common:SNTLogging",
         "//Source/common:SystemResources",
     ],
 )

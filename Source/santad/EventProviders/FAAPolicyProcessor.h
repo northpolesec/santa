@@ -99,7 +99,8 @@ class FAAPolicyProcessor {
 
   FAAPolicyProcessor(SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
                      std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
-                     std::shared_ptr<Metrics> metrics,
+                     std::shared_ptr<Metrics> metrics, uint32_t rate_limit_logs_per_sec,
+                     uint32_t rate_limit_window_size_sec,
                      GenerateEventDetailLinkBlock generate_event_detail_link_block,
                      StoreAccessEventBlock store_access_event_block);
 
@@ -109,6 +110,8 @@ class FAAPolicyProcessor {
                                     const es_process_t *es_proc);
 
   virtual SNTCachedDecision *__strong GetCachedDecision(const struct stat &stat_buf);
+
+  virtual void ModifyRateLimiterSettings(uint32_t logs_per_sec, uint32_t window_size_sec);
 
   static std::vector<FAAPolicyProcessor::PathTarget> PathTargets(const Message &msg);
 

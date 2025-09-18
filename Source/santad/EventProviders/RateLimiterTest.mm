@@ -33,6 +33,8 @@ class RateLimiterPeer : public RateLimiter {
   using RateLimiter::TryResetSerialized;
 
   using RateLimiter::log_count_total_;
+  using RateLimiter::max_log_count_total_;
+  using RateLimiter::reset_duration_ns_;
   using RateLimiter::reset_mach_time_;
 };
 
@@ -141,6 +143,58 @@ using santa::RateLimiterPeer;
 
   XCTAssertTrue(rlp.ShouldRateLimitSerialized());
   XCTAssertEqual(rlp.EventsRateLimitedSerialized(), logsOverQPS);
+}
+
+- (void)testModifySettings {
+  RateLimiterPeer rlp(nullptr, 3, 10);
+
+  // Simulate a smmaller volume of logs received than QPS
+  auto oldMax = rlp.max_log_count_total_;
+  rlp.log_count_total_ = rlp.max_log_count_total_ - 1;
+  XCTAssertFalse(rlp.ShouldRateLimitSerialized());
+  XCTAssertEqual(rlp.EventsRateLimitedSerialized(), 0);
+
+  // Modifying settings resets mach time
+  rlp.ModifySettings(5, 20);
+
+  // Ensure the new max is smaller than the old max
+  XCTAssertGreaterThan(rlp.max_log_count_total_, oldMax);
+  XCTAssertEqual(rlp.reset_duration_ns_, 20 * NSEC_PER_SEC);
+
+  // Simulate larger than the old max, nothing should be rate limited
+  rlp.log_count_total_ = oldMax + 1;
+  XCTAssertFalse(rlp.ShouldRateLimitSerialized());
+  XCTAssertEqual(rlp.EventsRateLimitedSerialized(), 0);
+
+  // Go over the new max
+  rlp.log_count_total_ = rlp.max_log_count_total_ + 20;
+  XCTAssertTrue(rlp.ShouldRateLimitSerialized());
+  XCTAssertEqual(rlp.EventsRateLimitedSerialized(), 20);
+
+  // Test disabling rate limiting by setting logs per sec
+  rlp.ModifySettings(0, 123);
+  XCTAssertEqual(rlp.max_log_count_total_,
+                 std::numeric_limits<decltype(rlp.max_log_count_total_)>::max());
+  XCTAssertEqual(rlp.reset_mach_time_, std::numeric_limits<decltype(rlp.reset_mach_time_)>::max());
+
+  rlp.log_count_total_ = std::numeric_limits<decltype(rlp.log_count_total_)>::max();
+  XCTAssertFalse(rlp.ShouldRateLimitSerialized());
+  XCTAssertEqual(rlp.EventsRateLimitedSerialized(), 0);
+
+  // Modify back to something more sensible, but trigger window size clamping
+  rlp.ModifySettings(123, 4000);
+  XCTAssertEqual(rlp.max_log_count_total_, 123 * 3600);
+  XCTAssertEqual(rlp.reset_duration_ns_, 3600 * NSEC_PER_SEC);
+
+  rlp.log_count_total_ = rlp.max_log_count_total_ + 50;
+  XCTAssertTrue(rlp.ShouldRateLimitSerialized());
+  XCTAssertEqual(rlp.EventsRateLimitedSerialized(), 50);
+
+  // Test disabling by zeroing the window size
+  rlp.ModifySettings(123, 0);
+  XCTAssertEqual(rlp.max_log_count_total_,
+                 std::numeric_limits<decltype(rlp.max_log_count_total_)>::max());
+  XCTAssertEqual(rlp.reset_mach_time_, std::numeric_limits<decltype(rlp.reset_mach_time_)>::max());
 }
 
 @end
