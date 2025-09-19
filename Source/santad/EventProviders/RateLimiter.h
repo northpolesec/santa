@@ -40,6 +40,7 @@ class RateLimiter {
   static RateLimiter Create(std::shared_ptr<santa::Metrics> metrics,
                             uint32_t logs_per_sec, uint32_t window_size_sec);
 
+  // Semi-arbitrary max window size limit of 1 hour
   RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint32_t logs_per_sec,
               uint32_t window_size_sec, uint32_t max_window_size = 3600);
 

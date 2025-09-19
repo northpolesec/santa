@@ -236,7 +236,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)stubRule:(SNTRule *)rule forIdentifiers:(struct RuleIdentifiers)wantIdentifiers {
-  OCMStub([self.mockRuleDatabase ruleForIdentifiers:wantIdentifiers])
+  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:wantIdentifiers])
       .ignoringNonObjectArgs()
       .andDo(^(NSInvocation *inv) {
         struct RuleIdentifiers gotIdentifiers = {};

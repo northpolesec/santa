@@ -315,7 +315,7 @@ static void UpdateCachedDecisionSigningInfo(
     }
   }
 
-  SNTRule *rule = [self.ruleTable ruleForIdentifiers:CreateRuleIDs(cd)];
+  SNTRule *rule = [self.ruleTable executionRuleForIdentifiers:CreateRuleIDs(cd)];
   if (rule) {
     // If we have a rule match we don't need to process any further.
     if ([self decision:cd

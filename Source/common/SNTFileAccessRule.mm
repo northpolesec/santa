@@ -45,7 +45,7 @@
   if (self) {
     DECODE_SELECTOR(decoder, state, NSNumber, intValue);
     DECODE(decoder, name, NSString);
-    DECODE_DICT(decoder, details);
+    DECODE(decoder, details, NSData);
   }
   return self;
 }

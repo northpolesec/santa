@@ -214,12 +214,19 @@ namespace pbv1 = ::santa::sync::v1;
   XCTAssertEqual(rule.state, SNTFileAccessRuleStateAdd);
 
   // Spot check
-  XCTAssertEqual([rule.details[kWatchItemConfigKeyPaths] count], 2);
-  XCTAssertEqualObjects(rule.details[kWatchItemConfigKeyPaths][1][kWatchItemConfigKeyPathsPath],
+  NSDictionary *details = [NSKeyedUnarchiver
+      unarchivedObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class],
+                                                      [NSString class], [NSNumber class],
+                                                      [NSData class], nil]
+                       fromData:rule.details
+                          error:nil];
+  XCTAssertNotNil(details);
+  XCTAssertEqual([details[kWatchItemConfigKeyPaths] count], 2);
+  XCTAssertEqualObjects(details[kWatchItemConfigKeyPaths][1][kWatchItemConfigKeyPathsPath],
                         @"/bar");
-  XCTAssertEqual([rule.details[kWatchItemConfigKeyProcesses] count], 3);
+  XCTAssertEqual([details[kWatchItemConfigKeyProcesses] count], 3);
   XCTAssertEqualObjects(
-      rule.details[kWatchItemConfigKeyProcesses][0][kWatchItemConfigKeyProcessesTeamID], @"my.tid");
+      details[kWatchItemConfigKeyProcesses][0][kWatchItemConfigKeyProcessesTeamID], @"my.tid");
 }
 
 - (void)testFileAccessRuleFromProtoFileAccessRuleRemove {

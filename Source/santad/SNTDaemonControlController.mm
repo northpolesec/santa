@@ -161,11 +161,14 @@ double watchdogRAMPeak = 0;
   // If any rules are added that are not plain allowlist rules, then flush decision cache.
   // In particular, the addition of allowlist compiler rules should cause a cache flush.
   // We also flush cache if a allowlist compiler rule is replaced with a allowlist rule.
-  BOOL flushCache = ((cleanupType != SNTRuleCleanupNone) ||
+  BOOL flushCache = ((cleanupType != SNTRuleCleanupNone) || (fileAccessRules.count > 0) ||
                      [ruleTable addedRulesShouldFlushDecisionCache:executionRules]);
 
   NSError *error;
-  [ruleTable addRules:executionRules ruleCleanup:cleanupType error:&error];
+  [ruleTable addExecutionRules:executionRules
+               fileAccessRules:fileAccessRules
+                   ruleCleanup:cleanupType
+                         error:&error];
 
   // Whenever we add rules, we can also check for and remove outdated transitive rules.
   [ruleTable removeOutdatedTransitiveRules];
@@ -193,14 +196,14 @@ double watchdogRAMPeak = 0;
 
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
                              reply:(void (^)(SNTRule *))reply {
-  reply([[SNTDatabaseController ruleTable] ruleForIdentifiers:[identifiers toStruct]]);
+  reply([[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]]);
 }
 
 - (void)staticRuleCount:(void (^)(int64_t count))reply {
   reply([SNTConfigurator configurator].staticRules.count);
 }
 
-- (void)retrieveAllRules:(void (^)(NSArray<SNTRule *> *, NSError *))reply {
+- (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule *> *, NSError *))reply {
 #ifndef DEBUG
   SNTConfigurator *config = [SNTConfigurator configurator];
   // Do not return any rules if syncBaseURL or static rules are set and return an error.
@@ -214,7 +217,7 @@ double watchdogRAMPeak = 0;
   }
 #endif
 
-  NSArray<SNTRule *> *rules = [[SNTDatabaseController ruleTable] retrieveAllRules];
+  NSArray<SNTRule *> *rules = [[SNTDatabaseController ruleTable] retrieveAllExecutionRules];
   reply(rules, nil);
 }
 

@@ -626,7 +626,7 @@ static NSString *const kPrinterProxyPostMonterey =
     return;
   }
 
-  [self.ruleTable addRules:@[ newRule ] ruleCleanup:SNTRuleCleanupNone error:&err];
+  [self.ruleTable addExecutionRules:@[ newRule ] ruleCleanup:SNTRuleCleanupNone error:&err];
   if (err) {
     LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
          err.localizedDescription);

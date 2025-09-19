@@ -462,7 +462,7 @@ REGISTER_COMMAND_NAME(@"rule")
 - (void)exportJSONFile:(NSString *)jsonFilePath {
   // Get the rules from the daemon and then write them to the file.
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-  [rop retrieveAllRules:^(NSArray<SNTRule *> *rules, NSError *error) {
+  [rop retrieveAllExecutionRules:^(NSArray<SNTRule *> *rules, NSError *error) {
     if (error) {
       TEE_LOGE(@"Failed to get rules: %@\n", error.localizedDescription);
       exit(1);

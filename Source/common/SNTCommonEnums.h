@@ -195,6 +195,9 @@ typedef NS_ENUM(NSInteger, SNTRuleCleanup) {
   SNTRuleCleanupNone,
   SNTRuleCleanupAll,
   SNTRuleCleanupNonTransitive,
+  SNTRuleCleanupStandalone,
+  SNTRuleCleanupExecutionRules,
+  SNTRuleCleanupFileAccessRules,
 };
 
 typedef NS_ENUM(NSInteger, SNTSigningStatus) {

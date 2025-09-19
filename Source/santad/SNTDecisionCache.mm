@@ -75,7 +75,7 @@
     SNTRule *rule = [[SNTRule alloc] initWithIdentifier:cd.sha256
                                                   state:SNTRuleStateAllowTransitive
                                                    type:SNTRuleTypeBinary];
-    [[SNTDatabaseController ruleTable] resetTimestampForRule:rule];
+    [[SNTDatabaseController ruleTable] resetTimestampForExecutionRule:rule];
     [self.timestampResetMap setObject:[NSDate date] forKey:cd.sha256];
   }
 
