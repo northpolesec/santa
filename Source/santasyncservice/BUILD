@@ -81,6 +81,10 @@ objc_library(
     name = "SNTSyncStage",
     srcs = ["SNTSyncStage.mm"],
     hdrs = ["SNTSyncStage.h"],
+    defines = select({
+        ":store_json_uploads": ["SANTA_STORE_SYNC_JSON"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":SNTSyncLogging",
         ":SNTSyncState",
@@ -163,10 +167,6 @@ objc_library(
         "SNTSyncPreflight.mm",
     ],
     hdrs = ["SNTSyncManager.h"],
-    defines = select({
-        ":store_json_uploads": ["SANTA_STORE_SYNC_JSON"],
-        "//conditions:default": [],
-    }),
     sdk_dylibs = ["libz"],
     sdk_frameworks = ["Network"],
     deps = [

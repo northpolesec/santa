@@ -297,10 +297,9 @@ using santa::NSStringToUTF8StringView;
   }
 
   SNTStoredFileAccessProcess *p = event.process;
-  ::pbv1::Process *proc = nullptr;
+  auto process_chain = e->mutable_process_chain();
   while (p) {
-    proc = (proc == nullptr ? e->mutable_process() : proc->mutable_parent());
-
+    ::pbv1::Process *proc = process_chain->Add();
     if (p.filePath) {
       proc->set_file_path(NSStringToUTF8StringView(p.filePath));
     }

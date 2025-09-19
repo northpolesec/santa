@@ -749,12 +749,13 @@
             XCTAssertEqualObjects(event[@"rule_name"], @"MyRule");
             XCTAssertEqualObjects(event[@"rule_version"], @"MyRuleVersion");
             XCTAssertEqualObjects(event[@"target"], @"/you/are/being/watched");
-            XCTAssertEqualObjects(event[@"process"][kFilePath], @"/bin/mkdir");
-            XCTAssertEqualObjects(event[@"process"][kCDHash],
+            XCTAssertEqual(((NSArray *)event[@"process_chain"]).count, 2);
+            XCTAssertEqualObjects(event[@"process_chain"][0][kFilePath], @"/bin/mkdir");
+            XCTAssertEqualObjects(event[@"process_chain"][0][kCDHash],
                                   @"0e923b9487572b38d65ff68f9c2919a4118318e0");
-            XCTAssertEqualObjects(event[@"process"][kPID], @(123));
-            XCTAssertEqualObjects(event[@"process"][@"parent"][kPID], @(456));
-            XCTAssertEqual([event[@"process"][kSigningChain] count], 3);
+            XCTAssertEqualObjects(event[@"process_chain"][0][kPID], @(123));
+            XCTAssertEqualObjects(event[@"process_chain"][1][kPID], @(456));
+            XCTAssertEqual([event[@"process_chain"][0][kSigningChain] count], 3);
             XCTAssertEqualObjects(event[@"access_time"], @(1753333333));
 
             return YES;
