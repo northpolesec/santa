@@ -317,7 +317,14 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   }
   details[kWatchItemConfigKeyProcesses] = processes;
 
-  faa.details = details;
+  NSData *detailsData = [NSKeyedArchiver archivedDataWithRootObject:details
+                                              requiringSecureCoding:YES
+                                                              error:nil];
+  if (!detailsData) {
+    return nil;
+  }
+
+  faa.details = detailsData;
   return faa;
 }
 

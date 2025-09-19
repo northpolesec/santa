@@ -24,7 +24,7 @@ typedef NS_ENUM(NSInteger, SNTFileAccessRuleState) {
 
 @property SNTFileAccessRuleState state;
 @property(copy) NSString *name;
-@property(copy) NSDictionary *details;
+@property(copy) NSData *details;
 
 - (instancetype)initWithState:(SNTFileAccessRuleState)state;
 

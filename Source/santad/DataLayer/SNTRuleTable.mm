@@ -25,6 +25,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTError.h"
+#import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
@@ -33,7 +34,7 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
-static const uint32_t kRuleTableCurrentVersion = 9;
+static const uint32_t kRuleTableCurrentVersion = 10;
 
 // How many rules must be in database before we start trying to remove transitive rules.
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
@@ -80,7 +81,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 @property NSDictionary *criticalSystemBinaries;
 @property(readonly) NSArray *criticalSystemBinaryPaths;
 @property(readwrite) NSDictionary<NSString *, SNTRule *> *cachedStaticRules;
-@property(atomic) NSString *rulesHash;
+@property(atomic) NSString *executionRulesHash;
+@property(atomic) NSString *fileAccessRulesHash;
 @end
 
 @implementation SNTRuleTable
@@ -276,6 +278,21 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     newVersion = 9;
   }
 
+  if (version < 10) {
+    // Modify the exsting rules table to be "execution_rules", and update the unique index
+    [db executeUpdate:@"DROP INDEX rulesunique"];
+    [db executeUpdate:@"ALTER TABLE rules RENAME TO execution_rules"];
+    [db executeUpdate:
+            @"CREATE UNIQUE INDEX execution_rules_unique ON execution_rules ('identifier', type)"];
+
+    // Add the new "file_access_rules" table
+    [db executeUpdate:@"CREATE TABLE 'file_access_rules' ("
+                      @"'name' TEXT NOT NULL PRIMARY KEY,"
+                      @"'rule_data' BLOB NOT NULL)"];
+
+    newVersion = 10;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -301,7 +318,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 - (int64_t)ruleCount {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase *db) {
-    count = [db longForQuery:@"SELECT COUNT(*) FROM rules"];
+    count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules"];
   }];
   return count;
 }
@@ -309,7 +326,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 - (int64_t)ruleCountForRuleType:(SNTRuleType)ruleType {
   __block int64_t count = 0;
   [self inDatabase:^(FMDatabase *db) {
-    count = [db longForQuery:@"SELECT COUNT(*) FROM rules WHERE type=?", @(ruleType)];
+    count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE type=?", @(ruleType)];
   }];
   return count;
 }
@@ -325,8 +342,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 - (int64_t)compilerRuleCount {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase *db) {
-    count =
-        [db longForQuery:@"SELECT COUNT(*) FROM rules WHERE state=?", @(SNTRuleStateAllowCompiler)];
+    count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE state=?",
+                             @(SNTRuleStateAllowCompiler)];
   }];
   return count;
 }
@@ -334,8 +351,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 - (int64_t)transitiveRuleCount {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase *db) {
-    count = [db
-        longForQuery:@"SELECT COUNT(*) FROM rules WHERE state=?", @(SNTRuleStateAllowTransitive)];
+    count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE state=?",
+                             @(SNTRuleStateAllowTransitive)];
   }];
   return count;
 }
@@ -352,7 +369,33 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return [self ruleCountForRuleType:SNTRuleTypeCDHash];
 }
 
-- (SNTRule *)ruleFromResultSet:(FMResultSet *)rs {
+- (int64_t)fileAccessRuleCount {
+  __block NSUInteger count = 0;
+  [self inDatabase:^(FMDatabase *db) {
+    count = [db longForQuery:@"SELECT COUNT(*) FROM file_access_rules"];
+  }];
+  return count;
+}
+
+- (NSDictionary *)fileAccessRuleFromResultSet:(FMResultSet *)rs {
+  NSString *name = [rs stringForColumn:@"name"];
+  NSData *details = [rs dataNoCopyForColumn:@"rule_data"];
+
+  NSDictionary *ruleDict = [NSKeyedUnarchiver
+      unarchivedObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class],
+                                                      [NSString class], [NSNumber class],
+                                                      [NSData class], nil]
+                       fromData:details
+                          error:nil];
+
+  if (ruleDict && name) {
+    return @{name : ruleDict};
+  } else {
+    return nil;
+  }
+}
+
+- (SNTRule *)executionRuleFromResultSet:(FMResultSet *)rs {
   return [[SNTRule alloc] initWithIdentifier:[rs stringForColumn:@"identifier"]
                                        state:static_cast<SNTRuleState>([rs intForColumn:@"state"])
                                         type:static_cast<SNTRuleType>([rs intForColumn:@"type"])
@@ -419,7 +462,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   //
   [self inDatabase:^(FMDatabase *db) {
     FMResultSet *rs =
-        [db executeQuery:@"SELECT * FROM rules WHERE "
+        [db executeQuery:@"SELECT * FROM execution_rules WHERE "
                          @"   (identifier=? AND type=500) "
                          @"OR (identifier=? AND type=1000) "
                          @"OR (identifier=? AND type=2000) "
@@ -428,7 +471,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                          identifiers.cdhash, identifiers.binarySHA256, identifiers.signingID,
                          identifiers.certificateSHA256, identifiers.teamID];
     if ([rs next]) {
-      rule = [self ruleFromResultSet:rs];
+      rule = [self executionRuleFromResultSet:rs];
     }
     [rs close];
   }];
@@ -446,10 +489,120 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 #pragma mark Adding
 
-- (BOOL)addRules:(NSArray *)rules ruleCleanup:(SNTRuleCleanup)cleanupType error:(NSError **)error {
+- (BOOL)addFileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+                      toDB:(FMDatabase *)db
+                     error:(NSError **)error {
+  for (SNTFileAccessRule *rule in fileAccessRules) {
+    // FAA rules must:
+    // 1. Be the right type
+    // 2. Have a name
+    // 3. If an add rule, must have details, otherwise must be a remove rule
+    if (![rule isKindOfClass:[SNTFileAccessRule class]] || rule.name.length == 0 ||
+        ((rule.state == SNTFileAccessRuleStateAdd && rule.details.length == 0) &&
+         (rule.state != SNTFileAccessRuleStateRemove))) {
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeRuleInvalid
+                      message:@"File access rule array contained invalid entry"
+                       detail:rule.description];
+      return NO;
+    }
+
+    if (rule.state == SNTFileAccessRuleStateRemove) {
+      if (![db executeUpdate:@"DELETE FROM file_access_rules WHERE name=?", rule.name]) {
+        [SNTError populateError:error
+                       withCode:SNTErrorCodeRemoveRuleFailed
+                        message:@"A database error occurred while deleting a file access rule"
+                         detail:[db lastErrorMessage]];
+        return NO;
+      }
+    } else {
+      if (![db executeUpdate:@"INSERT OR REPLACE INTO file_access_rules (name, rule_data) "
+                             @"VALUES (?, ?)",
+                             rule.name, rule.details]) {
+        [SNTError
+            populateError:error
+                 withCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                  message:@"A database error occurred while inserting/replacing a file access rule"
+                   detail:[db lastErrorMessage]];
+        return NO;
+      }
+    }
+  }
+
+  return YES;
+}
+
+- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
+                     toDB:(FMDatabase *)db
+                    error:(NSError **)error {
+  for (SNTRule *rule in executionRules) {
+    if (![rule isKindOfClass:[SNTRule class]] || rule.identifier.length == 0 ||
+        rule.state == SNTRuleStateUnknown || rule.type == SNTRuleTypeUnknown) {
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeRuleInvalid
+                      message:@"Execution rule array contained invalid entry"
+                       detail:rule.description];
+      return NO;
+    }
+
+    if (rule.state == SNTRuleStateCEL && _celEvaluator) {
+      auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
+      if (!celExpr.ok()) {
+        [SNTError populateError:error
+                       withCode:SNTErrorCodeRuleInvalidCELExpression
+                        message:@"Rule array contained rule with invalid CEL expression"
+                         detail:santa::StringToNSString(celExpr.status().message())];
+        continue;
+      }
+    }
+
+    if (rule.state == SNTRuleStateRemove) {
+      if (![db executeUpdate:@"DELETE FROM execution_rules WHERE identifier=? AND type=?",
+                             rule.identifier, @(rule.type)]) {
+        [SNTError populateError:error
+                       withCode:SNTErrorCodeRemoveRuleFailed
+                        message:@"A database error occurred while deleting a rule"
+                         detail:[db lastErrorMessage]];
+        return NO;
+      }
+    } else {
+      if (![db executeUpdate:@"INSERT OR REPLACE INTO execution_rules "
+                             @"(identifier, state, type, custommsg, customurl, timestamp, "
+                             @"comment, cel_expr) "
+                             @"VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+                             rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
+                             rule.customURL, @(rule.timestamp), rule.comment, rule.celExpr]) {
+        [SNTError populateError:error
+                       withCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                        message:@"A database error occurred while inserting/replacing a rule"
+                         detail:[db lastErrorMessage]];
+        return NO;
+      }
+    }
+  }
+
+  return YES;
+}
+
+- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
+              ruleCleanup:(SNTRuleCleanup)cleanupType
+                    error:(NSError **)error {
+  return [self addExecutionRules:executionRules
+                 fileAccessRules:nil
+                     ruleCleanup:cleanupType
+                           error:error];
+}
+
+- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
+          fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+              ruleCleanup:(SNTRuleCleanup)cleanupType
+                    error:(NSError **)error {
   // Only accept an empty rules array if the cleanup-type is not none.
-  if ((!rules || rules.count < 1) && cleanupType == SNTRuleCleanupNone) {
-    [SNTError populateError:error withCode:SNTErrorCodeEmptyRuleArray format:@"Empty rule array"];
+  if (executionRules.count == 0 && fileAccessRules.count == 0 &&
+      cleanupType == SNTRuleCleanupNone) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeEmptyRuleArray
+                     format:@"Empty execution  and file access rule arrays"];
     return NO;
   }
 
@@ -457,63 +610,42 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   __block NSError *blockErr;
 
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
-    if (cleanupType == SNTRuleCleanupAll) {
-      [db executeUpdate:@"DELETE FROM rules"];
-    } else if (cleanupType == SNTRuleCleanupNonTransitive) {
-      [db executeUpdate:@"DELETE FROM rules WHERE state != ?", @(SNTRuleStateAllowTransitive)];
+    switch (cleanupType) {
+      case SNTRuleCleanupAll:
+        [db executeUpdate:@"DELETE FROM execution_rules"];
+        [db executeUpdate:@"DELETE FROM file_access_rules"];
+        break;
+      case SNTRuleCleanupNonTransitive:
+        [db executeUpdate:@"DELETE FROM execution_rules WHERE state != ?",
+                          @(SNTRuleStateAllowTransitive)];
+        [db executeUpdate:@"DELETE FROM file_access_rules"];
+        break;
+      case SNTRuleCleanupExecutionRules:
+        [db executeUpdate:@"DELETE FROM execution_rules WHERE state != ?",
+                          @(SNTRuleStateAllowTransitive)];
+        break;
+      case SNTRuleCleanupFileAccessRules:
+        [db executeUpdate:@"DELETE FROM file_access_rules"];
+        break;
+      case SNTRuleCleanupNone: [[fallthrough]];
+      case SNTRuleCleanupStandalone:
+        // no-op
+        break;
     }
 
-    for (SNTRule *rule in rules) {
-      if (![rule isKindOfClass:[SNTRule class]] || rule.identifier.length == 0 ||
-          rule.state == SNTRuleStateUnknown || rule.type == SNTRuleTypeUnknown) {
-        [SNTError populateError:&blockErr
-                       withCode:SNTErrorCodeRuleInvalid
-                        message:@"Rule array contained invalid entry"
-                         detail:rule.description];
-        *rollback = failed = YES;
-        return;
-      }
+    if (![self addExecutionRules:executionRules toDB:db error:&blockErr]) {
+      *rollback = failed = YES;
+      return;
+    }
 
-      if (rule.state == SNTRuleStateCEL && _celEvaluator) {
-        auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
-        if (!celExpr.ok()) {
-          [SNTError populateError:&blockErr
-                         withCode:SNTErrorCodeRuleInvalidCELExpression
-                          message:@"Rule array contained rule with invalid CEL expression"
-                           detail:santa::StringToNSString(celExpr.status().message())];
-          continue;
-        }
-      }
-
-      if (rule.state == SNTRuleStateRemove) {
-        if (![db executeUpdate:@"DELETE FROM rules WHERE identifier=? AND type=?", rule.identifier,
-                               @(rule.type)]) {
-          [SNTError populateError:&blockErr
-                         withCode:SNTErrorCodeRemoveRuleFailed
-                          message:@"A database error occurred while deleting a rule"
-                           detail:[db lastErrorMessage]];
-          *rollback = failed = YES;
-          return;
-        }
-      } else {
-        if (![db executeUpdate:@"INSERT OR REPLACE INTO rules "
-                               @"(identifier, state, type, custommsg, customurl, timestamp, "
-                               @"comment, cel_expr) "
-                               @"VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
-                               rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
-                               rule.customURL, @(rule.timestamp), rule.comment, rule.celExpr]) {
-          [SNTError populateError:&blockErr
-                         withCode:SNTErrorCodeInsertOrReplaceRuleFailed
-                          message:@"A database error occurred while inserting/replacing a rule"
-                           detail:[db lastErrorMessage]];
-          *rollback = failed = YES;
-          return;
-        }
-      }
+    if (![self addFileAccessRules:fileAccessRules toDB:db error:&blockErr]) {
+      *rollback = failed = YES;
+      return;
     }
 
     // Clear the rules hash
-    self.rulesHash = nil;
+    self.executionRulesHash = nil;
+    self.fileAccessRulesHash = nil;
   }];
 
   if (blockErr && error) {
@@ -558,9 +690,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
         // same.
         //
         // If it does not then flush the cache. To ensure that the new rule is honored.
-        if ([db longForQuery:@"SELECT COUNT(*) FROM rules WHERE identifier=? AND type=? AND "
-                             @"state=? AND (cel_expr IS NULL OR cel_expr=?) LIMIT 1",
-                             rule.identifier, @(rule.type), @(rule.state), rule.celExpr] == 0) {
+        if ([db longForQuery:
+                    @"SELECT COUNT(*) FROM execution_rules WHERE identifier=? AND type=? AND "
+                    @"state=? AND (cel_expr IS NULL OR cel_expr=?) LIMIT 1",
+                    rule.identifier, @(rule.type), @(rule.state), rule.celExpr] == 0) {
           flushDecisionCache = YES;
           return;
         }
@@ -571,10 +704,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
         // Skip certificate and TeamID rules as they cannot be compiler rules.
         if (rule.type == SNTRuleTypeCertificate || rule.type == SNTRuleTypeTeamID) continue;
 
-        if ([db longForQuery:@"SELECT COUNT(*) FROM rules WHERE identifier=? AND type IN (?, ?, ?)"
-                             @" AND state=? LIMIT 1",
-                             rule.identifier, @(SNTRuleTypeCDHash), @(SNTRuleTypeBinary),
-                             @(SNTRuleTypeSigningID), @(SNTRuleStateAllowCompiler)] > 0) {
+        if ([db longForQuery:
+                    @"SELECT COUNT(*) FROM execution_rules WHERE identifier=? AND type IN (?, ?, ?)"
+                    @" AND state=? LIMIT 1",
+                    rule.identifier, @(SNTRuleTypeCDHash), @(SNTRuleTypeBinary),
+                    @(SNTRuleTypeSigningID), @(SNTRuleStateAllowCompiler)] > 0) {
           flushDecisionCache = YES;
           return;
         }
@@ -590,7 +724,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   if (!rule) return;
   [rule resetTimestamp];
   [self inDatabase:^(FMDatabase *db) {
-    if (![db executeUpdate:@"UPDATE rules SET timestamp=? WHERE identifier=? AND type=?",
+    if (![db executeUpdate:@"UPDATE execution_rules SET timestamp=? WHERE identifier=? AND type=?",
                            @(rule.timestamp), rule.identifier, @(rule.type)]) {
       LOGE(@"Could not update timestamp for rule with sha256=%@", rule.identifier);
     }
@@ -611,7 +745,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       [[NSDate date] timeIntervalSinceReferenceDate] - kTransitiveRuleExpirationSeconds;
 
   [self inDatabase:^(FMDatabase *db) {
-    if (![db executeUpdate:@"DELETE FROM rules WHERE state=? AND timestamp < ?",
+    if (![db executeUpdate:@"DELETE FROM execution_rules WHERE state=? AND timestamp < ?",
                            @(SNTRuleStateAllowTransitive), @(outdatedTimestamp)]) {
       LOGE(@"Could not remove outdated transitive rules");
     }
@@ -626,13 +760,27 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 - (NSArray<SNTRule *> *)retrieveAllRules {
   NSMutableArray<SNTRule *> *rules = [NSMutableArray array];
   [self inDatabase:^(FMDatabase *db) {
-    FMResultSet *rs = [db executeQuery:@"SELECT * FROM rules"];
+    FMResultSet *rs = [db executeQuery:@"SELECT * FROM execution_rules"];
     while ([rs next]) {
-      [rules addObject:[self ruleFromResultSet:rs]];
+      [rules addObject:[self executionRuleFromResultSet:rs]];
     }
     [rs close];
   }];
   return rules;
+}
+
+- (NSArray<NSDictionary *> *)retrieveAllFileAccessRules {
+  NSMutableArray<NSDictionary *> *faaRules = [NSMutableArray array];
+  [self inDatabase:^(FMDatabase *db) {
+    FMResultSet *rs = [db executeQuery:@"SELECT * FROM file_access_rules"];
+    while ([rs next]) {
+      NSDictionary *rule = [self fileAccessRuleFromResultSet:rs];
+      if (rule) {
+        [faaRules addObject:rule];
+      }
+    }
+  }];
+  return faaRules;
 }
 
 #pragma mark Caching Static Rules
@@ -674,16 +822,17 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     // If santad has previously computed the hash and stored it in memory, return it.
     // When a rule is added or removed the hash will be cleared so that the next
     // request for the hash will recompute it.
-    if (self.rulesHash.length) {
-      digest = self.rulesHash;
+    if (self.executionRulesHash.length) {
+      digest = self.executionRulesHash;
       return;
     }
 
     santa::Xxhash128 hash;
 
     FMResultSet *rs =
-        [db executeQuery:@"SELECT identifier, state, type, cel_expr FROM rules WHERE state != ?",
-                         @(SNTRuleStateAllowTransitive)];
+        [db executeQuery:
+                @"SELECT identifier, state, type, cel_expr FROM execution_rules WHERE state != ?",
+                @(SNTRuleStateAllowTransitive)];
     while ([rs next]) {
       NSString *identifier = [rs stringForColumn:@"identifier"];
       NSString *cel = [rs stringForColumn:@"cel_expr"];
@@ -699,7 +848,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     [rs close];
 
     digest = santa::StringToNSString(hash.HexDigest());
-    self.rulesHash = digest;
+    self.executionRulesHash = digest;
   }];
   return digest;
 }

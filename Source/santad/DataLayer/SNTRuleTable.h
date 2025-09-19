@@ -15,6 +15,8 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTFileAccessRule.h"
+#import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/santad/DataLayer/SNTDatabaseTable.h"
 
@@ -28,9 +30,14 @@
 @interface SNTRuleTable : SNTDatabaseTable
 
 ///
-///  @return Number of rules in the database
+///  @return Number of execution rules in the database
 ///
 - (int64_t)ruleCount;
+
+///
+///  @return Number of file access rules in the database
+///
+- (int64_t)fileAccessRuleCount;
 
 ///
 ///  @return Number of binary rules in the database
@@ -75,15 +82,27 @@
 - (SNTRule *)ruleForIdentifiers:(struct RuleIdentifiers)identifiers;
 
 ///
-///  Add an array of rules to the database. The rules will be added within a transaction and the
-///  transaction will abort if any rule fails to add.
+///  Add an array of execution rules and file access rules to the database. The rules will be added
+///  within a transaction and the transaction will abort if any rule fails to add.
 ///
-///  @param rules Array of SNTRule's to add.
+///  @param executionRules Array of SNTRule objects to add.
+///  @param fileAccessRules Array of SNTFileAccessRule objects to add.
 ///  @param ruleCleanup Rule cleanup type to perform (e.g. all, none, non-transitive).
 ///  @param error When returning NO, will be filled with appropriate error.
 ///  @return YES if adding all rules passed, NO if any were rejected.
 ///
-- (BOOL)addRules:(NSArray *)rules ruleCleanup:(SNTRuleCleanup)cleanupType error:(NSError **)error;
+- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
+          fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+              ruleCleanup:(SNTRuleCleanup)cleanupType
+                    error:(NSError **)error;
+
+///
+/// Wrapper for `addExecutionRules:fileAccessRules:ruleCleanup:error:` when there are no
+/// file access rules to add.
+///
+- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)rules
+              ruleCleanup:(SNTRuleCleanup)cleanupType
+                    error:(NSError **)error;
 
 ///
 ///  Checks the given array of rules to see if adding any of them to the rules database would
@@ -106,9 +125,14 @@
 - (void)removeOutdatedTransitiveRules;
 
 ///
-///  Retrieve all rules from the database for export.
+///  Retrieve all execution rules from the database for export.
 ///
 - (NSArray<SNTRule *> *)retrieveAllRules;
+
+///
+///  Retrieve all file access rules from the database for export.
+///
+- (NSArray<NSDictionary *> *)retrieveAllFileAccessRules;
 
 ///
 ///  Update the static rules from the configuration.

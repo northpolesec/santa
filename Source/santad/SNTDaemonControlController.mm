@@ -161,11 +161,14 @@ double watchdogRAMPeak = 0;
   // If any rules are added that are not plain allowlist rules, then flush decision cache.
   // In particular, the addition of allowlist compiler rules should cause a cache flush.
   // We also flush cache if a allowlist compiler rule is replaced with a allowlist rule.
-  BOOL flushCache = ((cleanupType != SNTRuleCleanupNone) ||
+  BOOL flushCache = ((cleanupType != SNTRuleCleanupNone) || (fileAccessRules.count > 0) ||
                      [ruleTable addedRulesShouldFlushDecisionCache:executionRules]);
 
   NSError *error;
-  [ruleTable addRules:executionRules ruleCleanup:cleanupType error:&error];
+  [ruleTable addExecutionRules:executionRules
+               fileAccessRules:fileAccessRules
+                   ruleCleanup:cleanupType
+                         error:&error];
 
   // Whenever we add rules, we can also check for and remove outdated transitive rules.
   [ruleTable removeOutdatedTransitiveRules];

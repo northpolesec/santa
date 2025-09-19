@@ -38,7 +38,6 @@ RateLimiter::RateLimiter(std::shared_ptr<santa::Metrics> metrics, uint32_t logs_
 }
 
 void RateLimiter::ModifySettingsSerialized(uint32_t logs_per_sec, uint32_t window_size_sec) {
-  // Semi-arbitrary window size limit of 1 hour
   if (window_size_sec > max_window_size_) {
     window_size_sec = max_window_size_;
     LOGW(@"Window size must be between 0 and %u. Clamped to: %u", max_window_size_,
