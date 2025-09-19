@@ -32,7 +32,7 @@
 ///
 ///  @return Number of execution rules in the database
 ///
-- (int64_t)ruleCount;
+- (int64_t)executionRuleCount;
 
 ///
 ///  @return Number of file access rules in the database
@@ -79,7 +79,7 @@
 ///          Currently: binary, signingID, certificate or teamID (in that order).
 ///          The first matching rule found is returned.
 ///
-- (SNTRule *)ruleForIdentifiers:(struct RuleIdentifiers)identifiers;
+- (SNTRule *)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers;
 
 ///
 ///  Add an array of execution rules and file access rules to the database. The rules will be added
@@ -117,7 +117,7 @@
 ///
 ///  Update timestamp for given rule to the current time.
 ///
-- (void)resetTimestampForRule:(SNTRule *)rule;
+- (void)resetTimestampForExecutionRule:(SNTRule *)rule;
 
 ///
 ///  Remove transitive rules that haven't been used in a long time.
@@ -127,7 +127,7 @@
 ///
 ///  Retrieve all execution rules from the database for export.
 ///
-- (NSArray<SNTRule *> *)retrieveAllRules;
+- (NSArray<SNTRule *> *)retrieveAllExecutionRules;
 
 ///
 ///  Retrieve all file access rules from the database for export.

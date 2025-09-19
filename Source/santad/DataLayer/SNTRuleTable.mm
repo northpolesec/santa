@@ -315,7 +315,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 #pragma mark Entry Counts
 
-- (int64_t)ruleCount {
+- (int64_t)executionRuleCount {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase *db) {
     count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules"];
@@ -407,7 +407,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                                        error:nil];
 }
 
-- (SNTRule *)ruleForIdentifiers:(struct RuleIdentifiers)identifiers {
+- (SNTRule *)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers {
   __block SNTRule *rule;
 
   // Look for a static rule that matches.
@@ -602,7 +602,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       cleanupType == SNTRuleCleanupNone) {
     [SNTError populateError:error
                    withCode:SNTErrorCodeEmptyRuleArray
-                     format:@"Empty execution  and file access rule arrays"];
+                     format:@"Empty execution and file access rule arrays"];
     return NO;
   }
 
@@ -720,7 +720,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 }
 
 // Updates the timestamp to current time for the given rule.
-- (void)resetTimestampForRule:(SNTRule *)rule {
+- (void)resetTimestampForExecutionRule:(SNTRule *)rule {
   if (!rule) return;
   [rule resetTimestamp];
   [self inDatabase:^(FMDatabase *db) {
@@ -739,7 +739,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     return;
 
   // Don't bother removing rules unless rule database is large.
-  if ([self ruleCount] < kTransitiveRuleCullingThreshold) return;
+  if ([self executionRuleCount] < kTransitiveRuleCullingThreshold) return;
   // Determine what timestamp qualifies as outdated.
   NSUInteger outdatedTimestamp =
       [[NSDate date] timeIntervalSinceReferenceDate] - kTransitiveRuleExpirationSeconds;
@@ -757,7 +757,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 #pragma mark Querying
 
 // Retrieve all rules from the Database
-- (NSArray<SNTRule *> *)retrieveAllRules {
+- (NSArray<SNTRule *> *)retrieveAllExecutionRules {
   NSMutableArray<SNTRule *> *rules = [NSMutableArray array];
   [self inDatabase:^(FMDatabase *db) {
     FMResultSet *rs = [db executeQuery:@"SELECT * FROM execution_rules"];

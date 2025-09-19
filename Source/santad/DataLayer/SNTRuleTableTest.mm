@@ -131,7 +131,7 @@
 }
 
 - (void)testAddRulesNotClean {
-  NSUInteger ruleCount = self.sut.ruleCount;
+  NSUInteger executionRuleCount = self.sut.executionRuleCount;
   NSUInteger binaryRuleCount = self.sut.binaryRuleCount;
 
   NSError *error;
@@ -139,7 +139,7 @@
                   ruleCleanup:SNTRuleCleanupNone
                         error:&error];
 
-  XCTAssertEqual(self.sut.ruleCount, ruleCount + 1);
+  XCTAssertEqual(self.sut.executionRuleCount, executionRuleCount + 1);
   XCTAssertEqual(self.sut.binaryRuleCount, binaryRuleCount + 1);
   XCTAssertNil(error);
 }
@@ -183,7 +183,7 @@
 }
 
 - (void)testAddMultipleRules {
-  NSUInteger ruleCount = self.sut.ruleCount;
+  NSUInteger executionRuleCount = self.sut.executionRuleCount;
 
   NSError *error;
   [self.sut addExecutionRules:@[
@@ -192,7 +192,7 @@
                   ruleCleanup:SNTRuleCleanupNone
                         error:&error];
 
-  XCTAssertEqual(self.sut.ruleCount, ruleCount + 2);
+  XCTAssertEqual(self.sut.executionRuleCount, executionRuleCount + 2);
   XCTAssertNil(error);
 }
 
@@ -251,7 +251,7 @@
                   ruleCleanup:SNTRuleCleanupNone
                         error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 0);
+  XCTAssertEqual(self.sut.executionRuleCount, 0);
   XCTAssertEqual(self.sut.fileAccessRuleCount, 1);
 
   [self.sut addExecutionRules:@[]
@@ -259,7 +259,7 @@
                   ruleCleanup:SNTRuleCleanupNone
                         error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 0);
+  XCTAssertEqual(self.sut.executionRuleCount, 0);
   XCTAssertEqual(self.sut.fileAccessRuleCount, 2);
 
   // Ensure both rules exist
@@ -275,7 +275,7 @@
                   ruleCleanup:SNTRuleCleanupNone
                         error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 0);
+  XCTAssertEqual(self.sut.executionRuleCount, 0);
   XCTAssertEqual(self.sut.fileAccessRuleCount, 1);
 
   // Ensure the other rule still exists
@@ -295,7 +295,7 @@
                         error:&error];
 
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 1);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
   XCTAssertEqual(self.sut.fileAccessRuleCount, 1);
 
   // Now remove both rule types
@@ -307,7 +307,7 @@
                         error:&error];
 
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 0);
+  XCTAssertEqual(self.sut.executionRuleCount, 0);
   XCTAssertEqual(self.sut.fileAccessRuleCount, 0);
 }
 
@@ -317,7 +317,7 @@
                         error:nil];
 
   SNTRule *r = [self.sut
-      ruleForIdentifiers:
+      executionRuleForIdentifiers:
           (struct RuleIdentifiers){
               .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
           }];
@@ -327,7 +327,7 @@
   XCTAssertEqual(r.type, SNTRuleTypeBinary);
 
   r = [self.sut
-      ruleForIdentifiers:
+      executionRuleForIdentifiers:
           (struct RuleIdentifiers){
               .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
           }];
@@ -340,7 +340,7 @@
                         error:nil];
 
   SNTRule *r =
-      [self.sut ruleForIdentifiers:
+      [self.sut executionRuleForIdentifiers:
                     (struct RuleIdentifiers){
                         .certificateSHA256 =
                             @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
@@ -350,7 +350,7 @@
                         @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258");
   XCTAssertEqual(r.type, SNTRuleTypeCertificate);
 
-  r = [self.sut ruleForIdentifiers:
+  r = [self.sut executionRuleForIdentifiers:
                     (struct RuleIdentifiers){
                         .certificateSHA256 =
                             @"5bdab1288fc16892fef50c658db54f1e2e19cf8f71cc55f77de2b95e051e2562",
@@ -363,17 +363,17 @@
                   ruleCleanup:SNTRuleCleanupNone
                         error:nil];
 
-  SNTRule *r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                                .teamID = @"ABCDEFGHIJ",
-                                            }];
+  SNTRule *r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                         .teamID = @"ABCDEFGHIJ",
+                                                     }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ");
   XCTAssertEqual(r.type, SNTRuleTypeTeamID);
   XCTAssertEqual([self.sut teamIDRuleCount], 1);
 
-  r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                       .teamID = @"nonexistentTeamID",
-                                   }];
+  r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                .teamID = @"nonexistentTeamID",
+                                            }];
   XCTAssertNil(r);
 }
 
@@ -387,24 +387,24 @@
 
   XCTAssertEqual([self.sut signingIDRuleCount], 2);
 
-  SNTRule *r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                                .signingID = @"ABCDEFGHIJ:signingID",
-                                            }];
+  SNTRule *r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                         .signingID = @"ABCDEFGHIJ:signingID",
+                                                     }];
 
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ:signingID");
   XCTAssertEqual(r.type, SNTRuleTypeSigningID);
 
-  r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                       .signingID = @"platform:signingID",
-                                   }];
+  r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                .signingID = @"platform:signingID",
+                                            }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"platform:signingID");
   XCTAssertEqual(r.type, SNTRuleTypeSigningID);
 
-  r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                       .signingID = @"nonexistent",
-                                   }];
+  r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                .signingID = @"nonexistent",
+                                            }];
   XCTAssertNil(r);
 }
 
@@ -417,18 +417,18 @@
 
   XCTAssertEqual([self.sut cdhashRuleCount], 1);
 
-  SNTRule *r =
-      [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                       .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
-                                   }];
+  SNTRule *r = [self.sut
+      executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                      .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
+                                  }];
 
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a");
   XCTAssertEqual(r.type, SNTRuleTypeCDHash);
 
-  r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                       .cdhash = @"nonexistent",
-                                   }];
+  r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                .cdhash = @"nonexistent",
+                                            }];
   XCTAssertNil(r);
 }
 
@@ -449,9 +449,9 @@
   [self.sut updateStaticRules:nil];
 
   // This test verifies that the implicit rule ordering we've been abusing is still working.
-  // See the comment in SNTRuleTable#ruleForIdentifiers:
+  // See the comment in SNTRuleTable#executionRuleForIdentifiers:
   SNTRule *r = [self.sut
-      ruleForIdentifiers:
+      executionRuleForIdentifiers:
           (struct RuleIdentifiers){
               .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
               .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
@@ -465,7 +465,7 @@
   XCTAssertEqual(r.type, SNTRuleTypeCDHash, @"Implicit rule ordering failed");
 
   r = [self.sut
-      ruleForIdentifiers:
+      executionRuleForIdentifiers:
           (struct RuleIdentifiers){
               .cdhash = @"unknown",
               .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
@@ -480,7 +480,7 @@
   XCTAssertEqual(r.type, SNTRuleTypeBinary, @"Implicit rule ordering failed");
 
   r = [self.sut
-      ruleForIdentifiers:
+      executionRuleForIdentifiers:
           (struct RuleIdentifiers){
               .cdhash = @"unknown",
               .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
@@ -494,7 +494,7 @@
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
   XCTAssertEqual(r.type, SNTRuleTypeBinary, @"Implicit rule ordering failed");
 
-  r = [self.sut ruleForIdentifiers:
+  r = [self.sut executionRuleForIdentifiers:
                     (struct RuleIdentifiers){
                         .cdhash = @"unknown",
                         .binarySHA256 = @"unknown",
@@ -509,24 +509,24 @@
                         @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258");
   XCTAssertEqual(r.type, SNTRuleTypeCertificate, @"Implicit rule ordering failed");
 
-  r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                       .cdhash = @"unknown",
-                                       .binarySHA256 = @"unknown",
-                                       .signingID = @"ABCDEFGHIJ:signingID",
-                                       .certificateSHA256 = @"unknown",
-                                       .teamID = @"ABCDEFGHIJ",
-                                   }];
+  r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                .cdhash = @"unknown",
+                                                .binarySHA256 = @"unknown",
+                                                .signingID = @"ABCDEFGHIJ:signingID",
+                                                .certificateSHA256 = @"unknown",
+                                                .teamID = @"ABCDEFGHIJ",
+                                            }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ:signingID");
   XCTAssertEqual(r.type, SNTRuleTypeSigningID, @"Implicit rule ordering failed (SigningID)");
 
-  r = [self.sut ruleForIdentifiers:(struct RuleIdentifiers){
-                                       .cdhash = @"unknown",
-                                       .binarySHA256 = @"unknown",
-                                       .signingID = @"unknown",
-                                       .certificateSHA256 = @"unknown",
-                                       .teamID = @"ABCDEFGHIJ",
-                                   }];
+  r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                .cdhash = @"unknown",
+                                                .binarySHA256 = @"unknown",
+                                                .signingID = @"unknown",
+                                                .certificateSHA256 = @"unknown",
+                                                .teamID = @"ABCDEFGHIJ",
+                                            }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ");
   XCTAssertEqual(r.type, SNTRuleTypeTeamID, @"Implicit rule ordering failed (TeamID)");
@@ -540,13 +540,13 @@
   SNTRuleTable *sut = [[SNTRuleTable alloc] initWithDatabaseQueue:dbq];
 
   [sut addExecutionRules:@[ [self _exampleBinaryRule] ] ruleCleanup:SNTRuleCleanupNone error:nil];
-  XCTAssertGreaterThan(sut.ruleCount, 0);
+  XCTAssertGreaterThan(sut.executionRuleCount, 0);
 
   [[NSFileManager defaultManager] removeItemAtPath:dbPath error:NULL];
 }
 
 - (void)testRetrieveAllRulesWithEmptyDatabase {
-  NSArray<SNTRule *> *rules = [self.sut retrieveAllRules];
+  NSArray<SNTRule *> *rules = [self.sut retrieveAllExecutionRules];
   XCTAssertEqual(rules.count, 0);
 }
 
@@ -561,7 +561,7 @@
                   ruleCleanup:SNTRuleCleanupNone
                         error:nil];
 
-  NSArray<SNTRule *> *rules = [self.sut retrieveAllRules];
+  NSArray<SNTRule *> *rules = [self.sut retrieveAllExecutionRules];
   XCTAssertEqual(rules.count, 5);
   XCTAssertEqualObjects(rules[0], [self _exampleCertRule]);
   XCTAssertEqualObjects(rules[1], [self _exampleBinaryRule]);
@@ -576,7 +576,7 @@
   SNTRule *r = [self _exampleBinaryRule];
   [self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 1);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
   XCTAssertEqual(self.sut.binaryRuleCount, 1);
 
   // Change the identifer so that the hash of a block rule is not found in the
@@ -592,7 +592,7 @@
   SNTRule *r = [self _exampleBinaryRule];
   [self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 1);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
   XCTAssertEqual(self.sut.binaryRuleCount, 1);
   XCTAssertEqual(NO, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
 }
@@ -603,7 +603,7 @@
   SNTRule *r = [self _exampleBinaryRule];
   [self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 1);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
   XCTAssertEqual(self.sut.binaryRuleCount, 1);
   NSMutableArray<SNTRule *> *newRules = [NSMutableArray array];
   for (int i = 0; i < 1000; i++) {
@@ -622,7 +622,7 @@
   r.state = SNTRuleStateAllowCompiler;
   [self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 1);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
   XCTAssertEqual(self.sut.binaryRuleCount, 1);
   // make the rule an allow rule
   r.state = SNTRuleStateAllow;
@@ -637,7 +637,7 @@
   r.state = SNTRuleStateAllow;
   [self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 1);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
   XCTAssertEqual(self.sut.binaryRuleCount, 1);
 
   r.state = SNTRuleStateRemove;
@@ -653,7 +653,7 @@
   r.celExpr = @"args.size() == 1";
   [self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone error:&error];
   XCTAssertNil(error);
-  XCTAssertEqual(self.sut.ruleCount, 1);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
   XCTAssertEqual(self.sut.teamIDRuleCount, 1);
 
   XCTAssertEqual(NO, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);

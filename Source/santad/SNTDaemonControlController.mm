@@ -196,14 +196,14 @@ double watchdogRAMPeak = 0;
 
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
                              reply:(void (^)(SNTRule *))reply {
-  reply([[SNTDatabaseController ruleTable] ruleForIdentifiers:[identifiers toStruct]]);
+  reply([[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]]);
 }
 
 - (void)staticRuleCount:(void (^)(int64_t count))reply {
   reply([SNTConfigurator configurator].staticRules.count);
 }
 
-- (void)retrieveAllRules:(void (^)(NSArray<SNTRule *> *, NSError *))reply {
+- (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule *> *, NSError *))reply {
 #ifndef DEBUG
   SNTConfigurator *config = [SNTConfigurator configurator];
   // Do not return any rules if syncBaseURL or static rules are set and return an error.
@@ -217,7 +217,7 @@ double watchdogRAMPeak = 0;
   }
 #endif
 
-  NSArray<SNTRule *> *rules = [[SNTDatabaseController ruleTable] retrieveAllRules];
+  NSArray<SNTRule *> *rules = [[SNTDatabaseController ruleTable] retrieveAllExecutionRules];
   reply(rules, nil);
 }
 

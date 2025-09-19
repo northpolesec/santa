@@ -63,7 +63,7 @@ NSString *const kBundleID = @"com.northpolesec.santa.daemon";
             ofReply:NO];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTRule class], nil]
-        forSelector:@selector(retrieveAllRules:)
+        forSelector:@selector(retrieveAllExecutionRules:)
       argumentIndex:0
             ofReply:YES];
 }
