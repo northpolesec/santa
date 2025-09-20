@@ -21,6 +21,13 @@ git_override(
     remote = "https://github.com/northpolesec/protos",
 )
 
+# NATS C client
+bazel_dep(name = "nats_c", version = "")
+local_path_override(
+    module_name = "nats_c",
+    path = "../nats.c",
+)
+
 # FMDB
 non_module_deps = use_extension("//deps:non_module_deps.bzl", "non_module_deps")
 use_repo(non_module_deps, "FMDB")

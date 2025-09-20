@@ -1,8 +1,9 @@
 """Modules for dependencies not included in the Bazel Central Registry"""
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
 
-def _non_module_deps_impl(_):
+def _non_module_deps_impl(mctx):
     # FMDB is used to access SQLite from Objective-C(++) code.
     git_repository(
         name = "FMDB",

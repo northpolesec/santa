@@ -29,6 +29,7 @@
 #include "Source/santasyncservice/Pinning.h"
 #import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
+#import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
@@ -73,7 +74,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _daemonConn = daemonConn;
 
     SNTConfigurator *config = [SNTConfigurator configurator];
-    if (config.enableAPNS) {
+    if (config.enableNATS) {
+      _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
+    } else if (config.enableAPNS) {
       _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];
     } else if (config.fcmEnabled) {
       _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
