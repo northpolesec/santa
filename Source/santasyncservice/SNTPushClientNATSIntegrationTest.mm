@@ -74,8 +74,10 @@ extern "C" {
 }
 
 - (void)tearDown {
-  [self.client disconnect];
-  self.client = nil;
+  if (self.client) {
+    [self.client disconnectAndWait:YES];
+    self.client = nil;
+  }
   
   if (self.testPublisher) {
     natsConnection_Close(self.testPublisher);
@@ -141,14 +143,14 @@ extern "C" {
   [self waitForExpectationsWithTimeout:2.0 handler:nil];
 }
 
-- (void)testMultipleMessagesOnlyTriggerOneSync {
+- (void)testMultipleMessagesTriggersMultipleSyncs {
   // Given: Client is initialized and connected
   __block NSInteger syncCallCount = 0;
-  self.syncExpectation = [self expectationWithDescription:@"Sync should be called"];
+  self.syncExpectation = [self expectationWithDescription:@"All syncs should complete"];
   
   OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
     syncCallCount++;
-    if (syncCallCount == 1) {
+    if (syncCallCount == 5) {
       [self.syncExpectation fulfill];
     }
   });
@@ -163,13 +165,10 @@ extern "C" {
   }
   natsConnection_Flush(self.testPublisher);
   
-  // Then: Sync should be triggered once (messages processed sequentially)
+  // Then: Each message should trigger a sync
   [self waitForExpectationsWithTimeout:2.0 handler:nil];
   
-  // Give a bit more time to ensure no additional syncs are triggered
-  [NSThread sleepForTimeInterval:0.5];
-  
-  // Each message triggers a sync, so we expect 5 calls
+  // Verify we got all 5 syncs
   XCTAssertEqual(syncCallCount, 5, @"Each message should trigger a sync");
 }
 

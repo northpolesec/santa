@@ -31,9 +31,11 @@ extern "C" {
 @property(nonatomic) natsConnection *conn;
 @property(nonatomic) natsSubscription *deviceSub;
 @property(nonatomic) natsSubscription *globalSub;
-@property(nonatomic) dispatch_queue_t natsQueue;
+@property(nonatomic) dispatch_queue_t connectionQueue; // Single queue for connection management
+@property(nonatomic) dispatch_queue_t messageQueue;    // Queue for processing messages
 @property(nonatomic, readwrite) BOOL isConnected;
 @property(nonatomic, readwrite) NSUInteger fullSyncInterval;
+@property(atomic) BOOL isShuttingDown;
 @end
 
 @implementation SNTPushClientNATS
@@ -43,7 +45,9 @@ extern "C" {
   if (self) {
     _syncDelegate = syncDelegate;
     _fullSyncInterval = kDefaultPushNotificationsFullSyncInterval;
-    _natsQueue = dispatch_queue_create("com.northpolesec.santa.nats", DISPATCH_QUEUE_SERIAL);
+    _connectionQueue = dispatch_queue_create("com.northpolesec.santa.nats.connection", DISPATCH_QUEUE_SERIAL);
+    _messageQueue = dispatch_queue_create("com.northpolesec.santa.nats.message", DISPATCH_QUEUE_SERIAL);
+    _isShuttingDown = NO;
     
     // Only attempt to connect if sync server is configured
     if ([[SNTConfigurator configurator] syncBaseURL]) {
@@ -56,11 +60,17 @@ extern "C" {
 }
 
 - (void)dealloc {
-  [self disconnect];
+  // Don't call disconnect here to avoid race conditions
+  // Cleanup should be done explicitly before dealloc
+  if (self.conn || self.deviceSub || self.globalSub) {
+    LOGW(@"NATS: Client deallocated without proper disconnect");
+  }
 }
 
 - (void)connect {
-  dispatch_async(self.natsQueue, ^{
+  dispatch_async(self.connectionQueue, ^{
+    if (self.isShuttingDown) return;
+    
     if (self.conn) {
       LOGD(@"NATS already connected");
       return;
@@ -84,10 +94,9 @@ extern "C" {
       return;
     }
     
-    // Set connection callbacks
-    natsOptions_SetDisconnectedCB(opts, &connectionDisconnectedCB, (__bridge void *)self);
-    natsOptions_SetReconnectedCB(opts, &connectionReconnectedCB, (__bridge void *)self);
-    natsOptions_SetClosedCB(opts, &connectionClosedCB, (__bridge void *)self);
+    // Disable async callbacks to have better control
+    natsOptions_SetAllowReconnect(opts, true);
+    natsOptions_SetMaxReconnect(opts, -1); // Infinite reconnects
     
     // Create connection
     status = natsConnection_Connect(&self->_conn, opts);
@@ -107,29 +116,69 @@ extern "C" {
 }
 
 - (void)disconnect {
-  dispatch_sync(self.natsQueue, ^{
+  [self disconnectWithCompletion:nil];
+}
+
+- (void)disconnectAndWait:(BOOL)wait {
+  // If nothing to disconnect, return immediately
+  if (!self.conn && !self.deviceSub && !self.globalSub) {
+    return;
+  }
+  
+  if (wait) {
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    [self disconnectWithCompletion:^{
+      dispatch_semaphore_signal(sem);
+    }];
+    // Add timeout to prevent hanging forever
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC);
+    long result = dispatch_semaphore_wait(sem, timeout);
+    if (result != 0) {
+      LOGE(@"NATS: Disconnect timed out after 1 second");
+    }
+  } else {
+    [self disconnectWithCompletion:nil];
+  }
+}
+
+- (void)disconnectWithCompletion:(void (^)(void))completion {
+  self.isShuttingDown = YES;
+  
+  dispatch_async(self.connectionQueue, ^{
+    LOGD(@"NATS: Starting disconnect");
+    
     if (self.deviceSub) {
+      LOGD(@"NATS: Destroying device subscription");
       natsSubscription_Destroy(self.deviceSub);
       self.deviceSub = NULL;
     }
     
     if (self.globalSub) {
+      LOGD(@"NATS: Destroying global subscription");
       natsSubscription_Destroy(self.globalSub);
       self.globalSub = NULL;
     }
     
     if (self.conn) {
+      LOGD(@"NATS: Closing connection");
       natsConnection_Close(self.conn);
+      LOGD(@"NATS: Destroying connection");
       natsConnection_Destroy(self.conn);
       self.conn = NULL;
     }
     
     self.isConnected = NO;
     LOGI(@"NATS: Disconnected");
+    
+    if (completion) {
+      dispatch_async(dispatch_get_main_queue(), completion);
+    }
   });
 }
 
 - (void)subscribe {
+  if (self.isShuttingDown) return;
+  
   natsStatus status;
   
   // Get machine UUID
@@ -170,7 +219,16 @@ extern "C" {
 // NATS message handler
 static void messageHandler(natsConnection *nc, natsSubscription *sub, 
                           natsMsg *msg, void *closure) {
+  if (!closure || !msg) {
+    natsMsg_Destroy(msg);
+    return;
+  }
+  
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  if (!self || self.isShuttingDown) {
+    natsMsg_Destroy(msg);
+    return;
+  }
   
   const char *subject = natsMsg_GetSubject(msg);
   const char *data = natsMsg_GetData(msg);
@@ -184,33 +242,23 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub,
   
   LOGD(@"NATS: Received message on subject '%@': %@", msgSubject, msgData ?: @"<no data>");
   
-  // Trigger immediate sync
-  dispatch_async(dispatch_get_main_queue(), ^{
-    LOGI(@"NATS: Triggering immediate sync due to message on %@", msgSubject);
-    [self.syncDelegate sync];
+  // Process on message queue to serialize handling
+  dispatch_async(self.messageQueue, ^{
+    if (!self.isShuttingDown) {
+      LOGI(@"NATS: Triggering immediate sync due to message on %@", msgSubject);
+      
+      // Queue sync to main thread
+      dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.isShuttingDown) {
+          [self.syncDelegate sync];
+        }
+      });
+    }
   });
   
   natsMsg_Destroy(msg);
 }
 
-// Connection callbacks
-static void connectionDisconnectedCB(natsConnection *nc, void *closure) {
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  LOGW(@"NATS: Connection disconnected");
-  self.isConnected = NO;
-}
-
-static void connectionReconnectedCB(natsConnection *nc, void *closure) {
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  LOGI(@"NATS: Connection reconnected");
-  self.isConnected = YES;
-}
-
-static void connectionClosedCB(natsConnection *nc, void *closure) {
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  LOGI(@"NATS: Connection closed");
-  self.isConnected = NO;
-}
 
 #pragma mark - SNTPushNotificationsClientDelegate
 
