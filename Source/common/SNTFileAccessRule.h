@@ -22,10 +22,11 @@ typedef NS_ENUM(NSInteger, SNTFileAccessRuleState) {
 
 @interface SNTFileAccessRule : NSObject <NSSecureCoding>
 
-@property SNTFileAccessRuleState state;
-@property(copy) NSString *name;
-@property(copy) NSData *details;
+@property(readonly) SNTFileAccessRuleState state;
+@property(readonly, copy) NSString *name;
+@property(readonly) NSData *details;
 
-- (instancetype)initWithState:(SNTFileAccessRuleState)state;
+- (instancetype)initAddRuleWithName:(NSString *)name details:(NSDictionary *)details;
+- (instancetype)initRemoveRuleWithName:(NSString *)name;
 
 @end

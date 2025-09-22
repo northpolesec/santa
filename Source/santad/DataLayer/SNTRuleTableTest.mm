@@ -119,15 +119,14 @@
   return r;
 }
 
-- (SNTFileAccessRule *)_exampleFileAccessRule {
-  SNTFileAccessRule *r = [[SNTFileAccessRule alloc] initWithState:SNTFileAccessRuleStateAdd];
-  r.name = @"example_name";
-  r.details = [NSKeyedArchiver
-      archivedDataWithRootObject:@{@"Paths" : @[ @"/tmp" ], @"Options" : @{}, @"Processes" : @{}}
-           requiringSecureCoding:YES
-                           error:nil];
+- (SNTFileAccessRule *)_exampleFileAccessAddRuleWithName:(NSString *)name {
+  return [[SNTFileAccessRule alloc]
+      initAddRuleWithName:name
+                  details:@{@"Paths" : @[ @"/tmp" ], @"Options" : @{}, @"Processes" : @{}}];
+}
 
-  return r;
+- (SNTFileAccessRule *)_exampleFileAccessRemoveRuleWithName:(NSString *)name {
+  return [[SNTFileAccessRule alloc] initRemoveRuleWithName:name];
 }
 
 - (void)testAddRulesNotClean {
@@ -242,10 +241,8 @@
 - (void)testAddRemoveFetchFileAccessRule {
   // Add some file access rules
   NSError *error;
-  SNTFileAccessRule *r1 = [self _exampleFileAccessRule];
-  r1.name = @"my_first_rule";
-  SNTFileAccessRule *r2 = [self _exampleFileAccessRule];
-  r2.name = @"my_second_rule";
+  SNTFileAccessRule *r1 = [self _exampleFileAccessAddRuleWithName:@"my_first_rule"];
+  SNTFileAccessRule *r2 = [self _exampleFileAccessAddRuleWithName:@"my_second_rule"];
   [self.sut addExecutionRules:@[]
               fileAccessRules:@[ r1 ]
                   ruleCleanup:SNTRuleCleanupNone
@@ -269,9 +266,9 @@
   XCTAssertEqualObjects([rules[1] allKeys][0], @"my_second_rule");
 
   // Now remove the first rule
-  r1.state = SNTFileAccessRuleStateRemove;
+  SNTFileAccessRule *r3 = [self _exampleFileAccessRemoveRuleWithName:r1.name];
   [self.sut addExecutionRules:@[]
-              fileAccessRules:@[ r1 ]
+              fileAccessRules:@[ r3 ]
                   ruleCleanup:SNTRuleCleanupNone
                         error:&error];
   XCTAssertNil(error);
@@ -288,7 +285,7 @@
   // Add both rule types simultaneously
   NSError *error;
   SNTRule *execRule = [self _exampleBinaryRule];
-  SNTFileAccessRule *faaRule = [self _exampleFileAccessRule];
+  SNTFileAccessRule *faaRule = [self _exampleFileAccessAddRuleWithName:@"foo"];
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[ faaRule ]
                   ruleCleanup:SNTRuleCleanupNone
@@ -300,7 +297,7 @@
 
   // Now remove both rule types
   execRule.state = SNTRuleStateRemove;
-  faaRule.state = SNTFileAccessRuleStateRemove;
+  faaRule = [self _exampleFileAccessRemoveRuleWithName:faaRule.name];
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[ faaRule ]
                   ruleCleanup:SNTRuleCleanupNone

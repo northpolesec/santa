@@ -18,16 +18,44 @@
 
 @implementation SNTFileAccessRule
 
-- (instancetype)initWithState:(SNTFileAccessRuleState)state {
+- (instancetype)initWithStates:(SNTFileAccessRuleState)state
+                          name:(NSString *)name
+                       details:(NSDictionary *)details {
   if (state != SNTFileAccessRuleStateAdd && state != SNTFileAccessRuleStateRemove) {
+    return nil;
+  }
+
+  if (!name) {
     return nil;
   }
 
   self = [super init];
   if (self) {
     _state = state;
+    _name = name;
+
+    if (details) {
+      NSData *detailsData = [NSKeyedArchiver archivedDataWithRootObject:details
+                                                  requiringSecureCoding:YES
+                                                                  error:nil];
+      if (!detailsData) {
+        return nil;
+      }
+
+      _details = detailsData;
+    }
   }
   return self;
+}
+- (instancetype)initAddRuleWithName:(NSString *)name details:(NSDictionary *)details {
+  if (!details) {
+    return nil;
+  }
+  return [self initWithStates:SNTFileAccessRuleStateAdd name:name details:details];
+}
+
+- (instancetype)initRemoveRuleWithName:(NSString *)name {
+  return [self initWithStates:SNTFileAccessRuleStateRemove name:name details:nil];
 }
 
 + (BOOL)supportsSecureCoding {

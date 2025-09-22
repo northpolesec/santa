@@ -98,6 +98,7 @@ namespace pbv1 = ::santa::sync::v1;
   {
     ::pbv1::FileAccessRule::Add addRule;
     addRule.set_rule_type(::pbv1::FileAccessRule::RULE_TYPE_PATHS_WITH_DENIED_PROCESSES);
+    addRule.set_version("v1");
     addRule.set_allow_read_access(true);
     addRule.set_block_violations(true);
     addRule.set_enable_silent_mode(true);
@@ -108,10 +109,9 @@ namespace pbv1 = ::santa::sync::v1;
 
     NSDictionary *opts = [self.sut optionsFromProtoFAARuleAdd:addRule];
 
-    XCTAssertEqual(opts.count, 8);
-    XCTAssertEqual(
-        static_cast<santa::WatchItemRuleType>([opts[kWatchItemConfigKeyOptionsRuleType] intValue]),
-        santa::WatchItemRuleType::kPathsWithDeniedProcesses);
+    XCTAssertEqual(opts.count, 9);
+    XCTAssertEqualObjects([opts[kWatchItemConfigKeyOptionsRuleType] lowercaseString],
+                          kRuleTypePathsWithDeniedProcesses);
     XCTAssertTrue([opts[kWatchItemConfigKeyOptionsAllowReadAccess] boolValue]);
     XCTAssertFalse([opts[kWatchItemConfigKeyOptionsAuditOnly] boolValue]);
     XCTAssertTrue([opts[kWatchItemConfigKeyOptionsEnableSilentMode] boolValue]);
@@ -127,11 +127,10 @@ namespace pbv1 = ::santa::sync::v1;
     ::pbv1::FileAccessRule::Add addRule;
     NSDictionary *opts = [self.sut optionsFromProtoFAARuleAdd:addRule];
 
-    XCTAssertEqual(opts.count, 5);
+    XCTAssertEqual(opts.count, 6);
 
-    XCTAssertEqual(
-        static_cast<santa::WatchItemRuleType>([opts[kWatchItemConfigKeyOptionsRuleType] intValue]),
-        santa::WatchItemRuleType::kPathsWithAllowedProcesses);
+    XCTAssertEqualObjects([opts[kWatchItemConfigKeyOptionsRuleType] lowercaseString],
+                          kRuleTypePathsWithAllowedProcesses);
     XCTAssertFalse([opts[kWatchItemConfigKeyOptionsAllowReadAccess] boolValue]);
     XCTAssertTrue([opts[kWatchItemConfigKeyOptionsAuditOnly] boolValue]);
     XCTAssertFalse([opts[kWatchItemConfigKeyOptionsEnableSilentMode] boolValue]);
@@ -194,6 +193,8 @@ namespace pbv1 = ::santa::sync::v1;
   path->set_path("/bar");
   path->set_path_type(::pbv1::FileAccessRule::Path::PATH_TYPE_PREFIX);
 
+  addRule->set_name("my_test_rule");
+  addRule->set_version("v1");
   addRule->set_rule_type(::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
   addRule->set_allow_read_access(true);
   addRule->set_block_violations(true);
@@ -204,9 +205,9 @@ namespace pbv1 = ::santa::sync::v1;
   addRule->set_event_detail_url("url url url");
 
   ::pbv1::FileAccessRule::Process *proc = addRule->add_processes();
-  proc->set_team_id("my.tid");
+  proc->set_team_id("EXAMPLETID");
   proc = addRule->add_processes();
-  proc->set_cd_hash("abc");
+  proc->set_cd_hash("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
   proc = addRule->add_processes();
   proc->set_binary_path("/my/path/");
 
@@ -226,7 +227,118 @@ namespace pbv1 = ::santa::sync::v1;
                         @"/bar");
   XCTAssertEqual([details[kWatchItemConfigKeyProcesses] count], 3);
   XCTAssertEqualObjects(
-      details[kWatchItemConfigKeyProcesses][0][kWatchItemConfigKeyProcessesTeamID], @"my.tid");
+      details[kWatchItemConfigKeyProcesses][0][kWatchItemConfigKeyProcessesTeamID], @"EXAMPLETID");
+}
+
+- (void)testInvalidFileAccessRuleFromProtoFileAccessRuleAdd {
+  // This test does various spot checks to ensure that rules are only returned
+  // from `fileAccessRuleFromProtoFileAccessRule` if they are determined to be valid.
+
+  // No paths defined
+  {
+    ::pbv1::FileAccessRule wi;
+    ::pbv1::FileAccessRule::Add *addRule = wi.mutable_add();
+    addRule->set_name("my_test_rule");
+    addRule->set_version("v1");
+    addRule->set_rule_type(::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
+
+    XCTAssertNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+
+    // Now add the path to ensure the rule parses
+    ::pbv1::FileAccessRule::Path *path = addRule->add_paths();
+    path->set_path("/foo");
+    path->set_path_type(::pbv1::FileAccessRule::Path::PATH_TYPE_LITERAL);
+
+    XCTAssertNotNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+  }
+
+  // Bad path tyoe
+  {
+    ::pbv1::FileAccessRule wi;
+    ::pbv1::FileAccessRule::Add *addRule = wi.mutable_add();
+    ::pbv1::FileAccessRule::Path *path = addRule->add_paths();
+    path->set_path("/foo");
+    path->set_path_type(static_cast<::pbv1::FileAccessRule::Path::PathType>(123));
+    addRule->set_name("my_test_rule");
+    addRule->set_version("v1");
+    addRule->set_rule_type(::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
+
+    XCTAssertNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+
+    // Now use a valid path type to ensure the rule parses
+    path->set_path_type(::pbv1::FileAccessRule::Path::PATH_TYPE_LITERAL);
+    XCTAssertNotNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+  }
+
+  // No name
+  {
+    ::pbv1::FileAccessRule wi;
+    ::pbv1::FileAccessRule::Add *addRule = wi.mutable_add();
+    ::pbv1::FileAccessRule::Path *path = addRule->add_paths();
+    path->set_path("/foo");
+    path->set_path_type(::pbv1::FileAccessRule::Path::PATH_TYPE_LITERAL);
+    addRule->set_version("v1");
+    addRule->set_rule_type(::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
+
+    XCTAssertNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+
+    // Now add the name to ensure the rule parses
+    addRule->set_name("my_test_rule");
+    XCTAssertNotNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+  }
+
+  // Invalid name
+  {
+    ::pbv1::FileAccessRule wi;
+    ::pbv1::FileAccessRule::Add *addRule = wi.mutable_add();
+    ::pbv1::FileAccessRule::Path *path = addRule->add_paths();
+    path->set_path("/foo");
+    path->set_path_type(::pbv1::FileAccessRule::Path::PATH_TYPE_LITERAL);
+    addRule->set_name("my-test-rule");
+    addRule->set_version("v1");
+    addRule->set_rule_type(::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
+
+    XCTAssertNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+
+    // Now use a valid name to ensure the rule parses
+    addRule->set_name("my_test_rule");
+    XCTAssertNotNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+  }
+
+  // No version
+  {
+    ::pbv1::FileAccessRule wi;
+    ::pbv1::FileAccessRule::Add *addRule = wi.mutable_add();
+    ::pbv1::FileAccessRule::Path *path = addRule->add_paths();
+    path->set_path("/foo");
+    path->set_path_type(::pbv1::FileAccessRule::Path::PATH_TYPE_LITERAL);
+    addRule->set_name("my_test_rule");
+    addRule->set_rule_type(::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
+
+    XCTAssertNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+
+    // Now add the version to ensure the rule parses
+    addRule->set_version("v1");
+    XCTAssertNotNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+  }
+
+  // Bad rule type
+  {
+    ::pbv1::FileAccessRule wi;
+    ::pbv1::FileAccessRule::Add *addRule = wi.mutable_add();
+    ::pbv1::FileAccessRule::Path *path = addRule->add_paths();
+    path->set_path("/foo");
+    path->set_path_type(::pbv1::FileAccessRule::Path::PATH_TYPE_LITERAL);
+    addRule->set_name("my_test_rule");
+    addRule->set_version("v1");
+    addRule->set_rule_type(static_cast<::pbv1::FileAccessRule::RuleType>(123));
+
+    XCTAssertNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+
+    // Now use a valid rule type to ensure the rule parses
+    addRule->set_rule_type(::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
+    XCTAssertNotNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
+  }
 }
 
 - (void)testFileAccessRuleFromProtoFileAccessRuleRemove {

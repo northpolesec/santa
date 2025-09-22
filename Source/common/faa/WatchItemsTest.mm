@@ -57,13 +57,13 @@ using santa::WatchItemsState;
 
 namespace santa {
 
-extern bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy &data_policies,
-                        SetSharedProcessWatchItemPolicy &proc_policies, NSError **err);
+extern bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_policies,
+                        SetSharedProcessWatchItemPolicy *proc_policies, NSError **err);
 extern bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err);
 extern bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
                                        NSDictionary *watch_item,
-                                       SetSharedDataWatchItemPolicy &data_policies,
-                                       SetSharedProcessWatchItemPolicy &proc_policies,
+                                       SetSharedDataWatchItemPolicy *data_policies,
+                                       SetSharedProcessWatchItemPolicy *proc_policies,
                                        NSError **err);
 extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id> *paths,
                                                                          NSError **err);
@@ -830,52 +830,52 @@ BlockGenResult CreatePolicyBlockGen() {
   SetSharedProcessWatchItemPolicy proc_policies;
 
   // Ensure top level keys must exist and be correct types
-  XCTAssertFalse(ParseConfig(@{}, data_policies, proc_policies, &err));
+  XCTAssertFalse(ParseConfig(@{}, &data_policies, &proc_policies, &err));
   XCTAssertFalse(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @(0)}, data_policies, proc_policies, &err));
+      ParseConfig(@{kWatchItemConfigKeyVersion : @(0)}, &data_policies, &proc_policies, &err));
   XCTAssertFalse(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @{}}, data_policies, proc_policies, &err));
+      ParseConfig(@{kWatchItemConfigKeyVersion : @{}}, &data_policies, &proc_policies, &err));
   XCTAssertFalse(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @[]}, data_policies, proc_policies, &err));
+      ParseConfig(@{kWatchItemConfigKeyVersion : @[]}, &data_policies, &proc_policies, &err));
   XCTAssertFalse(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @""}, data_policies, proc_policies, &err));
+      ParseConfig(@{kWatchItemConfigKeyVersion : @""}, &data_policies, &proc_policies, &err));
   XCTAssertFalse(
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @""},
-                  data_policies, proc_policies, &err));
+                  &data_policies, &proc_policies, &err));
   XCTAssertFalse(
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @[]},
-                  data_policies, proc_policies, &err));
+                  &data_policies, &proc_policies, &err));
   XCTAssertFalse(
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @(0)},
-                  data_policies, proc_policies, &err));
+                  &data_policies, &proc_policies, &err));
 
   // Minimally successful configs without watch items
   XCTAssertTrue(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @"1"}, data_policies, proc_policies, &err));
+      ParseConfig(@{kWatchItemConfigKeyVersion : @"1"}, &data_policies, &proc_policies, &err));
   XCTAssertTrue(
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{}},
-                  data_policies, proc_policies, &err));
+                  &data_policies, &proc_policies, &err));
 
   // Ensure constraints on watch items entries match expectations
   XCTAssertFalse(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@(0) : @(0)}},
-      data_policies, proc_policies, &err));
+      &data_policies, &proc_policies, &err));
   XCTAssertFalse(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"" : @{}}},
-      data_policies, proc_policies, &err));
+      &data_policies, &proc_policies, &err));
   XCTAssertFalse(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @[]}},
-      data_policies, proc_policies, &err));
+      &data_policies, &proc_policies, &err));
   XCTAssertFalse(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @{}}},
-      data_policies, proc_policies, &err));
+      &data_policies, &proc_policies, &err));
 
   // Minimally successful config with watch item
   XCTAssertTrue(ParseConfig(@{
     kWatchItemConfigKeyVersion : @"1",
     kWatchItemConfigKeyWatchItems : @{@"a" : @{kWatchItemConfigKeyPaths : @[ @"asdf" ]}}
   },
-                            data_policies, proc_policies, &err));
+                            &data_policies, &proc_policies, &err));
 }
 
 - (void)testParseConfigSingleWatchItemGeneral {
@@ -884,27 +884,28 @@ BlockGenResult CreatePolicyBlockGen() {
   NSError *err;
 
   // There must be valid Paths in a watch item
-  XCTAssertFalse(ParseConfigSingleWatchItem(@"", "", @{}, data_policies, proc_policies, &err));
-  XCTAssertFalse(ParseConfigSingleWatchItem(@"", "", @{kWatchItemConfigKeyPaths : @[ @"" ]},
-                                            data_policies, proc_policies, &err));
-  XCTAssertTrue(ParseConfigSingleWatchItem(@"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ]},
-                                           data_policies, proc_policies, &err));
+  XCTAssertFalse(
+      ParseConfigSingleWatchItem(@"", kVersion, @{}, &data_policies, &proc_policies, &err));
+  XCTAssertFalse(ParseConfigSingleWatchItem(@"", kVersion, @{kWatchItemConfigKeyPaths : @[ @"" ]},
+                                            &data_policies, &proc_policies, &err));
+  XCTAssertTrue(ParseConfigSingleWatchItem(@"", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ]},
+                                           &data_policies, &proc_policies, &err));
 
   // Empty options are fine
   XCTAssertTrue(ParseConfigSingleWatchItem(
-      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @{}},
-      data_policies, proc_policies, &err));
+      @"", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @{}},
+      &data_policies, &proc_policies, &err));
 
   // If an Options key exist, it must be a dictionary type
   XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @[]},
-      data_policies, proc_policies, &err));
+      @"", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @[]},
+      &data_policies, &proc_policies, &err));
   XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @""},
-      data_policies, proc_policies, &err));
+      @"", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @""},
+      &data_policies, &proc_policies, &err));
   XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @(0)},
-      data_policies, proc_policies, &err));
+      @"", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyOptions : @(0)},
+      &data_policies, &proc_policies, &err));
 
   // Options keys must be valid types
   {
@@ -918,49 +919,49 @@ BlockGenResult CreatePolicyBlockGen() {
          ]) {
       // Parse bool option with invliad type
       XCTAssertFalse(ParseConfigSingleWatchItem(
-          @"", "",
+          @"", kVersion,
           @{kWatchItemConfigKeyPaths : @[ @"a" ],
             kWatchItemConfigKeyOptions : @{key : @""}},
-          data_policies, proc_policies, &err));
+          &data_policies, &proc_policies, &err));
 
       // Parse bool option with valid type
       XCTAssertTrue(ParseConfigSingleWatchItem(
-          @"", "",
+          @"", kVersion,
           @{kWatchItemConfigKeyPaths : @[ @"a" ],
             kWatchItemConfigKeyOptions : @{key : @(0)}},
-          data_policies, proc_policies, &err));
+          &data_policies, &proc_policies, &err));
     }
 
     // Check other option keys
 
     // kWatchItemConfigKeyOptionsRuleType - Invalid type
     XCTAssertFalse(ParseConfigSingleWatchItem(
-        @"", "", @{
+        @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @[]}
         },
-        data_policies, proc_policies, &err));
+        &data_policies, &proc_policies, &err));
 
     // kWatchItemConfigKeyOptionsRuleType - Invalid RuleType value
     XCTAssertFalse(ParseConfigSingleWatchItem(
-        @"", "", @{
+        @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleType : @"InvalidValue"}
         },
-        data_policies, proc_policies, &err));
+        &data_policies, &proc_policies, &err));
 
     // kWatchItemConfigKeyOptionsRuleType - Override
     // kWatchItemConfigKeyOptionsInvertProcessExceptions
     data_policies.clear();
     XCTAssertTrue(ParseConfigSingleWatchItem(
-        @"", "", @{
+        @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{
-            kWatchItemConfigKeyOptionsRuleType : @"PathsWithAllowedProcesses",
+            kWatchItemConfigKeyOptionsRuleType : kRuleTypePathsWithAllowedProcesses,
             kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)
           }
         },
-        data_policies, proc_policies, &err));
+        &data_policies, &proc_policies, &err));
     XCTAssertEqual(data_policies.size(), 1);
     XCTAssertEqual(data_policies.begin()->get()->rule_type,
                    santa::WatchItemRuleType::kPathsWithAllowedProcesses);
@@ -969,63 +970,63 @@ BlockGenResult CreatePolicyBlockGen() {
     // as fallback
     data_policies.clear();
     XCTAssertTrue(ParseConfigSingleWatchItem(
-        @"", "", @{
+        @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)}
         },
-        data_policies, proc_policies, &err));
+        &data_policies, &proc_policies, &err));
     XCTAssertEqual(data_policies.size(), 1);
     XCTAssertEqual(data_policies.begin()->get()->rule_type,
                    santa::WatchItemRuleType::kPathsWithDeniedProcesses);
 
     // kWatchItemConfigKeyOptionsCustomMessage - Invalid type
     XCTAssertFalse(ParseConfigSingleWatchItem(
-        @"", "", @{
+        @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsCustomMessage : @[]}
         },
-        data_policies, proc_policies, &err));
+        &data_policies, &proc_policies, &err));
 
     // kWatchItemConfigKeyOptionsCustomMessage zero length
     XCTAssertTrue(ParseConfigSingleWatchItem(
-        @"", "", @{
+        @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsCustomMessage : @""}
         },
-        data_policies, proc_policies, &err));
+        &data_policies, &proc_policies, &err));
 
     // kWatchItemConfigKeyOptionsCustomMessage valid "normal" length
     XCTAssertTrue(ParseConfigSingleWatchItem(
-        @"", "", @{
+        @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions :
               @{kWatchItemConfigKeyOptionsCustomMessage : @"This is a custom message"}
         },
-        data_policies, proc_policies, &err));
+        &data_policies, &proc_policies, &err));
 
     // kWatchItemConfigKeyOptionsCustomMessage Invalid "long" length
     XCTAssertFalse(ParseConfigSingleWatchItem(
-        @"", "", @{
+        @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions :
               @{kWatchItemConfigKeyOptionsCustomMessage : RepeatedString(@"A", 4096)}
         },
-        data_policies, proc_policies, &err));
+        &data_policies, &proc_policies, &err));
   }
 
   // If processes are specified, they must be valid format
   // Note: Full tests in `testVerifyConfigWatchItemProcesses`
   XCTAssertFalse(ParseConfigSingleWatchItem(
-      @"", "", @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyProcesses : @""},
-      data_policies, proc_policies, &err));
+      @"", kVersion, @{kWatchItemConfigKeyPaths : @[ @"a" ], kWatchItemConfigKeyProcesses : @""},
+      &data_policies, &proc_policies, &err));
 
   // Test the policy vector is populated as expected
 
   // Test default options with no processes
   data_policies.clear();
   XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion,
-                                           @{kWatchItemConfigKeyPaths : @[ @"a" ]}, data_policies,
-                                           proc_policies, &err));
+                                           @{kWatchItemConfigKeyPaths : @[ @"a" ]}, &data_policies,
+                                           &proc_policies, &err));
   XCTAssertEqual(data_policies.size(), 1);
   XCTAssertEqual(
       **data_policies.begin(),
@@ -1065,9 +1066,9 @@ BlockGenResult CreatePolicyBlockGen() {
   } mutableCopy];
 
   singleWatchItemConfig[kWatchItemConfigKeyOptions][kWatchItemConfigKeyOptionsRuleType] =
-      @"PathsWithDeniedProcesses";
-  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, data_policies,
-                                           proc_policies, &err));
+      kRuleTypePathsWithDeniedProcesses;
+  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, &data_policies,
+                                           &proc_policies, &err));
 
   SetSharedDataWatchItemPolicy expectedDataPolicies = {
       std::make_shared<DataWatchItemPolicy>(
@@ -1089,9 +1090,9 @@ BlockGenResult CreatePolicyBlockGen() {
   proc_policies.clear();
 
   singleWatchItemConfig[kWatchItemConfigKeyOptions][kWatchItemConfigKeyOptionsRuleType] =
-      @"ProcessesWithDeniedPaths";
-  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, data_policies,
-                                           proc_policies, &err));
+      kRuleTypeProcessesWithDeniedPaths;
+  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, &data_policies,
+                                           &proc_policies, &err));
 
   XCTAssertEqual(proc_policies.size(), 1);
   XCTAssertEqual(data_policies.size(), 0);

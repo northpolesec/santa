@@ -47,6 +47,7 @@ extern NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode;
 extern NSString *const kWatchItemConfigKeyOptionsCustomMessage;
 extern NSString *const kWatchItemConfigKeyOptionsEventDetailText;
 extern NSString *const kWatchItemConfigKeyOptionsEventDetailURL;
+extern NSString *const kWatchItemConfigKeyOptionsVersion;
 extern NSString *const kWatchItemConfigKeyProcesses;
 extern NSString *const kWatchItemConfigKeyProcessesBinaryPath;
 extern NSString *const kWatchItemConfigKeyProcessesCertificateSha256;
@@ -54,6 +55,11 @@ extern NSString *const kWatchItemConfigKeyProcessesSigningID;
 extern NSString *const kWatchItemConfigKeyProcessesTeamID;
 extern NSString *const kWatchItemConfigKeyProcessesCDHash;
 extern NSString *const kWatchItemConfigKeyProcessesPlatformBinary;
+
+extern NSString *const kRuleTypePathsWithAllowedProcesses;
+extern NSString *const kRuleTypePathsWithDeniedProcesses;
+extern NSString *const kRuleTypeProcessesWithAllowedPaths;
+extern NSString *const kRuleTypeProcessesWithDeniedPaths;
 
 namespace santa {
 
@@ -177,6 +183,8 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
 
   std::pair<NSString *, NSString *> EventDetailLinkInfo(
       const std::shared_ptr<WatchItemPolicyBase> &watch_item);
+
+  static bool IsValidRule(NSString *name, NSDictionary *rule, NSError **error);
 
   friend class santa::WatchItemsPeer;
 

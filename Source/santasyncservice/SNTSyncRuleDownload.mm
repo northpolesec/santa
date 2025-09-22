@@ -224,24 +224,21 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   switch (pbAddRule.rule_type()) {
     case ::pbv1::FileAccessRule::RULE_TYPE_UNSPECIFIED:
     case ::pbv1::FileAccessRule::RULE_TYPE_PATHS_WITH_ALLOWED_PROCESSES:
-      optionsDict[kWatchItemConfigKeyOptionsRuleType] =
-          @(static_cast<int>(santa::WatchItemRuleType::kPathsWithAllowedProcesses));
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] = kRuleTypePathsWithAllowedProcesses;
       break;
     case ::pbv1::FileAccessRule::RULE_TYPE_PATHS_WITH_DENIED_PROCESSES:
-      optionsDict[kWatchItemConfigKeyOptionsRuleType] =
-          @(static_cast<int>(santa::WatchItemRuleType::kPathsWithDeniedProcesses));
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] = kRuleTypePathsWithDeniedProcesses;
       break;
     case ::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_ALLOWED_PATHS:
-      optionsDict[kWatchItemConfigKeyOptionsRuleType] =
-          @(static_cast<int>(santa::WatchItemRuleType::kProcessesWithAllowedPaths));
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] = kRuleTypeProcessesWithAllowedPaths;
       break;
     case ::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS:
-      optionsDict[kWatchItemConfigKeyOptionsRuleType] =
-          @(static_cast<int>(santa::WatchItemRuleType::kProcessesWithDeniedPaths));
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] = kRuleTypeProcessesWithDeniedPaths;
       break;
     default: return nil;
   }
 
+  optionsDict[kWatchItemConfigKeyOptionsVersion] = StringToNSString(pbAddRule.version());
   optionsDict[kWatchItemConfigKeyOptionsAllowReadAccess] = @(pbAddRule.allow_read_access());
   optionsDict[kWatchItemConfigKeyOptionsAuditOnly] = @(!pbAddRule.block_violations());
   optionsDict[kWatchItemConfigKeyOptionsEnableSilentMode] = @(pbAddRule.enable_silent_mode());
@@ -294,9 +291,6 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 }
 
 - (SNTFileAccessRule *)faaRuleFromProtoFAARuleAdd:(const ::pbv1::FileAccessRule::Add &)pbAddRule {
-  SNTFileAccessRule *faa = [[SNTFileAccessRule alloc] initWithState:SNTFileAccessRuleStateAdd];
-  faa.name = StringToNSString(pbAddRule.name());
-
   NSMutableDictionary *details = [NSMutableDictionary dictionary];
 
   NSArray *paths = [self pathsFromProtoFAARulePaths:pbAddRule.paths()];
@@ -317,22 +311,19 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   }
   details[kWatchItemConfigKeyProcesses] = processes;
 
-  NSData *detailsData = [NSKeyedArchiver archivedDataWithRootObject:details
-                                              requiringSecureCoding:YES
-                                                              error:nil];
-  if (!detailsData) {
+  NSString *name = StringToNSString(pbAddRule.name());
+
+  NSError *err;
+  if (santa::WatchItems::IsValidRule(name, details, &err)) {
+    return [[SNTFileAccessRule alloc] initAddRuleWithName:name details:details];
+  } else {
     return nil;
   }
-
-  faa.details = detailsData;
-  return faa;
 }
 
 - (SNTFileAccessRule *)faaRuleFromProtoFAARuleRemove:
     (const ::pbv1::FileAccessRule::Remove &)pbRemoveRule {
-  SNTFileAccessRule *faa = [[SNTFileAccessRule alloc] initWithState:SNTFileAccessRuleStateRemove];
-  faa.name = StringToNSString(pbRemoveRule.name());
-  return faa;
+  return [[SNTFileAccessRule alloc] initRemoveRuleWithName:StringToNSString(pbRemoveRule.name())];
 }
 
 - (SNTFileAccessRule *)fileAccessRuleFromProtoFileAccessRule:(const ::pbv1::FileAccessRule &)wi {
