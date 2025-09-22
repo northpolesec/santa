@@ -315,18 +315,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
   NSError *err;
   if (santa::WatchItems::IsValidRule(name, details, &err)) {
-    NSData *detailsData = [NSKeyedArchiver archivedDataWithRootObject:details
-                                                requiringSecureCoding:YES
-                                                                error:nil];
-
-    if (!detailsData) {
-      return nil;
-    }
-
-    SNTFileAccessRule *faa = [[SNTFileAccessRule alloc] initWithState:SNTFileAccessRuleStateAdd];
-    faa.name = name;
-    faa.details = detailsData;
-    return faa;
+    return [[SNTFileAccessRule alloc] initAddRuleWithName:name details:details];
   } else {
     return nil;
   }
@@ -334,9 +323,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 
 - (SNTFileAccessRule *)faaRuleFromProtoFAARuleRemove:
     (const ::pbv1::FileAccessRule::Remove &)pbRemoveRule {
-  SNTFileAccessRule *faa = [[SNTFileAccessRule alloc] initWithState:SNTFileAccessRuleStateRemove];
-  faa.name = StringToNSString(pbRemoveRule.name());
-  return faa;
+  return [[SNTFileAccessRule alloc] initRemoveRuleWithName:StringToNSString(pbRemoveRule.name())];
 }
 
 - (SNTFileAccessRule *)fileAccessRuleFromProtoFileAccessRule:(const ::pbv1::FileAccessRule &)wi {
