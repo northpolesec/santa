@@ -305,7 +305,6 @@ namespace pbv1 = ::santa::sync::v1;
     XCTAssertNotNil([self.sut fileAccessRuleFromProtoFileAccessRule:wi]);
   }
 
-
   // No version
   {
     ::pbv1::FileAccessRule wi;

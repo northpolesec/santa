@@ -19,8 +19,8 @@
 @implementation SNTFileAccessRule
 
 - (instancetype)initWithStates:(SNTFileAccessRuleState)state
-                         name:(NSString *)name
-                      details:(NSDictionary *)details {
+                          name:(NSString *)name
+                       details:(NSDictionary *)details {
   if (state != SNTFileAccessRuleStateAdd && state != SNTFileAccessRuleStateRemove) {
     return nil;
   }
