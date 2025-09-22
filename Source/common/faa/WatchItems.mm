@@ -57,6 +57,7 @@ NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode = @"EnableSilentTT
 NSString *const kWatchItemConfigKeyOptionsCustomMessage = @"BlockMessage";
 NSString *const kWatchItemConfigKeyOptionsEventDetailURL = kWatchItemConfigKeyEventDetailURL;
 NSString *const kWatchItemConfigKeyOptionsEventDetailText = kWatchItemConfigKeyEventDetailText;
+NSString *const kWatchItemConfigKeyOptionsVersion = kWatchItemConfigKeyVersion;
 NSString *const kWatchItemConfigKeyProcesses = @"Processes";
 NSString *const kWatchItemConfigKeyProcessesBinaryPath = @"BinaryPath";
 NSString *const kWatchItemConfigKeyProcessesCertificateSha256 = @"CertificateSha256";
@@ -91,6 +92,9 @@ static constexpr NSUInteger kWatchItemConfigEventDetailTextMaxLength = 48;
 // the URL supports pseudo-format strings that can extend the length, a smaller
 // max is used here.
 static constexpr NSUInteger kWatchItemConfigEventDetailURLMaxLength = 6000;
+
+// Semi-arbitrary length restriction on version strings
+static constexpr NSUInteger kVersionMaxLength = 256;
 
 namespace santa {
 
@@ -351,7 +355,6 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
                                  HexValidator(CC_SHA256_DIGEST_LENGTH * 2)) ||
                 !VerifyConfigKey(process, kWatchItemConfigKeyProcessesPlatformBinary,
                                  [NSNumber class], err, false, nil)) {
-              [SNTError populateError:err withFormat:@"Failed to verify key content"];
               return false;
             }
 
@@ -434,10 +437,10 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
 ///   ... See VerifyConfigWatchItemProcesses for more details ...
 ///   </array>
 /// </dict>
-bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
+bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy_version,
                                 NSDictionary *watch_item,
-                                SetSharedDataWatchItemPolicy &data_policies,
-                                SetSharedProcessWatchItemPolicy &proc_policies, NSError **err) {
+                                SetSharedDataWatchItemPolicy *data_policies,
+                                SetSharedProcessWatchItemPolicy *proc_policies, NSError **err) {
   if (!VerifyConfigKey(watch_item, kWatchItemConfigKeyPaths, [NSArray class], err, true)) {
     return false;
   }
@@ -491,6 +494,21 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
     }
   }
 
+  std::string policy_version;
+  // If the options dictionary contains a version key, use its value so long as it's valid
+  if (options[kWatchItemConfigKeyOptionsVersion]) {
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsVersion, [NSString class], nil, true,
+                         LenRangeValidator(1, kVersionMaxLength))) {
+      return false;
+    }
+    policy_version = NSStringToUTF8String(options[kWatchItemConfigKeyOptionsVersion]);
+  } else if (!fallback_policy_version.empty()) {
+    policy_version = fallback_policy_version;
+  } else {
+    [SNTError populateError:err withFormat:@"No version information set for rule"];
+    return false;
+  }
+
   bool allow_read_access = GetBoolValue(options, kWatchItemConfigKeyOptionsAllowReadAccess,
                                         kWatchItemPolicyDefaultAllowReadAccess);
   bool audit_only =
@@ -519,11 +537,16 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
     }
   }
 
+  // Passing nill sets means this is a verification only.
+  if (!data_policies || !proc_policies) {
+    return true;
+  }
+
   switch (rule_type) {
     case WatchItemRuleType::kPathsWithAllowedProcesses: [[fallthrough]];
     case WatchItemRuleType::kPathsWithDeniedProcesses:
       for (const PairPathAndType &path_type_pair : std::get<SetPairPathAndType>(path_list)) {
-        data_policies.insert(std::make_shared<DataWatchItemPolicy>(
+        data_policies->insert(std::make_shared<DataWatchItemPolicy>(
             NSStringToUTF8StringView(name), policy_version, path_type_pair.first,
             path_type_pair.second, allow_read_access, audit_only, rule_type, enable_silent_mode,
             enable_silent_tty_mode,
@@ -537,7 +560,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
 
     case WatchItemRuleType::kProcessesWithAllowedPaths: [[fallthrough]];
     case WatchItemRuleType::kProcessesWithDeniedPaths:
-      proc_policies.insert(std::make_shared<ProcessWatchItemPolicy>(
+      proc_policies->insert(std::make_shared<ProcessWatchItemPolicy>(
           NSStringToUTF8StringView(name), policy_version, std::get<SetPairPathAndType>(path_list),
           allow_read_access, audit_only, rule_type, enable_silent_mode, enable_silent_tty_mode,
           NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
@@ -579,8 +602,8 @@ bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err) {
   return true;
 }
 
-bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy &data_policies,
-                 SetSharedProcessWatchItemPolicy &proc_policies, NSError **err) {
+bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_policies,
+                 SetSharedProcessWatchItemPolicy *proc_policies, NSError **err) {
   if (![config[kWatchItemConfigKeyVersion] isKindOfClass:[NSString class]]) {
     [SNTError populateError:err
                  withFormat:@"Missing top level string key '%@'", kWatchItemConfigKeyVersion];
@@ -768,6 +791,11 @@ WatchItems::~WatchItems() {
   }
 }
 
+bool WatchItems::IsValidRule(NSString *name, NSDictionary *rule, NSError **error) {
+  return IsWatchItemNameValid(name, error) &&
+         ParseConfigSingleWatchItem(name, "", rule, nullptr, nullptr, error);
+}
+
 void WatchItems::RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback) {
   absl::MutexLock lock(&lock_);
   if (!data_watch_items_updated_callback_) {
@@ -857,7 +885,7 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
     SetSharedDataWatchItemPolicy new_data_policies;
     SetSharedProcessWatchItemPolicy new_proc_policies;
     NSError *err;
-    if (!ParseConfig(new_config, new_data_policies, new_proc_policies, &err)) {
+    if (!ParseConfig(new_config, &new_data_policies, &new_proc_policies, &err)) {
       LOGE(@"Failed to parse watch item config: %@",
            err ? err.localizedDescription : @"Unknown failure");
       return;
