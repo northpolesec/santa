@@ -224,16 +224,16 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
   switch (pbAddRule.rule_type()) {
     case ::pbv1::FileAccessRule::RULE_TYPE_UNSPECIFIED:
     case ::pbv1::FileAccessRule::RULE_TYPE_PATHS_WITH_ALLOWED_PROCESSES:
-      optionsDict[kWatchItemConfigKeyOptionsRuleType] = @"PathsWithAllowedProcesses";
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] = kRuleTypePathsWithAllowedProcesses;
       break;
     case ::pbv1::FileAccessRule::RULE_TYPE_PATHS_WITH_DENIED_PROCESSES:
-      optionsDict[kWatchItemConfigKeyOptionsRuleType] = @"PathsWithDeniedProcesses";
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] = kRuleTypePathsWithDeniedProcesses;
       break;
     case ::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_ALLOWED_PATHS:
-      optionsDict[kWatchItemConfigKeyOptionsRuleType] = @"ProcessesWithAllowedPaths";
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] = kRuleTypeProcessesWithAllowedPaths;
       break;
     case ::pbv1::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS:
-      optionsDict[kWatchItemConfigKeyOptionsRuleType] = @"ProcessesWithDeniedPaths";
+      optionsDict[kWatchItemConfigKeyOptionsRuleType] = kRuleTypeProcessesWithDeniedPaths;
       break;
     default: return nil;
   }

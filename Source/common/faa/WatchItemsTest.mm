@@ -957,7 +957,7 @@ BlockGenResult CreatePolicyBlockGen() {
         @"", kVersion, @{
           kWatchItemConfigKeyPaths : @[ @"a" ],
           kWatchItemConfigKeyOptions : @{
-            kWatchItemConfigKeyOptionsRuleType : @"PathsWithAllowedProcesses",
+            kWatchItemConfigKeyOptionsRuleType : kRuleTypePathsWithAllowedProcesses,
             kWatchItemConfigKeyOptionsInvertProcessExceptions : @(YES)
           }
         },
@@ -1066,7 +1066,7 @@ BlockGenResult CreatePolicyBlockGen() {
   } mutableCopy];
 
   singleWatchItemConfig[kWatchItemConfigKeyOptions][kWatchItemConfigKeyOptionsRuleType] =
-      @"PathsWithDeniedProcesses";
+      kRuleTypePathsWithDeniedProcesses;
   XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, &data_policies,
                                            &proc_policies, &err));
 
@@ -1090,7 +1090,7 @@ BlockGenResult CreatePolicyBlockGen() {
   proc_policies.clear();
 
   singleWatchItemConfig[kWatchItemConfigKeyOptions][kWatchItemConfigKeyOptionsRuleType] =
-      @"ProcessesWithDeniedPaths";
+      kRuleTypeProcessesWithDeniedPaths;
   XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, &data_policies,
                                            &proc_policies, &err));
 

@@ -66,6 +66,11 @@ NSString *const kWatchItemConfigKeyProcessesTeamID = @"TeamID";
 NSString *const kWatchItemConfigKeyProcessesCDHash = @"CDHash";
 NSString *const kWatchItemConfigKeyProcessesPlatformBinary = @"PlatformBinary";
 
+NSString *const kRuleTypePathsWithAllowedProcesses = @"pathswithallowedprocesses";
+NSString *const kRuleTypePathsWithDeniedProcesses = @"pathswithdeniedprocesses";
+NSString *const kRuleTypeProcessesWithAllowedPaths = @"processeswithallowedpaths";
+NSString *const kRuleTypeProcessesWithDeniedPaths = @"processeswithdeniedpaths";
+
 // https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/
 static constexpr NSUInteger kMaxTeamIDLength = 10;
 
@@ -125,13 +130,13 @@ static inline bool GetBoolValue(NSDictionary *options, NSString *key, bool defau
 
 std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type) {
   rule_type = [rule_type lowercaseString];
-  if ([rule_type isEqualToString:@"pathswithallowedprocesses"]) {
+  if ([rule_type isEqualToString:kRuleTypePathsWithAllowedProcesses]) {
     return WatchItemRuleType::kPathsWithAllowedProcesses;
-  } else if ([rule_type isEqualToString:@"pathswithdeniedprocesses"]) {
+  } else if ([rule_type isEqualToString:kRuleTypePathsWithDeniedProcesses]) {
     return WatchItemRuleType::kPathsWithDeniedProcesses;
-  } else if ([rule_type isEqualToString:@"processeswithallowedpaths"]) {
+  } else if ([rule_type isEqualToString:kRuleTypeProcessesWithAllowedPaths]) {
     return WatchItemRuleType::kProcessesWithAllowedPaths;
-  } else if ([rule_type isEqualToString:@"processeswithdeniedpaths"]) {
+  } else if ([rule_type isEqualToString:kRuleTypeProcessesWithDeniedPaths]) {
     return WatchItemRuleType::kProcessesWithDeniedPaths;
   } else {
     return std::nullopt;
@@ -537,7 +542,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
     }
   }
 
-  // Passing nill sets means this is a verification only.
+  // Passing nil sets means this is a verification only.
   if (!data_policies || !proc_policies) {
     return true;
   }

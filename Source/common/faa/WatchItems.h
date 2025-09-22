@@ -56,6 +56,11 @@ extern NSString *const kWatchItemConfigKeyProcessesTeamID;
 extern NSString *const kWatchItemConfigKeyProcessesCDHash;
 extern NSString *const kWatchItemConfigKeyProcessesPlatformBinary;
 
+extern NSString *const kRuleTypePathsWithAllowedProcesses;
+extern NSString *const kRuleTypePathsWithDeniedProcesses;
+extern NSString *const kRuleTypeProcessesWithAllowedPaths;
+extern NSString *const kRuleTypeProcessesWithDeniedPaths;
+
 namespace santa {
 
 // Forward declarations

@@ -111,7 +111,7 @@ namespace pbv1 = ::santa::sync::v1;
 
     XCTAssertEqual(opts.count, 9);
     XCTAssertEqualObjects([opts[kWatchItemConfigKeyOptionsRuleType] lowercaseString],
-                          @"pathswithdeniedprocesses");
+                          kRuleTypePathsWithDeniedProcesses);
     XCTAssertTrue([opts[kWatchItemConfigKeyOptionsAllowReadAccess] boolValue]);
     XCTAssertFalse([opts[kWatchItemConfigKeyOptionsAuditOnly] boolValue]);
     XCTAssertTrue([opts[kWatchItemConfigKeyOptionsEnableSilentMode] boolValue]);
@@ -130,7 +130,7 @@ namespace pbv1 = ::santa::sync::v1;
     XCTAssertEqual(opts.count, 6);
 
     XCTAssertEqualObjects([opts[kWatchItemConfigKeyOptionsRuleType] lowercaseString],
-                          @"pathswithallowedprocesses");
+                          kRuleTypePathsWithAllowedProcesses);
     XCTAssertFalse([opts[kWatchItemConfigKeyOptionsAllowReadAccess] boolValue]);
     XCTAssertTrue([opts[kWatchItemConfigKeyOptionsAuditOnly] boolValue]);
     XCTAssertFalse([opts[kWatchItemConfigKeyOptionsEnableSilentMode] boolValue]);
