@@ -769,14 +769,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return rules;
 }
 
-- (NSArray<NSDictionary *> *)retrieveAllFileAccessRules {
-  NSMutableArray<NSDictionary *> *faaRules = [NSMutableArray array];
+- (NSDictionary<NSString *, NSDictionary *> *)retrieveAllFileAccessRules {
+  NSMutableDictionary<NSString *, NSDictionary *> *faaRules = [NSMutableDictionary dictionary];
   [self inDatabase:^(FMDatabase *db) {
     FMResultSet *rs = [db executeQuery:@"SELECT * FROM file_access_rules"];
     while ([rs next]) {
       NSDictionary *rule = [self fileAccessRuleFromResultSet:rs];
       if (rule) {
-        [faaRules addObject:rule];
+        [faaRules addEntriesFromDictionary:rule];
       }
     }
   }];

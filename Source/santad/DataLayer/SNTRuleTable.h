@@ -132,7 +132,7 @@
 ///
 ///  Retrieve all file access rules from the database for export.
 ///
-- (NSArray<NSDictionary *> *)retrieveAllFileAccessRules;
+- (NSDictionary<NSString *, NSDictionary *> *)retrieveAllFileAccessRules;
 
 ///
 ///  Update the static rules from the configuration.

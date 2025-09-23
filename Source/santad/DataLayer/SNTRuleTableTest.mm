@@ -1,3 +1,4 @@
+
 /// Copyright 2015 Google Inc. All rights reserved.
 /// Copyright 2025 North Pole Security, Inc.
 ///
@@ -260,10 +261,10 @@
   XCTAssertEqual(self.sut.fileAccessRuleCount, 2);
 
   // Ensure both rules exist
-  NSArray<NSDictionary *> *rules = [self.sut retrieveAllFileAccessRules];
+  NSDictionary *rules = [self.sut retrieveAllFileAccessRules];
   XCTAssertEqual(rules.count, 2);
-  XCTAssertEqualObjects([rules[0] allKeys][0], @"my_first_rule");
-  XCTAssertEqualObjects([rules[1] allKeys][0], @"my_second_rule");
+  XCTAssertTrue([rules[@"my_first_rule"] isKindOfClass:[NSDictionary class]]);
+  XCTAssertTrue([rules[@"my_second_rule"] isKindOfClass:[NSDictionary class]]);
 
   // Now remove the first rule
   SNTFileAccessRule *r3 = [self _exampleFileAccessRemoveRuleWithName:r1.name];
@@ -278,7 +279,7 @@
   // Ensure the other rule still exists
   rules = [self.sut retrieveAllFileAccessRules];
   XCTAssertEqual(rules.count, 1);
-  XCTAssertEqualObjects([rules[0] allKeys][0], @"my_second_rule");
+  XCTAssertTrue([rules[@"my_second_rule"] isKindOfClass:[NSDictionary class]]);
 }
 
 - (void)testAddRemoveExecutionAndFileAccessRules {

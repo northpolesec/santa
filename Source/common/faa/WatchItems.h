@@ -155,10 +155,12 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   using ProcWatchItemsUpdatedBlock = std::function<void(size_t count)>;
 
   // Factory methods
-  static std::shared_ptr<WatchItems> Create(NSString *config_path,
-                                            uint64_t reapply_config_frequency_secs);
-  static std::shared_ptr<WatchItems> Create(NSDictionary *config,
-                                            uint64_t reapply_config_frequency_secs);
+  static std::shared_ptr<WatchItems> CreateFromPath(NSString *config_path,
+                                                    uint64_t reapply_config_frequency_secs);
+  static std::shared_ptr<WatchItems> CreateFromEmbeddedConfig(
+      NSDictionary *config, uint64_t reapply_config_frequency_secs);
+  static std::shared_ptr<WatchItems> CreateFromRules(NSDictionary *config,
+                                                     uint64_t reapply_config_frequency_secs);
 
   WatchItems(NSString *config_path, dispatch_queue_t q, dispatch_source_t timer_source,
              void (^periodic_task_complete_f)(void) = nullptr);
