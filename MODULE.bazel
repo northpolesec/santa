@@ -23,9 +23,10 @@ git_override(
 
 # NATS C client
 bazel_dep(name = "nats_c", version = "")
-local_path_override(
+git_override(
     module_name = "nats_c",
-    path = "../nats.c",
+    commit = "aeaf874d7f5013777d5dccd7d897a38463319ac1",
+    remote = "https://github.com/pmarkowsky/nats.c",
 )
 
 # FMDB
