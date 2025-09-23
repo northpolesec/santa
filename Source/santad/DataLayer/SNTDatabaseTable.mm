@@ -41,7 +41,8 @@
           bail = YES;
           return;
         }
-        LOGW(@"Unable to create a good connection to the database. Deleting. (%@)", [db databasePath]);
+        LOGW(@"Unable to create a good connection to the database. Deleting. (%@)",
+             [db databasePath]);
         [self closeDeleteReopenDatabase:db];
       } else if ([db userVersion] > [self currentSupportedVersion]) {
         LOGW(@"Database version newer than supported. Deleting. (%@)", [db databasePath]);
