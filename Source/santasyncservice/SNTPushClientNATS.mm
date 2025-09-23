@@ -87,6 +87,7 @@ extern "C" {
     }
     
     // Set server URL
+    // Assume we're going to change this ti push.northpole.security
     status = natsOptions_SetURL(opts, "nats://localhost:4222");
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to set URL: %s", natsStatus_GetText(status));
@@ -189,6 +190,7 @@ extern "C" {
   }
   
   // Subscribe to device-specific topic
+  // TODO make this take a format string from preflight for the the tenant ID
   NSString *deviceTopic = [NSString stringWithFormat:@"cloud.workshop.nps.santa.%@", machineID];
   status = natsConnection_Subscribe(&_deviceSub, self.conn, 
                                     [deviceTopic UTF8String],
@@ -261,7 +263,6 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub,
 
 
 #pragma mark - SNTPushNotificationsClientDelegate
-
 - (NSString *)token {
   // NATS doesn't use tokens like APNS/FCM
   return [[SNTConfigurator configurator] machineID];
