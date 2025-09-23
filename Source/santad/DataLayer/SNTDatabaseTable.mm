@@ -41,10 +41,22 @@
           bail = YES;
           return;
         }
+        LOGW(@"Unable to create a good connection to the database. Deleting. (%@)",
+             [db databasePath]);
         [self closeDeleteReopenDatabase:db];
       } else if ([db userVersion] > [self currentSupportedVersion]) {
-        LOGW(@"Database version newer than supported. Deleting.");
+        LOGW(@"Database version newer than supported. Deleting. (%@)", [db databasePath]);
         [self closeDeleteReopenDatabase:db];
+      } else if ([self isDatabaseCorrupted:db]) {
+        LOGW(@"Corrupted database detected. Attempting repairs. (%@)", [db databasePath]);
+        [db executeUpdate:@"REINDEX;"];
+        [db executeUpdate:@"VACUUM;"];
+        if ([self isDatabaseCorrupted:db]) {
+          LOGW(@"Unable to recover corrupted database. Deleting. (%@)", [db databasePath]);
+          [self closeDeleteReopenDatabase:db];
+        } else {
+          LOGW(@"Repairs successful. (%@)", [db databasePath]);
+        }
       }
     }];
 
@@ -59,6 +71,21 @@
 - (instancetype)init {
   [self doesNotRecognizeSelector:_cmd];
   return nil;
+}
+
+- (BOOL)isDatabaseCorrupted:(FMDatabase *)db {
+  BOOL corrupted = YES;
+
+  FMResultSet *rs = [db executeQuery:@"PRAGMA integrity_check"];
+  if ([rs next]) {
+    NSString *result = [rs stringForColumnIndex:0];
+    if ([result isEqualToString:@"ok"]) {
+      corrupted = NO;
+    }
+  }
+
+  [rs close];
+  return corrupted;
 }
 
 - (void)closeDeleteReopenDatabase:(FMDatabase *)db {
