@@ -740,13 +740,15 @@ std::shared_ptr<WatchItems> WatchItems::CreateFromPath(NSString *config_path,
   return CreateInternal(config_path, nil, reapply_config_frequency_secs);
 }
 
-std::shared_ptr<WatchItems> WatchItems::CreateFromEmbededConfig(
+std::shared_ptr<WatchItems> WatchItems::CreateFromEmbeddedConfig(
     NSDictionary *config, uint64_t reapply_config_frequency_secs) {
   return CreateInternal(nil, config, reapply_config_frequency_secs);
 }
 
 std::shared_ptr<WatchItems> WatchItems::CreateFromRules(NSDictionary *rules,
                                                         uint64_t reapply_config_frequency_secs) {
+  // The provided rules dictionary must be wrapped within another dictionary as a value
+  // for the `kWatchItemConfigKeyWatchItems` key.
   NSDictionary *config = @{kWatchItemConfigKeyWatchItems : rules};
   return CreateInternal(nil, config, reapply_config_frequency_secs);
 }

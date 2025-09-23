@@ -169,6 +169,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         [newRules addObject:r];
       }
 
+#ifdef DEBUG
       for (const ::pbv1::FileAccessRule &faaRule : response.file_access_rules()) {
         SNTFileAccessRule *rule = [self fileAccessRuleFromProtoFileAccessRule:faaRule];
         if (!rule) {
@@ -177,6 +178,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         }
         [newFileAccessRules addObject:rule];
       }
+#endif
 
       cursor = response.cursor();
       SLOGI(@"Received %lu rules", (unsigned long)response.rules_size());

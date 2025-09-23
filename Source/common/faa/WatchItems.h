@@ -157,7 +157,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   // Factory methods
   static std::shared_ptr<WatchItems> CreateFromPath(NSString *config_path,
                                                     uint64_t reapply_config_frequency_secs);
-  static std::shared_ptr<WatchItems> CreateFromEmbededConfig(
+  static std::shared_ptr<WatchItems> CreateFromEmbeddedConfig(
       NSDictionary *config, uint64_t reapply_config_frequency_secs);
   static std::shared_ptr<WatchItems> CreateFromRules(NSDictionary *config,
                                                      uint64_t reapply_config_frequency_secs);
