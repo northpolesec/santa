@@ -147,12 +147,22 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  std::shared_ptr<::WatchItems> watch_items =
-      [configurator fileAccessPolicy]
-          ? WatchItems::Create([configurator fileAccessPolicy],
-                               [configurator fileAccessPolicyUpdateIntervalSec])
-          : WatchItems::Create([configurator fileAccessPolicyPlist],
-                               [configurator fileAccessPolicyUpdateIntervalSec]);
+  // Attempt to create WatchItems from the following data sources with
+  // decending order of precedence:
+  // 1. Rules stored in the rules database
+  // 2. Rules embeded in the Santa configuration
+  // 3. Rules obtained by reading the plist at the configured path
+  std::shared_ptr<::WatchItems> watch_items = ^{
+    uint32_t interval = [configurator fileAccessPolicyUpdateIntervalSec];
+    if ([rule_table fileAccessRuleCount] > 0) {
+      return WatchItems::CreateFromRules([rule_table retrieveAllFileAccessRules], interval);
+    } else if ([configurator fileAccessPolicy]) {
+      return WatchItems::CreateFromEmbededConfig([configurator fileAccessPolicy], interval);
+    } else {
+      return WatchItems::CreateFromPath([configurator fileAccessPolicyPlist], interval);
+    }
+  }();
+
   if (!watch_items) {
     LOGE(@"Failed to create watch items");
     exit(EXIT_FAILURE);

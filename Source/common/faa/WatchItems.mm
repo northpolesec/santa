@@ -579,7 +579,16 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
   return true;
 }
 
-bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err) {
+bool IsWatchItemNameValid(id key, NSError **err) {
+  if (![key isKindOfClass:[NSString class]]) {
+    [SNTError populateError:err
+                 withFormat:@"Invalid %@ key %@: Expected type '%@' (got: %@)",
+                            kWatchItemConfigKeyWatchItems, key, NSStringFromClass([NSString class]),
+                            NSStringFromClass([key class])];
+    return false;
+  }
+
+  NSString *watch_item_name = (NSString *)key;
   if (!watch_item_name) {
     // This shouldn't be possible as written, but handle just in case
     [SNTError populateError:err withFormat:@"nil watch item name"];
@@ -609,16 +618,17 @@ bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err) {
 
 bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_policies,
                  SetSharedProcessWatchItemPolicy *proc_policies, NSError **err) {
-  if (![config[kWatchItemConfigKeyVersion] isKindOfClass:[NSString class]]) {
-    [SNTError populateError:err
-                 withFormat:@"Missing top level string key '%@'", kWatchItemConfigKeyVersion];
-    return false;
-  }
-
-  if ([(NSString *)config[kWatchItemConfigKeyVersion] length] == 0) {
-    [SNTError populateError:err
-                 withFormat:@"Top level key '%@' has empty value", kWatchItemConfigKeyVersion];
-    return false;
+  // If the top level version key exists, it must be well formatted.
+  // If no top level key exists, every individual rule is required to
+  // have its own version information set.
+  std::string policy_version;
+  if (config[kWatchItemConfigKeyVersion]) {
+    if (VerifyConfigKey(config, kWatchItemConfigKeyVersion, [NSString class], err, true,
+                        LenRangeValidator(1, kVersionMaxLength))) {
+      policy_version = NSStringToUTF8String(config[kWatchItemConfigKeyVersion]);
+    } else {
+      return false;
+    }
   }
 
   if (!VerifyConfigKey(config, kWatchItemConfigKeyEventDetailURL, [NSString class], err, false,
@@ -640,18 +650,9 @@ bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_polici
   }
 
   NSDictionary *watch_items = config[kWatchItemConfigKeyWatchItems];
-  std::string policy_version = NSStringToUTF8String(config[kWatchItemConfigKeyVersion]);
 
   for (id key in watch_items) {
-    if (![key isKindOfClass:[NSString class]]) {
-      [SNTError populateError:err
-                   withFormat:@"Invalid %@ key %@: Expected type '%@' (got: %@)",
-                              kWatchItemConfigKeyWatchItems, key,
-                              NSStringFromClass([NSString class]), NSStringFromClass([key class])];
-      return false;
-    }
-
-    if (!IsWatchItemNameValid((NSString *)key, err)) {
+    if (!IsWatchItemNameValid(key, err)) {
       [SNTError populateError:err
                    withFormat:@"Invalid %@ key '%@': %@", kWatchItemConfigKeyWatchItems, key,
                               (err && *err) ? (*err).localizedDescription : @"Unknown failure"];
@@ -734,13 +735,19 @@ void ProcessWatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock
 
 #pragma mark WatchItems
 
-std::shared_ptr<WatchItems> WatchItems::Create(NSString *config_path,
-                                               uint64_t reapply_config_frequency_secs) {
+std::shared_ptr<WatchItems> WatchItems::CreateFromPath(NSString *config_path,
+                                                       uint64_t reapply_config_frequency_secs) {
   return CreateInternal(config_path, nil, reapply_config_frequency_secs);
 }
 
-std::shared_ptr<WatchItems> WatchItems::Create(NSDictionary *config,
-                                               uint64_t reapply_config_frequency_secs) {
+std::shared_ptr<WatchItems> WatchItems::CreateFromEmbededConfig(
+    NSDictionary *config, uint64_t reapply_config_frequency_secs) {
+  return CreateInternal(nil, config, reapply_config_frequency_secs);
+}
+
+std::shared_ptr<WatchItems> WatchItems::CreateFromRules(NSDictionary *rules,
+                                                        uint64_t reapply_config_frequency_secs) {
+  NSDictionary *config = @{kWatchItemConfigKeyWatchItems : rules};
   return CreateInternal(nil, config, reapply_config_frequency_secs);
 }
 

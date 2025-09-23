@@ -59,7 +59,7 @@ namespace santa {
 
 extern bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_policies,
                         SetSharedProcessWatchItemPolicy *proc_policies, NSError **err);
-extern bool IsWatchItemNameValid(NSString *watch_item_name, NSError **err);
+extern bool IsWatchItemNameValid(id key, NSError **err);
 extern bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
                                        NSDictionary *watch_item,
                                        SetSharedDataWatchItemPolicy *data_policies,
@@ -813,6 +813,9 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertFalse(IsWatchItemNameValid(@"abc-1234", nil));
   XCTAssertFalse(IsWatchItemNameValid(@"a=b", nil));
   XCTAssertFalse(IsWatchItemNameValid(@"a!b", nil));
+  XCTAssertFalse(IsWatchItemNameValid(@(1), nil));
+  XCTAssertFalse(IsWatchItemNameValid(@[], nil));
+  XCTAssertFalse(IsWatchItemNameValid(@{}, nil));
 
   XCTAssertTrue(IsWatchItemNameValid(@"_", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"_1", nil));
@@ -829,8 +832,8 @@ BlockGenResult CreatePolicyBlockGen() {
   SetSharedDataWatchItemPolicy data_policies;
   SetSharedProcessWatchItemPolicy proc_policies;
 
-  // Ensure top level keys must exist and be correct types
-  XCTAssertFalse(ParseConfig(@{}, &data_policies, &proc_policies, &err));
+  // Ensure top level keys must be correct types if they exist
+  XCTAssertTrue(ParseConfig(@{}, &data_policies, &proc_policies, &err));
   XCTAssertFalse(
       ParseConfig(@{kWatchItemConfigKeyVersion : @(0)}, &data_policies, &proc_policies, &err));
   XCTAssertFalse(
