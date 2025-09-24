@@ -314,6 +314,7 @@ objc_library(
     name = "Timer",
     hdrs = ["Timer.h"],
     deps = [
+        ":SNTLogging",
     ],
 )
 

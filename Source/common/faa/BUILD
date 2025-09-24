@@ -39,6 +39,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:String",
         "//Source/common:Unit",
+        "//Source/common:Timer",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )

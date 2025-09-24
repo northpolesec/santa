@@ -686,6 +686,22 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    }
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(fileAccessPolicyUpdateIntervalSec)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   uint32_t oldInterval = [oldValue unsignedIntValue];
+                                   uint32_t newInterval = [newValue unsignedIntValue];
+
+                                   if (oldInterval == newInterval) {
+                                     return;
+                                   }
+
+                                   LOGI(@"FileAccessPolicyUpdateIntervalSec changed: %u -> %u",
+                                        oldInterval, newInterval);
+
+                                   watch_items->SetTimerInterval(newInterval);
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(fileAccessGlobalLogsPerSec)
                                      type:[NSNumber class]
                                  callback:^(NSNumber *oldValue, NSNumber *newValue) {
@@ -746,7 +762,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 #endif  // DEBUG
 
   // Start monitoring any watched items
-  watch_items->BeginPeriodicTask();
+  watch_items->StartTimer();
 
   [monitor_client enable];
   [device_client enable];
