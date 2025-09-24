@@ -300,6 +300,7 @@
 ///  export batch.
 ///  Note: All files in a batch are written as a single combined file at the destination.
 ///  See also: TelemetryExportBatchThresholdSizeMB
+///  Defaults to 50.
 ///
 ///  @note: This property is KVO compliant.
 ///

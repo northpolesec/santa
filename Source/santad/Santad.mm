@@ -611,6 +611,55 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    logger->SetTimerInterval(newInterval);
                                  }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(telemetryExportTimeoutSec)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   uint32_t oldInterval = [oldValue unsignedIntValue];
+                                   uint32_t newInterval = [newValue unsignedIntValue];
+
+                                   if (oldInterval == newInterval) {
+                                     return;
+                                   }
+
+                                   LOGI(@"TelemetryExportTimeoutSec changed: %u -> %u", oldInterval,
+                                        newInterval);
+
+                                   logger->SetTelmetryExportTimeoutSecs(newInterval);
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(telemetryExportBatchThresholdSizeMB)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   uint32_t oldInterval = [oldValue unsignedIntValue];
+                                   uint32_t newInterval = [newValue unsignedIntValue];
+
+                                   if (oldInterval == newInterval) {
+                                     return;
+                                   }
+
+                                   LOGI(@"TelemetryExportBatchThresholdSizeMB changed: %u -> %u",
+                                        oldInterval, newInterval);
+
+                                   logger->SetBatchThresholdSizeMB(newInterval);
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(telemetryExportMaxFilesPerBatch)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   uint32_t oldInterval = [oldValue unsignedIntValue];
+                                   uint32_t newInterval = [newValue unsignedIntValue];
+
+                                   if (oldInterval == newInterval) {
+                                     return;
+                                   }
+
+                                   LOGI(@"TelemetryExportMaxFilesPerBatch changed: %u -> %u",
+                                        oldInterval, newInterval);
+
+                                   logger->SetMaxFilesPerBatch(newInterval);
+                                 }],
+
     [[SNTKVOManager alloc]
         initWithObject:configurator
               selector:@selector(fileAccessPolicyPlist)
