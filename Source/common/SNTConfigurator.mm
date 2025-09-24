@@ -1212,13 +1212,13 @@ static SNTConfigurator *sharedConfigurator = nil;
              : (5 * 60);
 }
 
-- (uint32_t)telemetryExportMaxFileUploadSizeMB {
+- (uint32_t)telemetryExportBatchThresholdSizeMB {
   return self.configState[kTelemetryExportBatchThresholdSizeMB]
              ? [self.configState[kTelemetryExportBatchThresholdSizeMB] unsignedIntValue]
              : 500;
 }
 
-- (uint32_t)telemetryExportMaxOpenedFiles {
+- (uint32_t)telemetryExportMaxFilesPerBatch {
   return self.configState[kTelemetryExportMaxFilesPerBatch]
              ? [self.configState[kTelemetryExportMaxFilesPerBatch] unsignedIntValue]
              : 50;
