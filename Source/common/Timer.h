@@ -34,11 +34,13 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
     kSingleShot,  // Timer is cancelled while OnTimer fires and restarted once complete
   };
 
-  Timer(uint32_t minimum_interval, uint32_t maximum_interval, std::string backing_config_var,
-        Mode mode = Mode::kContinuous, dispatch_qos_class_t qos_class = QOS_CLASS_UTILITY)
+  Timer(uint32_t minimum_interval, uint32_t maximum_interval, uint32_t startup_delay,
+        std::string backing_config_var, Mode mode = Mode::kContinuous,
+        dispatch_qos_class_t qos_class = QOS_CLASS_UTILITY)
       : interval_seconds_(minimum_interval),
         minimum_interval_(minimum_interval),
         maximum_interval_(maximum_interval),
+        startup_delay_(startup_delay),
         backing_config_var_(std::move(backing_config_var)),
         mode_(mode) {
     static_assert(
@@ -61,6 +63,18 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
     ReleaseTimerSource();
   }
 
+  void TimerCallback() {
+    if (mode_ == Mode::kSingleShot) {
+      // In SingleShot mode, call OnTimer between cancelling and restarting the timer
+      ReleaseTimerSource();
+      static_cast<T *>(this)->OnTimer();
+      StartTimer(true);
+    } else {
+      // Continuous mode - just call OnTimer
+      static_cast<T *>(this)->OnTimer();
+    }
+  }
+
   /// Set new timer parameters. If the timer is running, it will fire immediately.
   void SetTimerInterval(uint32_t interval_seconds) {
     interval_seconds_ = std::clamp(interval_seconds, minimum_interval_, maximum_interval_);
@@ -72,16 +86,12 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
     UpdateTimingParameters(false);
   }
 
-  void TimerCallback() {
-    if (mode_ == Mode::kSingleShot) {
-      // In SingleShot mode, call OnTimer between cancelling and restarting the timer
-      ReleaseTimerSource();
-      static_cast<T *>(this)->OnTimer();
-      StartTimer(true);
-    } else {
-      // Continuous mode - just call OnTimer
-      static_cast<T *>(this)->OnTimer();
-    }
+ protected:
+  // Like SetTimerInterval, but doesn't clamp to min/max
+  // This is a protected interface that is exposed for testing.
+  void ForceSetIntervalForTesting(uint32_t interval_seconds) {
+    interval_seconds_ = interval_seconds;
+    UpdateTimingParameters(false);
   }
 
  private:
@@ -123,7 +133,7 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
       start_time = dispatch_time(DISPATCH_WALLTIME_NOW, interval_seconds_ * NSEC_PER_SEC);
     } else {
       // On initial start or timing interval changes, use 10 second delay
-      start_time = dispatch_time(DISPATCH_WALLTIME_NOW, 10 * NSEC_PER_SEC);
+      start_time = dispatch_time(DISPATCH_WALLTIME_NOW, startup_delay_ * NSEC_PER_SEC);
     }
 
     if (mode_ == Mode::kSingleShot) {
@@ -148,6 +158,7 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   uint32_t interval_seconds_;
   uint32_t minimum_interval_;
   uint32_t maximum_interval_;
+  uint32_t startup_delay_;
   std::string backing_config_var_;
   Mode mode_;
 };

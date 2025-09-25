@@ -81,8 +81,9 @@ static constexpr NSUInteger kMaxSigningIDLength = 512;
 // Goal is to prevent a configuration setting that would cause too much
 // churn rebuilding glob paths based on the state of the filesystem, while
 // also ensuring configuration isn't overly out of sync with the filesystem.
-static constexpr uint64_t kMinReapplyConfigFrequencySecs = 15;
-static constexpr uint64_t kMaxReapplyConfigFrequencySecs = 3600;
+static constexpr uint32_t kMinReapplyConfigFrequencySecs = 15;
+static constexpr uint32_t kMaxReapplyConfigFrequencySecs = 3600;
+static constexpr uint32_t kInitialTimerDelay = 0;
 
 // Semi-arbitrary max custom message length. The goal is to protect against
 // potential unbounded lengths, but no real reason this cannot be higher.
@@ -781,7 +782,7 @@ std::shared_ptr<WatchItems> WatchItems::CreateInternal(NSString *config_path, NS
 WatchItems::WatchItems(NSString *config_path, dispatch_queue_t q,
                        void (^periodic_task_complete_f)(void))
     : Timer<WatchItems>(kMinReapplyConfigFrequencySecs, kMaxReapplyConfigFrequencySecs,
-                        "FileAccessPolicyUpdateIntervalSec"),
+                        kInitialTimerDelay, "FileAccessPolicyUpdateIntervalSec"),
       config_path_(config_path),
       embedded_config_(nil),
       q_(q),
@@ -790,7 +791,7 @@ WatchItems::WatchItems(NSString *config_path, dispatch_queue_t q,
 WatchItems::WatchItems(NSDictionary *config, dispatch_queue_t q,
                        void (^periodic_task_complete_f)(void))
     : Timer<WatchItems>(kMinReapplyConfigFrequencySecs, kMaxReapplyConfigFrequencySecs,
-                        "FileAccessPolicyUpdateIntervalSec"),
+                        kInitialTimerDelay, "FileAccessPolicyUpdateIntervalSec"),
       config_path_(nil),
       embedded_config_(config),
       q_(q),

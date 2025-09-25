@@ -148,8 +148,7 @@ class ProcessWatchItems {
   SetSharedProcessWatchItemPolicy policies_;
 };
 
-class WatchItems : public Timer<WatchItems>
-{
+class WatchItems : public Timer<WatchItems> {
  public:
   // Type aliases
   using DataWatchItemsUpdatedBlock = std::function<void(
