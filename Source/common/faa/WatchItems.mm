@@ -77,10 +77,13 @@ static constexpr NSUInteger kMaxTeamIDLength = 10;
 // Semi-arbitrary upper bound.
 static constexpr NSUInteger kMaxSigningIDLength = 512;
 
-// Semi-arbitrary minimum allowed reapplication frequency.
+// Semi-arbitrary min/max allowed reapplication frequency.
 // Goal is to prevent a configuration setting that would cause too much
-// churn rebuilding glob paths based on the state of the filesystem.
-static constexpr uint64_t kMinReapplyConfigFrequencySecs = 15;
+// churn rebuilding glob paths based on the state of the filesystem, while
+// also ensuring configuration isn't overly out of sync with the filesystem.
+static constexpr uint32_t kMinReapplyConfigFrequencySecs = 15;
+static constexpr uint32_t kMaxReapplyConfigFrequencySecs = 3600;
+static constexpr uint32_t kInitialTimerDelay = 0;
 
 // Semi-arbitrary max custom message length. The goal is to protect against
 // potential unbounded lengths, but no real reason this cannot be higher.
@@ -736,17 +739,17 @@ void ProcessWatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock
 #pragma mark WatchItems
 
 std::shared_ptr<WatchItems> WatchItems::CreateFromPath(NSString *config_path,
-                                                       uint64_t reapply_config_frequency_secs) {
+                                                       uint32_t reapply_config_frequency_secs) {
   return CreateInternal(config_path, nil, reapply_config_frequency_secs);
 }
 
 std::shared_ptr<WatchItems> WatchItems::CreateFromEmbeddedConfig(
-    NSDictionary *config, uint64_t reapply_config_frequency_secs) {
+    NSDictionary *config, uint32_t reapply_config_frequency_secs) {
   return CreateInternal(nil, config, reapply_config_frequency_secs);
 }
 
 std::shared_ptr<WatchItems> WatchItems::CreateFromRules(NSDictionary *rules,
-                                                        uint64_t reapply_config_frequency_secs) {
+                                                        uint32_t reapply_config_frequency_secs) {
   // The provided rules dictionary must be wrapped within another dictionary as a value
   // for the `kWatchItemConfigKeyWatchItems` key.
   NSDictionary *config = @{kWatchItemConfigKeyWatchItems : rules};
@@ -754,13 +757,7 @@ std::shared_ptr<WatchItems> WatchItems::CreateFromRules(NSDictionary *rules,
 }
 
 std::shared_ptr<WatchItems> WatchItems::CreateInternal(NSString *config_path, NSDictionary *config,
-                                                       uint64_t reapply_config_frequency_secs) {
-  if (reapply_config_frequency_secs < kMinReapplyConfigFrequencySecs) {
-    LOGW(@"Invalid watch item update interval provided: %llu. Min allowed: %llu",
-         reapply_config_frequency_secs, kMinReapplyConfigFrequencySecs);
-    return nullptr;
-  }
-
+                                                       uint32_t reapply_config_frequency_secs) {
   if (config_path && config) {
     LOGW(@"Invalid arguments creating WatchItems - both config and config_path cannot be set.");
     return nullptr;
@@ -768,42 +765,37 @@ std::shared_ptr<WatchItems> WatchItems::CreateInternal(NSString *config_path, NS
 
   dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.watch_items.q",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
-  dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
-  dispatch_source_set_timer(timer_source, dispatch_time(DISPATCH_TIME_NOW, 0),
-                            NSEC_PER_SEC * reapply_config_frequency_secs, 0);
 
-  if (config_path) {
-    return std::make_shared<WatchItems>(config_path, q, timer_source);
-  } else {
-    return std::make_shared<WatchItems>(config, q, timer_source);
-  }
+  auto watch_items = ^{
+    if (config_path) {
+      return std::make_shared<WatchItems>(config_path, q);
+    } else {
+      return std::make_shared<WatchItems>(config, q);
+    }
+  }();
+
+  watch_items->SetTimerInterval(reapply_config_frequency_secs);
+
+  return watch_items;
 }
 
-WatchItems::WatchItems(NSString *config_path, dispatch_queue_t q, dispatch_source_t timer_source,
+WatchItems::WatchItems(NSString *config_path, dispatch_queue_t q,
                        void (^periodic_task_complete_f)(void))
-    : config_path_(config_path),
+    : Timer<WatchItems>(kMinReapplyConfigFrequencySecs, kMaxReapplyConfigFrequencySecs,
+                        kInitialTimerDelay, "FileAccessPolicyUpdateIntervalSec"),
+      config_path_(config_path),
       embedded_config_(nil),
       q_(q),
-      timer_source_(timer_source),
       periodic_task_complete_f_(periodic_task_complete_f) {}
 
-WatchItems::WatchItems(NSDictionary *config, dispatch_queue_t q, dispatch_source_t timer_source,
+WatchItems::WatchItems(NSDictionary *config, dispatch_queue_t q,
                        void (^periodic_task_complete_f)(void))
-    : config_path_(nil),
+    : Timer<WatchItems>(kMinReapplyConfigFrequencySecs, kMaxReapplyConfigFrequencySecs,
+                        kInitialTimerDelay, "FileAccessPolicyUpdateIntervalSec"),
+      config_path_(nil),
       embedded_config_(config),
       q_(q),
-      timer_source_(timer_source),
       periodic_task_complete_f_(periodic_task_complete_f) {}
-
-WatchItems::~WatchItems() {
-  if (!periodic_task_started_ && timer_source_ != NULL) {
-    // The timer_source_ must be resumed to ensure it has a proper retain count before being
-    // destroyed. Additionally, it should first be cancelled to ensure the timer isn't ever
-    // fired (see man page for `dispatch_source_cancel(3)`).
-    dispatch_source_cancel(timer_source_);
-    dispatch_resume(timer_source_);
-  }
-}
 
 bool WatchItems::IsValidRule(NSString *name, NSDictionary *rule, NSError **error) {
   return IsWatchItemNameValid(name, error) &&
@@ -925,27 +917,12 @@ NSDictionary *WatchItems::ReadConfigLocked() {
   }
 }
 
-void WatchItems::BeginPeriodicTask() {
-  if (periodic_task_started_) {
-    return;
+void WatchItems::OnTimer() {
+  ReloadConfig(embedded_config_ ?: ReadConfig());
+
+  if (periodic_task_complete_f_) {
+    periodic_task_complete_f_();
   }
-
-  std::weak_ptr<WatchItems> weak_watcher = weak_from_this();
-  dispatch_source_set_event_handler(timer_source_, ^{
-    std::shared_ptr<WatchItems> shared_watcher = weak_watcher.lock();
-    if (!shared_watcher) {
-      return;
-    }
-
-    shared_watcher->ReloadConfig(embedded_config_ ?: shared_watcher->ReadConfig());
-
-    if (shared_watcher->periodic_task_complete_f_) {
-      shared_watcher->periodic_task_complete_f_();
-    }
-  });
-
-  dispatch_resume(timer_source_);
-  periodic_task_started_ = true;
 }
 
 void WatchItems::FindPoliciesForTargets(IterateTargetsBlock iterateTargetsBlock) {

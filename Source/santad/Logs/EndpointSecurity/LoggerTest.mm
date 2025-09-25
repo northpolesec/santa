@@ -629,12 +629,14 @@ class MockWriter : public santa::Writer {
       .WillOnce(Return(std::nullopt));
 
   // Ensure the batches happen in the expected order
-  EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f4.UTF8String, true),
-                                                              Pair(f5.UTF8String, true))))
-      .After(
-          EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f3.UTF8String, true)))))
+  EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre()))
       .After(EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(
-                                          Pair(f1.UTF8String, true), Pair(f2.UTF8String, true)))));
+                                          Pair(f4.UTF8String, true), Pair(f5.UTF8String, true))))
+                 .After(EXPECT_CALL(*mockWriter,
+                                    FilesExported(UnorderedElementsAre(Pair(f3.UTF8String, true)))))
+                 .After(EXPECT_CALL(
+                     *mockWriter, FilesExported(UnorderedElementsAre(Pair(f1.UTF8String, true),
+                                                                     Pair(f2.UTF8String, true))))));
 
   l.ExportTelemetrySerialized();
 

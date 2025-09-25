@@ -52,9 +52,12 @@ static constexpr uint64_t kFlushBufferTimeoutMS = 10000;
 static constexpr size_t kBufferBatchSizeBytes = (1024 * 128);
 // Reserve an extra 4kb of buffer space to account for event overflow
 static constexpr size_t kMaxExpectedWriteSizeBytes = 4096;
-// Minimum allowable telemetry export frequency.
+// Minimum/maximum allowable telemetry export frequency.
 // Semi-arbitrary. Goal is to protect against too much strain on the export path.
 static constexpr uint32_t kMinTelemetryExportIntervalSecs = 60;
+static constexpr uint32_t kMaxTelemetryExportIntervalSecs = 3600;
+// Set a small initial delay to let Santa come up and stablize a bit.
+static constexpr uint32_t kInitialTimerDelay = 10;
 
 // Translate configured log type to appropriate Serializer/Writer pairs
 std::unique_ptr<Logger> Logger::Create(
@@ -135,7 +138,8 @@ Logger::Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock get_export_confi
                uint32_t telemetry_export_batch_threshold_size_mb,
                uint32_t telemetry_export_max_files_per_batch,
                std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer)
-    : Timer<Logger>(kMinTelemetryExportIntervalSecs, Logger::Mode::kSingleShot),
+    : Timer<Logger>(kMinTelemetryExportIntervalSecs, kMaxTelemetryExportIntervalSecs,
+                    kInitialTimerDelay, "TelemetryExportIntervalSec", Logger::Mode::kSingleShot),
       syncd_queue_(syncd_queue),
       get_export_config_block_(get_export_config_block),
       telemetry_mask_(telemetry_mask),

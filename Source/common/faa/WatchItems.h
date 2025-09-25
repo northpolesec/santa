@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "Source/common/PrefixTree.h"
+#include "Source/common/Timer.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "absl/container/flat_hash_set.h"
 
@@ -147,7 +148,7 @@ class ProcessWatchItems {
   SetSharedProcessWatchItemPolicy policies_;
 };
 
-class WatchItems : public std::enable_shared_from_this<WatchItems> {
+class WatchItems : public Timer<WatchItems> {
  public:
   // Type aliases
   using DataWatchItemsUpdatedBlock = std::function<void(
@@ -156,20 +157,20 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
 
   // Factory methods
   static std::shared_ptr<WatchItems> CreateFromPath(NSString *config_path,
-                                                    uint64_t reapply_config_frequency_secs);
+                                                    uint32_t reapply_config_frequency_secs);
   static std::shared_ptr<WatchItems> CreateFromEmbeddedConfig(
-      NSDictionary *config, uint64_t reapply_config_frequency_secs);
+      NSDictionary *config, uint32_t reapply_config_frequency_secs);
   static std::shared_ptr<WatchItems> CreateFromRules(NSDictionary *config,
-                                                     uint64_t reapply_config_frequency_secs);
+                                                     uint32_t reapply_config_frequency_secs);
 
-  WatchItems(NSString *config_path, dispatch_queue_t q, dispatch_source_t timer_source,
+  WatchItems(NSString *config_path, dispatch_queue_t q,
              void (^periodic_task_complete_f)(void) = nullptr);
-  WatchItems(NSDictionary *config, dispatch_queue_t q, dispatch_source_t timer_source,
+  WatchItems(NSDictionary *config, dispatch_queue_t q,
              void (^periodic_task_complete_f)(void) = nullptr);
 
-  ~WatchItems();
+  ~WatchItems() = default;
 
-  void BeginPeriodicTask();
+  void OnTimer();
 
   void RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback);
   void RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback);
@@ -192,7 +193,7 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
 
  private:
   static std::shared_ptr<WatchItems> CreateInternal(NSString *config_path, NSDictionary *config,
-                                                    uint64_t reapply_config_frequency_secs);
+                                                    uint32_t reapply_config_frequency_secs);
 
   NSDictionary *ReadConfig();
   NSDictionary *ReadConfigLocked() ABSL_SHARED_LOCKS_REQUIRED(lock_);
@@ -203,7 +204,6 @@ class WatchItems : public std::enable_shared_from_this<WatchItems> {
   NSString *config_path_;
   NSDictionary *embedded_config_;
   dispatch_queue_t q_;
-  dispatch_source_t timer_source_;
   void (^periodic_task_complete_f_)(void);
 
   absl::Mutex lock_;

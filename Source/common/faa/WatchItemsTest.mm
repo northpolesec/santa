@@ -74,8 +74,15 @@ extern std::vector<std::string> FindMatches(NSString *path);
 
 class WatchItemsPeer : public WatchItems {
  public:
-  using WatchItems::WatchItems;
+  WatchItemsPeer(NSString *config_path, dispatch_queue_t q,
+                 void (^periodic_task_complete_f)(void) = nullptr)
+      : WatchItems(config_path, q, periodic_task_complete_f) {}
 
+  WatchItemsPeer(NSDictionary *config, dispatch_queue_t q,
+                 void (^periodic_task_complete_f)(void) = nullptr)
+      : WatchItems(config, q, periodic_task_complete_f) {}
+
+  using WatchItems::ForceSetIntervalForTesting;
   using WatchItems::ReloadConfig;
   using WatchItems::SetConfig;
   using WatchItems::SetConfigPath;
@@ -265,34 +272,34 @@ BlockGenResult CreatePolicyBlockGen() {
   // Changes in config dictionary will update policy info even if the
   // filesystem didn't change.
   {
-    WatchItemsPeer watchItems((NSString *)nil, NULL, NULL);
-    watchItems.ReloadConfig(configAllFilesOriginalA);
+    auto watchItems = std::make_shared<WatchItemsPeer>((NSString *)nil, nullptr);
+    watchItems->ReloadConfig(configAllFilesOriginalA);
 
-    watchItems.FindPoliciesForTargets(blockGen({af1Path}));
+    watchItems->FindPoliciesForTargets(blockGen({af1Path}));
     XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                           "all_files_orig");
 
-    watchItems.ReloadConfig(configAllFilesRenameA);
-    watchItems.FindPoliciesForTargets(blockGen({af1Path}));
+    watchItems->ReloadConfig(configAllFilesRenameA);
+    watchItems->FindPoliciesForTargets(blockGen({af1Path}));
     XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                           "all_files_rename");
 
-    watchItems.FindPoliciesForTargets(blockGen({af1Path}));
+    watchItems->FindPoliciesForTargets(blockGen({af1Path}));
     XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                           "all_files_rename");
   }
 
   // Changes to fileystem structure are reflected when a config is reloaded
   {
-    WatchItemsPeer watchItems((NSString *)nil, NULL, NULL);
-    watchItems.ReloadConfig(configAllFilesOriginalA);
+    auto watchItems = std::make_shared<WatchItemsPeer>((NSString *)nil, nullptr);
+    watchItems->ReloadConfig(configAllFilesOriginalA);
 
-    watchItems.FindPoliciesForTargets(blockGen({af2Path}));
+    watchItems->FindPoliciesForTargets(blockGen({af2Path}));
     XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                           "all_files_orig");
 
-    watchItems.ReloadConfig(configAllFilesOriginalB);
-    watchItems.FindPoliciesForTargets(blockGen({bf2Path}));
+    watchItems->ReloadConfig(configAllFilesOriginalB);
+    watchItems->FindPoliciesForTargets(blockGen({bf2Path}));
     XCTAssertFalse(targetPolicies[0].has_value());
   }
 }
@@ -319,14 +326,8 @@ BlockGenResult CreatePolicyBlockGen() {
   NSDictionary *secondConfig =
       WrapWatchItemsConfig(@{@"f_files" : fFiles, @"weird_files" : weirdFiles});
 
-  dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.q);
-
-  const uint64 periodicFlushMS = 1000;
-  dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 0),
-                            NSEC_PER_MSEC * periodicFlushMS, 0);
-
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  auto watchItems = std::make_shared<WatchItemsPeer>(configFile, self.q, timer, ^{
+  auto watchItems = std::make_shared<WatchItemsPeer>(configFile, self.q, ^{
     dispatch_semaphore_signal(sema);
   });
 
@@ -344,7 +345,8 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertFalse(targetPolicies[0].has_value());
 
   // Begin the periodic task
-  watchItems->BeginPeriodicTask();
+  watchItems->ForceSetIntervalForTesting(1);
+  watchItems->StartTimer();
 
   // The first run of the task starts immediately
   // Wait for the first iteration and check for the expected policy
@@ -378,24 +380,24 @@ BlockGenResult CreatePolicyBlockGen() {
     }
   });
 
-  WatchItemsPeer watchItems((NSString *)nil, NULL, NULL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString *)nil, nullptr);
   auto [targetPolicies, blockGen] = CreatePolicyBlockGen();
 
   // Resultant vector is same size as input vector
   // Initially nothing should be in the map
   std::vector<std::string> paths;
-  watchItems.FindPoliciesForTargets(blockGen(paths));
+  watchItems->FindPoliciesForTargets(blockGen(paths));
   XCTAssertEqual(targetPolicies.size(), 0);
   paths.push_back(MakePathTarget("/foo"));
-  watchItems.FindPoliciesForTargets(blockGen(paths));
+  watchItems->FindPoliciesForTargets(blockGen(paths));
   XCTAssertEqual(targetPolicies.size(), 1);
   XCTAssertFalse(targetPolicies[0].has_value());
   paths.push_back(MakePathTarget("/baz"));
-  watchItems.FindPoliciesForTargets(blockGen(paths));
+  watchItems->FindPoliciesForTargets(blockGen(paths));
   XCTAssertEqual(targetPolicies.size(), 2);
 
   // Load the initial config
-  watchItems.ReloadConfig(config);
+  watchItems->ReloadConfig(config);
 
   {
     // Test expected values with the inital policy
@@ -407,7 +409,7 @@ BlockGenResult CreatePolicyBlockGen() {
     };
 
     for (const auto &kv : pathToPolicyName) {
-      watchItems.FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
+      watchItems->FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->version.data(),
                             kVersion.data());
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
@@ -415,7 +417,7 @@ BlockGenResult CreatePolicyBlockGen() {
     }
 
     // Test multiple lookup
-    watchItems.FindPoliciesForTargets(
+    watchItems->FindPoliciesForTargets(
         blockGen({MakePathTarget("/foo"), MakePathTarget("/does/not/exist")}));
     XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(), "foo_subdir");
     XCTAssertFalse(targetPolicies[1].has_value());
@@ -431,7 +433,7 @@ BlockGenResult CreatePolicyBlockGen() {
   [config[@"WatchItems"] setObject:barTxtFilePolicy forKey:@"bar_txt"];
 
   // Load the updated config
-  watchItems.ReloadConfig(config);
+  watchItems->ReloadConfig(config);
 
   {
     // Test expected values with the updated policy
@@ -443,7 +445,7 @@ BlockGenResult CreatePolicyBlockGen() {
     };
 
     for (const auto &kv : pathToPolicyName) {
-      watchItems.FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
+      watchItems->FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                             kv.second.data());
     }
@@ -459,7 +461,7 @@ BlockGenResult CreatePolicyBlockGen() {
   [config[@"WatchItems"] setObject:catchAllFilePolicy forKey:@"slash_everything"];
 
   // Load the updated config
-  watchItems.ReloadConfig(config);
+  watchItems->ReloadConfig(config);
 
   {
     // Test expected values with the catch-all policy
@@ -471,7 +473,7 @@ BlockGenResult CreatePolicyBlockGen() {
     };
 
     for (const auto &kv : pathToPolicyName) {
-      watchItems.FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
+      watchItems->FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                             kv.second.data());
     }
@@ -479,7 +481,7 @@ BlockGenResult CreatePolicyBlockGen() {
 
   // Now remove the foo_subdir rule, previous matches should fallback to the catch-all
   [config[@"WatchItems"] removeObjectForKey:@"foo_subdir"];
-  watchItems.ReloadConfig(config);
+  watchItems->ReloadConfig(config);
 
   {
     // Test expected values with the foo_subdir policy removed
@@ -491,7 +493,7 @@ BlockGenResult CreatePolicyBlockGen() {
     };
 
     for (const auto &kv : pathToPolicyName) {
-      watchItems.FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
+      watchItems->FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                             kv.second.data());
     }
@@ -1116,15 +1118,15 @@ BlockGenResult CreatePolicyBlockGen() {
     @"rule2" : @{kWatchItemConfigKeyPaths : @[ @"xyz" ]}
   });
 
-  WatchItemsPeer watchItems(configPath, NULL, NULL);
+  auto watchItems = std::make_shared<WatchItemsPeer>(configPath, nullptr);
 
   // If no policy yet exists, nullopt is returned
-  std::optional<WatchItemsState> optionalState = watchItems.State();
+  std::optional<WatchItemsState> optionalState = watchItems->State();
   XCTAssertFalse(optionalState.has_value());
 
-  watchItems.ReloadConfig(config);
+  watchItems->ReloadConfig(config);
 
-  optionalState = watchItems.State();
+  optionalState = watchItems->State();
   XCTAssertTrue(optionalState.has_value());
   WatchItemsState state = optionalState.value();
 
@@ -1139,38 +1141,38 @@ BlockGenResult CreatePolicyBlockGen() {
     @"rule1" : @{kWatchItemConfigKeyPaths : @[ @"abc", @"xyz*" ]},
   });
 
-  WatchItemsPeer watchItems(@"my_fake_config_path", NULL, NULL);
-  watchItems.ReloadConfig(config);
+  auto watchItems = std::make_shared<WatchItemsPeer>(@"my_fake_config_path", nullptr);
+  watchItems->ReloadConfig(config);
 
   // Ensure that non-glob patterns are watched
   auto [targetPolicies, blockGen] = CreatePolicyBlockGen();
-  watchItems.FindPoliciesForTargets(blockGen({MakePathTarget("/abc")}));
+  watchItems->FindPoliciesForTargets(blockGen({MakePathTarget("/abc")}));
   XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(), "rule1");
 
   // Check that patterns with globs are not returned
-  watchItems.FindPoliciesForTargets(blockGen({MakePathTarget("xyz")}));
+  watchItems->FindPoliciesForTargets(blockGen({MakePathTarget("xyz")}));
   XCTAssertFalse(targetPolicies[0].has_value());
-  watchItems.FindPoliciesForTargets(blockGen({MakePathTarget("xyzbar")}));
+  watchItems->FindPoliciesForTargets(blockGen({MakePathTarget("xyzbar")}));
   XCTAssertFalse(targetPolicies[0].has_value());
 }
 
 - (void)testSetConfigAndSetConfigPath {
   // Test internal state when switching back and forth between path-based and
   // dictionary-based config options.
-  WatchItemsPeer watchItems(@{}, NULL, NULL);
+  auto watchItems = std::make_shared<WatchItemsPeer>(@{}, nullptr);
 
-  XCTAssertNil(watchItems.config_path_);
-  XCTAssertNotNil(watchItems.embedded_config_);
+  XCTAssertNil(watchItems->config_path_);
+  XCTAssertNotNil(watchItems->embedded_config_);
 
-  watchItems.SetConfigPath(@"/path/to/a/nonexistent/file/so/nothing/is/opened");
+  watchItems->SetConfigPath(@"/path/to/a/nonexistent/file/so/nothing/is/opened");
 
-  XCTAssertNotNil(watchItems.config_path_);
-  XCTAssertNil(watchItems.embedded_config_);
+  XCTAssertNotNil(watchItems->config_path_);
+  XCTAssertNil(watchItems->embedded_config_);
 
-  watchItems.SetConfig(@{});
+  watchItems->SetConfig(@{});
 
-  XCTAssertNil(watchItems.config_path_);
-  XCTAssertNotNil(watchItems.embedded_config_);
+  XCTAssertNil(watchItems->config_path_);
+  XCTAssertNotNil(watchItems->embedded_config_);
 }
 
 - (void)testDataWatchItemsFindMatches {
