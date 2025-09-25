@@ -154,6 +154,7 @@ santa_unit_test(
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
