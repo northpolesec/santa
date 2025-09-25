@@ -167,7 +167,7 @@ static const uint32_t kEventTableCurrentVersion = 5;
 }
 
 - (SNTStoredEvent *)eventFromResultSet:(FMResultSet *)rs {
-  NSData *eventData = [rs dataForColumn:@"eventdata"];
+  NSData *eventData = [rs dataNoCopyForColumn:@"eventdata"];
   if (!eventData) return nil;
 
   NSError *err;

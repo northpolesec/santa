@@ -264,15 +264,16 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   id mockResultSet = OCMPartialMock(rs);
 
   NSData *oldStoredEventData = [self dataFromFixture:@"old_sntstoredevent_archive.plist"];
-  OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(oldStoredEventData);
+  OCMExpect([mockResultSet dataNoCopyForColumn:@"eventdata"]).andReturn(oldStoredEventData);
 
   NSData *newStoredExecEventData =
       [self dataFromFixture:@"new_sntstoredexecutionevent_archive.plist"];
-  OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(newStoredExecEventData);
+  OCMExpect([mockResultSet dataNoCopyForColumn:@"eventdata"]).andReturn(newStoredExecEventData);
 
   NSData *newStoredFileAccessEventData =
       [self dataFromFixture:@"sntstoredfileaccessevent_archive.plist"];
-  OCMExpect([mockResultSet dataForColumn:@"eventdata"]).andReturn(newStoredFileAccessEventData);
+  OCMExpect([mockResultSet dataNoCopyForColumn:@"eventdata"])
+      .andReturn(newStoredFileAccessEventData);
 
   XCTAssertNil([self.sut eventFromResultSet:mockResultSet]);
   XCTAssertNotNil([self.sut eventFromResultSet:mockResultSet]);
