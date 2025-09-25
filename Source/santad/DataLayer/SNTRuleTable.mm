@@ -381,6 +381,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   NSString *name = [rs stringForColumn:@"name"];
   NSData *details = [rs dataNoCopyForColumn:@"rule_data"];
 
+  if (!details) {
+    return nil;
+  }
+
   NSDictionary *ruleDict = [NSKeyedUnarchiver
       unarchivedObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class],
                                                       [NSString class], [NSNumber class],
