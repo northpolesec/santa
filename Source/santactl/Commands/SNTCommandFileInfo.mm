@@ -22,6 +22,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
@@ -398,13 +399,30 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         .teamID = csc.teamID,
     };
 
+    // If the binary is signed with a dev cert, see if a rule would've
+    // matched if it were prod signed.
+    SNTRuleIdentifiers *lookupIdentifiers =
+        signingStatus == SNTSigningStatusDevelopment
+            ? [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
+            : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers
+                                                 andSigningStatus:signingStatus];
+
     __block NSString *output = @"None";
     id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
-    [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc]
-                                        initWithRuleIdentifiers:identifiers
-                                               andSigningStatus:signingStatus]
+    [rop databaseRuleForIdentifiers:lookupIdentifiers
                               reply:^(SNTRule *r) {
-                                if (r) output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
+                                if (signingStatus == SNTSigningStatusDevelopment &&
+                                    (r.type == SNTRuleTypeSigningID ||
+                                     r.type == SNTRuleTypeTeamID)) {
+                                  output = [NSString
+                                      stringWithFormat:@"None (%@ rule ignored because code signed "
+                                                       @"with a development certificate.)",
+                                                       r.type == SNTRuleTypeTeamID ? @"TeamID"
+                                                                                   : @"SigningID"];
+                                } else {
+                                  if (r)
+                                    output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
+                                }
                                 dispatch_semaphore_signal(sema);
                               }];
 
