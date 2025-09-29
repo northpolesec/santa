@@ -158,6 +158,7 @@ extern NSString *const kPostflightRulesProcessed;
 ///
 ///  Are represented in seconds
 ///
+extern const NSUInteger kMinimumFullSyncInterval;
 extern const NSUInteger kDefaultFullSyncInterval;
 extern const NSUInteger kDefaultPushNotificationsFullSyncInterval;
 extern const NSUInteger kDefaultPushNotificationsGlobalRuleSyncDeadline;
