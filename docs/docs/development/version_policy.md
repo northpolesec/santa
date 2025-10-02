@@ -29,4 +29,4 @@ disabled on older OS's. Such features will be called out as such.
 | macOS 13 (Ventura) | ⚠️         | Until January 2026 |
 | macOS 14 (Sonoma)  | ✅        |                    |
 | macOS 15 (Sequoia) | ✅        |                    |
-| macOS 26 (Tahoe)   | ✅        |                    |
+| macOS 26 (Tahoe)   | ✅        | Since 2025.7       |
