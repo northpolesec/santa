@@ -151,6 +151,7 @@ NSString *const kPostflightRulesReceived = @"rules_received";
 NSString *const kPostflightRulesProcessed = @"rules_processed";
 
 const NSUInteger kDefaultEventBatchSize = 50;
+const NSUInteger kMinimumFullSyncInterval = 60;
 const NSUInteger kDefaultFullSyncInterval = 600;
 const NSUInteger kDefaultPushNotificationsFullSyncInterval = 14400;
 const NSUInteger kDefaultPushNotificationsGlobalRuleSyncDeadline = 600;

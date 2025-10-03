@@ -23,3 +23,10 @@ date of release.
 
 Features that require a new version of macOS may be included in Santa and
 disabled on older OS's. Such features will be called out as such.
+
+| OS Version         | Supported | Comment            |
+| :----------------- | :-------: | :----------------- |
+| macOS 13 (Ventura) | ⚠️         | Until January 2026 |
+| macOS 14 (Sonoma)  | ✅        |                    |
+| macOS 15 (Sequoia) | ✅        |                    |
+| macOS 26 (Tahoe)   | ✅        | Since 2025.7       |
