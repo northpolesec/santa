@@ -26,10 +26,15 @@
 
 #import "Source/common/Glob.h"
 #import "Source/common/PrefixTree.h"
+#import "Source/common/SNTError.h"
+#import "Source/common/String.h"
 #import "Source/common/Unit.h"
 #include "absl/container/flat_hash_set.h"
 
 namespace santa {
+
+static constexpr NSUInteger kTeamIDLength = 10;
+static NSString *const kPlatformTeamID = @"platform";
 
 // Forward declarations
 enum class WatchItemPathType;
@@ -76,22 +81,76 @@ static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
 
 struct WatchItemProcess {
-  WatchItemProcess(std::string bp, std::string sid, std::string ti, std::vector<uint8_t> cdh,
-                   std::string ch, std::optional<bool> pb)
+  static std::optional<WatchItemProcess> Create(NSString *bp, NSString *sid, NSString *tid,
+                                                NSString *cdh, NSString *ch, bool pb,
+                                                NSError **error) {
+    // Ensure at least one attribute set
+    if (!bp && !sid && !tid && !cdh && !ch && !pb) {
+      [SNTError populateError:error withFormat:@"No valid attributes set in process dictionary"];
+      return std::nullopt;
+    }
+
+    // Both PlatformBinary and TeamID cannot be set, unless the TID is "platform"
+    if (pb && tid.length > 0 && ![[tid lowercaseString] isEqualToString:kPlatformTeamID]) {
+      [SNTError populateError:error
+                   withFormat:@"Both PlatformBinary and TeamID attributes cannot be set"];
+      return std::nullopt;
+    }
+
+    // If a SigningID is supplied, and neither TeamID nor PlatformBinary
+    // are specified, attempt to extract the TID from the SID value.
+    if (sid.length > 0 && (!pb && tid.length == 0)) {
+      // Expected format "TID:SID". Lengh of TID is 10 (or the hardcoded
+      // value "platform"). We require 2 extra characters for a colon and
+      // a SID of at least length 1.
+      if (sid.length > (kTeamIDLength + 1) && [sid characterAtIndex:kTeamIDLength] == ':') {
+        tid = [sid substringToIndex:kTeamIDLength];
+        sid = [sid substringFromIndex:kTeamIDLength + 1];
+      } else if (sid.length > kPlatformTeamID.length + 1 &&
+                 [sid characterAtIndex:kPlatformTeamID.length] == ':' &&
+                 [[sid lowercaseString] hasPrefix:kPlatformTeamID]) {
+        tid = [sid substringToIndex:kPlatformTeamID.length];
+        sid = [sid substringFromIndex:kPlatformTeamID.length + 1];
+      } else {
+        // If an SID is specified but no TID/PB is specified, it is an
+        // error if the TID cannot be extracted.
+        [SNTError populateError:error
+                     withFormat:@"A SigningID attribute was specified, but no TeamID was provided"];
+        return std::nullopt;
+      }
+    }
+
+    if ([[tid lowercaseString] isEqualToString:@"platform"]) {
+      tid = nil;
+      pb = true;
+    }
+
+    std::string sid_str = NSStringToUTF8String(sid ?: @"");
+    size_t wildcard_pos = sid_str.find('*');
+
+    return WatchItemProcess(NSStringToUTF8String(bp ?: @""), std::move(sid_str),
+                            NSStringToUTF8String(tid ?: @""), HexStringToBuf(cdh),
+                            NSStringToUTF8String(ch ?: @""), pb, wildcard_pos);
+  }
+
+#ifdef DEBUG
+  // This interface is intended to only be used by tests
+  WatchItemProcess(std::string bp, std::string sid, std::string tid, std::vector<uint8_t> cdh,
+                   std::string ch, bool pb)
       : binary_path(bp),
         signing_id(sid),
-        team_id(ti),
+        team_id(tid),
         cdhash(std::move(cdh)),
         certificate_sha256(ch),
         platform_binary(pb) {
     signing_id_wildcard_pos = signing_id.find('*');
   }
+#endif
 
   bool operator==(const WatchItemProcess &other) const {
     return binary_path == other.binary_path && signing_id == other.signing_id &&
            team_id == other.team_id && cdhash == other.cdhash &&
            certificate_sha256 == other.certificate_sha256 &&
-           platform_binary.has_value() == other.platform_binary.has_value() &&
            platform_binary == other.platform_binary;
   }
 
@@ -111,13 +170,26 @@ struct WatchItemProcess {
     return H::combine(std::move(h), p.binary_path, p.signing_id, p.team_id, p.cdhash,
                       p.certificate_sha256, p.platform_binary);
   }
+
   std::string binary_path;
   const std::string signing_id;
   std::string team_id;
   std::vector<uint8_t> cdhash;
   std::string certificate_sha256;
-  std::optional<bool> platform_binary;
+  bool platform_binary;
   size_t signing_id_wildcard_pos;
+
+ private:
+  // This object is intended to be created via the factory method
+  WatchItemProcess(std::string bp, std::string sid, std::string tid, std::vector<uint8_t> cdh,
+                   std::string ch, bool pb, size_t wc)
+      : binary_path(bp),
+        signing_id(sid),
+        team_id(tid),
+        cdhash(std::move(cdh)),
+        certificate_sha256(ch),
+        platform_binary(pb),
+        signing_id_wildcard_pos(wc) {}
 };
 
 struct WatchItemPolicyBase {

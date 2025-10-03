@@ -113,7 +113,7 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   auto mockFAAProxy = std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(mockFAA);
 
   // Test object to provide to the CheckPolicyBlock
-  WatchItemProcess proc{"proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", std::nullopt};
+  WatchItemProcess proc("proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", false);
   auto pwip = std::make_shared<ProcessWatchItemPolicy>(
       "name", "ver", SetPairPathAndType{PairPathAndType{"path1", WatchItemPathType::kLiteral}},
       true, true, santa::WatchItemRuleType::kProcessesWithAllowedPaths, false, false, "", nil, nil,

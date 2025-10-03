@@ -55,7 +55,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   proc.team_id = "";
   proc.certificate_sha256 = "";
   proc.cdhash.clear();
-  proc.platform_binary = std::nullopt;
+  proc.platform_binary = false;
 }
 
 // Helper to create a devno/ino pair from an es_file_t
@@ -301,7 +301,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
 
 - (void)testApplyPolicy {
   const char *instigatingPath = "/path/to/proc";
-  WatchItemProcess policyProc(instigatingPath, "", "", {}, "", std::nullopt);
+  WatchItemProcess policyProc(instigatingPath, "", "", {}, "", false);
   es_file_t esFile = MakeESFile(instigatingPath);
   es_process_t esProc = MakeESProcess(&esFile);
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
@@ -595,7 +595,7 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
       .WillRepeatedly(testing::Return(@(instigatingCertHash)));
 
-  WatchItemProcess policyProc("", "", "", {}, "", std::nullopt);
+  WatchItemProcess policyProc("", "", "", {}, "", false);
 
   {
     // Process policy matching single attribute - path
@@ -630,15 +630,15 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
 
     esProc.is_platform_binary = false;
-    policyProc.platform_binary = std::make_optional(false);
+    policyProc.platform_binary = false;
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
 
     esProc.is_platform_binary = true;
-    policyProc.platform_binary = std::make_optional(true);
+    policyProc.platform_binary = true;
     XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
 
     esProc.is_platform_binary = false;
-    policyProc.platform_binary = std::make_optional(false);
+    policyProc.platform_binary = false;
     policyProc.team_id = teamId;
     XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
 
@@ -720,10 +720,12 @@ static inline std::pair<dev_t, ino_t> FileID(const es_file_t &file) {
   {
     // Process policy matching single attribute - platform binary
     ClearWatchItemPolicyProcess(policyProc);
-    policyProc.platform_binary = std::make_optional(true);
+    policyProc.platform_binary = true;
     XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
-    policyProc.platform_binary = std::make_optional(false);
+    esProc.is_platform_binary = false;
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+    // Reset for remaining tests
+    esProc.is_platform_binary = true;
   }
 
   {

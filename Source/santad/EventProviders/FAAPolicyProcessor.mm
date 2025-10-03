@@ -211,8 +211,7 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
   // is more broad and applies whether or not process exceptions exist.
   if (es_proc->codesigning_flags & CS_SIGNED) {
     // Check whether or not the process is a platform binary if specified by the policy.
-    if (policy_proc.platform_binary.has_value() &&
-        policy_proc.platform_binary.value() != es_proc->is_platform_binary) {
+    if (policy_proc.platform_binary && !es_proc->is_platform_binary) {
       return false;
     }
 
@@ -232,7 +231,7 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
       }
 
       if (policy_proc.signing_id_wildcard_pos != std::string::npos) {
-        if (!policy_proc.platform_binary.value_or(false) && policy_proc.team_id.empty()) {
+        if (!policy_proc.platform_binary && policy_proc.team_id.empty()) {
           // Policy SID is a prefix but neither Platform Binary nor Team ID were set
           // Note: Config parsing should have ensured this isn't possible, but the runtime check
           // here is meant as a fallback.

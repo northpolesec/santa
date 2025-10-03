@@ -13,6 +13,8 @@ objc_library(
     deps = [
         "//Source/common:Glob",
         "//Source/common:PrefixTree",
+        "//Source/common:SNTError",
+        "//Source/common:String",
         "//Source/common:Unit",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
@@ -23,6 +25,7 @@ santa_unit_test(
     srcs = ["WatchItemPolicyTest.mm"],
     deps = [
         ":WatchItemPolicy",
+        "//Source/common:TestUtils",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )

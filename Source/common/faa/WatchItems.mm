@@ -366,42 +366,19 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
               return false;
             }
 
-            // Ensure at least one attribute set
-            if (!process[kWatchItemConfigKeyProcessesBinaryPath] &&
-                !process[kWatchItemConfigKeyProcessesSigningID] &&
-                !process[kWatchItemConfigKeyProcessesTeamID] &&
-                !process[kWatchItemConfigKeyProcessesCDHash] &&
-                !process[kWatchItemConfigKeyProcessesCertificateSha256] &&
-                !process[kWatchItemConfigKeyProcessesPlatformBinary]) {
-              [SNTError populateError:err
-                           withFormat:@"No valid attributes set in process dictionary"];
+            auto watch_item_proc = WatchItemProcess::Create(
+                process[kWatchItemConfigKeyProcessesBinaryPath],
+                process[kWatchItemConfigKeyProcessesSigningID],
+                process[kWatchItemConfigKeyProcessesTeamID],
+                process[kWatchItemConfigKeyProcessesCDHash],
+                process[kWatchItemConfigKeyProcessesCertificateSha256],
+                [process[kWatchItemConfigKeyProcessesPlatformBinary] boolValue], err);
+
+            if (!watch_item_proc.has_value()) {
               return false;
             }
 
-            // Ensure that if the SigningID is a prefix, either PlatformBinary or TeamID is set
-            if (process[kWatchItemConfigKeyProcessesSigningID]) {
-              std::string sid([process[kWatchItemConfigKeyProcessesSigningID] UTF8String]);
-              if (sid.find('*') != std::string::npos &&
-                  (([process[kWatchItemConfigKeyProcessesPlatformBinary] boolValue] == false &&
-                    process[kWatchItemConfigKeyProcessesTeamID] == nil))) {
-                [SNTError populateError:err
-                             withFormat:@"A SigningID prefix (%@) requires either the "
-                                        @"PlatformBinary or TeamID keys be set",
-                                        process[kWatchItemConfigKeyProcessesSigningID]];
-                return false;
-              }
-            }
-
-            proc_list.insert(WatchItemProcess(
-                NSStringToUTF8String(process[kWatchItemConfigKeyProcessesBinaryPath] ?: @""),
-                NSStringToUTF8String(process[kWatchItemConfigKeyProcessesSigningID] ?: @""),
-                NSStringToUTF8String(process[kWatchItemConfigKeyProcessesTeamID] ?: @""),
-                HexStringToBuf(process[kWatchItemConfigKeyProcessesCDHash]),
-                NSStringToUTF8String(process[kWatchItemConfigKeyProcessesCertificateSha256] ?: @""),
-                process[kWatchItemConfigKeyProcessesPlatformBinary]
-                    ? std::make_optional(
-                          (bool)[process[kWatchItemConfigKeyProcessesPlatformBinary] boolValue])
-                    : std::nullopt));
+            proc_list.insert(std::move(*watch_item_proc));
 
             return true;
           })) {
