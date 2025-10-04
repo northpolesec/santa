@@ -19,6 +19,7 @@
 
 #include <memory>
 
+#include "Source/common/TestUtils.h"
 #include "absl/container/flat_hash_set.h"
 
 using santa::DataWatchItemPolicy;
@@ -38,7 +39,7 @@ using santa::WatchItemRuleType;
 
 - (void)testProcessWatchItemPolicy {
   // Make sure the hash function for a WatchItemProcess covers all members
-  WatchItemProcess proc{"proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", std::nullopt};
+  WatchItemProcess proc("proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", false);
 
   ProcessWatchItemPolicy pwip(
       "name", "ver", SetPairPathAndType{PairPathAndType{"path1", WatchItemPathType::kLiteral}},
@@ -78,6 +79,92 @@ using santa::WatchItemRuleType;
   pwip.processes.insert(proc);
   pwip.processes.insert(proc);
   XCTAssertEqual(pwip.processes.size(), 7);
+}
+
+- (void)testWatchItemProcessCreate {
+  // Fail when nothing is set
+  XCTAssertFalse(WatchItemProcess::Create(nil, nil, nil, nil, nil, false, nil).has_value());
+
+  // Both PlatformBinary and a TID cannot be set (as long as not "platform")
+  XCTAssertFalse(
+      WatchItemProcess::Create(nil, nil, @"ABCDE12345", nil, nil, true, nil).has_value());
+
+  // SigningID being set requires a TID/PlatformBinary
+  XCTAssertFalse(
+      WatchItemProcess::Create(nil, @"com.example", nil, nil, nil, false, nil).has_value());
+
+  // Test invalid TID prefixes for an SID
+  XCTAssertFalse(WatchItemProcess::Create(nil, @"platforms:com.example", nil, nil, nil, false, nil)
+                     .has_value());
+  XCTAssertFalse(WatchItemProcess::Create(nil, @"ABCDE1234:com.example", nil, nil, nil, false, nil)
+                     .has_value());
+  XCTAssertFalse(
+      WatchItemProcess::Create(nil, @"ABCDE123456:com.example", nil, nil, nil, false, nil)
+          .has_value());
+
+  {
+    // If PB is set, TID:SID prefix is ignored
+    auto wip = WatchItemProcess::Create(nil, @"ABCDE12345:com.example", nil, nil, nil, true, nil);
+    XCTAssertTrue(wip.has_value());
+    XCTAssertCppStringEqual(wip->signing_id, "ABCDE12345:com.example");
+    XCTAssertTrue(wip->platform_binary);
+  }
+
+  {
+    // If TID is set to platform, TID:SID prefix is ignored, marked as platform
+    auto wip =
+        WatchItemProcess::Create(nil, @"ABCDE12345:com.example", @"PLatFOrm", nil, nil, false, nil);
+    XCTAssertTrue(wip.has_value());
+    XCTAssertCppStringEqual(wip->signing_id, "ABCDE12345:com.example");
+    XCTAssertTrue(wip->platform_binary);
+    XCTAssertCppStringEqual(wip->team_id, "");
+  }
+
+  {
+    // If TID is set, TID:SID prefix is ignored
+    auto wip =
+        WatchItemProcess::Create(nil, @"platform:com.example", @"ABCDE12345", nil, nil, false, nil);
+    XCTAssertTrue(wip.has_value());
+    XCTAssertCppStringEqual(wip->signing_id, "platform:com.example");
+    XCTAssertFalse(wip->platform_binary);
+    XCTAssertCppStringEqual(wip->team_id, "ABCDE12345");
+  }
+
+  {
+    // Extract TID
+    auto wip = WatchItemProcess::Create(nil, @"ABCDE12345:x", nil, nil, nil, false, nil);
+    XCTAssertTrue(wip.has_value());
+    XCTAssertCppStringEqual(wip->signing_id, "x");
+    XCTAssertFalse(wip->platform_binary);
+    XCTAssertCppStringEqual(wip->team_id, "ABCDE12345");
+  }
+
+  {
+    // Extract platform TID
+    auto wip = WatchItemProcess::Create(nil, @"platFORM:*", nil, nil, nil, false, nil);
+    XCTAssertTrue(wip.has_value());
+    XCTAssertCppStringEqual(wip->signing_id, "*");
+    XCTAssertTrue(wip->platform_binary);
+    XCTAssertCppStringEqual(wip->team_id, "");
+  }
+
+  {
+    // Extract platform TID
+    auto wip = WatchItemProcess::Create(nil, @"platform:*", nil, nil, nil, false, nil);
+    XCTAssertTrue(wip.has_value());
+    XCTAssertCppStringEqual(wip->signing_id, "*");
+    XCTAssertTrue(wip->platform_binary);
+    XCTAssertCppStringEqual(wip->team_id, "");
+  }
+
+  {
+    // Both PlatformBinary and a TID can be set if TID is "platform"
+    auto wip = WatchItemProcess::Create(nil, nil, @"plATFOrm", nil, nil, true, nil);
+    XCTAssertTrue(wip.has_value());
+    XCTAssertTrue(wip->platform_binary);
+    XCTAssertCppStringEqual(wip->team_id, "");
+    XCTAssertCppStringEqual(wip->signing_id, "");
+  }
 }
 
 - (void)testSetDataWatchItemPolicy {

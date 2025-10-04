@@ -581,7 +581,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("mypath", "", "", {}, "", std::nullopt));
+                 WatchItemProcess("mypath", "", "", {}, "", false));
 
   // Test SigningID length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
@@ -591,16 +591,26 @@ BlockGenResult CreatePolicyBlockGen() {
                                              &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
 
-  // Test valid SigningID
+  // Test valid SigningID, but no TeamID set
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses :
         @[ @{kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.test"} ]
   },
                                              &err);
+  XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
+
+  // Test valid SigningID and TeamID
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses : @[ @{
+      kWatchItemConfigKeyProcessesSigningID : @"com.northpolesec.test",
+      kWatchItemConfigKeyProcessesTeamID : @"ABCDE12345",
+    } ],
+  },
+                                             &err);
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "com.northpolesec.test", "", {}, "", std::nullopt));
+                 WatchItemProcess("", "com.northpolesec.test", "ABCDE12345", {}, "", false));
   XCTAssertEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
                  std::string::npos);
 
@@ -645,7 +655,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "com.northpolesec.*", "", {}, "", std::make_optional(true)));
+                 WatchItemProcess("", "com.northpolesec.*", "", {}, "", true));
   XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
                     std::string::npos);
 
@@ -660,7 +670,49 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "com.*.test", "myvalidtid", {}, "", std::nullopt));
+                 WatchItemProcess("", "com.*.test", "myvalidtid", {}, "", false));
+  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+                    std::string::npos);
+
+  // Test SigningID with TeamID prefix
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses :
+        @[ @{kWatchItemConfigKeyProcessesSigningID : @"ABCDE12345:com.northpolesec.*"} ]
+  },
+                                             &err);
+  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
+  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+                 WatchItemProcess("", "com.northpolesec.*", "ABCDE12345", {}, "", false));
+  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+                    std::string::npos);
+
+  // Test SigningID with invalid TeamID prefix length (long)
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses :
+        @[ @{kWatchItemConfigKeyProcessesSigningID : @"ABCDE123456:com.northpolesec.*"} ]
+  },
+                                             &err);
+  XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
+
+  // Test SigningID with invalid TeamID prefix length (short)
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses :
+        @[ @{kWatchItemConfigKeyProcessesSigningID : @"ABCDE1234:com.northpolesec.*"} ]
+  },
+                                             &err);
+  XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
+
+  // Test SigningID with platform TeamID prefix
+  proc_list = VerifyConfigWatchItemProcesses(@{
+    kWatchItemConfigKeyProcesses :
+        @[ @{kWatchItemConfigKeyProcessesSigningID : @"platform:com.northpolesec.*"} ]
+  },
+                                             &err);
+  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
+  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+                 WatchItemProcess("", "com.northpolesec.*", "", {}, "", true));
   XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
                     std::string::npos);
 
@@ -675,7 +727,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "com.*.*test", "myvalidtid", {}, "", std::nullopt));
+                 WatchItemProcess("", "com.*.*test", "myvalidtid", {}, "", false));
   XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
                     std::string::npos);
 
@@ -694,7 +746,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "", "myvalidtid", {}, "", std::nullopt));
+                 WatchItemProcess("", "", "myvalidtid", {}, "", false));
 
   // Test CDHash length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
@@ -721,7 +773,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "", "", cdhashBytes, "", std::nullopt));
+                 WatchItemProcess("", "", "", cdhashBytes, "", false));
 
   // Test Cert Hash length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
@@ -752,7 +804,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "", "", {}, [certHash UTF8String], std::nullopt));
+                 WatchItemProcess("", "", "", {}, [certHash UTF8String], false));
 
   // Test valid invalid PlatformBinary type
   proc_list = VerifyConfigWatchItemProcesses(
@@ -767,7 +819,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
-                 WatchItemProcess("", "", "", {}, "", std::make_optional(true)));
+                 WatchItemProcess("", "", "", {}, "", true));
 
   // Test valid multiple attributes, multiple procs
   proc_list = VerifyConfigWatchItemProcesses(@{
@@ -778,7 +830,7 @@ BlockGenResult CreatePolicyBlockGen() {
         kWatchItemConfigKeyProcessesTeamID : @"validtid_1",
         kWatchItemConfigKeyProcessesCDHash : cdhash,
         kWatchItemConfigKeyProcessesCertificateSha256 : certHash,
-        kWatchItemConfigKeyProcessesPlatformBinary : @(YES),
+        kWatchItemConfigKeyProcessesPlatformBinary : @(NO),
       },
       @{
         kWatchItemConfigKeyProcessesBinaryPath : @"mypath2",
@@ -794,9 +846,9 @@ BlockGenResult CreatePolicyBlockGen() {
 
   SetWatchItemProcess expectedProcs{
       WatchItemProcess("mypath1", "com.northpolesec.test1", "validtid_1", cdhashBytes,
-                       [certHash UTF8String], std::make_optional(true)),
+                       [certHash UTF8String], false),
       WatchItemProcess("mypath2", "com.northpolesec.test2", "validtid_2", cdhashBytes,
-                       [certHash UTF8String], std::make_optional(false))};
+                       [certHash UTF8String], false)};
 
   XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 2);
@@ -1049,8 +1101,8 @@ BlockGenResult CreatePolicyBlockGen() {
   data_policies.clear();
   proc_policies.clear();
   SetWatchItemProcess procs = {
-      WatchItemProcess("pa", "", "", {}, "", std::nullopt),
-      WatchItemProcess("pb", "", "", {}, "", std::nullopt),
+      WatchItemProcess("pa", "", "", {}, "", false),
+      WatchItemProcess("pb", "", "", {}, "", false),
   };
 
   NSMutableDictionary *singleWatchItemConfig = [@{
