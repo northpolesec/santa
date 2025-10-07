@@ -711,19 +711,38 @@
     [self _exampleTeamIDRule],
     [self _exampleSigningIDRuleIsPlatform:NO],
   ];
-  [self.sut addExecutionRules:rules ruleCleanup:SNTRuleCleanupAll error:nil];
-  XCTAssertEqualObjects([self.sut hashOfHashes], @"a6cb5171bbb8895820d61e395592b293");
+  NSArray<SNTFileAccessRule *> *faaRules = @[
+    [self _exampleFileAccessAddRuleWithName:@"MyFirstRule"],
+    [self _exampleFileAccessAddRuleWithName:@"AnotherRule"],
+  ];
 
-  // Add a transitive rule. The hash should not change.
+  [self.sut addExecutionRules:rules
+              fileAccessRules:faaRules
+                  ruleCleanup:SNTRuleCleanupAll
+                        error:nil];
+  SNTRuleTableRulesHash *rulesHash = [self.sut hashOfHashes];
+  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
+  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");
+
+  // Add a transitive rule. The hashes should not change.
   SNTRule *transitiveRule = [self _exampleTransitiveRule];
   [self.sut addExecutionRules:@[ transitiveRule ] ruleCleanup:SNTRuleCleanupNone error:nil];
-  XCTAssertEqualObjects([self.sut hashOfHashes], @"a6cb5171bbb8895820d61e395592b293");
+  rulesHash = [self.sut hashOfHashes];
+  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
+  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");
 
-  // Add a remove rule. The hash should change.
+  // Add remove rules. The hashes should change.
   SNTRule *removeRule = self._exampleBinaryRule;
   removeRule.state = SNTRuleStateRemove;
-  [self.sut addExecutionRules:@[ removeRule ] ruleCleanup:SNTRuleCleanupNone error:nil];
-  XCTAssertEqualObjects([self.sut hashOfHashes], @"d4dd223bafbdda2c36bb0513dfabb38b");
+  SNTFileAccessRule *faaRemoveRule =
+      [[SNTFileAccessRule alloc] initRemoveRuleWithName:@"AnotherRule"];
+  [self.sut addExecutionRules:@[ removeRule ]
+              fileAccessRules:@[ faaRemoveRule ]
+                  ruleCleanup:SNTRuleCleanupNone
+                        error:nil];
+  rulesHash = [self.sut hashOfHashes];
+  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"d4dd223bafbdda2c36bb0513dfabb38b");
+  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"146f85d95d0d21d5c04d048b2b69f908");
 }
 
 @end

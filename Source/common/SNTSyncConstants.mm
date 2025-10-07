@@ -45,6 +45,7 @@ NSString *const kTransitiveRuleCount = @"transitive_rule_count";
 NSString *const kTeamIDRuleCount = @"teamid_rule_count";
 NSString *const kSigningIDRuleCount = @"signingid_rule_count";
 NSString *const kCDHashRuleCount = @"cdhash_rule_count";
+NSString *const kFileAccessRuleCount = @"file_access_rule_count";
 NSString *const kFullSyncInterval = @"full_sync_interval";
 NSString *const kFCMToken = @"fcm_token";
 NSString *const kFCMFullSyncInterval = @"fcm_full_sync_interval";

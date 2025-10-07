@@ -169,14 +169,15 @@
 }
 
 - (void)setupDefaultDaemonConnResponses {
-  struct RuleCounts ruleCounts = {0};
+  struct RuleCounts ruleCounts = {};
   OCMStub([self.daemonConnRop
       databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
   OCMStub([self.daemonConnRop
       syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTSyncTypeNormal), nil])]);
   OCMStub([self.daemonConnRop
       clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
-  OCMStub([self.daemonConnRop databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", nil])]);
+  OCMStub([self.daemonConnRop
+      databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", @"the-faa-hash", nil])]);
 }
 
 #pragma mark - SNTSyncStage Tests
@@ -402,6 +403,7 @@
       .teamID = 3,
       .signingID = 123,
       .cdhash = 11,
+      .fileAccess = 513,
   };
 
   OCMStub([self.daemonConnRop
@@ -419,6 +421,7 @@
             XCTAssertEqualObjects(requestDict[kTransitiveRuleCount], @(ruleCounts.transitive));
             XCTAssertEqualObjects(requestDict[kTeamIDRuleCount], @(ruleCounts.teamID));
             XCTAssertEqualObjects(requestDict[kSigningIDRuleCount], @(ruleCounts.signingID));
+            XCTAssertEqualObjects(requestDict[kFileAccessRuleCount], @(ruleCounts.fileAccess));
             return YES;
           }];
 
@@ -433,7 +436,7 @@
                                   response:(NSDictionary *)resp {
   SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  struct RuleCounts ruleCounts = {0};
+  struct RuleCounts ruleCounts = {};
   OCMStub([self.daemonConnRop
       databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
   OCMStub([self.daemonConnRop
@@ -965,6 +968,7 @@
           validateBlock:^BOOL(NSURLRequest *req) {
             NSDictionary *requestDict = [self dictFromRequest:req];
             XCTAssertEqualObjects(requestDict[@"rulesHash"], @"the-hash");
+            XCTAssertEqualObjects(requestDict[@"fileAccessRulesHash"], @"the-faa-hash");
             return YES;
           }];
 
