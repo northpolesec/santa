@@ -24,6 +24,11 @@
 @class SNTRule;
 @class SNTNotificationMessage;
 
+@interface SNTRuleTableRulesHash : NSObject
+@property(readonly) NSString *executionRulesHash;
+@property(readonly) NSString *fileAccessRulesHash;
+@end
+
 ///
 ///  Responsible for managing the rule tables.
 ///
@@ -147,7 +152,7 @@
 ///
 ///  Retrieve a hash of all the non-transitive rules in the database.
 ///
-- (NSString *)hashOfHashes;
+- (SNTRuleTableRulesHash *)hashOfHashes;
 
 ///
 ///  A map of a file hashes to cached decisions. This is used to pre-validate and whitelist

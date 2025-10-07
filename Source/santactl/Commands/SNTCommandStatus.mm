@@ -101,6 +101,7 @@ REGISTER_COMMAND_NAME(@"status")
       .teamID = -1,
       .signingID = -1,
       .cdhash = -1,
+      .fileAccess = -1,
   };
   [rop databaseRuleCounts:^(struct RuleCounts counts) {
     ruleCounts = counts;
@@ -118,9 +119,11 @@ REGISTER_COMMAND_NAME(@"status")
   }];
 
   // Rules hash
-  __block NSString *rulesHash;
-  [rop databaseRulesHash:^(NSString *hash) {
-    rulesHash = hash;
+  __block NSString *executionRulesHash;
+  __block NSString *fileAccessRulesHash;
+  [rop databaseRulesHash:^(NSString *execRulesHash, NSString *faaRulesHash) {
+    executionRulesHash = execRulesHash;
+    fileAccessRulesHash = faaRulesHash;
   }];
 
   // Sync status
@@ -259,7 +262,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"push_notifications" : pushNotifications,
         @"bundle_scanning" : @(enableBundles),
         @"events_pending_upload" : @(eventCount),
-        @"rules_hash" : rulesHash ?: @"null",
+        @"rules_hash" : executionRulesHash ?: @"null",
       };
     } else {
       stats[@"sync"] = @{
@@ -274,6 +277,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"policy_version" : watchItemsPolicyVersion,
         @"config_path" : watchItemsConfigPath ?: @"null",
         @"last_policy_update" : watchItemsLastUpdateStr ?: @"null",
+        @"rules_hash" : fileAccessRulesHash ?: @"null",
       };
     } else {
       stats[@"watch_items"] = @{
@@ -335,6 +339,7 @@ REGISTER_COMMAND_NAME(@"status")
     if (watchItemsEnabled) {
       printf("  %-25s | %s\n", "Policy Version", watchItemsPolicyVersion.UTF8String);
       printf("  %-25s | %llu\n", "Rule Count", watchItemsRuleCount);
+      printf("  %-25s | %s\n", "Rules Hash", [fileAccessRulesHash UTF8String]);
       printf("  %-25s | %s\n", "Config Path", (watchItemsConfigPath ?: @"(embedded)").UTF8String);
       printf("  %-25s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
     }
@@ -349,7 +354,7 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Push Notifications", [pushNotifications UTF8String]);
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
       printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
-      printf("  %-25s | %s\n", "Rules Hash", [rulesHash UTF8String]);
+      printf("  %-25s | %s\n", "Rules Hash", [executionRulesHash UTF8String]);
     }
 
     printf(">>> Metrics\n");

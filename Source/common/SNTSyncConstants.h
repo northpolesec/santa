@@ -45,6 +45,7 @@ extern NSString *const kTransitiveRuleCount;
 extern NSString *const kTeamIDRuleCount;
 extern NSString *const kSigningIDRuleCount;
 extern NSString *const kCDHashRuleCount;
+extern NSString *const kFileAccessRuleCount;
 extern NSString *const kFullSyncInterval;
 extern NSString *const kFCMToken;
 extern NSString *const kFCMFullSyncInterval;

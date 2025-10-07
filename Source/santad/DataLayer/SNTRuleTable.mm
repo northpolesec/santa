@@ -85,6 +85,18 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 @property(atomic) NSString *fileAccessRulesHash;
 @end
 
+@implementation SNTRuleTableRulesHash
+- (instancetype)initWithExecutionRulesHash:(NSString *)executionRulesHash
+                       fileAccessRulesHash:(NSString *)fileAccessRulesHash {
+  self = [super init];
+  if (self) {
+    _executionRulesHash = executionRulesHash;
+    _fileAccessRulesHash = fileAccessRulesHash;
+  }
+  return self;
+}
+@end
+
 @implementation SNTRuleTable
 
 //  ES on Monterey now has a “default mute set” of paths that are automatically applied to each ES
@@ -820,41 +832,72 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   self.cachedStaticRules = [rules copy];
 }
 
-- (NSString *)hashOfHashes {
-  __block NSString *digest;
-  [self inDatabase:^(FMDatabase *db) {
-    // If santad has previously computed the hash and stored it in memory, return it.
-    // When a rule is added or removed the hash will be cleared so that the next
-    // request for the hash will recompute it.
-    if (self.executionRulesHash.length) {
-      digest = self.executionRulesHash;
-      return;
-    }
+- (NSString *)executionRulesHashSerialized:(FMDatabase *)db {
+  // If santad has previously computed the hash and stored it in memory, return it.
+  // When a rule is added or removed the hash will be cleared so that the next
+  // request for the hash will recompute it.
+  if (self.executionRulesHash.length) {
+    return self.executionRulesHash;
+  }
 
-    santa::Xxhash128 hash;
+  santa::Xxhash128 hash;
 
-    FMResultSet *rs =
-        [db executeQuery:
-                @"SELECT identifier, state, type, cel_expr FROM execution_rules WHERE state != ?",
-                @(SNTRuleStateAllowTransitive)];
-    while ([rs next]) {
-      NSString *identifier = [rs stringForColumn:@"identifier"];
-      NSString *cel = [rs stringForColumn:@"cel_expr"];
-      int state = [rs intForColumn:@"state"];
-      int type = [rs intForColumn:@"type"];
+  FMResultSet *rs =
+      [db executeQuery:
+              @"SELECT identifier, state, type, cel_expr FROM execution_rules WHERE state != ?",
+              @(SNTRuleStateAllowTransitive)];
+  while ([rs next]) {
+    NSString *identifier = [rs stringForColumn:@"identifier"];
+    NSString *cel = [rs stringForColumn:@"cel_expr"];
+    int state = [rs intForColumn:@"state"];
+    int type = [rs intForColumn:@"type"];
 
-      hash.Update(identifier.UTF8String,
-                  [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
-      hash.Update(cel.UTF8String, [cel lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
-      hash.Update(static_cast<void *>(&state), sizeof(state));
-      hash.Update(static_cast<void *>(&type), sizeof(type));
-    }
-    [rs close];
+    hash.Update(identifier.UTF8String,
+                [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    hash.Update(cel.UTF8String, [cel lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    hash.Update(static_cast<void *>(&state), sizeof(state));
+    hash.Update(static_cast<void *>(&type), sizeof(type));
+  }
+  [rs close];
 
-    digest = santa::StringToNSString(hash.HexDigest());
-    self.executionRulesHash = digest;
-  }];
+  NSString *digest = santa::StringToNSString(hash.HexDigest());
+  self.executionRulesHash = digest;
   return digest;
+}
+
+- (NSString *)fileAccessRulesHashSerialized:(FMDatabase *)db {
+  // If santad has previously computed the hash and stored it in memory, return it.
+  // When a rule is added or removed the hash will be cleared so that the next
+  // request for the hash will recompute it.
+  if (self.fileAccessRulesHash.length) {
+    return self.fileAccessRulesHash;
+  }
+
+  santa::Xxhash128 hash;
+
+  FMResultSet *rs = [db executeQuery:@"SELECT name, rule_data FROM file_access_rules"];
+  while ([rs next]) {
+    NSString *name = [rs stringForColumn:@"name"];
+    NSData *blob = [rs dataNoCopyForColumn:@"rule_data"];
+
+    hash.Update(name.UTF8String, [name lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    hash.Update(blob.bytes, blob.length);
+  }
+  [rs close];
+
+  NSString *digest = santa::StringToNSString(hash.HexDigest());
+  self.executionRulesHash = digest;
+  return digest;
+}
+
+- (SNTRuleTableRulesHash *)hashOfHashes {
+  __block SNTRuleTableRulesHash *hashes;
+  [self inDatabase:^(FMDatabase *db) {
+    hashes = [[SNTRuleTableRulesHash alloc]
+        initWithExecutionRulesHash:[self executionRulesHashSerialized:db]
+               fileAccessRulesHash:[self fileAccessRulesHashSerialized:db]];
+  }];
+  return hashes;
 }
 
 @end

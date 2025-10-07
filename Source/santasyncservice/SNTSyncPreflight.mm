@@ -109,17 +109,19 @@ The following table expands upon the above logic to list most of the permutation
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
 
   [rop databaseRuleCounts:^(struct RuleCounts counts) {
-    req->set_binary_rule_count(uint32(counts.binary));
-    req->set_certificate_rule_count(uint32(counts.certificate));
-    req->set_compiler_rule_count(uint32(counts.compiler));
-    req->set_transitive_rule_count(uint32(counts.transitive));
-    req->set_teamid_rule_count(uint32(counts.teamID));
-    req->set_signingid_rule_count(uint32(counts.signingID));
-    req->set_cdhash_rule_count(uint32(counts.cdhash));
+    req->set_binary_rule_count(static_cast<uint32_t>(counts.binary));
+    req->set_certificate_rule_count(static_cast<uint32_t>(counts.certificate));
+    req->set_compiler_rule_count(static_cast<uint32_t>(counts.compiler));
+    req->set_transitive_rule_count(static_cast<uint32_t>(counts.transitive));
+    req->set_teamid_rule_count(static_cast<uint32_t>(counts.teamID));
+    req->set_signingid_rule_count(static_cast<uint32_t>(counts.signingID));
+    req->set_cdhash_rule_count(static_cast<uint32_t>(counts.cdhash));
+    req->set_file_access_rule_count(static_cast<uint32_t>(counts.fileAccess));
   }];
 
-  [rop databaseRulesHash:^(NSString *hash) {
-    req->set_rules_hash(NSStringToUTF8String(hash));
+  [rop databaseRulesHash:^(NSString *execRulesHash, NSString *faaRulesHash) {
+    req->set_rules_hash(NSStringToUTF8String(execRulesHash));
+    req->set_file_access_rules_hash(NSStringToUTF8String(faaRulesHash));
   }];
 
   [rop clientMode:^(SNTClientMode cm) {

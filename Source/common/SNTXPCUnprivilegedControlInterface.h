@@ -32,6 +32,7 @@ struct RuleCounts {
   int64_t teamID;
   int64_t signingID;
   int64_t cdhash;
+  int64_t fileAccess;
 };
 
 ///
@@ -51,7 +52,8 @@ struct RuleCounts {
 - (void)databaseRuleCounts:(void (^)(struct RuleCounts ruleCounts))reply;
 - (void)databaseEventCount:(void (^)(int64_t count))reply;
 - (void)staticRuleCount:(void (^)(int64_t count))reply;
-- (void)databaseRulesHash:(void (^)(NSString *hash))reply;
+- (void)databaseRulesHash:(void (^)(NSString *executionRulesHash,
+                                    NSString *fileAccessRulesHash))reply;
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
                              reply:(void (^)(SNTRule *))reply;
 

@@ -114,6 +114,7 @@ double watchdogRAMPeak = 0;
       .teamID = [rdb teamIDRuleCount],
       .signingID = [rdb signingIDRuleCount],
       .cdhash = [rdb cdhashRuleCount],
+      .fileAccess = [rdb fileAccessRuleCount],
   };
 
   // Update counts with data from StaticRules configuration
@@ -221,8 +222,9 @@ double watchdogRAMPeak = 0;
   reply(rules, nil);
 }
 
-- (void)databaseRulesHash:(void (^)(NSString *hash))reply {
-  reply([[SNTDatabaseController ruleTable] hashOfHashes]);
+- (void)databaseRulesHash:(void (^)(NSString *, NSString *))reply {
+  SNTRuleTableRulesHash *rulesHash = [[SNTDatabaseController ruleTable] hashOfHashes];
+  reply(rulesHash.executionRulesHash, rulesHash.fileAccessRulesHash);
 }
 
 #pragma mark Config Ops
