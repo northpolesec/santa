@@ -155,10 +155,16 @@
 - (SNTRuleTableRulesHash *)hashOfHashes;
 
 ///
-///  A map of a file hashes to cached decisions. This is used to pre-validate and whitelist
+///  A map of a file hashes to cached decisions. This is used to pre-validate and allowlist
 ///  certain critical system binaries that are integral to Santa's functionality.
 ///
 @property(readonly, nonatomic)
     NSDictionary<NSString *, SNTCachedDecision *> *criticalSystemBinaries;
+
+///
+/// If set, this callback is called when file access rule content is changed via
+/// addExecutionRules:fileAccessRules:ruleCleanup:error: with the latest rule count.
+///
+@property(copy) void (^fileAccessRulesChangedCallback)(int64_t faaRuleCount);
 
 @end

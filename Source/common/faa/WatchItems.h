@@ -28,6 +28,7 @@
 #include <utility>
 #include <vector>
 
+#include "Source/common/PassKey.h"
 #include "Source/common/PrefixTree.h"
 #include "Source/common/Timer.h"
 #include "Source/common/faa/WatchItemPolicy.h"
@@ -67,6 +68,7 @@ namespace santa {
 // Forward declarations
 class ProcessWatchItems;
 class WatchItemsPeer;
+struct WatchItemsState;
 
 // Type aliases
 // Implementations that call IterateProcessPoliciesBlock must provide a block
@@ -86,13 +88,6 @@ using LookupPolicyBlock =
     std::optional<std::shared_ptr<WatchItemPolicyBase>> (^)(const std::string &);
 using IterateTargetsBlock = void (^)(LookupPolicyBlock);
 using FindPoliciesForTargetsBlock = void (^)(IterateTargetsBlock);
-
-struct WatchItemsState {
-  uint64_t rule_count;
-  NSString *policy_version;
-  NSString *config_path;
-  NSTimeInterval last_config_load_epoch;
-};
 
 class DataWatchItems {
  public:
@@ -148,8 +143,15 @@ class ProcessWatchItems {
   SetSharedProcessWatchItemPolicy policies_;
 };
 
-class WatchItems : public Timer<WatchItems> {
+class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
  public:
+  enum class DataSource {
+    kUnknown = 0,
+    kEmbeddedConfig,
+    kDetachedConfig,
+    kDatabase,
+  };
+
   // Type aliases
   using DataWatchItemsUpdatedBlock = std::function<void(
       size_t count, const SetPairPathAndType &new_paths, const SetPairPathAndType &removed_paths)>;
@@ -163,10 +165,8 @@ class WatchItems : public Timer<WatchItems> {
   static std::shared_ptr<WatchItems> CreateFromRules(NSDictionary *config,
                                                      uint32_t reapply_config_frequency_secs);
 
-  WatchItems(NSString *config_path, dispatch_queue_t q,
-             void (^periodic_task_complete_f)(void) = nullptr);
-  WatchItems(NSDictionary *config, dispatch_queue_t q,
-             void (^periodic_task_complete_f)(void) = nullptr);
+  WatchItems(PassKey, DataSource data_source, NSString *config_path, NSDictionary *config,
+             dispatch_queue_t q, void (^periodic_task_complete_f)(void) = nullptr);
 
   ~WatchItems() = default;
 
@@ -175,6 +175,7 @@ class WatchItems : public Timer<WatchItems> {
   void RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback);
   void RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback);
 
+  void SetConfigRules(NSDictionary *rules);
   void SetConfigPath(NSString *config_path);
   void SetConfig(NSDictionary *config);
 
@@ -189,10 +190,13 @@ class WatchItems : public Timer<WatchItems> {
 
   static bool IsValidRule(NSString *name, NSDictionary *rule, NSError **error);
 
+  static NSString *DataSourceName(DataSource data_source);
+
   friend class santa::WatchItemsPeer;
 
  private:
-  static std::shared_ptr<WatchItems> CreateInternal(NSString *config_path, NSDictionary *config,
+  static std::shared_ptr<WatchItems> CreateInternal(DataSource data_source, NSString *config_path,
+                                                    NSDictionary *config,
                                                     uint32_t reapply_config_frequency_secs);
 
   NSDictionary *ReadConfig();
@@ -201,6 +205,7 @@ class WatchItems : public Timer<WatchItems> {
   void UpdateCurrentState(DataWatchItems new_data_watch_items,
                           ProcessWatchItems new_proc_watch_items, NSDictionary *new_config);
 
+  DataSource data_source_;
   NSString *config_path_;
   NSDictionary *embedded_config_;
   dispatch_queue_t q_;
@@ -218,6 +223,14 @@ class WatchItems : public Timer<WatchItems> {
   bool periodic_task_started_ = false;
   NSString *policy_event_detail_url_ ABSL_GUARDED_BY(lock_);
   NSString *policy_event_detail_text_ ABSL_GUARDED_BY(lock_);
+};
+
+struct WatchItemsState {
+  uint64_t rule_count;
+  NSString *policy_version;
+  WatchItems::DataSource data_source;
+  NSString *config_path;
+  NSTimeInterval last_config_load_epoch;
 };
 
 }  // namespace santa

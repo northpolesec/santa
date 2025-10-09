@@ -311,6 +311,11 @@ objc_library(
 )
 
 objc_library(
+    name = "PassKey",
+    hdrs = ["PassKey.h"],
+)
+
+objc_library(
     name = "Timer",
     hdrs = ["Timer.h"],
     deps = [
@@ -773,6 +778,7 @@ objc_library(
         ":SNTStoredExecutionEvent",
         ":SNTXPCBundleServiceInterface",
         ":SantaVnode",
+        "//Source/common/faa:WatchItems",
     ],
 )
 

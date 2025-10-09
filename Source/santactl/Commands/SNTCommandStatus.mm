@@ -14,6 +14,7 @@
 ///    limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include "Source/common/faa/WatchItems.h"
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
@@ -180,12 +181,15 @@ REGISTER_COMMAND_NAME(@"status")
   __block NSString *watchItemsPolicyVersion = nil;
   __block NSString *watchItemsConfigPath = nil;
   __block NSTimeInterval watchItemsLastUpdateEpoch = 0;
+  __block santa::WatchItems::DataSource watchItemsDataSource;
   [rop watchItemsState:^(BOOL enabled, uint64_t ruleCount, NSString *policyVersion,
-                         NSString *configPath, NSTimeInterval lastUpdateEpoch) {
+                         santa::WatchItems::DataSource dataSource, NSString *configPath,
+                         NSTimeInterval lastUpdateEpoch) {
     watchItemsEnabled = enabled;
     if (enabled) {
       watchItemsRuleCount = ruleCount;
       watchItemsPolicyVersion = policyVersion;
+      watchItemsDataSource = dataSource;
       watchItemsConfigPath = configPath;
       watchItemsLastUpdateEpoch = lastUpdateEpoch;
     }
@@ -253,7 +257,7 @@ REGISTER_COMMAND_NAME(@"status")
     } mutableCopy];
 
     if (syncURLStr.length) {
-      stats[@"sync"] = @{
+      stats[@"sync"] = [@{
         @"enabled" : @(YES),
         @"server" : syncURLStr ?: @"null",
         @"clean_required" : @(syncCleanReqd),
@@ -262,8 +266,12 @@ REGISTER_COMMAND_NAME(@"status")
         @"push_notifications" : pushNotifications,
         @"bundle_scanning" : @(enableBundles),
         @"events_pending_upload" : @(eventCount),
-        @"rules_hash" : executionRulesHash ?: @"null",
-      };
+        @"execution_rules_hash" : executionRulesHash ?: @"null",
+      } mutableCopy];
+
+      if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
+        stats[@"sync"][@"file_access_rules_hash"] = (fileAccessRulesHash ?: @"null");
+      }
     } else {
       stats[@"sync"] = @{
         @"enabled" : @(NO),
@@ -271,14 +279,20 @@ REGISTER_COMMAND_NAME(@"status")
     }
 
     if (watchItemsEnabled) {
-      stats[@"watch_items"] = @{
+      stats[@"watch_items"] = [@{
         @"enabled" : @(watchItemsEnabled),
+        @"data_source" : santa::WatchItems::DataSourceName(watchItemsDataSource),
         @"rule_count" : @(watchItemsRuleCount),
-        @"policy_version" : watchItemsPolicyVersion,
-        @"config_path" : watchItemsConfigPath ?: @"null",
         @"last_policy_update" : watchItemsLastUpdateStr ?: @"null",
-        @"rules_hash" : fileAccessRulesHash ?: @"null",
-      };
+      } mutableCopy];
+
+      if (watchItemsPolicyVersion.length > 0) {
+        stats[@"watch_items"][@"policy_version"] = watchItemsPolicyVersion;
+      }
+
+      if (watchItemsDataSource == santa::WatchItems::DataSource::kDetachedConfig) {
+        stats[@"watch_items"][@"config_path"] = watchItemsConfigPath ?: @"null";
+      }
     } else {
       stats[@"watch_items"] = @{
         @"enabled" : @(watchItemsEnabled),
@@ -337,10 +351,15 @@ REGISTER_COMMAND_NAME(@"status")
     printf(">>> Watch Items\n");
     printf("  %-25s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
     if (watchItemsEnabled) {
-      printf("  %-25s | %s\n", "Policy Version", watchItemsPolicyVersion.UTF8String);
+      printf("  %-25s | %s\n", "Data Source",
+             santa::WatchItems::DataSourceName(watchItemsDataSource).UTF8String);
+      if (watchItemsDataSource == santa::WatchItems::DataSource::kDetachedConfig) {
+        printf("  %-25s | %s\n", "Config Path", (watchItemsConfigPath ?: @"null").UTF8String);
+      }
+      if (watchItemsPolicyVersion.length > 0) {
+        printf("  %-25s | %s\n", "Policy Version", watchItemsPolicyVersion.UTF8String);
+      }
       printf("  %-25s | %llu\n", "Rule Count", watchItemsRuleCount);
-      printf("  %-25s | %s\n", "Rules Hash", [fileAccessRulesHash UTF8String]);
-      printf("  %-25s | %s\n", "Config Path", (watchItemsConfigPath ?: @"(embedded)").UTF8String);
       printf("  %-25s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
     }
 
@@ -354,7 +373,11 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Push Notifications", [pushNotifications UTF8String]);
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
       printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
-      printf("  %-25s | %s\n", "Rules Hash", [executionRulesHash UTF8String]);
+      printf("  %-25s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
+      if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
+        printf("  %-25s | %s\n", "File Access Rules Hash",
+               [(fileAccessRulesHash ?: @"null") UTF8String]);
+      }
     }
 
     printf(">>> Metrics\n");

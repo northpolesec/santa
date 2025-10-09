@@ -666,7 +666,13 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                   type:[NSString class]
               callback:^(NSString *oldValue, NSString *newValue) {
                 if ([configurator fileAccessPolicy]) {
-                  // Ignore any changes to this key if fileAccessPolicy is set
+                  LOGI(@"Ignoring change to FileAccessPolicyPlist because FileAccessPolicy is set");
+                  return;
+                }
+
+                if ([[SNTDatabaseController ruleTable] fileAccessRuleCount] > 0) {
+                  LOGI(@"Ignoring change to FileAccessPolicyPlist because file "
+                       @"access rules exist from the sync server");
                   return;
                 }
 
@@ -679,6 +685,13 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                  selector:@selector(fileAccessPolicy)
                                      type:[NSDictionary class]
                                  callback:^(NSDictionary *oldValue, NSDictionary *newValue) {
+                                   if ([[SNTDatabaseController ruleTable] fileAccessRuleCount] >
+                                       0) {
+                                     LOGI(@"Ignoring change to FileAccessPolicy because file "
+                                          @"access rules exist from the sync server");
+                                     return;
+                                   }
+
                                    if ((oldValue && !newValue) ||
                                        (newValue && ![oldValue isEqualToDictionary:newValue])) {
                                      LOGI(@"FileAccessPolicy changed");

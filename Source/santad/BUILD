@@ -919,6 +919,7 @@ objc_library(
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
+        "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCUnprivilegedControlInterface",
         "//Source/common:TelemetryEventMap",

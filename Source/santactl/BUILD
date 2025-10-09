@@ -113,6 +113,7 @@ objc_library(
         "//Source/common:SNTXPCUnprivilegedControlInterface",
         "//Source/common:SigningIDHelpers",
         "//Source/common:SystemResources",
+        "//Source/common/faa:WatchItems",
         "@FMDB",
         "@abseil-cpp//absl/cleanup:cleanup",
     ],

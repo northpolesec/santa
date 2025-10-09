@@ -37,6 +37,7 @@ objc_library(
     deps = [
         ":WatchItemPolicy",
         "//Source/common:Glob",
+        "//Source/common:PassKey",
         "//Source/common:PrefixTree",
         "//Source/common:SNTError",
         "//Source/common:SNTLogging",
