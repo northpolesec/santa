@@ -1,0 +1,9 @@
+objc_library(
+    name = "FMDB",
+    srcs = glob(["src/fmdb/*.m"], exclude=["src/fmdb.m"]),
+    hdrs = glob(["src/fmdb/*.h"]),
+    includes = ["src"],
+    sdk_dylibs = ["sqlite3"],
+    visibility = ["//visibility:public"],
+)
+
