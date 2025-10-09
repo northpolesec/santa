@@ -22,7 +22,7 @@ git_override(
 )
 
 # FMDB
-non_module_deps = use_extension("//:non_module_deps.bzl", "non_module_deps")
+non_module_deps = use_extension("//deps:non_module_deps.bzl", "non_module_deps")
 use_repo(non_module_deps, "FMDB")
 use_repo(non_module_deps, "OCMock")
 

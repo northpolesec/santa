@@ -1,0 +1,16 @@
+objc_library(
+    name = "OCMock",
+    testonly = 1,
+    hdrs = glob(["Source/OCMock/*.h"]),
+    copts = [
+        "-Wno-vla",
+    ],
+    includes = [
+        "Source",
+        "Source/OCMock",
+    ],
+    non_arc_srcs = glob(["Source/OCMock/*.m"]),
+    pch = "Source/OCMock/OCMock-Prefix.pch",
+    visibility = ["//visibility:public"],
+)
+
