@@ -22,7 +22,7 @@
 // Example:
 // struct Foo : public PassKey<Foo> {
 //   static std::shared_ptr<Foo> Create() {
-//     return std::make_shared<Foo>(PassKeyy());
+//     return std::make_shared<Foo>(PassKey());
 //   }
 //
 //   explicit Foo(PassKey) {}
