@@ -717,12 +717,13 @@ void ProcessWatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock
 
 std::shared_ptr<WatchItems> WatchItems::CreateFromPath(NSString *config_path,
                                                        uint32_t reapply_config_frequency_secs) {
-  return CreateInternal(config_path, nil, reapply_config_frequency_secs);
+  return CreateInternal(DataSource::kDetachedConfig, config_path, nil,
+                        reapply_config_frequency_secs);
 }
 
 std::shared_ptr<WatchItems> WatchItems::CreateFromEmbeddedConfig(
     NSDictionary *config, uint32_t reapply_config_frequency_secs) {
-  return CreateInternal(nil, config, reapply_config_frequency_secs);
+  return CreateInternal(DataSource::kEmbeddedConfig, nil, config, reapply_config_frequency_secs);
 }
 
 std::shared_ptr<WatchItems> WatchItems::CreateFromRules(NSDictionary *rules,
@@ -730,10 +731,11 @@ std::shared_ptr<WatchItems> WatchItems::CreateFromRules(NSDictionary *rules,
   // The provided rules dictionary must be wrapped within another dictionary as a value
   // for the `kWatchItemConfigKeyWatchItems` key.
   NSDictionary *config = @{kWatchItemConfigKeyWatchItems : rules};
-  return CreateInternal(nil, config, reapply_config_frequency_secs);
+  return CreateInternal(DataSource::kDatabase, nil, config, reapply_config_frequency_secs);
 }
 
-std::shared_ptr<WatchItems> WatchItems::CreateInternal(NSString *config_path, NSDictionary *config,
+std::shared_ptr<WatchItems> WatchItems::CreateInternal(DataSource data_source,
+                                                       NSString *config_path, NSDictionary *config,
                                                        uint32_t reapply_config_frequency_secs) {
   if (config_path && config) {
     LOGW(@"Invalid arguments creating WatchItems - both config and config_path cannot be set.");
@@ -743,33 +745,18 @@ std::shared_ptr<WatchItems> WatchItems::CreateInternal(NSString *config_path, NS
   dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.watch_items.q",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
 
-  auto watch_items = ^{
-    if (config_path) {
-      return std::make_shared<WatchItems>(config_path, q);
-    } else {
-      return std::make_shared<WatchItems>(config, q);
-    }
-  }();
-
+  auto watch_items = std::make_shared<WatchItems>(PassKey(), data_source, config_path, config, q);
   watch_items->SetTimerInterval(reapply_config_frequency_secs);
 
   return watch_items;
 }
 
-WatchItems::WatchItems(NSString *config_path, dispatch_queue_t q,
-                       void (^periodic_task_complete_f)(void))
+WatchItems::WatchItems(PassKey, DataSource data_source, NSString *config_path, NSDictionary *config,
+                       dispatch_queue_t q, void (^periodic_task_complete_f)(void))
     : Timer<WatchItems>(kMinReapplyConfigFrequencySecs, kMaxReapplyConfigFrequencySecs,
                         kInitialTimerDelay, "FileAccessPolicyUpdateIntervalSec"),
+      data_source_(data_source),
       config_path_(config_path),
-      embedded_config_(nil),
-      q_(q),
-      periodic_task_complete_f_(periodic_task_complete_f) {}
-
-WatchItems::WatchItems(NSDictionary *config, dispatch_queue_t q,
-                       void (^periodic_task_complete_f)(void))
-    : Timer<WatchItems>(kMinReapplyConfigFrequencySecs, kMaxReapplyConfigFrequencySecs,
-                        kInitialTimerDelay, "FileAccessPolicyUpdateIntervalSec"),
-      config_path_(nil),
       embedded_config_(config),
       q_(q),
       periodic_task_complete_f_(periodic_task_complete_f) {}
@@ -777,6 +764,16 @@ WatchItems::WatchItems(NSDictionary *config, dispatch_queue_t q,
 bool WatchItems::IsValidRule(NSString *name, NSDictionary *rule, NSError **error) {
   return IsWatchItemNameValid(name, error) &&
          ParseConfigSingleWatchItem(name, "", rule, nullptr, nullptr, error);
+}
+
+NSString *WatchItems::DataSourceName(DataSource data_source) {
+  switch (data_source) {
+    case DataSource::kUnknown: return @"Unknown";
+    case DataSource::kEmbeddedConfig: return @"Embedded in configuration profile";
+    case DataSource::kDetachedConfig: return @"Detached config file";
+    case DataSource::kDatabase: return @"Sync server";
+    default: return @"Invalid";
+  };
 }
 
 void WatchItems::RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback) {
@@ -912,6 +909,16 @@ void WatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
   proc_watch_items_.IterateProcessPolicies(checkPolicyBlock);
 }
 
+void WatchItems::SetDBRules(NSDictionary *rules) {
+  {
+    absl::MutexLock lock(&lock_);
+    config_path_ = nil;
+    embedded_config_ = @{kWatchItemConfigKeyWatchItems : rules};
+    data_source_ = DataSource::kDatabase;
+  }
+  ReloadConfig(embedded_config_);
+}
+
 void WatchItems::SetConfigPath(NSString *config_path) {
   // Acquire the lock to set the config path and read the config, but drop
   // the lock before reloading the config
@@ -920,6 +927,7 @@ void WatchItems::SetConfigPath(NSString *config_path) {
     absl::MutexLock lock(&lock_);
     config_path_ = config_path;
     embedded_config_ = nil;
+    data_source_ = DataSource::kDetachedConfig;
     config = ReadConfigLocked();
   }
   ReloadConfig(config);
@@ -930,6 +938,7 @@ void WatchItems::SetConfig(NSDictionary *config) {
     absl::MutexLock lock(&lock_);
     config_path_ = nil;
     embedded_config_ = config;
+    data_source_ = DataSource::kEmbeddedConfig;
   }
   ReloadConfig(embedded_config_);
 }
@@ -944,6 +953,7 @@ std::optional<WatchItemsState> WatchItems::State() {
   WatchItemsState state = {
       .rule_count = [current_config_[kWatchItemConfigKeyWatchItems] count],
       .policy_version = [NSString stringWithUTF8String:policy_version_.c_str()],
+      .data_source = data_source_,
       .config_path = [config_path_ copy],
       .last_config_load_epoch = last_update_time_,
   };

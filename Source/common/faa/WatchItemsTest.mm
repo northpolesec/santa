@@ -76,11 +76,13 @@ class WatchItemsPeer : public WatchItems {
  public:
   WatchItemsPeer(NSString *config_path, dispatch_queue_t q,
                  void (^periodic_task_complete_f)(void) = nullptr)
-      : WatchItems(config_path, q, periodic_task_complete_f) {}
+      : WatchItems(MakeKey(), WatchItems::DataSource::kDetachedConfig, config_path, nil, q,
+                   periodic_task_complete_f) {}
 
   WatchItemsPeer(NSDictionary *config, dispatch_queue_t q,
                  void (^periodic_task_complete_f)(void) = nullptr)
-      : WatchItems(config, q, periodic_task_complete_f) {}
+      : WatchItems(MakeKey(), WatchItems::DataSource::kEmbeddedConfig, nil, config, q,
+                   periodic_task_complete_f) {}
 
   using WatchItems::ForceSetIntervalForTesting;
   using WatchItems::ReloadConfig;

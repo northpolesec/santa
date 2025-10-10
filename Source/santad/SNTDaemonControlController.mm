@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include "Source/common/faa/WatchItems.h"
 
 #import <Foundation/Foundation.h>
 
@@ -233,15 +234,17 @@ double watchdogRAMPeak = 0;
   reply(watchdogCPUEvents, watchdogRAMEvents, watchdogCPUPeak, watchdogRAMPeak);
 }
 
-- (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString *, NSString *, NSTimeInterval))reply {
+- (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString *,
+                                  santa::WatchItems::DataSource dataSource, NSString *,
+                                  NSTimeInterval))reply {
   std::optional<WatchItemsState> optionalState = self->_watchItems->State();
 
   if (!optionalState.has_value()) {
-    reply(NO, 0, nil, nil, 0);
+    reply(NO, 0, nil, santa::WatchItems::DataSource::kUnknown, nil, 0);
   } else {
     WatchItemsState state = optionalState.value();
 
-    reply(YES, state.rule_count, state.policy_version, state.config_path,
+    reply(YES, state.rule_count, state.policy_version, state.data_source, state.config_path,
           state.last_config_load_epoch);
   }
 }

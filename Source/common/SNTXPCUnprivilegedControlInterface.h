@@ -19,6 +19,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SantaVnode.h"
+#import "Source/common/faa/WatchItems.h"
 
 @class SNTRule;
 @class SNTStoredExecutionEvent;
@@ -61,7 +62,9 @@ struct RuleCounts {
 ///  Config ops
 ///
 - (void)watchdogInfo:(void (^)(uint64_t, uint64_t, double, double))reply;
-- (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString *, NSString *, NSTimeInterval))reply;
+- (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString *,
+                                  santa::WatchItems::DataSource dataSource, NSString *,
+                                  NSTimeInterval))reply;
 - (void)clientMode:(void (^)(SNTClientMode))reply;
 - (void)fullSyncLastSuccess:(void (^)(NSDate *))reply;
 - (void)ruleSyncLastSuccess:(void (^)(NSDate *))reply;

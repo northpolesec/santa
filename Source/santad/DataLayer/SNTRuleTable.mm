@@ -381,10 +381,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return [self ruleCountForRuleType:SNTRuleTypeCDHash];
 }
 
+- (int64_t)fileAccessRuleCountSerialized:(FMDatabase *)db {
+  return [db longForQuery:@"SELECT COUNT(*) FROM file_access_rules"];
+}
+
 - (int64_t)fileAccessRuleCount {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase *db) {
-    count = [db longForQuery:@"SELECT COUNT(*) FROM file_access_rules"];
+    count = [self fileAccessRuleCountSerialized:db];
   }];
   return count;
 }
@@ -624,8 +628,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
   __block BOOL failed = NO;
   __block NSError *blockErr;
+  __block NSString *faaRulesHashBefore;
+  __block NSString *faaRulesHashAfter;
+  __block int64_t faaRuleCount = 0;
 
   [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
+    faaRulesHashBefore = [self fileAccessRulesHashSerialized:db];
     switch (cleanupType) {
       case SNTRuleCleanupAll:
         [db executeUpdate:@"DELETE FROM execution_rules"];
@@ -662,10 +670,19 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     // Clear the rules hash
     self.executionRulesHash = nil;
     self.fileAccessRulesHash = nil;
+
+    faaRulesHashAfter = [self fileAccessRulesHashSerialized:db];
+    faaRuleCount = [self fileAccessRuleCountSerialized:db];
   }];
 
   if (blockErr && error) {
     *error = blockErr;
+  }
+
+  // If the DB updated successfully, call the "rules changed" callback if appropriate
+  if (!failed && self.fileAccessRulesChangedCallback &&
+      ![faaRulesHashBefore isEqualToString:faaRulesHashAfter]) {
+    self.fileAccessRulesChangedCallback(faaRuleCount);
   }
 
   return !failed;
@@ -886,7 +903,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   [rs close];
 
   NSString *digest = santa::StringToNSString(hash.HexDigest());
-  self.executionRulesHash = digest;
+  self.fileAccessRulesHash = digest;
   return digest;
 }
 

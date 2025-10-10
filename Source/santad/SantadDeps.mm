@@ -22,6 +22,7 @@
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
+#import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/faa/WatchItems.h"
@@ -170,6 +171,20 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     LOGE(@"Failed to create watch items");
     exit(EXIT_FAILURE);
   }
+
+#ifdef DEBUG
+  WEAKIFY(rule_table);
+  rule_table.fileAccessRulesChangedCallback = ^(int64_t faaRuleCount) {
+    if (faaRuleCount > 0) {
+      STRONGIFY(rule_table);
+      watch_items->SetDBRules([rule_table retrieveAllFileAccessRules]);
+    } else if ([configurator fileAccessPolicy]) {
+      watch_items->SetConfig([configurator fileAccessPolicy]);
+    } else {
+      watch_items->SetConfigPath([configurator fileAccessPolicyPlist]);
+    }
+  };
+#endif
 
   std::shared_ptr<::Metrics> metrics =
       Metrics::Create(metric_set, [configurator metricExportInterval]);

@@ -19,9 +19,19 @@ objc_library(
     ],
 )
 
-santa_unit_test(
-    name = "SNTStoredEventArchiveGeneratorTest",
+objc_library(
+    name = "SNTFileAccessRuleArchiveGenerator",
+    srcs = ["SNTFileAccessRuleArchiveGenerator.mm"],
     deps = [
+        "//Source/common:SNTFileAccessRule",
+        "//Source/common/faa:WatchItems",
+    ],
+)
+
+santa_unit_test(
+    name = "OneOffBuildAll",
+    deps = [
+        ":SNTFileAccessRuleArchiveGenerator",
         ":SNTStoredEventArchiveGenerator",
     ],
 )
@@ -29,7 +39,7 @@ santa_unit_test(
 test_suite(
     name = "BuildOnly",
     tests = [
-        ":SNTStoredEventArchiveGeneratorTest",
+        ":OneOffBuildAll",
     ],
 )
 
@@ -46,4 +56,19 @@ macos_command_line_application(
     version = "//:version",
     visibility = ["//:santa_package_group"],
     deps = [":SNTStoredEventArchiveGenerator"],
+)
+
+macos_command_line_application(
+    name = "file_access_rule_generator",
+    bundle_id = "com.northpolesec.testing.stored_event_generator",
+    codesignopts = [
+        "--force",
+        "--options library,kill,runtime",
+    ],
+    infoplists = None,
+    minimum_os_version = "15.0",
+    provisioning_profile = None,
+    version = "//:version",
+    visibility = ["//:santa_package_group"],
+    deps = [":SNTFileAccessRuleArchiveGenerator"],
 )

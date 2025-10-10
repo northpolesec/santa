@@ -29,6 +29,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SigningIDHelpers.h"
+#import "Source/common/TestUtils.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 
 /// This test case actually tests SNTRuleTable and SNTRule
@@ -287,11 +288,32 @@
   NSError *error;
   SNTRule *execRule = [self _exampleBinaryRule];
   SNTFileAccessRule *faaRule = [self _exampleFileAccessAddRuleWithName:@"foo"];
+
+  __block int64_t ruleCount;
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  self.sut.fileAccessRulesChangedCallback = ^(int64_t count) {
+    ruleCount = count;
+    dispatch_semaphore_signal(sema);
+  };
+
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[ faaRule ]
                   ruleCleanup:SNTRuleCleanupNone
                         error:&error];
 
+  XCTAssertSemaTrue(sema, 0, "Rules changed callback was not called");
+  XCTAssertNil(error);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
+  XCTAssertEqual(self.sut.fileAccessRuleCount, 1);
+  XCTAssertEqual(ruleCount, 1);
+
+  // Re-add an exec rule that shouldn't trigger file access rule changed callback
+  [self.sut addExecutionRules:@[ execRule ]
+              fileAccessRules:@[]
+                  ruleCleanup:SNTRuleCleanupNone
+                        error:&error];
+  XCTAssertSemaFalse(sema, "Rules changed callback was unexpectedly called");
   XCTAssertNil(error);
   XCTAssertEqual(self.sut.executionRuleCount, 1);
   XCTAssertEqual(self.sut.fileAccessRuleCount, 1);
@@ -304,9 +326,11 @@
                   ruleCleanup:SNTRuleCleanupNone
                         error:&error];
 
+  XCTAssertSemaTrue(sema, 0, "Rules changed callback was not called");
   XCTAssertNil(error);
   XCTAssertEqual(self.sut.executionRuleCount, 0);
   XCTAssertEqual(self.sut.fileAccessRuleCount, 0);
+  XCTAssertEqual(ruleCount, 0);
 }
 
 - (void)testFetchBinaryRule {
