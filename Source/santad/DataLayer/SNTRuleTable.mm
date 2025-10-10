@@ -680,10 +680,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   }
 
   // If the DB updated successfully, call the "rules changed" callback if appropriate
-  if (!failed && ![faaRulesHashBefore isEqualToString:faaRulesHashAfter]) {
-    if (self.fileAccessRulesChangedCallback) {
-      self.fileAccessRulesChangedCallback(faaRuleCount);
-    }
+  if (!failed && self.fileAccessRulesChangedCallback &&
+      ![faaRulesHashBefore isEqualToString:faaRulesHashAfter]) {
+    self.fileAccessRulesChangedCallback(faaRuleCount);
   }
 
   return !failed;

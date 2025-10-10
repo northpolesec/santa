@@ -177,7 +177,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   rule_table.fileAccessRulesChangedCallback = ^(int64_t faaRuleCount) {
     if (faaRuleCount > 0) {
       STRONGIFY(rule_table);
-      watch_items->SetConfigRules([rule_table retrieveAllFileAccessRules]);
+      watch_items->SetDBRules([rule_table retrieveAllFileAccessRules]);
     } else if ([configurator fileAccessPolicy]) {
       watch_items->SetConfig([configurator fileAccessPolicy]);
     } else {

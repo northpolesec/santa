@@ -175,7 +175,7 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
   void RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback);
   void RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback);
 
-  void SetConfigRules(NSDictionary *rules);
+  void SetDBRules(NSDictionary *rules);
   void SetConfigPath(NSString *config_path);
   void SetConfig(NSDictionary *config);
 

@@ -909,7 +909,7 @@ void WatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
   proc_watch_items_.IterateProcessPolicies(checkPolicyBlock);
 }
 
-void WatchItems::SetConfigRules(NSDictionary *rules) {
+void WatchItems::SetDBRules(NSDictionary *rules) {
   {
     absl::MutexLock lock(&lock_);
     config_path_ = nil;
