@@ -887,6 +887,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertFalse(IsWatchItemNameValid(@(1), nil));
   XCTAssertFalse(IsWatchItemNameValid(@[], nil));
   XCTAssertFalse(IsWatchItemNameValid(@{}, nil));
+  XCTAssertFalse(IsWatchItemNameValid(RepeatedString(@"A", 64), nil));
 
   XCTAssertTrue(IsWatchItemNameValid(@"_", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"_1", nil));
@@ -896,6 +897,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(IsWatchItemNameValid(@"A_B", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"FooName", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"bar_Name", nil));
+  XCTAssertTrue(IsWatchItemNameValid(RepeatedString(@"A", 63), nil));
 }
 
 - (void)testParseConfig {
