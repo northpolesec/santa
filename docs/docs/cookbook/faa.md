@@ -61,6 +61,7 @@ process.
 	<array>
 		<dict>
 			<key>Path</key>
+			<string>/Users/*/Library/Application Support/Google/Chrome/*/Extensions/</string>
 			<key>IsPrefix</key>
 			<true/>
 		</dict>
