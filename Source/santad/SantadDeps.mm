@@ -155,12 +155,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   // 3. Rules obtained by reading the plist at the configured path
   std::shared_ptr<::WatchItems> watch_items = ^{
     uint32_t interval = [configurator fileAccessPolicyUpdateIntervalSec];
-#ifdef DEBUG
     if ([rule_table fileAccessRuleCount] > 0) {
       return WatchItems::CreateFromRules([rule_table retrieveAllFileAccessRules], interval);
-    }
-#endif
-    if ([configurator fileAccessPolicy]) {
+    } else if ([configurator fileAccessPolicy]) {
       return WatchItems::CreateFromEmbeddedConfig([configurator fileAccessPolicy], interval);
     } else {
       return WatchItems::CreateFromPath([configurator fileAccessPolicyPlist], interval);
@@ -172,7 +169,6 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-#ifdef DEBUG
   WEAKIFY(rule_table);
   rule_table.fileAccessRulesChangedCallback = ^(int64_t faaRuleCount) {
     if (faaRuleCount > 0) {
@@ -184,7 +180,6 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
       watch_items->SetConfigPath([configurator fileAccessPolicyPlist]);
     }
   };
-#endif
 
   std::shared_ptr<::Metrics> metrics =
       Metrics::Create(metric_set, [configurator metricExportInterval]);
