@@ -1,7 +1,6 @@
 #import <XCTest/XCTest.h>
 
 #import <Foundation/Foundation.h>
-#import <OCMock/OCMock.h>
 #import "Source/santametricservice/Formats/SNTMetricFormatTestHelper.h"
 #import "Source/santametricservice/Formats/SNTMetricMonarchJSONFormat.h"
 
@@ -11,14 +10,14 @@
 @implementation SNTMetricMonarchJSONFormatTest
 
 - (void)testMetricsConversionToJSON {
-  id classMock = OCMClassMock([NSDate class]);
-  OCMStub([classMock date])
-      .andReturn([NSDate dateWithTimeIntervalSince1970:1631826490]);  // 2021-09-16 21:08:10Z
+  NSDate *fixedDate = [NSDate dateWithTimeIntervalSince1970:1631826490];
 
   NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
   SNTMetricMonarchJSONFormat *formatter = [[SNTMetricMonarchJSONFormat alloc] init];
   NSError *err = nil;
-  NSArray<NSData *> *output = [formatter convert:validMetricsDict error:&err];
+  NSArray<NSData *> *output = [formatter convert:validMetricsDict
+                                    endTimestamp:fixedDate
+                                           error:&err];
 
   XCTAssertEqual(1, output.count);
   XCTAssertNotNil(output[0]);
@@ -50,8 +49,8 @@
   SNTMetricMonarchJSONFormat *formatter = [[SNTMetricMonarchJSONFormat alloc] init];
   NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
 
-  [formatter convert:validMetricsDict error:nil];
-  [formatter convert:validMetricsDict error:NULL];
+  [formatter convert:validMetricsDict endTimestamp:[NSDate date] error:nil];
+  [formatter convert:validMetricsDict endTimestamp:[NSDate date] error:NULL];
 }
 
 @end
