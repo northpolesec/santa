@@ -202,9 +202,8 @@ const NSString *kKey = @"key";
 /**
  * Normalizes the metrics dictionary for exporting to JSON
  **/
-- (NSDictionary *)normalize:(NSDictionary *)metrics {
+- (NSDictionary *)normalize:(NSDictionary *)metrics endTimestamp:(NSDate *)endTimestamp {
   NSMutableArray<NSDictionary *> *monarchMetrics = [[NSMutableArray alloc] init];
-  NSDate *endTimestamp = [NSDate date];
 
   for (NSString *metricName in metrics[@"metrics"]) {
     [monarchMetrics addObject:[self formatMetric:metricName
@@ -231,8 +230,10 @@ const NSString *kKey = @"key";
  * Returns an NSArray containing one entry of all metrics serialized to JSON or
  * nil on error.
  */
-- (NSArray<NSData *> *)convert:(NSDictionary *)metrics error:(NSError **)err {
-  NSDictionary *normalizedMetrics = [self normalize:metrics];
+- (NSArray<NSData *> *)convert:(NSDictionary *)metrics
+                  endTimestamp:(NSDate *)endTimestamp
+                         error:(NSError **)err {
+  NSDictionary *normalizedMetrics = [self normalize:metrics endTimestamp:endTimestamp];
 
   NSData *json = [NSJSONSerialization dataWithJSONObject:normalizedMetrics
                                                  options:NSJSONWritingPrettyPrinted

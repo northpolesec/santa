@@ -77,7 +77,6 @@ santa_unit_test(
     deps = [
         ":SNTMetricFormatTestHelper",
         ":SNTMetricMonarchJSONFormat",
-        "@OCMock",
     ],
 )
 
