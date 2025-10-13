@@ -77,6 +77,10 @@ static constexpr NSUInteger kMaxTeamIDLength = 10;
 // Semi-arbitrary upper bound.
 static constexpr NSUInteger kMaxSigningIDLength = 512;
 
+// FAA Rule names must conform to rules for valid C identifiers
+static constexpr NSUInteger kMaxRuleNameLength = 63;
+static NSString *const kValidRuleNamePattern = @"^[A-Za-z_][A-Za-z0-9_]*$";
+
 // Semi-arbitrary min/max allowed reapplication frequency.
 // Goal is to prevent a configuration setting that would cause too much
 // churn rebuilding glob paths based on the state of the filesystem, while
@@ -355,7 +359,8 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
                 !VerifyConfigKey(process, kWatchItemConfigKeyProcessesSigningID, [NSString class],
                                  err, false, LenRangeValidator(1, kMaxSigningIDLength)) ||
                 !VerifyConfigKey(process, kWatchItemConfigKeyProcessesTeamID, [NSString class], err,
-                                 false, LenRangeValidator(kMaxTeamIDLength, kMaxTeamIDLength)) ||
+                                 false,
+                                 LenRangeValidator(kPlatformTeamID.length, kMaxTeamIDLength)) ||
                 !VerifyConfigKey(process, kWatchItemConfigKeyProcessesCDHash, [NSString class], err,
                                  false, HexValidator(CS_CDHASH_LEN * 2)) ||
                 !VerifyConfigKey(process, kWatchItemConfigKeyProcessesCertificateSha256,
@@ -363,6 +368,15 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
                                  HexValidator(CC_SHA256_DIGEST_LENGTH * 2)) ||
                 !VerifyConfigKey(process, kWatchItemConfigKeyProcessesPlatformBinary,
                                  [NSNumber class], err, false, nil)) {
+              return false;
+            }
+
+            if ([process[kWatchItemConfigKeyProcessesTeamID] length] == kPlatformTeamID.length &&
+                ![[process[kWatchItemConfigKeyProcessesTeamID] lowercaseString]
+                    isEqualToString:kPlatformTeamID]) {
+              [SNTError
+                  populateError:err
+                     withFormat:@"Invalid TeamID: %@", process[kWatchItemConfigKeyProcessesTeamID]];
               return false;
             }
 
@@ -374,13 +388,12 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
                 process[kWatchItemConfigKeyProcessesCertificateSha256],
                 [process[kWatchItemConfigKeyProcessesPlatformBinary] boolValue], err);
 
-            if (!watch_item_proc.has_value()) {
+            if (watch_item_proc.has_value()) {
+              proc_list.insert(std::move(*watch_item_proc));
+              return true;
+            } else {
               return false;
             }
-
-            proc_list.insert(std::move(*watch_item_proc));
-
-            return true;
           })) {
     return Unit{};
   }
@@ -571,7 +584,14 @@ bool IsWatchItemNameValid(id key, NSError **err) {
   NSString *watch_item_name = (NSString *)key;
   if (!watch_item_name) {
     // This shouldn't be possible as written, but handle just in case
-    [SNTError populateError:err withFormat:@"nil watch item name"];
+    [SNTError populateError:err withFormat:@"Rule name not set"];
+    return false;
+  }
+
+  if (watch_item_name.length > kMaxRuleNameLength) {
+    [SNTError populateError:err
+                 withFormat:@"Rule name exceeds maximum allowed length (%ld): %@",
+                            kMaxRuleNameLength, watch_item_name];
     return false;
   }
 
@@ -580,7 +600,7 @@ bool IsWatchItemNameValid(id key, NSError **err) {
 
   dispatch_once(&once_token, ^{
     // Should only match legal C identifiers
-    regex = [NSRegularExpression regularExpressionWithPattern:@"^[A-Za-z_][A-Za-z0-9_]*$"
+    regex = [NSRegularExpression regularExpressionWithPattern:kValidRuleNamePattern
                                                       options:0
                                                         error:nil];
   });
@@ -589,7 +609,7 @@ bool IsWatchItemNameValid(id key, NSError **err) {
                              options:0
                                range:NSMakeRange(0, watch_item_name.length)] != 1) {
     [SNTError populateError:err
-                 withFormat:@"Key name must match regular expression \"%@\"", regex.pattern];
+                 withFormat:@"Rule name must match regular expression \"%@\"", regex.pattern];
     return false;
   }
 
@@ -633,25 +653,22 @@ bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_polici
 
   for (id key in watch_items) {
     if (!IsWatchItemNameValid(key, err)) {
-      [SNTError populateError:err
-                   withFormat:@"Invalid %@ key '%@': %@", kWatchItemConfigKeyWatchItems, key,
-                              (err && *err) ? (*err).localizedDescription : @"Unknown failure"];
-      return false;
+      LOGE(@"Ignoring file access rule '%@': Invalid name: %@", key,
+           (err && *err) ? (*err).localizedDescription : @"Unknown failure");
+      continue;
     }
 
     if (![watch_items[key] isKindOfClass:[NSDictionary class]]) {
-      [SNTError populateError:err
-                   withFormat:@"Value type for watch item '%@' must be a dictionary (got %@)", key,
-                              NSStringFromClass([watch_items[key] class])];
-      return false;
+      LOGE(@"Ignoring file access rule '%@'. Value type must be a dictionary (got %@)", key,
+           NSStringFromClass([watch_items[key] class]));
+      continue;
     }
 
     if (!ParseConfigSingleWatchItem(key, policy_version, watch_items[key], data_policies,
                                     proc_policies, err)) {
-      [SNTError populateError:err
-                   withFormat:@"In watch item '%@': %@", key,
-                              (err && *err) ? (*err).localizedDescription : @"Unknown failure"];
-      return false;
+      LOGE(@"Ignoring file access rule '%@': %@", key,
+           (err && *err) ? (*err).localizedDescription : @"Unknown failure");
+      continue;
     }
   }
 
@@ -834,7 +851,7 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
 
     last_update_time_ = [[NSDate date] timeIntervalSince1970];
 
-    LOGD(@"Changes to watch items detected, notifying registered clients.");
+    LOGD(@"Changes to file access rules detected, notifying registered clients.");
 
     if (data_watch_items_updated_callback_) {
       // Note: Enable clients on an async queue in case they perform any
@@ -951,7 +968,7 @@ std::optional<WatchItemsState> WatchItems::State() {
   }
 
   WatchItemsState state = {
-      .rule_count = [current_config_[kWatchItemConfigKeyWatchItems] count],
+      .rule_count = (data_watch_items_.Count() + proc_watch_items_.Count()),
       .policy_version = [NSString stringWithUTF8String:policy_version_.c_str()],
       .data_source = data_source_,
       .config_path = [config_path_ copy],
