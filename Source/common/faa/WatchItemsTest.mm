@@ -966,7 +966,7 @@ BlockGenResult CreatePolicyBlockGen() {
 
   data_policies.clear();
 
-  // Test a large config with serval valid and some invalid rules
+  // Test a large config with several valid and some invalid rules
   XCTAssertTrue(ParseConfig(@{
     kWatchItemConfigKeyVersion : @"1",
     kWatchItemConfigKeyWatchItems : @{
