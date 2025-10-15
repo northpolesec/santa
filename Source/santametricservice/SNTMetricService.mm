@@ -77,9 +77,10 @@
                              toFormat:(SNTMetricFormatType)format
                                 error:(NSError **)err {
   switch (format) {
-    case SNTMetricFormatTypeRawJSON: return [self->rawJSONFormatter convert:metrics error:err];
+    case SNTMetricFormatTypeRawJSON:
+      return [self->rawJSONFormatter convert:metrics endTimestamp:[NSDate date] error:err];
     case SNTMetricFormatTypeMonarchJSON:
-      return [self->monarchJSONFormatter convert:metrics error:err];
+      return [self->monarchJSONFormatter convert:metrics endTimestamp:[NSDate date] error:err];
     default: return nil;
   }
 }

@@ -77,7 +77,9 @@
  * Returns an NSArray containing one entry of all metrics serialized to JSON or
  * nil on error.
  */
-- (NSArray<NSData *> *)convert:(NSDictionary *)metrics error:(NSError **)err {
+- (NSArray<NSData *> *)convert:(NSDictionary *)metrics
+                  endTimestamp:(NSDate *)endTimestamp
+                         error:(NSError **)err {
   NSDictionary *normalizedMetrics = [self normalize:metrics];
 
   if (![NSJSONSerialization isValidJSONObject:normalizedMetrics]) {

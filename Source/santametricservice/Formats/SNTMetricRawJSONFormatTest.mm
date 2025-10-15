@@ -12,7 +12,9 @@
   NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
   SNTMetricRawJSONFormat *formatter = [[SNTMetricRawJSONFormat alloc] init];
   NSError *err = nil;
-  NSArray<NSData *> *output = [formatter convert:validMetricsDict error:&err];
+  NSArray<NSData *> *output = [formatter convert:validMetricsDict
+                                    endTimestamp:[NSDate date]
+                                           error:&err];
 
   XCTAssertEqual(1, output.count);
   XCTAssertNotNil(output[0]);
@@ -43,8 +45,8 @@
   SNTMetricRawJSONFormat *formatter = [[SNTMetricRawJSONFormat alloc] init];
   NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
 
-  [formatter convert:validMetricsDict error:nil];
-  [formatter convert:validMetricsDict error:NULL];
+  [formatter convert:validMetricsDict endTimestamp:[NSDate date] error:nil];
+  [formatter convert:validMetricsDict endTimestamp:[NSDate date] error:NULL];
 }
 
 @end

@@ -741,6 +741,12 @@ BlockGenResult CreatePolicyBlockGen() {
                                              &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
 
+  // Test TeamID short, but not "platform"
+  proc_list = VerifyConfigWatchItemProcesses(
+      @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"Blatform"} ]},
+      &err);
+  XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
+
   // Test valid TeamID
   proc_list = VerifyConfigWatchItemProcesses(
       @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"myvalidtid"} ]},
@@ -749,6 +755,15 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
   XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
                  WatchItemProcess("", "", "myvalidtid", {}, "", false));
+
+  // Test valid TeamID - "platform"
+  proc_list = VerifyConfigWatchItemProcesses(
+      @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"pLaTfOrM"} ]},
+      &err);
+  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
+  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+                 WatchItemProcess("", "", "", {}, "", true));
 
   // Test CDHash length limits
   proc_list = VerifyConfigWatchItemProcesses(@{
@@ -872,6 +887,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertFalse(IsWatchItemNameValid(@(1), nil));
   XCTAssertFalse(IsWatchItemNameValid(@[], nil));
   XCTAssertFalse(IsWatchItemNameValid(@{}, nil));
+  XCTAssertFalse(IsWatchItemNameValid(RepeatedString(@"A", 64), nil));
 
   XCTAssertTrue(IsWatchItemNameValid(@"_", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"_1", nil));
@@ -881,6 +897,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(IsWatchItemNameValid(@"A_B", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"FooName", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"bar_Name", nil));
+  XCTAssertTrue(IsWatchItemNameValid(RepeatedString(@"A", 63), nil));
 }
 
 - (void)testParseConfig {
@@ -915,19 +932,28 @@ BlockGenResult CreatePolicyBlockGen() {
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{}},
                   &data_policies, &proc_policies, &err));
 
-  // Ensure constraints on watch items entries match expectations
-  XCTAssertFalse(ParseConfig(
+  // File access rules being invalid doesn't cause loading the entire policy to fail.
+  // ParseConfig will return true here, but no policies will be created
+  XCTAssertTrue(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@(0) : @(0)}},
       &data_policies, &proc_policies, &err));
-  XCTAssertFalse(ParseConfig(
+  XCTAssertEqual(data_policies.size(), 0);
+  XCTAssertEqual(proc_policies.size(), 0);
+  XCTAssertTrue(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"" : @{}}},
       &data_policies, &proc_policies, &err));
-  XCTAssertFalse(ParseConfig(
+  XCTAssertEqual(data_policies.size(), 0);
+  XCTAssertEqual(proc_policies.size(), 0);
+  XCTAssertTrue(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @[]}},
       &data_policies, &proc_policies, &err));
-  XCTAssertFalse(ParseConfig(
+  XCTAssertEqual(data_policies.size(), 0);
+  XCTAssertEqual(proc_policies.size(), 0);
+  XCTAssertTrue(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @{}}},
       &data_policies, &proc_policies, &err));
+  XCTAssertEqual(data_policies.size(), 0);
+  XCTAssertEqual(proc_policies.size(), 0);
 
   // Minimally successful config with watch item
   XCTAssertTrue(ParseConfig(@{
@@ -935,6 +961,52 @@ BlockGenResult CreatePolicyBlockGen() {
     kWatchItemConfigKeyWatchItems : @{@"a" : @{kWatchItemConfigKeyPaths : @[ @"asdf" ]}}
   },
                             &data_policies, &proc_policies, &err));
+  XCTAssertEqual(data_policies.size(), 1);
+  XCTAssertEqual(proc_policies.size(), 0);
+
+  data_policies.clear();
+
+  // Test a large config with several valid and some invalid rules
+  XCTAssertTrue(ParseConfig(@{
+    kWatchItemConfigKeyVersion : @"1",
+    kWatchItemConfigKeyWatchItems : @{
+      @"a" : @{kWatchItemConfigKeyPaths : @[ @"foo1" ]},
+      @"b" : @{kWatchItemConfigKeyPaths : @[ @"foo2" ]},
+      @(123) : @{kWatchItemConfigKeyPaths : @[ @"foo_bad" ]},
+      @"c" : @{kWatchItemConfigKeyPaths : @[ @"foo3" ]},
+      @"d" : @{
+        kWatchItemConfigKeyPaths : @[ @"foo4" ],
+        kWatchItemConfigKeyOptions : @{
+          kWatchItemConfigKeyOptionsRuleType : kRuleTypeProcessesWithDeniedPaths,
+        },
+        kWatchItemConfigKeyProcesses : @[ @{
+          kWatchItemConfigKeyProcessesSigningID : @"hi.there",
+          kWatchItemConfigKeyProcessesPlatformBinary : @(YES)
+        } ]
+      },
+      @"e" : @{
+        kWatchItemConfigKeyPaths : @[ @"foo4" ],
+        kWatchItemConfigKeyOptions : @{
+          kWatchItemConfigKeyOptionsRuleType : kRuleTypeProcessesWithDeniedPaths,
+        },
+        kWatchItemConfigKeyProcesses : @[ @{
+          kWatchItemConfigKeyProcessesSigningID : @"hi:there",
+        } ]
+      },
+      @"f" : @{
+        kWatchItemConfigKeyPaths : @[ @"foo4" ],
+        kWatchItemConfigKeyOptions : @{
+          kWatchItemConfigKeyOptionsRuleType : kRuleTypeProcessesWithDeniedPaths,
+        },
+        kWatchItemConfigKeyProcesses : @[ @{
+          kWatchItemConfigKeyProcessesTeamID : @"platform",
+        } ]
+      },
+    },
+  },
+                            &data_policies, &proc_policies, &err));
+  XCTAssertEqual(data_policies.size(), 3);
+  XCTAssertEqual(proc_policies.size(), 2);
 }
 
 - (void)testParseConfigSingleWatchItemGeneral {
