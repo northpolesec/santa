@@ -70,8 +70,9 @@ process.
 	<dict>
 		<key>AuditOnly</key>
 		<false/>
+    <! -- Set to false if you don't want users to read extension content -->
 		<key>AllowReadAccess</key>
-		<false/>
+		<true/>
 		<key>RuleType</key>
 		<string>PathsWithAllowedProcesses</string>
 	</dict>
