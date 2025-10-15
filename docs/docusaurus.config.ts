@@ -24,6 +24,12 @@ const config: Config = {
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
 
+  // Analytics scripts
+  scripts: [
+    "https://plausible.io/js/pa-XQGVabe4SD4KoYNvIp588.js",
+    "/plausible.js",
+  ],
+
   markdown: {
     mermaid: true,
   },
@@ -81,6 +87,13 @@ const config: Config = {
         excludeImports: true,
         removeDuplicateHeadings: true,
         generateMarkdownFiles: true,
+      },
+    ],
+    [
+      "@docusaurus/plugin-google-gtag",
+      {
+        trackingID: "G-NRVWHNDHFK",
+        anonymizeIP: true,
       },
     ],
   ],
