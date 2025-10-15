@@ -48,6 +48,70 @@ process.
 </dict>
 ```
 
+## Chrome Extensions Directory
+
+This policy will prevent reads and writes of extensions used by Google Chrome, in any profile
+managed by any user, excepting Chrome itself and the Spotlight indexing
+process.
+
+```xml
+<key>ChromeExtensions</key>
+<dict>
+	<key>Paths</key>
+	<array>
+		<dict>
+			<key>Path</key>
+			<string>/Users/*/Library/Application Support/Google/Chrome/*/Extensions/</string>
+			<key>IsPrefix</key>
+			<true/>
+		</dict>
+	</array>
+	<key>Options</key>
+	<dict>
+		<key>AuditOnly</key>
+		<false/>
+    <! -- Set to false if you don't want users to read extension content -->
+		<key>AllowReadAccess</key>
+		<true/>
+		<key>RuleType</key>
+		<string>PathsWithAllowedProcesses</string>
+	</dict>
+	<key>Processes</key>
+	<array>
+		<dict>
+			<key>SigningID</key>
+			<string>com.google.Chrome*</string>
+			<key>TeamID</key>
+			<string>EQHXZ8M8AV</string>
+		</dict>
+		<dict>
+			<key>SigningID</key>
+			<string>com.apple.mdworker_shared</string>
+			<key>PlatformBinary</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>SigningID</key>
+			<string>com.apple.mds</string>
+			<key>PlatformBinary</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>SigningID</key>
+			<string>com.apple.mdsync</string>
+			<key>PlatformBinary</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>SigningID</key>
+			<string>com.apple.XProtectFramework.plugins.*</string>
+			<key>PlatformBinary</key>
+			<true/>
+		</dict>
+	</array>
+</dict>
+```
+
 ## Slack Cookies
 
 This policy will prevent reads of cookies from the Slack app, except to Slack
