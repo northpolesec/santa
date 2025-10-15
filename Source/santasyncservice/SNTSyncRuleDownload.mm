@@ -169,8 +169,8 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         [newRules addObject:r];
       }
 
-#ifdef DEBUG
-      for (const ::pbv1::FileAccessRule &faaRule : response.file_access_rules()) {
+      for (const ::pbv1::FileAccessRule &faaRule :
+           response.beta_do_not_use_yet_file_access_rules()) {
         SNTFileAccessRule *rule = [self fileAccessRuleFromProtoFileAccessRule:faaRule];
         if (!rule) {
           SLOGD(@"Ignoring bad file access rule: %s", faaRule.Utf8DebugString().c_str());
@@ -178,12 +178,12 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
         }
         [newFileAccessRules addObject:rule];
       }
-#endif
 
       cursor = response.cursor();
       SLOGI(@"Received %lu rules", (unsigned long)response.rules_size());
       self.syncState.rulesReceived += response.rules_size();
-      self.syncState.fileAccessRulesReceived += response.file_access_rules_size();
+      self.syncState.fileAccessRulesReceived +=
+          response.beta_do_not_use_yet_file_access_rules_size();
     }
   } while (!cursor.empty());
 
