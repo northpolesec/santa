@@ -24,3 +24,20 @@ Create a signing ID rule for `platform:com.apple.spctl` and attach the following
 ```clike
 ['--global-disable', '--master-disable','--disable', '--add', '--remove'].exists(flag, flag in args) ? BLOCKLIST : ALLOWLIST
 ```
+
+## Prevent Timestomping of LaunchAgents and LaunchDaemons
+
+MacOS malware like the Chollima families use "timestomping" to reset the
+timestamps of LaunchAgents and LaunchDaemons using touch. This can be prevented
+/ detected by creating a SigningID rule for `platform:com.apple.touch` with the
+following CEL program.
+
+This technique was recently discussed by [Jaron
+Bradely](https://themittenmac.com/author/jaron-bradley/) at [Objective by the
+Sea v8](https://objectivebythesea.org/v8/talks.html#Speaker_24)
+
+```clike
+('-a' in args || '-m' in args || '-r' in args) && args.join(" ").contains("Library/Launch") ? BLOCKLIST : ALLOWLIST
+```
+
+Note this will not stop using the system calls directly or otherwise programmatically modifying the timestamps.
