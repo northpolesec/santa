@@ -41,3 +41,24 @@ args.exists(arg, arg in ['-a', '-m', '-r', '-A', '-t']) && args.join(" ").contai
 ```
 
 Note this will not stop using the system calls directly or otherwise programmatically modifying the timestamps.
+
+## Prevent OSAScript From Popping Password Dialogs
+
+A lot of malware on macOS will attempt to get users to enter their passwords
+into a dialog box via osascript. This is a basic rule to stop directly asking
+for a password dialog.
+
+Make a SigningID rule for `platform:com.apple.osascript` with the following CEL
+Program
+
+```clike
+(args.join(" ").lowerAscii().matches(".*\\W+with\\W+hidden\\W+answer.*") || args.join(" ").lowerAscii().contains("password")) && args.join(" ").lowerAscii().matches(".*\\W+display\\W+dialog.*")  ? BLOCKLIST : ALLOWLIST
+```
+
+Note: This will not stop obfuscated osascript that's evaluated at runtime or
+any other malicious behavior triggered through osascript. For better security
+block osascript all together if you can.  Be aware software like the Google
+Cloud SDK installer and AI tools like claude code use osascript.
+
+Also if you're using osascript to do this legitimately this will break your
+usage.
