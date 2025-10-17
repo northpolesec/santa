@@ -57,7 +57,8 @@ readonly INPUT_SANTABS="${INPUT_APP}/Contents/MacOS/santabundleservice"
 readonly INPUT_SANTAMS="${INPUT_APP}/Contents/MacOS/santametricservice"
 readonly INPUT_SANTASS="${INPUT_APP}/Contents/MacOS/santasyncservice"
 
-readonly RELEASE_NAME="santa-$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${INPUT_APP}/Contents/Info.plist")"
+readonly RELEASE_VERSION="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${INPUT_APP}/Contents/Info.plist")"
+readonly RELEASE_NAME="santa-${RELEASE_VERSION}"
 
 readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
 
@@ -122,6 +123,7 @@ echo "productbuild pkg"
 /usr/bin/productbuild \
   --distribution "${RELEASE_ROOT}/conf/Distribution.xml" \
   --package-path "${SCRATCH}" \
+  --version "${RELEASE_VERSION}" \
   --sign "${INSTALLER_SIGNING_IDENTITY}" --keychain "${INSTALLER_SIGNING_KEYCHAIN}" \
   "${SCRATCH}/${RELEASE_NAME}/${RELEASE_NAME}.pkg"
 
