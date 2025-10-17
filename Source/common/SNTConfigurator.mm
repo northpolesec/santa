@@ -14,11 +14,11 @@
 /// limitations under the License.
 
 #import "Source/common/SNTConfigurator.h"
-#include "Source/common/SNTCommonEnums.h"
 
 #include <sys/stat.h>
 
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -48,9 +48,10 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 /// Holds the configurations from a sync server and mobileconfig.
 @property(atomic) NSDictionary *syncState;
 @property(atomic) NSMutableDictionary *configState;
+@property(atomic) NSDictionary *state;
 
 @property(readonly, nonatomic) NSString *syncStateFilePath;
-@property(readonly, nonatomic) NSString *statsStateFilePath;
+@property(readonly, nonatomic) NSString *stateFilePath;
 
 typedef BOOL (^StateFileAccessAuthorizer)(void);
 @property(nonatomic, copy) StateFileAccessAuthorizer syncStateAccessAuthorizerBlock;
@@ -62,12 +63,14 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 /// The hard-coded path to the sync state file.
 NSString *const kSyncStateFilePath = @"/var/db/santa/sync-state.plist";
 
-/// The hard-coded path to the stats state file.
-NSString *const kStatsStateFilePath = @"/var/db/santa/stats-state.plist";
+/// The hard-coded path to the state file.
+NSString *const kStateFilePath = @"/var/db/santa/state.plist";
+NSString *const kOldStateFilePath = @"/var/db/santa/stats-state.plist";
 
-/// Keys associated with the stats state file.
-static NSString *const kLastStatsSubmissionAttemptKey = @"LastAttempt";
-static NSString *const kLastStatsSubmissionVersionKey = @"LastVersion";
+/// Keys associated with the state file.
+static NSString *const kStateStatsKey = @"Stats";
+static NSString *const kStateStatsLastSubmissionAttemptKey = @"LastAttempt";
+static NSString *const kStateStatsLastSubmissionVersionKey = @"LastVersion";
 
 #ifdef DEBUG
 NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist";
@@ -199,20 +202,23 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 
 - (instancetype)init {
   return [self initWithSyncStateFile:kSyncStateFilePath
-      statsStateFile:kStatsStateFilePath
+      stateFile:kStateFilePath
+      oldStateFile:kOldStateFilePath
       syncStateAccessAuthorizer:^BOOL() {
         // Only access the sync state if a sync server is configured and running as root
         return self.syncBaseURL != nil && geteuid() == 0;
       }
-      statsStateAccessAuthorizer:^BOOL() {
-        return geteuid() == 0;
+      stateAccessAuthorizer:^BOOL() {
+        return geteuid() == 0 && [[[NSProcessInfo processInfo] processName]
+                                     isEqualToString:@"com.northpolesec.santa.daemon"];
       }];
 }
 
 - (instancetype)initWithSyncStateFile:(NSString *)syncStateFilePath
-                       statsStateFile:(NSString *)statsStateFilePath
+                            stateFile:(NSString *)stateFilePath
+                         oldStateFile:(NSString *)oldStateFilePath
             syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
-           statsStateAccessAuthorizer:(StateFileAccessAuthorizer)statsStateAccessAuthorizer {
+                stateAccessAuthorizer:(StateFileAccessAuthorizer)stateAccessAuthorizer {
   self = [super init];
   if (self) {
     Class number = [NSNumber class];
@@ -336,7 +342,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
     };
 
     _syncStateFilePath = syncStateFilePath;
-    _statsStateFilePath = statsStateFilePath;
+    _stateFilePath = stateFilePath;
     _syncStateAccessAuthorizerBlock = syncStateAccessAuthorizer;
 
     // This is used to keep KVO on changes, but we use `CFPreferences*` for reading.
@@ -351,7 +357,10 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       [self saveSyncStateToDisk];
     }
 
-    [self readStatsStateFromDisk:statsStateAccessAuthorizer];
+    if (stateAccessAuthorizer()) {
+      [self migrateDeprecatedStatsStatePath:oldStateFilePath];
+      _state = [self readStateFromDisk] ?: [NSDictionary dictionary];
+    }
 
     [self startWatchingDefaults];
   }
@@ -1508,28 +1517,75 @@ static SNTConfigurator *sharedConfigurator = nil;
   return EnsureArrayOfStrings(self.configState[kEntitlementsTeamIDFilterKey]);
 }
 
-- (void)readStatsStateFromDisk:(StateFileAccessAuthorizer)statsStateAccessAuthorizerBlock {
-  if (!statsStateAccessAuthorizerBlock()) {
+- (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {
+  // Attempt to load the new state file first. If that succeeds, no migration is necessary
+  if ([NSDictionary dictionaryWithContentsOfFile:self.stateFilePath]) {
     return;
   }
 
-  NSDictionary *state = [NSDictionary dictionaryWithContentsOfFile:self.statsStateFilePath];
-
-  if ([state[kLastStatsSubmissionAttemptKey] isKindOfClass:[NSDate class]]) {
-    _lastStatsSubmissionTimestamp = state[kLastStatsSubmissionAttemptKey];
+  NSDictionary *oldState = [NSDictionary dictionaryWithContentsOfFile:oldPath];
+  if (!oldState) {
+    return;
   }
 
-  if ([state[kLastStatsSubmissionVersionKey] isKindOfClass:[NSString class]]) {
-    _lastStatsSubmissionVersion = state[kLastStatsSubmissionVersionKey];
+  if ([oldState[kStateStatsLastSubmissionAttemptKey] isKindOfClass:[NSDate class]] &&
+      [oldState[kStateStatsLastSubmissionVersionKey] isKindOfClass:[NSString class]]) {
+    NSDictionary *newState = @{
+      kStateStatsKey : @{
+        kStateStatsLastSubmissionAttemptKey : oldState[kStateStatsLastSubmissionAttemptKey],
+        kStateStatsLastSubmissionVersionKey : oldState[kStateStatsLastSubmissionVersionKey],
+      }
+    };
+
+    [newState writeToFile:self.stateFilePath atomically:YES];
+  }
+
+  NSError *err;
+  if (![[NSFileManager defaultManager] removeItemAtPath:oldPath error:&err]) {
+    LOGW(@"Unable to remove old state file: %@", err);
   }
 }
 
-- (void)saveStatsSubmissionAttemptTime:(NSDate *)timestamp version:(NSString *)version {
-  NSMutableDictionary *state = [[NSMutableDictionary alloc] init];
-  state[kLastStatsSubmissionAttemptKey] = timestamp;
-  state[kLastStatsSubmissionVersionKey] = version;
+- (NSDictionary *)readStateFromDisk {
+  NSDictionary *state = [NSDictionary dictionaryWithContentsOfFile:self.stateFilePath];
+  if (!state) {
+    return nil;
+  }
 
-  [state writeToFile:self.statsStateFilePath atomically:YES];
+  // This acts as a filter, populated only with known state file data
+  // so that unknown state data is removed.
+  NSMutableDictionary *newState = [NSMutableDictionary dictionary];
+
+  if ([state[kStateStatsKey] isKindOfClass:[NSDictionary class]]) {
+    NSDictionary *stats = state[kStateStatsKey];
+    if ([stats[kStateStatsLastSubmissionAttemptKey] isKindOfClass:[NSDate class]] &&
+        [stats[kStateStatsLastSubmissionVersionKey] isKindOfClass:[NSString class]]) {
+      _lastStatsSubmissionTimestamp = stats[kStateStatsLastSubmissionAttemptKey];
+      _lastStatsSubmissionVersion = stats[kStateStatsLastSubmissionVersionKey];
+
+      newState[kStateStatsKey] = @{
+        kStateStatsLastSubmissionAttemptKey : _lastStatsSubmissionTimestamp,
+        kStateStatsLastSubmissionVersionKey : _lastStatsSubmissionVersion,
+      };
+    }
+  }
+
+  return newState;
+}
+
+- (void)saveStatsSubmissionAttemptTime:(NSDate *)timestamp version:(NSString *)version {
+  NSMutableDictionary *newState = [self.state mutableCopy];
+
+  newState[kStateStatsKey] = @{
+    kStateStatsLastSubmissionAttemptKey : timestamp,
+    kStateStatsLastSubmissionVersionKey : version,
+  };
+
+  self.state = newState;
+
+  if (![self.state writeToFile:self.stateFilePath atomically:YES]) {
+    LOGW(@"Unable to update state file");
+  }
 
   _lastStatsSubmissionTimestamp = timestamp;
   _lastStatsSubmissionVersion = version;
