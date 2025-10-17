@@ -421,6 +421,7 @@ objc_library(
     deps = [
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
+        ":SNTLogging",
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",

@@ -22,9 +22,10 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
 @interface SNTConfigurator (Testing)
 - (instancetype)initWithSyncStateFile:(NSString *)syncStateFilePath
-                       statsStateFile:(NSString *)statsStateFilePath
+                            stateFile:(NSString *)stateFilePath
+                         oldStateFile:(NSString *)oldStateFilePath
             syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
-           statsStateAccessAuthorizer:(StateFileAccessAuthorizer)statsStateAccessAuthorizer;
+                stateAccessAuthorizer:(StateFileAccessAuthorizer)stateAccessAuthorizer;
 
 @property NSDictionary *syncState;
 @end
@@ -59,12 +60,13 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertTrue([syncStatePlist writeToFile:syncStatePlistPath atomically:YES]);
 
   SNTConfigurator *cfg = [[SNTConfigurator alloc] initWithSyncStateFile:syncStatePlistPath
-      statsStateFile:@"/does/not/need/to/exist"
+      stateFile:@"/does/not/need/to/exist"
+      oldStateFile:@"/does/not/need/to/exist"
       syncStateAccessAuthorizer:^{
         // Allow all access to the test plist
         return YES;
       }
-      statsStateAccessAuthorizer:^BOOL {
+      stateAccessAuthorizer:^BOOL {
         return NO;
       }];
 
