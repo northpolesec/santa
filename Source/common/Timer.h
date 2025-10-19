@@ -26,6 +26,7 @@
 
 namespace santa {
 
+// NB: This class is not thread safe.
 template <typename T>
 class Timer : public std::enable_shared_from_this<Timer<T>> {
  public:
@@ -34,17 +35,26 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
     kSingleShot,  // Timer is cancelled while OnTimer fires and restarted once complete
   };
 
-  Timer(uint32_t minimum_interval, uint32_t maximum_interval, uint32_t startup_delay,
+  enum class OnStart {
+    // The timer will fire immediately on start, then at each subsequent interval
+    kFireImmediately,
+    // The timer will fire after the first interval and each subsequent interval
+    kWaitOneCycle,
+  };
+
+  Timer(uint32_t minimum_interval, uint32_t maximum_interval, OnStart startup_option,
         std::string backing_config_var, Mode mode = Mode::kContinuous,
         dispatch_qos_class_t qos_class = QOS_CLASS_UTILITY)
       : interval_seconds_(minimum_interval),
         minimum_interval_(minimum_interval),
         maximum_interval_(maximum_interval),
-        startup_delay_(startup_delay),
+        startup_option_(startup_option),
         backing_config_var_(std::move(backing_config_var)),
         mode_(mode) {
     static_assert(
-        requires(T t) { t.OnTimer(); }, "Classes using Timer<T> must implement 'void OnTimer()'");
+        requires(T t) {
+          { t.OnTimer() } -> std::same_as<void>;
+        }, "Classes using Timer<T> must implement 'void OnTimer()'");
 
     timer_queue_ = dispatch_get_global_queue(qos_class, 0);
   }
@@ -86,6 +96,8 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
     UpdateTimingParameters(false);
   }
 
+  bool IsStarted() { return timer_source_ != nullptr; }
+
  protected:
   // Like SetTimerInterval, but doesn't clamp to min/max
   // This is a protected interface that is exposed for testing.
@@ -115,12 +127,9 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   }
 
   /// Update the timer firing settings.
-  /// In SingleShot Mode:
-  ///   If the update is from a restart, will wait a full interval cycle.
-  ///   Otherwise, will use a 10 second "startup" value to allow changes to settle.
-  /// In Continuous Mode:
-  ///   An initial 10 second "startup" value is used to allow the system to settle
-  ///   and will then fire continuously on every interval cycle.
+  /// In SingleShot Mode, If the update is from a restart, will wait a full interval cycle.
+  /// Otherwise, the startup delay is based on `startup_option_` to determine if
+  /// the timer should fire immediately or wait a full cycle first.
   void UpdateTimingParameters(bool is_restart) {
     if (!timer_source_) {
       return;
@@ -128,12 +137,10 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
 
     dispatch_time_t start_time;
 
-    if (is_restart && mode_ == Mode::kSingleShot) {
-      // On restart in SingleShot mode, use the normal interval as the start time argument
+    if ((is_restart && mode_ == Mode::kSingleShot) || startup_option_ == OnStart::kWaitOneCycle) {
       start_time = dispatch_time(DISPATCH_WALLTIME_NOW, interval_seconds_ * NSEC_PER_SEC);
     } else {
-      // On initial start or timing interval changes, use 10 second delay
-      start_time = dispatch_time(DISPATCH_WALLTIME_NOW, startup_delay_ * NSEC_PER_SEC);
+      start_time = dispatch_time(DISPATCH_WALLTIME_NOW, 0);
     }
 
     if (mode_ == Mode::kSingleShot) {
@@ -158,7 +165,7 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   uint32_t interval_seconds_;
   uint32_t minimum_interval_;
   uint32_t maximum_interval_;
-  uint32_t startup_delay_;
+  OnStart startup_option_;
   std::string backing_config_var_;
   Mode mode_;
 };

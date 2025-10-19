@@ -665,18 +665,19 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
               selector:@selector(fileAccessPolicyPlist)
                   type:[NSString class]
               callback:^(NSString *oldValue, NSString *newValue) {
-                if ([configurator fileAccessPolicy]) {
-                  LOGI(@"Ignoring change to FileAccessPolicyPlist because FileAccessPolicy is set");
-                  return;
-                }
-
-                if ([[SNTDatabaseController ruleTable] fileAccessRuleCount] > 0) {
-                  LOGI(@"Ignoring change to FileAccessPolicyPlist because file "
-                       @"access rules exist from the sync server");
-                  return;
-                }
-
                 if ((oldValue && !newValue) || (newValue && ![oldValue isEqualToString:newValue])) {
+                  if ([configurator fileAccessPolicy]) {
+                    LOGI(@"Ignoring change to FileAccessPolicyPlist "
+                         @"because FileAccessPolicy is set");
+                    return;
+                  }
+
+                  if ([[SNTDatabaseController ruleTable] fileAccessRuleCount] > 0) {
+                    LOGI(@"Ignoring change to FileAccessPolicyPlist because file "
+                         @"access rules exist from the sync server");
+                    return;
+                  }
+
                   LOGI(@"FileAccessPolicyPlist changed: %@ -> %@", oldValue, newValue);
                   watch_items->SetConfigPath(newValue);
                 }
@@ -685,15 +686,15 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                  selector:@selector(fileAccessPolicy)
                                      type:[NSDictionary class]
                                  callback:^(NSDictionary *oldValue, NSDictionary *newValue) {
-                                   if ([[SNTDatabaseController ruleTable] fileAccessRuleCount] >
-                                       0) {
-                                     LOGI(@"Ignoring change to FileAccessPolicy because file "
-                                          @"access rules exist from the sync server");
-                                     return;
-                                   }
-
                                    if ((oldValue && !newValue) ||
                                        (newValue && ![oldValue isEqualToDictionary:newValue])) {
+                                     if ([[SNTDatabaseController ruleTable] fileAccessRuleCount] >
+                                         0) {
+                                       LOGI(@"Ignoring change to FileAccessPolicy because file "
+                                            @"access rules exist from the sync server");
+                                       return;
+                                     }
+
                                      LOGI(@"FileAccessPolicy changed");
                                      watch_items->SetConfig(newValue);
                                    }
@@ -781,9 +782,13 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   [device_client enable];
 
   if ([configurator enableTelemetryExport]) {
+    // Delay initial start to allow Santa to stabilize
     LOGW(@"WARNING - Telemetry export is currently in beta. Configuration and format are subject "
          @"to change.");
-    logger->StartTimer();
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC),
+                   dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                     logger->StartTimer();
+                   });
   }
 
   [[NSRunLoop mainRunLoop] run];
