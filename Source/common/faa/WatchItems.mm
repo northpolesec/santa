@@ -87,7 +87,6 @@ static NSString *const kValidRuleNamePattern = @"^[A-Za-z_][A-Za-z0-9_]*$";
 // also ensuring configuration isn't overly out of sync with the filesystem.
 static constexpr uint32_t kMinReapplyConfigFrequencySecs = 15;
 static constexpr uint32_t kMaxReapplyConfigFrequencySecs = 3600;
-static constexpr uint32_t kInitialTimerDelay = 0;
 
 // Semi-arbitrary max custom message length. The goal is to protect against
 // potential unbounded lengths, but no real reason this cannot be higher.
@@ -771,7 +770,7 @@ std::shared_ptr<WatchItems> WatchItems::CreateInternal(DataSource data_source,
 WatchItems::WatchItems(PassKey, DataSource data_source, NSString *config_path, NSDictionary *config,
                        dispatch_queue_t q, void (^periodic_task_complete_f)(void))
     : Timer<WatchItems>(kMinReapplyConfigFrequencySecs, kMaxReapplyConfigFrequencySecs,
-                        kInitialTimerDelay, "FileAccessPolicyUpdateIntervalSec"),
+                        Timer::OnStart::kFireImmediately, "FileAccessPolicyUpdateIntervalSec"),
       data_source_(data_source),
       config_path_(config_path),
       embedded_config_(config),
