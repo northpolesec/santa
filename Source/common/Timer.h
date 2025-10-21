@@ -127,7 +127,7 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   }
 
   /// Update the timer firing settings.
-  /// In SingleShot Mode, If the update is from a restart, will wait a full interval cycle.
+  /// In SingleShot Mode, if the update is from a restart, will wait a full interval cycle.
   /// Otherwise, the startup delay is based on `startup_option_` to determine if
   /// the timer should fire immediately or wait a full cycle first.
   void UpdateTimingParameters(bool is_restart) {
