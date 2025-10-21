@@ -22,7 +22,13 @@ target.signing_time >= timestamp('2025-05-31T00:00:00Z')
 Create a signing ID rule for `platform:com.apple.spctl` and attach the following CEL program
 
 ```clike
-['--global-disable', '--master-disable','--disable', '--add', '--remove'].exists(flag, flag in args) ? BLOCKLIST : ALLOWLIST
+[
+    '--global-disable',
+    '--master-disable',
+    '--disable',
+    '--add',
+    '--remove'
+].exists(flag, flag in args) ? BLOCKLIST : ALLOWLIST
 ```
 
 ## Prevent Timestomping of LaunchAgents and LaunchDaemons
@@ -37,7 +43,9 @@ Bradely](https://themittenmac.com/author/jaron-bradley/) at [Objective by the
 Sea v8](https://objectivebythesea.org/v8/talks.html#Speaker_24)
 
 ```clike
-args.exists(arg, arg in ['-a', '-m', '-r', '-A', '-t']) && args.join(" ").contains("Library/Launch") ? BLOCKLIST : ALLOWLIST
+args.exists(arg, arg in [
+  '-a', '-m', '-r', '-A', '-t'
+]) && args.join(" ").contains("Library/Launch") ? BLOCKLIST : ALLOWLIST
 ```
 
 Note this will not stop using the system calls directly or otherwise programmatically modifying the timestamps.
@@ -52,7 +60,12 @@ Make a SigningID rule for `platform:com.apple.osascript` with the following CEL
 Program
 
 ```clike
-(args.join(" ").lowerAscii().matches(".*\\W+with\\W+hidden\\W+answer.*") || args.join(" ").lowerAscii().contains("password")) && args.join(" ").lowerAscii().matches(".*\\W+display\\W+dialog.*")  ? BLOCKLIST : ALLOWLIST
+(
+    args.join(" ").lowerAscii().matches(".*\\W+with\\W+hidden\\W+answer.*") ||
+    args.join(" ").lowerAscii().contains("password")
+) &&
+    args.join(" ").lowerAscii().matches(
+        ".*\\W+display\\W+dialog.*")  ? BLOCKLIST : ALLOWLIST
 ```
 
 Note: This will not stop obfuscated osascript that's evaluated at runtime or
