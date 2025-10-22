@@ -95,4 +95,6 @@
 @property BOOL preflightOnly;
 @property BOOL pushNotificationSync;
 
+@property BOOL isSyncV2;
+
 @end

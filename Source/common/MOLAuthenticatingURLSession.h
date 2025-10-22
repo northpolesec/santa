@@ -118,6 +118,11 @@
 - (void)setServerRootsPemData:(NSData *)serverRootsPemData;
 
 /**
+  Same as `setServerRootsPemData:`, but for strings.
+*/
+- (void)setServerRootsPemString:(NSString *)serverRootsPemString;
+
+/**
   This method should be called with the path to a PEM file containing one or more certificates to
   use to verify the server's certificate chain. This will override the trusted system roots. If
   there are no usable certificates within the file, the trusted system roots will be used.

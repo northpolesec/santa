@@ -26,6 +26,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#include "Source/santasyncservice/Pinning.h"
 #import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
@@ -420,7 +421,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   };
 
   // Configure server auth
-  if ([config syncServerAuthRootsFile]) {
+  if (santa::IsDomainPinned(syncState.syncBaseURL)) {
+    authURLSession.serverRootsPemString = santa::PinnedCertPEMs();
+    syncState.isSyncV2 = YES;
+  } else if ([config syncServerAuthRootsFile]) {
     authURLSession.serverRootsPemFile = [config syncServerAuthRootsFile];
   } else if ([config syncServerAuthRootsData]) {
     authURLSession.serverRootsPemData = [config syncServerAuthRootsData];

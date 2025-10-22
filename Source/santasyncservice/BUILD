@@ -39,6 +39,12 @@ objc_library(
 )
 
 objc_library(
+    name = "Pinning",
+    srcs = ["Pinning.mm"],
+    hdrs = ["Pinning.h"],
+)
+
+objc_library(
     name = "SNTSyncConfigBundle",
     srcs = ["SNTSyncConfigBundle.mm"],
     hdrs = ["SNTSyncConfigBundle.h"],
@@ -171,6 +177,7 @@ objc_library(
     sdk_frameworks = ["Network"],
     deps = [
         ":FCM_lib",
+        ":Pinning",
         ":SNTPushNotificationsTracker",
         ":SNTSyncConfigBundle",
         ":SNTSyncLogging",

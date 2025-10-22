@@ -86,11 +86,20 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
     self.anchors = nil;
     return;
   }
-  NSString *pemStrings = [[NSString alloc] initWithData:serverRootsPemData
-                                               encoding:NSASCIIStringEncoding];
-  NSArray *certs = [MOLCertificate certificatesFromPEM:pemStrings];
+
+  [self setServerRootsPemString:[[NSString alloc] initWithData:serverRootsPemData
+                                                      encoding:NSASCIIStringEncoding]];
+}
+
+- (void)setServerRootsPemString:(NSString *)serverRootsPemString {
+  if (!serverRootsPemString) {
+    self.anchors = nil;
+    return;
+  }
+
+  NSArray *certs = [MOLCertificate certificatesFromPEM:serverRootsPemString];
   if (!certs.count) {
-    return [self log:@"Unable to read server root certificates from data %@", serverRootsPemData];
+    return [self log:@"Unable to read server root certificates from data %@", serverRootsPemString];
   }
   // Make a new array of the SecCertificateRef's from the MOLCertificate's.
   NSMutableArray *certRefs = [[NSMutableArray alloc] initWithCapacity:certs.count];
