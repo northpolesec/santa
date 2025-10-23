@@ -12,6 +12,7 @@ bazel_dep(name = "rules_shell", version = "0.6.1")
 bazel_dep(name = "rules_swift", version = "2.9.0")
 bazel_dep(name = "xxhash", version = "0.8.3")
 bazel_dep(name = "zstd", version = "1.5.7")
+bazel_dep(name = "boringssl", version = "0.20251002.0")
 
 # North Pole Protos
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
@@ -21,18 +22,11 @@ git_override(
     remote = "https://github.com/northpolesec/protos",
 )
 
-# NATS C client
-bazel_dep(name = "nats_c", version = "")
-git_override(
-    module_name = "nats_c",
-    commit = "aeaf874d7f5013777d5dccd7d897a38463319ac1",
-    remote = "https://github.com/pmarkowsky/nats.c",
-)
-
 # FMDB
 non_module_deps = use_extension("//deps:non_module_deps.bzl", "non_module_deps")
 use_repo(non_module_deps, "FMDB")
 use_repo(non_module_deps, "OCMock")
+use_repo(non_module_deps, "nats_c")
 
 # Hedron's Compile Commands Extractor
 # Note: Moved to a fork because the original project's maintenance status is in limbo.

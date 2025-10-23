@@ -21,4 +21,12 @@ def _non_module_deps_impl(mctx):
         build_file = "@//deps:BUILD.ocmock",
     )
 
+    # NATS C client library
+    git_repository(
+        name = "nats_c",
+        remote = "https://github.com/nats-io/nats.c.git",
+        tag = "v3.8.2",  # Latest stable release
+        build_file = "@//deps:BUILD.nats",
+    )
+
 non_module_deps = module_extension(implementation = _non_module_deps_impl)

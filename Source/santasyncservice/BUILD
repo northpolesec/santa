@@ -27,7 +27,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
-        "@nats_c//src:nats",
+        "@nats_c//:nats",
     ],
 )
 
@@ -380,7 +380,7 @@ santa_unit_test(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTSyncConstants",
         "@OCMock",
-        "@nats_c//src:nats",
+        "@nats_c//:nats",
     ],
     tags = ["manual"],  # Only run when explicitly requested
 )
