@@ -76,7 +76,7 @@ namespace {
 template <bool IsV2>
 BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
                SNTSyncType requestSyncType) {
-  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+  using Traits = santa::ProtoTraits<IsV2>;
 
   auto req = google::protobuf::Arena::Create<typename Traits::PreflightRequestT>(arena);
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];

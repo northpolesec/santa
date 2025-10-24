@@ -42,15 +42,15 @@ namespace {
 template <bool IsV2>
 BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch);
 template <bool IsV2>
-std::optional<typename santa::ProtoTraits<std::bool_constant<IsV2>>::EventT>
-MessageForExecutionEvent(SNTStoredExecutionEvent *event, google::protobuf::Arena *arena);
+std::optional<typename santa::ProtoTraits<IsV2>::EventT> MessageForExecutionEvent(
+    SNTStoredExecutionEvent *event, google::protobuf::Arena *arena);
 template <bool IsV2>
-std::optional<typename santa::ProtoTraits<std::bool_constant<IsV2>>::FileAccessEventT>
-MessageForFileAccessEvent(SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena);
+std::optional<typename santa::ProtoTraits<IsV2>::FileAccessEventT> MessageForFileAccessEvent(
+    SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena);
 
 template <bool IsV2>
 BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch) {
-  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+  using Traits = santa::ProtoTraits<IsV2>;
   if (eventsInBatch == 0) {
     return YES;
   }
@@ -82,7 +82,7 @@ BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, in
 
 template <bool IsV2>
 BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
-  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+  using Traits = santa::ProtoTraits<IsV2>;
   google::protobuf::Arena arena;
   google::protobuf::Arena *pArena = &arena;
   NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
@@ -146,9 +146,9 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
 }
 
 template <bool IsV2>
-std::optional<typename santa::ProtoTraits<std::bool_constant<IsV2>>::EventT>
-MessageForExecutionEvent(SNTStoredExecutionEvent *event, google::protobuf::Arena *arena) {
-  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+std::optional<typename santa::ProtoTraits<IsV2>::EventT> MessageForExecutionEvent(
+    SNTStoredExecutionEvent *event, google::protobuf::Arena *arena) {
+  using Traits = santa::ProtoTraits<IsV2>;
   auto e = google::protobuf::Arena::Create<typename Traits::EventT>(arena);
 
   e->set_file_sha256(NSStringToUTF8String(event.fileSHA256));
@@ -266,9 +266,9 @@ MessageForExecutionEvent(SNTStoredExecutionEvent *event, google::protobuf::Arena
 }
 
 template <bool IsV2>
-std::optional<typename santa::ProtoTraits<std::bool_constant<IsV2>>::FileAccessEventT>
-MessageForFileAccessEvent(SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena) {
-  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+std::optional<typename santa::ProtoTraits<IsV2>::FileAccessEventT> MessageForFileAccessEvent(
+    SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena) {
+  using Traits = santa::ProtoTraits<IsV2>;
   auto e = google::protobuf::Arena::Create<typename Traits::FileAccessEventT>(arena);
 
   e->set_rule_version(NSStringToUTF8StringView(event.ruleVersion));

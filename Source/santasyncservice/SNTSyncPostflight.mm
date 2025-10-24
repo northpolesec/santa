@@ -29,7 +29,7 @@ namespace {
 
 template <bool IsV2>
 BOOL Postflight(SNTSyncPostflight *self) {
-  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+  using Traits = santa::ProtoTraits<IsV2>;
   google::protobuf::Arena arena;
   auto req = google::protobuf::Arena::Create<typename Traits::PostflightRequestT>(&arena);
   req->set_machine_id(santa::NSStringToUTF8String(self.syncState.machineID));
