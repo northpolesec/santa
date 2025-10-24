@@ -29,44 +29,35 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
+#include "Source/santasyncservice/ProtoTraits.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
-
-#include <google/protobuf/arena.h>
-#include "sync/v1.pb.h"
-namespace pbv1 = ::santa::sync::v1;
+#include "google/protobuf/arena.h"
 
 using santa::NSStringToUTF8String;
 using santa::NSStringToUTF8StringView;
 
-@implementation SNTSyncEventUpload
+namespace {
 
-- (NSURL *)stageURL {
-  NSString *stageName = [@"eventupload" stringByAppendingFormat:@"/%@", self.syncState.machineID];
-  return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
-}
+template <bool IsV2>
+BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch);
+template <bool IsV2>
+std::optional<typename santa::ProtoTraits<std::bool_constant<IsV2>>::EventT>
+MessageForExecutionEvent(SNTStoredExecutionEvent *event, google::protobuf::Arena *arena);
+template <bool IsV2>
+std::optional<typename santa::ProtoTraits<std::bool_constant<IsV2>>::FileAccessEventT>
+MessageForFileAccessEvent(SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena);
 
-- (BOOL)sync {
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  [[self.daemonConn remoteObjectProxy] databaseEventsPending:^(NSArray *events) {
-    if (events.count) {
-      [self uploadEvents:events];
-    }
-    dispatch_semaphore_signal(sema);
-  }];
-  return (dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER) == 0);
-}
-
-- (BOOL)performRequest:(::pbv1::EventUploadRequest *)req {
-  int eventsInBatch =
-      req->events_size() + req->file_access_events_size() + req->audit_events_size();
+template <bool IsV2>
+BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch) {
+  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
   if (eventsInBatch == 0) {
     return YES;
   }
 
   if (self.syncState.syncType == SNTSyncTypeNormal ||
       [[SNTConfigurator configurator] enableCleanSyncEventUpload]) {
-    ::pbv1::EventUploadResponse response;
+    typename Traits::EventUploadResponseT response;
     NSError *err = [self performRequest:[self requestWithMessage:req]
                             intoMessage:&response
                                 timeout:30];
@@ -89,14 +80,17 @@ using santa::NSStringToUTF8StringView;
   return YES;
 }
 
-- (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events {
+template <bool IsV2>
+BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
+  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
   google::protobuf::Arena arena;
   google::protobuf::Arena *pArena = &arena;
   NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
-  auto req = google::protobuf::Arena::Create<::pbv1::EventUploadRequest>(&arena);
+  auto req = google::protobuf::Arena::Create<typename Traits::EventUploadRequestT>(&arena);
   req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
-  google::protobuf::RepeatedPtrField<::pbv1::Event> *uploadEvents = req->mutable_events();
-  google::protobuf::RepeatedPtrField<::pbv1::FileAccessEvent> *uploadFAAEvents =
+  google::protobuf::RepeatedPtrField<typename Traits::EventT> *uploadEvents =
+      req->mutable_events();
+  google::protobuf::RepeatedPtrField<typename Traits::FileAccessEventT> *uploadFAAEvents =
       req->mutable_file_access_events();
   __block BOOL success = YES;
   NSUInteger finalIdx = (events.count - 1);
@@ -107,14 +101,12 @@ using santa::NSStringToUTF8StringView;
     if (event.idx) [eventIds addObject:event.idx];
 
     if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
-      if (auto e = [self messageForExecutionEvent:(SNTStoredExecutionEvent *)event
-                                        withArena:pArena];
+      if (auto e = MessageForExecutionEvent<IsV2>((SNTStoredExecutionEvent *)event, pArena);
           e.has_value()) {
         uploadEvents->Add(*std::move(e));
       }
     } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
-      if (auto e = [self messageForFileAccessEvent:(SNTStoredFileAccessEvent *)event
-                                         withArena:pArena];
+      if (auto e = MessageForFileAccessEvent<IsV2>((SNTStoredFileAccessEvent *)event, pArena);
           e.has_value()) {
         uploadFAAEvents->Add(*std::move(e));
       }
@@ -127,7 +119,9 @@ using santa::NSStringToUTF8StringView;
 
     if ((uploadEvents->size() + uploadFAAEvents->size()) >= self.syncState.eventBatchSize ||
         idx == finalIdx) {
-      if (![self performRequest:req]) {
+      int eventsInBatch =
+          req->events_size() + req->file_access_events_size() + req->audit_events_size();
+      if (PerformRequest<IsV2>(self, req, eventsInBatch)) {
         success = NO;
         *stop = YES;
         return;
@@ -152,9 +146,11 @@ using santa::NSStringToUTF8StringView;
   return success;
 }
 
-- (std::optional<::pbv1::Event>)messageForExecutionEvent:(SNTStoredExecutionEvent *)event
-                                               withArena:(google::protobuf::Arena *)arena {
-  auto e = google::protobuf::Arena::Create<::pbv1::Event>(arena);
+template <bool IsV2>
+std::optional<typename santa::ProtoTraits<std::bool_constant<IsV2>>::EventT>
+MessageForExecutionEvent(SNTStoredExecutionEvent *event, google::protobuf::Arena *arena) {
+  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+  auto e = google::protobuf::Arena::Create<typename Traits::EventT>(arena);
 
   e->set_file_sha256(NSStringToUTF8String(event.fileSHA256));
   e->set_file_path(NSStringToUTF8String([event.filePath stringByDeletingLastPathComponent]));
@@ -170,23 +166,23 @@ using santa::NSStringToUTF8StringView;
   }
 
   switch (event.decision) {
-    case SNTEventStateAllowUnknown: e->set_decision(::pbv1::ALLOW_UNKNOWN); break;
-    case SNTEventStateAllowBinary: e->set_decision(::pbv1::ALLOW_BINARY); break;
-    case SNTEventStateAllowCompilerBinary: e->set_decision(::pbv1::ALLOW_BINARY); break;
-    case SNTEventStateAllowCertificate: e->set_decision(::pbv1::ALLOW_CERTIFICATE); break;
-    case SNTEventStateAllowScope: e->set_decision(::pbv1::ALLOW_SCOPE); break;
-    case SNTEventStateAllowTeamID: e->set_decision(::pbv1::ALLOW_TEAMID); break;
-    case SNTEventStateAllowSigningID: e->set_decision(::pbv1::ALLOW_SIGNINGID); break;
-    case SNTEventStateAllowCompilerSigningID: e->set_decision(::pbv1::ALLOW_SIGNINGID); break;
-    case SNTEventStateAllowCDHash: e->set_decision(::pbv1::ALLOW_CDHASH); break;
-    case SNTEventStateAllowCompilerCDHash: e->set_decision(::pbv1::ALLOW_CDHASH); break;
-    case SNTEventStateBlockUnknown: e->set_decision(::pbv1::BLOCK_UNKNOWN); break;
-    case SNTEventStateBlockBinary: e->set_decision(::pbv1::BLOCK_BINARY); break;
-    case SNTEventStateBlockCertificate: e->set_decision(::pbv1::BLOCK_CERTIFICATE); break;
-    case SNTEventStateBlockScope: e->set_decision(::pbv1::BLOCK_SCOPE); break;
-    case SNTEventStateBlockTeamID: e->set_decision(::pbv1::BLOCK_TEAMID); break;
-    case SNTEventStateBlockSigningID: e->set_decision(::pbv1::BLOCK_SIGNINGID); break;
-    case SNTEventStateBlockCDHash: e->set_decision(::pbv1::BLOCK_CDHASH); break;
+    case SNTEventStateAllowUnknown: e->set_decision(Traits::ALLOW_UNKNOWN); break;
+    case SNTEventStateAllowBinary: e->set_decision(Traits::ALLOW_BINARY); break;
+    case SNTEventStateAllowCompilerBinary: e->set_decision(Traits::ALLOW_BINARY); break;
+    case SNTEventStateAllowCertificate: e->set_decision(Traits::ALLOW_CERTIFICATE); break;
+    case SNTEventStateAllowScope: e->set_decision(Traits::ALLOW_SCOPE); break;
+    case SNTEventStateAllowTeamID: e->set_decision(Traits::ALLOW_TEAMID); break;
+    case SNTEventStateAllowSigningID: e->set_decision(Traits::ALLOW_SIGNINGID); break;
+    case SNTEventStateAllowCompilerSigningID: e->set_decision(Traits::ALLOW_SIGNINGID); break;
+    case SNTEventStateAllowCDHash: e->set_decision(Traits::ALLOW_CDHASH); break;
+    case SNTEventStateAllowCompilerCDHash: e->set_decision(Traits::ALLOW_CDHASH); break;
+    case SNTEventStateBlockUnknown: e->set_decision(Traits::BLOCK_UNKNOWN); break;
+    case SNTEventStateBlockBinary: e->set_decision(Traits::BLOCK_BINARY); break;
+    case SNTEventStateBlockCertificate: e->set_decision(Traits::BLOCK_CERTIFICATE); break;
+    case SNTEventStateBlockScope: e->set_decision(Traits::BLOCK_SCOPE); break;
+    case SNTEventStateBlockTeamID: e->set_decision(Traits::BLOCK_TEAMID); break;
+    case SNTEventStateBlockSigningID: e->set_decision(Traits::BLOCK_SIGNINGID); break;
+    case SNTEventStateBlockCDHash: e->set_decision(Traits::BLOCK_CDHASH); break;
     case SNTEventStateAllowTransitive: return std::nullopt;
     case SNTEventStateAllowLocalBinary: return std::nullopt;
     case SNTEventStateAllowLocalSigningID: return std::nullopt;
@@ -196,7 +192,7 @@ using santa::NSStringToUTF8StringView;
     case SNTEventStateBlock: return std::nullopt;
     case SNTEventStateUnknown: return std::nullopt;
     case SNTEventStateBundleBinary:
-      e->set_decision(::pbv1::BUNDLE_BINARY);
+      e->set_decision(Traits::BUNDLE_BINARY);
       e->clear_execution_time();
       break;
   }
@@ -228,20 +224,20 @@ using santa::NSStringToUTF8StringView;
   e->set_signing_time([event.signingTime timeIntervalSince1970]);
 
   switch (event.signingStatus) {
-    case SNTSigningStatusUnsigned: e->set_signing_status(::pbv1::SIGNING_STATUS_UNSIGNED); break;
-    case SNTSigningStatusInvalid: e->set_signing_status(::pbv1::SIGNING_STATUS_INVALID); break;
-    case SNTSigningStatusAdhoc: e->set_signing_status(::pbv1::SIGNING_STATUS_ADHOC); break;
+    case SNTSigningStatusUnsigned: e->set_signing_status(Traits::SIGNING_STATUS_UNSIGNED); break;
+    case SNTSigningStatusInvalid: e->set_signing_status(Traits::SIGNING_STATUS_INVALID); break;
+    case SNTSigningStatusAdhoc: e->set_signing_status(Traits::SIGNING_STATUS_ADHOC); break;
     case SNTSigningStatusDevelopment:
-      e->set_signing_status(::pbv1::SIGNING_STATUS_DEVELOPMENT);
+      e->set_signing_status(Traits::SIGNING_STATUS_DEVELOPMENT);
       break;
     case SNTSigningStatusProduction:
-      e->set_signing_status(::pbv1::SIGNING_STATUS_PRODUCTION);
+      e->set_signing_status(Traits::SIGNING_STATUS_PRODUCTION);
       break;
-    default: e->set_signing_status(::pbv1::SIGNING_STATUS_UNSPECIFIED); break;
+    default: e->set_signing_status(Traits::SIGNING_STATUS_UNSPECIFIED); break;
   }
 
   for (MOLCertificate *cert in event.signingChain) {
-    ::pbv1::Certificate *c = e->add_signing_chain();
+    typename Traits::CertificateT *c = e->add_signing_chain();
     c->set_sha256(NSStringToUTF8String(cert.SHA256));
     c->set_cn(NSStringToUTF8String(cert.commonName));
     c->set_org(NSStringToUTF8String(cert.orgName));
@@ -250,7 +246,7 @@ using santa::NSStringToUTF8StringView;
     c->set_valid_until([cert.validUntil timeIntervalSince1970]);
   }
 
-  ::pbv1::EntitlementInfo *pb_entitlement_info = e->mutable_entitlement_info();
+  typename Traits::EntitlementInfoT *pb_entitlement_info = e->mutable_entitlement_info();
 
   santa::EncodeEntitlementsCommon(
       event.entitlements, event.entitlementsFiltered,
@@ -259,7 +255,7 @@ using santa::NSStringToUTF8StringView;
         pb_entitlement_info->mutable_entitlements()->Reserve((int)count);
       },
       ^(NSString *entitlement, NSString *value) {
-        ::pbv1::Entitlement *pb_entitlement = pb_entitlement_info->add_entitlements();
+        typename Traits::EntitlementT *pb_entitlement = pb_entitlement_info->add_entitlements();
         pb_entitlement->set_key(NSStringToUTF8StringView(entitlement));
         pb_entitlement->set_value(NSStringToUTF8StringView(value));
       });
@@ -270,10 +266,11 @@ using santa::NSStringToUTF8StringView;
   return std::make_optional(*e);
 }
 
-- (std::optional<::pbv1::FileAccessEvent>)
-    messageForFileAccessEvent:(SNTStoredFileAccessEvent *)event
-                    withArena:(google::protobuf::Arena *)arena {
-  auto e = google::protobuf::Arena::Create<::pbv1::FileAccessEvent>(arena);
+template <bool IsV2>
+std::optional<typename santa::ProtoTraits<std::bool_constant<IsV2>>::FileAccessEventT>
+MessageForFileAccessEvent(SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena) {
+  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+  auto e = google::protobuf::Arena::Create<typename Traits::FileAccessEventT>(arena);
 
   e->set_rule_version(NSStringToUTF8StringView(event.ruleVersion));
   e->set_rule_name(NSStringToUTF8StringView(event.ruleName));
@@ -282,13 +279,13 @@ using santa::NSStringToUTF8StringView;
 
   switch (event.decision) {
     case FileAccessPolicyDecision::kDenied:
-      e->set_decision(::pbv1::FILE_ACCESS_DECISION_DENIED);
+      e->set_decision(Traits::FILE_ACCESS_DECISION_DENIED);
       break;
     case FileAccessPolicyDecision::kDeniedInvalidSignature:
-      e->set_decision(::pbv1::FILE_ACCESS_DECISION_DENIED_INVALID_SIGNATURE);
+      e->set_decision(Traits::FILE_ACCESS_DECISION_DENIED_INVALID_SIGNATURE);
       break;
     case FileAccessPolicyDecision::kAllowedAuditOnly:
-      e->set_decision(::pbv1::FILE_ACCESS_DECISION_AUDIT_ONLY);
+      e->set_decision(Traits::FILE_ACCESS_DECISION_AUDIT_ONLY);
       break;
     case FileAccessPolicyDecision::kNoPolicy: return std::nullopt;
     case FileAccessPolicyDecision::kAllowed: return std::nullopt;
@@ -299,7 +296,7 @@ using santa::NSStringToUTF8StringView;
   SNTStoredFileAccessProcess *p = event.process;
   auto process_chain = e->mutable_process_chain();
   while (p) {
-    ::pbv1::Process *proc = process_chain->Add();
+    typename Traits::ProcessT *proc = process_chain->Add();
     if (p.filePath) {
       proc->set_file_path(NSStringToUTF8StringView(p.filePath));
     }
@@ -325,7 +322,7 @@ using santa::NSStringToUTF8StringView;
     }
 
     for (MOLCertificate *cert in p.signingChain) {
-      ::pbv1::Certificate *c = proc->add_signing_chain();
+      typename Traits::CertificateT *c = proc->add_signing_chain();
       c->set_sha256(NSStringToUTF8String(cert.SHA256));
       c->set_cn(NSStringToUTF8String(cert.commonName));
       c->set_org(NSStringToUTF8String(cert.orgName));
@@ -338,6 +335,34 @@ using santa::NSStringToUTF8StringView;
   }
 
   return std::make_optional(*e);
+}
+
+}  // namespace
+
+@implementation SNTSyncEventUpload
+
+- (NSURL *)stageURL {
+  NSString *stageName = [@"eventupload" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+  return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
+}
+
+- (BOOL)sync {
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  [[self.daemonConn remoteObjectProxy] databaseEventsPending:^(NSArray *events) {
+    if (events.count) {
+      [self uploadEvents:events];
+    }
+    dispatch_semaphore_signal(sema);
+  }];
+  return (dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER) == 0);
+}
+
+- (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events {
+  if (self.syncState.isSyncV2) {
+    return EventUpload<true>(self, events);
+  } else {
+    return EventUpload<false>(self, events);
+  }
 }
 
 @end

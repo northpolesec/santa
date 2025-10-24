@@ -20,14 +20,52 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
+#include "Source/santasyncservice/ProtoTraits.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncState.h"
+#include "google/protobuf/arena.h"
 
-#include <google/protobuf/arena.h>
-#include "sync/v1.pb.h"
-namespace pbv1 = ::santa::sync::v1;
+namespace {
 
-using santa::NSStringToUTF8String;
+template <bool IsV2>
+BOOL Postflight(SNTSyncPostflight *self) {
+  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+  google::protobuf::Arena arena;
+  auto req = google::protobuf::Arena::Create<typename Traits::PostflightRequestT>(&arena);
+  req->set_machine_id(santa::NSStringToUTF8String(self.syncState.machineID));
+  req->set_rules_received(static_cast<uint32_t>(self.syncState.rulesReceived));
+  req->set_rules_processed(static_cast<uint32_t>(self.syncState.rulesProcessed));
+  if constexpr (IsV2) {
+    req->set_file_access_rules_received(
+        static_cast<uint32_t>(self.syncState.fileAccessRulesReceived));
+    req->set_file_access_rules_processed(
+        static_cast<uint32_t>(self.syncState.fileAccessRulesProcessed));
+  }
+
+  switch (self.syncState.syncType) {
+    case SNTSyncTypeNormal: req->set_sync_type(Traits::NORMAL); break;
+    case SNTSyncTypeClean: req->set_sync_type(Traits::CLEAN); break;
+    case SNTSyncTypeCleanAll: req->set_sync_type(Traits::CLEAN_ALL); break;
+  }
+
+  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
+  [rop databaseRulesHash:^(NSString *execRulesHash, NSString *faaRulesHash) {
+    req->set_rules_hash(santa::NSStringToUTF8String(execRulesHash));
+    if constexpr (IsV2) {
+      req->set_file_access_rules_hash(santa::NSStringToUTF8String(faaRulesHash));
+    }
+  }];
+
+  typename Traits::PostflightResponseT response;
+  [self performRequest:[self requestWithMessage:req] intoMessage:&response timeout:30];
+  [rop updateSyncSettings:PostflightConfigBundle(self.syncState)
+                    reply:^{
+                    }];
+
+  return YES;
+}
+
+}  // namespace
 
 @implementation SNTSyncPostflight
 
@@ -37,35 +75,11 @@ using santa::NSStringToUTF8String;
 }
 
 - (BOOL)sync {
-  google::protobuf::Arena arena;
-  auto req = google::protobuf::Arena::Create<::pbv1::PostflightRequest>(&arena);
-  req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
-  req->set_rules_received(static_cast<uint32_t>(self.syncState.rulesReceived));
-  req->set_rules_processed(static_cast<uint32_t>(self.syncState.rulesProcessed));
-  req->set_file_access_rules_received(
-      static_cast<uint32_t>(self.syncState.fileAccessRulesReceived));
-  req->set_file_access_rules_processed(
-      static_cast<uint32_t>(self.syncState.fileAccessRulesProcessed));
-
-  switch (self.syncState.syncType) {
-    case SNTSyncTypeNormal: req->set_sync_type(::pbv1::NORMAL); break;
-    case SNTSyncTypeClean: req->set_sync_type(::pbv1::CLEAN); break;
-    case SNTSyncTypeCleanAll: req->set_sync_type(::pbv1::CLEAN_ALL); break;
+  if (self.syncState.isSyncV2) {
+    return Postflight<true>(self);
+  } else {
+    return Postflight<false>(self);
   }
-
-  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-  [rop databaseRulesHash:^(NSString *execRulesHash, NSString *faaRulesHash) {
-    req->set_rules_hash(NSStringToUTF8String(execRulesHash));
-    req->set_file_access_rules_hash(NSStringToUTF8String(faaRulesHash));
-  }];
-
-  ::pbv1::PostflightResponse response;
-  [self performRequest:[self requestWithMessage:req] intoMessage:&response timeout:30];
-  [rop updateSyncSettings:PostflightConfigBundle(self.syncState)
-                    reply:^{
-                    }];
-
-  return YES;
 }
 
 @end
