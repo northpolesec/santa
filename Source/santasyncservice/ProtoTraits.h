@@ -22,13 +22,13 @@
 
 namespace santa {
 
-template <typename T>
+template <bool IsV2>
 struct ProtoTraits;
 
 // Disabling clang format because this is more readable with longer lines
 // clang-format off
 template <>
-struct ProtoTraits<std::bool_constant<false>> {
+struct ProtoTraits<false> {
   // Sync Phase Types
   using PreflightRequestT = ::santa::sync::v1::PreflightRequest;
   using PreflightResponseT = ::santa::sync::v1::PreflightResponse;
@@ -121,7 +121,7 @@ struct ProtoTraits<std::bool_constant<false>> {
 };
 
 template <>
-struct ProtoTraits<std::bool_constant<true>> {
+struct ProtoTraits<true> {
   // Sync Phase Types
   using PreflightRequestT = ::santa::sync::v2::PreflightRequest;
   using PreflightResponseT = ::santa::sync::v2::PreflightResponse;

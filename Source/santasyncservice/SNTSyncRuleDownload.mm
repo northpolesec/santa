@@ -39,15 +39,13 @@ using santa::NSStringToUTF8String;
 using santa::StringToNSString;
 
 template <bool IsV2>
-SNTRule *RuleFromProtoRule(
-    const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT &rule);
+SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT &rule);
 template <bool IsV2>
-void ProcessBundleNotificationsForRule(
-    SNTSyncRuleDownload *self, SNTRule *rule,
-    const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule);
+void ProcessBundleNotificationsForRule(SNTSyncRuleDownload *self, SNTRule *rule,
+                                       const typename santa::ProtoTraits<IsV2>::RuleT *protoRule);
 template <bool IsV2>
 void ProcessDeprecatedBundleNotificationsForRule(
-    SNTRule *rule, const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule);
+    SNTRule *rule, const typename santa::ProtoTraits<IsV2>::RuleT *protoRule);
 SNTFileAccessRule *FAARuleFromProtoFAARuleRemove(
     const ::pbv2::FileAccessRule::Remove &pbRemoveRule);
 SNTFileAccessRule *FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi);
@@ -90,7 +88,7 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 // Note that rules from the server are filtered.
 template <bool IsV2>
 SNTDownloadedRuleSets *DownloadNewRulesFromServer(SNTSyncRuleDownload *self) {
-  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+  using Traits = santa::ProtoTraits<IsV2>;
   google::protobuf::Arena arena;
 
   self.syncState.rulesReceived = 0;
@@ -297,9 +295,8 @@ SNTFileAccessRule *FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &
 }
 
 template <bool IsV2>
-SNTRule *RuleFromProtoRule(
-    const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT &rule) {
-  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT &rule) {
+  using Traits = santa::ProtoTraits<IsV2>;
   NSString *identifier = StringToNSString(rule.identifier());
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -349,9 +346,8 @@ SNTRule *RuleFromProtoRule(
 }
 
 template <bool IsV2>
-void ProcessBundleNotificationsForRule(
-    SNTSyncRuleDownload *self, SNTRule *rule,
-    const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule) {
+void ProcessBundleNotificationsForRule(SNTSyncRuleDownload *self, SNTRule *rule,
+                                       const typename santa::ProtoTraits<IsV2>::RuleT *protoRule) {
   // Display a system notification if notification_app_name is set and this is not a clean sync.
   NSString *appName = StringToNSString(protoRule->notification_app_name());
   if (appName.length) {
@@ -374,7 +370,7 @@ void ProcessBundleNotificationsForRule(
 
 template <bool IsV2>
 void ProcessDeprecatedBundleNotificationsForRule(
-    SNTRule *rule, const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule) {
+    SNTRule *rule, const typename santa::ProtoTraits<IsV2>::RuleT *protoRule) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   // Check rule for extra notification related info.
