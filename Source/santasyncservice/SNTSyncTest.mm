@@ -66,7 +66,7 @@
 @implementation SNTSyncTest
 
 - (BOOL)runV2Tests {
-  // The base class runssync v1 tests
+  // The base class runs sync v1 tests
   return NO;
 }
 

@@ -31,7 +31,7 @@ extern NSArray *PathsFromProtoFAARulePaths(
 extern NSDictionary *OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule);
 extern NSArray *ProcessesFromProtoFAARuleProcesses(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process> &pbProcesses);
-extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi);
+extern SNTFileAccessRule *FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi);
 
 @interface SNTSyncRuleDownloadTest : XCTestCase
 @end
@@ -172,7 +172,7 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
   XCTAssertNil(procs);
 }
 
-- (void)testFileAccessRuleFromProtoFileAccessRuleAdd {
+- (void)testFAARuleFromProtoFileAccessRuleAdd {
   ::pbv2::FileAccessRule wi;
   ::pbv2::FileAccessRule::Add *addRule = wi.mutable_add();
   ::pbv2::FileAccessRule::Path *path = addRule->add_paths();
@@ -200,7 +200,7 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
   proc = addRule->add_processes();
   proc->set_binary_path("/my/path/");
 
-  SNTFileAccessRule *rule = FileAccessRuleFromProtoFileAccessRule(wi);
+  SNTFileAccessRule *rule = FAARuleFromProtoFileAccessRule(wi);
   XCTAssertEqual(rule.state, SNTFileAccessRuleStateAdd);
 
   // Spot check
@@ -219,9 +219,9 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
       details[kWatchItemConfigKeyProcesses][0][kWatchItemConfigKeyProcessesTeamID], @"EXAMPLETID");
 }
 
-- (void)testInvalidFileAccessRuleFromProtoFileAccessRuleAdd {
+- (void)testInvalidFAARuleFromProtoFileAccessRuleAdd {
   // This test does various spot checks to ensure that rules are only returned
-  // from `fileAccessRuleFromProtoFileAccessRule` if they are determined to be valid.
+  // from `FAARuleFromProtoFileAccessRule` if they are determined to be valid.
 
   // No paths defined
   {
@@ -231,14 +231,14 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
     addRule->set_version("v1");
     addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
 
-    XCTAssertNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNil(FAARuleFromProtoFileAccessRule(wi));
 
     // Now add the path to ensure the rule parses
     ::pbv2::FileAccessRule::Path *path = addRule->add_paths();
     path->set_path("/foo");
     path->set_path_type(::pbv2::FileAccessRule::Path::PATH_TYPE_LITERAL);
 
-    XCTAssertNotNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNotNil(FAARuleFromProtoFileAccessRule(wi));
   }
 
   // Bad path tyoe
@@ -252,11 +252,11 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
     addRule->set_version("v1");
     addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
 
-    XCTAssertNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNil(FAARuleFromProtoFileAccessRule(wi));
 
     // Now use a valid path type to ensure the rule parses
     path->set_path_type(::pbv2::FileAccessRule::Path::PATH_TYPE_LITERAL);
-    XCTAssertNotNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNotNil(FAARuleFromProtoFileAccessRule(wi));
   }
 
   // No name
@@ -269,11 +269,11 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
     addRule->set_version("v1");
     addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
 
-    XCTAssertNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNil(FAARuleFromProtoFileAccessRule(wi));
 
     // Now add the name to ensure the rule parses
     addRule->set_name("my_test_rule");
-    XCTAssertNotNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNotNil(FAARuleFromProtoFileAccessRule(wi));
   }
 
   // Invalid name
@@ -287,11 +287,11 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
     addRule->set_version("v1");
     addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
 
-    XCTAssertNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNil(FAARuleFromProtoFileAccessRule(wi));
 
     // Now use a valid name to ensure the rule parses
     addRule->set_name("my_test_rule");
-    XCTAssertNotNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNotNil(FAARuleFromProtoFileAccessRule(wi));
   }
 
   // No version
@@ -304,11 +304,11 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
     addRule->set_name("my_test_rule");
     addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
 
-    XCTAssertNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNil(FAARuleFromProtoFileAccessRule(wi));
 
     // Now add the version to ensure the rule parses
     addRule->set_version("v1");
-    XCTAssertNotNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNotNil(FAARuleFromProtoFileAccessRule(wi));
   }
 
   // Bad rule type
@@ -322,20 +322,20 @@ extern SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::Fi
     addRule->set_version("v1");
     addRule->set_rule_type(static_cast<::pbv2::FileAccessRule::RuleType>(123));
 
-    XCTAssertNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNil(FAARuleFromProtoFileAccessRule(wi));
 
     // Now use a valid rule type to ensure the rule parses
     addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
-    XCTAssertNotNil(FileAccessRuleFromProtoFileAccessRule(wi));
+    XCTAssertNotNil(FAARuleFromProtoFileAccessRule(wi));
   }
 }
 
-- (void)testFileAccessRuleFromProtoFileAccessRuleRemove {
+- (void)testFAARuleFromProtoFileAccessRuleRemove {
   ::pbv2::FileAccessRule wi;
   ::pbv2::FileAccessRule::Remove *pbRemove = wi.mutable_remove();
   pbRemove->set_name("foo");
 
-  SNTFileAccessRule *rule = FileAccessRuleFromProtoFileAccessRule(wi);
+  SNTFileAccessRule *rule = FAARuleFromProtoFileAccessRule(wi);
 
   XCTAssertEqual(rule.state, SNTFileAccessRuleStateRemove);
   XCTAssertEqualObjects(rule.name, @"foo");

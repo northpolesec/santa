@@ -48,10 +48,10 @@ void ProcessBundleNotificationsForRule(
 template <bool IsV2>
 void ProcessDeprecatedBundleNotificationsForRule(
     SNTRule *rule, const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule);
-SNTFileAccessRule *FaaRuleFromProtoFAARuleRemove(
+SNTFileAccessRule *FAARuleFromProtoFAARuleRemove(
     const ::pbv2::FileAccessRule::Remove &pbRemoveRule);
-SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi);
-SNTFileAccessRule *FaaRuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule);
+SNTFileAccessRule *FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi);
+SNTFileAccessRule *FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule);
 NSArray *PathsFromProtoFAARulePaths(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Path> &pbPaths);
 NSDictionary *OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule);
@@ -129,7 +129,7 @@ SNTDownloadedRuleSets *DownloadNewRulesFromServer(SNTSyncRuleDownload *self) {
 
       if constexpr (IsV2) {
         for (const typename Traits::FileAccessRuleT &faaRule : response.file_access_rules()) {
-          SNTFileAccessRule *rule = FileAccessRuleFromProtoFileAccessRule(faaRule);
+          SNTFileAccessRule *rule = FAARuleFromProtoFileAccessRule(faaRule);
           if (!rule) {
             SLOGD(@"Ignoring bad file access rule: %s", faaRule.Utf8DebugString().c_str());
             continue;
@@ -252,7 +252,7 @@ NSArray *ProcessesFromProtoFAARuleProcesses(
   return processes;
 }
 
-SNTFileAccessRule *FaaRuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule) {
+SNTFileAccessRule *FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule) {
   NSMutableDictionary *details = [NSMutableDictionary dictionary];
 
   NSArray *paths = PathsFromProtoFAARulePaths(pbAddRule.paths());
@@ -283,15 +283,15 @@ SNTFileAccessRule *FaaRuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add 
   }
 }
 
-SNTFileAccessRule *FaaRuleFromProtoFAARuleRemove(
+SNTFileAccessRule *FAARuleFromProtoFAARuleRemove(
     const ::pbv2::FileAccessRule::Remove &pbRemoveRule) {
   return [[SNTFileAccessRule alloc] initRemoveRuleWithName:StringToNSString(pbRemoveRule.name())];
 }
 
-SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi) {
+SNTFileAccessRule *FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi) {
   switch (wi.action_case()) {
-    case ::pbv2::FileAccessRule::kAdd: return FaaRuleFromProtoFAARuleAdd(wi.add());
-    case ::pbv2::FileAccessRule::kRemove: return FaaRuleFromProtoFAARuleRemove(wi.remove());
+    case ::pbv2::FileAccessRule::kAdd: return FAARuleFromProtoFAARuleAdd(wi.add());
+    case ::pbv2::FileAccessRule::kRemove: return FAARuleFromProtoFAARuleRemove(wi.remove());
     default: return nil;
   }
 }
@@ -404,14 +404,13 @@ void ProcessDeprecatedBundleNotificationsForRule(
 
 - (BOOL)sync {
   // Grab the new rules from server
-  // SNTDownloadedRuleSets *newRules = [self downloadNewRulesFromServer];
   SNTDownloadedRuleSets *newRules;
   if (self.syncState.isSyncV2) {
     newRules = DownloadNewRulesFromServer<true>(self);
   } else {
     newRules = DownloadNewRulesFromServer<false>(self);
   }
-  // `downloadNewRulesFromServer` returns nil if there was a problem with the download
+  // `DownloadNewRulesFromServer` returns nil if there was a problem with the download
   if (!newRules) {
     return NO;
   }
