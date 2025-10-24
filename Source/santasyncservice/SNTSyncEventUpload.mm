@@ -120,7 +120,7 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
         idx == finalIdx) {
       int eventsInBatch =
           req->events_size() + req->file_access_events_size() + req->audit_events_size();
-      if (PerformRequest<IsV2>(self, req, eventsInBatch)) {
+      if (!PerformRequest<IsV2>(self, req, eventsInBatch)) {
         success = NO;
         *stop = YES;
         return;
