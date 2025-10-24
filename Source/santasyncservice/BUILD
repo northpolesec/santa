@@ -121,9 +121,9 @@ objc_library(
     name = "ProtoTraits",
     hdrs = ["ProtoTraits.h"],
     deps = [
-      "@northpolesec_protos//sync:v1_cc_proto",
-      "@northpolesec_protos//syncv2:v2_cc_proto",
-    ]
+        "@northpolesec_protos//sync:v1_cc_proto",
+        "@northpolesec_protos//syncv2:v2_cc_proto",
+    ],
 )
 
 objc_library(
@@ -131,6 +131,7 @@ objc_library(
     srcs = ["SNTSyncRuleDownload.mm"],
     hdrs = ["SNTSyncRuleDownload.h"],
     deps = [
+        ":ProtoTraits",
         ":SNTPushNotificationsTracker",
         ":SNTSyncConfigBundle",
         ":SNTSyncLogging",
@@ -145,7 +146,6 @@ objc_library(
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
         "@northpolesec_protos//syncv2:v2_cc_proto",
-        ":ProtoTraits",
     ],
 )
 
@@ -188,6 +188,7 @@ objc_library(
     deps = [
         ":FCM_lib",
         ":Pinning",
+        ":ProtoTraits",
         ":SNTPushNotificationsTracker",
         ":SNTSyncConfigBundle",
         ":SNTSyncLogging",
@@ -217,7 +218,6 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:String",
-        ":ProtoTraits",
         "@protobuf//src/google/protobuf/json",
     ],
 )

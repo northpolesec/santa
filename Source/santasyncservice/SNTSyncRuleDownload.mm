@@ -154,7 +154,8 @@ SNTDownloadedRuleSets *DownloadNewRulesFromServer(SNTSyncRuleDownload *self) {
                                                fileAccessRules:newFileAccessRules];
 }
 
-NSArray *PathsFromProtoFAARulePaths(const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Path> &pbPaths) {
+NSArray *PathsFromProtoFAARulePaths(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Path> &pbPaths) {
   NSMutableArray *watchPaths = [NSMutableArray array];
 
   for (const ::pbv2::FileAccessRule::Path &path : pbPaths) {
@@ -217,7 +218,8 @@ NSDictionary *OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAd
   return optionsDict;
 }
 
-NSArray *ProcessesFromProtoFAARuleProcesses(const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process> &pbProcesses) {
+NSArray *ProcessesFromProtoFAARuleProcesses(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process> &pbProcesses) {
   NSMutableArray *processes = [NSMutableArray array];
 
   for (const ::pbv2::FileAccessRule::Process &process : pbProcesses) {
@@ -281,7 +283,8 @@ SNTFileAccessRule *FaaRuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add 
   }
 }
 
-SNTFileAccessRule *FaaRuleFromProtoFAARuleRemove(const ::pbv2::FileAccessRule::Remove &pbRemoveRule) {
+SNTFileAccessRule *FaaRuleFromProtoFAARuleRemove(
+    const ::pbv2::FileAccessRule::Remove &pbRemoveRule) {
   return [[SNTFileAccessRule alloc] initRemoveRuleWithName:StringToNSString(pbRemoveRule.name())];
 }
 
@@ -294,7 +297,8 @@ SNTFileAccessRule *FileAccessRuleFromProtoFileAccessRule(const ::pbv2::FileAcces
 }
 
 template <bool IsV2>
-SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT &rule) {
+SNTRule *RuleFromProtoRule(
+    const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT &rule) {
   using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
   NSString *identifier = StringToNSString(rule.identifier());
 #pragma clang diagnostic push
@@ -345,7 +349,9 @@ SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<std::bool_constant<
 }
 
 template <bool IsV2>
-void ProcessBundleNotificationsForRule(SNTSyncRuleDownload *self, SNTRule *rule, const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule) {
+void ProcessBundleNotificationsForRule(
+    SNTSyncRuleDownload *self, SNTRule *rule,
+    const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule) {
   // Display a system notification if notification_app_name is set and this is not a clean sync.
   NSString *appName = StringToNSString(protoRule->notification_app_name());
   if (appName.length) {
@@ -354,9 +360,11 @@ void ProcessBundleNotificationsForRule(SNTSyncRuleDownload *self, SNTRule *rule,
     // we don't want to fallback to the deprecated behavior. Also ignore app name if the rule state
     // is remove.
     if (self.syncState.syncType != SNTSyncTypeNormal || rule.state == SNTRuleStateRemove) return;
-    [[SNTPushNotificationsTracker tracker]
-        addNotification:[@{kFileName : appName, kFileBundleBinaryCount : @(0)} mutableCopy]
-                forHash:rule.identifier];
+    [[SNTPushNotificationsTracker tracker] addNotification:[@{
+                                             kFileName : appName,
+                                             kFileBundleBinaryCount : @(0)
+                                           } mutableCopy]
+                                                   forHash:rule.identifier];
     return;
   }
 
@@ -365,7 +373,8 @@ void ProcessBundleNotificationsForRule(SNTSyncRuleDownload *self, SNTRule *rule,
 }
 
 template <bool IsV2>
-void ProcessDeprecatedBundleNotificationsForRule(SNTRule *rule, const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule) {
+void ProcessDeprecatedBundleNotificationsForRule(
+    SNTRule *rule, const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT *protoRule) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   // Check rule for extra notification related info.

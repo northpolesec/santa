@@ -88,8 +88,7 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
   NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
   auto req = google::protobuf::Arena::Create<typename Traits::EventUploadRequestT>(&arena);
   req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
-  google::protobuf::RepeatedPtrField<typename Traits::EventT> *uploadEvents =
-      req->mutable_events();
+  google::protobuf::RepeatedPtrField<typename Traits::EventT> *uploadEvents = req->mutable_events();
   google::protobuf::RepeatedPtrField<typename Traits::FileAccessEventT> *uploadFAAEvents =
       req->mutable_file_access_events();
   __block BOOL success = YES;
