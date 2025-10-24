@@ -15,8 +15,6 @@
 
 #import "Source/santasyncservice/SNTSyncPreflight.h"
 
-#include <google/protobuf/arena.h>
-
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -27,11 +25,10 @@
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
+#include "Source/santasyncservice/ProtoTraits.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
-#include "sync/v1.pb.h"
-
-namespace pbv1 = ::santa::sync::v1;
+#include "google/protobuf/arena.h"
 
 using santa::NSStringToUTF8String;
 using santa::StringToNSString;
@@ -73,16 +70,17 @@ The following table expands upon the above logic to list most of the permutation
 | CLEAN_ALL         | Yes                 | New AND Dep Key    | Dep key ignored     |
 +-------------------+---------------------+--------------------+---------------------+
 */
-@implementation SNTSyncPreflight
 
-- (NSURL *)stageURL {
-  NSString *stageName = [@"preflight" stringByAppendingFormat:@"/%@", self.syncState.machineID];
-  return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
-}
+namespace {
 
-- (BOOL)sync {
-  google::protobuf::Arena arena;
-  auto req = google::protobuf::Arena::Create<::pbv1::PreflightRequest>(&arena);
+template <bool IsV2>
+BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
+               SNTSyncType requestSyncType) {
+  using Traits = santa::ProtoTraits<std::bool_constant<IsV2>>;
+
+  auto req = google::protobuf::Arena::Create<typename Traits::PreflightRequestT>(arena);
+  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
+
   req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
   req->set_serial_number(NSStringToUTF8String([SNTSystemInfo serialNumber]));
   req->set_hostname(NSStringToUTF8String([SNTSystemInfo longHostname]));
@@ -106,8 +104,6 @@ The following table expands upon the above logic to list most of the permutation
     req->set_push_notification_sync(true);
   }
 
-  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-
   [rop databaseRuleCounts:^(struct RuleCounts counts) {
     req->set_binary_rule_count(static_cast<uint32_t>(counts.binary));
     req->set_certificate_rule_count(static_cast<uint32_t>(counts.certificate));
@@ -116,26 +112,25 @@ The following table expands upon the above logic to list most of the permutation
     req->set_teamid_rule_count(static_cast<uint32_t>(counts.teamID));
     req->set_signingid_rule_count(static_cast<uint32_t>(counts.signingID));
     req->set_cdhash_rule_count(static_cast<uint32_t>(counts.cdhash));
-    req->set_file_access_rule_count(static_cast<uint32_t>(counts.fileAccess));
+    if constexpr (IsV2) {
+      req->set_file_access_rule_count(static_cast<uint32_t>(counts.fileAccess));
+    }
   }];
 
   [rop databaseRulesHash:^(NSString *execRulesHash, NSString *faaRulesHash) {
     req->set_rules_hash(NSStringToUTF8String(execRulesHash));
-    req->set_file_access_rules_hash(NSStringToUTF8String(faaRulesHash));
+    if constexpr (IsV2) {
+      req->set_file_access_rules_hash(NSStringToUTF8String(faaRulesHash));
+    }
   }];
 
   [rop clientMode:^(SNTClientMode cm) {
     switch (cm) {
-      case SNTClientModeMonitor: req->set_client_mode(::pbv1::MONITOR); break;
-      case SNTClientModeLockdown: req->set_client_mode(::pbv1::LOCKDOWN); break;
-      case SNTClientModeStandalone: req->set_client_mode(::pbv1::STANDALONE); break;
+      case SNTClientModeMonitor: req->set_client_mode(Traits::MONITOR); break;
+      case SNTClientModeLockdown: req->set_client_mode(Traits::LOCKDOWN); break;
+      case SNTClientModeStandalone: req->set_client_mode(Traits::STANDALONE); break;
       default: break;
     }
-  }];
-
-  __block SNTSyncType requestSyncType = SNTSyncTypeNormal;
-  [rop syncTypeRequired:^(SNTSyncType syncTypeRequired) {
-    requestSyncType = syncTypeRequired;
   }];
 
   // If user requested it or we've never had a successful sync, try from a clean slate.
@@ -145,7 +140,7 @@ The following table expands upon the above logic to list most of the permutation
     req->set_request_clean_sync(true);
   }
 
-  ::pbv1::PreflightResponse resp;
+  typename Traits::PreflightResponseT resp;
   NSError *err = [self performRequest:[self requestWithMessage:req] intoMessage:&resp timeout:30];
 
   if (err) {
@@ -199,9 +194,9 @@ The following table expands upon the above logic to list most of the permutation
       (value < kMinimumFullSyncInterval) ? kMinimumFullSyncInterval : value;
 
   switch (resp.client_mode()) {
-    case ::pbv1::MONITOR: self.syncState.clientMode = SNTClientModeMonitor; break;
-    case ::pbv1::LOCKDOWN: self.syncState.clientMode = SNTClientModeLockdown; break;
-    case ::pbv1::STANDALONE: self.syncState.clientMode = SNTClientModeStandalone; break;
+    case Traits::MONITOR: self.syncState.clientMode = SNTClientModeMonitor; break;
+    case Traits::LOCKDOWN: self.syncState.clientMode = SNTClientModeLockdown; break;
+    case Traits::STANDALONE: self.syncState.clientMode = SNTClientModeStandalone; break;
     default: break;
   }
 
@@ -228,10 +223,10 @@ The following table expands upon the above logic to list most of the permutation
 
   if (resp.has_override_file_access_action()) {
     switch (resp.override_file_access_action()) {
-      case ::pbv1::NONE: self.syncState.overrideFileAccessAction = @"NONE"; break;
-      case ::pbv1::AUDIT_ONLY: self.syncState.overrideFileAccessAction = @"AUDIT_ONLY"; break;
-      case ::pbv1::DISABLE: self.syncState.overrideFileAccessAction = @"DISABLE"; break;
-      case ::pbv1::FILE_ACCESS_ACTION_UNSPECIFIED:  // Intentional fallthrough
+      case Traits::NONE: self.syncState.overrideFileAccessAction = @"NONE"; break;
+      case Traits::AUDIT_ONLY: self.syncState.overrideFileAccessAction = @"AUDIT_ONLY"; break;
+      case Traits::DISABLE: self.syncState.overrideFileAccessAction = @"DISABLE"; break;
+      case Traits::FILE_ACCESS_ACTION_UNSPECIFIED:  // Intentional fallthrough
       default: self.syncState.overrideFileAccessAction = nil; break;
     }
   }
@@ -273,7 +268,7 @@ The following table expands upon the above logic to list most of the permutation
   // over the kCleanSyncDeprecated key.
   if (resp.has_sync_type()) {
     switch (resp.sync_type()) {
-      case ::pbv1::CLEAN:
+      case Traits::CLEAN:
         // If the client wants to Clean All, this takes precedence. The server
         // cannot override the client wanting to remove all rules.
         SLOGD(@"Clean sync requested by server");
@@ -283,9 +278,9 @@ The following table expands upon the above logic to list most of the permutation
           self.syncState.syncType = SNTSyncTypeClean;
         }
         break;
-      case ::pbv1::CLEAN_ALL: self.syncState.syncType = SNTSyncTypeCleanAll; break;
-      case ::pbv1::SYNC_TYPE_UNSPECIFIED:  // Intentional fallthrough
-      case ::pbv1::NORMAL:                 // Intentional fallthrough
+      case Traits::CLEAN_ALL: self.syncState.syncType = SNTSyncTypeCleanAll; break;
+      case Traits::SYNC_TYPE_UNSPECIFIED:  // Intentional fallthrough
+      case Traits::NORMAL:                 // Intentional fallthrough
       default: self.syncState.syncType = SNTSyncTypeNormal; break;
     }
   } else if (resp.deprecated_clean_sync()) {
@@ -305,6 +300,30 @@ The following table expands upon the above logic to list most of the permutation
   }
 
   return YES;
+}
+
+}  // namespace
+
+@implementation SNTSyncPreflight
+
+- (NSURL *)stageURL {
+  NSString *stageName = [@"preflight" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+  return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
+}
+
+- (BOOL)sync {
+  google::protobuf::Arena arena;
+  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
+  __block SNTSyncType requestSyncType = SNTSyncTypeNormal;
+  [rop syncTypeRequired:^(SNTSyncType syncTypeRequired) {
+    requestSyncType = syncTypeRequired;
+  }];
+
+  if (self.syncState.isSyncV2) {
+    return Preflight<true>(self, &arena, requestSyncType);
+  } else {
+    return Preflight<false>(self, &arena, requestSyncType);
+  }
 }
 
 @end

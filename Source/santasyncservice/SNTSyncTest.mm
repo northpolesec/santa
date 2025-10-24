@@ -54,7 +54,21 @@
 @property id<SNTDaemonControlXPC> daemonConnRop;
 @end
 
+// The SNTSyncTestV2 subclass will re-run all tests with `self.syncState.isSyncV2 == YES`
+@interface SNTSyncTestV2 : SNTSyncTest
+@end
+@implementation SNTSyncTestV2
+- (BOOL)runV2Tests {
+  return YES;
+}
+@end
+
 @implementation SNTSyncTest
+
+- (BOOL)runV2Tests {
+  // The base class runs sync v1 tests
+  return NO;
+}
 
 - (void)setUp {
   [super setUp];
@@ -85,6 +99,8 @@
   self.syncState.syncBaseURL = [NSURL URLWithString:@"https://myserver.local/"];
   self.syncState.machineID = @"50C7E1EB-2EF5-42D4-A084-A7966FC45A95";
   self.syncState.machineOwner = @"username1";
+
+  self.syncState.isSyncV2 = [self runV2Tests];
 }
 
 #pragma mark Test Helpers
@@ -311,7 +327,9 @@
                 error:nil
         validateBlock:^BOOL(NSURLRequest *req) {
           NSData *gotReqData = [req HTTPBody];
-          NSData *expectedReqData = [self dataFromFixture:@"sync_preflight_request.json"];
+          NSData *expectedReqData =
+              [self dataFromFixture:(self.syncState.isSyncV2) ? @"sync_preflight_request_v2.json"
+                                                              : @"sync_preflight_request.json"];
 
           NSString *gotReq = [[NSString alloc] initWithData:gotReqData
                                                    encoding:NSUTF8StringEncoding];
@@ -421,7 +439,11 @@
             XCTAssertEqualObjects(requestDict[kTransitiveRuleCount], @(ruleCounts.transitive));
             XCTAssertEqualObjects(requestDict[kTeamIDRuleCount], @(ruleCounts.teamID));
             XCTAssertEqualObjects(requestDict[kSigningIDRuleCount], @(ruleCounts.signingID));
-            XCTAssertEqualObjects(requestDict[kFileAccessRuleCount], @(ruleCounts.fileAccess));
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(requestDict[kFileAccessRuleCount], @(ruleCounts.fileAccess));
+            } else {
+              XCTAssertNil(requestDict[kFileAccessRuleCount]);
+            }
             return YES;
           }];
 
@@ -837,7 +859,7 @@
             return YES;
           }];
 
-  [sut sync];
+  XCTAssertTrue([sut sync]);
 
   XCTAssertEqual(requestCount, 3);
 }
@@ -968,7 +990,9 @@
           validateBlock:^BOOL(NSURLRequest *req) {
             NSDictionary *requestDict = [self dictFromRequest:req];
             XCTAssertEqualObjects(requestDict[@"rulesHash"], @"the-hash");
-            XCTAssertEqualObjects(requestDict[@"fileAccessRulesHash"], @"the-faa-hash");
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(requestDict[@"fileAccessRulesHash"], @"the-faa-hash");
+            }
             return YES;
           }];
 

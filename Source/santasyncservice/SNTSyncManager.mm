@@ -430,6 +430,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     authURLSession.serverRootsPemData = [config syncServerAuthRootsData];
   }
 
+  SLOGD(@"Using sync protocol version: %d", syncState.isSyncV2 ? 2 : 1);
+
   // Configure client auth
   if ([config syncClientAuthCertificateFile]) {
     authURLSession.clientCertFile = [config syncClientAuthCertificateFile];
