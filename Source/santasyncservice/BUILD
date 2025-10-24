@@ -160,7 +160,7 @@ santa_unit_test(
         "//Source/common:TestUtils",
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
-        "@northpolesec_protos//sync:v1_cc_proto",
+        "@northpolesec_protos//syncv2:v2_cc_proto",
     ],
 )
 

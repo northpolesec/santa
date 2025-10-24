@@ -38,7 +38,6 @@ namespace pbv2 = ::santa::sync::v2;
 using santa::NSStringToUTF8String;
 using santa::StringToNSString;
 
-namespace {
 template <bool IsV2>
 SNTRule *RuleFromProtoRule(
     const typename santa::ProtoTraits<std::bool_constant<IsV2>>::RuleT &rule);
@@ -58,7 +57,6 @@ NSArray *PathsFromProtoFAARulePaths(
 NSDictionary *OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule);
 NSArray *ProcessesFromProtoFAARuleProcesses(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process> &pbProcesses);
-}  // namespace
 
 // Small local object to more easily return the different sets of downloaded rules.
 @interface SNTDownloadedRuleSets : NSObject
@@ -86,8 +84,6 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
     default: return SNTRuleCleanupNone;
   }
 }
-
-namespace {
 
 // Downloads new rules from server and converts them into SNTRule.
 // Returns an array of all converted rules, or nil if there was a server problem.
@@ -389,8 +385,6 @@ void ProcessDeprecatedBundleNotificationsForRule(SNTRule *rule, const typename s
   }
 #pragma clang diagnostic push
 }
-
-}  // namespace
 
 @implementation SNTSyncRuleDownload
 
