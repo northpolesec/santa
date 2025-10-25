@@ -50,98 +50,14 @@
   [super tearDown];
 }
 
-- (void)testSyncManagerInitializesNATSClientWhenEnabled {
-  // Given: NATS is enabled and sync URL is configured
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
-  
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  
+- (void)testSyncManagerAlwaysInitializesNATSClient {
+  // Given: Daemon connection is available
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
   
-  // Then: Push notifications should be NATS client
+  // Then: Push notifications should always be NATS client
   XCTAssertNotNil(self.syncManager.pushNotifications);
   XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientNATS class]]);
-}
-
-- (void)testSyncManagerPrefersNATSOverAPNS {
-  // Given: Both NATS and APNS are enabled
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
-  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
-  
-  // When: Sync manager is initialized
-  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
-  
-  // Then: NATS should be chosen over APNS
-  XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientNATS class]]);
-  XCTAssertFalse([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]);
-}
-
-- (void)testSyncManagerPrefersNATSOverFCM {
-  // Given: Both NATS and FCM are enabled
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
-  
-  // Mock FCM requirements
-  OCMStub([self.mockConfigurator fcmProject]).andReturn(@"test-project");
-  OCMStub([self.mockConfigurator fcmEntity]).andReturn(@"test-entity");
-  OCMStub([self.mockConfigurator fcmAPIKey]).andReturn(@"test-api-key");
-  
-  // When: Sync manager is initialized
-  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
-  
-  // Then: NATS should be chosen over FCM
-  XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientNATS class]]);
-  XCTAssertFalse([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientFCM class]]);
-}
-
-- (void)testSyncManagerFallsBackToAPNSWhenNATSDisabled {
-  // Given: NATS is disabled, APNS is enabled
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
-  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
-  
-  // When: Sync manager is initialized
-  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
-  
-  // Then: APNS should be used
-  XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]);
-}
-
-- (void)testSyncManagerFallsBackToFCMWhenNATSAndAPNSDisabled {
-  // Given: NATS and APNS are disabled, FCM is enabled
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
-  
-  // Mock FCM requirements
-  OCMStub([self.mockConfigurator fcmProject]).andReturn(@"test-project");
-  OCMStub([self.mockConfigurator fcmEntity]).andReturn(@"test-entity");
-  OCMStub([self.mockConfigurator fcmAPIKey]).andReturn(@"test-api-key");
-  
-  // When: Sync manager is initialized
-  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
-  
-  // Then: FCM should be used
-  XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientFCM class]]);
-}
-
-- (void)testSyncManagerHasNoPushClientWhenAllDisabled {
-  // Given: All push notification methods are disabled
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
-  
-  // When: Sync manager is initialized
-  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
-  
-  // Then: No push client should be initialized
-  XCTAssertNil(self.syncManager.pushNotifications);
 }
 
 @end

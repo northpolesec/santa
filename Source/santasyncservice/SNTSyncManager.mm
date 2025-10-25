@@ -73,14 +73,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   if (self) {
     _daemonConn = daemonConn;
 
-    SNTConfigurator *config = [SNTConfigurator configurator];
-    if (config.enableNATS) {
-      _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
-    } else if (config.enableAPNS) {
-      _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];
-    } else if (config.fcmEnabled) {
-      _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
-    }
+    // Always use NATS for push notifications
+    _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
 
     _fullSyncTimer = [self createSyncTimerWithBlock:^{
       [self rescheduleTimerQueue:self.fullSyncTimer

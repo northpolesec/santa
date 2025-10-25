@@ -22,6 +22,7 @@ objc_library(
         "SNTPushNotifications.h",
     ],
     deps = [
+        ":SNTSyncState",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
@@ -377,12 +378,35 @@ santa_unit_test(
     srcs = ["SNTPushClientNATSIntegrationTest.mm"],
     deps = [
         ":NATS_lib",
+        ":SNTSyncState",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTSyncConstants",
         "@OCMock",
         "@nats_c//:nats",
     ],
     tags = ["manual"],  # Only run when explicitly requested
+    env = {
+        "NATS_INTEGRATION_TEST": "1",
+        "SANTA_NATS_DISABLE_TLS": "1",
+        "SANTA_NATS_DISABLE_DOMAIN_SUFFIX": "1",
+    },
+)
+
+santa_unit_test(
+    name = "SNTPushClientNATSConnectionTest",
+    srcs = ["SNTPushClientNATSConnectionTest.mm"],
+    deps = [
+        ":NATS_lib",
+        "//Source/common:SNTConfigurator",
+        "@OCMock",
+        "@nats_c//:nats",
+    ],
+    tags = ["manual"],  # Only run when explicitly requested
+    env = {
+        "NATS_INTEGRATION_TEST": "1",
+        "SANTA_NATS_DISABLE_TLS": "1",
+        "SANTA_NATS_DISABLE_DOMAIN_SUFFIX": "1",
+    },
 )
 
 santa_unit_test(

@@ -19,4 +19,9 @@
 - (void)disconnect;
 - (void)disconnectAndWait:(BOOL)wait;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
+- (void)configureWithPushServer:(NSString *)server 
+                      pushToken:(NSString *)token 
+                            jwt:(NSString *)jwt 
+                           tags:(NSArray<NSString *> *)tags;
+- (void)connectIfConfigured;
 @end

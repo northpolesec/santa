@@ -57,8 +57,8 @@ extern "C" {
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
   
-  // Set up machine ID to match our test user credentials
-  NSString *machineID = @"test-machine-12345";
+  // Set up machine ID to match our test user credentials (hexadecimal only)
+  NSString *machineID = @"ABCDEF123456789";
   OCMStub([self.mockConfigurator machineID]).andReturn(machineID);
   
   self.mockSyncDelegate = OCMProtocolMock(@protocol(SNTPushNotificationsSyncDelegate));

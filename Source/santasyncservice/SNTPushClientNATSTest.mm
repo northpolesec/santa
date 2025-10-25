@@ -71,57 +71,33 @@ extern "C" {
 
 #pragma mark - Initialization Tests
 
-- (void)testInitWithSyncDelegateWhenSyncServerConfigured {
-  // Given: Sync server is configured
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  
+- (void)testInitWithSyncDelegate {
   // When: Client is initialized
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
-  // Then: Client should be created with sync delegate set
+  // Then: Client should be created with sync delegate set but not connected
   XCTAssertNotNil(self.client);
   XCTAssertEqual(self.client.fullSyncInterval, kDefaultPushNotificationsFullSyncInterval);
-  
-  // Give time for async connection
-  [NSThread sleepForTimeInterval:0.1];
-}
-
-- (void)testInitWithSyncDelegateWhenSyncServerNotConfigured {
-  // Given: No sync server configured
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(nil);
-  
-  // When: Client is initialized
-  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
-  
-  // Then: Client should be created but not connected
-  XCTAssertNotNil(self.client);
   XCTAssertFalse(self.client.isConnected);
   XCTAssertTrue(self.client.conn == NULL);
 }
 
 #pragma mark - Connection Tests
 
-- (void)testConnectWhenAlreadyConnected {
-  // Given: Sync server is configured and client is connected
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  
+- (void)testConnectWithoutConfiguration {
+  // Given: Client is initialized without configuration
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
-  [NSThread sleepForTimeInterval:0.1]; // Allow initial connection
   
-  // Assuming connection succeeded (would need real NATS server for true test)
-  // When: Connect is called again
+  // When: Connect is called without configuration
   [self.client connect];
   
-  // Then: Should not attempt duplicate connection
-  // (Would verify through logs in real test)
+  // Then: Should not connect
+  XCTAssertFalse(self.client.isConnected);
+  XCTAssertTrue(self.client.conn == NULL);
 }
 
 - (void)testDisconnect {
   // Given: Client is initialized
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
   // When: Disconnect is called
@@ -141,15 +117,12 @@ extern "C" {
   NSString *machineID = @"12345678-1234-1234-1234-123456789012";
   OCMStub([self.mockConfigurator machineID]).andReturn(machineID);
   
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  
-  // When: Client is initialized (which triggers subscribe)
+  // When: Client is initialized and configured
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
-  // Then: Should attempt to subscribe to both topics
-  // Device topic: cloud.workshop.nps.santa.12345678-1234-1234-1234-123456789012
-  // Global topic: cloud.workshop.nps.santa.global
+  // Then: Should attempt to subscribe when connected
+  // Device topic: santa.12345678-1234-1234-1234-123456789012
+  // Tags: as provided in configuration
   // (Would verify through NATS connection in integration test)
 }
 
@@ -157,34 +130,29 @@ extern "C" {
   // Given: No machine ID available
   OCMStub([self.mockConfigurator machineID]).andReturn(nil);
   
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  
-  // When: Client is initialized
+  // When: Client is initialized and configured
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
   // Then: Should log error and not crash
-  // (Would verify through logs)
+  // (Would verify through logs in integration test)
 }
 
 #pragma mark - Message Handling Tests
 
-- (void)testMessageHandlerTriggersSyncImmediately {
-  // Given: Client is initialized with mock delegate
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  
-  // Expect sync to be called
-  OCMExpect([self.mockSyncDelegate sync]);
-  
+- (void)testConfigureWithPushServer {
+  // Given: Client is initialized
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
-  // When: Message handler would be called by NATS
-  // (In a real test, we'd simulate NATS calling the message handler)
-  // For now, we'll verify the delegate would be called
+  // When: Client is configured with push server details
+  [self.client configureWithPushServer:@"workshop"
+                            pushToken:@"test-nkey"
+                                  jwt:@"test-jwt"
+                                 tags:@[@"tag1", @"tag2"]];
   
-  // Then: Verify expectations
-  // OCMVerifyAllWithDelay(self.mockSyncDelegate, 0.5);
+  // Then: Configuration should be stored and connection attempted
+  // Server should be appended with .push.northpole.security
+  // (Would verify connection parameters in integration test)
+  [NSThread sleepForTimeInterval:0.1]; // Allow async configuration
 }
 
 #pragma mark - Token Tests
@@ -193,9 +161,6 @@ extern "C" {
   // Given: Machine ID is configured
   NSString *machineID = @"test-machine-id";
   OCMStub([self.mockConfigurator machineID]).andReturn(machineID);
-  
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
   
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
@@ -208,53 +173,60 @@ extern "C" {
 
 #pragma mark - Preflight Sync State Tests
 
-- (void)testHandlePreflightSyncStateWhenSyncServerRemoved {
-  // Skip this test for now as it requires actual NATS connection
-  // The unit test should focus on logic, not integration
-  XCTSkip(@"This test requires integration testing approach");
-}
-
-- (void)testHandlePreflightSyncStateWhenSyncServerAddedAndNotConnected {
-  // Given: Client is not connected (no sync server initially)
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(nil);
+- (void)testHandlePreflightSyncStateWithConfiguration {
+  // Given: Client is initialized
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
+  // When: Preflight sync state with push configuration is handled
+  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  syncState.pushServer = @"workshop";
+  syncState.pushNKey = @"test-nkey";
+  syncState.pushJWT = @"test-jwt";
+  syncState.pushTags = @[@"tag1", @"tag2"];
+  syncState.pushNotificationsFullSyncInterval = 3600;
+  
+  [self.client handlePreflightSyncState:syncState];
+  
+  // Then: Client should be configured and connection attempted
+  XCTAssertEqual(self.client.fullSyncInterval, 3600);
+  // (Would verify configuration and connection in integration test)
+}
+
+- (void)testHandlePreflightSyncStateWithoutConfiguration {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // When: Preflight sync state without push configuration is handled
+  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  // No push configuration fields set
+  
+  [self.client handlePreflightSyncState:syncState];
+  
+  // Then: Client should not connect
   XCTAssertFalse(self.client.isConnected);
-  
-  // When: Sync server is configured
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
-  [self.client handlePreflightSyncState:syncState];
-  
-  // Then: Client should attempt to connect
-  [NSThread sleepForTimeInterval:0.1]; // Allow connection attempt
-  // (Would verify connection attempt in integration test)
+  // (Would verify no connection attempt in integration test)
 }
 
-- (void)testHandlePreflightSyncStateWhenAlreadyConnected {
-  // Given: Client is connected with sync server
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  
+- (void)testHandlePreflightSyncStateUpdatesInterval {
+  // Given: Client is initialized
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
-  self.client.isConnected = YES; // Simulate connected state
+  NSUInteger originalInterval = self.client.fullSyncInterval;
   
-  // When: Preflight sync state is handled (server still configured)
+  // When: Preflight sync state with new interval is handled
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  syncState.pushNotificationsFullSyncInterval = 7200; // 2 hours
+  
   [self.client handlePreflightSyncState:syncState];
   
-  // Then: Should remain connected (no disconnect/reconnect)
-  XCTAssertTrue(self.client.isConnected);
+  // Then: Interval should be updated
+  XCTAssertEqual(self.client.fullSyncInterval, 7200);
+  XCTAssertNotEqual(self.client.fullSyncInterval, originalInterval);
 }
 
 #pragma mark - Full Sync Interval Tests
 
 - (void)testFullSyncIntervalDefaultValue {
-  // Given: Client is initialized
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
-  
+  // Given/When: Client is initialized
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
   // Then: Full sync interval should be default value

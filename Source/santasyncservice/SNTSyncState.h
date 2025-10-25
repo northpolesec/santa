@@ -47,6 +47,12 @@
 /// An token to subscribe to push notifications.
 @property(copy) NSString *pushNotificationsToken;
 
+/// NATS push notification configuration
+@property(copy) NSString *pushServer;
+@property(copy) NSString *pushNKey;  // The nkey for authentication
+@property(copy) NSString *pushJWT;   // JWT for authentication
+@property(copy) NSArray<NSString *> *pushTags;  // Tags to subscribe to
+
 /// Full sync interval in seconds while listening for push notifications, defaults to
 /// kDefaultPushNotificationsFullSyncInterval.
 @property NSUInteger pushNotificationsFullSyncInterval;

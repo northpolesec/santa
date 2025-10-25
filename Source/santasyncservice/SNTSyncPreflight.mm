@@ -249,6 +249,29 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     }
   }
 
+  // Extract NATS push notification configuration (only available in v2)
+  if constexpr (IsV2) {
+    if (!resp.push_server().empty()) {
+      self.syncState.pushServer = StringToNSString(resp.push_server());
+    }
+    
+    if (!resp.push_key().empty()) {
+      self.syncState.pushNKey = StringToNSString(resp.push_key());
+    }
+    
+    if (!resp.push_token().empty()) {
+      self.syncState.pushJWT = StringToNSString(resp.push_token());
+    }
+    
+    if (resp.push_tags_size() > 0) {
+      NSMutableArray *tags = [NSMutableArray arrayWithCapacity:resp.push_tags_size()];
+      for (const auto &tag : resp.push_tags()) {
+        [tags addObject:StringToNSString(tag)];
+      }
+      self.syncState.pushTags = [tags copy];
+    }
+  }
+
   // Default sync type is SNTSyncTypeNormal
   //
   // Logic overview:
