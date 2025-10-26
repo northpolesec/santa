@@ -51,6 +51,7 @@
 @property(copy) NSString *pushServer;
 @property(copy) NSString *pushNKey;  // The nkey for authentication
 @property(copy) NSString *pushJWT;   // JWT for authentication
+@property(copy) NSString *pushDeviceID;  // Device ID for NATS subscription
 @property(copy) NSArray<NSString *> *pushTags;  // Tags to subscribe to
 
 /// Full sync interval in seconds while listening for push notifications, defaults to

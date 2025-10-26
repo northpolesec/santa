@@ -15,6 +15,7 @@
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 
 #import <dispatch/dispatch.h>
+#include <string.h>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
@@ -32,6 +33,7 @@ extern "C" {
 @property(nonatomic) natsConnection *conn;
 @property(nonatomic) natsSubscription *deviceSub;
 @property(nonatomic) natsSubscription *globalSub;
+@property(nonatomic) NSMutableArray<NSValue *> *tagSubscriptions; // Array of natsSubscription pointers
 @property(nonatomic) dispatch_queue_t connectionQueue; // Single queue for connection management
 @property(nonatomic) dispatch_queue_t messageQueue;    // Queue for processing messages
 @property(nonatomic, readwrite) BOOL isConnected;
@@ -41,6 +43,7 @@ extern "C" {
 @property(nonatomic, copy) NSString *pushServer;
 @property(nonatomic, copy) NSString *pushToken;  // nkey
 @property(nonatomic, copy) NSString *jwt;
+@property(nonatomic, copy) NSString *pushDeviceID;
 @property(nonatomic, copy) NSArray<NSString *> *tags;
 @property(nonatomic) BOOL hasSyncedWithServer;
 @end
@@ -56,6 +59,7 @@ extern "C" {
     _messageQueue = dispatch_queue_create("com.northpolesec.santa.nats.message", DISPATCH_QUEUE_SERIAL);
     _isShuttingDown = NO;
     _hasSyncedWithServer = NO;
+    _tagSubscriptions = [NSMutableArray array];
     
     // Don't connect immediately - wait for preflight to provide configuration
     LOGI(@"NATS push client: Initialized, waiting for preflight configuration");
@@ -73,33 +77,72 @@ extern "C" {
 
 - (void)configureWithPushServer:(NSString *)server 
                       pushToken:(NSString *)token 
-                            jwt:(NSString *)jwt 
+                            jwt:(NSString *)jwt
+                   pushDeviceID:(NSString *)deviceID
                            tags:(NSArray<NSString *> *)tags {
   dispatch_async(self.connectionQueue, ^{
     if (self.isShuttingDown) return;
     
     NSString *fullServer;
-#ifdef DEBUG
+#ifdef SANTA_FORCE_SYNC_V2
     // In debug builds, allow overriding the domain suffix
-    if (getenv("SANTA_NATS_DISABLE_DOMAIN_SUFFIX")) {
-      fullServer = server;
-      LOGW(@"NATS: Domain suffix disabled for debugging - using server as-is: %@", fullServer);
-    } else {
-      fullServer = [NSString stringWithFormat:@"%@.push.northpole.security", server];
-    }
+    fullServer = server;
+    LOGW(@"NATS: Domain suffix disabled for debugging - using server as-is: %@", fullServer);
 #else
-    // Always append domain suffix in release builds
+    // Always append domain suffix in release builds 
     fullServer = [NSString stringWithFormat:@"%@.push.northpole.security", server];
 #endif
+    
+    // Check if device ID has changed
+    BOOL deviceIDChanged = NO;
+    if (self.pushDeviceID == nil && deviceID != nil) {
+      deviceIDChanged = YES;
+    } else if (self.pushDeviceID != nil && deviceID == nil) {
+      deviceIDChanged = YES;
+    } else if (self.pushDeviceID != nil && deviceID != nil) {
+      deviceIDChanged = ![self.pushDeviceID isEqualToString:deviceID];
+    }
+    
+    if (deviceIDChanged) {
+      LOGI(@"NATS: Push device ID changed from '%@' to '%@'", self.pushDeviceID ?: @"(none)", deviceID ?: @"(none)");
+    }
+    
+    // Check if tags have changed
+    BOOL tagsChanged = NO;
+    if (self.tags == nil && tags != nil) {
+      tagsChanged = YES;
+    } else if (self.tags != nil && tags == nil) {
+      tagsChanged = YES;
+    } else if (self.tags != nil && tags != nil) {
+      NSSet *oldTagSet = [NSSet setWithArray:self.tags];
+      NSSet *newTagSet = [NSSet setWithArray:tags];
+      tagsChanged = ![oldTagSet isEqualToSet:newTagSet];
+    }
+    
+    // If device ID or tags changed, resubscribe to all topics
+    if ((deviceIDChanged || tagsChanged) && self.conn) {
+      if (deviceIDChanged) {
+        LOGI(@"NATS: Device ID changed, resubscribing to all topics");
+      } else {
+        LOGI(@"NATS: Tags changed, resubscribing to all topics");
+      }
+      [self unsubscribeAll];
+    }
     
     // Store configuration
     self.pushServer = fullServer;
     self.pushToken = token;
     self.jwt = jwt;
+    self.pushDeviceID = deviceID;
     self.tags = tags;
     self.hasSyncedWithServer = YES;
     
-    LOGI(@"NATS: Configured with server: %@, tags: %@", fullServer, tags);
+    LOGI(@"NATS: Configured with server: %@, deviceID: %@, tags: %@", fullServer, deviceID, tags);
+    
+    // If device ID or tags changed and we're connected, resubscribe with new configuration
+    if ((deviceIDChanged || tagsChanged) && self.conn) {
+      [self subscribe];
+    }
   });
 }
 
@@ -108,7 +151,7 @@ extern "C" {
     if (self.isShuttingDown) return;
     
     // Only connect if we have configuration
-    if (self.hasSyncedWithServer && self.pushServer && self.pushToken && self.jwt) {
+    if (self.hasSyncedWithServer && self.pushServer && self.pushToken && self.jwt && self.pushDeviceID) {
       [self connect];
     } else {
       LOGD(@"NATS: Not connecting - missing configuration");
@@ -126,7 +169,7 @@ extern "C" {
     }
     
     // Check if we have necessary configuration
-    if (!self.hasSyncedWithServer || !self.pushServer || !self.pushToken || !self.jwt) {
+    if (!self.hasSyncedWithServer || !self.pushServer || !self.pushToken || !self.jwt || !self.pushDeviceID) {
       LOGD(@"NATS: Not connecting - waiting for preflight configuration");
       return;
     }
@@ -143,19 +186,16 @@ extern "C" {
     
     // Set server URL with TLS unless debug mode is enabled
     NSString *serverURL;
-#ifdef DEBUG
-    // Allow non-TLS connections in debug builds if SANTA_NATS_DISABLE_TLS is set
-    if (getenv("SANTA_NATS_DISABLE_TLS")) {
-      serverURL = [NSString stringWithFormat:@"nats://%@:443", self.pushServer];
-      LOGW(@"NATS: TLS disabled for debugging - using insecure connection on port 443");
-    } else {
-      serverURL = [NSString stringWithFormat:@"tls://%@:443", self.pushServer];
-    }
-#else
-    // Always use TLS in release builds
-    serverURL = [NSString stringWithFormat:@"tls://%@:443", self.pushServer];
+
+#if defined(SANTA_FORCE_SYNC_V2) && defined(SANTA_NATS_DISABLE_TLS)
+      serverURL = [NSString stringWithFormat:@"nats://%@", self.pushServer];
+      LOGW(@"NATS: TLS disabled for debugging - using insecure connection on %@", serverURL);
+#else 
+      serverURL = [NSString stringWithFormat:@"tls://%@", self.pushServer];
 #endif
-    
+
+     LOGI(@"NATS: Using connection to %@", serverURL);
+   
     status = natsOptions_SetURL(opts, [serverURL UTF8String]);
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to set URL %@: %s", serverURL, natsStatus_GetText(status));
@@ -178,6 +218,14 @@ extern "C" {
     // Connection options
     natsOptions_SetAllowReconnect(opts, true);
     natsOptions_SetMaxReconnect(opts, -1); // Infinite reconnects
+    
+    // Set error callback to catch subscription violations and other errors
+    natsOptions_SetErrorHandler(opts, &errorHandler, (__bridge void *)self);
+    
+    // Set connection callbacks for better monitoring
+    natsOptions_SetDisconnectedCB(opts, &disconnectedCallback, (__bridge void *)self);
+    natsOptions_SetReconnectedCB(opts, &reconnectedCallback, (__bridge void *)self);
+    natsOptions_SetClosedCB(opts, &closedCallback, (__bridge void *)self);
     
     // Create connection
     status = natsConnection_Connect(&self->_conn, opts);
@@ -240,6 +288,18 @@ extern "C" {
       self.globalSub = NULL;
     }
     
+    // Destroy all tag subscriptions
+    if (self.tagSubscriptions.count > 0) {
+      LOGD(@"NATS: Tearing down %lu tag subscriptions", (unsigned long)self.tagSubscriptions.count);
+      for (NSValue *subValue in self.tagSubscriptions) {
+        natsSubscription *sub = (natsSubscription *)[subValue pointerValue];
+        if (sub) {
+          natsSubscription_Destroy(sub);
+        }
+      }
+      [self.tagSubscriptions removeAllObjects];
+    }
+    
     if (self.conn) {
       LOGD(@"NATS: Closing connection");
       natsConnection_Close(self.conn);
@@ -257,30 +317,97 @@ extern "C" {
   });
 }
 
+- (void)unsubscribeAll {
+  // This should only be called from within connectionQueue
+  LOGD(@"NATS: Unsubscribing from all topics");
+  
+  // Unsubscribe device subscription
+  if (self.deviceSub) {
+    natsSubscription_Unsubscribe(self.deviceSub);
+    natsSubscription_Destroy(self.deviceSub);
+    self.deviceSub = NULL;
+  }
+  
+  // Unsubscribe global subscription
+  if (self.globalSub) {
+    natsSubscription_Unsubscribe(self.globalSub);
+    natsSubscription_Destroy(self.globalSub);
+    self.globalSub = NULL;
+  }
+  
+  // Unsubscribe all tag subscriptions
+  for (NSValue *subValue in self.tagSubscriptions) {
+    natsSubscription *sub = (natsSubscription *)[subValue pointerValue];
+    if (sub) {
+      natsSubscription_Unsubscribe(sub);
+      natsSubscription_Destroy(sub);
+    }
+  }
+  [self.tagSubscriptions removeAllObjects];
+  
+  LOGD(@"NATS: All topics unsubscribed");
+}
+
 - (void)subscribe {
   if (self.isShuttingDown) return;
   
   natsStatus status;
+  NSString *deviceTopic = nil;
   
-  // Get machine UUID
-  NSString *machineID = [[SNTConfigurator configurator] machineID];
-  if (!machineID) {
-    LOGE(@"NATS: No machine ID available for subscription");
-    return;
+  // Check if we should skip device subscription (for debugging)
+  BOOL skipDeviceSubscription = NO;
+#ifdef DEBUG
+  if (getenv("SANTA_NATS_SKIP_DEVICE_SUB")) {
+    skipDeviceSubscription = YES;
+    LOGW(@"NATS: Skipping device subscription due to SANTA_NATS_SKIP_DEVICE_SUB");
   }
+#endif
   
-  // Subscribe to device-specific topic: santa.host.<device_id>
-  NSString *deviceTopic = [NSString stringWithFormat:@"santa.host.%@", machineID];
-  status = natsConnection_Subscribe(&_deviceSub, self.conn, 
-                                    [deviceTopic UTF8String],
-                                    &messageHandler, 
-                                    (__bridge void *)self);
-  
-  if (status != NATS_OK) {
-    LOGE(@"NATS: Failed to subscribe to device topic %@: %s", 
-         deviceTopic, natsStatus_GetText(status));
-  } else {
-    LOGI(@"NATS: Subscribed to device topic: %@", deviceTopic);
+  if (!skipDeviceSubscription) {
+    // Use push device ID from preflight
+    if (!self.pushDeviceID) {
+      LOGE(@"NATS: No push device ID available for subscription");
+      // Don't return - continue with other subscriptions
+    } else {
+      // Log the raw push device ID to debug
+      LOGI(@"NATS: Push device ID from preflight: '%@'", self.pushDeviceID);
+      
+      // Subscribe to device-specific topic: santa.host.<device_id>
+      // Check if we should use an alternative format
+#ifdef DEBUG
+      if (getenv("SANTA_NATS_DEVICE_TOPIC_PREFIX")) {
+        NSString *prefix = @(getenv("SANTA_NATS_DEVICE_TOPIC_PREFIX"));
+        deviceTopic = [NSString stringWithFormat:@"%@.%@", prefix, self.pushDeviceID];
+        LOGW(@"NATS: Using custom device topic prefix: %@", deviceTopic);
+      } else {
+        deviceTopic = [NSString stringWithFormat:@"santa.host.%@", self.pushDeviceID];
+      }
+#else
+      deviceTopic = [NSString stringWithFormat:@"santa.host.%@", self.pushDeviceID];
+#endif
+      LOGI(@"NATS: Attempting to subscribe to device topic: %@", deviceTopic);
+      
+      status = natsConnection_Subscribe(&_deviceSub, self.conn, 
+                                      [deviceTopic UTF8String],
+                                      &messageHandler, 
+                                      (__bridge void *)self);
+      
+      if (status != NATS_OK) {
+        LOGE(@"NATS: Failed to subscribe to device topic %@: %s (status: %d)", 
+             deviceTopic, natsStatus_GetText(status), status);
+        // Log connection info for debugging
+        char urlBuffer[256];
+        natsStatus urlStatus = natsConnection_GetConnectedUrl(self.conn, urlBuffer, sizeof(urlBuffer));
+        if (urlStatus == NATS_OK) {
+          LOGE(@"NATS: Connection URL: %s", urlBuffer);
+        } else {
+          LOGE(@"NATS: Could not get connection URL");
+        }
+        LOGW(@"NATS: Continuing without device-specific subscription - will use tag-based topics only");
+      } else {
+        LOGI(@"NATS: Successfully subscribed to device topic: %@", deviceTopic);
+      }
+    }
   }
   
   // Subscribe to global tag: santa.tag.global
@@ -299,8 +426,47 @@ extern "C" {
   
   // Subscribe to all tags from preflight: santa.tag.<tag>
   if (self.tags && self.tags.count > 0) {
+    LOGI(@"NATS: Processing %lu tags from preflight", (unsigned long)self.tags.count);
+    
+    // Keep track of already subscribed topics to avoid duplicates
+    NSMutableSet *subscribedTopics = [NSMutableSet set];
+    if (deviceTopic) {
+      [subscribedTopics addObject:deviceTopic];
+    }
+    [subscribedTopics addObject:globalTagTopic];
+    
     for (NSString *tag in self.tags) {
-      NSString *tagTopic = [NSString stringWithFormat:@"santa.tag.%@", tag];
+      LOGD(@"NATS: Processing tag: '%@'", tag);
+      
+      // Strip hyphens from tag for NATS compatibility
+      NSString *sanitizedTag = [tag stringByReplacingOccurrencesOfString:@"-" withString:@""];
+      LOGD(@"NATS: Sanitized tag: '%@'", sanitizedTag);
+      
+      // Check if tag already has a prefix to avoid stuttering
+      NSString *tagTopic;
+      if ([sanitizedTag hasPrefix:@"santa."]) {
+        // Tag already has full topic name, use as-is
+        tagTopic = sanitizedTag;
+        LOGD(@"NATS: Tag already has prefix, using as-is: '%@'", tagTopic);
+      } else {
+        // Add santa.tag. prefix
+        tagTopic = [NSString stringWithFormat:@"santa.tag.%@", sanitizedTag];
+        LOGD(@"NATS: Added prefix to tag: '%@'", tagTopic);
+      }
+      
+      // Skip santa.host.* topics in tags - these should not be in the tags array
+      if ([tagTopic hasPrefix:@"santa.host."]) {
+        LOGW(@"NATS: Skipping host topic in tags array: %@ (host topics should not be in tags)", tagTopic);
+        continue;
+      }
+      
+      // Skip if we've already subscribed to this topic
+      if ([subscribedTopics containsObject:tagTopic]) {
+        LOGD(@"NATS: Skipping duplicate subscription to: %@", tagTopic);
+        continue;
+      }
+      [subscribedTopics addObject:tagTopic];
+      
       natsSubscription *tagSub = NULL;
       status = natsConnection_Subscribe(&tagSub, self.conn,
                                         [tagTopic UTF8String],
@@ -312,10 +478,9 @@ extern "C" {
              tagTopic, natsStatus_GetText(status));
       } else {
         LOGI(@"NATS: Subscribed to tag topic: %@", tagTopic);
+        // Store the subscription for later cleanup
+        [self.tagSubscriptions addObject:[NSValue valueWithPointer:tagSub]];
       }
-      
-      // Note: We're not storing tag subscriptions individually.
-      // They'll be cleaned up when the connection is destroyed.
     }
   }
 }
@@ -363,6 +528,66 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub,
   natsMsg_Destroy(msg);
 }
 
+// NATS error handler callback
+static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus err, void *closure) {
+  if (!closure) return;
+  
+  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  const char *lastError = natsStatus_GetText(err);
+  const char *subSubject = sub ? natsSubscription_GetSubject(sub) : "unknown";
+  
+  LOGE(@"NATS Error: %s (status: %d) on subscription: %s", 
+       lastError ? lastError : "unknown error", err, subSubject);
+  
+  // Check for specific error types
+  // NATS doesn't expose specific permission violation status, but we can check the error text
+  if (err == NATS_ERR || (lastError && strstr(lastError, "violation")) ||
+      (lastError && strstr(lastError, "Permitted"))) {
+    LOGE(@"NATS: Permission/Subscription violation on subject: %s", subSubject);
+    
+    // Check if this is a device subscription error
+    if (subSubject && strstr(subSubject, "santa.host")) {
+      LOGE(@"NATS: Device-specific subscription not permitted by server JWT");
+      // Don't mark connection as failed - other subscriptions might work
+    } else {
+      // Mark connection as failed if we get permission violations on other subjects
+      dispatch_async(self.connectionQueue, ^{
+        self.isConnected = NO;
+      });
+    }
+  }
+}
+
+// NATS disconnected callback
+static void disconnectedCallback(natsConnection *nc, void *closure) {
+  if (!closure) return;
+  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  LOGW(@"NATS: Disconnected from server");
+  dispatch_async(self.connectionQueue, ^{
+    self.isConnected = NO;
+  });
+}
+
+// NATS reconnected callback
+static void reconnectedCallback(natsConnection *nc, void *closure) {
+  if (!closure) return;
+  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  LOGI(@"NATS: Reconnected to server");
+  dispatch_async(self.connectionQueue, ^{
+    self.isConnected = YES;
+  });
+}
+
+// NATS closed callback
+static void closedCallback(natsConnection *nc, void *closure) {
+  if (!closure) return;
+  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  LOGI(@"NATS: Connection closed");
+  dispatch_async(self.connectionQueue, ^{
+    self.isConnected = NO;
+  });
+}
+
 
 #pragma mark - SNTPushNotificationsClientDelegate
 - (NSString *)token {
@@ -371,18 +596,26 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub,
 }
 
 - (void)handlePreflightSyncState:(SNTSyncState *)syncState {
+  LOGD(@"NATS: handlePreflightSyncState - server: %@, deviceID: %@", 
+       syncState.pushServer, syncState.pushDeviceID);
+  
   // Check if we have push configuration from preflight
-  if (syncState.pushServer && syncState.pushNKey && syncState.pushJWT) {
+  if (syncState.pushServer && syncState.pushNKey && syncState.pushJWT && syncState.pushDeviceID) {
     // Configure with preflight data
     [self configureWithPushServer:syncState.pushServer
                         pushToken:syncState.pushNKey
                               jwt:syncState.pushJWT
+                     pushDeviceID:syncState.pushDeviceID
                              tags:syncState.pushTags];
     
     // Now attempt to connect
     [self connectIfConfigured];
   } else {
-    LOGI(@"NATS: No push configuration received from preflight, waiting for next sync");
+    LOGW(@"NATS: Missing required push configuration from preflight");
+    if (!syncState.pushServer) LOGW(@"NATS: - Missing push server");
+    if (!syncState.pushNKey) LOGW(@"NATS: - Missing push nkey");  
+    if (!syncState.pushJWT) LOGW(@"NATS: - Missing push JWT");
+    if (!syncState.pushDeviceID) LOGW(@"NATS: - Missing push device ID");
   }
   
   // Update sync interval

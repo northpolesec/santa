@@ -25,6 +25,13 @@ extern "C" {
 #import "src/nats.h"
 }
 
+// Test credentials
+#define TEST_JWT @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw"
+#define TEST_NKEY @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ"
+#define TEST_PUBLISHER_JWT @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJYNlREWklOTE1VUVRHWjdXT0k1Tzc0MkQ2VExWQk1OV0oyNDIyUEtCUTRJMklMRk1ITlFBIiwiaWF0IjoxNzYxMzk2NjU0LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LXB1Ymxpc2hlciIsInN1YiI6IlVCM1ZDTFRRSVMyWklPUjRNRzdZSFFQNkU2Q1NQUVA0NkxQNjNVUUFHNldITU40WUJJS0VPTkIyIiwibmF0cyI6eyJwdWIiOnsiYWxsb3ciOlsic2FudGEuKiIsInNhbnRhLmhvc3QuKiIsInNhbnRhLnRhZy4qIl19LCJzdWIiOnsiYWxsb3ciOlsic2FudGEuKiJdfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.-WT84YZASQ4e8cqmTncyVwaDMfjkM66HQFnFxYU36_WOoUV9FZHexCDYHArWLjdJu_ybaiIv4tmn2hIhkRq2Bw"
+#define TEST_PUBLISHER_NKEY @"SUAHTEEWVEQ72TBSE5ZRCCALOU57HKPOLWDLZGBHZB6RMAPOD5OI4KNAYM"
+#define TEST_MACHINE_ID @"test-machine-12345"
+
 // Integration test that requires a real NATS server running on localhost:4222
 // Run with: bazel test //Source/santasyncservice:SNTPushClientNATSIntegrationTest --test_env=NATS_INTEGRATION_TEST=1
 @interface SNTPushClientNATSIntegrationTest : XCTestCase
@@ -55,8 +62,8 @@ extern "C" {
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
   
-  // Setup test machine ID to match our credentials (hexadecimal only)
-  self.machineID = @"ABCDEF123456789";
+  // Setup test machine ID to match our credentials
+  self.machineID = TEST_MACHINE_ID;
   OCMStub([self.mockConfigurator machineID]).andReturn(self.machineID);
   
   // Setup sync URL
@@ -92,8 +99,9 @@ extern "C" {
   // Configure with test credentials
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
-  syncState.pushNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  syncState.pushJWT = @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = self.machineID;
   syncState.pushTags = @[@"santa-clients", @"workshop"];
   
   [self.client handlePreflightSyncState:syncState];
@@ -118,8 +126,9 @@ extern "C" {
   // Configure with test credentials
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
-  syncState.pushNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  syncState.pushJWT = @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = self.machineID;
   syncState.pushTags = @[@"santa-clients", @"workshop"];
   
   [self.client handlePreflightSyncState:syncState];
@@ -150,8 +159,9 @@ extern "C" {
   // Configure with test credentials
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
-  syncState.pushNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  syncState.pushJWT = @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = self.machineID;
   syncState.pushTags = @[@"santa-clients", @"workshop"];
   
   [self.client handlePreflightSyncState:syncState];
@@ -181,8 +191,8 @@ extern "C" {
   // Configure with test credentials (no specific tags needed, global is always subscribed)
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
-  syncState.pushNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  syncState.pushJWT = @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
   syncState.pushTags = @[];  // No specific tags, just testing global
   
   [self.client handlePreflightSyncState:syncState];
@@ -216,8 +226,9 @@ extern "C" {
   // Configure with test credentials
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
-  syncState.pushNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  syncState.pushJWT = @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = self.machineID;
   syncState.pushTags = @[@"santa-clients", @"workshop"];
   
   [self.client handlePreflightSyncState:syncState];
@@ -246,8 +257,9 @@ extern "C" {
   // Configure with test credentials
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
-  syncState.pushNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  syncState.pushJWT = @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = self.machineID;
   syncState.pushTags = @[@"santa-clients", @"workshop"];
   
   [self.client handlePreflightSyncState:syncState];
@@ -282,8 +294,9 @@ extern "C" {
   // Configure with test credentials
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
-  syncState.pushNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  syncState.pushJWT = @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = self.machineID;
   syncState.pushTags = @[@"santa-clients", @"workshop"];
   
   [self.client handlePreflightSyncState:syncState];
@@ -319,20 +332,16 @@ extern "C" {
     XCTAssertEqual(status, NATS_OK, @"Failed to create NATS options");
     
     // Create credentials string in NATS format - use test publisher credentials with pub permissions
-    NSString *creds = @"-----BEGIN NATS USER JWT-----\n"
-                      @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJBVExEVUVUNlY2NktISk02SjdNSFJGNFJTM1EzWEpKQ0JTUjc0T0lBQzI1UlpaNlpVM09RIiwiaWF0IjoxNzYxMzk3NjcxLCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LXB1Ymxpc2hlciIsInN1YiI6IlVCM1ZDTFRRSVMyWklPUjRNRzdZSFFQNkU2Q1NQUVA0NkxQNjNVUUFHNldITU40WUJJS0VPTkIyIiwibmF0cyI6eyJwdWIiOnsiYWxsb3ciOlsiX0lOQk9YLlx1MDAzZSIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiJdfSwic3ViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiLCJzYW50YS4qIl19LCJzdWJzIjotMSwiZGF0YSI6LTEsInBheWxvYWQiOi0xLCJ0eXBlIjoidXNlciIsInZlcnNpb24iOjJ9fQ.tXLixxZrPw0ELjueZ3gNJsfwytv8aprtDygWo-kKWvEKtNXSYZ9gKIW3zm5LkuyIuD5c2Y3ZEPnxDteJbi77Cw\n"
-                      @"------END NATS USER JWT------\n"
-                      @"\n"
-                      @"-----BEGIN USER NKEY SEED-----\n"
-                      @"SUAHTEEWVEQ72TBSE5ZRCCALOU57HKPOLWDLZGBHZB6RMAPOD5OI4KNAYM\n"
-                      @"------END USER NKEY SEED------\n";
+    NSString *creds = [NSString stringWithFormat:@"-----BEGIN NATS USER JWT-----\n%@\n------END NATS USER JWT------\n\n-----BEGIN USER NKEY SEED-----\n%@\n------END USER NKEY SEED------\n",
+                      TEST_PUBLISHER_JWT,
+                      TEST_PUBLISHER_NKEY];
     
     // Set credentials
     status = natsOptions_SetUserCredentialsFromMemory(opts, creds.UTF8String);
     XCTAssertEqual(status, NATS_OK, @"Failed to set user credentials");
     
     // Set server URL - connect to localhost:443
-    status = natsOptions_SetURL(opts, "nats://localhost:443");
+    status = natsOptions_SetURL(opts, "nats://localhost:4222");
     XCTAssertEqual(status, NATS_OK, @"Failed to set server URL");
     
     // Connect with credentials
@@ -352,8 +361,8 @@ extern "C" {
   // but we can verify it attempts TLS connection on port 443
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"workshop";
-  syncState.pushNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  syncState.pushJWT = @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0IjoxNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAwM2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW50YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
   syncState.pushTags = @[@"santa-clients", @"workshop"];
   
   [self.client handlePreflightSyncState:syncState];

@@ -251,8 +251,10 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
 
   // Extract NATS push notification configuration (only available in v2)
   if constexpr (IsV2) {
+    LOGD(@"Preflight: Processing push notification configuration");
     if (!resp.push_server().empty()) {
       self.syncState.pushServer = StringToNSString(resp.push_server());
+      LOGD(@"Preflight: Push server: %@", self.syncState.pushServer);
     }
     
     if (!resp.push_key().empty()) {
@@ -261,6 +263,13 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     
     if (!resp.push_token().empty()) {
       self.syncState.pushJWT = StringToNSString(resp.push_token());
+    }
+    
+    if (!resp.push_deviceid().empty()) {
+      self.syncState.pushDeviceID = StringToNSString(resp.push_deviceid());
+      LOGI(@"Preflight: Received push device ID: %@", self.syncState.pushDeviceID);
+    } else {
+      LOGW(@"Preflight: No push device ID received from server");
     }
     
     if (resp.push_tags_size() > 0) {

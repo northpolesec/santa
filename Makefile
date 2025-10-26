@@ -9,6 +9,12 @@ build:
 test:
 	bazel test --define=SANTA_BUILD_TYPE=adhoc --test_output=errors //:unit_tests
 
+v2release:
+	bazel build -c opt --apple_generate_dsym --copt=-DSANTA_FORCE_SYNC_V2=1 --macos_cpus=arm64,x86_64 //:release
+
+v2release-notls:
+	bazel build -c opt --apple_generate_dsym --copt=-DSANTA_FORCE_SYNC_V2=1 --copt=-DSANTA_NATS_DISABLE_TLS=1 --macos_cpus=arm64,x86_64 //:release
+
 devrelease:
 	bazel build -c opt --apple_generate_dsym --macos_cpus=arm64,x86_64 //:release
 

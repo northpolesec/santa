@@ -147,6 +147,7 @@ extern "C" {
   [self.client configureWithPushServer:@"workshop"
                             pushToken:@"test-nkey"
                                   jwt:@"test-jwt"
+                         pushDeviceID:@"test-device-id"
                                  tags:@[@"tag1", @"tag2"]];
   
   // Then: Configuration should be stored and connection attempted
@@ -182,6 +183,7 @@ extern "C" {
   syncState.pushServer = @"workshop";
   syncState.pushNKey = @"test-nkey";
   syncState.pushJWT = @"test-jwt";
+  syncState.pushDeviceID = @"test-device-id";
   syncState.pushTags = @[@"tag1", @"tag2"];
   syncState.pushNotificationsFullSyncInterval = 3600;
   

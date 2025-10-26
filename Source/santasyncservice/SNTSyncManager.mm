@@ -425,7 +425,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     authURLSession.serverRootsPemFile = [config syncServerAuthRootsFile];
   } else if ([config syncServerAuthRootsData]) {
     authURLSession.serverRootsPemData = [config syncServerAuthRootsData];
-  }
+  } 
+
+  // Force sync v2 via compile-time define
+  #ifdef SANTA_FORCE_SYNC_V2
+  syncState.isSyncV2 = YES;
+  #endif
 
   SLOGD(@"Using sync protocol version: %d", syncState.isSyncV2 ? 2 : 1);
 
