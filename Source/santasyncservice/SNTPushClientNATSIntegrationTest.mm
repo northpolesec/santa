@@ -375,4 +375,171 @@ extern "C" {
   XCTAssertFalse(self.client.isConnected, @"Should not connect without proper TLS server");
 }
 
+- (void)testInvalidDeviceIDWithPeriodsIsRejected {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // When: Client is configured with device ID containing periods
+  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  syncState.pushServer = @"localhost";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = @"invalid.device.id";
+  syncState.pushTags = @[@"santa-clients"];
+  
+  [self.client handlePreflightSyncState:syncState];
+  
+  // Wait for connection
+  [NSThread sleepForTimeInterval:0.5];
+  
+  // Then: Client should be connected but device subscription should fail
+  XCTAssertTrue(self.client.isConnected, @"Client should still connect to NATS server");
+  
+  // Verify no sync is triggered from device topic
+  [self setupTestPublisher];
+  NSString *deviceTopic = [NSString stringWithFormat:@"santa.host.%@", @"invalid.device.id"];
+  natsConnection_PublishString(self.testPublisher, [deviceTopic UTF8String], "test message");
+  natsConnection_Flush(self.testPublisher);
+  
+  // Wait a bit - no sync should be triggered
+  [NSThread sleepForTimeInterval:0.5];
+  
+  // Verify client responds to valid tag topics
+  self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered from tag"];
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+    [self.syncExpectation fulfill];
+  });
+  
+  natsConnection_PublishString(self.testPublisher, "santa.tag.santaclients", "test message");
+  natsConnection_Flush(self.testPublisher);
+  
+  [self waitForExpectationsWithTimeout:2.0 handler:nil];
+}
+
+- (void)testInvalidDeviceIDWithHyphensIsRejected {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // When: Client is configured with device ID containing hyphens
+  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  syncState.pushServer = @"localhost";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = @"invalid-device-id";
+  syncState.pushTags = @[@"workshop"];
+  
+  [self.client handlePreflightSyncState:syncState];
+  
+  // Wait for connection
+  [NSThread sleepForTimeInterval:0.5];
+  
+  // Then: Client should be connected but device subscription should fail
+  XCTAssertTrue(self.client.isConnected, @"Client should still connect to NATS server");
+  
+  // Verify client responds to valid tag topics
+  self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered from tag"];
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+    [self.syncExpectation fulfill];
+  });
+  
+  natsConnection_PublishString(self.testPublisher, "santa.tag.workshop", "test message");
+  natsConnection_Flush(self.testPublisher);
+  
+  [self waitForExpectationsWithTimeout:2.0 handler:nil];
+}
+
+- (void)testValidTopicsWithAlphanumericCharacters {
+  // Given: Client is initialized
+  self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered"];
+  
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+    [self.syncExpectation fulfill];
+  });
+  
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // Configure with valid alphanumeric device ID and tags
+  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  syncState.pushServer = @"localhost";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = @"ABC123xyz789";
+  syncState.pushTags = @[@"tag123", @"workshop456", @"santa-test-tag"];
+  
+  [self.client handlePreflightSyncState:syncState];
+  
+  // Wait for connection
+  [NSThread sleepForTimeInterval:0.5];
+  
+  // When: Message is published to valid device topic
+  [self setupTestPublisher];
+  NSString *deviceTopic = @"santa.host.ABC123xyz789";
+  natsConnection_PublishString(self.testPublisher, [deviceTopic UTF8String], "test message");
+  natsConnection_Flush(self.testPublisher);
+  
+  // Then: Sync should be triggered
+  [self waitForExpectationsWithTimeout:2.0 handler:nil];
+}
+
+- (void)testReconnectionTriggersSync {
+  // Skip this test in automated builds - it requires manual server restart
+  if (!getenv("NATS_MANUAL_RECONNECT_TEST")) {
+    XCTSkip(@"Manual reconnection test requires NATS_MANUAL_RECONNECT_TEST=1");
+    return;
+  }
+  
+  // Given: Client is connected
+  self.syncExpectation = [self expectationWithDescription:@"Initial sync after message"];
+  __block NSInteger syncCallCount = 0;
+  
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+    syncCallCount++;
+    if (self.syncExpectation) {
+      [self.syncExpectation fulfill];
+      self.syncExpectation = nil;
+    }
+  });
+  
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  syncState.pushServer = @"localhost";
+  syncState.pushNKey = TEST_NKEY;
+  syncState.pushJWT = TEST_JWT;
+  syncState.pushDeviceID = self.machineID;
+  syncState.pushTags = @[@"santa-clients"];
+  
+  [self.client handlePreflightSyncState:syncState];
+  [NSThread sleepForTimeInterval:0.5];
+  
+  XCTAssertTrue(self.client.isConnected, @"Should be connected initially");
+  
+  // Send initial message to verify connection
+  [self setupTestPublisher];
+  natsConnection_PublishString(self.testPublisher, "santa.tag.global", "test initial");
+  natsConnection_Flush(self.testPublisher);
+  [self waitForExpectationsWithTimeout:2.0 handler:nil];
+  
+  NSInteger initialSyncCount = syncCallCount;
+  
+  // When: Server disconnects and reconnects
+  // NOTE: This requires manually stopping/starting the NATS server
+  NSLog(@"Please restart the NATS server now. Test will wait 35 seconds for reconnection sync...");
+  
+  // Create expectation for sync after reconnection (with jitter up to 30s)
+  self.syncExpectation = [self expectationWithDescription:@"Sync after reconnection"];
+  
+  // Wait for reconnection sync (max jitter is 30s + some buffer)
+  [self waitForExpectationsWithTimeout:35.0 handler:^(NSError *error) {
+    if (error) {
+      XCTFail(@"Sync was not triggered after reconnection within jitter window: %@", error);
+    }
+  }];
+  
+  // Then: Sync should have been triggered exactly once more
+  XCTAssertEqual(syncCallCount, initialSyncCount + 1, 
+                 @"Exactly one additional sync should be triggered after reconnection");
+  XCTAssertTrue(self.client.isConnected, @"Should be reconnected");
+}
+
 @end
