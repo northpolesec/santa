@@ -166,8 +166,6 @@ static NSString *const kFCMAPIKey = @"FCMAPIKey";
 
 static NSString *const kEnableAPNS = @"EnableAPNS";
 
-static NSString *const kEnableNATS = @"EnableNATS";
-
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
 
@@ -329,7 +327,6 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFCMEntity : string,
       kFCMAPIKey : string,
       kEnableAPNS : number,
-      kEnableNATS : number,
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
@@ -1319,11 +1316,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (BOOL)enableAPNS {
   // TODO: Consider supporting enablement from the sync server.
   NSNumber *number = self.configState[kEnableAPNS];
-  return [number boolValue];
-}
-
-- (BOOL)enableNATS {
-  NSNumber *number = self.configState[kEnableNATS];
   return [number boolValue];
 }
 

@@ -772,12 +772,6 @@
 @property(readonly, nonatomic) BOOL enableAPNS;
 
 ///
-///  Set to true to use NATS push notifications. Defaults to false.
-///  NATS takes precedence over both FCM and APNS if enabled.
-///
-@property(readonly, nonatomic) BOOL enableNATS;
-
-///
 /// True if metricsFormat and metricsURL are set. False otherwise.
 ///
 @property(readonly, nonatomic) BOOL exportMetrics;
