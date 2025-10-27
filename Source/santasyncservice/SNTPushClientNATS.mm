@@ -500,7 +500,8 @@ extern "C" {
 
       // Skip santa.host.* topics in tags - these should not be in the tags array
       if ([tag hasPrefix:@"santa.host."]) {
-        LOGW(@"NATS: Skipping host topic in tags array: %@ (host topics should not be in tags)", tag);
+        LOGW(@"NATS: Skipping host topic in tags array: %@ (host topics should not be in tags)",
+             tag);
         continue;
       }
 
@@ -532,7 +533,8 @@ extern "C" {
                                         (__bridge void *)self);
 
       if (status != NATS_OK) {
-        LOGE(@"NATS: Failed to subscribe to tag topic %@: %s", tagTopic, natsStatus_GetText(status));
+        LOGE(@"NATS: Failed to subscribe to tag topic %@: %s", tagTopic,
+             natsStatus_GetText(status));
       } else {
         LOGI(@"NATS: Subscribed to tag topic: %@", tagTopic);
         // Store the subscription for later cleanup
