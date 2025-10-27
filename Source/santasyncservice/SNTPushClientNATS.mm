@@ -755,7 +755,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
          [missing componentsJoinedByString:@", "]);
   }
 
-  // Update sync interval
+  // Update sync interval to avoid polling Workshop.
   if (syncState.pushNotificationsFullSyncInterval > 0) {
     self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval;
   }
