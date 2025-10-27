@@ -466,81 +466,80 @@ extern "C" {
       }
     }
   }
-}
 
-// Subscribe to global tag: santa.tag.global
-NSString *globalTagTopic = @"santa.tag.global";
+  // Subscribe to global tag: santa.tag.global
+  NSString *globalTagTopic = @"santa.tag.global";
 
-// Validate global tag topic
-if (![self isValidNATSTopic:globalTagTopic]) {
-  LOGE(@"NATS: Invalid global tag topic: %@", globalTagTopic);
-} else {
-  status = natsConnection_Subscribe(&_globalSub, self.conn, [globalTagTopic UTF8String],
-                                    &messageHandler, (__bridge void *)self);
-
-  if (status != NATS_OK) {
-    LOGE(@"NATS: Failed to subscribe to global tag topic: %s", natsStatus_GetText(status));
+  // Validate global tag topic
+  if (![self isValidNATSTopic:globalTagTopic]) {
+    LOGE(@"NATS: Invalid global tag topic: %@", globalTagTopic);
   } else {
-    LOGI(@"NATS: Subscribed to global tag topic: %@", globalTagTopic);
-  }
-}
-
-// Subscribe to all tags from preflight: santa.tag.<tag>
-if (self.tags && self.tags.count > 0) {
-  LOGD(@"NATS: Processing %lu tags from preflight", (unsigned long)self.tags.count);
-
-  // Keep track of already subscribed topics to avoid duplicates
-  NSMutableSet *subscribedTopics = [NSMutableSet set];
-  if (deviceTopic) {
-    [subscribedTopics addObject:deviceTopic];
-  }
-  [subscribedTopics addObject:globalTagTopic];
-
-  for (NSString *tag in self.tags) {
-    LOGD(@"NATS: Processing tag: '%@'", tag);
-
-    // Skip santa.host.* topics in tags - these should not be in the tags array
-    if ([tag hasPrefix:@"santa.host."]) {
-      LOGW(@"NATS: Skipping host topic in tags array: %@ (host topics should not be in tags)", tag);
-      continue;
-    }
-
-    // Build the topic from the tag
-    NSString *tagTopic = [self buildTopicFromTag:tag];
-
-    // Double-check the built topic doesn't start with santa.host.
-    if ([tagTopic hasPrefix:@"santa.host."]) {
-      LOGE(@"NATS: Built topic still has host prefix: %@ from tag: %@", tagTopic, tag);
-      continue;
-    }
-
-    // Skip if we've already subscribed to this topic
-    if ([subscribedTopics containsObject:tagTopic]) {
-      LOGD(@"NATS: Skipping duplicate subscription to: %@", tagTopic);
-      continue;
-    }
-
-    // Validate tag topic
-    if (![self isValidNATSTopic:tagTopic]) {
-      LOGE(@"NATS: Invalid tag topic: %@", tagTopic);
-      continue;
-    }
-
-    [subscribedTopics addObject:tagTopic];
-
-    natsSubscription *tagSub = NULL;
-    status = natsConnection_Subscribe(&tagSub, self.conn, [tagTopic UTF8String], &messageHandler,
-                                      (__bridge void *)self);
+    status = natsConnection_Subscribe(&_globalSub, self.conn, [globalTagTopic UTF8String],
+                                      &messageHandler, (__bridge void *)self);
 
     if (status != NATS_OK) {
-      LOGE(@"NATS: Failed to subscribe to tag topic %@: %s", tagTopic, natsStatus_GetText(status));
+      LOGE(@"NATS: Failed to subscribe to global tag topic: %s", natsStatus_GetText(status));
     } else {
-      LOGI(@"NATS: Subscribed to tag topic: %@", tagTopic);
-      // Store the subscription for later cleanup
-      [self.tagSubscriptions addObject:[NSValue valueWithPointer:tagSub]];
+      LOGI(@"NATS: Subscribed to global tag topic: %@", globalTagTopic);
     }
   }
-}
+
+  // Subscribe to all tags from preflight: santa.tag.<tag>
+  if (self.tags && self.tags.count > 0) {
+    LOGD(@"NATS: Processing %lu tags from preflight", (unsigned long)self.tags.count);
+
+    // Keep track of already subscribed topics to avoid duplicates
+    NSMutableSet *subscribedTopics = [NSMutableSet set];
+    if (deviceTopic) {
+      [subscribedTopics addObject:deviceTopic];
+    }
+    [subscribedTopics addObject:globalTagTopic];
+
+    for (NSString *tag in self.tags) {
+      LOGD(@"NATS: Processing tag: '%@'", tag);
+
+      // Skip santa.host.* topics in tags - these should not be in the tags array
+      if ([tag hasPrefix:@"santa.host."]) {
+        LOGW(@"NATS: Skipping host topic in tags array: %@ (host topics should not be in tags)", tag);
+        continue;
+      }
+
+      // Build the topic from the tag
+      NSString *tagTopic = [self buildTopicFromTag:tag];
+
+      // Double-check the built topic doesn't start with santa.host.
+      if ([tagTopic hasPrefix:@"santa.host."]) {
+        LOGE(@"NATS: Built topic still has host prefix: %@ from tag: %@", tagTopic, tag);
+        continue;
+      }
+
+      // Skip if we've already subscribed to this topic
+      if ([subscribedTopics containsObject:tagTopic]) {
+        LOGD(@"NATS: Skipping duplicate subscription to: %@", tagTopic);
+        continue;
+      }
+
+      // Validate tag topic
+      if (![self isValidNATSTopic:tagTopic]) {
+        LOGE(@"NATS: Invalid tag topic: %@", tagTopic);
+        continue;
+      }
+
+      [subscribedTopics addObject:tagTopic];
+
+      natsSubscription *tagSub = NULL;
+      status = natsConnection_Subscribe(&tagSub, self.conn, [tagTopic UTF8String], &messageHandler,
+                                        (__bridge void *)self);
+
+      if (status != NATS_OK) {
+        LOGE(@"NATS: Failed to subscribe to tag topic %@: %s", tagTopic, natsStatus_GetText(status));
+      } else {
+        LOGI(@"NATS: Subscribed to tag topic: %@", tagTopic);
+        // Store the subscription for later cleanup
+        [self.tagSubscriptions addObject:[NSValue valueWithPointer:tagSub]];
+      }
+    }
+  }
 }
 
 // NATS message handler
