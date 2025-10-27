@@ -66,7 +66,12 @@ extern "C" {
 
 - (void)tearDown {
   if (self.client) {
-    [self.client disconnectAndWait:YES];
+    // Use expectation to wait for disconnect completion
+    XCTestExpectation *disconnectExpectation = [self expectationWithDescription:@"Client disconnect"];
+    [self.client disconnectWithCompletion:^{
+      [disconnectExpectation fulfill];
+    }];
+    [self waitForExpectations:@[disconnectExpectation] timeout:1.0];
     self.client = nil;
   }
   [self.mockConfigurator stopMocking];
@@ -83,6 +88,7 @@ extern "C" {
   [self.client configureWithPushServer:@"localhost"
                             pushToken:@"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ"
                                   jwt:@"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJPR1NBRFVWVUdQV0NFNkk2UlNTRTdYTlpZVzRYQTRMNTZJV0NOVE9DQ0pYWjdHTVNDMjdBIiwiaWF0IjoxNzYxMzk2NjM5LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7fSwic3ViIjp7ImFsbG93IjpbInNhbnRhLWNsaWVudHMiLCJzYW50YS4qIiwic2FudGEuaG9zdC4qIiwic2FudGEudGFnLioiLCJ3b3Jrc2hvcCJdfSwicmVzcCI6eyJtYXgiOjEsInR0bCI6MH0sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.ieJNiXBnlTPQ2sLy-A2-s-mobMWO0uNH621coUax4CZDbnprqFDR2X2OUp3w62dmxcNvkQeMSnhCOckEkMgTDw"
+                         pushDeviceID:@"testmachine12345"
                                  tags:@[@"santa-clients", @"workshop"]];
   
   // Give async configuration time to complete
@@ -131,6 +137,7 @@ extern "C" {
   [self.client configureWithPushServer:@"localhost"
                             pushToken:@"UADJHFAVSNFSSBVRCTGTTXWXHYRNTTDKEEKZFADF5CJ6KGZOKT2A7WZM"
                                   jwt:nil
+                         pushDeviceID:@"testmachine12345"
                                  tags:@[@"test-tag"]];
   
   [NSThread sleepForTimeInterval:0.1];
@@ -150,6 +157,7 @@ extern "C" {
   [self.client configureWithPushServer:@"production"
                             pushToken:@"test-key"
                                   jwt:@"test-jwt"
+                         pushDeviceID:@"testmachine12345"
                                  tags:nil];
   
   [NSThread sleepForTimeInterval:0.1];
@@ -170,6 +178,7 @@ extern "C" {
   [self.client configureWithPushServer:@"server1"
                             pushToken:@"token1"
                                   jwt:@"jwt1"
+                         pushDeviceID:@"testmachine12345"
                                  tags:@[@"tag1"]];
   
   [NSThread sleepForTimeInterval:0.1];
@@ -177,6 +186,7 @@ extern "C" {
   [self.client configureWithPushServer:@"server2"
                             pushToken:@"token2"
                                   jwt:@"jwt2"
+                         pushDeviceID:@"testmachine12345"
                                  tags:@[@"tag2", @"tag3"]];
   
   [NSThread sleepForTimeInterval:0.1];
@@ -203,6 +213,7 @@ extern "C" {
   [self.client configureWithPushServer:@"localhost"
                             pushToken:validNKey
                                   jwt:validJWT
+                         pushDeviceID:@"testmachine12345"
                                  tags:@[@"santa-clients", @"workshop"]];
   
   [NSThread sleepForTimeInterval:0.1];

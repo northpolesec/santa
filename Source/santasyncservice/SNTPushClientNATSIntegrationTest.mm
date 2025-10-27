@@ -30,7 +30,7 @@ extern "C" {
 #define TEST_NKEY @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ"
 #define TEST_PUBLISHER_JWT @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJYNlREWklOTE1VUVRHWjdXT0k1Tzc0MkQ2VExWQk1OV0oyNDIyUEtCUTRJMklMRk1ITlFBIiwiaWF0IjoxNzYxMzk2NjU0LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LXB1Ymxpc2hlciIsInN1YiI6IlVCM1ZDTFRRSVMyWklPUjRNRzdZSFFQNkU2Q1NQUVA0NkxQNjNVUUFHNldITU40WUJJS0VPTkIyIiwibmF0cyI6eyJwdWIiOnsiYWxsb3ciOlsic2FudGEuKiIsInNhbnRhLmhvc3QuKiIsInNhbnRhLnRhZy4qIl19LCJzdWIiOnsiYWxsb3ciOlsic2FudGEuKiJdfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.-WT84YZASQ4e8cqmTncyVwaDMfjkM66HQFnFxYU36_WOoUV9FZHexCDYHArWLjdJu_ybaiIv4tmn2hIhkRq2Bw"
 #define TEST_PUBLISHER_NKEY @"SUAHTEEWVEQ72TBSE5ZRCCALOU57HKPOLWDLZGBHZB6RMAPOD5OI4KNAYM"
-#define TEST_MACHINE_ID @"test-machine-12345"
+#define TEST_MACHINE_ID @"testmachine12345"
 
 // Integration test that requires a real NATS server running on localhost:4222
 // Run with: bazel test //Source/santasyncservice:SNTPushClientNATSIntegrationTest --test_env=NATS_INTEGRATION_TEST=1
@@ -76,7 +76,12 @@ extern "C" {
 
 - (void)tearDown {
   if (self.client) {
-    [self.client disconnectAndWait:YES];
+    // Use expectation to wait for disconnect completion
+    XCTestExpectation *disconnectExpectation = [self expectationWithDescription:@"Client disconnect"];
+    [self.client disconnectWithCompletion:^{
+      [disconnectExpectation fulfill];
+    }];
+    [self waitForExpectations:@[disconnectExpectation] timeout:1.0];
     self.client = nil;
   }
   
@@ -310,7 +315,7 @@ extern "C" {
   [self waitForExpectationsWithTimeout:2.0 handler:nil];
   
   // When: Client disconnects
-  [self.client disconnect];
+  [self.client disconnectWithCompletion:nil];
   [NSThread sleepForTimeInterval:0.2];
   
   // Then: Further messages should not trigger sync

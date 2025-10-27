@@ -46,6 +46,11 @@ extern "C" {
 @property(nonatomic, copy) NSString *pushDeviceID;
 @property(nonatomic, copy) NSArray<NSString *> *tags;
 @property(nonatomic) BOOL hasSyncedWithServer;
+// Connection retry state
+@property(nonatomic) dispatch_source_t connectionRetryTimer;
+@property(nonatomic) NSTimeInterval currentRetryDelay;
+@property(nonatomic) NSInteger retryAttempt;
+@property(nonatomic) BOOL isRetrying;
 @end
 
 @implementation SNTPushClientNATS
@@ -60,6 +65,9 @@ extern "C" {
     _isShuttingDown = NO;
     _hasSyncedWithServer = NO;
     _tagSubscriptions = [NSMutableArray array];
+    _currentRetryDelay = 1.0; // Start with 1 second
+    _retryAttempt = 0;
+    _isRetrying = NO;
     
     // Don't connect immediately - wait for preflight to provide configuration
     LOGI(@"NATS push client: Initialized, waiting for preflight configuration");
@@ -146,12 +154,16 @@ extern "C" {
   });
 }
 
+- (BOOL)hasRequiredConfiguration {
+  return self.hasSyncedWithServer && self.pushServer && self.pushToken && self.jwt && self.pushDeviceID;
+}
+
 - (void)connectIfConfigured {
   dispatch_async(self.connectionQueue, ^{
     if (self.isShuttingDown) return;
     
     // Only connect if we have configuration
-    if (self.hasSyncedWithServer && self.pushServer && self.pushToken && self.jwt && self.pushDeviceID) {
+    if ([self hasRequiredConfiguration]) {
       [self connect];
     } else {
       LOGD(@"NATS: Not connecting - missing configuration");
@@ -169,7 +181,7 @@ extern "C" {
     }
     
     // Check if we have necessary configuration
-    if (!self.hasSyncedWithServer || !self.pushServer || !self.pushToken || !self.jwt || !self.pushDeviceID) {
+    if (![self hasRequiredConfiguration]) {
       LOGD(@"NATS: Not connecting - waiting for preflight configuration");
       return;
     }
@@ -233,72 +245,51 @@ extern "C" {
     
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to connect: %s", natsStatus_GetText(status));
+      [self scheduleConnectionRetry];
       return;
     }
     
     LOGI(@"NATS: Connected to %@", serverURL);
     self.isConnected = YES;
     
+    // Reset retry state on successful connection
+    self.retryAttempt = 0;
+    self.currentRetryDelay = 1.0;
+    self.isRetrying = NO;
+    if (self.connectionRetryTimer) {
+      dispatch_source_cancel(self.connectionRetryTimer);
+      self.connectionRetryTimer = nil;
+    }
+    
     // Subscribe to topics
     [self subscribe];
   });
 }
 
-- (void)disconnect {
-  [self disconnectWithCompletion:nil];
-}
 
-- (void)disconnectAndWait:(BOOL)wait {
-  // If nothing to disconnect, return immediately
-  if (!self.conn && !self.deviceSub && !self.globalSub) {
+- (void)disconnectWithCompletion:(void (^)(void))completion {
+  // Early return if nothing to disconnect
+  if (!self.conn && !self.deviceSub && !self.globalSub && self.tagSubscriptions.count == 0) {
+    if (completion) {
+      dispatch_async(dispatch_get_main_queue(), completion);
+    }
     return;
   }
   
-  if (wait) {
-    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-    [self disconnectWithCompletion:^{
-      dispatch_semaphore_signal(sem);
-    }];
-    // Add timeout to prevent hanging forever
-    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC);
-    long result = dispatch_semaphore_wait(sem, timeout);
-    if (result != 0) {
-      LOGE(@"NATS: Disconnect timed out after 1 second");
-    }
-  } else {
-    [self disconnectWithCompletion:nil];
-  }
-}
-
-- (void)disconnectWithCompletion:(void (^)(void))completion {
   self.isShuttingDown = YES;
   
   dispatch_async(self.connectionQueue, ^{
     LOGD(@"NATS: Starting disconnect");
     
-    if (self.deviceSub) {
-      LOGD(@"NATS: Destroying device subscription");
-      natsSubscription_Destroy(self.deviceSub);
-      self.deviceSub = NULL;
+    // Cancel any pending retry timer
+    if (self.connectionRetryTimer) {
+      dispatch_source_cancel(self.connectionRetryTimer);
+      self.connectionRetryTimer = nil;
     }
+    self.isRetrying = NO;
     
-    if (self.globalSub) {
-      LOGD(@"NATS: Destroying global subscription");
-      natsSubscription_Destroy(self.globalSub);
-      self.globalSub = NULL;
-    }
-    
-    // Destroy all tag subscriptions
-    if (self.tagSubscriptions.count > 0) {
-      LOGD(@"NATS: Tearing down %lu tag subscriptions", (unsigned long)self.tagSubscriptions.count);
-      for (NSValue *subValue in self.tagSubscriptions) {
-        natsSubscription *sub = (natsSubscription *)[subValue pointerValue];
-        if (sub) {
-          natsSubscription_Destroy(sub);
-        }
-      }
-      [self.tagSubscriptions removeAllObjects];
-    }
+    // Use unsubscribeAll to avoid code duplication
+    [self unsubscribeAll];
     
     if (self.conn) {
       LOGD(@"NATS: Closing connection");
@@ -317,23 +308,23 @@ extern "C" {
   });
 }
 
+- (void)cleanupSubscription:(natsSubscription **)subscription {
+  if (subscription && *subscription) {
+    natsSubscription_Unsubscribe(*subscription);
+    natsSubscription_Destroy(*subscription);
+    *subscription = NULL;
+  }
+}
+
 - (void)unsubscribeAll {
   // This should only be called from within connectionQueue
   LOGD(@"NATS: Unsubscribing from all topics");
   
   // Unsubscribe device subscription
-  if (self.deviceSub) {
-    natsSubscription_Unsubscribe(self.deviceSub);
-    natsSubscription_Destroy(self.deviceSub);
-    self.deviceSub = NULL;
-  }
+  [self cleanupSubscription:&_deviceSub];
   
   // Unsubscribe global subscription
-  if (self.globalSub) {
-    natsSubscription_Unsubscribe(self.globalSub);
-    natsSubscription_Destroy(self.globalSub);
-    self.globalSub = NULL;
-  }
+  [self cleanupSubscription:&_globalSub];
   
   // Unsubscribe all tag subscriptions
   for (NSValue *subValue in self.tagSubscriptions) {
@@ -348,31 +339,53 @@ extern "C" {
   LOGD(@"NATS: All topics unsubscribed");
 }
 
+- (NSString *)buildTopicFromTag:(NSString *)tag {
+  NSString *processedTag = tag;
+  
+  // IMPORTANT: santa.host.* topics should never be processed as tags
+  if ([tag hasPrefix:@"santa.host."]) {
+    LOGE(@"NATS: Attempted to process host topic '%@' as tag - this should not happen", tag);
+    // Return the original tag to let validation fail it
+    return tag;
+  }
+  
+  // If tag already has santa.tag. prefix, extract just the tag part
+  if ([tag hasPrefix:@"santa.tag."]) {
+    processedTag = [tag substringFromIndex:10]; // Length of "santa.tag."
+    LOGD(@"NATS: Tag already has prefix, extracted: '%@'", processedTag);
+  }
+  
+  // Strip hyphens and periods from tag for NATS compatibility
+  NSString *sanitizedTag = [processedTag stringByReplacingOccurrencesOfString:@"-" withString:@""];
+  sanitizedTag = [sanitizedTag stringByReplacingOccurrencesOfString:@"." withString:@""];
+  LOGD(@"NATS: Sanitized tag: '%@'", sanitizedTag);
+  
+  // Build as santa.tag.<sanitized>
+  NSString *tagTopic = [NSString stringWithFormat:@"santa.tag.%@", sanitizedTag];
+  LOGD(@"NATS: Built tag topic: '%@'", tagTopic);
+  return tagTopic;
+}
+
 - (BOOL)isValidNATSTopic:(NSString *)topic {
   if (!topic || topic.length == 0) {
     return NO;
   }
   
+  NSString *suffix = nil;
+  
   // Check if topic starts with santa.host. or santa.tag.
   if ([topic hasPrefix:@"santa.host."]) {
-    NSString *suffix = [topic substringFromIndex:11]; // Length of "santa.host."
-    // Suffix should not contain periods or hyphens
-    if ([suffix rangeOfString:@"."].location != NSNotFound ||
-        [suffix rangeOfString:@"-"].location != NSNotFound) {
-      return NO;
-    }
-    return suffix.length > 0; // Must have some suffix
+    suffix = [topic substringFromIndex:11];
   } else if ([topic hasPrefix:@"santa.tag."]) {
-    NSString *suffix = [topic substringFromIndex:10]; // Length of "santa.tag."
-    // Suffix should not contain periods or hyphens
-    if ([suffix rangeOfString:@"."].location != NSNotFound ||
-        [suffix rangeOfString:@"-"].location != NSNotFound) {
-      return NO;
-    }
-    return suffix.length > 0; // Must have some suffix
+    suffix = [topic substringFromIndex:10];
+  } else {
+    return NO; // Topic doesn't start with allowed prefixes
   }
   
-  return NO; // Topic doesn't start with allowed prefixes
+  // Validate suffix: must exist and cannot contain periods or hyphens
+  return suffix.length > 0 &&
+         [suffix rangeOfString:@"."].location == NSNotFound &&
+         [suffix rangeOfString:@"-"].location == NSNotFound;
 }
 
 - (void)subscribe {
@@ -399,23 +412,30 @@ extern "C" {
       // Log the raw push device ID to debug
       LOGI(@"NATS: Push device ID from preflight: '%@'", self.pushDeviceID);
       
-      // Validate device ID - no periods or hyphens allowed
-      if ([self.pushDeviceID rangeOfString:@"."].location != NSNotFound ||
-          [self.pushDeviceID rangeOfString:@"-"].location != NSNotFound) {
-        LOGE(@"NATS: Invalid push device ID '%@' - contains period or hyphen", self.pushDeviceID);
+      // Sanitize device ID - remove periods and hyphens for NATS compatibility
+      NSString *sanitizedDeviceID = [self.pushDeviceID stringByReplacingOccurrencesOfString:@"-" withString:@""];
+      sanitizedDeviceID = [sanitizedDeviceID stringByReplacingOccurrencesOfString:@"." withString:@""];
+      
+      if (![sanitizedDeviceID isEqualToString:self.pushDeviceID]) {
+        LOGW(@"NATS: Sanitized device ID from '%@' to '%@' (removed periods/hyphens)", 
+             self.pushDeviceID, sanitizedDeviceID);
+      }
+      
+      if (sanitizedDeviceID.length == 0) {
+        LOGE(@"NATS: Device ID became empty after sanitization");
       } else {
         // Subscribe to device-specific topic: santa.host.<device_id>
         // Check if we should use an alternative format
 #ifdef DEBUG
         if (getenv("SANTA_NATS_DEVICE_TOPIC_PREFIX")) {
           NSString *prefix = @(getenv("SANTA_NATS_DEVICE_TOPIC_PREFIX"));
-          deviceTopic = [NSString stringWithFormat:@"%@.%@", prefix, self.pushDeviceID];
+          deviceTopic = [NSString stringWithFormat:@"%@.%@", prefix, sanitizedDeviceID];
           LOGW(@"NATS: Using custom device topic prefix: %@", deviceTopic);
         } else {
-          deviceTopic = [NSString stringWithFormat:@"santa.host.%@", self.pushDeviceID];
+          deviceTopic = [NSString stringWithFormat:@"santa.host.%@", sanitizedDeviceID];
         }
 #else
-        deviceTopic = [NSString stringWithFormat:@"santa.host.%@", self.pushDeviceID];
+        deviceTopic = [NSString stringWithFormat:@"santa.host.%@", sanitizedDeviceID];
 #endif
         
         // Final validation of the complete topic
@@ -483,25 +503,18 @@ extern "C" {
     for (NSString *tag in self.tags) {
       LOGD(@"NATS: Processing tag: '%@'", tag);
       
-      // Strip hyphens from tag for NATS compatibility
-      NSString *sanitizedTag = [tag stringByReplacingOccurrencesOfString:@"-" withString:@""];
-      LOGD(@"NATS: Sanitized tag: '%@'", sanitizedTag);
-      
-      // Check if tag already has a prefix to avoid stuttering
-      NSString *tagTopic;
-      if ([sanitizedTag hasPrefix:@"santa."]) {
-        // Tag already has full topic name, use as-is
-        tagTopic = sanitizedTag;
-        LOGD(@"NATS: Tag already has prefix, using as-is: '%@'", tagTopic);
-      } else {
-        // Add santa.tag. prefix
-        tagTopic = [NSString stringWithFormat:@"santa.tag.%@", sanitizedTag];
-        LOGD(@"NATS: Added prefix to tag: '%@'", tagTopic);
+      // Skip santa.host.* topics in tags - these should not be in the tags array
+      if ([tag hasPrefix:@"santa.host."]) {
+        LOGW(@"NATS: Skipping host topic in tags array: %@ (host topics should not be in tags)", tag);
+        continue;
       }
       
-      // Skip santa.host.* topics in tags - these should not be in the tags array
+      // Build the topic from the tag
+      NSString *tagTopic = [self buildTopicFromTag:tag];
+      
+      // Double-check the built topic doesn't start with santa.host.
       if ([tagTopic hasPrefix:@"santa.host."]) {
-        LOGW(@"NATS: Skipping host topic in tags array: %@ (host topics should not be in tags)", tagTopic);
+        LOGE(@"NATS: Built topic still has host prefix: %@ from tag: %@", tagTopic, tag);
         continue;
       }
       
@@ -657,6 +670,66 @@ static void closedCallback(natsConnection *nc, void *closure) {
   });
 }
 
+// Schedule a connection retry with exponential backoff and jitter
+- (void)scheduleConnectionRetry {
+  if (self.isShuttingDown || self.isRetrying) return;
+  
+  self.isRetrying = YES;
+  self.retryAttempt++;
+  
+  // Calculate exponential backoff with jitter
+  // Base delay doubles each attempt: 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s
+  NSTimeInterval baseDelay = pow(2.0, MIN(self.retryAttempt - 1, 8)); // Cap at 2^8 = 256 seconds
+  
+  // Add jitter: ±25% randomization to prevent thundering herd
+  double jitterFactor = 0.75 + (0.5 * ((double)arc4random_uniform(UINT32_MAX) / UINT32_MAX));
+  self.currentRetryDelay = baseDelay * jitterFactor;
+  
+  // Cap at 5-10 minutes (randomly between 300-600 seconds) after initial backoff
+  if (self.retryAttempt > 9) {
+    self.currentRetryDelay = 300.0 + arc4random_uniform(301); // 5-10 minutes
+  }
+  
+  LOGW(@"NATS: Connection failed, will retry in %.1f seconds (attempt %ld)", 
+       self.currentRetryDelay, (long)self.retryAttempt);
+  
+  // Cancel any existing retry timer
+  if (self.connectionRetryTimer) {
+    dispatch_source_cancel(self.connectionRetryTimer);
+    self.connectionRetryTimer = nil;
+  }
+  
+  // Create retry timer
+  self.connectionRetryTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.connectionQueue);
+  if (!self.connectionRetryTimer) {
+    LOGE(@"NATS: Failed to create retry timer");
+    self.isRetrying = NO;
+    return;
+  }
+  
+  dispatch_source_set_timer(self.connectionRetryTimer,
+                            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(self.currentRetryDelay * NSEC_PER_SEC)),
+                            DISPATCH_TIME_FOREVER, 
+                            (int64_t)(0.1 * NSEC_PER_SEC)); // 100ms leeway
+  
+  __weak SNTPushClientNATS *weakSelf = self;
+  dispatch_source_set_event_handler(self.connectionRetryTimer, ^{
+    __strong SNTPushClientNATS *strongSelf = weakSelf;
+    if (!strongSelf || strongSelf.isShuttingDown) return;
+    
+    strongSelf.isRetrying = NO;
+    if (strongSelf.connectionRetryTimer) {
+      dispatch_source_cancel(strongSelf.connectionRetryTimer);
+      strongSelf.connectionRetryTimer = nil;
+    }
+    
+    LOGI(@"NATS: Retrying connection (attempt %ld)", (long)strongSelf.retryAttempt);
+    [strongSelf connect];
+  });
+  
+  dispatch_resume(self.connectionRetryTimer);
+}
+
 
 #pragma mark - SNTPushNotificationsClientDelegate
 - (NSString *)token {
@@ -680,11 +753,13 @@ static void closedCallback(natsConnection *nc, void *closure) {
     // Now attempt to connect
     [self connectIfConfigured];
   } else {
-    LOGW(@"NATS: Missing required push configuration from preflight");
-    if (!syncState.pushServer) LOGW(@"NATS: - Missing push server");
-    if (!syncState.pushNKey) LOGW(@"NATS: - Missing push nkey");  
-    if (!syncState.pushJWT) LOGW(@"NATS: - Missing push JWT");
-    if (!syncState.pushDeviceID) LOGW(@"NATS: - Missing push device ID");
+    NSMutableArray *missing = [NSMutableArray array];
+    if (!syncState.pushServer) [missing addObject:@"server"];
+    if (!syncState.pushNKey) [missing addObject:@"nkey"];
+    if (!syncState.pushJWT) [missing addObject:@"JWT"];
+    if (!syncState.pushDeviceID) [missing addObject:@"device ID"];
+    LOGW(@"NATS: Missing required push configuration from preflight: %@", 
+         [missing componentsJoinedByString:@", "]);
   }
   
   // Update sync interval

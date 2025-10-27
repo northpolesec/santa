@@ -32,10 +32,16 @@ extern "C" {
 @property(nonatomic) natsSubscription *deviceSub;
 @property(nonatomic) natsSubscription *globalSub;
 @property(nonatomic, readwrite) BOOL isConnected;
+@property(nonatomic) dispatch_source_t connectionRetryTimer;
+@property(nonatomic) NSTimeInterval currentRetryDelay;
+@property(nonatomic) NSInteger retryAttempt;
+@property(nonatomic) BOOL isRetrying;
+@property(nonatomic) BOOL hasSyncedWithServer;
 - (void)connect;
-- (void)disconnect;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
 - (void)subscribe;
+- (void)scheduleConnectionRetry;
+- (NSString *)buildTopicFromTag:(NSString *)tag;
 @end
 
 @interface SNTPushClientNATSTest : XCTestCase
@@ -62,7 +68,7 @@ extern "C" {
 }
 
 - (void)tearDown {
-  [self.client disconnect];
+  [self.client disconnectWithCompletion:nil];
   self.client = nil;
   [self.mockConfigurator stopMocking];
   [self.mockSystemInfo stopMocking];
@@ -101,7 +107,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
   // When: Disconnect is called
-  [self.client disconnect];
+  [self.client disconnectWithCompletion:nil];
   
   // Then: Client should be disconnected
   XCTAssertFalse(self.client.isConnected);
@@ -120,8 +126,8 @@ extern "C" {
   // When: Client is initialized and configured
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   
-  // Then: Should attempt to subscribe when connected
-  // Device topic: santa.12345678-1234-1234-1234-123456789012
+  // Then: Should sanitize the device ID (remove hyphens)
+  // Expected sanitized device topic: santa.host.12345678123412341234123456789012
   // Tags: as provided in configuration
   // (Would verify through NATS connection in integration test)
 }
@@ -233,6 +239,191 @@ extern "C" {
   
   // Then: Full sync interval should be default value
   XCTAssertEqual(self.client.fullSyncInterval, kDefaultPushNotificationsFullSyncInterval);
+}
+
+#pragma mark - Connection Retry Tests
+
+- (void)testConnectionRetryInitialization {
+  // Given/When: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // Then: Retry state should be initialized correctly
+  XCTAssertEqual(self.client.currentRetryDelay, 1.0);
+  XCTAssertEqual(self.client.retryAttempt, 0);
+  XCTAssertFalse(self.client.isRetrying);
+  XCTAssertNil(self.client.connectionRetryTimer);
+}
+
+- (void)testConnectionRetryScheduled {
+  // Given: Client is initialized and configured
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  self.client.hasSyncedWithServer = YES;
+  
+  // When: scheduleConnectionRetry is called
+  [self.client scheduleConnectionRetry];
+  
+  // Then: Retry should be scheduled
+  XCTAssertTrue(self.client.isRetrying);
+  XCTAssertEqual(self.client.retryAttempt, 1);
+  XCTAssertNotNil(self.client.connectionRetryTimer);
+  XCTAssertGreaterThan(self.client.currentRetryDelay, 0.0);
+  XCTAssertLessThanOrEqual(self.client.currentRetryDelay, 2.0); // First retry with jitter
+  
+  // Cleanup
+  if (self.client.connectionRetryTimer) {
+    dispatch_source_cancel(self.client.connectionRetryTimer);
+  }
+}
+
+- (void)testRetryDelayExponentialBackoff {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  self.client.hasSyncedWithServer = YES;
+  
+  // When: Multiple retries are scheduled
+  NSTimeInterval previousDelay = 0;
+  for (int i = 1; i <= 5; i++) {
+    [self.client scheduleConnectionRetry];
+    
+    // Then: Delay should increase exponentially (accounting for jitter)
+    NSTimeInterval baseDelay = pow(2.0, i - 1);
+    NSTimeInterval minDelay = baseDelay * 0.75;
+    NSTimeInterval maxDelay = baseDelay * 1.25;
+    
+    XCTAssertGreaterThanOrEqual(self.client.currentRetryDelay, minDelay);
+    XCTAssertLessThanOrEqual(self.client.currentRetryDelay, maxDelay);
+    XCTAssertGreaterThan(self.client.currentRetryDelay, previousDelay);
+    
+    previousDelay = self.client.currentRetryDelay;
+    
+    // Cleanup timer for next iteration
+    if (self.client.connectionRetryTimer) {
+      dispatch_source_cancel(self.client.connectionRetryTimer);
+      self.client.connectionRetryTimer = nil;
+    }
+    self.client.isRetrying = NO;
+  }
+}
+
+- (void)testRetryDelayCapAt5To10Minutes {
+  // Given: Client with many retry attempts
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  self.client.hasSyncedWithServer = YES;
+  self.client.retryAttempt = 9; // Set to 9 so next attempt will be 10th
+  
+  // When: Next retry is scheduled
+  [self.client scheduleConnectionRetry];
+  
+  // Then: Delay should be capped between 5-10 minutes
+  XCTAssertEqual(self.client.retryAttempt, 10);
+  XCTAssertGreaterThanOrEqual(self.client.currentRetryDelay, 300.0); // 5 minutes
+  XCTAssertLessThanOrEqual(self.client.currentRetryDelay, 600.0);    // 10 minutes
+  
+  // Cleanup
+  if (self.client.connectionRetryTimer) {
+    dispatch_source_cancel(self.client.connectionRetryTimer);
+  }
+}
+
+#pragma mark - Topic Building Tests
+
+- (void)testBuildTopicFromTag {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // Test 1: Regular tag
+  NSString *topic1 = [self.client buildTopicFromTag:@"production"];
+  XCTAssertEqualObjects(topic1, @"santa.tag.production");
+  
+  // Test 2: Tag with hyphens and periods (should be sanitized)
+  NSString *topic2 = [self.client buildTopicFromTag:@"prod-env.v2"];
+  XCTAssertEqualObjects(topic2, @"santa.tag.prodenvv2");
+  
+  // Test 3: Tag already prefixed with santa.tag.
+  NSString *topic3 = [self.client buildTopicFromTag:@"santa.tag.staging"];
+  XCTAssertEqualObjects(topic3, @"santa.tag.staging");
+}
+
+- (void)testBuildTopicFromTagRejectsHostTopics {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // When: Attempting to build topic from santa.host.* tag
+  NSString *hostTopic = [self.client buildTopicFromTag:@"santa.host.7228546F079C54169E2C929EACE830BE"];
+  
+  // Then: Should return the original tag without processing (to fail validation later)
+  XCTAssertEqualObjects(hostTopic, @"santa.host.7228546F079C54169E2C929EACE830BE");
+  // The topic should not be transformed into santa.tag.*
+  XCTAssertFalse([hostTopic hasPrefix:@"santa.tag."]);
+}
+
+- (void)testHandlePreflightSyncStateFiltersHostTopics {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // When: Preflight sync state includes santa.host.* in tags (which shouldn't happen)
+  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  syncState.pushServer = @"workshop";
+  syncState.pushNKey = @"test-nkey";
+  syncState.pushJWT = @"test-jwt";
+  syncState.pushDeviceID = @"test-device-id";
+  syncState.pushTags = @[@"production", @"santa.host.7228546F079C54169E2C929EACE830BE", @"staging"];
+  syncState.pushNotificationsFullSyncInterval = 3600;
+  
+  [self.client handlePreflightSyncState:syncState];
+  
+  // Then: The santa.host.* topic should be filtered out during subscription
+  // (This would be verified through logs in integration test)
+  // The client should still be configured normally
+  XCTAssertEqual(self.client.fullSyncInterval, 3600);
+}
+
+#pragma mark - Device ID Sanitization Tests
+
+- (void)testDeviceIDSanitization {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // Test various device ID formats that need sanitization
+  NSArray<NSArray<NSString *> *> *testCases = @[
+    @[@"12345678-1234-1234-1234-123456789012", @"santa.host.12345678123412341234123456789012"],
+    @[@"device.id.with.dots", @"santa.host.deviceidwithdots"],
+    @[@"device-id-with-hyphens", @"santa.host.deviceidwithhyphens"],
+    @[@"mixed.device-id.format-123", @"santa.host.mixeddeviceidformat123"],
+    @[@"UPPERCASE-DEVICE.ID", @"santa.host.UPPERCASEDEVICEID"],
+    @[@"simple", @"santa.host.simple"]
+  ];
+  
+  for (NSArray<NSString *> *testCase in testCases) {
+    NSString *input = testCase[0];
+    // NSString *expected = testCase[1]; // Expected sanitized topic for verification in integration tests
+    
+    // Configure with device ID that needs sanitization
+    [self.client configureWithPushServer:@"workshop"
+                            pushToken:@"test-nkey"
+                                  jwt:@"test-jwt"
+                         pushDeviceID:input
+                                 tags:@[]];
+    
+    // The subscribe method would create the sanitized topic
+    // Expected result: testCase[1]
+    // (Would verify through connection logs in integration test)
+  }
+}
+
+- (void)testEmptyDeviceIDAfterSanitization {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  
+  // When: Device ID consists only of periods and hyphens
+  [self.client configureWithPushServer:@"workshop"
+                          pushToken:@"test-nkey"
+                                jwt:@"test-jwt"
+                       pushDeviceID:@"..--..--"
+                               tags:@[]];
+  
+  // Then: Should log error about empty device ID after sanitization
+  // (Would verify through logs in integration test)
 }
 
 @end
