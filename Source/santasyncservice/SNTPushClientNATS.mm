@@ -185,7 +185,7 @@ extern "C" {
       return;
     }
 
-    // Check if we have teh necessary configuration to connect to the push service.
+    // Check if we have the necessary configuration to connect to the push service.
     if (![self hasRequiredConfiguration]) {
       LOGD(@"NATS: Not connecting - waiting for preflight configuration");
       return;
@@ -248,7 +248,7 @@ extern "C" {
     natsOptions_SetClosedCB(opts, &closedCallback, (__bridge void *)self);
 
     // Create connection
-    status = natsConnection_Connect(&self->_conn, opts);
+    status = natsConnection_Connect(self.conn, opts);
     natsOptions_Destroy(opts);
 
     if (status != NATS_OK) {
@@ -450,7 +450,7 @@ extern "C" {
           LOGE(@"NATS: Failed to subscribe to device topic %@: %s (status: %d)", deviceTopic,
                natsStatus_GetText(status), status);
           // Log connection info for debugging
-          char urlBuffer[256];
+          char urlBuffer[256] = {0};
           natsStatus urlStatus =
               natsConnection_GetConnectedUrl(self.conn, urlBuffer, sizeof(urlBuffer));
           if (urlStatus == NATS_OK) {
