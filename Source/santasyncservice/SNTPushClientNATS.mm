@@ -248,7 +248,8 @@ extern "C" {
     natsOptions_SetClosedCB(opts, &closedCallback, (__bridge void *)self);
 
     // Create connection
-    status = natsConnection_Connect(self.conn, opts);
+    natsConnection *conn = NULL;
+    status = natsConnection_Connect(&conn, opts);
     natsOptions_Destroy(opts);
 
     if (status != NATS_OK) {
@@ -258,6 +259,7 @@ extern "C" {
     }
 
     LOGI(@"NATS: Connected to %@", serverURL);
+    self.conn = conn;
     self.isConnected = YES;
 
     // Reset retry state on successful connection
