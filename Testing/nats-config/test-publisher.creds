@@ -1,0 +1,13 @@
+-----BEGIN NATS USER JWT-----
+eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJYNlREWklOTE1VUVRHWjdXT0k1Tzc0MkQ2VExWQk1OV0oyNDIyUEtCUTRJMklMRk1ITlFBIiwiaWF0IjoxNzYxMzk2NjU0LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiOiJ0ZXN0LXB1Ymxpc2hlciIsInN1YiI6IlVCM1ZDTFRRSVMyWklPUjRNRzdZSFFQNkU2Q1NQUVA0NkxQNjNVUUFHNldITU40WUJJS0VPTkIyIiwibmF0cyI6eyJwdWIiOnsiYWxsb3ciOlsic2FudGEuKiIsInNhbnRhLmhvc3QuKiIsInNhbnRhLnRhZy4qIl19LCJzdWIiOnsiYWxsb3ciOlsic2FudGEuKiJdfSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.-WT84YZASQ4e8cqmTncyVwaDMfjkM66HQFnFxYU36_WOoUV9FZHexCDYHArWLjdJu_ybaiIv4tmn2hIhkRq2Bw
+------END NATS USER JWT------
+
+************************* IMPORTANT *************************
+NKEY Seed printed below can be used to sign and prove identity.
+NKEYs are sensitive and should be treated as secrets.
+
+-----BEGIN USER NKEY SEED-----
+SUAHTEEWVEQ72TBSE5ZRCCALOU57HKPOLWDLZGBHZB6RMAPOD5OI4KNAYM
+------END USER NKEY SEED------
+
+*************************************************************
