@@ -46,6 +46,11 @@
 ///
 + (BOOL)isHidden;
 
+///
+///  Additional names that should resolve to the command.
+///
++ (NSSet<NSString *> *)aliases;
+
 @end
 
 @protocol SNTCommandRunProtocol <NSObject>

@@ -220,6 +220,10 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           formattedStringForKeyArray(self.signingChainKeys)];
 }
 
++ (NSSet<NSString *> *)aliases {
+  return [NSSet setWithArray:@[ @"fi" ]];
+}
+
 + (NSArray<NSString *> *)fileInfoKeys {
   return @[
     kPath,
