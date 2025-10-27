@@ -24,6 +24,7 @@
 /// Key is the name of the command
 /// Value is the Class
 static NSMutableDictionary *registeredCommands;
+static NSMutableDictionary *registeredAliases;
 
 + (void)registerCommand:(Class<SNTCommandProtocol, SNTCommandRunProtocol>)command
                   named:(NSString *)name {
@@ -31,6 +32,26 @@ static NSMutableDictionary *registeredCommands;
     registeredCommands = [NSMutableDictionary dictionary];
   }
   registeredCommands[name] = command;
+
+  if ([command respondsToSelector:@selector(aliases)]) {
+    if (!registeredAliases) {
+      registeredAliases = [NSMutableDictionary dictionary];
+    }
+
+    NSSet<NSString *> *aliases = [command aliases];
+    if (!aliases) {
+      return;
+    }
+
+    for (NSString *alias in aliases) {
+      if (registeredAliases[alias]) {
+        TEE_LOGE(@"Duplicate alias registered: %@", alias);
+        exit(EXIT_FAILURE);
+      }
+
+      registeredAliases[alias] = name;
+    }
+  }
 }
 
 + (NSString *)usage {
@@ -64,13 +85,25 @@ static NSMutableDictionary *registeredCommands;
   if (command) {
     NSString *shortHelp = [command shortHelpText];
     NSString *longHelp = [command longHelpText];
-    if (longHelp) {
-      return [NSString stringWithFormat:@"Help for '%@':\n%@", commandName, longHelp];
-    } else if (shortHelp) {
-      return [NSString stringWithFormat:@"Help for '%@':\n%@", commandName, shortHelp];
+    if (longHelp || shortHelp) {
+      longHelp = [NSString stringWithFormat:@"Help for '%@':\n%@", commandName, longHelp ?: shortHelp];
     } else {
-      return @"This command does not have any help information.";
+      longHelp = @"This command does not have any help information.";
     }
+
+    // Normalize trailing whitespace so as not to rely on all commands conforming to a style.
+    longHelp = [longHelp stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    longHelp = [longHelp stringByAppendingString:@"\n"];
+
+    if ([command respondsToSelector:@selector(aliases)]) {
+      NSSet<NSString *> *aliases = [command aliases];
+      if (aliases.count > 0) {
+        longHelp = [NSString stringWithFormat:@"%@\nAliases: %@\n", longHelp,
+                                              [[aliases allObjects] componentsJoinedByString:@", "]];
+      }
+    }
+
+    return longHelp;
   }
   return nil;
 }
@@ -93,6 +126,15 @@ static NSMutableDictionary *registeredCommands;
 
 + (BOOL)hasCommandWithName:(NSString *)commandName {
   return ([registeredCommands objectForKey:commandName] != nil);
+}
+
++ (NSString *)resolveCommandName:(NSString *)name {
+  // Remove hyphens and underscores
+  NSString *normalized = [[name stringByReplacingOccurrencesOfString:@"-" withString:@""]
+      stringByReplacingOccurrencesOfString:@"_"
+                                withString:@""];
+
+  return registeredAliases[normalized] ?: normalized;
 }
 
 + (void)runCommandWithName:(NSString *)commandName arguments:(NSArray *)arguments {
