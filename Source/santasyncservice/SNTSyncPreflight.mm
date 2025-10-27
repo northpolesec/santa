@@ -256,22 +256,22 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
       self.syncState.pushServer = StringToNSString(resp.push_server());
       LOGD(@"Preflight: Push server: %@", self.syncState.pushServer);
     }
-    
+
     if (!resp.push_key().empty()) {
       self.syncState.pushNKey = StringToNSString(resp.push_key());
     }
-    
+
     if (!resp.push_token().empty()) {
       self.syncState.pushJWT = StringToNSString(resp.push_token());
     }
-    
+
     if (!resp.push_deviceid().empty()) {
       self.syncState.pushDeviceID = StringToNSString(resp.push_deviceid());
       LOGI(@"Preflight: Received push device ID: %@", self.syncState.pushDeviceID);
     } else {
       LOGW(@"Preflight: No push device ID received from server");
     }
-    
+
     if (resp.push_tags_size() > 0) {
       NSMutableArray *tags = [NSMutableArray arrayWithCapacity:resp.push_tags_size()];
       for (const auto &tag : resp.push_tags()) {

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <XCTest/XCTest.h>
 #import <OCMock/OCMock.h>
+#import <XCTest/XCTest.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
@@ -37,10 +37,10 @@
 
 - (void)setUp {
   [super setUp];
-  
+
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
-  
+
   self.mockDaemonConn = OCMClassMock([MOLXPCConnection class]);
 }
 
@@ -54,7 +54,7 @@
   // Given: Daemon connection is available
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
-  
+
   // Then: Push notifications should always be NATS client
   XCTAssertNotNil(self.syncManager.pushNotifications);
   XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientNATS class]]);

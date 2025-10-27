@@ -17,8 +17,8 @@
 @interface SNTPushClientNATS : NSObject <SNTPushNotificationsClientDelegate>
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
-- (void)configureWithPushServer:(NSString *)server 
-                      pushToken:(NSString *)token 
+- (void)configureWithPushServer:(NSString *)server
+                      pushToken:(NSString *)token
                             jwt:(NSString *)jwt
                    pushDeviceID:(NSString *)deviceID
                            tags:(NSArray<NSString *> *)tags;
