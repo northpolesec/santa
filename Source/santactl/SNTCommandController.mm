@@ -86,20 +86,23 @@ static NSMutableDictionary *registeredAliases;
     NSString *shortHelp = [command shortHelpText];
     NSString *longHelp = [command longHelpText];
     if (longHelp || shortHelp) {
-      longHelp = [NSString stringWithFormat:@"Help for '%@':\n%@", commandName, longHelp ?: shortHelp];
+      longHelp =
+          [NSString stringWithFormat:@"Help for '%@':\n%@", commandName, longHelp ?: shortHelp];
     } else {
       longHelp = @"This command does not have any help information.";
     }
 
     // Normalize trailing whitespace so as not to rely on all commands conforming to a style.
-    longHelp = [longHelp stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    longHelp = [longHelp
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     longHelp = [longHelp stringByAppendingString:@"\n"];
 
     if ([command respondsToSelector:@selector(aliases)]) {
       NSSet<NSString *> *aliases = [command aliases];
       if (aliases.count > 0) {
-        longHelp = [NSString stringWithFormat:@"%@\nAliases: %@\n", longHelp,
-                                              [[aliases allObjects] componentsJoinedByString:@", "]];
+        longHelp =
+            [NSString stringWithFormat:@"%@\nAliases: %@\n", longHelp,
+                                       [[aliases allObjects] componentsJoinedByString:@", "]];
       }
     }
 
