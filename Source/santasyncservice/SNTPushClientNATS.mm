@@ -37,16 +37,19 @@ __END_DECLS
 @property(nonatomic) natsConnection *conn;
 @property(nonatomic) natsSubscription *deviceSub;
 @property(nonatomic) natsSubscription *globalSub;
-@property(nonatomic)
-    NSMutableArray<NSValue *> *tagSubscriptions;        // Array of natsSubscription pointers
-@property(nonatomic) dispatch_queue_t connectionQueue;  // Single queue for connection management
-@property(nonatomic) dispatch_queue_t messageQueue;     // Queue for processing messages
+// Array of natsSubscription pointers wrapped in NSValue
+@property(nonatomic) NSMutableArray<NSValue *> *tagSubscriptions;
+// Single queue for connection management
+@property(nonatomic) dispatch_queue_t connectionQueue;
+// Queue for processing messages
+@property(nonatomic) dispatch_queue_t messageQueue;
 @property(atomic, readwrite) BOOL isConnected;
 @property(nonatomic, readwrite) NSUInteger fullSyncInterval;
 @property(atomic) BOOL isShuttingDown;
 // Push notification configuration from preflight
 @property(nonatomic, copy) NSString *pushServer;
-@property(nonatomic, copy) NSString *pushToken;  // nkey
+// nkey
+@property(nonatomic, copy) NSString *pushToken;
 @property(nonatomic, copy) NSString *jwt;
 @property(nonatomic, copy) NSString *pushDeviceID;
 @property(nonatomic, copy) NSArray<NSString *> *tags;
@@ -180,6 +183,7 @@ __END_DECLS
   });
 }
 
+// Check if we have the necessary configuration to connect to the push service.
 - (BOOL)hasRequiredConfiguration {
   return self.hasSyncedWithServer && self.pushServer && self.pushToken && self.jwt &&
          self.pushDeviceID;
@@ -368,32 +372,6 @@ __END_DECLS
   [self.tagSubscriptions removeAllObjects];
 
   LOGD(@"NATS: All topics unsubscribed");
-}
-
-- (NSString *)buildTopicFromTag:(NSString *)tag {
-  NSString *processedTag = tag;
-
-  // IMPORTANT: santa.host.* topics should never be processed as tags
-  if ([tag hasPrefix:@"santa.host."]) {
-    return tag;
-  }
-
-  // If tag already has santa.tag. prefix, extract just the tag part
-  if ([tag hasPrefix:@"santa.tag."]) {
-    // Length of "santa.tag." is 10
-    processedTag = [tag substringFromIndex:10];
-    LOGD(@"NATS: Tag already has prefix, extracted: '%@'", processedTag);
-  }
-
-  // Strip hyphens and periods from tag for NATS compatibility
-  NSString *sanitizedTag = [processedTag stringByReplacingOccurrencesOfString:@"-" withString:@""];
-  sanitizedTag = [sanitizedTag stringByReplacingOccurrencesOfString:@"." withString:@""];
-  LOGD(@"NATS: Sanitized tag: '%@'", sanitizedTag);
-
-  // Build as santa.tag.<sanitized>
-  NSString *tagTopic = [NSString stringWithFormat:@"santa.tag.%@", sanitizedTag];
-  LOGD(@"NATS: Built tag topic: '%@'", tagTopic);
-  return tagTopic;
 }
 
 - (BOOL)isValidNATSTopic:(NSString *)topic {
