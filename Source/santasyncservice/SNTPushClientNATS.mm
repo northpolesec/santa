@@ -726,7 +726,6 @@ static void closedCallback(natsConnection *nc, void *closure) {
       DISPATCH_TIME_FOREVER,
       (int64_t)(0.1 * NSEC_PER_SEC));  // 100ms leeway
 
-  __weak SNTPushClientNATS *weakSelf = self;
   WEAKIFY(self);
 
   dispatch_source_set_event_handler(self.connectionRetryTimer, ^{
