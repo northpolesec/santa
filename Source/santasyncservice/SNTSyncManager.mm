@@ -73,8 +73,16 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   if (self) {
     _daemonConn = daemonConn;
 
-    // Always use NATS for push notifications
-    _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
+    SNTConfigurator *config = [SNTConfigurator configurator];
+    if (config.enableAPNS) {
+      _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];
+    } else if (config.fcmEnabled) {
+      _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
+    } else {
+      // Default to NATS if no other push notifications are enabled. This will
+      // only work for V2 sync clients.
+      _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
+    }
 
     _fullSyncTimer = [self createSyncTimerWithBlock:^{
       [self rescheduleTimerQueue:self.fullSyncTimer
