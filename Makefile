@@ -15,6 +15,9 @@ v2release:
 v2release-notls:
 	bazel build -c opt --apple_generate_dsym --copt=-DSANTA_FORCE_SYNC_V2=1 --copt=-DSANTA_NATS_DISABLE_TLS=1 --macos_cpus=arm64,x86_64 //:release
 
+debugrelease:
+	bazel build -c opt --apple_generate_dsym --copt=-DDEBUG=1 --macos_cpus=arm64,x86_64 //:release
+
 devrelease:
 	bazel build -c opt --apple_generate_dsym --macos_cpus=arm64,x86_64 //:release
 

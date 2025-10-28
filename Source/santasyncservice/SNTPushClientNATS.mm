@@ -19,6 +19,7 @@
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/santasyncservice/SNTSyncState.h"
@@ -726,18 +727,20 @@ static void closedCallback(natsConnection *nc, void *closure) {
       (int64_t)(0.1 * NSEC_PER_SEC));  // 100ms leeway
 
   __weak SNTPushClientNATS *weakSelf = self;
-  dispatch_source_set_event_handler(self.connectionRetryTimer, ^{
-    __strong SNTPushClientNATS *strongSelf = weakSelf;
-    if (!strongSelf || strongSelf.isShuttingDown) return;
+  WEAKIFY(self);
 
-    strongSelf.isRetrying = NO;
-    if (strongSelf.connectionRetryTimer) {
-      dispatch_source_cancel(strongSelf.connectionRetryTimer);
-      strongSelf.connectionRetryTimer = nil;
+  dispatch_source_set_event_handler(self.connectionRetryTimer, ^{
+    STRONGIFY(self);
+    if (!self || self.isShuttingDown) return;
+
+    self.isRetrying = NO;
+    if (self.connectionRetryTimer) {
+      dispatch_source_cancel(self.connectionRetryTimer);
+      self.connectionRetryTimer = nil;
     }
 
-    LOGI(@"NATS: Retrying connection (attempt %ld)", (long)strongSelf.retryAttempt);
-    [strongSelf connect];
+    LOGI(@"NATS: Retrying connection (attempt %ld)", (long)self.retryAttempt);
+    [self connect];
   });
 
   dispatch_resume(self.connectionRetryTimer);
