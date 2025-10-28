@@ -57,8 +57,8 @@ __END_DECLS
 // Connection retry state
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
 @property(nonatomic) NSTimeInterval currentRetryDelay;
-@property(nonatomic) NSInteger retryAttempt;
-@property(nonatomic) BOOL isRetrying;
+@property(atomic) NSInteger retryAttempt;
+@property(atomic) BOOL isRetrying;
 @end
 
 @implementation SNTPushClientNATS
@@ -72,12 +72,8 @@ __END_DECLS
         dispatch_queue_create("com.northpolesec.santa.nats.connection", DISPATCH_QUEUE_SERIAL);
     _messageQueue =
         dispatch_queue_create("com.northpolesec.santa.nats.message", DISPATCH_QUEUE_SERIAL);
-    _isShuttingDown = NO;
-    _hasSyncedWithServer = NO;
     _tagSubscriptions = [NSMutableArray array];
     _currentRetryDelay = 1.0;  // Start with 1 second
-    _retryAttempt = 0;
-    _isRetrying = NO;
 
     // Don't connect immediately - wait for preflight to provide configuration
     LOGI(@"NATS push client: Initialized, waiting for preflight configuration");
@@ -234,7 +230,11 @@ __END_DECLS
     serverURL = [NSString stringWithFormat:@"nats://%@", self.pushServer];
     LOGW(@"NATS: TLS disabled for debugging - using insecure connection on %@", serverURL);
 #else 
-      serverURL = [NSString stringWithFormat:@"tls://%@", self.pushServer];
+   if (![self.pushServer hasPrefix:@"tls://"]) {
+    LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", self.pushServer);
+    return;
+   }
+   serverURL = self.pushServer;
 #endif
 
     LOGI(@"NATS: Using connection to %@", serverURL);
@@ -456,14 +456,21 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   int dataLen = natsMsg_GetDataLength(msg);
 
   NSString *msgSubject = subject ? @(subject) : @"<unknown>";
-  NSString *msgData = nil;
+  NSString *msgData;
   if (data && dataLen > 0) {
+    // Decode the payload as a UTF-8 string. 
+    // TODO in the future handle binary data e.g. protobuf if / when needed.
     msgData = [[NSString alloc] initWithBytes:data length:dataLen encoding:NSUTF8StringEncoding];
+  } else {
+    msgData = @"";
   }
 
   LOGD(@"NATS: Received message on subject '%@': %@", msgSubject, msgData ?: @"<no data>");
 
-  // Process on message queue to serialize handling
+  // Process on message queue to serialize handling of messages and gurantee we
+  // avoid blocking the NATS managed thread. Then call back to the main thread
+  // to trigger the sync. Also force serialization of the sync call to avoid
+  // thundering herd.
   dispatch_async(self.messageQueue, ^{
     if (!self.isShuttingDown) {
       LOGI(@"NATS: Triggering immediate sync due to message on %@", msgSubject);
@@ -531,8 +538,8 @@ static void reconnectedCallback(natsConnection *nc, void *closure) {
     // Trigger sync with jitter to avoid thundering herd
     // We might have missed push notifications while disconnected
     if (!self.isShuttingDown) {
-      // Calculate jitter: random delay between 0 and 30 seconds
-      uint32_t jitterSeconds = arc4random_uniform(30);
+      // Calculate jitter: random delay between 0 and 90 seconds
+      uint32_t jitterSeconds = arc4random_uniform(91);
 
       LOGI(@"NATS: Scheduling sync after reconnect with %u second jitter delay", jitterSeconds);
 
@@ -595,6 +602,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
     return;
   }
 
+  // Set a one shot timer to retry the connection with the calculated delay.
   dispatch_source_set_timer(
       self.connectionRetryTimer,
       dispatch_time(DISPATCH_TIME_NOW, (int64_t)(self.currentRetryDelay * NSEC_PER_SEC)),
@@ -603,6 +611,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
 
   WEAKIFY(self);
 
+  // Set the event handler to retry the connection when the timer fires.
   dispatch_source_set_event_handler(self.connectionRetryTimer, ^{
     STRONGIFY(self);
     if (!self || self.isShuttingDown) return;
