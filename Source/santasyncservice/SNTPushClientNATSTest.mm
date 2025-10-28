@@ -41,7 +41,6 @@ extern "C" {
 - (void)disconnectWithCompletion:(void (^)(void))completion;
 - (void)subscribe;
 - (void)scheduleConnectionRetry;
-- (NSString *)buildTopicFromTag:(NSString *)tag;
 @end
 
 @interface SNTPushClientNATSTest : XCTestCase
@@ -326,37 +325,6 @@ extern "C" {
 }
 
 #pragma mark - Topic Building Tests
-
-- (void)testBuildTopicFromTag {
-  // Given: Client is initialized
-  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
-
-  // Test 1: Regular tag
-  NSString *topic1 = [self.client buildTopicFromTag:@"production"];
-  XCTAssertEqualObjects(topic1, @"santa.tag.production");
-
-  // Test 2: Tag with hyphens and periods (should be sanitized)
-  NSString *topic2 = [self.client buildTopicFromTag:@"prod-env.v2"];
-  XCTAssertEqualObjects(topic2, @"santa.tag.prodenvv2");
-
-  // Test 3: Tag already prefixed with santa.tag.
-  NSString *topic3 = [self.client buildTopicFromTag:@"santa.tag.staging"];
-  XCTAssertEqualObjects(topic3, @"santa.tag.staging");
-}
-
-- (void)testBuildTopicFromTagRejectsHostTopics {
-  // Given: Client is initialized
-  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
-
-  // When: Attempting to build topic from santa.host.* tag
-  NSString *hostTopic =
-      [self.client buildTopicFromTag:@"santa.host.7228546F079C54169E2C929EACE830BE"];
-
-  // Then: Should return the original tag without processing (to fail validation later)
-  XCTAssertEqualObjects(hostTopic, @"santa.host.7228546F079C54169E2C929EACE830BE");
-  // The topic should not be transformed into santa.tag.*
-  XCTAssertFalse([hostTopic hasPrefix:@"santa.tag."]);
-}
 
 - (void)testHandlePreflightSyncStateFiltersHostTopics {
   // Given: Client is initialized

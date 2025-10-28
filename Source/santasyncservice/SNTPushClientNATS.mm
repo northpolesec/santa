@@ -458,7 +458,7 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   NSString *msgSubject = subject ? @(subject) : @"<unknown>";
   NSString *msgData;
   if (data && dataLen > 0) {
-    // Decode the payload as a UTF-8 string. 
+    // Decode the payload as a UTF-8 string.
     // TODO in the future handle binary data e.g. protobuf if / when needed.
     msgData = [[NSString alloc] initWithBytes:data length:dataLen encoding:NSUTF8StringEncoding];
   } else {
