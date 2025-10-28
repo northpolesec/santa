@@ -95,13 +95,29 @@ extern "C" {
     if (self.isShuttingDown) return;
 
     NSString *fullServer;
-#ifdef SANTA_FORCE_SYNC_V2
+#ifdef DEBUG
     // In debug builds, allow overriding the domain suffix
     fullServer = server;
-    LOGW(@"NATS: Domain suffix disabled for debugging - using server as-is: %@", fullServer);
+    LOGW(@"NATS: Domain check disabled - using server as-is: %@", fullServer);
 #else
-    // Always append domain suffix in release builds 
-    fullServer = [NSString stringWithFormat:@"%@.push.northpole.security", server];
+  if (!server) {
+    LOGE(@"NATS: Invalid push server domain. No server provided");
+    return;
+  }
+
+ // In release builds, validate the domain suffix.
+ if (![server hasSuffix:@".push.northpole.security:443"]) {
+      LOGE(@"NATS: Invalid push server domain. Must end with '.push.northpole.security', got: %@", server);
+      return;
+ }
+
+ // Make sure this starts with either nats:// or tls://
+ if (![server hasPrefix:@"tls://"]) {
+      LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", server);
+      return;
+ }
+
+  fullServer = server;
 #endif
 
     // Check if device ID has changed
