@@ -16,6 +16,7 @@
 
 #import <dispatch/dispatch.h>
 #include <string.h>
+#include <sys/cdefs.h>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
@@ -24,10 +25,12 @@
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
+__BEGIN_DECLS
+
 // Include NATS C client header
-extern "C" {
 #import "src/nats.h"
-}
+
+__END_DECLS
 
 @interface SNTPushClientNATS ()
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
@@ -38,7 +41,7 @@ extern "C" {
     NSMutableArray<NSValue *> *tagSubscriptions;        // Array of natsSubscription pointers
 @property(nonatomic) dispatch_queue_t connectionQueue;  // Single queue for connection management
 @property(nonatomic) dispatch_queue_t messageQueue;     // Queue for processing messages
-@property(nonatomic, readwrite) BOOL isConnected;
+@property(atomic, readwrite) BOOL isConnected;
 @property(nonatomic, readwrite) NSUInteger fullSyncInterval;
 @property(atomic) BOOL isShuttingDown;
 // Push notification configuration from preflight
@@ -106,11 +109,13 @@ extern "C" {
     return;
   }
 
- // In release builds, validate the domain suffix.
+// In release builds, validate the domain suffix.
+#ifndef DEBUG
  if (![server hasSuffix:@".push.northpole.security:443"]) {
       LOGE(@"NATS: Invalid push server domain. Must end with '.push.northpole.security', got: %@", server);
       return;
  }
+#endif
 
  // Make sure this starts with either nats:// or tls://
  if (![server hasPrefix:@"tls://"]) {
@@ -370,14 +375,13 @@ extern "C" {
 
   // IMPORTANT: santa.host.* topics should never be processed as tags
   if ([tag hasPrefix:@"santa.host."]) {
-    LOGE(@"NATS: Attempted to process host topic '%@' as tag - this should not happen", tag);
-    // Return the original tag to let validation fail it
     return tag;
   }
 
   // If tag already has santa.tag. prefix, extract just the tag part
   if ([tag hasPrefix:@"santa.tag."]) {
-    processedTag = [tag substringFromIndex:10];  // Length of "santa.tag."
+    // Length of "santa.tag." is 10
+    processedTag = [tag substringFromIndex:10];
     LOGD(@"NATS: Tag already has prefix, extracted: '%@'", processedTag);
   }
 
@@ -417,147 +421,40 @@ extern "C" {
   if (self.isShuttingDown) return;
 
   natsStatus status;
-  NSString *deviceTopic = nil;
 
-  // Check if we should skip device subscription (for debugging)
-  BOOL skipDeviceSubscription = NO;
-#ifdef DEBUG
-  if (getenv("SANTA_NATS_SKIP_DEVICE_SUB")) {
-    skipDeviceSubscription = YES;
-    LOGW(@"NATS: Skipping device subscription due to SANTA_NATS_SKIP_DEVICE_SUB");
-  }
-#endif
-
-  if (!skipDeviceSubscription) {
-    // Use push device ID from preflight
-    if (!self.pushDeviceID) {
-      LOGE(@"NATS: No push device ID available for subscription");
-      // Don't return - continue with other subscriptions
-    } else {
-      // Log the raw push device ID to debug
-      LOGI(@"NATS: Push device ID from preflight: '%@'", self.pushDeviceID);
-
-      // Sanitize device ID - remove periods and hyphens for NATS compatibility
-      NSString *sanitizedDeviceID = [self.pushDeviceID stringByReplacingOccurrencesOfString:@"-"
-                                                                                 withString:@""];
-      sanitizedDeviceID = [sanitizedDeviceID stringByReplacingOccurrencesOfString:@"."
-                                                                       withString:@""];
-
-      if (![sanitizedDeviceID isEqualToString:self.pushDeviceID]) {
-        LOGW(@"NATS: Sanitized device ID from '%@' to '%@' (removed periods/hyphens)",
-             self.pushDeviceID, sanitizedDeviceID);
-      }
-
-      if (sanitizedDeviceID.length == 0) {
-        LOGE(@"NATS: Device ID became empty after sanitization");
-        return;
-      } else {
-        // Subscribe to device-specific topic: santa.host.<device_id>
-        deviceTopic = [NSString stringWithFormat:@"santa.host.%@", sanitizedDeviceID];
-      }
-
-      // Final validation of the complete topic
-      if (![self isValidNATSTopic:deviceTopic]) {
-        LOGE(@"NATS: Invalid device topic: %@", deviceTopic);
-      } else {
-        LOGI(@"NATS: Attempting to subscribe to device topic: %@", deviceTopic);
-
-        status = natsConnection_Subscribe(&_deviceSub, self.conn, [deviceTopic UTF8String],
-                                          &messageHandler, (__bridge void *)self);
-
-        if (status != NATS_OK) {
-          LOGE(@"NATS: Failed to subscribe to device topic %@: %s (status: %d)", deviceTopic,
-               natsStatus_GetText(status), status);
-          // Log connection info for debugging
-          char urlBuffer[256] = {0};
-          natsStatus urlStatus =
-              natsConnection_GetConnectedUrl(self.conn, urlBuffer, sizeof(urlBuffer));
-          if (urlStatus == NATS_OK) {
-            LOGE(@"NATS: Connection URL: %s", urlBuffer);
-          } else {
-            LOGE(@"NATS: Could not get connection URL");
-          }
-          LOGW(@"NATS: Continuing without device-specific subscription - will use tag-based topics "
-               @"only");
-        } else {
-          LOGI(@"NATS: Successfully subscribed to device topic: %@", deviceTopic);
-        }
-      }
-    }
-  }
-
-  // Subscribe to global tag: santa.tag.global
-  NSString *globalTagTopic = @"santa.tag.global";
-
-  // Validate global tag topic
-  if (![self isValidNATSTopic:globalTagTopic]) {
-    LOGE(@"NATS: Invalid global tag topic: %@", globalTagTopic);
-  } else {
-    status = natsConnection_Subscribe(&_globalSub, self.conn, [globalTagTopic UTF8String],
-                                      &messageHandler, (__bridge void *)self);
-
-    if (status != NATS_OK) {
-      LOGE(@"NATS: Failed to subscribe to global tag topic: %s", natsStatus_GetText(status));
-    } else {
-      LOGI(@"NATS: Subscribed to global tag topic: %@", globalTagTopic);
-    }
-  }
-
+  // Use push device ID from preflight
   // Subscribe to all tags from preflight: santa.tag.<tag>
   if (self.tags && self.tags.count > 0) {
     LOGD(@"NATS: Processing %lu tags from preflight", (unsigned long)self.tags.count);
 
     // Keep track of already subscribed topics to avoid duplicates
     NSMutableSet *subscribedTopics = [NSMutableSet set];
-    if (deviceTopic) {
-      [subscribedTopics addObject:deviceTopic];
-    }
-    [subscribedTopics addObject:globalTagTopic];
 
     for (NSString *tag in self.tags) {
       LOGD(@"NATS: Processing tag: '%@'", tag);
 
-      // Skip santa.host.* topics in tags - these should not be in the tags array
-      if ([tag hasPrefix:@"santa.host."]) {
-        LOGW(@"NATS: Skipping host topic in tags array: %@ (host topics should not be in tags)",
-             tag);
-        continue;
-      }
-
-      // Build the topic from the tag
-      NSString *tagTopic = [self buildTopicFromTag:tag];
-
-      // Double-check the built topic doesn't start with santa.host.
-      if ([tagTopic hasPrefix:@"santa.host."]) {
-        LOGE(@"NATS: Built topic still has host prefix: %@ from tag: %@", tagTopic, tag);
-        continue;
-      }
-
       // Skip if we've already subscribed to this topic
-      if ([subscribedTopics containsObject:tagTopic]) {
-        LOGD(@"NATS: Skipping duplicate subscription to: %@", tagTopic);
+      if ([subscribedTopics containsObject:tag]) {
+        LOGD(@"NATS: Skipping duplicate subscription to: %@", tag);
         continue;
       }
 
-      // Validate tag topic
-      if (![self isValidNATSTopic:tagTopic]) {
-        LOGE(@"NATS: Invalid tag topic: %@", tagTopic);
+      if (![self isValidNATSTopic:tag]) {
+        LOGE(@"NATS: Invalid tag: %@ - skipping", tag);
         continue;
       }
-
-      [subscribedTopics addObject:tagTopic];
 
       natsSubscription *tagSub = NULL;
-      status = natsConnection_Subscribe(&tagSub, self.conn, [tagTopic UTF8String], &messageHandler,
+      status = natsConnection_Subscribe(&tagSub, self.conn, [tag UTF8String], &messageHandler,
                                         (__bridge void *)self);
 
       if (status != NATS_OK) {
-        LOGE(@"NATS: Failed to subscribe to tag topic %@: %s", tagTopic,
-             natsStatus_GetText(status));
+        LOGE(@"NATS: Failed to subscribe to tag topic %@: %s", tag, natsStatus_GetText(status));
       } else {
-        LOGI(@"NATS: Subscribed to tag topic: %@", tagTopic);
+        LOGI(@"NATS: Subscribed to tag topic: %@", tag);
         // Store the subscription for later cleanup
         [self.tagSubscriptions addObject:[NSValue valueWithPointer:tagSub]];
+        [subscribedTopics addObject:tag];
       }
     }
   }

@@ -14,14 +14,17 @@
 
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
+#include <sys/cdefs.h>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 
+__BEGIN_DECLS
+
 // Include NATS C client header
-extern "C" {
 #import "src/nats.h"
-}
+
+__END_DECLS
 
 // Expose private methods and properties for testing
 @interface SNTPushClientNATS (ConnectionTesting)
