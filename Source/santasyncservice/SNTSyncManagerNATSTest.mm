@@ -50,14 +50,59 @@
   [super tearDown];
 }
 
-- (void)testSyncManagerAlwaysInitializesNATSClient {
-  // Given: Daemon connection is available
+- (void)testSyncManagerInitializesNATSClientWhenEnabled {
+  // Given: FCM is disabled, NATS is enabled (default), and APNS is disabled
+  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
+  OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
+  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
+  
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
 
-  // Then: Push notifications should always be NATS client
+  // Then: Push notifications should be NATS client
   XCTAssertNotNil(self.syncManager.pushNotifications);
   XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientNATS class]]);
+}
+
+- (void)testSyncManagerFCMTakesPrecedenceOverNATS {
+  // Given: Both FCM and NATS are enabled
+  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
+  OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
+  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
+  
+  // When: Sync manager is initialized
+  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
+
+  // Then: Push notifications should be FCM client (FCM takes precedence)
+  XCTAssertNotNil(self.syncManager.pushNotifications);
+  XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientFCM class]]);
+}
+
+- (void)testSyncManagerFallsBackToAPNSWhenNATSDisabled {
+  // Given: FCM is disabled, NATS is disabled, and APNS is enabled
+  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
+  OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
+  OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
+  
+  // When: Sync manager is initialized
+  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
+
+  // Then: Push notifications should be APNS client
+  XCTAssertNotNil(self.syncManager.pushNotifications);
+  XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]);
+}
+
+- (void)testSyncManagerNoPushClientWhenAllDisabled {
+  // Given: All push notification systems are disabled
+  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
+  OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
+  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
+  
+  // When: Sync manager is initialized
+  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
+
+  // Then: Push notifications should be nil
+  XCTAssertNil(self.syncManager.pushNotifications);
 }
 
 @end
