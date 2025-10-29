@@ -112,7 +112,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
         if (![[teamID lowercaseString] isEqualToString:@"platform"]) {
           if (teamID.length != kExpectedTeamIDLength ||
-            [teamID rangeOfCharacterFromSet:nonAlnum].location != NSNotFound) {
+              [teamID rangeOfCharacterFromSet:nonAlnum].location != NSNotFound) {
             [SNTError populateError:error
                            withCode:SNTErrorCodeRuleInvalidIdentifier
                              format:@"Rule received with invalid identifier for its type %@",
