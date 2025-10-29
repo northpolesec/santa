@@ -48,6 +48,11 @@
 + (BOOL)hasCommandWithName:(NSString *)commandName;
 
 ///
+/// Strips hyphens and underscores. If the given name is an alias, returns the real command.
+///
++ (NSString *)resolveCommandName:(NSString *)name;
+
+///
 ///  Runs the given command with the given arguments.
 ///
 ///  @param commandName the name of a previously-registered command

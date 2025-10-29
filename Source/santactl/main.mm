@@ -44,7 +44,7 @@ int main(int argc, const char *argv[]) {
     NSMutableArray *arguments = [[[NSProcessInfo processInfo] arguments] mutableCopy];
     [arguments removeObjectAtIndex:0];
 
-    NSString *commandName = [arguments firstObject];
+    NSString *commandName = [SNTCommandController resolveCommandName:[arguments firstObject]];
     if (!commandName || [commandName isEqualToString:@"usage"] ||
         [commandName isEqualToString:@"commands"]) {
       print_usage();
@@ -56,7 +56,8 @@ int main(int argc, const char *argv[]) {
         [commandName isEqualToString:@"--help"]) {
       if ([arguments count]) {
         // User wants help for specific command
-        commandName = [arguments firstObject];
+        commandName = [SNTCommandController resolveCommandName:[arguments firstObject]];
+
         if (![SNTCommandController hasCommandWithName:commandName]) {
           print_unknown_command(commandName);
           return 1;

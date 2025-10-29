@@ -11,6 +11,7 @@ on:
       - helper.bzl
       - non_module_deps.bzl
       - .github/**
+      - .bazelrc
 
 jobs:
   lint:
