@@ -103,26 +103,25 @@ __END_DECLS
     fullServer = server;
     LOGW(@"NATS: Domain check disabled - using server as-is: %@", fullServer);
 #else
-  if (!server) {
-    LOGE(@"NATS: Invalid push server domain. No server provided");
-    return;
-  }
-
- // In release builds, validate the domain suffix.
- if (![server hasSuffix:@".push.northpole.security:443"]) {
-      LOGE(@"NATS: Invalid push server domain. Must end with '.push.northpole.security', got: %@", server);
-      return;
- }
-#endif
-
-    // Make sure this starts with either nats:// or tls://
-    if (![server hasPrefix:@"tls://"]) {
-      LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", server);
+    if (!server) {
+      LOGE(@"NATS: Invalid push server domain. No server provided");
       return;
     }
 
-    fullServer = server;
+    // In release builds, validate the domain suffix.
+    if (![server hasSuffix:@".push.northpole.security:443"]) {
+        LOGE(@"NATS: Invalid push server domain. Must end with '.push.northpole.security', got: %@", server);
+        return;
+    }
+
+    // Make sure this starts with either nats:// or tls://
+    if (![server hasPrefix:@"tls://"]) {
+        LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", server);
+        return;
+    }
 #endif
+
+    fullServer = server;
 
     // Check if device ID has changed
     BOOL deviceIDChanged = NO;
