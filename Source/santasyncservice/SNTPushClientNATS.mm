@@ -227,15 +227,17 @@ __END_DECLS
     NSString *serverURL;
 
 #if defined(SANTA_FORCE_SYNC_V2) && defined(SANTA_NATS_DISABLE_TLS)
-    serverURL = [NSString stringWithFormat:@"nats://%@", self.pushServer];
-    LOGW(@"NATS: TLS disabled for debugging - using insecure connection on %@", serverURL);
+    if (![self.pushServer hasPrefix:@"tls://"]) {
+      LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", self.pushServer);
+    }
 #else 
    if (![self.pushServer hasPrefix:@"tls://"]) {
-    LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", self.pushServer);
-    return;
+      LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", self.pushServer);
+      natsOptions_Destroy(opts);
+      return;
    }
-   serverURL = self.pushServer;
 #endif
+    serverURL = self.pushServer;
 
     LOGI(@"NATS: Using connection to %@", serverURL);
 

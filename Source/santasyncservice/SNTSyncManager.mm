@@ -74,13 +74,18 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _daemonConn = daemonConn;
 
     SNTConfigurator *config = [SNTConfigurator configurator];
-    if (config.enableAPNS) {
+    LOGD(@"Push notification configuration: enableAPNS=%d, fcmEnabled=%d", 
+         config.enableAPNS, config.fcmEnabled);
+    if (config.enableAPNS == YES) {
+      LOGD(@"Using APNS push notifications");
       _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];
-    } else if (config.fcmEnabled) {
+    } else if (config.fcmEnabled == YES) {
+      LOGD(@"Using FCM push notifications");
       _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
     } else {
       // Default to NATS if no other push notifications are enabled. This will
       // only work for V2 sync clients.
+      LOGD(@"Defaulting to NATS push notifications");
       _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
     }
 
