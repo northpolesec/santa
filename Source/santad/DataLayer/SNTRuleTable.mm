@@ -831,7 +831,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     NSError *error;
     SNTRule *r = [[SNTRule alloc] initStaticRuleWithDictionary:rule error:&error];
     if (error) {
-      LOGE(@"Failed to initialize static rule %@: %@", rule, error);
+      LOGE(@"Failed to initialize static rule %@: %@", rule, error.localizedDescription);
     }
     if (!r) continue;
 
