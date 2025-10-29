@@ -74,8 +74,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _daemonConn = daemonConn;
 
     SNTConfigurator *config = [SNTConfigurator configurator];
-    LOGD(@"Push notification configuration: enableAPNS=%d, fcmEnabled=%d", 
-         config.enableAPNS, config.fcmEnabled);
+    LOGD(@"Push notification configuration: enableAPNS=%d, fcmEnabled=%d", config.enableAPNS,
+         config.fcmEnabled);
     if (config.enableAPNS == YES) {
       LOGD(@"Using APNS push notifications");
       _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];

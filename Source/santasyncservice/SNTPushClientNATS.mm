@@ -108,21 +108,20 @@ __END_DECLS
     return;
   }
 
-// In release builds, validate the domain suffix.
-#ifndef DEBUG
+ // In release builds, validate the domain suffix.
  if (![server hasSuffix:@".push.northpole.security:443"]) {
       LOGE(@"NATS: Invalid push server domain. Must end with '.push.northpole.security', got: %@", server);
       return;
  }
 #endif
 
- // Make sure this starts with either nats:// or tls://
- if (![server hasPrefix:@"tls://"]) {
+    // Make sure this starts with either nats:// or tls://
+    if (![server hasPrefix:@"tls://"]) {
       LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", server);
       return;
- }
+    }
 
-  fullServer = server;
+    fullServer = server;
 #endif
 
     // Check if device ID has changed
