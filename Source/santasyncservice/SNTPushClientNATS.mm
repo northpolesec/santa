@@ -540,8 +540,8 @@ static void reconnectedCallback(natsConnection *nc, void *closure) {
     // Trigger sync with jitter to avoid thundering herd
     // We might have missed push notifications while disconnected
     if (!self.isShuttingDown) {
-      // Calculate jitter: random delay between 0 and 90 seconds
-      uint32_t jitterSeconds = arc4random_uniform(91);
+      // Calculate jitter: random delay between 0 and 600 seconds (10 minutes)
+      uint32_t jitterSeconds = arc4random_uniform(601);
 
       LOGI(@"NATS: Scheduling sync after reconnect with %u second jitter delay", jitterSeconds);
 
