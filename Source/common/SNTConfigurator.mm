@@ -1632,6 +1632,16 @@ static SNTConfigurator *sharedConfigurator = nil;
 #endif
 }
 
+- (id)overriderValue:(id)value forKey:(NSString *)key {
+  // Overrides should only be applied under debug builds.
+  id overrideValue = value;
+#ifdef DEBUG
+  overrideValue =
+      [NSDictionary dictionaryWithContentsOfFile:kConfigOverrideFilePath][key] ?: overrideValue;
+#endif
+  return overrideValue;
+}
+
 - (NSMutableDictionary *)readForcedConfig {
   NSMutableDictionary *forcedConfig = [NSMutableDictionary dictionary];
   for (NSString *key in self.forcedConfigKeyTypes) {
@@ -1728,8 +1738,7 @@ static SNTConfigurator *sharedConfigurator = nil;
     // If the key is not forced it will be ignored, so we don't need to validate
     // it. This also has the effect of removing Apple keys that are present in
     // the user defaults preferences.
-    CFStringRef keyRef = (__bridge CFStringRef)key;
-    if (!CFPreferencesAppValueIsForced(keyRef, kMobileConfigDomain)) return;
+    if (!CFPreferencesAppValueIsForced((__bridge CFStringRef)key, kMobileConfigDomain)) return;
 
     // If the key is a 'standard' configuration profile key, skip it.
     static NSArray *profileKeys = @[
@@ -1746,7 +1755,9 @@ static SNTConfigurator *sharedConfigurator = nil;
     }
 
     // Check that the type of the value matches the expected type.
-    id value = CFBridgingRelease(CFPreferencesCopyAppValue(keyRef, kMobileConfigDomain));
+    id value = CFBridgingRelease(
+        CFPreferencesCopyAppValue((__bridge CFStringRef)key, kMobileConfigDomain));
+    value = [self overriderValue:value forKey:key];
     if (![value isKindOfClass:type] &&
         !(type == [NSRegularExpression class] && [value isKindOfClass:[NSString class]])) {
       [errors addObject:[NSString stringWithFormat:@"The key %@ has an unexpected type: %@", key,
