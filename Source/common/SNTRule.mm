@@ -56,7 +56,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
     NSCharacterSet *nonHex =
         [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
-    NSCharacterSet *nonAlnum = [[NSCharacterSet alphanumericCharacterSet] invertedSet];
+    NSCharacterSet *nonAlnum = [[NSCharacterSet
+        characterSetWithCharactersInString:
+            @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"] invertedSet];
 
     switch (type) {
       case SNTRuleTypeBinary: OS_FALLTHROUGH;
@@ -134,8 +136,14 @@ static const NSUInteger kExpectedTeamIDLength = 10;
           return nil;
         }
 
-        // TeamIDs are always [0-9A-Z], so enforce that the TeamID is uppercase
-        identifier = [NSString stringWithFormat:@"%@:%@", [teamID uppercaseString], signingID];
+        // TeamIDs are always [0-9A-Z], so enforce that the TeamID is uppercase, unless "platform"
+        if ([[teamID lowercaseString] isEqualToString:@"platform"]) {
+          teamID = [teamID lowercaseString];
+        } else {
+          teamID = [teamID uppercaseString];
+        }
+
+        identifier = [NSString stringWithFormat:@"%@:%@", teamID, signingID];
         break;
       }
 
