@@ -55,7 +55,7 @@
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  
+
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
 
@@ -69,7 +69,7 @@
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  
+
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
 
@@ -83,7 +83,7 @@
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
-  
+
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
 
@@ -97,7 +97,7 @@
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  
+
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
 
