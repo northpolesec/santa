@@ -30,7 +30,8 @@ static const uint32_t kEventTableCurrentVersion = 5;
 static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
 @interface SNTEventTable ()
-@property NSTimeInterval unactionableEventCacheTimeSeconds;
+// This property is only set once, safe to be nonatomic
+@property(nonatomic) NSTimeInterval unactionableEventCacheTimeSeconds;
 @end
 
 @implementation SNTEventTable {
