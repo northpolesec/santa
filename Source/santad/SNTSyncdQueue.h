@@ -23,6 +23,9 @@
 
 @interface SNTSyncdQueue : NSObject
 
+- (instancetype)initWithCacheSize:(uint64_t)cacheSize;
+- (instancetype)init NS_UNAVAILABLE;
+
 - (void)reassessSyncServiceConnection;
 - (void)reassessSyncServiceConnectionImmediately;
 

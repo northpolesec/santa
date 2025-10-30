@@ -65,4 +65,9 @@
   return nil;
 }
 
+- (BOOL)unactionableEvent {
+  [self doesNotRecognizeSelector:_cmd];
+  return NO;
+}
+
 @end

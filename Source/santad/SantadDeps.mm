@@ -86,7 +86,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  SNTSyncdQueue *syncd_queue = [[SNTSyncdQueue alloc] init];
+  SNTSyncdQueue *syncd_queue = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
   if (!syncd_queue) {
     LOGE(@"Failed to initialize syncd queue.");
     exit(EXIT_FAILURE);

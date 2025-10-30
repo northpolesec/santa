@@ -57,6 +57,8 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SantaCache",
+        "//Source/common:String",
     ],
 )
 
@@ -1061,6 +1063,9 @@ santa_unit_test(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SantaCache",
+        "//Source/common:String",
+        "//Source/common:TestUtils",
         "@FMDB",
         "@OCMock",
     ],
