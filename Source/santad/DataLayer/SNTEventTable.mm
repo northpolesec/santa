@@ -43,7 +43,7 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 }
 
 - (uint32_t)initializeDatabase:(FMDatabase *)db fromVersion:(uint32_t)version {
-  _storeBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(1024);
+  _storeBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(2048);
   self.unactionableEventCacheTimeSeconds = kUnactionableEventCacheTimeSeconds;
 
   int newVersion = 0;
