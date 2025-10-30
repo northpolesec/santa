@@ -32,7 +32,7 @@
 @implementation SNTSyncdQueueTest
 
 - (void)testBackoffForPrimaryHash {
-  SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] init];
+  SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] initWithCacheSize:256];
 
   // Fill up the cache.
   for (int i = 0; i < 256; ++i) {
@@ -72,7 +72,7 @@
 }
 
 - (void)testAddEvents {
-  SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] init];
+  SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
   sut = OCMPartialMock(sut);
   OCMStub([sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 

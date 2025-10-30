@@ -15,21 +15,30 @@
 
 #import "Source/santad/DataLayer/SNTEventTable.h"
 
+#include <memory>
+
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#include "Source/common/SantaCache.h"
+#include "Source/common/String.h"
 
 static const uint32_t kEventTableCurrentVersion = 5;
+// 4 hour cache
+static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
-@implementation SNTEventTable
+@implementation SNTEventTable {
+  std::unique_ptr<SantaCache<std::string, NSDate *>> _storeBackoff;
+}
 
 - (uint32_t)currentSupportedVersion {
   return kEventTableCurrentVersion;
 }
 
 - (uint32_t)initializeDatabase:(FMDatabase *)db fromVersion:(uint32_t)version {
+  _storeBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(1024);
   int newVersion = 0;
 
   if (version < 1) {
@@ -112,6 +121,10 @@ static const uint32_t kEventTableCurrentVersion = 5;
       continue;
     }
 
+    if ([event unactionableEvent] && [self backoffForPrimaryHash:[event uniqueID]]) {
+      continue;
+    }
+
     NSData *eventData = [NSKeyedArchiver archivedDataWithRootObject:event
                                               requiringSecureCoding:YES
                                                               error:nil];
@@ -133,6 +146,18 @@ static const uint32_t kEventTableCurrentVersion = 5;
   }];
 
   return success;
+}
+
+- (BOOL)backoffForPrimaryHash:(NSString *)hash {
+  NSDate *backoff = _storeBackoff->get(santa::NSStringToUTF8String(hash));
+  NSDate *now = [NSDate date];
+  if (([now timeIntervalSince1970] - [backoff timeIntervalSince1970]) <
+      kUnactionableEventCacheTimeSeconds) {
+    return YES;
+  } else {
+    _storeBackoff->set(santa::NSStringToUTF8String(hash), now);
+    return NO;
+  }
 }
 
 #pragma mark Querying/Retreiving

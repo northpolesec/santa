@@ -82,7 +82,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   event.executingUser = @"nobody";
   event.loggedInUsers = @[ @"nobody" ];
   event.currentSessions = @[ @"nobody@ttys000", @"nobody@console" ];
-  event.decision = SNTEventStateAllowBinary;
+  event.decision = SNTEventStateBlockBinary;
   return event;
 }
 

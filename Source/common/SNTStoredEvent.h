@@ -28,4 +28,8 @@
 // The base class implementation will throw an exception.
 - (nullable NSString *)uniqueID;
 
+// Subclasses are required to define: `unactionableEvent`.
+// The base class implementation will throw an exception.
+- (BOOL)unactionableEvent;
+
 @end
