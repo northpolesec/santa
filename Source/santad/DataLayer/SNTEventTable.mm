@@ -29,6 +29,10 @@ static const uint32_t kEventTableCurrentVersion = 5;
 // 4 hour cache
 static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
+@interface SNTEventTable ()
+@property NSTimeInterval unactionableEventCacheTimeSeconds;
+@end
+
 @implementation SNTEventTable {
   std::unique_ptr<SantaCache<std::string, NSDate *>> _storeBackoff;
 }
@@ -39,6 +43,8 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
 - (uint32_t)initializeDatabase:(FMDatabase *)db fromVersion:(uint32_t)version {
   _storeBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(1024);
+  self.unactionableEventCacheTimeSeconds = kUnactionableEventCacheTimeSeconds;
+
   int newVersion = 0;
 
   if (version < 1) {
@@ -152,7 +158,7 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
   NSDate *backoff = _storeBackoff->get(santa::NSStringToUTF8String(hash));
   NSDate *now = [NSDate date];
   if (([now timeIntervalSince1970] - [backoff timeIntervalSince1970]) <
-      kUnactionableEventCacheTimeSeconds) {
+      self.unactionableEventCacheTimeSeconds) {
     return YES;
   } else {
     _storeBackoff->set(santa::NSStringToUTF8String(hash), now);

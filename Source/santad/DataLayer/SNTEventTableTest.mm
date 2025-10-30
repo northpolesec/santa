@@ -24,6 +24,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#include "Source/common/TestUtils.h"
 
 NSString *GenerateRandomHexStringWithSHA256Length() {
   // Create an array to hold random bytes
@@ -48,6 +49,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 
 @interface SNTEventTable (Testing)
 - (SNTStoredEvent *)eventFromResultSet:(FMResultSet *)rs;
+@property NSTimeInterval unactionableEventCacheTimeSeconds;
 @end
 
 /// This test case actually tests SNTEventTable and SNTStoredEvent.
@@ -100,6 +102,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   event.process.pid = @(1234);
   event.process.parent = [[SNTStoredFileAccessProcess alloc] init];
   event.process.parent.pid = @(4567);
+  event.decision = FileAccessPolicyDecision::kDenied;
   return event;
 }
 
@@ -111,7 +114,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   XCTAssertEqual(self.sut.pendingEventsCount, 2);
 }
 
-- (void)testUniqueIndex {
+- (void)testUniqueIndexActionable {
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
 
   SNTStoredExecutionEvent *event = [self createTestEvent];
@@ -155,6 +158,94 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   faaEvent.process.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
   XCTAssertFalse([self.sut addStoredEvent:faaEvent]);
   XCTAssertEqual(self.sut.pendingEventsCount, 4);
+}
+
+- (void)testUniqueIndexUnactionable {
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  SNTStoredExecutionEvent *event = [self createTestEvent];
+  // Make this an "unactionable" event
+  event.decision = SNTEventStateAllowBinary;
+  XCTAssertTrue([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+
+  // Attempt to add an event with the same file hash will fail because
+  // no insert will be attempted
+  event.idx = @(arc4random());
+  XCTAssertFalse([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+
+  // Create a new hash and re-insert
+  event.idx = @(arc4random());
+  event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
+  XCTAssertTrue([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 2);
+
+  // Attempting to add an event with a non-unique idx fails
+  event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
+  XCTAssertFalse([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 2);
+
+  // Now for FAA Events...
+  SNTStoredFileAccessEvent *faaEvent = [self createTestFileAccessEvent];
+  // Make this an "unactionable" event
+  faaEvent.decision = FileAccessPolicyDecision::kAllowedAuditOnly;
+  XCTAssertTrue([self.sut addStoredEvent:faaEvent]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 3);
+
+  // Attempt to add an event with the same file hash will fail because
+  // no insert will be attempted
+  faaEvent.idx = @(arc4random());
+  XCTAssertFalse([self.sut addStoredEvent:faaEvent]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 3);
+
+  // Create a new hash and re-insert
+  faaEvent.process.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
+  XCTAssertTrue([self.sut addStoredEvent:faaEvent]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 4);
+
+  // Attempting to add an event with a non-unique idx fails
+  faaEvent.process.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
+  XCTAssertFalse([self.sut addStoredEvent:faaEvent]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 4);
+}
+
+- (void)testBackoff {
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  // Set the backoff time to 3 seconds
+  self.sut.unactionableEventCacheTimeSeconds = 3;
+
+  SNTStoredExecutionEvent *event = [self createTestEvent];
+  // Make this an "unactionable" event
+  event.decision = SNTEventStateAllowBinary;
+  NSNumber *origId = event.idx;
+  XCTAssertTrue([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+
+  // Attempt to add an event with the same file hash will fail because
+  // no insert will be attempted
+  event.idx = @(arc4random());
+  XCTAssertFalse([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+
+  // Delete everything
+  [self.sut deleteEventWithId:origId];
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  // Attempt to reinsert an unactionable event before the backoff time
+  // This should still fail, even though it wouldn't conflict in the DB
+  event.idx = @(arc4random());
+  XCTAssertFalse([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  // Sleep for the backoff time
+  SleepMS(3000);
+
+  // Now re-add the stored event, all should be well
+  event.idx = @(arc4random());
+  XCTAssertTrue([self.sut addStoredEvent:event]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
 }
 
 - (void)testRetrieveExecutionEvent {

@@ -1065,6 +1065,7 @@ santa_unit_test(
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SantaCache",
         "//Source/common:String",
+        "//Source/common:TestUtils",
         "@FMDB",
         "@OCMock",
     ],
