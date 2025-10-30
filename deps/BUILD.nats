@@ -1,0 +1,42 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "nats",
+    srcs = glob([
+        "src/*.c",
+        "src/unix/*.c",
+    ], exclude = [
+        "src/win/*.c",
+        "src/test.c",
+        "src/glib/*.c",  # Exclude glib integration
+        "src/stan/*.c",   # Exclude STAN (deprecated)
+    ]),
+    hdrs = glob([
+        "src/*.h",
+        "src/include/*.h",
+    ]) + glob([
+        "src/adapters/*.h",
+    ]),
+    includes = [
+        "src",
+        "src/include",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@boringssl//:ssl",
+        "@boringssl//:crypto",
+    ],
+    defines = [
+        "NATS_HAS_TLS",
+        "_REENTRANT",
+    ],
+    copts = [
+        "-Wno-unused-function",
+        "-Wno-unused-variable",
+    ],
+    linkopts = [
+        "-framework", "Security",
+        "-lpthread",
+    ],
+)
+
