@@ -58,7 +58,8 @@ using santa::WatchItemsState;
 namespace santa {
 
 extern bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_policies,
-                        SetSharedProcessWatchItemPolicy *proc_policies, NSError **err);
+                        SetSharedProcessWatchItemPolicy *proc_policies, uint64_t *rules_loaded,
+                        NSError **err);
 extern bool IsWatchItemNameValid(id key, NSError **err);
 extern bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
                                        NSDictionary *watch_item,
@@ -904,65 +905,74 @@ BlockGenResult CreatePolicyBlockGen() {
   NSError *err;
   SetSharedDataWatchItemPolicy data_policies;
   SetSharedProcessWatchItemPolicy proc_policies;
+  uint64_t num_rules;
 
   // Ensure top level keys must be correct types if they exist
-  XCTAssertTrue(ParseConfig(@{}, &data_policies, &proc_policies, &err));
-  XCTAssertFalse(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @(0)}, &data_policies, &proc_policies, &err));
-  XCTAssertFalse(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @{}}, &data_policies, &proc_policies, &err));
-  XCTAssertFalse(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @[]}, &data_policies, &proc_policies, &err));
-  XCTAssertFalse(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @""}, &data_policies, &proc_policies, &err));
+  XCTAssertTrue(ParseConfig(@{}, &data_policies, &proc_policies, &num_rules, &err));
+  XCTAssertEqual(num_rules, 0);
+  XCTAssertFalse(ParseConfig(@{kWatchItemConfigKeyVersion : @(0)}, &data_policies, &proc_policies,
+                             &num_rules, &err));
+  XCTAssertFalse(ParseConfig(@{kWatchItemConfigKeyVersion : @{}}, &data_policies, &proc_policies,
+                             &num_rules, &err));
+  XCTAssertFalse(ParseConfig(@{kWatchItemConfigKeyVersion : @[]}, &data_policies, &proc_policies,
+                             &num_rules, &err));
+  XCTAssertFalse(ParseConfig(@{kWatchItemConfigKeyVersion : @""}, &data_policies, &proc_policies,
+                             &num_rules, &err));
   XCTAssertFalse(
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @""},
-                  &data_policies, &proc_policies, &err));
+                  &data_policies, &proc_policies, &num_rules, &err));
   XCTAssertFalse(
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @[]},
-                  &data_policies, &proc_policies, &err));
+                  &data_policies, &proc_policies, &num_rules, &err));
   XCTAssertFalse(
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @(0)},
-                  &data_policies, &proc_policies, &err));
+                  &data_policies, &proc_policies, &num_rules, &err));
 
   // Minimally successful configs without watch items
-  XCTAssertTrue(
-      ParseConfig(@{kWatchItemConfigKeyVersion : @"1"}, &data_policies, &proc_policies, &err));
+  XCTAssertTrue(ParseConfig(@{kWatchItemConfigKeyVersion : @"1"}, &data_policies, &proc_policies,
+                            &num_rules, &err));
+  XCTAssertEqual(num_rules, 0);
   XCTAssertTrue(
       ParseConfig(@{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{}},
-                  &data_policies, &proc_policies, &err));
+                  &data_policies, &proc_policies, &num_rules, &err));
+  XCTAssertEqual(num_rules, 0);
 
   // File access rules being invalid doesn't cause loading the entire policy to fail.
   // ParseConfig will return true here, but no policies will be created
   XCTAssertTrue(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@(0) : @(0)}},
-      &data_policies, &proc_policies, &err));
+      &data_policies, &proc_policies, &num_rules, &err));
   XCTAssertEqual(data_policies.size(), 0);
   XCTAssertEqual(proc_policies.size(), 0);
+  XCTAssertEqual(num_rules, 0);
   XCTAssertTrue(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"" : @{}}},
-      &data_policies, &proc_policies, &err));
+      &data_policies, &proc_policies, &num_rules, &err));
   XCTAssertEqual(data_policies.size(), 0);
   XCTAssertEqual(proc_policies.size(), 0);
+  XCTAssertEqual(num_rules, 0);
   XCTAssertTrue(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @[]}},
-      &data_policies, &proc_policies, &err));
+      &data_policies, &proc_policies, &num_rules, &err));
   XCTAssertEqual(data_policies.size(), 0);
   XCTAssertEqual(proc_policies.size(), 0);
+  XCTAssertEqual(num_rules, 0);
   XCTAssertTrue(ParseConfig(
       @{kWatchItemConfigKeyVersion : @"1", kWatchItemConfigKeyWatchItems : @{@"a" : @{}}},
-      &data_policies, &proc_policies, &err));
+      &data_policies, &proc_policies, &num_rules, &err));
   XCTAssertEqual(data_policies.size(), 0);
   XCTAssertEqual(proc_policies.size(), 0);
+  XCTAssertEqual(num_rules, 0);
 
   // Minimally successful config with watch item
   XCTAssertTrue(ParseConfig(@{
     kWatchItemConfigKeyVersion : @"1",
     kWatchItemConfigKeyWatchItems : @{@"a" : @{kWatchItemConfigKeyPaths : @[ @"asdf" ]}}
   },
-                            &data_policies, &proc_policies, &err));
+                            &data_policies, &proc_policies, &num_rules, &err));
   XCTAssertEqual(data_policies.size(), 1);
   XCTAssertEqual(proc_policies.size(), 0);
+  XCTAssertEqual(num_rules, 1);
 
   data_policies.clear();
 
@@ -1004,9 +1014,10 @@ BlockGenResult CreatePolicyBlockGen() {
       },
     },
   },
-                            &data_policies, &proc_policies, &err));
+                            &data_policies, &proc_policies, &num_rules, &err));
   XCTAssertEqual(data_policies.size(), 3);
   XCTAssertEqual(proc_policies.size(), 2);
+  XCTAssertEqual(num_rules, 5);
 }
 
 - (void)testParseConfigSingleWatchItemGeneral {

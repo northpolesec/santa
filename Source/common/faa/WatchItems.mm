@@ -616,7 +616,8 @@ bool IsWatchItemNameValid(id key, NSError **err) {
 }
 
 bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_policies,
-                 SetSharedProcessWatchItemPolicy *proc_policies, NSError **err) {
+                 SetSharedProcessWatchItemPolicy *proc_policies, uint64_t *rules_loaded,
+                 NSError **err) {
   // If the top level version key exists, it must be well formatted.
   // If no top level key exists, every individual rule is required to
   // have its own version information set.
@@ -650,6 +651,7 @@ bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_polici
 
   NSDictionary *watch_items = config[kWatchItemConfigKeyWatchItems];
 
+  uint64_t count = 0;
   for (id key in watch_items) {
     if (!IsWatchItemNameValid(key, err)) {
       LOGE(@"Ignoring file access rule '%@': Invalid name: %@", key,
@@ -669,6 +671,12 @@ bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_polici
            (err && *err) ? (*err).localizedDescription : @"Unknown failure");
       continue;
     }
+
+    count++;
+  }
+
+  if (rules_loaded) {
+    *rules_loaded = count;
   }
 
   return true;
@@ -808,7 +816,7 @@ void WatchItems::RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBloc
 
 void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
                                     ProcessWatchItems new_proc_watch_items,
-                                    NSDictionary *new_config) {
+                                    NSDictionary *new_config, uint64_t rules_loaded) {
   absl::MutexLock lock(&lock_);
 
   // The following conditions require updating the current config:
@@ -842,10 +850,12 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
         policy_event_detail_url_ = nil;
       }
       policy_event_detail_text_ = new_config[kWatchItemConfigKeyEventDetailText];
+      rules_loaded_ = rules_loaded;
     } else {
       policy_version_ = "";
       policy_event_detail_url_ = nil;
       policy_event_detail_text_ = nil;
+      rules_loaded_ = 0;
     }
 
     last_update_time_ = [[NSDate date] timeIntervalSince1970];
@@ -876,12 +886,13 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
 void WatchItems::ReloadConfig(NSDictionary *new_config) {
   DataWatchItems new_data_watch_items;
   ProcessWatchItems new_proc_watch_items;
+  uint64_t rules_loaded = 0;
 
   if (new_config) {
     SetSharedDataWatchItemPolicy new_data_policies;
     SetSharedProcessWatchItemPolicy new_proc_policies;
     NSError *err;
-    if (!ParseConfig(new_config, &new_data_policies, &new_proc_policies, &err)) {
+    if (!ParseConfig(new_config, &new_data_policies, &new_proc_policies, &rules_loaded, &err)) {
       LOGE(@"Failed to parse watch item config: %@",
            err ? err.localizedDescription : @"Unknown failure");
       return;
@@ -891,7 +902,8 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
     new_proc_watch_items.Build(std::move(new_proc_policies));
   }
 
-  UpdateCurrentState(std::move(new_data_watch_items), std::move(new_proc_watch_items), new_config);
+  UpdateCurrentState(std::move(new_data_watch_items), std::move(new_proc_watch_items), new_config,
+                     rules_loaded);
 }
 
 NSDictionary *WatchItems::ReadConfig() {
@@ -967,7 +979,7 @@ std::optional<WatchItemsState> WatchItems::State() {
   }
 
   WatchItemsState state = {
-      .rule_count = (data_watch_items_.Count() + proc_watch_items_.Count()),
+      .rule_count = rules_loaded_,
       .policy_version = [NSString stringWithUTF8String:policy_version_.c_str()],
       .data_source = data_source_,
       .config_path = [config_path_ copy],
