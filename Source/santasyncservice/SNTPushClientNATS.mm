@@ -81,7 +81,7 @@ __END_DECLS
 - (void)dealloc {
   // Don't call disconnect here to avoid race conditions
   // Cleanup should be done explicitly before dealloc
-  if (self.conn && self.isConnected)  {
+  if (self.conn && self.isConnected) {
     LOGW(@"NATS: Client deallocated without proper disconnect");
   }
 }
