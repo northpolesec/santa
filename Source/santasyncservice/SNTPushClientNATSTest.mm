@@ -29,14 +29,11 @@ extern "C" {
 // Expose private methods for testing
 @interface SNTPushClientNATS (Testing)
 @property(nonatomic) natsConnection *conn;
-@property(nonatomic) natsSubscription *deviceSub;
-@property(nonatomic) natsSubscription *globalSub;
 @property(nonatomic, readwrite) BOOL isConnected;
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
 @property(nonatomic) NSTimeInterval currentRetryDelay;
 @property(nonatomic) NSInteger retryAttempt;
 @property(nonatomic) BOOL isRetrying;
-@property(nonatomic) BOOL hasSyncedWithServer;
 - (void)connect;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
 - (void)subscribe;
@@ -111,8 +108,6 @@ extern "C" {
   // Then: Client should be disconnected
   XCTAssertFalse(self.client.isConnected);
   XCTAssertTrue(self.client.conn == NULL);
-  XCTAssertTrue(self.client.deviceSub == NULL);
-  XCTAssertTrue(self.client.globalSub == NULL);
 }
 
 #pragma mark - Subscription Tests
@@ -256,7 +251,6 @@ extern "C" {
 - (void)testConnectionRetryScheduled {
   // Given: Client is initialized and configured
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
-  self.client.hasSyncedWithServer = YES;
 
   // When: scheduleConnectionRetry is called
   [self.client scheduleConnectionRetry];
@@ -277,7 +271,6 @@ extern "C" {
 - (void)testRetryDelayExponentialBackoff {
   // Given: Client is initialized
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
-  self.client.hasSyncedWithServer = YES;
 
   // When: Multiple retries are scheduled
   NSTimeInterval previousDelay = 0;
@@ -307,7 +300,6 @@ extern "C" {
 - (void)testRetryDelayCapAt5To10Minutes {
   // Given: Client with many retry attempts
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
-  self.client.hasSyncedWithServer = YES;
   self.client.retryAttempt = 9;  // Set to 9 so next attempt will be 10th
 
   // When: Next retry is scheduled

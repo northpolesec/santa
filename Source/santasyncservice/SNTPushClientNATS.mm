@@ -35,8 +35,6 @@ __END_DECLS
 @interface SNTPushClientNATS ()
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
 @property(nonatomic) natsConnection *conn;
-@property(nonatomic) natsSubscription *deviceSub;
-@property(nonatomic) natsSubscription *globalSub;
 // Array of natsSubscription pointers wrapped in NSValue
 @property(nonatomic) NSMutableArray<NSValue *> *tagSubscriptions;
 // Single queue for connection management
@@ -53,7 +51,6 @@ __END_DECLS
 @property(nonatomic, copy) NSString *jwt;
 @property(nonatomic, copy) NSString *pushDeviceID;
 @property(nonatomic, copy) NSArray<NSString *> *tags;
-@property(nonatomic) BOOL hasSyncedWithServer;
 // Connection retry state
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
 @property(nonatomic) NSTimeInterval currentRetryDelay;
@@ -84,7 +81,7 @@ __END_DECLS
 - (void)dealloc {
   // Don't call disconnect here to avoid race conditions
   // Cleanup should be done explicitly before dealloc
-  if (self.conn || self.deviceSub || self.globalSub) {
+  if (self.conn && self.isConnected)  {
     LOGW(@"NATS: Client deallocated without proper disconnect");
   }
 }
@@ -100,7 +97,6 @@ __END_DECLS
     NSString *fullServer;
 #ifdef DEBUG
     // In debug builds, allow overriding the domain suffix
-    fullServer = server;
     LOGW(@"NATS: Domain check disabled - using server as-is: %@", fullServer);
 #else
     if (!server) {
@@ -120,7 +116,6 @@ __END_DECLS
         return;
     }
 #endif
-
     fullServer = server;
 
     // Check if device ID has changed
@@ -166,7 +161,6 @@ __END_DECLS
     self.jwt = jwt;
     self.pushDeviceID = deviceID;
     self.tags = tags;
-    self.hasSyncedWithServer = YES;
 
     LOGI(@"NATS: Configured with server: %@, deviceID: %@, tags: %@", fullServer, deviceID, tags);
 
@@ -179,8 +173,7 @@ __END_DECLS
 
 // Check if we have the necessary configuration to connect to the push service.
 - (BOOL)hasRequiredConfiguration {
-  return self.hasSyncedWithServer && self.pushServer && self.pushToken && self.jwt &&
-         self.pushDeviceID;
+  return self.pushServer && self.pushToken && self.jwt && self.pushDeviceID;
 }
 
 - (void)connectIfConfigured {
@@ -304,7 +297,7 @@ __END_DECLS
 
 - (void)disconnectWithCompletion:(void (^)(void))completion {
   // Early return if nothing to disconnect
-  if (!self.conn && !self.deviceSub && !self.globalSub && self.tagSubscriptions.count == 0) {
+  if (!self.conn || !self.isConnected || self.tagSubscriptions.count == 0) {
     if (completion) {
       dispatch_async(dispatch_get_main_queue(), completion);
     }
@@ -354,12 +347,6 @@ __END_DECLS
 - (void)unsubscribeAll {
   // This should only be called from within connectionQueue
   LOGD(@"NATS: Unsubscribing from all topics");
-
-  // Unsubscribe device subscription
-  [self cleanupSubscription:&_deviceSub];
-
-  // Unsubscribe global subscription
-  [self cleanupSubscription:&_globalSub];
 
   // Unsubscribe all tag subscriptions
   for (NSValue *subValue in self.tagSubscriptions) {
@@ -607,7 +594,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
       self.connectionRetryTimer,
       dispatch_time(DISPATCH_TIME_NOW, (int64_t)(self.currentRetryDelay * NSEC_PER_SEC)),
       DISPATCH_TIME_FOREVER,
-      (int64_t)(0.1 * NSEC_PER_SEC));  // 100ms leeway
+      (int64_t)(100 * NSEC_PER_MSEC));  // 100ms leeway
 
   WEAKIFY(self);
 
