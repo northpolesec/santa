@@ -304,7 +304,16 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     // Start listening for push notifications with a full sync every
     // pushNotificationsFullSyncInterval.
     if (self.pushNotifications) {
+      NSUInteger oldInterval = self.pushNotifications.fullSyncInterval;
       [self.pushNotifications handlePreflightSyncState:syncState];
+
+      // If push interval changed, reschedule the timer immediately
+      if (oldInterval != self.pushNotifications.fullSyncInterval) {
+        LOGD(@"Push notification sync interval changed from %lu to %lu seconds. Rescheduling timer.",
+             oldInterval, self.pushNotifications.fullSyncInterval);
+      }
+      [self rescheduleTimerQueue:self.fullSyncTimer
+                  secondsFromNow:self.pushNotifications.fullSyncInterval];
     } else {
       LOGD(@"Push notifications are not enabled. Sync every %lu min.",
            syncState.fullSyncInterval / 60);
