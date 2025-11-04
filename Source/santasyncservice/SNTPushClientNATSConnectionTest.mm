@@ -36,6 +36,13 @@ __END_DECLS
 @property(nonatomic) BOOL hasSyncedWithServer;
 @property(nonatomic, readwrite) BOOL isConnected;
 - (void)connect;
+- (void)disconnectWithCompletion:(void (^)(void))completion;
+- (void)configureWithPushServer:(NSString *)server
+                      pushToken:(NSString *)token
+                            jwt:(NSString *)jwt
+                   pushDeviceID:(NSString *)deviceID
+                           tags:(NSArray<NSString *> *)tags;
+- (void)connectIfConfigured;
 @end
 
 /// This test focuses on the NATS connection logic independent of preflight
