@@ -55,7 +55,8 @@
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
+  OCMStub([self.mockConfigurator syncBaseURL])
+      .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
@@ -70,7 +71,8 @@
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
+  OCMStub([self.mockConfigurator syncBaseURL])
+      .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
@@ -85,7 +87,8 @@
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
+  OCMStub([self.mockConfigurator syncBaseURL])
+      .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
@@ -100,7 +103,8 @@
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
-  OCMStub([self.mockConfigurator syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
+  OCMStub([self.mockConfigurator syncBaseURL])
+      .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
