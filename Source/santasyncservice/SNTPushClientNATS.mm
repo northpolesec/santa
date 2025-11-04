@@ -107,7 +107,7 @@ __END_DECLS
         LOGE(@"NATS: Invalid push server domain. Must end with '.push.northpole.security', got: %@", server);
         return;
     }
-    // Make sure this starts with tls://
+    // Make sure we're using TLS for production builds.
     if (![server hasPrefix:@"tls://"]) {
         LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", server);
         return;
