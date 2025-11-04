@@ -144,7 +144,7 @@ __END_DECLS
     }
 
     // If device ID or tags changed, resubscribe to all topics
-    if ((deviceIDChanged || tagsChanged) && self.conn) {
+    if ((deviceIDChanged || tagsChanged) && [self isConnectionAlive]) {
       if (deviceIDChanged) {
         LOGI(@"NATS: Device ID changed, resubscribing to all topics");
       } else {
@@ -163,7 +163,7 @@ __END_DECLS
     LOGI(@"NATS: Configured with server: %@, deviceID: %@, tags: %@", fullServer, deviceID, tags);
 
     // If device ID or tags changed and we're connected, resubscribe with new configuration
-    if ((deviceIDChanged || tagsChanged) && self.conn) {
+    if ((deviceIDChanged || tagsChanged) && [self isConnectionAlive]) {
       [self subscribe];
     }
   });
@@ -172,6 +172,26 @@ __END_DECLS
 // Check if we have the necessary configuration to connect to the push service.
 - (BOOL)hasRequiredConfiguration {
   return self.pushServer && self.pushToken && self.jwt && self.pushDeviceID;
+}
+
+// Check if the connection is actually alive by consulting both our flag and the NATS library.
+// This should be called from within connectionQueue for thread safety.
+- (BOOL)isConnectionAlive {
+  if (!self.conn) {
+    return NO;
+  }
+
+  // Check NATS library's view of the connection state
+  if (natsConnection_IsClosed(self.conn)) {
+    // Connection is closed according to NATS but our flag might be stale
+    if (self.isConnected) {
+      LOGW(@"NATS: Connection state mismatch - NATS reports closed but isConnected=YES");
+      self.isConnected = NO;
+    }
+    return NO;
+  }
+
+  return self.isConnected;
 }
 
 // Dispatch async to connect on a background thread.
@@ -192,9 +212,18 @@ __END_DECLS
   dispatch_async(self.connectionQueue, ^{
     if (self.isShuttingDown) return;
 
-    if (self.conn) {
+    // Check if we already have a live connection
+    if ([self isConnectionAlive]) {
       LOGD(@"NATS already connected");
       return;
+    }
+
+    // Clean up any stale connection
+    if (self.conn) {
+      LOGW(@"NATS: Cleaning up stale connection before reconnecting");
+      natsConnection_Destroy(self.conn);
+      self.conn = NULL;
+      self.isConnected = NO;
     }
 
     // Check if we have the necessary configuration to connect to the push service.
@@ -295,7 +324,9 @@ __END_DECLS
 
 - (void)disconnectWithCompletion:(void (^)(void))completion {
   // Early return if nothing to disconnect
-  if (!self.conn || !self.isConnected || self.tagSubscriptions.count == 0) {
+  // Note: We check self.conn directly here rather than isConnectionAlive since we want to
+  // clean up even if the connection is closed but resources still exist
+  if (!self.conn && !self.isConnected && self.tagSubscriptions.count == 0) {
     if (completion) {
       dispatch_async(dispatch_get_main_queue(), completion);
     }
@@ -382,6 +413,12 @@ __END_DECLS
 
 - (void)subscribe {
   if (self.isShuttingDown) return;
+
+  // Verify connection is alive before subscribing
+  if (![self isConnectionAlive]) {
+    LOGW(@"NATS: Cannot subscribe - connection not alive");
+    return;
+  }
 
   natsStatus status;
 
@@ -495,8 +532,18 @@ static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus e
       // Don't mark connection as failed - other subscriptions might work
     } else {
       // Mark connection as failed if we get permission violations on other subjects
+      // Also verify the connection state and potentially trigger reconnection
       dispatch_async(self.connectionQueue, ^{
         self.isConnected = NO;
+
+        // Check if the connection is actually closed
+        if (self.conn && natsConnection_IsClosed(self.conn)) {
+          LOGE(@"NATS: Connection closed due to permissions error, cleaning up and scheduling "
+               @"reconnect");
+          natsConnection_Destroy(self.conn);
+          self.conn = NULL;
+          [self scheduleConnectionRetry];
+        }
       });
     }
   }

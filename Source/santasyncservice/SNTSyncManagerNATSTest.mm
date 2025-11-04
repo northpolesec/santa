@@ -54,6 +54,7 @@
   // Given: FCM is disabled, NATS is enabled (default), and APNS is disabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
+  OCMStub([self.mockConfigurator isSyncV2]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
 
   // When: Sync manager is initialized
@@ -68,6 +69,7 @@
   // Given: Both FCM and NATS are enabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
+  OCMStub([self.mockConfigurator isSyncV2]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
 
   // When: Sync manager is initialized
@@ -82,6 +84,7 @@
   // Given: FCM is disabled, NATS is disabled, and APNS is enabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
+  OCMStub([self.mockConfigurator isSyncV2]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
 
   // When: Sync manager is initialized
@@ -96,6 +99,7 @@
   // Given: All push notification systems are disabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
+  OCMStub([self.mockConfigurator isSyncV2]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
 
   // When: Sync manager is initialized
