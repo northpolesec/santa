@@ -200,7 +200,7 @@ __END_DECLS
     // Reconnect or resubscribe based on what changed
     if (credentialsChanged) {
       // Reconnect with new credentials
-      [self connectIfConfigured];
+      [self connect];
     } else if ((deviceIDChanged || tagsChanged) && isConnected) {
       // Just resubscribe with new device ID or tags
       [self subscribe];
@@ -231,23 +231,6 @@ __END_DECLS
   }
 
   return self.isConnected;
-}
-
-// Asynchronously attempts to connect to the push service using connectionQueue.
-// Serves as the public entry point for establishing a push service connection
-// if configuration is available.  Also used in tests to exercise retry logic
-// when required configuration is intentionally missing.
-- (void)connectIfConfigured {
-  dispatch_async(self.connectionQueue, ^{
-    if (self.isShuttingDown) return;
-
-    // Only connect if we have configuration
-    if ([self hasRequiredConfiguration]) {
-      [self connect];
-    } else {
-      LOGD(@"NATS: Not connecting - missing configuration");
-    }
-  });
 }
 
 - (void)connect {
@@ -743,7 +726,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
                              tags:syncState.pushTags];
 
     // Now attempt to connect
-    [self connectIfConfigured];
+    [self connect];
   } else {
     NSMutableArray *missing = [NSMutableArray array];
     if (!syncState.pushServer) [missing addObject:@"server"];

@@ -49,6 +49,11 @@ extern "C" {
 #define TEST_PUBLISHER_NKEY @"SUAHTEEWVEQ72TBSE5ZRCCALOU57HKPOLWDLZGBHZB6RMAPOD5OI4KNAYM"
 #define TEST_MACHINE_ID @"testmachine12345"
 
+// Expose private methods for testing
+@interface SNTPushClientNATS (IntegrationTesting)
+- (void)disconnectWithCompletion:(void (^)(void))completion;
+@end
+
 // Integration test that requires a real NATS server running on localhost:4222
 // Run with: bazel test //Source/santasyncservice:SNTPushClientNATSIntegrationTest
 // --test_env=NATS_INTEGRATION_TEST=1

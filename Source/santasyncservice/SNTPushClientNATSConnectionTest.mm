@@ -33,7 +33,6 @@ __END_DECLS
 @property(nonatomic, copy) NSString *pushToken;
 @property(nonatomic, copy) NSString *jwt;
 @property(nonatomic, copy) NSArray<NSString *> *tags;
-@property(nonatomic) BOOL hasSyncedWithServer;
 @property(nonatomic, readwrite) BOOL isConnected;
 - (void)connect;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
@@ -42,7 +41,6 @@ __END_DECLS
                             jwt:(NSString *)jwt
                    pushDeviceID:(NSString *)deviceID
                            tags:(NSArray<NSString *> *)tags;
-- (void)connectIfConfigured;
 @end
 
 /// This test focuses on the NATS connection logic independent of preflight
@@ -117,8 +115,6 @@ __END_DECLS
   [NSThread sleepForTimeInterval:0.1];
 
   // Then: Verify configuration was stored correctly
-  XCTAssertTrue(self.client.hasSyncedWithServer);
-
   // Check if domain suffix is disabled
   if (getenv("SANTA_NATS_DISABLE_DOMAIN_SUFFIX")) {
     XCTAssertEqualObjects(self.client.pushServer, @"localhost");
@@ -132,7 +128,7 @@ __END_DECLS
   XCTAssertEqual(self.client.tags.count, 2);
 
   // When: Explicitly connect
-  [self.client connectIfConfigured];
+  [self.client connect];
   [NSThread sleepForTimeInterval:0.5];
 
   // Then: Should be connected (assuming local NATS server is running)
@@ -145,7 +141,7 @@ __END_DECLS
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // When: Attempt to connect without configuration
-  [self.client connectIfConfigured];
+  [self.client connect];
   [NSThread sleepForTimeInterval:0.2];
 
   // Then: Should not connect
@@ -166,7 +162,7 @@ __END_DECLS
   [NSThread sleepForTimeInterval:0.1];
 
   // When: Attempt to connect
-  [self.client connectIfConfigured];
+  [self.client connect];
   [NSThread sleepForTimeInterval:0.2];
 
   // Then: Should not connect due to missing JWT
@@ -251,7 +247,7 @@ __END_DECLS
   [NSThread sleepForTimeInterval:0.1];
 
   // When: Connect with valid credentials
-  [self.client connectIfConfigured];
+  [self.client connect];
   [NSThread sleepForTimeInterval:0.5];
 
   // Then: Should connect successfully

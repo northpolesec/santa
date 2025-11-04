@@ -42,7 +42,6 @@ extern "C" {
                             jwt:(NSString *)jwt
                    pushDeviceID:(NSString *)deviceID
                            tags:(NSArray<NSString *> *)tags;
-- (void)connectIfConfigured;
 @end
 
 @interface SNTPushClientNATSTest : XCTestCase
