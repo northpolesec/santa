@@ -470,6 +470,24 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "SNTModeTransition",
+    srcs = ["SNTModeTransition.mm"],
+    hdrs = ["SNTModeTransition.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTLogging",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTModeTransitionTest",
+    srcs = ["SNTModeTransitionTest.mm"],
+    deps = [
+        ":SNTModeTransition",
+    ],
+)
+
+objc_library(
     name = "SNTKVOManager",
     srcs = ["SNTKVOManager.mm"],
     hdrs = ["SNTKVOManager.h"],
@@ -862,6 +880,7 @@ test_suite(
     name = "unit_tests",
     tests = [
         ":EncodeEntitlementsTest",
+        ":KeychainTest",
         ":MOLAuthenticatingURLSessionTest",
         ":MOLCertificateTest",
         ":MOLCodesignCheckerTest",
@@ -877,9 +896,11 @@ test_suite(
         ":SNTFileInfoTest",
         ":SNTKVOManagerTest",
         ":SNTMetricSetTest",
+        ":SNTModeTransitionTest",
         ":SNTRuleTest",
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
+        ":SNTXxhashTest",
         ":SantaCacheTest",
         ":SantaSetCacheTest",
         ":ScopedCFTypeRefTest",
