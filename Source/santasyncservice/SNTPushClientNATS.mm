@@ -110,7 +110,7 @@ __END_DECLS
         return;
     }
 
-    // Make sure this starts with either nats:// or tls://
+    // Make sure this starts with tls://
     if (![server hasPrefix:@"tls://"]) {
         LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", server);
         return;

@@ -780,6 +780,13 @@
 @property(readonly, nonatomic) BOOL enableNATS;
 
 ///
+///  Returns YES if the sync server is using protocol v2.
+///  This is determined by checking if the syncBaseURL domain is pinned
+///  or if SANTA_FORCE_SYNC_V2 is defined at compile time.
+///
+@property(readonly, nonatomic) BOOL isSyncV2;
+
+///
 /// True if metricsFormat and metricsURL are set. False otherwise.
 ///
 @property(readonly, nonatomic) BOOL exportMetrics;

@@ -60,6 +60,7 @@ objc_library(
     name = "Pinning",
     srcs = ["Pinning.mm"],
     hdrs = ["Pinning.h"],
+    visibility = ["//Source/common:__pkg__"],
 )
 
 objc_library(

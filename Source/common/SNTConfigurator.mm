@@ -22,6 +22,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/santasyncservice/Pinning.h"
 
 // Ensures the given object is an NSArray and only contains NSString value types
 static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
@@ -674,6 +675,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEnableNATS {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingIsSyncV2 {
   return [self configStateSet];
 }
 
@@ -1334,6 +1339,25 @@ static SNTConfigurator *sharedConfigurator = nil;
     return YES;
   }
   return [number boolValue];
+}
+
+- (BOOL)isSyncV2 {
+  NSURL *syncURL = self.syncBaseURL;
+  if (!syncURL) {
+    return NO;
+  }
+  
+  // Check if the domain is pinned (Workshop domains)
+  if (santa::IsDomainPinned(syncURL)) {
+    return YES;
+  }
+  
+  // Check for compile-time flag
+#ifdef SANTA_FORCE_SYNC_V2
+  return YES;
+#else
+  return NO;
+#endif
 }
 
 - (void)setBlockUSBMount:(BOOL)enabled {
