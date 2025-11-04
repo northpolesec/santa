@@ -42,6 +42,26 @@
   XCTAssertEqualObjects([faaEvent uniqueID], @"MyRule|MyVersion|bar");
 }
 
+- (void)testUnactionableEvent {
+  // The base class should throw
+  SNTStoredEvent *baseEvent = [[SNTStoredEvent alloc] init];
+  XCTAssertThrows([baseEvent unactionableEvent]);
+
+  // Spot check allow/block events
+  SNTStoredExecutionEvent *execEvent = [[SNTStoredExecutionEvent alloc] init];
+  execEvent.decision = SNTEventStateAllowBinary;
+  XCTAssertTrue([execEvent unactionableEvent]);
+  execEvent.decision = SNTEventStateBlockBinary;
+  XCTAssertFalse([execEvent unactionableEvent]);
+
+  // Spot check audit only/denied events
+  SNTStoredFileAccessEvent *faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  faaEvent.decision = FileAccessPolicyDecision::kAllowedAuditOnly;
+  XCTAssertTrue([faaEvent unactionableEvent]);
+  faaEvent.decision = FileAccessPolicyDecision::kDenied;
+  XCTAssertFalse([faaEvent unactionableEvent]);
+}
+
 - (void)testEncodeDecode {
   SNTStoredExecutionEvent *execEvent = [[SNTStoredExecutionEvent alloc] init];
   execEvent.fileSHA256 = @"foo";

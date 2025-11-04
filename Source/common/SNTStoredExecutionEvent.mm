@@ -171,4 +171,8 @@
   return self.fileSHA256;
 }
 
+- (BOOL)unactionableEvent {
+  return (self.decision & SNTEventStateAllow) != 0;
+}
+
 @end

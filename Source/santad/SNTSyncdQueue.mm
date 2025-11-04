@@ -39,10 +39,10 @@
   std::unique_ptr<SantaCache<std::string, NSDate *>> _uploadBackoff;
 }
 
-- (instancetype)init {
+- (instancetype)initWithCacheSize:(uint64_t)cacheSize {
   self = [super init];
   if (self) {
-    _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(256);
+    _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(cacheSize);
     _syncdQueue = dispatch_queue_create("com.northpolesec.syncd_queue",
                                         DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
   }

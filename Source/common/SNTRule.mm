@@ -55,37 +55,41 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     }
 
     NSCharacterSet *nonHex =
-        [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet];
-    NSCharacterSet *nonUppercaseAlphaNumeric = [[NSCharacterSet
-        characterSetWithCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"] invertedSet];
+        [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
+    NSCharacterSet *nonAlnum = [[NSCharacterSet
+        characterSetWithCharactersInString:
+            @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"] invertedSet];
 
     switch (type) {
       case SNTRuleTypeBinary: OS_FALLTHROUGH;
       case SNTRuleTypeCertificate: {
-        // For binary and certificate rules, force the hash identifier to be lowercase hex.
-        identifier = [identifier lowercaseString];
-
-        identifier = [identifier stringByTrimmingCharactersInSet:nonHex];
-        if (identifier.length != (CC_SHA256_DIGEST_LENGTH * 2)) {
+        if (identifier.length != (CC_SHA256_DIGEST_LENGTH * 2) ||
+            [identifier rangeOfCharacterFromSet:nonHex].location != NSNotFound) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                           format:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type %@",
+                                  [self invalidIdentifier:identifier forType:type]];
           return nil;
         }
+
+        // For binary and certificate rules, force the hash identifier to be lowercase hex.
+        identifier = [identifier lowercaseString];
 
         break;
       }
 
       case SNTRuleTypeTeamID: {
-        // TeamIDs are always [0-9A-Z], so enforce that the identifier is uppercase
-        identifier =
-            [[identifier uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
-        if (identifier.length != kExpectedTeamIDLength) {
+        if (identifier.length != kExpectedTeamIDLength ||
+            [identifier rangeOfCharacterFromSet:nonAlnum].location != NSNotFound) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                           format:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type %@",
+                                  [self invalidIdentifier:identifier forType:type]];
           return nil;
         }
+
+        // TeamIDs are always [0-9A-Z], so enforce that the identifier is uppercase
+        identifier = [identifier uppercaseString];
 
         break;
       }
@@ -100,20 +104,21 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         if (!sidComponents || sidComponents.count < 2) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                           format:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type %@",
+                                  [self invalidIdentifier:identifier forType:type]];
           return nil;
         }
 
         // The first component is the TeamID
         NSString *teamID = sidComponents[0];
 
-        if (![teamID isEqualToString:@"platform"]) {
-          teamID =
-              [[teamID uppercaseString] stringByTrimmingCharactersInSet:nonUppercaseAlphaNumeric];
-          if (teamID.length != kExpectedTeamIDLength) {
+        if (![[teamID lowercaseString] isEqualToString:@"platform"]) {
+          if (teamID.length != kExpectedTeamIDLength ||
+              [teamID rangeOfCharacterFromSet:nonAlnum].location != NSNotFound) {
             [SNTError populateError:error
                            withCode:SNTErrorCodeRuleInvalidIdentifier
-                             format:@"Rule received with invalid identifier for its type"];
+                             format:@"Rule received with invalid identifier for its type %@",
+                                    [self invalidIdentifier:identifier forType:type]];
             return nil;
           }
         }
@@ -126,8 +131,16 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         if (signingID.length == 0) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                           format:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type %@",
+                                  [self invalidIdentifier:identifier forType:type]];
           return nil;
+        }
+
+        // TeamIDs are always [0-9A-Z], so enforce that the TeamID is uppercase, unless "platform"
+        if ([[teamID lowercaseString] isEqualToString:@"platform"]) {
+          teamID = [teamID lowercaseString];
+        } else {
+          teamID = [teamID uppercaseString];
         }
 
         identifier = [NSString stringWithFormat:@"%@:%@", teamID, signingID];
@@ -135,13 +148,16 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       }
 
       case SNTRuleTypeCDHash: {
-        identifier = [[identifier lowercaseString] stringByTrimmingCharactersInSet:nonHex];
-        if (identifier.length != CS_CDHASH_LEN * 2) {
+        if (identifier.length != CS_CDHASH_LEN * 2 ||
+            [identifier rangeOfCharacterFromSet:nonHex].location != NSNotFound) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
-                           format:@"Rule received with invalid identifier for its type"];
+                           format:@"Rule received with invalid identifier for its type %@",
+                                  [self invalidIdentifier:identifier forType:type]];
           return nil;
         }
+        // For CDHash rules, force the hash identifier to be lowercase hex.
+        identifier = [identifier lowercaseString];
         break;
       }
 
@@ -203,6 +219,19 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                           comment:nil
                           celExpr:nil
                             error:nil];
+}
+
+- (NSString *)invalidIdentifier:(NSString *)identifier forType:(SNTRuleType)type {
+  static NSDictionary<NSNumber *, NSString *> *const typeStr = @{
+    @(SNTRuleTypeCDHash) : kRuleTypeCDHash,
+    @(SNTRuleTypeBinary) : kRuleTypeBinary,
+    @(SNTRuleTypeSigningID) : kRuleTypeSigningID,
+    @(SNTRuleTypeCertificate) : kRuleTypeCertificate,
+    @(SNTRuleTypeTeamID) : kRuleTypeTeamID,
+  };
+
+  return [NSString stringWithFormat:@"(rule type: %@, identifier: %@)",
+                                    typeStr[@(type)] ?: @"<unknown>", identifier];
 }
 
 // lowercase policy keys and upper case the policy decision.

@@ -62,6 +62,10 @@
   return [NSString stringWithFormat:@"%@|%@|%@", _ruleName, _ruleVersion, _process.fileSHA256];
 }
 
+- (BOOL)unactionableEvent {
+  return self.decision == FileAccessPolicyDecision::kAllowedAuditOnly;
+}
+
 @end
 
 @implementation SNTStoredFileAccessProcess
