@@ -17,6 +17,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTModeTransition.h"
 
 @class SNTSyncManager;
 @class MOLXPCConnection;
@@ -80,6 +81,7 @@
 @property NSArray *remountUSBMode;
 @property NSString *overrideFileAccessAction;
 @property SNTExportConfiguration *exportConfig;
+@property SNTModeTransition *modeTransition;
 
 /// Clean sync flag, if True, all existing rules should be deleted before inserting any new rules.
 @property SNTSyncType syncType;

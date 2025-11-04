@@ -53,6 +53,7 @@ objc_library(
     deps = [
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTExportConfiguration",
+        "//Source/common:SNTModeTransition",
     ],
 )
 
@@ -71,6 +72,7 @@ objc_library(
         ":SNTSyncState",
         "//Source/common:SNTConfigBundle",
         "//Source/common:SNTExportConfiguration",
+        "//Source/common:SNTModeTransition",
     ],
 )
 
@@ -226,6 +228,7 @@ objc_library(
         "//Source/common:SNTError",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTModeTransition",
         "//Source/common:SNTRule",
         "//Source/common:SNTSIPStatus",
         "//Source/common:SNTStoredEvent",
@@ -237,6 +240,7 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:String",
+        "@northpolesec_protos//syncv2:v2_cc_proto",
         "@protobuf//src/google/protobuf/json",
     ],
 )
@@ -288,6 +292,7 @@ santa_unit_test(
         "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTModeTransition",
         "//Source/common:SNTRule",
         "//Source/common:SNTSIPStatus",
         "//Source/common:SNTStoredEvent",
@@ -300,6 +305,7 @@ santa_unit_test(
         "//Source/common:String",
         "@OCMock",
         "@northpolesec_protos//sync:v1_cc_proto",
+        "@northpolesec_protos//syncv2:v2_cc_proto",
         "@protobuf//src/google/protobuf/json",
     ],
 )

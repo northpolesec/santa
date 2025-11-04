@@ -422,6 +422,7 @@ objc_library(
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
         ":SNTLogging",
+        ":SNTModeTransition",
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
@@ -436,6 +437,7 @@ objc_library(
         ":CoderMacros",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
+        ":SNTModeTransition",
     ],
 )
 
@@ -446,6 +448,7 @@ santa_unit_test(
         ":SNTCommonEnums",
         ":SNTConfigBundle",
         ":SNTExportConfiguration",
+        ":SNTModeTransition",
     ],
 )
 

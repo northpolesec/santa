@@ -19,6 +19,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTModeTransition.h"
 
 @interface SNTConfigBundle (Testing)
 @property NSNumber *clientMode;
@@ -35,6 +36,7 @@
 @property SNTExportConfiguration *exportConfiguration;
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
+@property SNTModeTransition *modeTransition;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -44,7 +46,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 14;
+  exp.expectedFulfillmentCount = 15;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -64,6 +66,7 @@
   bundle.exportConfiguration = [[SNTExportConfiguration alloc]
       initWithURL:[NSURL URLWithString:@"https://example.com/upload"]
        formValues:@{@"key1" : @"value1", @"key2" : @"value2"}];
+  bundle.modeTransition = [[SNTModeTransition alloc] initOnDemandMinutes:4 defaultDuration:2];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -134,6 +137,13 @@
 
   [bundle ruleSyncLastSuccess:^(NSDate *val) {
     XCTAssertEqualObjects(val, nowDate);
+    [exp fulfill];
+  }];
+
+  [bundle modeTransition:^(SNTModeTransition *val) {
+    XCTAssertEqual(val.type, SNTModeTransitionTypeOnDemand);
+    XCTAssertEqualObjects(val.maxMinutes, @(4));
+    XCTAssertEqualObjects(val.defaultDurationMinutes, @(2));
     [exp fulfill];
   }];
 
@@ -216,6 +226,13 @@
 
   [bundle ruleSyncLastSuccess:^(NSDate *val) {
     XCTAssertEqualObjects(val, [NSDate now]);
+    [exp fulfill];
+  }];
+
+  [bundle modeTransition:^(SNTModeTransition *val) {
+    XCTAssertEqual(val.type, SNTModeTransitionTypeOnDemand);
+    XCTAssertEqualObjects(val.maxMinutes, @(2));
+    XCTAssertEqualObjects(val.defaultDurationMinutes, @(4));
     [exp fulfill];
   }];
 

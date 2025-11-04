@@ -18,6 +18,7 @@
 #import "Source/common/SNTCommonEnums.h"
 
 @class SNTExportConfiguration;
+@class SNTModeTransition;
 @class SNTRule;
 
 ///
@@ -606,6 +607,16 @@
 ///  Set the export configuration as received from a sync server.
 ///
 - (void)setSyncServerExportConfig:(nonnull SNTExportConfiguration *)exportConfig;
+
+///
+///  Currently defined mode transition configuration. Its value is set by a sync server.
+///
+@property(nullable, readonly) SNTModeTransition *modeTransition;
+
+///
+///  Set the mode transition configuration as received from a sync server.
+///
+- (void)setSyncServerModeTransition:(nonnull SNTModeTransition *)modeTransition;
 
 #pragma mark - USB Settings
 

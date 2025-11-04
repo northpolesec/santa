@@ -15,6 +15,7 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTModeTransition.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 
 // Expose necessary setters for SNTConfigBundle properties related to Postflight
@@ -33,6 +34,7 @@
 @property SNTExportConfiguration *exportConfiguration;
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
+@property SNTModeTransition *modeTransition;
 @end
 
 SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
@@ -50,6 +52,7 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.disableUnknownEventUpload = syncState.disableUnknownEventUpload;
   bundle.overrideFileAccessAction = syncState.overrideFileAccessAction;
   bundle.exportConfiguration = syncState.exportConfig;
+  bundle.modeTransition = syncState.modeTransition;
 
   bundle.fullSyncLastSuccess = [NSDate now];
 
