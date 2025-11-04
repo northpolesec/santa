@@ -92,22 +92,21 @@ __END_DECLS
   dispatch_async(self.connectionQueue, ^{
     if (self.isShuttingDown) return;
 
-    NSString *fullServer;
-#ifdef DEBUG
-    // In debug builds, allow overriding the domain suffix
-    LOGW(@"NATS: Domain check disabled - using server as-is: %@", fullServer);
-#else
     if (!server) {
       LOGE(@"NATS: Invalid push server domain. No server provided");
       return;
     }
 
+    NSString *fullServer;
+#ifdef DEBUG
+    // In debug builds, allow overriding the domain suffix and avoid TLS checks.
+    LOGW(@"NATS: Domain check disabled - using server as-is: %@", server);
+#else
     // In release builds, validate the domain suffix.
     if (![server hasSuffix:@".push.northpole.security:443"]) {
         LOGE(@"NATS: Invalid push server domain. Must end with '.push.northpole.security', got: %@", server);
         return;
     }
-
     // Make sure this starts with tls://
     if (![server hasPrefix:@"tls://"]) {
         LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", server);
@@ -143,14 +142,50 @@ __END_DECLS
       tagsChanged = ![oldTagSet isEqualToSet:newTagSet];
     }
 
-    // If device ID or tags changed, resubscribe to all topics
-    if ((deviceIDChanged || tagsChanged) && [self isConnectionAlive]) {
-      if (deviceIDChanged) {
+    // Check if credentials (JWT or NKey) have changed Credential changes
+    // require a full reconnection since they're embedded in the connection
+    BOOL credentialsChanged = NO;
+    if (self.jwt == nil && jwt != nil) {
+      credentialsChanged = YES;
+    } else if (self.jwt != nil && jwt == nil) {
+      credentialsChanged = YES;
+    } else if (self.jwt != nil && jwt != nil) {
+      credentialsChanged = ![self.jwt isEqualToString:jwt];
+    }
+
+    if (!credentialsChanged) {
+      if (self.pushToken == nil && token != nil) {
+        credentialsChanged = YES;
+      } else if (self.pushToken != nil && token == nil) {
+        credentialsChanged = YES;
+      } else if (self.pushToken != nil && token != nil) {
+        credentialsChanged = ![self.pushToken isEqualToString:token];
+      }
+    }
+
+    if (credentialsChanged) {
+      LOGI(@"NATS: Credentials changed - will reconnect with new JWT/NKey");
+    }
+
+    // Handle configuration changes
+    BOOL isConnected = [self isConnectionAlive];
+
+    if ((deviceIDChanged || tagsChanged || credentialsChanged) && isConnected) {
+      if (credentialsChanged) {
+        LOGI(@"NATS: Credentials changed, forcing disconnect and reconnect");
+        // Must fully disconnect and reconnect since credentials are embedded in the connection
+        [self unsubscribeAll];
+        natsConnection_Close(self.conn);
+        natsConnection_Destroy(self.conn);
+        self.conn = NULL;
+        self.isConnected = NO;
+      } else if (deviceIDChanged) {
         LOGI(@"NATS: Device ID changed, resubscribing to all topics");
+        [self unsubscribeAll];
       } else {
         LOGI(@"NATS: Tags changed, resubscribing to all topics");
+        [self unsubscribeAll];
       }
-      [self unsubscribeAll];
     }
 
     // Store configuration
@@ -162,8 +197,12 @@ __END_DECLS
 
     LOGI(@"NATS: Configured with server: %@, deviceID: %@, tags: %@", fullServer, deviceID, tags);
 
-    // If device ID or tags changed and we're connected, resubscribe with new configuration
-    if ((deviceIDChanged || tagsChanged) && [self isConnectionAlive]) {
+    // Reconnect or resubscribe based on what changed
+    if (credentialsChanged) {
+      // Reconnect with new credentials
+      [self connectIfConfigured];
+    } else if ((deviceIDChanged || tagsChanged) && isConnected) {
+      // Just resubscribe with new device ID or tags
       [self subscribe];
     }
   });
@@ -194,7 +233,10 @@ __END_DECLS
   return self.isConnected;
 }
 
-// Dispatch async to connect on a background thread.
+// Asynchronously attempts to connect to the push service using connectionQueue.
+// Serves as the public entry point for establishing a push service connection
+// if configuration is available.  Also used in tests to exercise retry logic
+// when required configuration is intentionally missing.
 - (void)connectIfConfigured {
   dispatch_async(self.connectionQueue, ^{
     if (self.isShuttingDown) return;
@@ -245,16 +287,22 @@ __END_DECLS
     // Set server URL with TLS unless debug mode is enabled
     NSString *serverURL;
 
-#if defined(SANTA_FORCE_SYNC_V2) && defined(SANTA_NATS_DISABLE_TLS)
-    if (![self.pushServer hasPrefix:@"tls://"]) {
-      LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", self.pushServer);
+#ifndef DEBUG
+    // Make sure it's running on push.northpole.security and on port 443
+    if (![self.pushServer hasSuffix:@".push.northpole.security:443"]) {
+      LOGE(@"NATS: Invalid push server domain. Must end with '.push.northpole.security:443', got: "
+           @"%@",
+           self.pushServer);
+      natsOptions_Destroy(opts);
+      return;
     }
-#else 
-   if (![self.pushServer hasPrefix:@"tls://"]) {
+
+    // Production builds must use TLS
+    if (![self.pushServer hasPrefix:@"tls://"]) {
       LOGE(@"NATS: Invalid push server domain. Must start with 'tls://', got: %@", self.pushServer);
       natsOptions_Destroy(opts);
       return;
-   }
+    }
 #endif
     serverURL = self.pushServer;
 
@@ -416,7 +464,7 @@ __END_DECLS
 
   // Verify connection is alive before subscribing
   if (![self isConnectionAlive]) {
-    LOGW(@"NATS: Cannot subscribe - connection not alive");
+    LOGW(@"NATS: Cannot subscribe - not connected");
     return;
   }
 
@@ -526,26 +574,26 @@ static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus e
       (lastError && strstr(lastError, "Permitted"))) {
     LOGE(@"NATS: Permission/Subscription violation on subject: %s", subSubject);
 
-    // Check if this is a device subscription error
-    if (subSubject && strstr(subSubject, "santa.host")) {
-      LOGE(@"NATS: Device-specific subscription not permitted by server JWT");
-      // Don't mark connection as failed - other subscriptions might work
-    } else {
-      // Mark connection as failed if we get permission violations on other subjects
-      // Also verify the connection state and potentially trigger reconnection
-      dispatch_async(self.connectionQueue, ^{
-        self.isConnected = NO;
+    // Permission errors on subscriptions don't necessarily mean the connection is dead.
+    // The connection may still be alive and other subscriptions may work.
+    // We just log the failure and continue - the subscription that failed won't receive messages.
+    // If the server actually closes the connection due to policy violations,
+    // the disconnected or closed callbacks will handle that separately.
 
-        // Check if the connection is actually closed
-        if (self.conn && natsConnection_IsClosed(self.conn)) {
-          LOGE(@"NATS: Connection closed due to permissions error, cleaning up and scheduling "
-               @"reconnect");
-          natsConnection_Destroy(self.conn);
-          self.conn = NULL;
-          [self scheduleConnectionRetry];
-        }
-      });
-    }
+    // Verify if the connection is actually closed despite the permission error
+    dispatch_async(self.connectionQueue, ^{
+      if (self.conn && natsConnection_IsClosed(self.conn)) {
+        LOGE(@"NATS: Connection was closed by server due to permissions error, cleaning up and "
+             @"scheduling reconnect");
+        self.isConnected = NO;
+        natsConnection_Destroy(self.conn);
+        self.conn = NULL;
+        [self scheduleConnectionRetry];
+      } else {
+        LOGD(@"NATS: Connection still alive despite subscription error on %s, continuing",
+             subSubject);
+      }
+    });
   }
 }
 
