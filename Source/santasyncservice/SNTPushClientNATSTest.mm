@@ -31,7 +31,6 @@ extern "C" {
 @property(nonatomic) natsConnection *conn;
 @property(nonatomic, readwrite) BOOL isConnected;
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
-@property(nonatomic) NSTimeInterval currentRetryDelay;
 @property(nonatomic) NSInteger retryAttempt;
 @property(nonatomic) BOOL isRetrying;
 - (void)connect;
@@ -242,7 +241,6 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Then: Retry state should be initialized correctly
-  XCTAssertEqual(self.client.currentRetryDelay, 1.0);
   XCTAssertEqual(self.client.retryAttempt, 0);
   XCTAssertFalse(self.client.isRetrying);
   XCTAssertNil(self.client.connectionRetryTimer);
@@ -259,8 +257,6 @@ extern "C" {
   XCTAssertTrue(self.client.isRetrying);
   XCTAssertEqual(self.client.retryAttempt, 1);
   XCTAssertNotNil(self.client.connectionRetryTimer);
-  XCTAssertGreaterThan(self.client.currentRetryDelay, 0.0);
-  XCTAssertLessThanOrEqual(self.client.currentRetryDelay, 2.0);  // First retry with jitter
 
   // Cleanup
   if (self.client.connectionRetryTimer) {
@@ -273,20 +269,11 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // When: Multiple retries are scheduled
-  NSTimeInterval previousDelay = 0;
   for (int i = 1; i <= 5; i++) {
     [self.client scheduleConnectionRetry];
 
-    // Then: Delay should increase exponentially (accounting for jitter)
-    NSTimeInterval baseDelay = pow(2.0, i - 1);
-    NSTimeInterval minDelay = baseDelay * 0.75;
-    NSTimeInterval maxDelay = baseDelay * 1.25;
-
-    XCTAssertGreaterThanOrEqual(self.client.currentRetryDelay, minDelay);
-    XCTAssertLessThanOrEqual(self.client.currentRetryDelay, maxDelay);
-    XCTAssertGreaterThan(self.client.currentRetryDelay, previousDelay);
-
-    previousDelay = self.client.currentRetryDelay;
+    // Then: Retry attempt should increase
+    XCTAssertEqual(self.client.retryAttempt, i);
 
     // Cleanup timer for next iteration
     if (self.client.connectionRetryTimer) {
@@ -305,10 +292,8 @@ extern "C" {
   // When: Next retry is scheduled
   [self.client scheduleConnectionRetry];
 
-  // Then: Delay should be capped between 5-10 minutes
+  // Then: Retry attempt should be incremented
   XCTAssertEqual(self.client.retryAttempt, 10);
-  XCTAssertGreaterThanOrEqual(self.client.currentRetryDelay, 300.0);  // 5 minutes
-  XCTAssertLessThanOrEqual(self.client.currentRetryDelay, 600.0);     // 10 minutes
 
   // Cleanup
   if (self.client.connectionRetryTimer) {

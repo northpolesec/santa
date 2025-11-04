@@ -53,7 +53,6 @@ __END_DECLS
 @property(nonatomic, copy) NSArray<NSString *> *tags;
 // Connection retry state
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
-@property(nonatomic) NSTimeInterval currentRetryDelay;
 @property(atomic) NSInteger retryAttempt;
 @property(atomic) BOOL isRetrying;
 @end
@@ -70,7 +69,6 @@ __END_DECLS
     _messageQueue =
         dispatch_queue_create("com.northpolesec.santa.nats.message", DISPATCH_QUEUE_SERIAL);
     _tagSubscriptions = [NSMutableArray array];
-    _currentRetryDelay = 1.0;  // Start with 1 second
 
     // Don't connect immediately - wait for preflight to provide configuration
     LOGI(@"NATS push client: Initialized, waiting for preflight configuration");
@@ -176,6 +174,7 @@ __END_DECLS
   return self.pushServer && self.pushToken && self.jwt && self.pushDeviceID;
 }
 
+// Dispatch async to connect on a background thread.
 - (void)connectIfConfigured {
   dispatch_async(self.connectionQueue, ^{
     if (self.isShuttingDown) return;
@@ -283,7 +282,6 @@ __END_DECLS
 
     // Reset retry state on successful connection
     self.retryAttempt = 0;
-    self.currentRetryDelay = 1.0;
     self.isRetrying = NO;
     if (self.connectionRetryTimer) {
       dispatch_source_cancel(self.connectionRetryTimer);
@@ -548,6 +546,20 @@ static void closedCallback(natsConnection *nc, void *closure) {
   LOGI(@"NATS: Connection closed");
   dispatch_async(self.connectionQueue, ^{
     self.isConnected = NO;
+
+    // If we're not shutting down, schedule a reconnection attempt
+    // The closed callback is called when the connection is permanently closed
+    // and NATS won't automatically reconnect, so we need to do it ourselves
+    if (!self.isShuttingDown && self.conn) {
+      LOGI(@"NATS: Connection closed unexpectedly, cleaning up and scheduling reconnect");
+
+      // Clean up the closed connection
+      natsConnection_Destroy(self.conn);
+      self.conn = NULL;
+
+      // Schedule reconnection with exponential backoff
+      [self scheduleConnectionRetry];
+    }
   });
 }
 
@@ -564,14 +576,14 @@ static void closedCallback(natsConnection *nc, void *closure) {
 
   // Add jitter: ±25% randomization to prevent thundering herd
   double jitterFactor = 0.75 + (0.5 * ((double)arc4random_uniform(UINT32_MAX) / UINT32_MAX));
-  self.currentRetryDelay = baseDelay * jitterFactor;
+  NSTimeInterval currentRetryDelay = baseDelay * jitterFactor;
 
   // Cap at 5-10 minutes (randomly between 300-600 seconds) after initial backoff
   if (self.retryAttempt > 9) {
-    self.currentRetryDelay = 300.0 + arc4random_uniform(301);  // 5-10 minutes
+    currentRetryDelay = 300.0 + arc4random_uniform(301);  // 5-10 minutes
   }
 
-  LOGW(@"NATS: Connection failed, will retry in %.1f seconds (attempt %ld)", self.currentRetryDelay,
+  LOGW(@"NATS: Connection failed, will retry in %.1f seconds (attempt %ld)", currentRetryDelay,
        (long)self.retryAttempt);
 
   // Cancel any existing retry timer
@@ -592,7 +604,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
   // Set a one shot timer to retry the connection with the calculated delay.
   dispatch_source_set_timer(
       self.connectionRetryTimer,
-      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(self.currentRetryDelay * NSEC_PER_SEC)),
+      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(currentRetryDelay * NSEC_PER_SEC)),
       DISPATCH_TIME_FOREVER,
       (int64_t)(100 * NSEC_PER_MSEC));  // 100ms leeway
 
