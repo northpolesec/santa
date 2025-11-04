@@ -524,6 +524,9 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   // avoid blocking the NATS managed thread. Then call back to the main thread
   // to trigger the sync. Also force serialization of the sync call to avoid
   // thundering herd.
+  //
+  // IMPORTANT: Do not touch the nats objects in this block they are owned by
+  // the nats library and will be destroyed after this block.
   dispatch_async(self.messageQueue, ^{
     if (!self.isShuttingDown) {
       LOGI(@"NATS: Triggering immediate sync due to message on %@", msgSubject);

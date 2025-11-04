@@ -78,7 +78,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (config.fcmEnabled == YES) {
       LOGD(@"Using FCM push notifications");
       _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
-    } else if (config.enableNATS == YES && config.isSyncV2) {
+    } else if (config.enableNATS == YES && santa::IsDomainPinned(config.syncBaseURL)) {
       LOGD(@"Using NATS push notifications");
       // Use NATS this will only work for V2 sync clients.
       _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];

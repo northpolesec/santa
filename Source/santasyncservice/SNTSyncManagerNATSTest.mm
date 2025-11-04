@@ -51,11 +51,11 @@
 }
 
 - (void)testSyncManagerInitializesNATSClientWhenEnabled {
-  // Given: FCM is disabled, NATS is enabled (default), and APNS is disabled
+  // Given: FCM is disabled, NATS is enabled (default), APNS is disabled, and syncBaseURL is pinned
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
-  OCMStub([self.mockConfigurator isSyncV2]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
+  OCMStub([self.mockConfigurator syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
@@ -69,8 +69,8 @@
   // Given: Both FCM and NATS are enabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
-  OCMStub([self.mockConfigurator isSyncV2]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
+  OCMStub([self.mockConfigurator syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
@@ -84,8 +84,8 @@
   // Given: FCM is disabled, NATS is disabled, and APNS is enabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
-  OCMStub([self.mockConfigurator isSyncV2]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
+  OCMStub([self.mockConfigurator syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
@@ -99,8 +99,8 @@
   // Given: All push notification systems are disabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
-  OCMStub([self.mockConfigurator isSyncV2]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
+  OCMStub([self.mockConfigurator syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
   // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
