@@ -1346,12 +1346,12 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (!syncURL) {
     return NO;
   }
-  
+
   // Check if the domain is pinned (Workshop domains)
   if (santa::IsDomainPinned(syncURL)) {
     return YES;
   }
-  
+
   // Check for compile-time flag
 #ifdef SANTA_FORCE_SYNC_V2
   return YES;
