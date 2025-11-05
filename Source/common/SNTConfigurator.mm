@@ -1328,12 +1328,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (BOOL)enableNATS {
   // TODO: Consider supporting enablement from the sync server.
-  NSNumber *number = self.configState[kEnableNATS];
-  // Default to YES.
-  if (number == nil) {
-    return YES;
-  }
-  return [number boolValue];
+  return [self.configState[kEnableNATS] boolValue];
 }
 
 - (void)setBlockUSBMount:(BOOL)enabled {
