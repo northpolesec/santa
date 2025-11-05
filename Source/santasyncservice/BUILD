@@ -338,6 +338,7 @@ santa_unit_test(
     sdk_dylibs = ["libz"],
     deps = [
         ":FCM_lib",
+        ":NATS_lib",
         ":SNTPushNotificationsTracker",
         ":SNTSyncConfigBundle",
         ":SNTSyncLogging",
