@@ -19,6 +19,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDropRootPrivs.h"
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -36,6 +37,8 @@
 @property NSDate *lastStatsSubmissionAttempt;
 @property NSString *lastStatsSubmissionVersion;
 @property NSString *currentVersion;
+
+@property NSArray<SNTKVOManager *> *kvoWatchers;
 @end
 
 @implementation SNTSyncService
@@ -82,6 +85,33 @@
     // Start the stat submission thread, which spins up daily to submit stats to Polaris
     // IF AND ONLY IF the user has enabled stat collection.
     [self statSubmissionThread];
+
+    self.kvoWatchers = @[
+      [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
+                                   selector:@selector(enableAPNS)
+                                       type:[NSNumber class]
+                                   callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                     BOOL oldBool = [oldValue boolValue];
+                                     BOOL newBool = [newValue boolValue];
+
+                                     if (oldBool != newBool) {
+                                       LOGI(@"EnableAPNS changed: %d -> %d", oldBool, newBool);
+                                       [self spindown];
+                                     }
+                                   }],
+      [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
+                                   selector:@selector(enableNATS)
+                                       type:[NSNumber class]
+                                   callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                     BOOL oldBool = [oldValue boolValue];
+                                     BOOL newBool = [newValue boolValue];
+
+                                     if (oldBool != newBool) {
+                                       LOGI(@"EnableNATS changed: %d -> %d", oldBool, newBool);
+                                       [self spindown];
+                                     }
+                                   }],
+    ];
   }
   return self;
 }
