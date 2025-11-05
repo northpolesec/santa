@@ -15,6 +15,24 @@ objc_library(
 )
 
 objc_library(
+    name = "NATS_lib",
+    srcs = ["SNTPushClientNATS.mm"],
+    hdrs = [
+        "SNTPushClientNATS.h",
+        "SNTPushNotifications.h",
+    ],
+    deps = [
+        ":SNTSyncState",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTSyncConstants",
+        "//Source/common:SNTSystemInfo",
+        "@nats_c//:nats",
+    ],
+)
+
+objc_library(
     name = "polaris_lib",
     srcs = [
         "SNTPolaris.h",
@@ -42,6 +60,7 @@ objc_library(
     name = "Pinning",
     srcs = ["Pinning.mm"],
     hdrs = ["Pinning.h"],
+    visibility = ["//Source/common:__pkg__"],
 )
 
 objc_library(
@@ -171,7 +190,6 @@ objc_library(
         "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
-        "SNTPushNotifications.h",
         "SNTStreamingMultipartFormData.h",
         "SNTStreamingMultipartFormData.mm",
         "SNTSyncEventUpload.h",
@@ -187,6 +205,7 @@ objc_library(
     sdk_frameworks = ["Network"],
     deps = [
         ":FCM_lib",
+        ":NATS_lib",
         ":Pinning",
         ":ProtoTraits",
         ":SNTPushNotificationsTracker",
@@ -342,11 +361,73 @@ macos_command_line_application(
     deps = [":santass_lib"],
 )
 
+santa_unit_test(
+    name = "SNTPushClientNATSTest",
+    srcs = ["SNTPushClientNATSTest.mm"],
+    deps = [
+        ":NATS_lib",
+        ":SNTSyncState",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTSyncConstants",
+        "//Source/common:SNTSystemInfo",
+        "@OCMock",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTPushClientNATSIntegrationTest",
+    srcs = ["SNTPushClientNATSIntegrationTest.mm"],
+    env = {
+        "NATS_INTEGRATION_TEST": "1",
+        "SANTA_NATS_DISABLE_TLS": "1",
+        "SANTA_NATS_DISABLE_DOMAIN_SUFFIX": "1",
+    },
+    tags = ["manual"],  # Only run when explicitly requested
+    deps = [
+        ":NATS_lib",
+        ":SNTSyncState",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTSyncConstants",
+        "@OCMock",
+        "@nats_c//:nats",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTPushClientNATSConnectionTest",
+    srcs = ["SNTPushClientNATSConnectionTest.mm"],
+    env = {
+        "NATS_INTEGRATION_TEST": "1",
+        "SANTA_NATS_DISABLE_TLS": "1",
+        "SANTA_NATS_DISABLE_DOMAIN_SUFFIX": "1",
+    },
+    tags = ["manual"],  # Only run when explicitly requested
+    deps = [
+        ":NATS_lib",
+        "//Source/common:SNTConfigurator",
+        "@OCMock",
+        "@nats_c//:nats",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTSyncManagerNATSTest",
+    srcs = ["SNTSyncManagerNATSTest.mm"],
+    deps = [
+        ":sync_lib",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "@OCMock",
+    ],
+)
+
 test_suite(
     name = "unit_tests",
     tests = [
+        ":SNTPushClientNATSTest",
         ":SNTStreamingMultipartFormDataTest",
         ":SNTSyncConfigBundleTest",
+        ":SNTSyncManagerNATSTest",
         ":SNTSyncRuleDownloadTest",
         ":SNTSyncTest",
     ],

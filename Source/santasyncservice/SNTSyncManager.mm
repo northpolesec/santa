@@ -29,6 +29,7 @@
 #include "Source/santasyncservice/Pinning.h"
 #import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
+#import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
@@ -73,10 +74,17 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _daemonConn = daemonConn;
 
     SNTConfigurator *config = [SNTConfigurator configurator];
-    if (config.enableAPNS) {
-      _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];
-    } else if (config.fcmEnabled) {
+
+    if (config.fcmEnabled == YES) {
+      LOGD(@"Using FCM push notifications");
       _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
+    } else if (config.enableNATS == YES && santa::IsDomainPinned(config.syncBaseURL)) {
+      LOGD(@"Using NATS push notifications");
+      // Use NATS this will only work for V2 sync clients.
+      _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
+    } else if (config.enableAPNS == YES) {
+      LOGD(@"Using APNS push notifications");
+      _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];
     }
 
     _fullSyncTimer = [self createSyncTimerWithBlock:^{
@@ -429,6 +437,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   } else if ([config syncServerAuthRootsData]) {
     authURLSession.serverRootsPemData = [config syncServerAuthRootsData];
   }
+
+// Force sync v2 via compile-time define
+#ifdef SANTA_FORCE_SYNC_V2
+  syncState.isSyncV2 = YES;
+#endif
 
   SLOGD(@"Using sync protocol version: %d", syncState.isSyncV2 ? 2 : 1);
 
