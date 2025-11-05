@@ -28,7 +28,10 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/santasyncservice/SNTPushClientNATS.h"
+#import "Source/santasyncservice/SNTPushNotifications.h"
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
+#import "Source/santasyncservice/SNTSyncManager.h"
 #import "Source/santasyncservice/SNTSyncPostflight.h"
 #import "Source/santasyncservice/SNTSyncPreflight.h"
 #import "Source/santasyncservice/SNTSyncRuleDownload.h"
@@ -47,6 +50,18 @@
 
 @interface SNTSyncStage (XSSI)
 - (NSData *)stripXssi:(NSData *)data;
+@end
+
+@interface SNTSyncManager (Testing)
+- (SNTSyncStatusType)preflightWithSyncState:(SNTSyncState *)syncState;
+- (void)rescheduleTimerQueue:(dispatch_source_t)timerQueue secondsFromNow:(uint64_t)seconds;
+- (void)startReachability;
+@property(nonatomic) dispatch_source_t fullSyncTimer;
+@property id<SNTPushNotificationsClientDelegate> pushNotifications;
+@end
+
+@interface SNTPushClientNATS (Testing)
+@property(nonatomic, readwrite) NSUInteger fullSyncInterval;
 @end
 
 @interface SNTSyncTest : XCTestCase
@@ -408,6 +423,53 @@
 
   XCTAssertTrue([sut sync]);
   XCTAssertNil(self.syncState.overrideFileAccessAction);
+}
+
+- (void)testReschedulePreflightFail {
+  // Have SNTSyncPreflight return mock obejcts
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+
+  SNTSyncState *ss = [[SNTSyncState alloc] init];
+  SNTSyncManager *sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+  id smPartialMock = OCMPartialMock(sm);
+  OCMStub([smPartialMock startReachability]);
+  sm.pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
+
+  // Simulate preflight failure
+  OCMStub([(SNTSyncPreflight *)mockPreflight sync]).andReturn(NO);
+
+  // Expect that we reschedule when push is enabled to the lower time value
+  OCMExpect([smPartialMock rescheduleTimerQueue:sm.fullSyncTimer
+                                 secondsFromNow:kDefaultFullSyncInterval]);
+  [sm preflightWithSyncState:ss];
+  XCTAssertTrue(OCMVerifyAll(smPartialMock));
+}
+
+- (void)testReschedulePreflightFailAfterPushIntervalUpdated {
+  // Have SNTSyncPreflight return mock obejcts
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+
+  SNTSyncState *ss = [[SNTSyncState alloc] init];
+  SNTSyncManager *sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+  id smPartialMock = OCMPartialMock(sm);
+  OCMStub([smPartialMock startReachability]);
+
+  // Simulate a previously received updated push interval
+  SNTPushClientNATS *nats = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
+  nats.fullSyncInterval = 2;
+  sm.pushNotifications = nats;
+
+  // Simulate preflight failure
+  OCMStub([(SNTSyncPreflight *)mockPreflight sync]).andReturn(NO);
+
+  // Expect that we reschedule when push is enabled to the lower time value
+  OCMExpect([smPartialMock rescheduleTimerQueue:sm.fullSyncTimer secondsFromNow:2]);
+  [sm preflightWithSyncState:ss];
+  XCTAssertTrue(OCMVerifyAll(smPartialMock));
 }
 
 - (void)testPreflightDatabaseCounts {

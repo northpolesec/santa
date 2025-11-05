@@ -335,6 +335,13 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     if (syncState.preflightOnly) return SNTSyncStatusTypeSuccess;
     return [self eventUploadWithSyncState:syncState];
+  } else if (_pushNotifications) {
+    // If preflight failed and push notifications are enabled, force a reschedule for
+    // the smaller of the default sync interval (default 10 minutes) and whatever the
+    // last push full sync interval was set to (default 4 hours).
+    // If push notifications are not enabled, the default sync interval was already set (10m).
+    auto interval = std::min(_pushNotifications.fullSyncInterval, kDefaultFullSyncInterval);
+    [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:interval];
   }
 
   SLOGE(@"Preflight failed, will try again once %@ is reachable",
