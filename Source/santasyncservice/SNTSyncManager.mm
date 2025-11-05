@@ -230,7 +230,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 - (void)rescheduleTimerQueue:(dispatch_source_t)timerQueue secondsFromNow:(uint64_t)seconds {
   uint64_t interval = seconds * NSEC_PER_SEC;
-  uint64_t leeway = (seconds * 0.5) * NSEC_PER_SEC;
+  uint64_t leeway = 5 * NSEC_PER_SEC;
   dispatch_source_set_timer(timerQueue, dispatch_walltime(NULL, interval), interval, leeway);
 }
 
@@ -321,14 +321,17 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
             @"Push notification sync interval changed from %lu to %lu seconds. Rescheduling timer.",
             oldInterval, self.pushNotifications.fullSyncInterval);
       }
+
+      // Always reschedule
+      [self rescheduleTimerQueue:self.fullSyncTimer
+                  secondsFromNow:self.pushNotifications.fullSyncInterval];
     } else {
       LOGD(@"Push notifications are not enabled. Sync every %lu min.",
            syncState.fullSyncInterval / 60);
-    }
 
-    // Always reschedule
-    [self rescheduleTimerQueue:self.fullSyncTimer
-                secondsFromNow:self.pushNotifications.fullSyncInterval];
+      // Always reschedule
+      [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:syncState.fullSyncInterval];
+    }
 
     if (syncState.preflightOnly) return SNTSyncStatusTypeSuccess;
     return [self eventUploadWithSyncState:syncState];
