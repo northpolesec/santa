@@ -53,7 +53,7 @@
 - (void)testSyncManagerInitializesNATSClientWhenEnabled {
   // Given: FCM is disabled, NATS is enabled (default), APNS is disabled, and syncBaseURL is pinned
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
+  OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
@@ -69,7 +69,7 @@
 - (void)testSyncManagerFCMTakesPrecedenceOverNATS {
   // Given: Both FCM and NATS are enabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(YES);
+  OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(YES);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
@@ -85,7 +85,7 @@
 - (void)testSyncManagerFallsBackToAPNSWhenNATSDisabled {
   // Given: FCM is disabled, NATS is disabled, and APNS is enabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
+  OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(NO);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
@@ -101,7 +101,7 @@
 - (void)testSyncManagerNoPushClientWhenAllDisabled {
   // Given: All push notification systems are disabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
-  OCMStub([self.mockConfigurator enableNATS]).andReturn(NO);
+  OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(NO);
   OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
