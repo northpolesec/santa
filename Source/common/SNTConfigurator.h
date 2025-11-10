@@ -823,6 +823,16 @@
 @property(readonly, nonatomic) BOOL enablePushNotifications;
 
 ///
+///  Deprecated: Use enablePushNotifications instead.
+///  Set to true to use NATS push notifications. Defaults to true.
+///  NATS takes precedence over APNS if enabled, but not FCM.
+///
+//   This can only used with Workshop and SyncV2.
+///
+@property(readonly, nonatomic) BOOL enableNATS
+    __attribute__((deprecated("Use enablePushNotifications instead")));
+
+///
 /// True if metricsFormat and metricsURL are set. False otherwise.
 ///
 @property(readonly, nonatomic) BOOL exportMetrics;
