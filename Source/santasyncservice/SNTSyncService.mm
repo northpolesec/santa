@@ -107,7 +107,8 @@
                                      BOOL newBool = [newValue boolValue];
 
                                      if (oldBool != newBool) {
-                                       LOGI(@"EnablePushNotifications changed: %d -> %d", oldBool, newBool);
+                                       LOGI(@"EnablePushNotifications changed: %d -> %d", oldBool,
+                                            newBool);
                                        [self spindown];
                                      }
                                    }],

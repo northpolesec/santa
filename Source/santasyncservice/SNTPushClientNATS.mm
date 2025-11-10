@@ -508,12 +508,13 @@ __END_DECLS
   // Subscribe to commands topic: santa.host.<device-id>.commands
   // Note: Failure to subscribe to commands topic is non-fatal - client continues operating
   if (self.pushDeviceID && self.pushDeviceID.length > 0) {
-    NSString *commandsTopic = [NSString stringWithFormat:@"santa.host.%@.commands", self.pushDeviceID];
+    NSString *commandsTopic =
+        [NSString stringWithFormat:@"santa.host.%@.commands", self.pushDeviceID];
     LOGD(@"NATS: Subscribing to commands topic: %@", commandsTopic);
 
     natsSubscription *commandsSub = NULL;
     status = natsConnection_Subscribe(&commandsSub, self.conn, [commandsTopic UTF8String],
-                                     &commandMessageHandler, (__bridge void *)self);
+                                      &commandMessageHandler, (__bridge void *)self);
 
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to subscribe to commands topic %@: %s (non-fatal, continuing)",
@@ -593,7 +594,7 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
 
 // NATS command message handler - handles serialization/deserialization and dispatches to handlers
 static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg,
-                                   void *closure) {
+                                  void *closure) {
   if (!closure || !msg) {
     natsMsg_Destroy(msg);
     return;
@@ -680,9 +681,9 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
         return;
       }
 
-      natsStatus status = natsConnection_Publish(
-          self.conn, [replyTopic UTF8String], responseData.data(),
-          static_cast<int>(responseData.length()));
+      natsStatus status =
+          natsConnection_Publish(self.conn, [replyTopic UTF8String], responseData.data(),
+                                 static_cast<int>(responseData.length()));
       if (status != NATS_OK) {
         LOGE(@"NATS: Failed to publish command response to %@: %s (non-fatal)", replyTopic,
              natsStatus_GetText(status));
@@ -697,7 +698,7 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
 
 - (void)publishCommandResponse:(santa::commands::v1::SantaCommandResponseCode)resultCode
                         output:(NSString *)output
-                   toReplyTopic:(NSString *)replyTopic {
+                  toReplyTopic:(NSString *)replyTopic {
   // Failures are logged but don't crash the client
   if (!replyTopic || replyTopic.length == 0) {
     LOGW(@"NATS: Cannot publish command response - no reply topic provided (non-fatal)");
@@ -722,9 +723,9 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
       return;
     }
 
-    natsStatus status = natsConnection_Publish(
-        self.conn, [replyTopic UTF8String], responseData.data(),
-        static_cast<int>(responseData.length()));
+    natsStatus status =
+        natsConnection_Publish(self.conn, [replyTopic UTF8String], responseData.data(),
+                               static_cast<int>(responseData.length()));
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to publish command response to %@: %s (non-fatal)", replyTopic,
            natsStatus_GetText(status));
@@ -736,14 +737,14 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
 
 - (void)sendCommandSuccess:(NSString *)message toReplyTopic:(NSString *)replyTopic {
   [self publishCommandResponse:santa::commands::v1::COMMAND_SUCCESSFUL
-                         output:message
-                    toReplyTopic:replyTopic];
+                        output:message
+                  toReplyTopic:replyTopic];
 }
 
 - (void)sendCommandError:(NSString *)errorMessage toReplyTopic:(NSString *)replyTopic {
   [self publishCommandResponse:santa::commands::v1::COMMAND_ERROR
-                         output:errorMessage
-                    toReplyTopic:replyTopic];
+                        output:errorMessage
+                  toReplyTopic:replyTopic];
 }
 
 // NATS error handler callback

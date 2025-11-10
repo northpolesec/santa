@@ -40,8 +40,8 @@ __END_DECLS
 - (santa::commands::v1::SantaCommandResponse)handlePingCommand:
     (const santa::commands::v1::PingRequest &)pingRequest;
 - (void)publishCommandResponse:(santa::commands::v1::SantaCommandResponseCode)resultCode
-                          output:(NSString *)output
-                     toReplyTopic:(NSString *)replyTopic;
+                        output:(NSString *)output
+                  toReplyTopic:(NSString *)replyTopic;
 - (void)sendCommandSuccess:(NSString *)message toReplyTopic:(NSString *)replyTopic;
 - (void)sendCommandError:(NSString *)errorMessage toReplyTopic:(NSString *)replyTopic;
 @end
@@ -270,8 +270,7 @@ __END_DECLS
                    @"Result should match for output: %@", output);
     if (output.length > 0) {
       NSString *deserializedOutput = @(deserialized.output().c_str());
-      XCTAssertEqualObjects(deserializedOutput, output,
-                            @"Output should match for: %@", output);
+      XCTAssertEqualObjects(deserializedOutput, output, @"Output should match for: %@", output);
     }
   }
 }
@@ -319,4 +318,3 @@ __END_DECLS
 }
 
 @end
-

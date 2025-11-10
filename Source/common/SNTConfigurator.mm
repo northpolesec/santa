@@ -167,7 +167,8 @@ static NSString *const kFCMAPIKey = @"FCMAPIKey";
 static NSString *const kEnableAPNS = @"EnableAPNS";
 
 static NSString *const kEnablePushNotifications = @"EnablePushNotifications";
-static NSString *const kEnableNATS = @"EnableNATS";  // Deprecated: alias for EnablePushNotifications
+static NSString *const kEnableNATS =
+    @"EnableNATS";  // Deprecated: alias for EnablePushNotifications
 
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
