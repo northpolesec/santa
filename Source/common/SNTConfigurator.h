@@ -818,7 +818,7 @@
 ///  Set to true to use NATS push notifications. Defaults to true.
 ///  NATS takes precedence over APNS if enabled, but not FCM.
 ///
-//   This can only used with Workshop and SyncV2.
+///  This can only used with Workshop and SyncV2.
 ///
 @property(readonly, nonatomic) BOOL enablePushNotifications;
 

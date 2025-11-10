@@ -350,7 +350,6 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kEnableAPNS : number,
       kEnablePushNotifications : number,
       kEnableNATS : number,  // Deprecated: alias for EnablePushNotifications, kept for config key
-                             // compatibility
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
@@ -697,6 +696,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEnablePushNotifications {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableNATS {
+  // Deprecated: alias for enablePushNotifications
   return [self configStateSet];
 }
 
@@ -1439,6 +1443,11 @@ static SNTConfigurator *sharedConfigurator = nil;
   return NO;
 }
 
+- (BOOL)enableNATS {
+  // Deprecated: use enablePushNotifications instead
+  return [self enablePushNotifications];
+}
+
 - (void)setBlockUSBMount:(BOOL)enabled {
   [self updateSyncStateForKey:kBlockUSBMountKey value:@(enabled)];
 }
@@ -1855,6 +1864,12 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 
   [self applyOverrides:forcedConfig];
+
+  // Backward compatibility: if EnableNATS is set but EnablePushNotifications is not,
+  // copy the value from EnableNATS to EnablePushNotifications
+  if (forcedConfig[kEnableNATS] != nil && forcedConfig[kEnablePushNotifications] == nil) {
+    forcedConfig[kEnablePushNotifications] = forcedConfig[kEnableNATS];
+  }
 
   return forcedConfig;
 }
