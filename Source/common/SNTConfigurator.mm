@@ -166,7 +166,8 @@ static NSString *const kFCMAPIKey = @"FCMAPIKey";
 
 static NSString *const kEnableAPNS = @"EnableAPNS";
 
-static NSString *const kEnableNATS = @"EnableNATS";
+static NSString *const kEnablePushNotifications = @"EnablePushNotifications";
+static NSString *const kEnableNATS = @"EnableNATS";  // Deprecated: alias for EnablePushNotifications
 
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
@@ -329,7 +330,8 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFCMEntity : string,
       kFCMAPIKey : string,
       kEnableAPNS : number,
-      kEnableNATS : number,
+      kEnablePushNotifications : number,
+      kEnableNATS : number,  // Deprecated: alias for EnablePushNotifications
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
@@ -673,7 +675,12 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self configStateSet];
 }
 
++ (NSSet *)keyPathsForValuesAffectingEnablePushNotifications {
+  return [self configStateSet];
+}
+
 + (NSSet *)keyPathsForValuesAffectingEnableNATS {
+  // Deprecated: alias for enablePushNotifications
   return [self configStateSet];
 }
 
@@ -1326,9 +1333,19 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [number boolValue];
 }
 
-- (BOOL)enableNATS {
+- (BOOL)enablePushNotifications {
   // TODO: Consider supporting enablement from the sync server.
+  // Check new key first, then fall back to deprecated key for backward compatibility
+  NSNumber *value = self.configState[kEnablePushNotifications];
+  if (value != nil) {
+    return [value boolValue];
+  }
   return [self.configState[kEnableNATS] boolValue];
+}
+
+- (BOOL)enableNATS {
+  // Deprecated: use enablePushNotifications instead
+  return [self enablePushNotifications];
 }
 
 - (void)setBlockUSBMount:(BOOL)enabled {
@@ -1667,6 +1684,12 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 
   [self applyOverrides:forcedConfig];
+
+  // Backward compatibility: if EnableNATS is set but EnablePushNotifications is not,
+  // copy the value from EnableNATS to EnablePushNotifications
+  if (forcedConfig[kEnableNATS] != nil && forcedConfig[kEnablePushNotifications] == nil) {
+    forcedConfig[kEnablePushNotifications] = forcedConfig[kEnableNATS];
+  }
 
   return forcedConfig;
 }

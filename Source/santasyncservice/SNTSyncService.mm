@@ -100,14 +100,14 @@
                                      }
                                    }],
       [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
-                                   selector:@selector(enableNATS)
+                                   selector:@selector(enablePushNotifications)
                                        type:[NSNumber class]
                                    callback:^(NSNumber *oldValue, NSNumber *newValue) {
                                      BOOL oldBool = [oldValue boolValue];
                                      BOOL newBool = [newValue boolValue];
 
                                      if (oldBool != newBool) {
-                                       LOGI(@"EnableNATS changed: %d -> %d", oldBool, newBool);
+                                       LOGI(@"EnablePushNotifications changed: %d -> %d", oldBool, newBool);
                                        [self spindown];
                                      }
                                    }],
