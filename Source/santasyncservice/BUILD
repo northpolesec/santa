@@ -28,6 +28,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
+        "//Source/common:santa_commands_cc_proto",
         "@nats_c//:nats",
     ],
 )
@@ -434,6 +435,18 @@ santa_unit_test(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
+        "@OCMock",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTPushClientNATSCommandTest",
+    srcs = ["SNTPushClientNATSCommandTest.mm"],
+    deps = [
+        ":NATS_lib",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTSyncConstants",
+        "//Source/common:santa_commands_cc_proto",
         "@OCMock",
     ],
 )
