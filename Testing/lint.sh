@@ -15,6 +15,14 @@ swift format lint -s -r ${GIT_ROOT}
 
 ! git grep -EIn $'[ \t]+$' -- ':(exclude)*.patch'
 
-go install github.com/bazelbuild/buildtools/buildifier@latest
-~/go/bin/buildifier --lint=warn -r ${GIT_ROOT}
+# Use the buildifier binary committed in the repository
+BUILDIFIER="${GIT_ROOT}/Testing/tools/buildifier"
+
+if [[ ! -x "${BUILDIFIER}" ]]; then
+  echo "Error: buildifier not found at ${BUILDIFIER}"
+  echo "Please ensure Testing/tools/buildifier exists in the repository"
+  exit 1
+fi
+
+${BUILDIFIER} --lint=warn -r ${GIT_ROOT}
 
