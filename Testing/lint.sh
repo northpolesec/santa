@@ -15,6 +15,7 @@ swift format lint -s -r ${GIT_ROOT}
 
 ! git grep -EIn $'[ \t]+$' -- ':(exclude)*.patch'
 
-go install github.com/bazelbuild/buildtools/buildifier@latest
-~/go/bin/buildifier --lint=warn -r ${GIT_ROOT}
+GBIN=${GOBIN:-${GOPATH:-${HOME}/go}/bin}
+go install github.com/bazelbuild/buildtools/buildifier@b1e23f1 # v8.2.1
+${GBIN}/buildifier --lint=warn -r ${GIT_ROOT}
 
