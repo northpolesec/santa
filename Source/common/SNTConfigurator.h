@@ -786,7 +786,8 @@
 ///
 //   This can only used with Workshop and SyncV2.
 ///
-@property(readonly, nonatomic) BOOL enableNATS __attribute__((deprecated("Use enablePushNotifications instead")));
+@property(readonly, nonatomic) BOOL enableNATS
+    __attribute__((deprecated("Use enablePushNotifications instead")));
 
 ///
 /// True if metricsFormat and metricsURL are set. False otherwise.
