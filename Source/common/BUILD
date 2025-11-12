@@ -160,7 +160,6 @@ santa_unit_test(
     ],
     deps = [
         ":ScopedIOObjectRef",
-        "//Source/santad:EndpointSecuritySerializerUtilities",
     ],
 )
 
