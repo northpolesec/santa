@@ -16,6 +16,7 @@
 
 #import "Source/common/CoderMacros.h"
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTModeTransition.h"
 
 @interface SNTConfigBundle ()
 @property NSNumber *clientMode;
@@ -32,6 +33,7 @@
 @property SNTExportConfiguration *exportConfiguration;
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
+@property SNTModeTransition *modeTransition;
 @end
 
 @implementation SNTConfigBundle
@@ -55,6 +57,7 @@
   ENCODE(coder, exportConfiguration);
   ENCODE(coder, fullSyncLastSuccess);
   ENCODE(coder, ruleSyncLastSuccess);
+  ENCODE(coder, modeTransition);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -74,6 +77,7 @@
     DECODE(decoder, exportConfiguration, SNTExportConfiguration);
     DECODE(decoder, fullSyncLastSuccess, NSDate);
     DECODE(decoder, ruleSyncLastSuccess, NSDate);
+    DECODE(decoder, modeTransition, SNTModeTransition);
   }
   return self;
 }
@@ -158,6 +162,12 @@
 - (void)ruleSyncLastSuccess:(void (^)(NSDate *))block {
   if (self.ruleSyncLastSuccess) {
     block(self.ruleSyncLastSuccess);
+  }
+}
+
+- (void)modeTransition:(void (^)(SNTModeTransition *))block {
+  if (self.modeTransition) {
+    block(self.modeTransition);
   }
 }
 

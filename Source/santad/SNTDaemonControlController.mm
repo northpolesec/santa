@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#import "Source/common/SNTModeTransition.h"
 #include "Source/common/faa/WatchItems.h"
 
 #import <Foundation/Foundation.h>
@@ -353,6 +354,10 @@ double watchdogRAMPeak = 0;
 
   [result ruleSyncLastSuccess:^(NSDate *val) {
     [configurator setFullSyncLastSuccess:val];
+  }];
+
+  [result modeTransition:^(SNTModeTransition *val) {
+    [configurator setSyncServerModeTransition:val];
   }];
 
   reply();

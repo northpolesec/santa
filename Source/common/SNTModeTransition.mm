@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTModeTransition.h"
 
 #import "Source/common/CoderMacros.h"
 #import "Source/common/SNTLogging.h"

@@ -19,6 +19,7 @@
 
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -194,13 +195,14 @@ static NSString *const kBlockedPathRegexKeyDeprecated = @"BlacklistRegex";
 static NSString *const kEnableAllEventUploadKey = @"EnableAllEventUpload";
 static NSString *const kOverrideFileAccessActionKey = @"OverrideFileAccessAction";
 static NSString *const kEnableBundlesKey = @"EnableBundles";
-static NSString *const kExportConfigurationKey = @"ExportConfiguration";
 
 // The keys managed by a sync server.
 static NSString *const kFullSyncLastSuccess = @"FullSyncLastSuccess";
 static NSString *const kRuleSyncLastSuccess = @"RuleSyncLastSuccess";
 static NSString *const kSyncCleanRequiredDeprecated = @"SyncCleanRequired";
 static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
+static NSString *const kExportConfigurationKey = @"ExportConfiguration";
+static NSString *const kModeTransitionKey = @"ModeTransition";
 
 - (instancetype)init {
   return [self initWithSyncStateFile:kSyncStateFilePath
@@ -248,6 +250,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kOverrideFileAccessActionKey : string,
       kEnableBundlesKey : number,
       kExportConfigurationKey : data,
+      kModeTransitionKey : data,
     };
     _forcedConfigKeyTypes = @{
       kClientModeKey : number,
@@ -745,6 +748,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self syncStateSet];
 }
 
++ (NSSet *)keyPathsForValuesAffectingModeTransition {
+  return [self syncStateSet];
+}
+
 #pragma mark Public Interface
 
 - (SNTClientMode)clientMode {
@@ -805,6 +812,19 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)setSyncServerExportConfig:(SNTExportConfiguration *)exportConfig {
   [self updateSyncStateForKey:kExportConfigurationKey value:[exportConfig serialize]];
+}
+
+- (SNTModeTransition *)modeTransition {
+  return [SNTModeTransition deserialize:self.syncState[kModeTransitionKey]];
+}
+
+- (void)setSyncServerModeTransition:(SNTModeTransition *)modeTransition {
+  if (modeTransition.type == SNTModeTransitionTypeRevoke) {
+    // On revoke, set the value to nil to remove the key from the dictionary
+    [self updateSyncStateForKey:kModeTransitionKey value:nil];
+  } else {
+    [self updateSyncStateForKey:kModeTransitionKey value:[modeTransition serialize]];
+  }
 }
 
 - (NSRegularExpression *)allowedPathRegex {

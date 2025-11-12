@@ -20,6 +20,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTSIPStatus.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -29,6 +30,9 @@
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 #include "google/protobuf/arena.h"
+#include "syncv2/v2.pb.h"
+
+namespace pbv2 = ::santa::sync::v2;
 
 using santa::NSStringToUTF8String;
 using santa::StringToNSString;
@@ -278,6 +282,32 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
         [tags addObject:StringToNSString(tag)];
       }
       self.syncState.pushTags = [tags copy];
+    }
+  }
+
+  if constexpr (IsV2) {
+    if (resp.has_mode_transition()) {
+      switch (resp.mode_transition().transition_case()) {
+        case ::pbv2::ModeTransition::kRevoke:
+          self.syncState.modeTransition = [[SNTModeTransition alloc] initRevocation];
+          break;
+
+        case ::pbv2::ModeTransition::kOnDemandMonitorMode: {
+          auto &odmm = resp.mode_transition().on_demand_monitor_mode();
+          if (odmm.has_default_duration_minutes()) {
+            self.syncState.modeTransition =
+                [[SNTModeTransition alloc] initOnDemandMinutes:odmm.max_minutes()
+                                               defaultDuration:odmm.default_duration_minutes()];
+          } else {
+            self.syncState.modeTransition =
+                [[SNTModeTransition alloc] initOnDemandMinutes:odmm.max_minutes()];
+          }
+
+          break;
+        }
+
+        default: break;
+      }
     }
   }
 
