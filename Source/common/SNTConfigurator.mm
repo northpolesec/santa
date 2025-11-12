@@ -332,7 +332,8 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
       kFCMAPIKey : string,
       kEnableAPNS : number,
       kEnablePushNotifications : number,
-      kEnableNATS : number,  // Deprecated: alias for EnablePushNotifications
+      kEnableNATS : number,  // Deprecated: alias for EnablePushNotifications, kept for config key
+                             // compatibility
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
@@ -677,11 +678,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEnablePushNotifications {
-  return [self configStateSet];
-}
-
-+ (NSSet *)keyPathsForValuesAffectingEnableNATS {
-  // Deprecated: alias for enablePushNotifications
   return [self configStateSet];
 }
 
@@ -1341,12 +1337,12 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (value != nil) {
     return [value boolValue];
   }
-  return [self.configState[kEnableNATS] boolValue];
-}
-
-- (BOOL)enableNATS {
-  // Deprecated: use enablePushNotifications instead
-  return [self enablePushNotifications];
+  NSNumber *deprecatedValue = self.configState[kEnableNATS];
+  if (deprecatedValue != nil) {
+    return [deprecatedValue boolValue];
+  }
+  // Default to true when neither key is set, as documented
+  return YES;
 }
 
 - (void)setBlockUSBMount:(BOOL)enabled {
