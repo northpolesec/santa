@@ -85,7 +85,7 @@ __END_DECLS
 
   // When: Creating a response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::COMMAND_SUCCESSFUL);
+  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
   response.set_output([output UTF8String]);
 
   std::string responseData;
@@ -102,7 +102,7 @@ __END_DECLS
 
   // When: Creating an error response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::COMMAND_ERROR);
+  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
   response.set_output([errorMessage UTF8String]);
 
   std::string responseData;
@@ -119,7 +119,7 @@ __END_DECLS
 
   // When: Creating a success response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::COMMAND_SUCCESSFUL);
+  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
   response.set_output([message UTF8String]);
 
   std::string responseData;
@@ -136,7 +136,7 @@ __END_DECLS
 
   // When: Creating an error response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::COMMAND_ERROR);
+  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
   response.set_output([errorMessage UTF8String]);
 
   std::string responseData;
@@ -157,7 +157,7 @@ __END_DECLS
   santa::commands::v1::SantaCommandResponse response = [self.client handlePingCommand:pingRequest];
 
   // Then: Should return a successful response
-  XCTAssertEqual(response.result(), santa::commands::v1::COMMAND_SUCCESSFUL,
+  XCTAssertEqual(response.result(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
                  @"Ping command should return successful result");
   XCTAssertEqual(response.output(), "Ping successful",
                  @"Ping command should return success message");
@@ -185,7 +185,7 @@ __END_DECLS
   // Verify the ping handler works with the deserialized command
   santa::commands::v1::SantaCommandResponse response =
       [self.client handlePingCommand:deserialized.ping()];
-  XCTAssertEqual(response.result(), santa::commands::v1::COMMAND_SUCCESSFUL,
+  XCTAssertEqual(response.result(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
                  @"Ping handler should return successful result");
 }
 
@@ -247,7 +247,7 @@ __END_DECLS
 
   for (NSString *output in testOutputs) {
     santa::commands::v1::SantaCommandResponse response;
-    response.set_result(santa::commands::v1::COMMAND_SUCCESSFUL);
+    response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
     if (output.length > 0) {
       response.set_output([output UTF8String]);
     }
@@ -266,7 +266,7 @@ __END_DECLS
     BOOL parsed = deserialized.ParseFromString(responseData);
 
     XCTAssertTrue(parsed, @"Failed to parse serialized response for output: %@", output);
-    XCTAssertEqual(deserialized.result(), santa::commands::v1::COMMAND_SUCCESSFUL,
+    XCTAssertEqual(deserialized.result(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
                    @"Result should match for output: %@", output);
     if (output.length > 0) {
       NSString *deserializedOutput = @(deserialized.output().c_str());
@@ -278,7 +278,7 @@ __END_DECLS
 - (void)testCommandResponseErrorSerialization {
   // Given: Error response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::COMMAND_ERROR);
+  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
   response.set_output("Unknown command type");
 
   std::string responseData;
@@ -292,7 +292,7 @@ __END_DECLS
   BOOL parsed = deserialized.ParseFromString(responseData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized error response");
-  XCTAssertEqual(deserialized.result(), santa::commands::v1::COMMAND_ERROR,
+  XCTAssertEqual(deserialized.result(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR,
                  @"Result should be ERROR");
   XCTAssertEqualObjects(@(deserialized.output().c_str()), @"Unknown command type",
                         @"Error message should match");
