@@ -1689,7 +1689,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (forcedConfig[kEnableNATS] != nil && forcedConfig[kEnablePushNotifications] == nil) {
     forcedConfig[kEnablePushNotifications] = forcedConfig[kEnableNATS];
   }
-  
+
   [self applyOverrides:forcedConfig];
 
   return forcedConfig;
