@@ -266,7 +266,8 @@ __END_DECLS
     BOOL parsed = deserialized.ParseFromString(responseData);
 
     XCTAssertTrue(parsed, @"Failed to parse serialized response for output: %@", output);
-    XCTAssertEqual(deserialized.result(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
+    XCTAssertEqual(deserialized.result(),
+                   santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
                    @"Result should match for output: %@", output);
     if (output.length > 0) {
       NSString *deserializedOutput = @(deserialized.output().c_str());
