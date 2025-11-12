@@ -18,7 +18,6 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
-#include <IOKit/IOKitLib.h>
 #include <bsm/libbsm.h>
 
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
@@ -40,10 +39,6 @@ es_file_t *GetAllowListTargetFile(const santa::Message &msg);
 NSString *NormalizePath(es_string_token_t path);
 /// Concat `path` onto `prefix` if `path` is relative
 NSString *ConcatPrefixIfRelativePath(es_string_token_t path, es_string_token_t prefix);
-
-static inline const mach_port_t GetDefaultIOKitCommsPort() {
-  return kIOMainPortDefault;
-}
 
 }  // namespace santa
 

@@ -18,9 +18,7 @@
 #import <XCTest/XCTest.h>
 
 #include "Source/common/ScopedIOObjectRef.h"
-#include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 
-using santa::GetDefaultIOKitCommsPort;
 using santa::ScopedIOObjectRef;
 
 @interface ScopedIOObjectRefTest : XCTestCase
@@ -47,7 +45,7 @@ using santa::ScopedIOObjectRef;
     CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
     XCTAssertNotEqual((CFMutableDictionaryRef)NULL, matchingDict);
 
-    io_service_t service = IOServiceGetMatchingService(GetDefaultIOKitCommsPort(), matchingDict);
+    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict);
 
     ScopedIOObjectRef<io_service_t> scopedServiceRef =
         ScopedIOObjectRef<io_service_t>::Assume(service);
@@ -61,7 +59,7 @@ using santa::ScopedIOObjectRef;
   CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
   XCTAssertNotEqual((CFMutableDictionaryRef)NULL, matchingDict);
 
-  io_service_t service = IOServiceGetMatchingService(GetDefaultIOKitCommsPort(), matchingDict);
+  io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict);
 
   // Baseline state, initial retain count is 1 after object creation
   XCTAssertEqual(1, IOObjectGetUserRetainCount(service));
@@ -81,7 +79,7 @@ using santa::ScopedIOObjectRef;
   CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
   XCTAssertNotEqual((CFMutableDictionaryRef)NULL, matchingDict);
 
-  io_service_t service = IOServiceGetMatchingService(GetDefaultIOKitCommsPort(), matchingDict);
+  io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict);
 
   // Baseline state, initial retain count is 1 after object creation
   XCTAssertEqual(1, IOObjectGetUserRetainCount(service));

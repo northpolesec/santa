@@ -603,9 +603,6 @@ objc_library(
     sdk_dylibs = [
         "bsm",
     ],
-    visibility = [
-        "//Source/common:__pkg__",
-    ],
     deps = [
         ":EndpointSecurityMessage",
         ":SNTDecisionCache",
