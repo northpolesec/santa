@@ -1684,13 +1684,13 @@ static SNTConfigurator *sharedConfigurator = nil;
     }
   }
 
-  [self applyOverrides:forcedConfig];
-
   // Backward compatibility: if EnableNATS is set but EnablePushNotifications is not,
   // copy the value from EnableNATS to EnablePushNotifications
   if (forcedConfig[kEnableNATS] != nil && forcedConfig[kEnablePushNotifications] == nil) {
     forcedConfig[kEnablePushNotifications] = forcedConfig[kEnableNATS];
   }
+  
+  [self applyOverrides:forcedConfig];
 
   return forcedConfig;
 }
