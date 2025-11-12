@@ -324,6 +324,25 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTTimer",
+    srcs = ["SNTTimer.mm"],
+    hdrs = ["SNTTimer.h"],
+    deps = [
+        ":SNTLogging",
+        ":Timer",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTTimerTest",
+    srcs = ["SNTTimerTest.mm"],
+    deps = [
+        ":SNTTimer",
+        ":TestUtils",
+    ],
+)
+
+objc_library(
     name = "SNTXxhash",
     hdrs = ["SNTXxhash.h"],
     deps = [
@@ -902,6 +921,7 @@ test_suite(
         ":SNTRuleTest",
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
+        ":SNTTimerTest",
         ":SNTXxhashTest",
         ":SantaCacheTest",
         ":SantaSetCacheTest",
