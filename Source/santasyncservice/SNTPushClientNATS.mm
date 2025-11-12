@@ -507,7 +507,7 @@ __END_DECLS
 
   // Subscribe to commands topic: santa.host.<device-id>.commands
   // Note: Failure to subscribe to commands topic is non-fatal - client continues operating
-  if (self.pushDeviceID && self.pushDeviceID.length > 0) {
+  if (self.pushDeviceID.length > 0) {
     NSString *commandsTopic =
         [NSString stringWithFormat:@"santa.host.%@.commands", self.pushDeviceID];
     LOGD(@"NATS: Subscribing to commands topic: %@", commandsTopic);
@@ -606,13 +606,8 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
     return;
   }
 
-  const char *subject = natsMsg_GetSubject(msg);
-  const char *reply = natsMsg_GetReply(msg);
-  const char *data = natsMsg_GetData(msg);
-  int dataLen = natsMsg_GetDataLength(msg);
-
-  NSString *msgSubject = subject ? @(subject) : @"<unknown>";
-  NSString *replyTopic = reply ? @(reply) : nil;
+  NSString *msgSubject = @(natsMsg_GetSubject(msg) ?: "<unknown>");
+  NSString *replyTopic = natsMsg_GetReply(msg) ? @(natsMsg_GetReply(msg)) : nil;
 
   LOGD(@"NATS: Received command message on subject '%@' with reply '%@'", msgSubject,
        replyTopic ?: @"<no reply>");

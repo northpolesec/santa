@@ -26,8 +26,9 @@ message SantaCommandRequest {
 }
 
 enum SantaCommandResponseCode {
-  COMMAND_SUCCESSFUL = 0;
-  COMMAND_ERROR = 1;
+  SANTA_COMMAND_RESPONSE_CODE_UNSPECIFIED = 0;
+  SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL = 1;
+  SANTA_COMMAND_RESPONSE_CODE_ERROR = 2;
 }
 
 message SantaCommandResponse {
