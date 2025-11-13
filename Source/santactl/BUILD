@@ -71,7 +71,6 @@ objc_library(
         "Commands/SNTCommandFlushCache.mm",
         "Commands/SNTCommandMetrics.h",
         "Commands/SNTCommandMetrics.mm",
-        "Commands/SNTCommandRule.h",
         "Commands/SNTCommandRule.mm",
         "Commands/SNTCommandStatus.mm",
         "Commands/SNTCommandSync.mm",
