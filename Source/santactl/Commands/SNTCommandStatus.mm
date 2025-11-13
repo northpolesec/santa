@@ -189,6 +189,9 @@ REGISTER_COMMAND_NAME(@"status")
           case SNTPushNotificationStatusDisabled: pushNotifications = @"Disabled"; break;
           case SNTPushNotificationStatusDisconnected: pushNotifications = @"Disconnected"; break;
           case SNTPushNotificationStatusConnected: pushNotifications = @"Connected"; break;
+          case SNTPushNotificationStatusConnectedNATS:
+            pushNotifications = @"Connected (NPS Push Service)";
+            break;
           default: break;
         }
         dispatch_semaphore_signal(sema);

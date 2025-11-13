@@ -165,9 +165,16 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply {
   if (!self.pushNotifications) {
     reply(SNTPushNotificationStatusDisabled);
+    return;
   }
   if (!self.pushNotifications.isConnected) {
     reply(SNTPushNotificationStatusDisconnected);
+    return;
+  }
+  // Check if using NATS push client
+  if ([self.pushNotifications isKindOfClass:[SNTPushClientNATS class]]) {
+    reply(SNTPushNotificationStatusConnectedNATS);
+    return;
   }
   reply(SNTPushNotificationStatusConnected);
 }
