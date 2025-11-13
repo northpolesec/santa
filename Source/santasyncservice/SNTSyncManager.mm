@@ -179,6 +179,18 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   reply(SNTPushNotificationStatusConnected);
 }
 
+- (void)pushNotificationServerAddress:(void (^)(NSString *))reply {
+  // Only return server address if using NATS and connected
+  if ([self.pushNotifications isKindOfClass:[SNTPushClientNATS class]] &&
+      self.pushNotifications.isConnected) {
+    SNTPushClientNATS *natsClient = (SNTPushClientNATS *)self.pushNotifications;
+    NSString *serverAddress = [natsClient pushServerAddress];
+    reply(serverAddress);
+    return;
+  }
+  reply(nil);
+}
+
 - (void)APNSTokenChanged {
   if ([self.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]) {
     [(SNTPushClientAPNS *)self.pushNotifications APNSTokenChanged];

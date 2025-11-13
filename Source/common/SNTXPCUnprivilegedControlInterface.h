@@ -88,6 +88,7 @@ struct RuleCounts {
 ///  Syncd Ops
 ///
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
+- (void)pushNotificationServerAddress:(void (^)(NSString *))reply;
 
 ///
 ///  Bundle Ops

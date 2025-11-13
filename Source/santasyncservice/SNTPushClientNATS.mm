@@ -746,4 +746,8 @@ static void closedCallback(natsConnection *nc, void *closure) {
   }
 }
 
+- (NSString *)pushServerAddress {
+  return self.pushServer;
+}
+
 @end

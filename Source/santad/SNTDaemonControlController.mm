@@ -454,6 +454,17 @@ double watchdogRAMPeak = 0;
   }];
 }
 
+- (void)pushNotificationServerAddress:(void (^)(NSString *))reply {
+  // This message should be handled in a timely manner, santactl status waits for the response.
+  // Instead of reusing the existing connection, create a new connection to the sync service.
+  // Otherwise, the message would potentially be queued behind various long lived sync operations.
+  MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
+  [conn resume];
+  [conn.remoteObjectProxy pushNotificationServerAddress:^(NSString *serverAddress) {
+    reply(serverAddress);
+  }];
+}
+
 - (void)postRuleSyncNotificationForApplication:(NSString *)app reply:(void (^)(void))reply {
   [[self.notQueue.notifierConnection remoteObjectProxy] postRuleSyncNotificationForApplication:app];
   reply();
