@@ -100,6 +100,13 @@ struct RuleCounts {
 ///
 - (void)exportTelemetryWithReply:(void (^)(BOOL))reply;
 
+///
+/// Temporary Monitor Mode Ops
+///
+- (void)requestTemporaryMonitorModeWithDuration:(NSNumber *)requestedDuration
+                                          reply:(void (^)(uint32_t, NSError *))reply;
+- (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply;
+
 @end
 
 @interface SNTXPCUnprivilegedControlInterface : NSObject

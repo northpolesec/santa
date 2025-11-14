@@ -618,6 +618,22 @@
 ///
 - (void)setSyncServerModeTransition:(nonnull SNTModeTransition *)modeTransition;
 
+///
+///  Return if Santa is temporarily in Monitor Mode and will revert back
+///  to Lockdown Mode after a configured time period.
+///
+@property(readonly) BOOL inTemporaryMonitorMode;
+
+///
+///  Set Santa to be in Monitor Mode temporarily
+///
+- (void)enterTemporaryMonitorMode;
+
+///
+///  Set Santa as having left temporary Monitor Mode
+///
+- (void)leaveTemporaryMonitorMode;
+
 #pragma mark - USB Settings
 
 ///

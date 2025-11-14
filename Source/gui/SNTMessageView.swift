@@ -209,6 +209,17 @@ public struct CopyDetailsButton: View {
   }
 }
 
+@objc public class SNTAuthorizationHelper: NSObject {
+  @objc public static func authorizeTemporaryMonitorMode(replyBlock: @escaping (Bool) -> Void) {
+    let format = NSLocalizedString(
+      "authorize temporary Monitor Mode",
+      comment: "Authorize temporary Monitor Mode exception"
+    )
+
+    AuthorizeViaTouchID(reason: format, replyBlock: replyBlock)
+  }
+}
+
 public func AuthorizeViaTouchID(reason: String, replyBlock: @escaping (Bool) -> Void) {
   let policy: LAPolicy =
     SNTConfigurator.configurator().enableStandalonePasswordFallback
