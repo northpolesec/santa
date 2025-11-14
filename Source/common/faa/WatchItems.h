@@ -170,7 +170,7 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
 
   ~WatchItems() = default;
 
-  void OnTimer();
+  bool OnTimer();
 
   void RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback);
   void RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback);

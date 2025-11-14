@@ -59,6 +59,10 @@
 #define XCTAssertSemaFalse(s, m) \
   XCTAssertNotEqual(             \
     0, dispatch_semaphore_wait((s), DISPATCH_TIME_NOW), m)
+
+#define XCTAssertSemaFalseTimeout(s, sec, m) \
+  XCTAssertNotEqual(                         \
+    0, dispatch_semaphore_wait((s), dispatch_time(DISPATCH_TIME_NOW, (sec) * NSEC_PER_SEC)), m)
 // clang-format on
 
 #define XCTAssertStatusOk(s) XCTAssertTrue((s).ok())

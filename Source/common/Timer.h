@@ -26,13 +26,19 @@
 
 namespace santa {
 
+// This is a CRTP mixin class template. Derived classes must provide the interface:
+//   bool OnTimer(void);
+// Derived classes can prevent future timer scheduling by returning `false` from `OnTimer`.
+//
 // NB: This class is not thread safe.
 template <typename T>
 class Timer : public std::enable_shared_from_this<Timer<T>> {
  public:
-  enum class Mode {
-    kContinuous,  // Default: timer fires repeatedly at intervals
-    kSingleShot,  // Timer is cancelled while OnTimer fires and restarted once complete
+  enum class RescheduleMode {
+    // Default: timer is reschedule immediately, prior to OnTimer being called
+    kLeadingEdge,
+    // Timer is rescheduled after OnTimer returns
+    kTrailingEdge,
   };
 
   enum class OnStart {
@@ -43,18 +49,19 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   };
 
   Timer(uint32_t minimum_interval, uint32_t maximum_interval, OnStart startup_option,
-        std::string backing_config_var, Mode mode = Mode::kContinuous,
+        std::string backing_config_var,
+        RescheduleMode reschedule_mode = RescheduleMode::kLeadingEdge,
         dispatch_qos_class_t qos_class = QOS_CLASS_UTILITY)
       : interval_seconds_(minimum_interval),
         minimum_interval_(minimum_interval),
         maximum_interval_(maximum_interval),
         startup_option_(startup_option),
         backing_config_var_(std::move(backing_config_var)),
-        mode_(mode) {
+        reschedule_mode_(reschedule_mode) {
     static_assert(
         requires(T t) {
-          { t.OnTimer() } -> std::same_as<void>;
-        }, "Classes using Timer<T> must implement 'void OnTimer()'");
+          { t.OnTimer() } -> std::same_as<bool>;
+        }, "Classes using Timer<T> must implement 'bool OnTimer()'");
 
     timer_queue_ = dispatch_get_global_queue(qos_class, 0);
   }
@@ -65,23 +72,22 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   void StartTimer() { StartTimer(false); }
 
   /// Stop the timer if running.
-  void StopTimer() {
-    if (!timer_source_) {
-      return;  // No-op if not running
-    }
-
-    ReleaseTimerSource();
-  }
+  void StopTimer() { ReleaseTimerSource(); }
 
   void TimerCallback() {
-    if (mode_ == Mode::kSingleShot) {
-      // In SingleShot mode, call OnTimer between cancelling and restarting the timer
-      ReleaseTimerSource();
-      static_cast<T *>(this)->OnTimer();
-      StartTimer(true);
+    if (reschedule_mode_ == RescheduleMode::kTrailingEdge) {
+      // If rescheduling on the trailing edge, Stop the timer and then
+      // restart if requested.
+      StopTimer();
+      if (static_cast<T *>(this)->OnTimer()) {
+        StartTimer(true);
+      }
     } else {
-      // Continuous mode - just call OnTimer
-      static_cast<T *>(this)->OnTimer();
+      // If rescheduling on the leading edge, the timer will have already
+      // started, but stop it if requested.
+      if (!static_cast<T *>(this)->OnTimer()) {
+        StopTimer();
+      }
     }
   }
 
@@ -127,7 +133,7 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   }
 
   /// Update the timer firing settings.
-  /// In SingleShot Mode, if the update is from a restart, will wait a full interval cycle.
+  /// In trailing edge scheduling, if the update is from a restart, will wait a full interval cycle.
   /// Otherwise, the startup delay is based on `startup_option_` to determine if
   /// the timer should fire immediately or wait a full cycle first.
   void UpdateTimingParameters(bool is_restart) {
@@ -137,23 +143,24 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
 
     dispatch_time_t start_time;
 
-    if ((is_restart && mode_ == Mode::kSingleShot) || startup_option_ == OnStart::kWaitOneCycle) {
+    if ((is_restart && reschedule_mode_ == RescheduleMode::kTrailingEdge) ||
+        startup_option_ == OnStart::kWaitOneCycle) {
       start_time = dispatch_time(DISPATCH_WALLTIME_NOW, interval_seconds_ * NSEC_PER_SEC);
     } else {
       start_time = dispatch_time(DISPATCH_WALLTIME_NOW, 0);
     }
 
-    if (mode_ == Mode::kSingleShot) {
-      // For single-shot mode, set up a one-time timer
+    if (reschedule_mode_ == RescheduleMode::kTrailingEdge) {
+      // For trailing edge scheduling, set up a one-time timer
       dispatch_source_set_timer(timer_source_, start_time, DISPATCH_TIME_FOREVER, 0);
     } else {
-      // For continuous mode, set up repeating timer
+      // For leading edge scheduling, set up repeating timer
       dispatch_source_set_timer(timer_source_, start_time, interval_seconds_ * NSEC_PER_SEC, 0);
     }
   }
 
   /// Cancels the dispatch timer source.
-  void ReleaseTimerSource() {
+  inline void ReleaseTimerSource() {
     if (timer_source_) {
       dispatch_source_cancel(timer_source_);
       timer_source_ = nullptr;
@@ -167,7 +174,7 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   uint32_t maximum_interval_;
   OnStart startup_option_;
   std::string backing_config_var_;
-  Mode mode_;
+  RescheduleMode reschedule_mode_;
 };
 
 }  // namespace santa

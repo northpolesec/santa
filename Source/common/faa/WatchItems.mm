@@ -919,12 +919,14 @@ NSDictionary *WatchItems::ReadConfigLocked() {
   }
 }
 
-void WatchItems::OnTimer() {
+bool WatchItems::OnTimer() {
   ReloadConfig(embedded_config_ ?: ReadConfig());
 
   if (periodic_task_complete_f_) {
     periodic_task_complete_f_();
   }
+
+  return true;
 }
 
 void WatchItems::FindPoliciesForTargets(IterateTargetsBlock iterateTargetsBlock) {
