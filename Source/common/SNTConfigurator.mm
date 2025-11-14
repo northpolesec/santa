@@ -792,7 +792,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)enterTemporaryMonitorModeForSeconds:(uint32_t)duration {
   @synchronized(self) {
-    //NB: Using continuous time so that the clock advances while the system is asleep
+    // NB: Using continuous time so that the clock advances while the system is asleep
     uint64_t deadline = AddNanosecondsToMachTime(duration * NSEC_PER_SEC, mach_continuous_time());
     [self updateStateSynchronizedKey:kStateTempMonitorModeKey
                                value:@{
