@@ -57,6 +57,9 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 typedef BOOL (^StateFileAccessAuthorizer)(void);
 @property(nonatomic, copy) StateFileAccessAuthorizer syncStateAccessAuthorizerBlock;
 
+// Re-declare read/write for KVO
+@property BOOL inTemporaryMonitorMode;
+
 @end
 
 @implementation SNTConfigurator
@@ -433,7 +436,8 @@ static SNTConfigurator *sharedConfigurator = nil;
 #pragma mark KVO Dependencies
 
 + (NSSet *)keyPathsForValuesAffectingClientMode {
-  return [self syncAndConfigStateSet];
+  return [[self syncAndConfigStateSet]
+      setByAddingObject:NSStringFromSelector(@selector(inTemporaryMonitorMode))];
 }
 
 + (NSSet *)keyPathsForValuesAffectingAllowlistPathRegex {
@@ -755,6 +759,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 #pragma mark Public Interface
 
 - (SNTClientMode)clientMode {
+  if ([self inTemporaryMonitorMode]) {
+    return SNTClientModeMonitor;
+  }
+
   SNTClientMode cm = static_cast<SNTClientMode>([self.syncState[kClientModeKey] integerValue]);
   if (cm == SNTClientModeMonitor || cm == SNTClientModeLockdown || cm == SNTClientModeStandalone) {
     return cm;
@@ -773,6 +781,14 @@ static SNTConfigurator *sharedConfigurator = nil;
       newMode == SNTClientModeStandalone) {
     [self updateSyncStateForKey:kClientModeKey value:@(newMode)];
   }
+}
+
+- (void)enterTemporaryMonitorMode {
+  self.inTemporaryMonitorMode = YES;
+}
+
+- (void)leaveTemporaryMonitorMode {
+  self.inTemporaryMonitorMode = NO;
 }
 
 - (BOOL)failClosed {

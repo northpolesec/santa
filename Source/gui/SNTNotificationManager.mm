@@ -37,6 +37,7 @@
 #import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 #import "Source/gui/SNTDeviceMessageWindowController.h"
 #import "Source/gui/SNTFileAccessMessageWindowController.h"
+#import "Source/gui/SNTMessageView-Swift.h"
 #import "Source/gui/SNTMessageWindowController.h"
 
 @interface SNTNotificationManager ()
@@ -451,6 +452,12 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                                                       configState:configState];
 
   [self queueMessage:pendingMsg enableSilences:YES];
+}
+
+- (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply {
+  [SNTAuthorizationHelper authorizeTemporaryMonitorModeWithReplyBlock:^(BOOL success) {
+    reply(success);
+  }];
 }
 
 // XPC handler. The sync service requests the APNS token, by way of the daemon.

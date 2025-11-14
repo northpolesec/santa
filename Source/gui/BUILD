@@ -8,6 +8,7 @@ licenses(["notice"])
 swift_library(
     name = "SNTMessageView",
     srcs = ["SNTMessageView.swift"],
+    generates_header = 1,
     module_name = "santa_gui_SNTMessageView",
     deps = ["//Source/common:SNTConfigurator"],
 )

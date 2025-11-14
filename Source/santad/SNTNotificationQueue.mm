@@ -179,4 +179,8 @@
   });
 }
 
+- (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply {
+  [[self.notifierConnection synchronousRemoteObjectProxy] authorizeTemporaryMonitorMode:reply];
+}
+
 @end

@@ -72,4 +72,10 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
 + (void)populateError:(NSError *_Nullable *_Nullable)error
            withFormat:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(2, 3);
 
+// Return a new SNTError with the provided format string message.
+// `msg` will populate the NSLocalizedErrorDescription key. The error code
+// will be SNTErrorCodeUnknown.
++ (nullable NSError *)createErrorWithFormat:(nonnull NSString *)format,
+                                            ... NS_FORMAT_FUNCTION(1, 2);
+
 @end
