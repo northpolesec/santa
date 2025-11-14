@@ -627,12 +627,18 @@
 ///
 ///  Set Santa to be in Monitor Mode temporarily
 ///
-- (void)enterTemporaryMonitorMode;
+- (void)enterTemporaryMonitorModeForSeconds:(uint32_t)duration;
 
 ///
 ///  Set Santa as having left temporary Monitor Mode
 ///
 - (void)leaveTemporaryMonitorMode;
+
+///
+/// Returns the number of seconds remaining of a previously authorized
+/// session of temporary Monitor Mode.
+///
+- (nullable NSNumber *)temporaryMonitorModeStateSecondsRemaining;
 
 #pragma mark - USB Settings
 
