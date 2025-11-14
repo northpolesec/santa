@@ -18,6 +18,4 @@
 #import "Source/santactl/SNTCommandController.h"
 
 @interface SNTCommandMetrics : SNTCommand <SNTCommandProtocol>
-- (void)prettyPrintMetrics:(NSDictionary *)metircs asJSON:(BOOL)exportJSON;
-- (NSDictionary *)filterMetrics:(NSDictionary *)metrics withArguments:(NSArray *)args;
 @end

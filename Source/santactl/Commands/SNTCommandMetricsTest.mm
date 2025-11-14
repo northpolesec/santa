@@ -19,6 +19,11 @@
 #import "Source/santactl/Commands/SNTCommandMetrics.h"
 #import "Source/santametricservice/Formats/SNTMetricFormatTestHelper.h"
 
+@interface SNTCommandMetrics (Testing)
+- (void)prettyPrintMetrics:(NSDictionary *)metircs asJSON:(BOOL)exportJSON;
+- (NSDictionary *)filterMetrics:(NSDictionary *)metrics withArguments:(NSArray *)args;
+@end
+
 @interface SNTCommandMetricsTest : XCTestCase
 @property NSString *tempDir;
 @property id mockConfigurator;
