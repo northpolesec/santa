@@ -33,6 +33,38 @@ NSString *StartupOptionToString(SNTDeviceManagerStartupPreferences pref) {
   }
 }
 
+NSString *Plural(uint64_t val, NSString *base) {
+  if (val == 1) {
+    return base;
+  } else {
+    return [base stringByAppendingString:@"s"];
+  }
+}
+
+NSString *FormatTimeRemaining(uint64_t seconds) {
+  if (seconds < 60) {
+    return @"Less than 1 minute remaining";
+  }
+
+  // Round to nearest minute
+  uint64_t minutes = (seconds + 30) / 60;
+  uint64_t hours = minutes / 60;
+  uint64_t remainingMinutes = minutes % 60;
+
+  if (hours > 0) {
+    if (remainingMinutes > 0) {
+      return [NSString stringWithFormat:@"About %llu %@ and %llu %@ remaining", hours,
+                                        Plural(hours, @"hour"), remainingMinutes,
+                                        Plural(remainingMinutes, @"minute")];
+    } else {
+      return [NSString stringWithFormat:@"About %llu %@ remaining", hours, Plural(hours, @"hour")];
+    }
+  } else {
+    return
+        [NSString stringWithFormat:@"About %llu %@ remaining", minutes, Plural(minutes, @"minute")];
+  }
+}
+
 @interface SNTCommandStatus : SNTCommand <SNTCommandProtocol>
 @end
 
@@ -64,12 +96,20 @@ REGISTER_COMMAND_NAME(@"status")
   __block NSString *clientMode;
   __block uint64_t cpuEvents, ramEvents;
   __block double cpuPeak, ramPeak;
-  [rop clientMode:^(SNTClientMode cm) {
-    switch (cm) {
-      case SNTClientModeMonitor: clientMode = @"Monitor"; break;
-      case SNTClientModeLockdown: clientMode = @"Lockdown"; break;
-      case SNTClientModeStandalone: clientMode = @"Standalone"; break;
-      default: clientMode = [NSString stringWithFormat:@"Unknown (%ld)", cm]; break;
+
+  [rop temporaryMonitorModeSecondsRemaining:^(NSNumber *val) {
+    if (val) {
+      clientMode = [@"Temporary Monitor Mode "
+          stringByAppendingFormat:@"(%@)", FormatTimeRemaining([val unsignedLongLongValue])];
+    } else {
+      [rop clientMode:^(SNTClientMode cm) {
+        switch (cm) {
+          case SNTClientModeMonitor: clientMode = @"Monitor"; break;
+          case SNTClientModeLockdown: clientMode = @"Lockdown"; break;
+          case SNTClientModeStandalone: clientMode = @"Standalone"; break;
+          default: clientMode = [NSString stringWithFormat:@"Unknown (%ld)", cm]; break;
+        }
+      }];
     }
   }];
 
