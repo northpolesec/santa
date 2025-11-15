@@ -14,6 +14,11 @@
 
 #include <Foundation/Foundation.h>
 
+// Semi-arbitrary min/max values for max minutes.
+// Max minutes must be less than 30 days (in minutes).
+static constexpr uint32_t kMinTemporaryMonitorModeMinutes = 1;
+static constexpr uint32_t kMaxTemporaryMonitorModeMinutes = 1 * 60 * 24 * 30;
+
 typedef NS_ENUM(NSInteger, SNTModeTransitionType) {
   SNTModeTransitionTypeUnspecified = 0,
   SNTModeTransitionTypeRevoke,

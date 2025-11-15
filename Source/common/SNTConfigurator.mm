@@ -15,6 +15,7 @@
 
 #import "Source/common/SNTConfigurator.h"
 
+#include <mach/mach_time.h>
 #include <sys/stat.h>
 
 #import "Source/common/SNTExportConfiguration.h"
@@ -23,6 +24,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/SystemResources.h"
 
 // Ensures the given object is an NSArray and only contains NSString value types
 static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
@@ -56,6 +58,7 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 
 typedef BOOL (^StateFileAccessAuthorizer)(void);
 @property(nonatomic, copy) StateFileAccessAuthorizer syncStateAccessAuthorizerBlock;
+@property(nonatomic, copy) StateFileAccessAuthorizer stateAccessAuthorizerBlock;
 
 // Re-declare read/write for KVO
 @property BOOL inTemporaryMonitorMode;
@@ -75,6 +78,9 @@ NSString *const kOldStateFilePath = @"/var/db/santa/stats-state.plist";
 static NSString *const kStateStatsKey = @"Stats";
 static NSString *const kStateStatsLastSubmissionAttemptKey = @"LastAttempt";
 static NSString *const kStateStatsLastSubmissionVersionKey = @"LastVersion";
+static NSString *const kStateTempMonitorModeKey = @"TMM";
+static NSString *const kStateTempMonitorModeBootSessionUUIDKey = @"UUID";
+static NSString *const kStateTempMonitorModeDeadlineKey = @"Deadline";
 
 #ifdef DEBUG
 NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist";
@@ -353,6 +359,7 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
     _syncStateFilePath = syncStateFilePath;
     _stateFilePath = stateFilePath;
     _syncStateAccessAuthorizerBlock = syncStateAccessAuthorizer;
+    _stateAccessAuthorizerBlock = stateAccessAuthorizer;
 
     // This is used to keep KVO on changes, but we use `CFPreferences*` for reading.
     _defaults = [NSUserDefaults standardUserDefaults];
@@ -366,7 +373,7 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       [self saveSyncStateToDisk];
     }
 
-    if (stateAccessAuthorizer()) {
+    if (self.stateAccessAuthorizerBlock()) {
       [self migrateDeprecatedStatsStatePath:oldStateFilePath];
       _state = [self readStateFromDisk] ?: [NSDictionary dictionary];
     }
@@ -783,12 +790,45 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 }
 
-- (void)enterTemporaryMonitorMode {
-  self.inTemporaryMonitorMode = YES;
+- (void)enterTemporaryMonitorModeForSeconds:(uint32_t)duration {
+  @synchronized(self) {
+    // NB: Using continuous time so that the clock advances while the system is asleep
+    uint64_t deadline = AddNanosecondsToMachTime(duration * NSEC_PER_SEC, mach_continuous_time());
+    [self updateStateSynchronizedKey:kStateTempMonitorModeKey
+                               value:@{
+                                 kStateTempMonitorModeBootSessionUUIDKey :
+                                     [SNTSystemInfo bootSessionUUID],
+                                 kStateTempMonitorModeDeadlineKey : @(deadline),
+                               }];
+    self.inTemporaryMonitorMode = YES;
+  }
 }
 
 - (void)leaveTemporaryMonitorMode {
-  self.inTemporaryMonitorMode = NO;
+  @synchronized(self) {
+    self.inTemporaryMonitorMode = NO;
+
+    // Clear the temporary Monitor Mode state now that it has ended
+    [self updateStateSynchronizedKey:kStateTempMonitorModeKey value:nil];
+  }
+}
+
+- (NSNumber *)temporaryMonitorModeStateSecondsRemaining {
+  NSNumber *deadline = self.state[kStateTempMonitorModeKey][kStateTempMonitorModeDeadlineKey];
+  if (!deadline) {
+    return nil;
+  }
+
+  uint64_t deadlineMachTime = [deadline unsignedLongLongValue];
+  uint64_t machTime = mach_continuous_time();
+
+  // Check if time expired
+  if (deadlineMachTime <= machTime) {
+    return nil;
+  }
+
+  // Convert time remaining to seconds
+  return @(MachTimeToNanos(deadlineMachTime - machTime) / NSEC_PER_SEC);
 }
 
 - (BOOL)failClosed {
@@ -1566,6 +1606,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {
+  if (!self.stateAccessAuthorizerBlock()) {
+    return;
+  }
+
   // Attempt to load the new state file first. If that succeeds, no migration is necessary
   if ([NSDictionary dictionaryWithContentsOfFile:self.stateFilePath]) {
     return;
@@ -1586,6 +1630,9 @@ static SNTConfigurator *sharedConfigurator = nil;
     };
 
     [newState writeToFile:self.stateFilePath atomically:YES];
+    @synchronized(self) {
+      [self saveStateToDiskSynchronized:newState];
+    }
   }
 
   NSError *err;
@@ -1595,6 +1642,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (NSDictionary *)readStateFromDisk {
+  if (!self.stateAccessAuthorizerBlock()) {
+    return nil;
+  }
+
   NSDictionary *state = [NSDictionary dictionaryWithContentsOfFile:self.stateFilePath];
   if (!state) {
     return nil;
@@ -1618,25 +1669,59 @@ static SNTConfigurator *sharedConfigurator = nil;
     }
   }
 
+  if ([state[kStateTempMonitorModeKey] isKindOfClass:[NSDictionary class]]) {
+    NSDictionary *tmm = state[kStateTempMonitorModeKey];
+    // If the stored temp monitor mode boot session uuid matches, then carry over the
+    // values. Otherwise they will get discarded.
+    if ([tmm[kStateTempMonitorModeBootSessionUUIDKey] isKindOfClass:[NSString class]] &&
+        [tmm[kStateTempMonitorModeDeadlineKey] isKindOfClass:[NSNumber class]] &&
+        [tmm[kStateTempMonitorModeBootSessionUUIDKey]
+            isEqualToString:[SNTSystemInfo bootSessionUUID]]) {
+      newState[kStateTempMonitorModeKey] = @{
+        kStateTempMonitorModeBootSessionUUIDKey : tmm[kStateTempMonitorModeBootSessionUUIDKey],
+        kStateTempMonitorModeDeadlineKey : tmm[kStateTempMonitorModeDeadlineKey]
+      };
+    }
+  }
+
   return newState;
 }
 
 - (void)saveStatsSubmissionAttemptTime:(NSDate *)timestamp version:(NSString *)version {
-  NSMutableDictionary *newState = [self.state mutableCopy];
-
-  newState[kStateStatsKey] = @{
-    kStateStatsLastSubmissionAttemptKey : timestamp,
-    kStateStatsLastSubmissionVersionKey : version,
-  };
-
-  self.state = newState;
-
-  if (![self.state writeToFile:self.stateFilePath atomically:YES]) {
-    LOGW(@"Unable to update state file");
+  @synchronized(self) {
+    [self updateStateSynchronizedKey:kStateStatsKey
+                               value:@{
+                                 kStateStatsLastSubmissionAttemptKey : timestamp,
+                                 kStateStatsLastSubmissionVersionKey : version,
+                               }];
   }
 
   _lastStatsSubmissionTimestamp = timestamp;
   _lastStatsSubmissionVersion = version;
+}
+
+- (void)updateStateSynchronizedKey:(NSString *)key value:(NSDictionary *)value {
+  NSMutableDictionary *newState = [self.state mutableCopy];
+
+  newState[key] = value;
+  self.state = newState;
+
+  [self saveStateToDiskSynchronized:self.state];
+}
+
+- (BOOL)saveStateToDiskSynchronized:(NSDictionary *)state {
+  if (!self.stateAccessAuthorizerBlock()) {
+    return NO;
+  }
+
+  if (![state writeToFile:self.stateFilePath atomically:YES]) {
+    LOGW(@"Unable to update state file");
+    return NO;
+  }
+
+  return [[NSFileManager defaultManager] setAttributes:@{NSFilePosixPermissions : @0600}
+                                          ofItemAtPath:self.stateFilePath
+                                                 error:NULL];
 }
 
 #pragma mark - Private Defaults Methods

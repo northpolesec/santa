@@ -58,11 +58,6 @@ uint64_t watchdogRAMEvents = 0;
 double watchdogCPUPeak = 0;
 double watchdogRAMPeak = 0;
 
-// Semi-arbitrary limits for temporary Monitor Mode.
-// Min: 1 minute. Max: 30 days.
-static constexpr uint32_t kMinTempMonitorModeMinutes = 1;
-static constexpr uint32_t kMaxTempMonitorModeMinutes = 1 * 60 * 24 * 30;
-
 @interface SNTDaemonControlController ()
 @property SNTPolicyProcessor *policyProcessor;
 @property SNTNotificationQueue *notQueue;
@@ -92,8 +87,8 @@ static constexpr uint32_t kMaxTempMonitorModeMinutes = 1 * 60 * 24 * 30;
     _syncdQueue = syncdQueue;
 
     _tempMonitorMode =
-        [[SNTTimer alloc] initWithMinInterval:kMinTempMonitorModeMinutes * 60
-                                  maxInterval:kMaxTempMonitorModeMinutes * 60
+        [[SNTTimer alloc] initWithMinInterval:kMinTemporaryMonitorModeMinutes * 60
+                                  maxInterval:kMaxTemporaryMonitorModeMinutes * 60
                                          name:@"Temporary Monitor Mode"
                                   fireOnStart:NO
                                rescheduleMode:SNTTimerRescheduleModeTrailingEdge
@@ -104,6 +99,8 @@ static constexpr uint32_t kMaxTempMonitorModeMinutes = 1 * 60 * 24 * 30;
                                        // Don't restart the timer
                                        return false;
                                      }];
+
+    [self enterTemporaryMonitorModeOnInitIfRequired];
   }
   return self;
 }
@@ -378,6 +375,12 @@ static constexpr uint32_t kMaxTempMonitorModeMinutes = 1 * 60 * 24 * 30;
   }];
 
   [result modeTransition:^(SNTModeTransition *val) {
+    if (val.type == SNTModeTransitionTypeRevoke) {
+      if (self.tempMonitorMode.isStarted) {
+        [self.tempMonitorMode stop];
+        [[SNTConfigurator configurator] leaveTemporaryMonitorMode];
+      }
+    }
     [configurator setSyncServerModeTransition:val];
   }];
 
@@ -579,6 +582,24 @@ static constexpr uint32_t kMaxTempMonitorModeMinutes = 1 * 60 * 24 * 30;
   reply(YES);
 }
 
+- (void)enterTemporaryMonitorModeOnInitIfRequired {
+  // Require at least 30 seconds left of Monitor Mode, otherwise don't bother.
+  static constexpr uint64_t kMinRemainingSeconds = 30;
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+
+  uint32_t secsRemaining =
+      [[configurator temporaryMonitorModeStateSecondsRemaining] unsignedIntValue];
+
+  if (secsRemaining < kMinRemainingSeconds) {
+    // Let configurator do any necessary cleanup
+    [configurator leaveTemporaryMonitorMode];
+    return;
+  }
+
+  [self.tempMonitorMode startWithInterval:secsRemaining];
+  [configurator enterTemporaryMonitorModeForSeconds:secsRemaining];
+}
+
 - (void)requestTemporaryMonitorModeWithDuration:(NSNumber *)requestedDuration
                                           reply:(void (^)(uint32_t, NSError *))reply {
   SNTConfigurator *configurator = [SNTConfigurator configurator];
@@ -611,8 +632,7 @@ static constexpr uint32_t kMaxTempMonitorModeMinutes = 1 * 60 * 24 * 30;
   uint32_t durationMin = [modeTransition getDurationMinutes:requestedDuration];
 
   [self.tempMonitorMode startWithInterval:(durationMin * 60)];
-
-  [configurator enterTemporaryMonitorMode];
+  [configurator enterTemporaryMonitorModeForSeconds:(durationMin * 60)];
 
   reply(durationMin, nil);
 }
