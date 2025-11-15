@@ -33,6 +33,19 @@ NSString *StartupOptionToString(SNTDeviceManagerStartupPreferences pref) {
   }
 }
 
+NSString *FormatTimeRemaining(NSTimeInterval seconds) {
+  NSDateComponentsFormatter *formatter = [[NSDateComponentsFormatter alloc] init];
+  formatter.unitsStyle = NSDateComponentsFormatterUnitsStyleFull;
+  formatter.allowedUnits =
+      NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
+  formatter.collapsesLargestUnit = NO;
+  formatter.includesTimeRemainingPhrase = YES;
+  formatter.includesApproximationPhrase = YES;
+  formatter.maximumUnitCount = 2;
+
+  return [formatter stringFromTimeInterval:seconds];
+}
+
 @interface SNTCommandStatus : SNTCommand <SNTCommandProtocol>
 @end
 
@@ -64,12 +77,20 @@ REGISTER_COMMAND_NAME(@"status")
   __block NSString *clientMode;
   __block uint64_t cpuEvents, ramEvents;
   __block double cpuPeak, ramPeak;
-  [rop clientMode:^(SNTClientMode cm) {
-    switch (cm) {
-      case SNTClientModeMonitor: clientMode = @"Monitor"; break;
-      case SNTClientModeLockdown: clientMode = @"Lockdown"; break;
-      case SNTClientModeStandalone: clientMode = @"Standalone"; break;
-      default: clientMode = [NSString stringWithFormat:@"Unknown (%ld)", cm]; break;
+
+  [rop temporaryMonitorModeSecondsRemaining:^(NSNumber *val) {
+    if (val) {
+      clientMode = [@"Temporary Monitor Mode "
+          stringByAppendingFormat:@"(%@)", FormatTimeRemaining([val unsignedLongLongValue])];
+    } else {
+      [rop clientMode:^(SNTClientMode cm) {
+        switch (cm) {
+          case SNTClientModeMonitor: clientMode = @"Monitor"; break;
+          case SNTClientModeLockdown: clientMode = @"Lockdown"; break;
+          case SNTClientModeStandalone: clientMode = @"Standalone"; break;
+          default: clientMode = [NSString stringWithFormat:@"Unknown (%ld)", cm]; break;
+        }
+      }];
     }
   }];
 

@@ -637,6 +637,10 @@ double watchdogRAMPeak = 0;
   reply(durationMin, nil);
 }
 
+- (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply {
+  reply([[SNTConfigurator configurator] temporaryMonitorModeStateSecondsRemaining]);
+}
+
 - (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply {
   SNTConfigurator *configurator = [SNTConfigurator configurator];
   NSError *err;
