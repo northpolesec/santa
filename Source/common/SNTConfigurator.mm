@@ -1341,8 +1341,9 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (deprecatedValue != nil) {
     return [deprecatedValue boolValue];
   }
-  // Default to true when neither key is set, as documented
-  return YES;
+  // Default to true when neither key is set, and the SyncBaseURL is a pinned
+  // Workshop URL.
+  return NO;
 }
 
 - (void)setBlockUSBMount:(BOOL)enabled {
