@@ -33,36 +33,17 @@ NSString *StartupOptionToString(SNTDeviceManagerStartupPreferences pref) {
   }
 }
 
-NSString *Plural(uint64_t val, NSString *base) {
-  if (val == 1) {
-    return base;
-  } else {
-    return [base stringByAppendingString:@"s"];
-  }
-}
+NSString *FormatTimeRemaining(NSTimeInterval seconds) {
+  NSDateComponentsFormatter *formatter = [[NSDateComponentsFormatter alloc] init];
+  formatter.unitsStyle = NSDateComponentsFormatterUnitsStyleFull;
+  formatter.allowedUnits =
+      NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
+  formatter.collapsesLargestUnit = NO;
+  formatter.includesTimeRemainingPhrase = YES;
+  formatter.includesApproximationPhrase = YES;
+  formatter.maximumUnitCount = 2;
 
-NSString *FormatTimeRemaining(uint64_t seconds) {
-  if (seconds < 60) {
-    return @"Less than 1 minute remaining";
-  }
-
-  // Round to nearest minute
-  uint64_t minutes = (seconds + 30) / 60;
-  uint64_t hours = minutes / 60;
-  uint64_t remainingMinutes = minutes % 60;
-
-  if (hours > 0) {
-    if (remainingMinutes > 0) {
-      return [NSString stringWithFormat:@"About %llu %@ and %llu %@ remaining", hours,
-                                        Plural(hours, @"hour"), remainingMinutes,
-                                        Plural(remainingMinutes, @"minute")];
-    } else {
-      return [NSString stringWithFormat:@"About %llu %@ remaining", hours, Plural(hours, @"hour")];
-    }
-  } else {
-    return
-        [NSString stringWithFormat:@"About %llu %@ remaining", minutes, Plural(minutes, @"minute")];
-  }
+  return [formatter stringFromTimeInterval:seconds];
 }
 
 @interface SNTCommandStatus : SNTCommand <SNTCommandProtocol>
