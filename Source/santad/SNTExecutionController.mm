@@ -454,8 +454,9 @@ static NSString *const kPrinterProxyPostMonterey =
                             @"\033[1mIdentifier:\033[0m %@\n"
                             @"\033[1mParent:    \033[0m %@ (%@)\n\n",
                             se.filePath, se.fileSHA256, se.parentName, se.ppid];
-          NSURL *detailURL = [SNTBlockMessage eventDetailURLForEvent:se
-                                                           customURL:(cd.customURL ?: config.eventDetailURL)];
+          NSURL *detailURL =
+              [SNTBlockMessage eventDetailURLForEvent:se
+                                            customURL:(cd.customURL ?: config.eventDetailURL)];
           if (detailURL) {
             [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
           }
@@ -496,7 +497,7 @@ static NSString *const kPrinterProxyPostMonterey =
         // Let the user know what happened in the GUI.
         [self.notifierQueue addEvent:se
                    withCustomMessage:cd.customMsg
-                           customURL:(cd.customURL ?: config.eventDetailURL)
+                           customURL:cd.customURL ?: config.eventDetailURL
                          configState:configState
                             andReply:replyBlock];
       }

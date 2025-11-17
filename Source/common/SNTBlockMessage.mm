@@ -260,8 +260,7 @@ static id ValueOrNull(id value) {
   return u;
 }
 
-+ (NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event
-                        customURL:(NSString *)url {
++ (NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event customURL:(NSString *)url {
   return [self eventDetailURLForEvent:event
                             customURL:url
                       templateMapping:[self eventDetailTemplateMappingForEvent:event]];
@@ -269,9 +268,10 @@ static id ValueOrNull(id value) {
 
 + (NSURL *)eventDetailURLForFileAccessEvent:(SNTStoredFileAccessEvent *)event
                                   customURL:(NSString *)url {
-  return [self eventDetailURLForEvent:event
-                            customURL:(url ?: [[SNTConfigurator configurator] eventDetailURL])
-                      templateMapping:[self fileAccessEventDetailTemplateMappingForEvent:event]];
+  return [self
+      eventDetailURLForEvent:event
+                   customURL:(url ?: [[SNTConfigurator configurator] eventDetailURL])templateMapping
+                            :[self fileAccessEventDetailTemplateMappingForEvent:event]];
 }
 
 @end
