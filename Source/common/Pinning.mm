@@ -22,6 +22,9 @@ namespace santa {
 static NSArray<NSString *> *const kPinnedDomains = @[
   @".workshop.cloud",
   @".north-pole.tech",
+#ifdef DEBUG
+  @"localhost",
+#endif
 ];
 
 bool IsDomainPinned(NSURL *url) {
