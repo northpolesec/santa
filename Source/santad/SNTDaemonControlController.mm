@@ -384,6 +384,14 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerModeTransition:val];
   }];
 
+  [result eventDetailURL:^(NSString *val) {
+    [configurator setSyncServerEventDetailURL:val];
+  }];
+
+  [result eventDetailText:^(NSString *val) {
+    [configurator setSyncServerEventDetailText:val];
+  }];
+
   reply();
 }
 

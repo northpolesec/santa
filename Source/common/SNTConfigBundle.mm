@@ -34,6 +34,8 @@
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
 @property SNTModeTransition *modeTransition;
+@property NSString *eventDetailURL;
+@property NSString *eventDetailText;
 @end
 
 @implementation SNTConfigBundle
@@ -58,6 +60,8 @@
   ENCODE(coder, fullSyncLastSuccess);
   ENCODE(coder, ruleSyncLastSuccess);
   ENCODE(coder, modeTransition);
+  ENCODE(coder, eventDetailURL);
+  ENCODE(coder, eventDetailText);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -78,6 +82,8 @@
     DECODE(decoder, fullSyncLastSuccess, NSDate);
     DECODE(decoder, ruleSyncLastSuccess, NSDate);
     DECODE(decoder, modeTransition, SNTModeTransition);
+    DECODE(decoder, eventDetailURL, NSString);
+    DECODE(decoder, eventDetailText, NSString);
   }
   return self;
 }
@@ -168,6 +174,18 @@
 - (void)modeTransition:(void (^)(SNTModeTransition *))block {
   if (self.modeTransition) {
     block(self.modeTransition);
+  }
+}
+
+- (void)eventDetailURL:(void (^)(NSString *))block {
+  if (self.eventDetailURL) {
+    block(self.eventDetailURL);
+  }
+}
+
+- (void)eventDetailText:(void (^)(NSString *))block {
+  if (self.eventDetailText) {
+    block(self.eventDetailText);
   }
 }
 

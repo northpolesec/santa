@@ -241,12 +241,11 @@ static id ValueOrNull(id value) {
 // The "format strings" in `templateMapping` will be replaced in the URL, if they are present.
 + (NSURL *)eventDetailURLForEvent:(SNTStoredEvent *)event
                         customURL:(NSString *)url
+                      fallbackURL:(NSString *)fallbackURL
                   templateMapping:(NSDictionary *)templateMapping {
-  SNTConfigurator *config = [SNTConfigurator configurator];
-
   NSString *formatStr = url;
   if (!formatStr.length) {
-    formatStr = config.eventDetailURL;
+    formatStr = fallbackURL;
     if (!formatStr.length) {
       return nil;
     }
@@ -265,9 +264,12 @@ static id ValueOrNull(id value) {
   return u;
 }
 
-+ (NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event customURL:(NSString *)url {
++ (NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event
+                        customURL:(NSString *)url
+                      fallbackURL:(NSString *)fallbackURL {
   return [self eventDetailURLForEvent:event
                             customURL:url
+                          fallbackURL:fallbackURL
                       templateMapping:[self eventDetailTemplateMappingForEvent:event]];
 }
 
@@ -275,6 +277,7 @@ static id ValueOrNull(id value) {
                                   customURL:(NSString *)url {
   return [self eventDetailURLForEvent:event
                             customURL:url
+                          fallbackURL:[[SNTConfigurator configurator] eventDetailURL]
                       templateMapping:[self fileAccessEventDetailTemplateMappingForEvent:event]];
 }
 

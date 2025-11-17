@@ -84,6 +84,7 @@ santa_unit_test(
         ":SNTSyncState",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTModeTransition",
     ],
 )
 

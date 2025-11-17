@@ -441,9 +441,19 @@
 @property(nullable, readonly, nonatomic) NSString *eventDetailURL;
 
 ///
+///  Set the EventDetailURL as received from a sync server.
+///
+- (void)setSyncServerEventDetailURL:(nullable NSString *)eventDetailURL;
+
+///
 ///  Related to the above property, this string represents the text to show on the button.
 ///
 @property(nullable, readonly, nonatomic) NSString *eventDetailText;
+
+///
+///  Set the EventDetailText as received from a sync server.
+///
+- (void)setSyncServerEventDetailText:(nullable NSString *)eventDetailText;
 
 ///
 ///  This string represents the text to show on the "Dismiss" button in the UI instead of "Dismiss".

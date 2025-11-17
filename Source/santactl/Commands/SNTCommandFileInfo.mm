@@ -15,7 +15,6 @@
 
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
-#import <objc/runtime.h>
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCertificate.h"

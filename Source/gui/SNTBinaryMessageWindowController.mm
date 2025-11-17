@@ -33,7 +33,7 @@
 @property(copy) NSString *customMessage;
 
 ///  The custom URL to use for this event
-@property(copy) NSString *customURL;
+@property(copy) NSURL *customURL;
 
 @end
 
@@ -41,7 +41,7 @@
 
 - (instancetype)initWithEvent:(SNTStoredExecutionEvent *)event
                     customMsg:(NSString *)message
-                    customURL:(NSString *)url
+                    customURL:(NSURL *)url
                   configState:(SNTConfigState *)configState
                         reply:(void (^)(BOOL))replyBlock {
   self = [super init];

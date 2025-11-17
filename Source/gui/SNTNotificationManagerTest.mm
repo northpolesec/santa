@@ -61,7 +61,7 @@
 
   [sut postBlockNotification:ev
            withCustomMessage:@""
-                   customURL:@""
+                   customURL:nil
                  configState:nil
                     andReply:^(BOOL authenticated){
                     }];
