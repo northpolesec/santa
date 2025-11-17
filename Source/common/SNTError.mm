@@ -62,4 +62,18 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
                            userInfo:@{NSLocalizedDescriptionKey : msg}];
 }
 
++ (nullable NSError *)createErrorWithFormat:(nonnull NSString *)format,
+                                            ... NS_FORMAT_FUNCTION(1, 2) {
+  NSError *error = nil;
+
+  va_list args;
+  va_start(args, format);
+  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+  va_end(args);
+
+  [self populateError:&error withFormat:@"%@", msg];
+
+  return error;
+}
+
 @end

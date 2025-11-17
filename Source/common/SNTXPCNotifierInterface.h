@@ -38,6 +38,7 @@
                             configState:(SNTConfigState *)configState;
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
 - (void)postRuleSyncNotificationForApplication:(NSString *)app;
+- (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;
 - (void)requestAPNSToken:(void (^)(NSString *))reply;
 @end
 

@@ -160,7 +160,6 @@ santa_unit_test(
     ],
     deps = [
         ":ScopedIOObjectRef",
-        "//Source/santad:EndpointSecuritySerializerUtilities",
     ],
 )
 
@@ -324,6 +323,25 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTTimer",
+    srcs = ["SNTTimer.mm"],
+    hdrs = ["SNTTimer.h"],
+    deps = [
+        ":SNTLogging",
+        ":Timer",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTTimerTest",
+    srcs = ["SNTTimerTest.mm"],
+    deps = [
+        ":SNTTimer",
+        ":TestUtils",
+    ],
+)
+
+objc_library(
     name = "SNTXxhash",
     hdrs = ["SNTXxhash.h"],
     deps = [
@@ -422,10 +440,12 @@ objc_library(
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
         ":SNTLogging",
+        ":SNTModeTransition",
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
         "//Source/santasyncservice:Pinning",
+        ":SystemResources",
     ],
 )
 
@@ -437,6 +457,7 @@ objc_library(
         ":CoderMacros",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
+        ":SNTModeTransition",
     ],
 )
 
@@ -447,6 +468,7 @@ santa_unit_test(
         ":SNTCommonEnums",
         ":SNTConfigBundle",
         ":SNTExportConfiguration",
+        ":SNTModeTransition",
     ],
 )
 
@@ -900,6 +922,7 @@ test_suite(
         ":SNTRuleTest",
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
+        ":SNTTimerTest",
         ":SNTXxhashTest",
         ":SantaCacheTest",
         ":SantaSetCacheTest",

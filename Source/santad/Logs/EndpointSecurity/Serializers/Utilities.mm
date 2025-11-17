@@ -15,6 +15,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 
+#include <IOKit/IOKitLib.h>
 #include <sys/mount.h>
 #include <sys/param.h>
 
@@ -63,8 +64,7 @@ NSString *SerialForDevice(NSString *devPath) {
     return nil;
   }
   NSString *serial;
-  io_registry_entry_t device =
-      IORegistryEntryFromPath(GetDefaultIOKitCommsPort(), devPath.UTF8String);
+  io_registry_entry_t device = IORegistryEntryFromPath(kIOMainPortDefault, devPath.UTF8String);
   while (!serial && device) {
     CFMutableDictionaryRef device_properties = NULL;
     IORegistryEntryCreateCFProperties(device, &device_properties, kCFAllocatorDefault, kNilOptions);
@@ -110,8 +110,7 @@ static NSDictionary *PropertiesForDevice(NSString *devPath) {
     return nil;
   }
 
-  io_registry_entry_t device =
-      IORegistryEntryFromPath(GetDefaultIOKitCommsPort(), devPath.UTF8String);
+  io_registry_entry_t device = IORegistryEntryFromPath(kIOMainPortDefault, devPath.UTF8String);
   CFMutableDictionaryRef device_properties = NULL;
   IORegistryEntryCreateCFProperties(device, &device_properties, kCFAllocatorDefault, kNilOptions);
   NSDictionary *properties = CFBridgingRelease(device_properties);

@@ -138,7 +138,7 @@ Logger::Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock get_export_confi
                std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer)
     : Timer<Logger>(kMinTelemetryExportIntervalSecs, kMaxTelemetryExportIntervalSecs,
                     Timer::OnStart::kFireImmediately, "TelemetryExportIntervalSec",
-                    Logger::Mode::kSingleShot),
+                    Logger::RescheduleMode::kTrailingEdge),
       syncd_queue_(syncd_queue),
       get_export_config_block_(get_export_config_block),
       telemetry_mask_(telemetry_mask),
@@ -244,8 +244,9 @@ std::pair<NSString *, NSString *> Logger::GetContentTypeAndExtension(ExportLogTy
   }
 }
 
-void Logger::OnTimer() {
+bool Logger::OnTimer() {
   ExportTelemetry();
+  return true;
 }
 
 void Logger::ExportTelemetry() {

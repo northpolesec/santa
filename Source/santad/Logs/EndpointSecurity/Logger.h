@@ -97,7 +97,7 @@ class Logger : public Timer<Logger> {
 
   void UpdateMachineIDLogging() const;
 
-  void OnTimer();
+  bool OnTimer();
 
   /// Export existing telemetry files.
   void ExportTelemetry();

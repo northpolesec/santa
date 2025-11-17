@@ -20,6 +20,7 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSIPStatus.h"
 #import "Source/common/SNTStoredEvent.h"
@@ -470,6 +471,46 @@
   OCMExpect([smPartialMock rescheduleTimerQueue:sm.fullSyncTimer secondsFromNow:2]);
   [sm preflightWithSyncState:ss];
   XCTAssertTrue(OCMVerifyAll(smPartialMock));
+}
+
+- (void)testPreflightModeTransitionRevoke {
+  if (![self runV2Tests]) {
+    // This feature is not in v1 sync
+    return;
+  }
+
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData *respData =
+      [@"{\"mode_transition\": { \"revoke\": true }}" dataUsingEncoding:NSUTF8StringEncoding];
+
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqual(self.syncState.modeTransition.type, SNTModeTransitionTypeRevoke);
+}
+
+- (void)testPreflightModeTransitionOnDemand {
+  if (![self runV2Tests]) {
+    // This feature is not in v1 sync
+    return;
+  }
+
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData *respData = [@"{\"mode_transition\": "
+                      @"{ \"on_demand_monitor_mode\": "
+                      @"{ \"max_minutes\": 100, \"default_duration_minutes\": 50 } } }"
+      dataUsingEncoding:NSUTF8StringEncoding];
+
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqual(self.syncState.modeTransition.type, SNTModeTransitionTypeOnDemand);
+  XCTAssertEqualObjects(self.syncState.modeTransition.maxMinutes, @(100));
+  XCTAssertEqualObjects(self.syncState.modeTransition.defaultDurationMinutes, @(50));
 }
 
 - (void)testPreflightDatabaseCounts {

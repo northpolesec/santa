@@ -27,9 +27,11 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCControlInterface.h"
-#import "Source/santactl/Commands/SNTCommandRule.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
+
+@interface SNTCommandRule : SNTCommand <SNTCommandProtocol>
+@end
 
 @implementation SNTCommandRule
 

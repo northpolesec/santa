@@ -41,4 +41,6 @@ using NotificationReplyBlock = void (^)(BOOL);
           configState:(SNTConfigState *)configState
              andReply:(void (^)(BOOL authenticated))reply;
 
+- (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;
+
 @end

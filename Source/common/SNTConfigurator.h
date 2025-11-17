@@ -18,6 +18,7 @@
 #import "Source/common/SNTCommonEnums.h"
 
 @class SNTExportConfiguration;
+@class SNTModeTransition;
 @class SNTRule;
 
 ///
@@ -606,6 +607,38 @@
 ///  Set the export configuration as received from a sync server.
 ///
 - (void)setSyncServerExportConfig:(nonnull SNTExportConfiguration *)exportConfig;
+
+///
+///  Currently defined mode transition configuration. Its value is set by a sync server.
+///
+@property(nullable, readonly) SNTModeTransition *modeTransition;
+
+///
+///  Set the mode transition configuration as received from a sync server.
+///
+- (void)setSyncServerModeTransition:(nonnull SNTModeTransition *)modeTransition;
+
+///
+///  Return if Santa is temporarily in Monitor Mode and will revert back
+///  to Lockdown Mode after a configured time period.
+///
+@property(readonly) BOOL inTemporaryMonitorMode;
+
+///
+///  Set Santa to be in Monitor Mode temporarily
+///
+- (void)enterTemporaryMonitorModeForSeconds:(uint32_t)duration;
+
+///
+///  Set Santa as having left temporary Monitor Mode
+///
+- (void)leaveTemporaryMonitorMode;
+
+///
+/// Returns the number of seconds remaining of a previously authorized
+/// session of temporary Monitor Mode.
+///
+- (nullable NSNumber *)temporaryMonitorModeStateSecondsRemaining;
 
 #pragma mark - USB Settings
 

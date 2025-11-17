@@ -12,15 +12,10 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTModeTransition.h"
 
 #import "Source/common/CoderMacros.h"
 #import "Source/common/SNTLogging.h"
-
-// Semi-arbitrary min/max values for max minutes.
-// Max minutes must be less than 30 days (in minutes).
-static constexpr uint32_t kMinMonitorModeMinutes = 1;
-static constexpr uint32_t kMaxMonitorModeMinutes = 1 * 60 * 24 * 30;
 
 @interface SNTModeTransition ()
 @property(readwrite) NSNumber *maxMinutes;
@@ -56,10 +51,10 @@ static constexpr uint32_t kMaxMonitorModeMinutes = 1 * 60 * 24 * 30;
 }
 
 - (NSNumber *)clampMinutes:(uint64_t)minutesVal {
-  if (minutesVal < kMinMonitorModeMinutes) {
-    return @(kMinMonitorModeMinutes);
-  } else if (minutesVal > kMaxMonitorModeMinutes) {
-    return @(kMaxMonitorModeMinutes);
+  if (minutesVal < kMinTemporaryMonitorModeMinutes) {
+    return @(kMinTemporaryMonitorModeMinutes);
+  } else if (minutesVal > kMaxTemporaryMonitorModeMinutes) {
+    return @(kMaxTemporaryMonitorModeMinutes);
   } else {
     return @(minutesVal);
   }

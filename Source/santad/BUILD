@@ -603,9 +603,6 @@ objc_library(
     sdk_dylibs = [
         "bsm",
     ],
-    visibility = [
-        "//Source/common:__pkg__",
-    ],
     deps = [
         ":EndpointSecurityMessage",
         ":SNTDecisionCache",
@@ -822,10 +819,12 @@ objc_library(
         "//Source/common:SNTFileAccessRule",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
+        "//Source/common:SNTModeTransition",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStrengthify",
+        "//Source/common:SNTTimer",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",

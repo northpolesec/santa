@@ -14,7 +14,6 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
-#include "Source/common/faa/WatchItems.h"
 
 #import <Foundation/Foundation.h>
 
@@ -30,12 +29,15 @@
 #import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
+#import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStrengthify.h"
+#import "Source/common/SNTTimer.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
+#include "Source/common/faa/WatchItems.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
@@ -60,6 +62,7 @@ double watchdogRAMPeak = 0;
 @property SNTPolicyProcessor *policyProcessor;
 @property SNTNotificationQueue *notQueue;
 @property SNTSyncdQueue *syncdQueue;
+@property SNTTimer *tempMonitorMode;
 @end
 
 @implementation SNTDaemonControlController {
@@ -82,6 +85,22 @@ double watchdogRAMPeak = 0;
     _watchItems = std::move(watchItems);
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
+
+    _tempMonitorMode =
+        [[SNTTimer alloc] initWithMinInterval:kMinTemporaryMonitorModeMinutes * 60
+                                  maxInterval:kMaxTemporaryMonitorModeMinutes * 60
+                                         name:@"Temporary Monitor Mode"
+                                  fireOnStart:NO
+                               rescheduleMode:SNTTimerRescheduleModeTrailingEdge
+                                     qosClass:QOS_CLASS_USER_INITIATED
+                                     callback:^bool {
+                                       [[SNTConfigurator configurator] leaveTemporaryMonitorMode];
+
+                                       // Don't restart the timer
+                                       return false;
+                                     }];
+
+    [self enterTemporaryMonitorModeOnInitIfRequired];
   }
   return self;
 }
@@ -355,6 +374,16 @@ double watchdogRAMPeak = 0;
     [configurator setFullSyncLastSuccess:val];
   }];
 
+  [result modeTransition:^(SNTModeTransition *val) {
+    if (val.type == SNTModeTransitionTypeRevoke) {
+      if (self.tempMonitorMode.isStarted) {
+        [self.tempMonitorMode stop];
+        [[SNTConfigurator configurator] leaveTemporaryMonitorMode];
+      }
+    }
+    [configurator setSyncServerModeTransition:val];
+  }];
+
   reply();
 }
 
@@ -551,6 +580,75 @@ double watchdogRAMPeak = 0;
 - (void)exportTelemetryWithReply:(void (^)(BOOL))reply {
   _logger->ExportTelemetry();
   reply(YES);
+}
+
+- (void)enterTemporaryMonitorModeOnInitIfRequired {
+  // Require at least 30 seconds left of Monitor Mode, otherwise don't bother.
+  static constexpr uint64_t kMinRemainingSeconds = 30;
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+
+  uint32_t secsRemaining =
+      [[configurator temporaryMonitorModeStateSecondsRemaining] unsignedIntValue];
+
+  if (secsRemaining < kMinRemainingSeconds) {
+    // Let configurator do any necessary cleanup
+    [configurator leaveTemporaryMonitorMode];
+    return;
+  }
+
+  [self.tempMonitorMode startWithInterval:secsRemaining];
+  [configurator enterTemporaryMonitorModeForSeconds:secsRemaining];
+}
+
+- (void)requestTemporaryMonitorModeWithDuration:(NSNumber *)requestedDuration
+                                          reply:(void (^)(uint32_t, NSError *))reply {
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+
+  SNTModeTransition *modeTransition = [configurator modeTransition];
+  if (modeTransition.type != SNTModeTransitionTypeOnDemand) {
+    reply(0,
+          [SNTError createErrorWithFormat:@"Machine is not eligible for temporary Monitor Mode"]);
+    return;
+  }
+
+  SNTClientMode clientMode = [configurator clientMode];
+  if (!(clientMode == SNTClientModeLockdown ||
+        (clientMode == SNTClientModeMonitor && [configurator inTemporaryMonitorMode]))) {
+    reply(0, [SNTError createErrorWithFormat:@"Machine must be in Lockdown Mode in order to "
+                                             @"transition to temporary Monitor Mode"]);
+    return;
+  }
+
+  __block BOOL authSuccess = NO;
+  [self.notQueue authorizeTemporaryMonitorMode:^(BOOL authenticated) {
+    authSuccess = authenticated;
+  }];
+
+  if (!authSuccess) {
+    reply(0, [SNTError createErrorWithFormat:@"User authorization failed"]);
+    return;
+  }
+
+  uint32_t durationMin = [modeTransition getDurationMinutes:requestedDuration];
+
+  [self.tempMonitorMode startWithInterval:(durationMin * 60)];
+  [configurator enterTemporaryMonitorModeForSeconds:(durationMin * 60)];
+
+  reply(durationMin, nil);
+}
+
+- (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply {
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  NSError *err;
+
+  if ([configurator inTemporaryMonitorMode]) {
+    [self.tempMonitorMode stop];
+    [configurator leaveTemporaryMonitorMode];
+  } else {
+    err = [SNTError createErrorWithFormat:@"Machine is not currently in temporary Monitor Mode"];
+  }
+
+  reply(err);
 }
 
 @end

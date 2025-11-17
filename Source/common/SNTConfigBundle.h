@@ -17,6 +17,7 @@
 #import "Source/common/SNTCommonEnums.h"
 
 @class SNTExportConfiguration;
+@class SNTModeTransition;
 
 @interface SNTConfigBundle : NSObject <NSSecureCoding>
 
@@ -35,5 +36,6 @@
 - (void)exportConfiguration:(void (^)(SNTExportConfiguration *))block;
 - (void)fullSyncLastSuccess:(void (^)(NSDate *))block;
 - (void)ruleSyncLastSuccess:(void (^)(NSDate *))block;
+- (void)modeTransition:(void (^)(SNTModeTransition *))block;
 
 @end
