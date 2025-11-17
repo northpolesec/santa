@@ -25,6 +25,10 @@ static NSArray<NSString *> *const kPinnedDomains = @[
 ];
 
 bool IsDomainPinned(NSURL *url) {
+  if (!url.host.length) {
+    return false;
+  }
+
   NSString *host = url.host;
 
   // Check if the given host or host suffix matches a pinned domain

@@ -19,6 +19,7 @@
 
 #import "Source/common/MOLAuthenticatingURLSession.h"
 #import "Source/common/MOLXPCConnection.h"
+#include "Source/common/Pinning.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
@@ -26,7 +27,6 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
-#include "Source/santasyncservice/Pinning.h"
 #import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
