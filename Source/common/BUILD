@@ -445,6 +445,7 @@ objc_library(
         ":SNTStrengthify",
         ":SNTSystemInfo",
         ":SystemResources",
+        "//Source/santasyncservice:Pinning",
     ],
 )
 

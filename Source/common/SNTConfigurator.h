@@ -810,7 +810,7 @@
 ///
 //   This can only used with Workshop and SyncV2.
 ///
-@property(readonly, nonatomic) BOOL enableNATS;
+@property(readonly, nonatomic) BOOL enablePushNotifications;
 
 ///
 /// True if metricsFormat and metricsURL are set. False otherwise.
