@@ -16,6 +16,9 @@
 /* Default text for Approve */
 "Approve" = "Затвердити";
 
+/* Authorize temporary Monitor Mode exception */
+"authorize temporary Monitor Mode" = "дозволити тимчасовий режим монітора";
+
 /* Authorize execution of an application with Signing ID or Path */
 "authorize execution of %@" = "дозволити виконання %@";
 

@@ -16,6 +16,9 @@
 /* Default text for Approve */
 "Approve" = "Approve";
 
+/* Authorize temporary Monitor Mode exception */
+"authorize temporary Monitor Mode" = "authorize temporary Monitor Mode";
+
 /* Authorize execution of an application with Signing ID or Path */
 "authorize execution of %@" = "authorize execution of %@";
 
