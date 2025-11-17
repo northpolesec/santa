@@ -451,7 +451,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
   // Configure server auth
   if (santa::IsDomainPinned(syncState.syncBaseURL)) {
+#ifndef DEBUG
     authURLSession.serverRootsPemString = santa::PinnedCertPEMs();
+#endif
     syncState.isSyncV2 = YES;
   } else if ([config syncServerAuthRootsFile]) {
     authURLSession.serverRootsPemFile = [config syncServerAuthRootsFile];
