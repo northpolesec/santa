@@ -121,8 +121,6 @@ static NSString *const kEnableSilentModeKey = @"EnableSilentMode";
 static NSString *const kEnableSilentTTYModeKey = @"EnableSilentTTYMode";
 static NSString *const kAboutTextKey = @"AboutText";
 static NSString *const kMoreInfoURLKey = @"MoreInfoURL";
-static NSString *const kEventDetailURLKey = @"EventDetailURL";
-static NSString *const kEventDetailTextKey = @"EventDetailText";
 static NSString *const kDismissTextKey = @"DismissText";
 static NSString *const kUnknownBlockMessage = @"UnknownBlockMessage";
 static NSString *const kBannedBlockMessage = @"BannedBlockMessage";
@@ -208,6 +206,8 @@ static NSString *const kBlockedPathRegexKeyDeprecated = @"BlacklistRegex";
 static NSString *const kEnableAllEventUploadKey = @"EnableAllEventUpload";
 static NSString *const kOverrideFileAccessActionKey = @"OverrideFileAccessAction";
 static NSString *const kEnableBundlesKey = @"EnableBundles";
+static NSString *const kEventDetailURLKey = @"EventDetailURL";
+static NSString *const kEventDetailTextKey = @"EventDetailText";
 
 // The keys managed by a sync server.
 static NSString *const kFullSyncLastSuccess = @"FullSyncLastSuccess";
@@ -264,6 +264,8 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kEnableBundlesKey : number,
       kExportConfigurationKey : data,
       kModeTransitionKey : data,
+      kEventDetailURLKey : string,
+      kEventDetailTextKey : string,
     };
     _forcedConfigKeyTypes = @{
       kClientModeKey : number,
@@ -510,11 +512,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEventDetailURL {
-  return [self configStateSet];
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingEventDetailText {
-  return [self configStateSet];
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingDismissText {
@@ -1034,11 +1036,19 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (NSString *)eventDetailURL {
-  return self.configState[kEventDetailURLKey];
+  return self.syncState[kEventDetailURLKey] ?: self.configState[kEventDetailURLKey];
+}
+
+- (void)setSyncServerEventDetailURL:(NSString *)eventDetailURL {
+  [self updateSyncStateForKey:kEventDetailURLKey value:eventDetailURL];
 }
 
 - (NSString *)eventDetailText {
-  return self.configState[kEventDetailTextKey];
+  return self.syncState[kEventDetailTextKey] ?: self.configState[kEventDetailTextKey];
+}
+
+- (void)setSyncServerEventDetailText:(NSString *)eventDetailText {
+  [self updateSyncStateForKey:kEventDetailTextKey value:eventDetailText];
 }
 
 - (NSString *)dismissText {

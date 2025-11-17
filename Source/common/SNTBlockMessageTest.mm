@@ -64,7 +64,7 @@
                       @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"
                       @"un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url fallbackURL:nil];
 
   // Set fileBundleHash and test again for newly expected values
   se.fileBundleHash = @"my_fbh";
@@ -74,12 +74,12 @@
             @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"
             @"un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
-  gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+  gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url fallbackURL:nil];
 
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 
-  XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:nil]);
-  XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:@"null"]);
+  XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:nil fallbackURL:nil]);
+  XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:@"null" fallbackURL:nil]);
 }
 
 - (void)testEventDetailURLForFileAccessEvent {
@@ -120,7 +120,7 @@
   NSString *url = @"http://localhost?fi=%file_identifier%";
   NSString *wantUrl = @"http://localhost?fi=my_fi";
 
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url fallbackURL:nil];
 
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 }

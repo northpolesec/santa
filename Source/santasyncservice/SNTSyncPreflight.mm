@@ -311,6 +311,14 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     }
   }
 
+  if (resp.has_event_detail_url()) {
+    self.syncState.eventDetailURL = StringToNSString(resp.event_detail_url());
+  }
+
+  if (resp.has_event_detail_text()) {
+    self.syncState.eventDetailText = StringToNSString(resp.event_detail_text());
+  }
+
   // Default sync type is SNTSyncTypeNormal
   //
   // Logic overview:

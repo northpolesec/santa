@@ -19,6 +19,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigBundle.h"
+#import "Source/common/SNTModeTransition.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
 @interface SNTConfigBundle (ConfigBundleCreator)
@@ -35,6 +36,9 @@
 @property NSString *overrideFileAccessAction;
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
+@property SNTModeTransition *modeTransition;
+@property NSString *eventDetailURL;
+@property NSString *eventDetailText;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -65,6 +69,19 @@
   syncState.syncType = SNTSyncTypeCleanAll;
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.syncType, @(SNTSyncTypeNormal));
+
+  syncState.modeTransition = [[SNTModeTransition alloc] initRevocation];
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertNotNil(bundle.modeTransition);
+  XCTAssertEqual(bundle.modeTransition.type, SNTModeTransitionTypeRevoke);
+
+  syncState.eventDetailURL = @"my://url";
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.eventDetailURL, syncState.eventDetailURL);
+
+  syncState.eventDetailText = @"Click Button";
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.eventDetailText, syncState.eventDetailText);
 }
 
 - (void)testRuleSyncConfigBundle {
@@ -85,6 +102,9 @@
   XCTAssertNil(bundle.disableUnknownEventUpload);
   XCTAssertNil(bundle.overrideFileAccessAction);
   XCTAssertNil(bundle.fullSyncLastSuccess);
+  XCTAssertNil(bundle.modeTransition);
+  XCTAssertNil(bundle.eventDetailURL);
+  XCTAssertNil(bundle.eventDetailText);
 }
 
 - (void)testSyncTypeConfigBundle {
@@ -111,6 +131,9 @@
   XCTAssertNil(bundle.overrideFileAccessAction);
   XCTAssertNil(bundle.fullSyncLastSuccess);
   XCTAssertNil(bundle.ruleSyncLastSuccess);
+  XCTAssertNil(bundle.modeTransition);
+  XCTAssertNil(bundle.eventDetailURL);
+  XCTAssertNil(bundle.eventDetailText);
 }
 
 @end

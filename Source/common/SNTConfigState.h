@@ -24,6 +24,7 @@
 //
 @property(readonly) SNTClientMode clientMode;
 @property(readonly) BOOL enableNotificationSilences;
+@property(readonly) NSString *eventDetailText;
 
 - (instancetype)initWithConfig:(SNTConfigurator *)config;
 

@@ -82,6 +82,8 @@
 @property NSString *overrideFileAccessAction;
 @property SNTExportConfiguration *exportConfig;
 @property SNTModeTransition *modeTransition;
+@property NSString *eventDetailURL;
+@property NSString *eventDetailText;
 
 /// Clean sync flag, if True, all existing rules should be deleted before inserting any new rules.
 @property SNTSyncType syncType;

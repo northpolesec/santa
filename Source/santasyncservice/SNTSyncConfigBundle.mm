@@ -35,6 +35,8 @@
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
 @property SNTModeTransition *modeTransition;
+@property NSString *eventDetailURL;
+@property NSString *eventDetailText;
 @end
 
 SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
@@ -53,6 +55,8 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.overrideFileAccessAction = syncState.overrideFileAccessAction;
   bundle.exportConfiguration = syncState.exportConfig;
   bundle.modeTransition = syncState.modeTransition;
+  bundle.eventDetailURL = syncState.eventDetailURL;
+  bundle.eventDetailText = syncState.eventDetailText;
 
   bundle.fullSyncLastSuccess = [NSDate now];
 

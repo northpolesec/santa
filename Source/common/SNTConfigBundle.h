@@ -37,5 +37,7 @@
 - (void)fullSyncLastSuccess:(void (^)(NSDate *))block;
 - (void)ruleSyncLastSuccess:(void (^)(NSDate *))block;
 - (void)modeTransition:(void (^)(SNTModeTransition *))block;
+- (void)eventDetailURL:(void (^)(NSString *))block;
+- (void)eventDetailText:(void (^)(NSString *))block;
 
 @end
