@@ -46,6 +46,12 @@ objc_library(
 )
 
 objc_library(
+    name = "Pinning",
+    srcs = ["Pinning.mm"],
+    hdrs = ["Pinning.h"],
+)
+
+objc_library(
     name = "NSData+Zlib",
     srcs = ["NSData+Zlib.mm"],
     hdrs = ["NSData+Zlib.h"],
@@ -437,6 +443,7 @@ objc_library(
         "Foundation",
     ],
     deps = [
+        ":Pinning",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
         ":SNTLogging",
@@ -445,7 +452,6 @@ objc_library(
         ":SNTStrengthify",
         ":SNTSystemInfo",
         ":SystemResources",
-        "//Source/santasyncservice:Pinning",
     ],
 )
 

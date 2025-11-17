@@ -58,13 +58,6 @@ objc_library(
 )
 
 objc_library(
-    name = "Pinning",
-    srcs = ["Pinning.mm"],
-    hdrs = ["Pinning.h"],
-    visibility = ["//Source/common:__pkg__"],
-)
-
-objc_library(
     name = "SNTSyncConfigBundle",
     srcs = ["SNTSyncConfigBundle.mm"],
     hdrs = ["SNTSyncConfigBundle.h"],
@@ -208,7 +201,6 @@ objc_library(
     deps = [
         ":FCM_lib",
         ":NATS_lib",
-        ":Pinning",
         ":ProtoTraits",
         ":SNTPushNotificationsTracker",
         ":SNTSyncConfigBundle",
@@ -223,6 +215,7 @@ objc_library(
         "//Source/common:MOLCertificate",
         "//Source/common:MOLXPCConnection",
         "//Source/common:NSData+Zlib",
+        "//Source/common:Pinning",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
@@ -274,7 +267,6 @@ santa_unit_test(
     deps = [
         ":FCM_lib",
         ":NATS_lib",
-        ":Pinning",
         ":SNTPushNotificationsTracker",
         ":SNTSyncConfigBundle",
         ":SNTSyncLogging",
@@ -287,6 +279,7 @@ santa_unit_test(
         "//Source/common:MOLCertificate",
         "//Source/common:MOLXPCConnection",
         "//Source/common:NSData+Zlib",
+        "//Source/common:Pinning",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDropRootPrivs",
@@ -325,8 +318,6 @@ santa_unit_test(
 santa_unit_test(
     name = "SNTSyncManagerTest",
     srcs = [
-        "Pinning.h",
-        "Pinning.mm",
         "ProtoTraits.h",
         "SNTPushClientAPNS.h",
         "SNTPushClientAPNS.mm",
@@ -360,6 +351,7 @@ santa_unit_test(
         "//Source/common:MOLCertificate",
         "//Source/common:MOLXPCConnection",
         "//Source/common:NSData+Zlib",
+        "//Source/common:Pinning",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDropRootPrivs",
