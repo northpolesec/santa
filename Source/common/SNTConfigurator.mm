@@ -17,6 +17,8 @@
 
 #include <sys/stat.h>
 
+#include "Source/santasyncservice/Pinning.h"
+
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
@@ -1343,6 +1345,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
   // Default to true when neither key is set, and the SyncBaseURL is a pinned
   // Workshop URL.
+  NSURL *syncBaseURL = [self syncBaseURL];
+  if (syncBaseURL && santa::IsDomainPinned(syncBaseURL)) {
+    return YES;
+  }
   return NO;
 }
 
