@@ -21,6 +21,7 @@
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
+#include "Source/common/Pinning.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -375,13 +376,13 @@ double watchdogRAMPeak = 0;
   }];
 
   [result modeTransition:^(SNTModeTransition *val) {
+    [configurator setSyncServerModeTransition:val];
     if (val.type == SNTModeTransitionTypeRevoke) {
-      if (self.tempMonitorMode.isStarted) {
-        [self.tempMonitorMode stop];
-        [[SNTConfigurator configurator] leaveTemporaryMonitorMode];
+      // Passing `NO` since this block already updates the mode transition
+      if ([self revokeTemporaryMonitorModeUpdateModeTransition:NO]) {
+        LOGI(@"Temporary Monitor Mode session revoked due to policy change.");
       }
     }
-    [configurator setSyncServerModeTransition:val];
   }];
 
   [result eventDetailURL:^(NSString *val) {
@@ -614,8 +615,8 @@ double watchdogRAMPeak = 0;
 
   SNTModeTransition *modeTransition = [configurator modeTransition];
   if (modeTransition.type != SNTModeTransitionTypeOnDemand) {
-    reply(0,
-          [SNTError createErrorWithFormat:@"Machine is not eligible for temporary Monitor Mode"]);
+    reply(0, [SNTError createErrorWithFormat:@"This machine does not currently have a "
+                                             @"policy allowing temporary Monitor Mode."]);
     return;
   }
 
@@ -623,8 +624,13 @@ double watchdogRAMPeak = 0;
   if (!(clientMode == SNTClientModeLockdown ||
         (clientMode == SNTClientModeMonitor && [configurator inTemporaryMonitorMode]))) {
     reply(0, [SNTError createErrorWithFormat:@"Machine must be in Lockdown Mode in order to "
-                                             @"transition to temporary Monitor Mode"]);
+                                             @"transition to temporary Monitor Mode."]);
     return;
+  }
+
+  if (!santa::IsDomainPinned(configurator.syncBaseURL)) {
+    reply(0, [SNTError createErrorWithFormat:@"This machine is not configured with a sync "
+                                             @"server that supports temporary Monitor Mode."]);
   }
 
   __block BOOL authSuccess = NO;
@@ -633,7 +639,7 @@ double watchdogRAMPeak = 0;
   }];
 
   if (!authSuccess) {
-    reply(0, [SNTError createErrorWithFormat:@"User authorization failed"]);
+    reply(0, [SNTError createErrorWithFormat:@"User authorization failed."]);
     return;
   }
 
@@ -647,6 +653,24 @@ double watchdogRAMPeak = 0;
 
 - (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply {
   reply([[SNTConfigurator configurator] temporaryMonitorModeStateSecondsRemaining]);
+}
+
+- (BOOL)revokeTemporaryMonitorModeUpdateModeTransition:(BOOL)revokeModeTransition {
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+
+  // Remove the mode transition policy first to prevent Monitor Mode transitions.
+  // Then, if in a temporary Monitor Mode session, end it.
+  if (revokeModeTransition) {
+    [configurator setSyncServerModeTransition:[[SNTModeTransition alloc] initRevocation]];
+  }
+
+  if (self.tempMonitorMode.isStarted) {
+    [self.tempMonitorMode stop];
+    [configurator leaveTemporaryMonitorMode];
+    return YES;
+  } else {
+    return NO;
+  }
 }
 
 - (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply {

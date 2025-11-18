@@ -27,6 +27,10 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
             syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
                 stateAccessAuthorizer:(StateFileAccessAuthorizer)stateAccessAuthorizer;
 
+- (BOOL)verifyTemporaryMonitorModeState:(NSDictionary *)tmm
+                 currentBootSessionUUID:(NSString *)currentBootSessionUUID
+                     currentSyncBaseURL:(NSURL *)currentSyncBaseURL;
+
 @property NSDictionary *syncState;
 @end
 
@@ -105,6 +109,80 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                                 XCTAssertNil(cfg.syncState[@"SyncCleanRequired"]);
                                 XCTAssertNil(cfg.syncState[@"SyncTypeRequired"]);
                               }];
+}
+
+- (void)testVerifyTemporaryMonitorModeState {
+  static NSString *const kBootSessionUUIDKey = @"UUID";
+  static NSString *const kDeadlineKey = @"Deadline";
+  static NSString *const kSyncURLKey = @"SyncURL";
+
+  NSURL *unpinnedURL = [NSURL URLWithString:@"https://my.sync.server"];
+  NSURL *pinnedURL = [NSURL URLWithString:@"https://foo.workshop.cloud"];
+
+  SNTConfigurator *sut = [SNTConfigurator configurator];
+
+  // Good
+  XCTAssertTrue(([sut verifyTemporaryMonitorModeState:@{
+    kBootSessionUUIDKey : @"abc",
+    kDeadlineKey : @(123),
+    kSyncURLKey : pinnedURL.host
+  }
+                               currentBootSessionUUID:@"abc"
+                                   currentSyncBaseURL:pinnedURL]));
+
+  // Bad Boot Session UUID type
+  XCTAssertFalse(([sut verifyTemporaryMonitorModeState:@{
+    kBootSessionUUIDKey : @(123),
+    kDeadlineKey : @(123),
+    kSyncURLKey : pinnedURL.host
+  }
+                                currentBootSessionUUID:@"abc"
+                                    currentSyncBaseURL:pinnedURL]));
+
+  // Bad Deadline type
+  XCTAssertFalse(([sut verifyTemporaryMonitorModeState:@{
+    kBootSessionUUIDKey : @"abc",
+    kDeadlineKey : @"123",
+    kSyncURLKey : pinnedURL.host
+  }
+                                currentBootSessionUUID:@"abc"
+                                    currentSyncBaseURL:pinnedURL]));
+
+  // Bad Sync URL type type
+  XCTAssertFalse(([sut verifyTemporaryMonitorModeState:@{
+    kBootSessionUUIDKey : @"abc",
+    kDeadlineKey : @(123),
+    kSyncURLKey : @(123),
+  }
+                                currentBootSessionUUID:@"abc"
+                                    currentSyncBaseURL:pinnedURL]));
+
+  // Mismatched boot session UUID
+  XCTAssertFalse(([sut verifyTemporaryMonitorModeState:@{
+    kBootSessionUUIDKey : @"abc",
+    kDeadlineKey : @(123),
+    kSyncURLKey : pinnedURL.host
+  }
+                                currentBootSessionUUID:@"xyz"
+                                    currentSyncBaseURL:pinnedURL]));
+
+  // Unpinned sync URL
+  XCTAssertFalse(([sut verifyTemporaryMonitorModeState:@{
+    kBootSessionUUIDKey : @"abc",
+    kDeadlineKey : @(123),
+    kSyncURLKey : unpinnedURL.host,
+  }
+                                currentBootSessionUUID:@"abc"
+                                    currentSyncBaseURL:unpinnedURL]));
+
+  // Mismatched sync URL
+  XCTAssertFalse(([sut verifyTemporaryMonitorModeState:@{
+    kBootSessionUUIDKey : @"abc",
+    kDeadlineKey : @(123),
+    kSyncURLKey : unpinnedURL.host,
+  }
+                                currentBootSessionUUID:@"abc"
+                                    currentSyncBaseURL:pinnedURL]));
 }
 
 @end

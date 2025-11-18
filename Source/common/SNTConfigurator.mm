@@ -83,6 +83,7 @@ static NSString *const kStateStatsLastSubmissionVersionKey = @"LastVersion";
 static NSString *const kStateTempMonitorModeKey = @"TMM";
 static NSString *const kStateTempMonitorModeBootSessionUUIDKey = @"UUID";
 static NSString *const kStateTempMonitorModeDeadlineKey = @"Deadline";
+static NSString *const kStateTempMonitorModeSavedSyncURLKey = @"SyncURL";
 
 #ifdef DEBUG
 NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist";
@@ -807,6 +808,7 @@ static SNTConfigurator *sharedConfigurator = nil;
                                  kStateTempMonitorModeBootSessionUUIDKey :
                                      [SNTSystemInfo bootSessionUUID],
                                  kStateTempMonitorModeDeadlineKey : @(deadline),
+                                 kStateTempMonitorModeSavedSyncURLKey : self.syncBaseURL.host,
                                }];
     self.inTemporaryMonitorMode = YES;
   }
@@ -1671,6 +1673,36 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 }
 
+// When reading Temporary Monitor Mode state, all of the following
+// conditions must be true, otherwise the state is discarded:
+//   0. All types must meet expectations
+//   1. The saved boot session UUID must match the current boot session UUID
+//   2. The saved sync URL must match the current SyncBaseURL
+//   3. The current SyncBaseURL must be pinned
+- (BOOL)verifyTemporaryMonitorModeState:(NSDictionary *)tmm
+                 currentBootSessionUUID:(NSString *)currentBootSessionUUID
+                     currentSyncBaseURL:(NSURL *)currentSyncBaseURL {
+  if (![tmm[kStateTempMonitorModeBootSessionUUIDKey] isKindOfClass:[NSString class]] ||
+      ![tmm[kStateTempMonitorModeDeadlineKey] isKindOfClass:[NSNumber class]] ||
+      ![tmm[kStateTempMonitorModeSavedSyncURLKey] isKindOfClass:[NSString class]]) {
+    return NO;
+  }
+
+  if (![tmm[kStateTempMonitorModeBootSessionUUIDKey] isEqualToString:currentBootSessionUUID]) {
+    return NO;
+  }
+
+  if (![tmm[kStateTempMonitorModeSavedSyncURLKey] isEqualToString:currentSyncBaseURL.host]) {
+    return NO;
+  }
+
+  if (!santa::IsDomainPinned(currentSyncBaseURL)) {
+    return NO;
+  }
+
+  return YES;
+}
+
 - (NSDictionary *)readStateFromDisk {
   if (!self.stateAccessAuthorizerBlock()) {
     return nil;
@@ -1701,15 +1733,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 
   if ([state[kStateTempMonitorModeKey] isKindOfClass:[NSDictionary class]]) {
     NSDictionary *tmm = state[kStateTempMonitorModeKey];
-    // If the stored temp monitor mode boot session uuid matches, then carry over the
-    // values. Otherwise they will get discarded.
-    if ([tmm[kStateTempMonitorModeBootSessionUUIDKey] isKindOfClass:[NSString class]] &&
-        [tmm[kStateTempMonitorModeDeadlineKey] isKindOfClass:[NSNumber class]] &&
-        [tmm[kStateTempMonitorModeBootSessionUUIDKey]
-            isEqualToString:[SNTSystemInfo bootSessionUUID]]) {
+
+    if ([self verifyTemporaryMonitorModeState:tmm
+                       currentBootSessionUUID:[SNTSystemInfo bootSessionUUID]
+                           currentSyncBaseURL:self.syncBaseURL]) {
       newState[kStateTempMonitorModeKey] = @{
         kStateTempMonitorModeBootSessionUUIDKey : tmm[kStateTempMonitorModeBootSessionUUIDKey],
-        kStateTempMonitorModeDeadlineKey : tmm[kStateTempMonitorModeDeadlineKey]
+        kStateTempMonitorModeDeadlineKey : tmm[kStateTempMonitorModeDeadlineKey],
+        kStateTempMonitorModeSavedSyncURLKey : tmm[kStateTempMonitorModeSavedSyncURLKey],
       };
     }
   }

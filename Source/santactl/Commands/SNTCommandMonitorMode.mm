@@ -110,7 +110,7 @@ REGISTER_COMMAND_NAME(@"monitormode")
                                             }
 
                                             TEE_LOGI(
-                                                @"Temporarily switching to Monitor Mode for %u %@",
+                                                @"Monitor Mode temporarily authorized for %u %@",
                                                 minutes, minutes > 1 ? @"minutes" : @"minute");
                                           }];
   }
