@@ -143,7 +143,7 @@ bool Activation::IsResultCacheable() const {
   return !args_.HasValue() && !envs_.HasValue();
 }
 
-::cel::Type Activation::CELType(google::protobuf::internal::FieldDescriptorLite::CppType type,
+::cel::Type Activation::CELType(google::protobuf::FieldDescriptor::CppType type,
                                 const google::protobuf::Descriptor *messageType) {
   switch (type) {
     case ::google::protobuf::FieldDescriptor::CPPTYPE_STRING: return ::cel::StringType();

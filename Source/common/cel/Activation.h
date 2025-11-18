@@ -65,7 +65,7 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
 
   bool IsResultCacheable() const;
 
-  static ::cel::Type CELType(google::protobuf::internal::FieldDescriptorLite::CppType type,
+  static ::cel::Type CELType(google::protobuf::FieldDescriptor::CppType type,
                              const google::protobuf::Descriptor *messageType);
 
   template <typename T>
