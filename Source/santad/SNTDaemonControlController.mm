@@ -382,10 +382,6 @@ double watchdogRAMPeak = 0;
       if ([self revokeTemporaryMonitorModeUpdateModeTransition:NO]) {
         LOGI(@"Temporary Monitor Mode session revoked due to policy change.");
       }
-      if (self.tempMonitorMode.isStarted) {
-        [self.tempMonitorMode stop];
-        [[SNTConfigurator configurator] leaveTemporaryMonitorMode];
-      }
     }
   }];
 
@@ -667,7 +663,8 @@ double watchdogRAMPeak = 0;
   if (revokeModeTransition) {
     [configurator setSyncServerModeTransition:[[SNTModeTransition alloc] initRevocation]];
   }
-  if ([configurator inTemporaryMonitorMode]) {
+
+  if (self.tempMonitorMode.isStarted) {
     [self.tempMonitorMode stop];
     [configurator leaveTemporaryMonitorMode];
     return YES;
