@@ -53,9 +53,8 @@ NS_ASSUME_NONNULL_BEGIN
 ///  Return a URL generated from the EventDetailURL configuration key
 ///  after replacing templates in the URL with values from the event.
 ///
-+ (nullable NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event
-                                 customURL:(nullable NSString *)url
-                               fallbackURL:(nullable NSString *)fallbackURL;
++ (nullable NSURL *)eventDetailURLForEvent:(nullable SNTStoredExecutionEvent *)event
+                                 customURL:(nullable NSString *)url;
 + (nullable NSURL *)eventDetailURLForFileAccessEvent:(nullable SNTStoredFileAccessEvent *)event
                                            customURL:(nullable NSString *)url;
 

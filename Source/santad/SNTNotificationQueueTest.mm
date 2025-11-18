@@ -56,7 +56,7 @@
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
   NSString *customMessage = @"custom msg";
-  NSURL *customURL = [NSURL URLWithString:@"https://northpolesec.com"];
+  NSString *customURL = @"https://northpolesec.com";
 
   OCMExpect([self.mockProxy postBlockNotification:se
                                 withCustomMessage:customMessage
@@ -88,7 +88,7 @@
 - (void)testAddEventNil {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   NSString *customMessage = @"custom msg";
-  NSURL *customURL = [NSURL URLWithString:@"https://northpolesec.com"];
+  NSString *customURL = @"https://northpolesec.com";
 
   [self.sut addEvent:nil
       withCustomMessage:customMessage
@@ -113,7 +113,7 @@
 // well as posting messages for everything in the queue.
 - (void)testAddEventMulti {
   NSString *customMessage = @"custom msg";
-  NSURL *customURL = [NSURL URLWithString:@"https://northpolesec.com"];
+  NSString *customURL = @"https://northpolesec.com";
 
   SNTStoredExecutionEvent *se1 = [[SNTStoredExecutionEvent alloc] init];
   SNTStoredExecutionEvent *se2 = [[SNTStoredExecutionEvent alloc] init];
@@ -149,19 +149,19 @@
   NSMutableDictionary *d1 = [NSMutableDictionary dictionary];
   [d1 setValue:se1 forKey:@"event"];
   [d1 setValue:@"Message 1" forKey:@"message"];
-  [d1 setValue:[NSURL URLWithString:@"https://northpolesec.com/1"] forKey:@"url"];
+  [d1 setValue:@"https://northpolesec.com/1" forKey:@"url"];
   [d1 setValue:replyBlock1 forKey:@"reply"];
 
   NSMutableDictionary *d2 = [NSMutableDictionary dictionary];
   [d2 setValue:se2 forKey:@"event"];
   [d2 setValue:@"Message 2" forKey:@"message"];
-  [d2 setValue:[NSURL URLWithString:@"https://northpolesec.com/2"] forKey:@"url"];
+  [d2 setValue:@"https://northpolesec.com/2" forKey:@"url"];
   [d2 setValue:replyBlock2 forKey:@"reply"];
 
   NSMutableDictionary *d3 = [NSMutableDictionary dictionary];
   [d3 setValue:se3 forKey:@"event"];
   [d3 setValue:@"Message 3" forKey:@"message"];
-  [d3 setValue:[NSURL URLWithString:@"https://northpolesec.com/3"] forKey:@"url"];
+  [d3 setValue:@"https://northpolesec.com/3" forKey:@"url"];
   [d3 setValue:replyBlock3 forKey:@"reply"];
 
   self.ringbuf->Enqueue(d1);
@@ -172,19 +172,17 @@
   XCTAssertFalse(self.ringbuf->Empty());
 
   // postBlockNotification should never be called for `se1` since it will fall out of the ring
-  OCMVerify(never(), [self.mockProxy
-                         postBlockNotification:se1
-                             withCustomMessage:@"Message 1"
-                                     customURL:[NSURL URLWithString:@"https://northpolesec.com/1"]
-                                   configState:OCMOCK_ANY
-                                      andReply:OCMOCK_ANY]);
+  OCMVerify(never(), [self.mockProxy postBlockNotification:se1
+                                         withCustomMessage:@"Message 1"
+                                                 customURL:@"https://northpolesec.com/1"
+                                               configState:OCMOCK_ANY
+                                                  andReply:OCMOCK_ANY]);
 
-  OCMExpect([self.mockProxy
-                postBlockNotification:se2
-                    withCustomMessage:@"Message 2"
-                            customURL:[NSURL URLWithString:@"https://northpolesec.com/2"]
-                          configState:OCMOCK_ANY
-                             andReply:OCMOCK_ANY])
+  OCMExpect([self.mockProxy postBlockNotification:se2
+                                withCustomMessage:@"Message 2"
+                                        customURL:@"https://northpolesec.com/2"
+                                      configState:OCMOCK_ANY
+                                         andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *invocation) {
         void (^__unsafe_unretained replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:6];
@@ -194,12 +192,11 @@
         });
       });
 
-  OCMExpect([self.mockProxy
-                postBlockNotification:se3
-                    withCustomMessage:@"Message 3"
-                            customURL:[NSURL URLWithString:@"https://northpolesec.com/3"]
-                          configState:OCMOCK_ANY
-                             andReply:OCMOCK_ANY])
+  OCMExpect([self.mockProxy postBlockNotification:se3
+                                withCustomMessage:@"Message 3"
+                                        customURL:@"https://northpolesec.com/3"
+                                      configState:OCMOCK_ANY
+                                         andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation *invocation) {
         void (^__unsafe_unretained replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:6];
@@ -261,20 +258,20 @@
   NSMutableDictionary *d1 = [NSMutableDictionary dictionary];
   [d1 setValue:se1 forKey:@"event"];
   [d1 setValue:@"Message 1" forKey:@"message"];
-  [d1 setValue:[NSURL URLWithString:@"https://northpolesec.com/1"] forKey:@"url"];
+  [d1 setValue:@"https://northpolesec.com/1" forKey:@"url"];
   [d1 setValue:[replyBlock1 copy] forKey:@"reply"];
 
   NSMutableDictionary *d2 = [NSMutableDictionary dictionary];
   [d2 setValue:se2 forKey:@"event"];
   [d2 setValue:@"Message 2" forKey:@"message"];
-  [d2 setValue:[NSURL URLWithString:@"https://northpolesec.com/2"] forKey:@"url"];
+  [d2 setValue:@"https://northpolesec.com/2" forKey:@"url"];
   [d2 setValue:[replyBlock2 copy] forKey:@"reply"];
 
   // Create dictionary with no reply block
   NSMutableDictionary *d3 = [NSMutableDictionary dictionary];
   [d3 setValue:se3 forKey:@"event"];
   [d3 setValue:@"Message 3" forKey:@"message"];
-  [d3 setValue:[NSURL URLWithString:@"https://northpolesec.com/3"] forKey:@"url"];
+  [d3 setValue:@"https://northpolesec.com/3" forKey:@"url"];
   // Intentionally not setting a reply block for d3
 
   self.ringbuf->Enqueue(d1);

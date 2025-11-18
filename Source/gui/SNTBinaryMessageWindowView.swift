@@ -34,7 +34,7 @@ import santa_gui_SNTMessageView
     window: NSWindow,
     event: SNTStoredExecutionEvent,
     customMsg: NSString?,
-    customURL: NSURL?,
+    customURL: NSString?,
     configState: SNTConfigState,
     bundleProgress: SNTBundleProgress,
     uiStateCallback: ((TimeInterval) -> Void)?,
@@ -56,7 +56,7 @@ import santa_gui_SNTMessageView
   }
 }
 
-func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: URL?) {
+func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: String?) {
   var s = "Santa blocked \((e?.fileBundleName?.isEmpty == false) ? e!.fileBundleName! : "an application")"
   if let publisher = e?.publisherInfo {
     s += "\nPublisher  : \(publisher)"
@@ -76,7 +76,8 @@ func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: URL?) {
   s += "\nSHA-256    : \(e?.fileSHA256 ?? "unknown")"
   s += "\nParent     : \(e?.parentName ?? "") (\(String(format: "%d", e?.ppid?.intValue ?? 0)))"
 
-  s += "\nURL        : \(customURL?.absoluteString ?? "unknown")"
+  let url = SNTBlockMessage.eventDetailURL(for: e, customURL: customURL as String?)
+  s += "\nURL : \(url?.absoluteString ?? "unknown")"
   s += "\n"
 
   let pasteboard = NSPasteboard.general
@@ -86,7 +87,7 @@ func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: URL?) {
 
 struct MoreDetailsView: View {
   let e: SNTStoredExecutionEvent?
-  let customURL: NSURL?
+  let customURL: NSString?
 
   @Environment(\.presentationMode) var presentationMode
 
@@ -155,7 +156,7 @@ struct MoreDetailsView: View {
 
         HStack {
           CopyDetailsButton(action: {
-            copyDetailsToClipboard(e: e, customURL: customURL as URL?)
+            copyDetailsToClipboard(e: e, customURL: customURL as String?)
           })
 
           Button(action: { presentationMode.wrappedValue.dismiss() }) {
@@ -179,7 +180,7 @@ struct MoreDetailsView: View {
 
 struct SNTBinaryMessageEventView: View {
   let e: SNTStoredExecutionEvent?
-  let customURL: NSURL?
+  let customURL: NSString?
 
   @State private var isShowingDetails = false
 
@@ -225,7 +226,7 @@ struct SNTBinaryMessageEventView: View {
         MoreDetailsButton($isShowingDetails)
 
         CopyDetailsButton(action: {
-          copyDetailsToClipboard(e: e, customURL: customURL as URL?)
+          copyDetailsToClipboard(e: e, customURL: customURL as String?)
         })
       }
 
@@ -238,7 +239,7 @@ struct SNTBinaryMessageWindowView: View {
   let window: NSWindow?
   let event: SNTStoredExecutionEvent?
   let customMsg: NSString?
-  let customURL: NSURL?
+  let customURL: NSString?
   let configState: SNTConfigState
   @StateObject var bundleProgress: SNTBundleProgress
   let uiStateCallback: ((TimeInterval) -> Void)?
@@ -338,7 +339,7 @@ struct SNTBinaryMessageWindowView: View {
   }
 
   func shouldAddOpenButton() -> Bool {
-    return customURL?.absoluteString?.isEmpty == false
+    return customURL?.length ?? 0 > 0
   }
 
   func openButton() {
@@ -356,7 +357,7 @@ struct SNTBinaryMessageWindowView: View {
 
     window?.close()
 
-    if let url = customURL as URL? {
+    if let url = SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String?) {
       openURL(url)
     }
   }

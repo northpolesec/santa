@@ -49,7 +49,7 @@
 
 - (void)addEvent:(SNTStoredExecutionEvent *)event
     withCustomMessage:(NSString *)message
-            customURL:(NSURL *)url
+            customURL:(NSString *)url
           configState:(SNTConfigState *)configState
              andReply:(NotificationReplyBlock)replyBlock {
   if (!event) {

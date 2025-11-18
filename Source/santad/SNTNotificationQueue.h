@@ -37,7 +37,7 @@ using NotificationReplyBlock = void (^)(BOOL);
 
 - (void)addEvent:(SNTStoredExecutionEvent *)event
     withCustomMessage:(NSString *)message
-            customURL:(NSURL *)url
+            customURL:(NSString *)url
           configState:(SNTConfigState *)configState
              andReply:(void (^)(BOOL authenticated))reply;
 

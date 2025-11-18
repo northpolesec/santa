@@ -405,7 +405,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)postBlockNotification:(SNTStoredExecutionEvent *)event
             withCustomMessage:(NSString *)message
-                    customURL:(NSURL *)url
+                    customURL:(NSString *)url
                   configState:(SNTConfigState *)configState
                      andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
