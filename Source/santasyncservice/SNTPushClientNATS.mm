@@ -25,7 +25,7 @@
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
-#include "Source/common/santa_commands.pb.h"
+#include "commands/v1.pb.h"
 
 __BEGIN_DECLS
 
@@ -587,8 +587,8 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
 - (santa::commands::v1::SantaCommandResponse)handlePingCommand:
     (const santa::commands::v1::PingRequest &)pingRequest {
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-  response.set_output("Ping successful");
+  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
+  response.mutable_ping();
   return response;
 }
 
@@ -666,8 +666,7 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
       case santa::commands::v1::SantaCommandRequest::COMMAND_NOT_SET:
       default:
         LOGE(@"NATS: Unknown command type on %@", msgSubject);
-        response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
-        response.set_output("Unknown command type");
+        response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
         break;
     }
 
@@ -693,7 +692,7 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
         LOGE(@"NATS: Failed to publish command response to %@: %s (non-fatal)", replyTopic,
              natsStatus_GetText(status));
       } else {
-        LOGD(@"NATS: Sent command response to %@ (result: %d)", replyTopic, response.result());
+        LOGD(@"NATS: Sent command response to %@ (code: %d)", replyTopic, response.code());
       }
     });
   });
@@ -709,9 +708,10 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
   }
 
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(resultCode);
-  if (output) {
-    response.set_output([output UTF8String]);
+  response.set_code(resultCode);
+  // For successful ping responses, set the ping field
+  if (resultCode == santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL) {
+    response.mutable_ping();
   }
 
   std::string responseData;

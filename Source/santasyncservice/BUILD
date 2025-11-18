@@ -28,7 +28,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
-        "//Source/common:santa_commands_cc_proto",
+        "@northpolesec_protos//commands:v1_cc_proto",
         "@nats_c//:nats",
     ],
 )
@@ -446,7 +446,7 @@ santa_unit_test(
         ":NATS_lib",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTSyncConstants",
-        "//Source/common:santa_commands_cc_proto",
+        "@northpolesec_protos//commands:v1_cc_proto",
         "@OCMock",
     ],
 )

@@ -26,16 +26,6 @@ cc_proto_library(
     deps = [":santa_proto"],
 )
 
-proto_library(
-    name = "santa_commands_proto",
-    srcs = ["santa_commands.proto"],
-)
-
-cc_proto_library(
-    name = "santa_commands_cc_proto",
-    deps = [":santa_commands_proto"],
-)
-
 # Note: Simple wrapper for a `cc_proto_library` target which cannot be directly
 # depended upon by an `objc_library` target.
 cc_library(

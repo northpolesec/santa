@@ -20,7 +20,7 @@
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
 
-#include "Source/common/santa_commands.pb.h"
+#include "commands/v1.pb.h"
 
 __BEGIN_DECLS
 
@@ -81,12 +81,11 @@ __END_DECLS
   // Given: Success response
   // Note: We can't actually test NATS publish without a real connection
   // This test verifies the serialization logic works correctly
-  NSString *output = @"Ping successful";
 
   // When: Creating a response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-  response.set_output([output UTF8String]);
+  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
+  response.mutable_ping();
 
   std::string responseData;
   BOOL serialized = response.SerializeToString(&responseData);
@@ -98,12 +97,9 @@ __END_DECLS
 
 - (void)testPublishCommandResponseError {
   // Given: Error response
-  NSString *errorMessage = @"Unknown command type";
-
   // When: Creating an error response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
-  response.set_output([errorMessage UTF8String]);
+  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
 
   std::string responseData;
   BOOL serialized = response.SerializeToString(&responseData);
@@ -115,12 +111,10 @@ __END_DECLS
 
 - (void)testSendCommandSuccess {
   // Given: Success message
-  NSString *message = @"Ping successful";
-
   // When: Creating a success response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-  response.set_output([message UTF8String]);
+  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
+  response.mutable_ping();
 
   std::string responseData;
   BOOL serialized = response.SerializeToString(&responseData);
@@ -132,12 +126,9 @@ __END_DECLS
 
 - (void)testSendCommandError {
   // Given: Error message
-  NSString *errorMessage = @"Unknown command type";
-
   // When: Creating an error response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
-  response.set_output([errorMessage UTF8String]);
+  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
 
   std::string responseData;
   BOOL serialized = response.SerializeToString(&responseData);
@@ -157,10 +148,10 @@ __END_DECLS
   santa::commands::v1::SantaCommandResponse response = [self.client handlePingCommand:pingRequest];
 
   // Then: Should return a successful response
-  XCTAssertEqual(response.result(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Ping command should return successful result");
-  XCTAssertEqual(response.output(), "Ping successful",
-                 @"Ping command should return success message");
+  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
+                 @"Ping command should return successful code");
+  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
+                 @"Ping command should return ping response");
 }
 
 - (void)testCommandHandlerPingRequest {
@@ -185,8 +176,10 @@ __END_DECLS
   // Verify the ping handler works with the deserialized command
   santa::commands::v1::SantaCommandResponse response =
       [self.client handlePingCommand:deserialized.ping()];
-  XCTAssertEqual(response.result(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Ping handler should return successful result");
+  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
+                 @"Ping handler should return successful code");
+  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
+                 @"Ping handler should return ping response");
 }
 
 - (void)testCommandHandlerUnknownCommand {
@@ -236,51 +229,34 @@ __END_DECLS
 }
 
 - (void)testCommandResponseSerialization {
-  // Given: Command response with various outputs
-  NSArray<NSString *> *testOutputs = @[
-    @"Ping successful",
-    @"Unknown command type",
-    @"Failed to parse command",
-    @"",
-    @"Very long output message that might test serialization limits and ensure the protobuf serialization works correctly with longer strings",
-  ];
+  // Given: Command response for ping
+  santa::commands::v1::SantaCommandResponse response;
+  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
+  response.mutable_ping();
 
-  for (NSString *output in testOutputs) {
-    santa::commands::v1::SantaCommandResponse response;
-    response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-    if (output.length > 0) {
-      response.set_output([output UTF8String]);
-    }
+  std::string responseData;
+  BOOL serialized = response.SerializeToString(&responseData);
 
-    std::string responseData;
-    BOOL serialized = response.SerializeToString(&responseData);
+  // Then: Should serialize successfully
+  XCTAssertTrue(serialized, @"Failed to serialize ping response");
+  XCTAssertGreaterThan(responseData.length(), 0, @"Serialized data should not be empty");
 
-    // Then: Should serialize successfully
-    XCTAssertTrue(serialized, @"Failed to serialize response with output: %@", output);
-    // Note: Empty output can result in minimal serialized data, but should still serialize
-    XCTAssertGreaterThanOrEqual(responseData.length(), 0,
-                                @"Serialized data should be valid for output: %@", output);
+  // Verify deserialization
+  santa::commands::v1::SantaCommandResponse deserialized;
+  BOOL parsed = deserialized.ParseFromString(responseData);
 
-    // Verify deserialization
-    santa::commands::v1::SantaCommandResponse deserialized;
-    BOOL parsed = deserialized.ParseFromString(responseData);
-
-    XCTAssertTrue(parsed, @"Failed to parse serialized response for output: %@", output);
-    XCTAssertEqual(deserialized.result(),
-                   santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                   @"Result should match for output: %@", output);
-    if (output.length > 0) {
-      NSString *deserializedOutput = @(deserialized.output().c_str());
-      XCTAssertEqualObjects(deserializedOutput, output, @"Output should match for: %@", output);
-    }
-  }
+  XCTAssertTrue(parsed, @"Failed to parse serialized ping response");
+  XCTAssertEqual(deserialized.code(),
+                 santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
+                 @"Code should be SUCCESSFUL");
+  XCTAssertEqual(deserialized.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
+                 @"Result should be ping");
 }
 
 - (void)testCommandResponseErrorSerialization {
   // Given: Error response
   santa::commands::v1::SantaCommandResponse response;
-  response.set_result(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
-  response.set_output("Unknown command type");
+  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
 
   std::string responseData;
   BOOL serialized = response.SerializeToString(&responseData);
@@ -293,10 +269,10 @@ __END_DECLS
   BOOL parsed = deserialized.ParseFromString(responseData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized error response");
-  XCTAssertEqual(deserialized.result(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR,
-                 @"Result should be ERROR");
-  XCTAssertEqualObjects(@(deserialized.output().c_str()), @"Unknown command type",
-                        @"Error message should match");
+  XCTAssertEqual(deserialized.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR,
+                 @"Code should be ERROR");
+  XCTAssertEqual(deserialized.result_case(), santa::commands::v1::SantaCommandResponse::RESULT_NOT_SET,
+                 @"Result should not be set for error");
 }
 
 - (void)testPingRequestSerialization {
