@@ -261,6 +261,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                 LOGI(@"SyncBaseURL changed: %@ -> %@", oldValue, newValue);
 
+                if ([dc revokeTemporaryMonitorModeUpdateModeTransition:YES]) {
+                  LOGI(@"Temporary Monitor Mode session revoked due to SyncBaseURL changing.");
+                }
+
                 [syncd_queue reassessSyncServiceConnection];
               }],
     [[SNTKVOManager alloc] initWithObject:configurator

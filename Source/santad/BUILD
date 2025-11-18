@@ -812,6 +812,7 @@ objc_library(
         ":SNTSyncdQueue",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:Pinning",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
