@@ -303,8 +303,13 @@ REGISTER_COMMAND_NAME(@"status")
         @"events_pending_upload" : @(eventCount),
         @"execution_rules_hash" : executionRulesHash ?: @"null",
         @"full_sync_interval_seconds" : @(fullSyncInterval),
-        @"push_notifications_full_sync_interval_seconds" : @(pushNotificationsFullSyncInterval),
       } mutableCopy];
+
+      if (configurator.fcmEnabled || configurator.enablePushNotifications ||
+          configurator.enableAPNS) {
+        stats[@"sync"][@"push_notifications_full_sync_interval_seconds"] =
+            @(pushNotificationsFullSyncInterval);
+      }
 
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
         stats[@"sync"][@"file_access_rules_hash"] = (fileAccessRulesHash ?: @"null");
@@ -412,8 +417,11 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
       printf("  %-25s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
       printf("  %-25s | %s\n", "Full Sync Interval", [FormatInterval(fullSyncInterval) UTF8String]);
-      printf("  %-25s | %s\n", "Sync Interval (w/Push)",
-             [FormatInterval(pushNotificationsFullSyncInterval) UTF8String]);
+      if (configurator.fcmEnabled || configurator.enablePushNotifications ||
+          configurator.enableAPNS) {
+        printf("  %-25s | %s\n", "Sync Interval (w/Push)",
+               [FormatInterval(pushNotificationsFullSyncInterval) UTF8String]);
+      }
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
         printf("  %-25s | %s\n", "File Access Rules Hash",
                [(fileAccessRulesHash ?: @"null") UTF8String]);
