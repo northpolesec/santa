@@ -46,6 +46,18 @@ NSString *FormatTimeRemaining(NSTimeInterval seconds) {
   return [formatter stringFromTimeInterval:seconds];
 }
 
+NSString *FormatInterval(NSUInteger seconds) {
+  NSDateComponentsFormatter *formatter = [[NSDateComponentsFormatter alloc] init];
+  formatter.unitsStyle = NSDateComponentsFormatterUnitsStyleFull;
+  formatter.allowedUnits = NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
+  formatter.collapsesLargestUnit = NO;
+  formatter.includesTimeRemainingPhrase = NO;
+  formatter.includesApproximationPhrase = NO;
+  formatter.maximumUnitCount = 3;
+
+  return [formatter stringFromTimeInterval:seconds];
+}
+
 @interface SNTCommandStatus : SNTCommand <SNTCommandProtocol>
 @end
 
@@ -239,6 +251,8 @@ REGISTER_COMMAND_NAME(@"status")
           ?: @"Never";
 
   NSString *syncURLStr = configurator.syncBaseURL.absoluteString;
+  NSUInteger fullSyncInterval = configurator.fullSyncInterval;
+  NSUInteger pushNotificationsFullSyncInterval = configurator.pushNotificationsFullSyncInterval;
 
   BOOL exportMetrics = configurator.exportMetrics;
   NSURL *metricsURLStr = configurator.metricURL;
@@ -288,7 +302,14 @@ REGISTER_COMMAND_NAME(@"status")
         @"bundle_scanning" : @(enableBundles),
         @"events_pending_upload" : @(eventCount),
         @"execution_rules_hash" : executionRulesHash ?: @"null",
+        @"full_sync_interval_seconds" : @(fullSyncInterval),
       } mutableCopy];
+
+      if (configurator.fcmEnabled || configurator.enablePushNotifications ||
+          configurator.enableAPNS) {
+        stats[@"sync"][@"push_notifications_full_sync_interval_seconds"] =
+            @(pushNotificationsFullSyncInterval);
+      }
 
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
         stats[@"sync"][@"file_access_rules_hash"] = (fileAccessRulesHash ?: @"null");
@@ -395,6 +416,18 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
       printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
       printf("  %-25s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
+
+      // If push notifications are enabled, show the push notifications full
+      // sync interval since it's the active configuration.
+      NSString *fullSyncIntervalStr = FormatInterval(fullSyncInterval);
+      if (configurator.fcmEnabled || configurator.enablePushNotifications ||
+          configurator.enableAPNS) {
+        fullSyncIntervalStr =
+            [NSString stringWithFormat:@"%@ (with Push Notifications)",
+                                       FormatInterval(pushNotificationsFullSyncInterval)];
+      }
+      printf("  %-25s | %s\n", "Full Sync Interval", [fullSyncIntervalStr UTF8String]);
+
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
         printf("  %-25s | %s\n", "File Access Rules Hash",
                [(fileAccessRulesHash ?: @"null") UTF8String]);
