@@ -246,8 +246,7 @@ __END_DECLS
   BOOL parsed = deserialized.ParseFromString(responseData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized ping response");
-  XCTAssertEqual(deserialized.code(),
-                 santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
+  XCTAssertEqual(deserialized.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
                  @"Code should be SUCCESSFUL");
   XCTAssertEqual(deserialized.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
                  @"Result should be ping");
@@ -271,7 +270,8 @@ __END_DECLS
   XCTAssertTrue(parsed, @"Failed to parse serialized error response");
   XCTAssertEqual(deserialized.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR,
                  @"Code should be ERROR");
-  XCTAssertEqual(deserialized.result_case(), santa::commands::v1::SantaCommandResponse::RESULT_NOT_SET,
+  XCTAssertEqual(deserialized.result_case(),
+                 santa::commands::v1::SantaCommandResponse::RESULT_NOT_SET,
                  @"Result should not be set for error");
 }
 

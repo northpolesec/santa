@@ -28,8 +28,8 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
-        "@northpolesec_protos//commands:v1_cc_proto",
         "@nats_c//:nats",
+        "@northpolesec_protos//commands:v1_cc_proto",
     ],
 )
 
@@ -446,8 +446,8 @@ santa_unit_test(
         ":NATS_lib",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTSyncConstants",
-        "@northpolesec_protos//commands:v1_cc_proto",
         "@OCMock",
+        "@northpolesec_protos//commands:v1_cc_proto",
     ],
 )
 
