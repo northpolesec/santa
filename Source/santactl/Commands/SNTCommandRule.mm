@@ -27,6 +27,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#include "Source/common/faa/WatchItems.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
@@ -63,6 +64,9 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    --check: check for an existing rule\n"
           @"    --import {path}: import rules from a JSON file\n"
           @"    --export {path}: export rules to a JSON file\n"
+#ifdef DEBUG
+          @"    --export-file-access {path}: export file access rules to a Plist file\n"
+#endif
           @"\n"
           @"  One of:\n"
           @"    --path {path}: path of binary/bundle to add/remove.\n"
@@ -138,11 +142,12 @@ REGISTER_COMMAND_NAME(@"rule")
   NSString *celExpr, *customMsg, *customURL, *comment;
 
   NSString *path;
-  NSString *jsonFilePath;
+  NSString *importExportFilePath;
   BOOL check = NO;
   SNTRuleCleanup cleanupType = SNTRuleCleanupNone;
   BOOL importRules = NO;
   BOOL exportRules = NO;
+  BOOL exportFileAccessRules = NO;
 
   // Parse arguments
   for (NSUInteger i = 0; i < arguments.count; ++i) {
@@ -214,7 +219,7 @@ REGISTER_COMMAND_NAME(@"rule")
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--import requires an argument"];
       }
-      jsonFilePath = arguments[i];
+      importExportFilePath = arguments[i];
     } else if ([arg caseInsensitiveCompare:@"--clean"] == NSOrderedSame) {
       cleanupType = SNTRuleCleanupNonTransitive;
     } else if ([arg caseInsensitiveCompare:@"--clean-all"] == NSOrderedSame) {
@@ -227,7 +232,19 @@ REGISTER_COMMAND_NAME(@"rule")
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--export requires an argument"];
       }
-      jsonFilePath = arguments[i];
+      importExportFilePath = arguments[i];
+#ifdef DEBUG
+    } else if ([arg caseInsensitiveCompare:@"--export-file-access"] == NSOrderedSame) {
+      if (importRules || exportRules) {
+        [self printErrorUsageAndExit:
+                  @"--import, --export, and --export-file-access are mutually exclusive"];
+      }
+      exportFileAccessRules = YES;
+      if (++i > arguments.count - 1) {
+        [self printErrorUsageAndExit:@"--export-file-access requires an argument"];
+      }
+      importExportFilePath = arguments[i];
+#endif
     } else if ([arg caseInsensitiveCompare:@"--help"] == NSOrderedSame ||
                [arg caseInsensitiveCompare:@"-h"] == NSOrderedSame) {
       printf("%s\n", self.class.longHelpText.UTF8String);
@@ -240,6 +257,8 @@ REGISTER_COMMAND_NAME(@"rule")
   if (check) {
     if (importRules) [self printErrorUsageAndExit:@"--check and --import are mutually exclusive"];
     if (exportRules) [self printErrorUsageAndExit:@"--check and --export are mutually exclusive"];
+    if (exportFileAccessRules)
+      [self printErrorUsageAndExit:@"--check and --export-file-access are mutually exclusive"];
     if (cleanupType != SNTRuleCleanupNone)
       [self printErrorUsageAndExit:@"--check and --clean/--clean-all are mutually exclusive"];
   }
@@ -258,17 +277,24 @@ REGISTER_COMMAND_NAME(@"rule")
     exit(EXIT_SUCCESS);
   }
 
-  if (jsonFilePath.length > 0) {
+  if (importExportFilePath.length > 0) {
     if (importRules) {
       if (identifier != nil || path != nil || check) {
         [self printErrorUsageAndExit:@"--import can only be used by itself"];
       }
-      [self importJSONFile:jsonFilePath with:cleanupType];
+      [self importJSONFile:importExportFilePath with:cleanupType];
     } else if (exportRules) {
       if (identifier != nil || path != nil || check) {
         [self printErrorUsageAndExit:@"--export can only be used by itself"];
       }
-      [self exportJSONFile:jsonFilePath];
+      [self exportExecutionRulesToJSONFile:importExportFilePath];
+#ifdef DEBUG
+    } else if (exportFileAccessRules) {
+      if (identifier != nil || path != nil || check) {
+        [self printErrorUsageAndExit:@"--export-file-access can only be used by itself"];
+      }
+      [self exportFileAccessRulesToPlistFile:importExportFilePath];
+#endif
     }
     return;
   }
@@ -461,7 +487,7 @@ REGISTER_COMMAND_NAME(@"rule")
                               }];
 }
 
-- (void)exportJSONFile:(NSString *)jsonFilePath {
+- (void)exportExecutionRulesToJSONFile:(NSString *)jsonFilePath {
   // Get the rules from the daemon and then write them to the file.
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
   [rop retrieveAllExecutionRules:^(NSArray<SNTRule *> *rules, NSError *error) {
@@ -506,5 +532,29 @@ REGISTER_COMMAND_NAME(@"rule")
     exit(0);
   }];
 }
+
+#ifdef DEBUG
+- (void)exportFileAccessRulesToPlistFile:(NSString *)plistFilePath {
+  // Get the rules from the daemon and then write them to the file.
+  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
+  [rop retrieveAllFileAccessRules:^(NSDictionary<NSString *, NSDictionary *> *fileAccessRules,
+                                    NSError *error) {
+    if (error) {
+      TEE_LOGE(@"Failed to get file access rules: %@\n", error.localizedDescription);
+      exit(1);
+    }
+
+    if (fileAccessRules.count == 0) {
+      TEE_LOGI(@"No rules to export.");
+      exit(1);
+    }
+
+    // Wrap rules with required outer key
+    [@{kWatchItemConfigKeyWatchItems : fileAccessRules} writeToFile:plistFilePath atomically:YES];
+
+    exit(0);
+  }];
+}
+#endif
 
 @end

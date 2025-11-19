@@ -46,6 +46,8 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent *> *events))reply;
 - (void)databaseRemoveEventsWithIDs:(NSArray *)ids;
 - (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule *> *rules, NSError *error))reply;
+- (void)retrieveAllFileAccessRules:
+    (void (^)(NSDictionary<NSString *, NSDictionary *> *fileAccessRules, NSError *error))reply;
 
 ///
 ///  Config ops
