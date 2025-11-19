@@ -109,7 +109,7 @@ care not to define rules with duplicate paths.
 Path globs represent a point-in-time snapshot. Globs are expanded when a
 configuration is applied and periodically re-evaluated based on the
 [FileAccessPolicyUpdateIntervalSec](/configuration/keys#FileAccessPolicyUpdateIntervalSec)
-setting (minimum 15 seconds).
+setting.
 
 When multiple path globs or prefixes match an operation, the rule with the "most
 specific" or longest match is applied.
