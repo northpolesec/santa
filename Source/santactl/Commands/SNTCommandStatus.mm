@@ -416,12 +416,18 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
       printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
       printf("  %-25s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
-      printf("  %-25s | %s\n", "Full Sync Interval", [FormatInterval(fullSyncInterval) UTF8String]);
+
+      // If push notifications are enabled, show the push notifications full
+      // sync interval since it's the active configuration.
+      NSString *fullSyncIntervalStr = FormatInterval(fullSyncInterval);
       if (configurator.fcmEnabled || configurator.enablePushNotifications ||
           configurator.enableAPNS) {
-        printf("  %-25s | %s\n", "Sync Interval (w/Push)",
-               [FormatInterval(pushNotificationsFullSyncInterval) UTF8String]);
+        fullSyncIntervalStr =
+            [NSString stringWithFormat:@"%@ (with Push Notifications)",
+                                       FormatInterval(pushNotificationsFullSyncInterval)];
       }
+      printf("  %-25s | %s\n", "Full Sync Interval", [fullSyncIntervalStr UTF8String]);
+
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
         printf("  %-25s | %s\n", "File Access Rules Hash",
                [(fileAccessRulesHash ?: @"null") UTF8String]);
