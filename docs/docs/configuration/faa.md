@@ -136,7 +136,7 @@ are symbolic links (e.g., `/tmp` and `/var` are both symlinks into `/private`).
 
 Processes can be matched using several identifiers:
 
-- **Signing ID**: Specified with the `SigningID` key (e.g., `com.google.Chrome.helper`)
+- **Signing ID**: Specified with the `SigningID` key (e.g., `EQHXZ8M8AV:com.google.Chrome.helper`)
 - **Team ID**: Specified with the `TeamID` key (e.g., `ZMCG7MLDV9`)
 - **Platform Binary**: Specified with the `PlatformBinary` boolean key
 - **CDHash**: Specified with the `CDHash` key (e.g., `397d55ebec87943ea3c3fe6b4d4f47edc490d25e`)
@@ -145,9 +145,10 @@ Processes can be matched using several identifiers:
 
 :::tip
 
-Signing IDs are specified differently in FAA policies than in binary
-authorization rules. Instead of prefixing the Signing ID with a TeamID or
-`platform`, you specify these in separate `TeamID` or `PlatformBinary` keys.
+Signing IDs must be scoped to a specific TeamID. You can use the same format as
+binary authorization rules where the SigningID is prefixed with the TeamID (e.g.
+`TeamID:SigningID`. For platform binaries, you can use the hard coded string
+`platform` as the TeamID (e.g. `platform:com.apple.yes`).
 
 :::
 
@@ -171,13 +172,17 @@ The `Options` dictionary within each rule supports the following keys:
 
 - `AllowReadAccess` (optional): Boolean controlling whether read access is allowed. When `false`, both read and write access are monitored/blocked. When `true`, only write access is monitored/blocked. Defaults to `true` if not specified.
 
-- `AuditOnly` (optional): Boolean. When `true`, violations are logged but not blocked. Defaults to `false`.
+- `AuditOnly` (optional): Boolean. When `true`, violations are logged but not blocked. Defaults to `true`.
 
 - `EventDetailURL` (optional): Rule-specific URL that overrides the top-level EventDetailURL.
 
-- `EventDetailText` (optional): Custom button label text for this specific rule, overriding the root-level setting
+- `EventDetailText` (optional): Custom button label text for this specific rule, overriding the root-level setting.
 
-- `EnableSilentMode` (optional): Boolean. When `true`, violations are logged but no notification is shown to the user
+- `BlockMessage` (optional): Custom message to be shown in the dialog presented to users upon a violation. Defaults to a reasonable, generic message that the action was blocked.
+
+- `EnableSilentMode` (optional): Boolean. When `true`, violations are logged but no notification is shown to the user. Defaults to `false`.
+
+- `EnableSilentTTYMode` (optional): Boolean. When `true`, violations are logged, but no notification is sent to the controlling TTY. Defaults to `false`.
 
 ## Rule Type Selection
 
@@ -206,6 +211,9 @@ rule. This URL can contain placeholders, which will be populated at runtime; the
 | `%file_identifier%` | SHA-256 of the binary that was being executed                                                                             |
 | `%accessed_path%`   | The path that was being accessed                                                                                          |
 | `%username%`        | The executing user                                                                                                        |
+| `%team_id%`         | The team ID that signed this binary, if any |
+| `%signing_id%`      | The signing ID of this binary, if any |
+| `%cdhash%`          | The binary's CDHash, if any |
 | `%machine_id%`      | The ID of the machine, usually the hardware UUID unless [overridden](https://northpole.dev/configuration/keys/#MachineID) |
 | `%serial%`          | The serial number of the machine                                                                                          |
 | `%uuid%`            | The hardware UUID of the machine                                                                                          |
