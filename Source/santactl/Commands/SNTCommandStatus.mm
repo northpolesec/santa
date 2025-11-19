@@ -49,8 +49,7 @@ NSString *FormatTimeRemaining(NSTimeInterval seconds) {
 NSString *FormatInterval(NSUInteger seconds) {
   NSDateComponentsFormatter *formatter = [[NSDateComponentsFormatter alloc] init];
   formatter.unitsStyle = NSDateComponentsFormatterUnitsStyleFull;
-  formatter.allowedUnits =
-      NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
+  formatter.allowedUnits = NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
   formatter.collapsesLargestUnit = NO;
   formatter.includesTimeRemainingPhrase = NO;
   formatter.includesApproximationPhrase = NO;
