@@ -243,6 +243,18 @@ double watchdogRAMPeak = 0;
   reply(rules, nil);
 }
 
+- (void)retrieveAllFileAccessRules:
+    (void (^)(NSDictionary<NSString *, NSDictionary *> *fileAccessRules, NSError *error))reply {
+#ifdef DEBUG
+  reply([[SNTDatabaseController ruleTable] retrieveAllFileAccessRules], nil);
+#else
+  NSError *err = [SNTError
+      createErrorWithFormat:@"File access rule retrieval not supported in release builds."];
+  reply(nil, err);
+
+#endif
+}
+
 - (void)databaseRulesHash:(void (^)(NSString *, NSString *))reply {
   SNTRuleTableRulesHash *rulesHash = [[SNTDatabaseController ruleTable] hashOfHashes];
   reply(rulesHash.executionRulesHash, rulesHash.fileAccessRulesHash);
