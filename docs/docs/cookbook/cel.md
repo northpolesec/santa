@@ -89,6 +89,6 @@ To block this create a signing ID rule for `platform:com.apple.systemsetup` and
 attach the following CEL program:
 
 ```clike
-args.join(" ").contains("-setremotelogin on") || 
+args.join(" ").contains("-setremotelogin on") ||
 args.join(" ").contains("-setremoteappleevents on") ? BLOCKLIST : ALLOWLIST
 ```
