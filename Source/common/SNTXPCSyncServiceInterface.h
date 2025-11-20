@@ -32,6 +32,7 @@
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
+- (void)pushNotificationServerAddress:(void (^)(NSString *))reply;
 
 // Array of telemetry files to export. Files will be exported as a single stream to the destination
 // provided in the config. The streamed files will be listed under the the provided file name. The

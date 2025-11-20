@@ -130,6 +130,10 @@
   [self.syncManager pushNotificationStatus:reply];
 }
 
+- (void)pushNotificationServerAddress:(void (^)(NSString *))reply {
+  [self.syncManager pushNotificationServerAddress:reply];
+}
+
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
                     fileName:(NSString *)fileName
                    totalSize:(NSUInteger)totalSize

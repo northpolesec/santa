@@ -177,7 +177,8 @@ REGISTER_COMMAND_NAME(@"status")
   }];
 
   __block NSString *pushNotifications = @"Unknown";
-  if ([[SNTConfigurator configurator] syncBaseURL]) {
+  __block NSString *pushServerAddress = nil;
+  if ([configurator syncBaseURL]) {
     // The request to santad to discover whether push notifications are enabled
     // makes a call to santasyncservice. If it's unavailable the call can hang
     // so we run the request asynchronously with a semaphore timer; if we have
@@ -188,7 +189,31 @@ REGISTER_COMMAND_NAME(@"status")
         switch (response) {
           case SNTPushNotificationStatusDisabled: pushNotifications = @"Disabled"; break;
           case SNTPushNotificationStatusDisconnected: pushNotifications = @"Disconnected"; break;
-          case SNTPushNotificationStatusConnected: pushNotifications = @"Connected"; break;
+          case SNTPushNotificationStatusConnected: {
+            // Determine if using APNS or FCM
+            if ([configurator fcmEnabled]) {
+              pushNotifications = @"FCM";
+            } else if ([configurator enableAPNS]) {
+              pushNotifications = @"APNS";
+            } else {
+              pushNotifications = @"Connected";
+            }
+            break;
+          }
+          case SNTPushNotificationStatusConnectedNATS: {
+            pushNotifications = @"NPS Push Service";
+            // Fetch the push server address for NATS
+            dispatch_semaphore_t serverSema = dispatch_semaphore_create(0);
+            [rop pushNotificationServerAddress:^(NSString *serverAddress) {
+              if (serverAddress) {
+                pushServerAddress = [[NSURL URLWithString:serverAddress] host];
+              }
+              dispatch_semaphore_signal(serverSema);
+            }];
+            // Wait up to 1 second for the server address
+            dispatch_semaphore_wait(serverSema, dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC));
+            break;
+          }
           default: break;
         }
         dispatch_semaphore_signal(sema);
@@ -299,6 +324,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"last_successful_full" : fullSyncLastSuccessStr ?: @"null",
         @"last_successful_rule" : ruleSyncLastSuccessStr ?: @"null",
         @"push_notifications" : pushNotifications,
+        @"push_server" : (pushServerAddress ?: @"null"),
         @"bundle_scanning" : @(enableBundles),
         @"events_pending_upload" : @(eventCount),
         @"execution_rules_hash" : executionRulesHash ?: @"null",
@@ -412,7 +438,13 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
       printf("  %-25s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
       printf("  %-25s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
-      printf("  %-25s | %s\n", "Push Notifications", [pushNotifications UTF8String]);
+      // Format push notifications output
+      NSString *pushNotificationsOutput = pushNotifications;
+      if (pushServerAddress && [pushNotifications containsString:@"NPS Push Service"]) {
+        pushNotificationsOutput =
+            [NSString stringWithFormat:@"NPS Push Service (%@)", pushServerAddress];
+      }
+      printf("  %-25s | %s\n", "Push Notifications", [pushNotificationsOutput UTF8String]);
       printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
       printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
       printf("  %-25s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);

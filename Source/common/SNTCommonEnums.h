@@ -213,6 +213,7 @@ typedef NS_ENUM(NSInteger, SNTPushNotificationStatus) {
   SNTPushNotificationStatusDisabled,
   SNTPushNotificationStatusDisconnected,
   SNTPushNotificationStatusConnected,
+  SNTPushNotificationStatusConnectedNATS,
 };
 
 enum class FileAccessPolicyDecision {
