@@ -79,26 +79,16 @@ Cloud SDK installer and AI tools like claude code use osascript.
 Also if you're using osascript to do this legitimately this will break your
 usage.
 
-## Prevent users from enabling SSH (Santa 2025.8+)
+## Prevent users from enabling SSH and Remote Apple Events (Santa 2025.8+)
 
 As called out in [loobins](https://www.loobins.io/binaries/systemsetup/) the
-systemsetup command can be used to enable SSH.
+systemsetup command can be used to enable SSH and Remote Apple Events via
+command line options.
 
 To block this create a signing ID rule for `platform:com.apple.systemsetup` and
 attach the following CEL program:
 
 ```clike
-args.join(" ").contains("-setremotelogin on")
-```
-
-## Prevent users from enabling Remote Apple Event (Santa 2025.8+)
-
-As called out in [loobins](https://www.loobins.io/binaries/systemsetup/) the
-systemsetup command can be used to enable Remote Apple Events.
-
-To block this create a signing ID rule for `platform:com.apple.systemsetup` and
-attach the following CEL program:
-
-```clike
-args.join(" ").contains("-setremoteappleevents on")
+args.join(" ").contains("-setremotelogin on") ||
+args.join(" ").contains("-setremoteappleevents on") ? BLOCKLIST : ALLOWLIST
 ```
