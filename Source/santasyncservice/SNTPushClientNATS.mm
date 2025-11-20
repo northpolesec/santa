@@ -13,6 +13,7 @@
 /// limitations under the License.
 
 #import "Source/santasyncservice/SNTPushClientNATS.h"
+#import "Source/santasyncservice/SNTPushClientNATSCommands.h"
 
 #import <dispatch/dispatch.h>
 #include <string.h>
@@ -582,144 +583,24 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   natsMsg_Destroy(msg);
 }
 
-// Handle PingRequest command
-// Always returns a successful response. Failures are handled by the caller.
-- (santa::commands::v1::SantaCommandResponse)handlePingCommand:
-    (const santa::commands::v1::PingRequest &)pingRequest {
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-  response.mutable_ping();
-  return response;
-}
 
-// NATS command message handler - handles serialization/deserialization and dispatches to handlers
-static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg,
-                                  void *closure) {
-  if (!closure || !msg) {
-    natsMsg_Destroy(msg);
-    return;
-  }
-
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  if (!self || self.isShuttingDown) {
-    natsMsg_Destroy(msg);
-    return;
-  }
-
-  NSString *msgSubject = @(natsMsg_GetSubject(msg) ?: "<unknown>");
-  NSString *replyTopic = natsMsg_GetReply(msg) ? @(natsMsg_GetReply(msg)) : nil;
-
-  LOGD(@"NATS: Received command message on subject '%@' with reply '%@'", msgSubject,
-       replyTopic ?: @"<no reply>");
-
-  if (!replyTopic) {
-    LOGW(@"NATS: Command message on %@ has no reply topic, ignoring", msgSubject);
-    natsMsg_Destroy(msg);
-    return;
-  }
-
-  // Validate message data before dispatching
-  const void *data = natsMsg_GetData(msg);
-  int dataLen = natsMsg_GetDataLength(msg);
-
-  if (!data || dataLen <= 0) {
-    LOGE(@"NATS: Command message on %@ has no data", msgSubject);
-    // Try to send error response, but don't fail if that also fails
-    [self sendCommandError:@"Command message has no data" toReplyTopic:replyTopic];
-    natsMsg_Destroy(msg);
-    return;
-  }
-
-  // Deserialize the message to SantaCommandRequest
-  // Note: We must extract all data from msg before destroying it, as NATS owns the message
-  // and will free it after this callback returns
-  santa::commands::v1::SantaCommandRequest command;
-  if (!command.ParseFromArray(data, dataLen)) {
-    LOGE(@"NATS: Failed to parse SantaCommandRequest from message on %@", msgSubject);
-    // Try to send error response, but don't fail if that also fails
-    [self sendCommandError:@"Failed to parse command" toReplyTopic:replyTopic];
-    natsMsg_Destroy(msg);
-    return;
-  }
-
-  // Destroy the message now - NATS owns it and will free it after callback returns anyway
-  // We've extracted all needed data (command, replyTopic, msgSubject) which are safe to capture
-  natsMsg_Destroy(msg);
-  msg = NULL;  // Prevent accidental use
-
-  // Process on message queue to serialize handling of messages
-  // Failures are logged but don't crash the client
-  dispatch_async(self.messageQueue, ^{
-    if (self.isShuttingDown) {
-      return;
-    }
-
-    // Dispatch to appropriate command handler based on oneof case
-    santa::commands::v1::SantaCommandResponse response;
-
-    switch (command.command_case()) {
-      case santa::commands::v1::SantaCommandRequest::kPing:
-        LOGI(@"NATS: Received PingRequest on %@", msgSubject);
-        response = [self handlePingCommand:command.ping()];
-        break;
-
-      case santa::commands::v1::SantaCommandRequest::COMMAND_NOT_SET:
-      default:
-        LOGE(@"NATS: Unknown command type on %@", msgSubject);
-        response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
-        break;
-    }
-
-    // Serialize and publish the response
-    // Serialization failures are logged but don't crash the client
-    std::string responseData;
-    if (!response.SerializeToString(&responseData)) {
-      LOGE(@"NATS: Failed to serialize command response (non-fatal)");
-      return;
-    }
-
-    // Publish response asynchronously - failures are logged but don't crash
-    dispatch_async(self.connectionQueue, ^{
-      if (![self isConnectionAlive]) {
-        LOGW(@"NATS: Cannot send command response - not connected (non-fatal)");
-        return;
-      }
-
-      natsStatus status =
-          natsConnection_Publish(self.conn, [replyTopic UTF8String], responseData.data(),
-                                 static_cast<int>(responseData.length()));
-      if (status != NATS_OK) {
-        LOGE(@"NATS: Failed to publish command response to %@: %s (non-fatal)", replyTopic,
-             natsStatus_GetText(status));
-      } else {
-        LOGD(@"NATS: Sent command response to %@ (code: %d)", replyTopic, response.code());
-      }
-    });
-  });
-}
-
-- (void)publishCommandResponse:(santa::commands::v1::SantaCommandResponseCode)resultCode
-                        output:(NSString *)output
-                  toReplyTopic:(NSString *)replyTopic {
+// Publish a command response to the reply topic
+- (void)publishResponse:(const santa::commands::v1::SantaCommandResponse &)response
+           toReplyTopic:(NSString *)replyTopic {
   // Failures are logged but don't crash the client
   if (!replyTopic || replyTopic.length == 0) {
     LOGW(@"NATS: Cannot publish command response - no reply topic provided (non-fatal)");
     return;
   }
 
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(resultCode);
-  // For successful ping responses, set the ping field
-  if (resultCode == santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL) {
-    response.mutable_ping();
-  }
-
+  // Serialize the response
   std::string responseData;
   if (!response.SerializeToString(&responseData)) {
     LOGE(@"NATS: Failed to serialize command response (non-fatal)");
     return;
   }
 
+  // Publish asynchronously - failures are logged but don't crash
   dispatch_async(self.connectionQueue, ^{
     if (![self isConnectionAlive]) {
       LOGW(@"NATS: Cannot send command response - not connected (non-fatal)");
@@ -733,21 +614,9 @@ static void commandMessageHandler(natsConnection *nc, natsSubscription *sub, nat
       LOGE(@"NATS: Failed to publish command response to %@: %s (non-fatal)", replyTopic,
            natsStatus_GetText(status));
     } else {
-      LOGD(@"NATS: Sent command response to %@ (result: %d)", replyTopic, resultCode);
+      LOGD(@"NATS: Sent command response to %@ (code: %d)", replyTopic, response.code());
     }
   });
-}
-
-- (void)sendCommandSuccess:(NSString *)message toReplyTopic:(NSString *)replyTopic {
-  [self publishCommandResponse:santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL
-                        output:message
-                  toReplyTopic:replyTopic];
-}
-
-- (void)sendCommandError:(NSString *)errorMessage toReplyTopic:(NSString *)replyTopic {
-  [self publishCommandResponse:santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR
-                        output:errorMessage
-                  toReplyTopic:replyTopic];
 }
 
 // NATS error handler callback

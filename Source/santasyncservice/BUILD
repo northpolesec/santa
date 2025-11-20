@@ -16,9 +16,13 @@ objc_library(
 
 objc_library(
     name = "NATS_lib",
-    srcs = ["SNTPushClientNATS.mm"],
+    srcs = [
+        "SNTPushClientNATS.mm",
+        "SNTPushClientNATSCommands.mm",
+    ],
     hdrs = [
         "SNTPushClientNATS.h",
+        "SNTPushClientNATSCommands.h",
         "SNTPushNotifications.h",
     ],
     deps = [
