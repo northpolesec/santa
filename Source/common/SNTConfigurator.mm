@@ -349,7 +349,8 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kFCMAPIKey : string,
       kEnableAPNS : number,
       kEnablePushNotifications : number,
-      kEnableNATS : number,  // Deprecated: alias for EnablePushNotifications, kept for config key compatibility
+      kEnableNATS : number,  // Deprecated: alias for EnablePushNotifications, kept for config key
+                             // compatibility
       kMetricFormat : string,
       kMetricURL : string,
       kMetricExportInterval : number,
