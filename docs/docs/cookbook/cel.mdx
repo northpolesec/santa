@@ -1,5 +1,7 @@
 # Common Expression Language (CEL)
 
+import AddedBadge from "@site/src/components/AddedBadge/AddedBadge";
+
 This page lists well-known and/or community-contributed CEL expressions.
 
 CEL ([Common Expression Language](https://cel.dev/)) rules allow for more
@@ -31,7 +33,7 @@ Create a signing ID rule for `platform:com.apple.spctl` and attach the following
 ].exists(flag, flag in args) ? BLOCKLIST : ALLOWLIST
 ```
 
-## Prevent Timestomping of LaunchAgents and LaunchDaemons
+## Prevent Timestomping of LaunchAgents and LaunchDaemons <AddedBadge added={"Santa 2025.8"} />
 
 Malware like those produced by the Chollima groups use "timestomping" to reset the
 timestamps of LaunchAgents and LaunchDaemons using touch. This can be prevented
@@ -53,7 +55,7 @@ programmatically modifying the timestamps. Also this won't cover modifications
 if the process' current working directory is already in the LaunchDaemons /
 LaunchAgents directories.
 
-## Prevent OSAScript From Popping Password Dialogs
+## Prevent OSAScript From Popping Password Dialogs <AddedBadge added={"Santa 2025.8"} />
 
 A lot of malware on macOS will attempt to get users to enter their passwords
 into a dialog box via osascript. This is a basic rule to stop directly asking
@@ -79,7 +81,7 @@ Cloud SDK installer and AI tools like claude code use osascript.
 Also if you're using osascript to do this legitimately this will break your
 usage.
 
-## Prevent users from enabling SSH and Remote Apple Events (Santa 2025.8+)
+## Prevent users from enabling SSH and Remote Apple Events <AddedBadge added={"Santa 2025.8"} />
 
 As called out in [loobins](https://www.loobins.io/binaries/systemsetup/) the
 systemsetup command can be used to enable SSH and Remote Apple Events via
