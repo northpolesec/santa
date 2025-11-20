@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include "Source/common/String.h"
 
 #import <Foundation/Foundation.h>
 
@@ -219,6 +220,22 @@ double watchdogRAMPeak = 0;
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
                              reply:(void (^)(SNTRule *))reply {
   reply([[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]]);
+}
+
+- (void)dataFileAccessRuleForTarget:(NSString *)path reply:(void (^)(NSString *, NSString *))reply {
+  __block NSString *ruleName;
+  __block NSString *ruleVersion;
+
+  _watchItems->FindPoliciesForTargets(^(santa::LookupPolicyBlock lookup_policy_block) {
+    std::optional<std::shared_ptr<santa::WatchItemPolicyBase>> policy =
+        lookup_policy_block(path.UTF8String);
+    if (policy.has_value()) {
+      ruleName = santa::StringToNSString((*policy)->name);
+      ruleVersion = santa::StringToNSString((*policy)->version);
+    }
+  });
+
+  reply(ruleName, ruleVersion);
 }
 
 - (void)staticRuleCount:(void (^)(int64_t count))reply {
