@@ -75,6 +75,11 @@ struct RuleCounts {
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply;
 
 ///
+/// FAA Retrieval ops
+///
+- (void)dataFileAccessRuleForTarget:(NSString *)path reply:(void (^)(NSString *, NSString *))reply;
+
+///
 /// Metrics ops
 ///
 - (void)metrics:(void (^)(NSDictionary *))reply;

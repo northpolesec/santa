@@ -69,11 +69,9 @@ REGISTER_COMMAND_NAME(@"rule")
 #endif
           @"\n"
           @"  One of:\n"
-          @"    --path {path}: path of binary/bundle to add/remove.\n"
+          @"    --path {path}: path of binary/bundle to add/remove/check.\n"
           @"                   Will add an appropriate rule for the file currently at that path.\n"
           @"                   Defaults to a SHA-256 rule unless overridden with another flag.\n"
-          @"                   Does not work with --check. Use the fileinfo verb to check.\n"
-          @"                   the rule state of a file.\n"
           @"    --identifier {sha256|teamID|signingID|cdhash}: identifier to add/remove/check\n"
           @"    --sha256 {sha256}: hash to add/remove/check [deprecated]\n"
           @"\n"
@@ -82,6 +80,7 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    --signingid: add or check a signing ID rule instead of binary (see notes)\n"
           @"    --certificate: add or check a certificate sha256 rule instead of binary\n"
           @"    --cdhash: add or check a cdhash rule instead of binary\n"
+          @"    --file-access: Check a path for associated File Access rules. Requires --path.\n"
 #ifdef DEBUG
           @"    --force: allow manual changes even when SyncBaseUrl is set\n"
 #endif
@@ -148,6 +147,7 @@ REGISTER_COMMAND_NAME(@"rule")
   BOOL importRules = NO;
   BOOL exportRules = NO;
   BOOL exportFileAccessRules = NO;
+  BOOL faaLookup = NO;
 
   // Parse arguments
   for (NSUInteger i = 0; i < arguments.count; ++i) {
@@ -182,6 +182,8 @@ REGISTER_COMMAND_NAME(@"rule")
       type = SNTRuleTypeSigningID;
     } else if ([arg caseInsensitiveCompare:@"--cdhash"] == NSOrderedSame) {
       type = SNTRuleTypeCDHash;
+    } else if ([arg caseInsensitiveCompare:@"--file-access"] == NSOrderedSame) {
+      faaLookup = YES;
     } else if ([arg caseInsensitiveCompare:@"--path"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--path requires an argument"];
@@ -261,6 +263,25 @@ REGISTER_COMMAND_NAME(@"rule")
       [self printErrorUsageAndExit:@"--check and --export-file-access are mutually exclusive"];
     if (cleanupType != SNTRuleCleanupNone)
       [self printErrorUsageAndExit:@"--check and --clean/--clean-all are mutually exclusive"];
+  }
+
+  if (faaLookup) {
+    if (!check) [self printErrorUsageAndExit:@"--file-access can only be used with --check"];
+    if (!path) [self printErrorUsageAndExit:@"--file-access requires --path"];
+
+    __block NSString *output = @"No Data File Access Rules exist";
+    [[self.daemonConn synchronousRemoteObjectProxy]
+        dataFileAccessRuleForTarget:path
+                              reply:^(NSString *name, NSString *version) {
+                                if (name && version) {
+                                  output = [NSString stringWithFormat:@"Data File Access Rule\n"
+                                                                      @"     Name: %@\n"
+                                                                      @"  Version: %@",
+                                                                      name, version];
+                                }
+                              }];
+    printf("%s\n", output.UTF8String);
+    exit(EXIT_SUCCESS);
   }
 
   if (!importRules && cleanupType != SNTRuleCleanupNone) {
