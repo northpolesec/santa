@@ -605,7 +605,7 @@ changes in the release notes of any future release that changes them.`,
     {
       key: "FileAccessPolicyUpdateIntervalSec",
       description: `Number of seconds between re-reading the file access policy config and policies/monitored paths
-        updated`,
+        updated. The minimum value is 15 seconds.`,
       type: "integer",
       defaultValue: 600,
     },
