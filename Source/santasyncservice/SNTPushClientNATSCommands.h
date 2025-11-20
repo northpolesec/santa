@@ -23,9 +23,9 @@ __BEGIN_DECLS
 #import "src/nats.h"
 
 // Forward declaration for command message handler
-void commandMessageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure);
+void commandMessageHandler(natsConnection *nc, natsSubscription *sub,
+                           natsMsg *msg, void *closure);
 
 __END_DECLS
 
 #endif /* SNTPushClientNATSCommands_h */
-

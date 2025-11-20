@@ -583,7 +583,6 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   natsMsg_Destroy(msg);
 }
 
-
 // Publish a command response to the reply topic
 - (void)publishResponse:(const santa::commands::v1::SantaCommandResponse &)response
            toReplyTopic:(NSString *)replyTopic {

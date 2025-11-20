@@ -147,7 +147,8 @@ static void commandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
       return;
     }
 
-    santa::commands::v1::SantaCommandResponse response = [self dispatchSantaCommandToHandler:command];
+    santa::commands::v1::SantaCommandResponse response =
+        [self dispatchSantaCommandToHandler:command];
 
     // Publish the response
     [self publishResponse:response toReplyTopic:replyTopic];
@@ -157,11 +158,9 @@ static void commandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
 __BEGIN_DECLS
 
 // NATS-compatible wrapper that converts void *closure to SNTPushClientNATS *
-void commandMessageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg,
-                           void *closure) {
+void commandMessageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure) {
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
   commandMessageHandlerImpl(nc, sub, msg, self);
 }
 
 __END_DECLS
-
