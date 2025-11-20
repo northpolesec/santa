@@ -196,17 +196,7 @@ REGISTER_COMMAND_NAME(@"status")
             dispatch_semaphore_t serverSema = dispatch_semaphore_create(0);
             [rop pushNotificationServerAddress:^(NSString *serverAddress) {
               if (serverAddress) {
-                // Remove tls:// prefix and port number for display
-                NSString *cleanedAddress = serverAddress;
-                if ([cleanedAddress hasPrefix:@"tls://"]) {
-                  cleanedAddress = [cleanedAddress substringFromIndex:6];
-                }
-                // Remove port number (e.g., :443)
-                NSRange portRange = [cleanedAddress rangeOfString:@":"];
-                if (portRange.location != NSNotFound) {
-                  cleanedAddress = [cleanedAddress substringToIndex:portRange.location];
-                }
-                pushServerAddress = cleanedAddress;
+                pushServerAddress = [[NSURL URLWithString:serverAddress] host];
               }
               dispatch_semaphore_signal(serverSema);
             }];
