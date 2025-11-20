@@ -671,6 +671,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         ^std::map<std::string, std::string>() {
           return std::map<std::string, std::string>{{"ENV_VARIABLE1", "value1"},
                                                     {"OTHER_ENV_VAR", "value2"}};
+        },
+        ^uid_t() {
+          return 0;
+        },
+        ^std::string() {
+          return "/";
         });
   };
 

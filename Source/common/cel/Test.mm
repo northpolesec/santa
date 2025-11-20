@@ -42,6 +42,12 @@ namespace pbv1 = ::santa::cel::v1;
       },
       ^std::map<std::string, std::string>() {
         return {{"DYLD_INSERT_LIBRARIES", "1"}};
+      },
+      ^uid_t() {
+        return 0;
+      },
+      ^std::string() {
+        return "/";
       });
 
   auto sut = santa::cel::Evaluator::Create();
@@ -100,6 +106,12 @@ namespace pbv1 = ::santa::cel::v1;
         },
         ^std::map<std::string, std::string>() {
           return {{"DYLD_INSERT_LIBRARIES", "1"}};
+        },
+        ^uid_t() {
+          return 501;
+        },
+        ^std::string() {
+          return "/Users/foo";
         });
 
     auto result2 = sut.value()->Evaluate(expr.value().get(), activation2);
@@ -142,6 +154,12 @@ namespace pbv1 = ::santa::cel::v1;
         },
         ^std::map<std::string, std::string>() {
           return {{"DYLD_INSERT_LIBRARIES", "1"}};
+        },
+        ^uid_t() {
+          return 0;
+        },
+        ^std::string {
+          return "/";
         });
 
     auto result = sut.value()->CompileAndEvaluate(
