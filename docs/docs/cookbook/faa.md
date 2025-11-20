@@ -260,6 +260,8 @@ while](https://theevilbit.github.io/beyond/beyond_0011/), going back to Patrick 
 		<false/>
 		<key>EnableSilentMode</key>
 		<true/>
+		<key>RuleType</key>
+		<string>PathsWithAllowedProcesses</string>
 	</dict>
 	<key>Processes</key>
 	<array>
