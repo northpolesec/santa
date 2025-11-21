@@ -25,6 +25,7 @@
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
+#import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SystemResources.h"
 
@@ -267,6 +268,8 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kModeTransitionKey : data,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
+      kFullSyncInterval : number,
+      kFCMFullSyncInterval : number,
     };
     _forcedConfigKeyTypes = @{
       kClientModeKey : number,
@@ -1167,6 +1170,22 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)setSyncTypeRequired:(SNTSyncType)syncTypeRequired {
   [self updateSyncStateForKey:kSyncTypeRequired value:@(syncTypeRequired)];
+}
+
+- (NSUInteger)fullSyncInterval {
+  NSNumber *interval = self.syncState[kFullSyncInterval];
+  if (interval) {
+    return [interval unsignedIntegerValue];
+  }
+  return kDefaultFullSyncInterval;
+}
+
+- (NSUInteger)pushNotificationsFullSyncInterval {
+  NSNumber *interval = self.syncState[kFCMFullSyncInterval];
+  if (interval) {
+    return [interval unsignedIntegerValue];
+  }
+  return kDefaultPushNotificationsFullSyncInterval;
 }
 
 - (NSString *)machineOwner {

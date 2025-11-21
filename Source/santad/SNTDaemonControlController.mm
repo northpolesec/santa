@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include "Source/common/String.h"
 
 #import <Foundation/Foundation.h>
 
@@ -221,6 +222,22 @@ double watchdogRAMPeak = 0;
   reply([[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]]);
 }
 
+- (void)dataFileAccessRuleForTarget:(NSString *)path reply:(void (^)(NSString *, NSString *))reply {
+  __block NSString *ruleName;
+  __block NSString *ruleVersion;
+
+  _watchItems->FindPoliciesForTargets(^(santa::LookupPolicyBlock lookup_policy_block) {
+    std::optional<std::shared_ptr<santa::WatchItemPolicyBase>> policy =
+        lookup_policy_block(path.UTF8String);
+    if (policy.has_value()) {
+      ruleName = santa::StringToNSString((*policy)->name);
+      ruleVersion = santa::StringToNSString((*policy)->version);
+    }
+  });
+
+  reply(ruleName, ruleVersion);
+}
+
 - (void)staticRuleCount:(void (^)(int64_t count))reply {
   reply([SNTConfigurator configurator].staticRules.count);
 }
@@ -241,6 +258,18 @@ double watchdogRAMPeak = 0;
 
   NSArray<SNTRule *> *rules = [[SNTDatabaseController ruleTable] retrieveAllExecutionRules];
   reply(rules, nil);
+}
+
+- (void)retrieveAllFileAccessRules:
+    (void (^)(NSDictionary<NSString *, NSDictionary *> *fileAccessRules, NSError *error))reply {
+#ifdef DEBUG
+  reply([[SNTDatabaseController ruleTable] retrieveAllFileAccessRules], nil);
+#else
+  NSError *err = [SNTError
+      createErrorWithFormat:@"File access rule retrieval not supported in release builds."];
+  reply(nil, err);
+
+#endif
 }
 
 - (void)databaseRulesHash:(void (^)(NSString *, NSString *))reply {
@@ -439,6 +468,17 @@ double watchdogRAMPeak = 0;
   [conn resume];
   [conn.remoteObjectProxy pushNotificationStatus:^(SNTPushNotificationStatus response) {
     reply(response);
+  }];
+}
+
+- (void)pushNotificationServerAddress:(void (^)(NSString *))reply {
+  // This message should be handled in a timely manner, santactl status waits for the response.
+  // Instead of reusing the existing connection, create a new connection to the sync service.
+  // Otherwise, the message would potentially be queued behind various long lived sync operations.
+  MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
+  [conn resume];
+  [conn.remoteObjectProxy pushNotificationServerAddress:^(NSString *serverAddress) {
+    reply(serverAddress);
   }];
 }
 

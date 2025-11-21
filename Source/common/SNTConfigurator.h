@@ -587,6 +587,19 @@
 @property(nonatomic) SNTSyncType syncTypeRequired;
 
 ///
+///  Full sync interval in seconds. Defaults to kDefaultFullSyncInterval.
+///  If push notifications are being used, this interval will be ignored
+///  in favor of pushNotificationsFullSyncInterval.
+///
+@property(readonly, nonatomic) NSUInteger fullSyncInterval;
+
+///
+///  Full sync interval in seconds while listening for push notifications.
+///  Defaults to kDefaultPushNotificationsFullSyncInterval.
+///
+@property(readonly, nonatomic) NSUInteger pushNotificationsFullSyncInterval;
+
+///
 ///  Enable statistics uploading to polaris.northpole.security.
 ///  See https://northpole.dev/deployment/stats for more info.
 ///

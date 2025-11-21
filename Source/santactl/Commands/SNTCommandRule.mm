@@ -27,6 +27,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#include "Source/common/faa/WatchItems.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
@@ -63,13 +64,14 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    --check: check for an existing rule\n"
           @"    --import {path}: import rules from a JSON file\n"
           @"    --export {path}: export rules to a JSON file\n"
+#ifdef DEBUG
+          @"    --export-file-access {path}: export file access rules to a Plist file\n"
+#endif
           @"\n"
           @"  One of:\n"
-          @"    --path {path}: path of binary/bundle to add/remove.\n"
+          @"    --path {path}: path of binary/bundle to add/remove/check.\n"
           @"                   Will add an appropriate rule for the file currently at that path.\n"
           @"                   Defaults to a SHA-256 rule unless overridden with another flag.\n"
-          @"                   Does not work with --check. Use the fileinfo verb to check.\n"
-          @"                   the rule state of a file.\n"
           @"    --identifier {sha256|teamID|signingID|cdhash}: identifier to add/remove/check\n"
           @"    --sha256 {sha256}: hash to add/remove/check [deprecated]\n"
           @"\n"
@@ -78,6 +80,7 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    --signingid: add or check a signing ID rule instead of binary (see notes)\n"
           @"    --certificate: add or check a certificate sha256 rule instead of binary\n"
           @"    --cdhash: add or check a cdhash rule instead of binary\n"
+          @"    --file-access: Check a path for associated File Access rules. Requires --path.\n"
 #ifdef DEBUG
           @"    --force: allow manual changes even when SyncBaseUrl is set\n"
 #endif
@@ -138,11 +141,13 @@ REGISTER_COMMAND_NAME(@"rule")
   NSString *celExpr, *customMsg, *customURL, *comment;
 
   NSString *path;
-  NSString *jsonFilePath;
+  NSString *importExportFilePath;
   BOOL check = NO;
   SNTRuleCleanup cleanupType = SNTRuleCleanupNone;
   BOOL importRules = NO;
   BOOL exportRules = NO;
+  BOOL exportFileAccessRules = NO;
+  BOOL faaLookup = NO;
 
   // Parse arguments
   for (NSUInteger i = 0; i < arguments.count; ++i) {
@@ -177,6 +182,8 @@ REGISTER_COMMAND_NAME(@"rule")
       type = SNTRuleTypeSigningID;
     } else if ([arg caseInsensitiveCompare:@"--cdhash"] == NSOrderedSame) {
       type = SNTRuleTypeCDHash;
+    } else if ([arg caseInsensitiveCompare:@"--file-access"] == NSOrderedSame) {
+      faaLookup = YES;
     } else if ([arg caseInsensitiveCompare:@"--path"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--path requires an argument"];
@@ -214,7 +221,7 @@ REGISTER_COMMAND_NAME(@"rule")
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--import requires an argument"];
       }
-      jsonFilePath = arguments[i];
+      importExportFilePath = arguments[i];
     } else if ([arg caseInsensitiveCompare:@"--clean"] == NSOrderedSame) {
       cleanupType = SNTRuleCleanupNonTransitive;
     } else if ([arg caseInsensitiveCompare:@"--clean-all"] == NSOrderedSame) {
@@ -227,7 +234,19 @@ REGISTER_COMMAND_NAME(@"rule")
       if (++i > arguments.count - 1) {
         [self printErrorUsageAndExit:@"--export requires an argument"];
       }
-      jsonFilePath = arguments[i];
+      importExportFilePath = arguments[i];
+#ifdef DEBUG
+    } else if ([arg caseInsensitiveCompare:@"--export-file-access"] == NSOrderedSame) {
+      if (importRules || exportRules) {
+        [self printErrorUsageAndExit:
+                  @"--import, --export, and --export-file-access are mutually exclusive"];
+      }
+      exportFileAccessRules = YES;
+      if (++i > arguments.count - 1) {
+        [self printErrorUsageAndExit:@"--export-file-access requires an argument"];
+      }
+      importExportFilePath = arguments[i];
+#endif
     } else if ([arg caseInsensitiveCompare:@"--help"] == NSOrderedSame ||
                [arg caseInsensitiveCompare:@"-h"] == NSOrderedSame) {
       printf("%s\n", self.class.longHelpText.UTF8String);
@@ -240,8 +259,29 @@ REGISTER_COMMAND_NAME(@"rule")
   if (check) {
     if (importRules) [self printErrorUsageAndExit:@"--check and --import are mutually exclusive"];
     if (exportRules) [self printErrorUsageAndExit:@"--check and --export are mutually exclusive"];
+    if (exportFileAccessRules)
+      [self printErrorUsageAndExit:@"--check and --export-file-access are mutually exclusive"];
     if (cleanupType != SNTRuleCleanupNone)
       [self printErrorUsageAndExit:@"--check and --clean/--clean-all are mutually exclusive"];
+  }
+
+  if (faaLookup) {
+    if (!check) [self printErrorUsageAndExit:@"--file-access can only be used with --check"];
+    if (!path) [self printErrorUsageAndExit:@"--file-access requires --path"];
+
+    __block NSString *output = @"No Data File Access Rules exist";
+    [[self.daemonConn synchronousRemoteObjectProxy]
+        dataFileAccessRuleForTarget:path
+                              reply:^(NSString *name, NSString *version) {
+                                if (name && version) {
+                                  output = [NSString stringWithFormat:@"Data File Access Rule\n"
+                                                                      @"     Name: %@\n"
+                                                                      @"  Version: %@",
+                                                                      name, version];
+                                }
+                              }];
+    printf("%s\n", output.UTF8String);
+    exit(EXIT_SUCCESS);
   }
 
   if (!importRules && cleanupType != SNTRuleCleanupNone) {
@@ -258,17 +298,24 @@ REGISTER_COMMAND_NAME(@"rule")
     exit(EXIT_SUCCESS);
   }
 
-  if (jsonFilePath.length > 0) {
+  if (importExportFilePath.length > 0) {
     if (importRules) {
       if (identifier != nil || path != nil || check) {
         [self printErrorUsageAndExit:@"--import can only be used by itself"];
       }
-      [self importJSONFile:jsonFilePath with:cleanupType];
+      [self importJSONFile:importExportFilePath with:cleanupType];
     } else if (exportRules) {
       if (identifier != nil || path != nil || check) {
         [self printErrorUsageAndExit:@"--export can only be used by itself"];
       }
-      [self exportJSONFile:jsonFilePath];
+      [self exportExecutionRulesToJSONFile:importExportFilePath];
+#ifdef DEBUG
+    } else if (exportFileAccessRules) {
+      if (identifier != nil || path != nil || check) {
+        [self printErrorUsageAndExit:@"--export-file-access can only be used by itself"];
+      }
+      [self exportFileAccessRulesToPlistFile:importExportFilePath];
+#endif
     }
     return;
   }
@@ -461,7 +508,7 @@ REGISTER_COMMAND_NAME(@"rule")
                               }];
 }
 
-- (void)exportJSONFile:(NSString *)jsonFilePath {
+- (void)exportExecutionRulesToJSONFile:(NSString *)jsonFilePath {
   // Get the rules from the daemon and then write them to the file.
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
   [rop retrieveAllExecutionRules:^(NSArray<SNTRule *> *rules, NSError *error) {
@@ -506,5 +553,29 @@ REGISTER_COMMAND_NAME(@"rule")
     exit(0);
   }];
 }
+
+#ifdef DEBUG
+- (void)exportFileAccessRulesToPlistFile:(NSString *)plistFilePath {
+  // Get the rules from the daemon and then write them to the file.
+  id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
+  [rop retrieveAllFileAccessRules:^(NSDictionary<NSString *, NSDictionary *> *fileAccessRules,
+                                    NSError *error) {
+    if (error) {
+      TEE_LOGE(@"Failed to get file access rules: %@\n", error.localizedDescription);
+      exit(1);
+    }
+
+    if (fileAccessRules.count == 0) {
+      TEE_LOGI(@"No rules to export.");
+      exit(1);
+    }
+
+    // Wrap rules with required outer key
+    [@{kWatchItemConfigKeyWatchItems : fileAccessRules} writeToFile:plistFilePath atomically:YES];
+
+    exit(0);
+  }];
+}
+#endif
 
 @end
