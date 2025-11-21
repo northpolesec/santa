@@ -16,6 +16,7 @@
 
 #import "Source/common/SNTLogging.h"
 
+#include <google/protobuf/descriptor.h>
 #include "commands/v1.pb.h"
 
 __BEGIN_DECLS
@@ -24,6 +25,20 @@ __BEGIN_DECLS
 #import "src/nats.h"
 
 __END_DECLS
+
+// Forward declaration - implementation is in SNTPushClientNATS.mm
+NSString *ResponseCodeToString(santa::commands::v1::SantaCommandResponseCode code);
+
+// Helper function to convert command type to readable string
+// Note: CommandCase is not a protobuf enum, so we use a switch for readability
+static NSString *CommandTypeToString(
+    santa::commands::v1::SantaCommandRequest::CommandCase commandCase) {
+  switch (commandCase) {
+    case santa::commands::v1::SantaCommandRequest::kPing: return @"Ping";
+    case santa::commands::v1::SantaCommandRequest::COMMAND_NOT_SET: return @"NOT_SET";
+    default: return [NSString stringWithFormat:@"UNKNOWN(%d)", static_cast<int>(commandCase)];
+  }
+}
 
 // Forward declaration of private interface to access private properties
 @interface SNTPushClientNATS ()
@@ -53,6 +68,12 @@ __END_DECLS
   santa::commands::v1::SantaCommandResponse response;
   response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
   response.mutable_ping();
+
+  // Verify the code was set correctly
+  santa::commands::v1::SantaCommandResponseCode code = response.code();
+  LOGD(@"NATS: Ping response code set to: %d (%@)", static_cast<int>(code),
+       ResponseCodeToString(code));
+
   return response;
 }
 
@@ -61,7 +82,8 @@ __END_DECLS
     (const santa::commands::v1::SantaCommandRequest &)command {
   santa::commands::v1::SantaCommandResponse response;
 
-  switch (command.command_case()) {
+  santa::commands::v1::SantaCommandRequest::CommandCase commandCase = command.command_case();
+  switch (commandCase) {
     case santa::commands::v1::SantaCommandRequest::kPing:
       LOGI(@"NATS: Dispatching PingRequest command");
       response = [self handlePingCommand:command.ping()];
@@ -69,7 +91,8 @@ __END_DECLS
 
     case santa::commands::v1::SantaCommandRequest::COMMAND_NOT_SET:
     default:
-      LOGE(@"NATS: Unknown or unset command type: %d", command.command_case());
+      LOGE(@"NATS: Unknown or unset command type: %@ (%d)", CommandTypeToString(commandCase),
+           static_cast<int>(commandCase));
       response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
       break;
   }

@@ -26,6 +26,7 @@
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
+#include <google/protobuf/descriptor.h>
 #include "commands/v1.pb.h"
 
 __BEGIN_DECLS
@@ -34,6 +35,31 @@ __BEGIN_DECLS
 #import "src/nats.h"
 
 __END_DECLS
+
+// Helper function to convert response code to readable string using protobuf generated code
+NSString *ResponseCodeToString(santa::commands::v1::SantaCommandResponseCode code) {
+  // Try the generated _Name() function first
+  std::string name = santa::commands::v1::SantaCommandResponseCode_Name(code);
+  if (!name.empty()) {
+    return @(name.c_str());
+  }
+
+  // Fallback to descriptor API if _Name() doesn't recognize the value
+  const google::protobuf::EnumDescriptor *descriptor =
+      santa::commands::v1::SantaCommandResponseCode_descriptor();
+  if (descriptor) {
+    const google::protobuf::EnumValueDescriptor *value_desc =
+        descriptor->FindValueByNumber(static_cast<int>(code));
+    if (value_desc) {
+      std::string_view name_view = value_desc->name();
+      return [NSString stringWithUTF8String:name_view.data()];
+    }
+  }
+
+  // Last resort: return the numeric value with hex for debugging
+  return [NSString stringWithFormat:@"UNKNOWN(%d/0x%x)", static_cast<int>(code),
+                                    static_cast<unsigned int>(code)];
+}
 
 @interface SNTPushClientNATS ()
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
@@ -592,6 +618,9 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
     return;
   }
 
+  // Capture the response code before serialization (response may go out of scope)
+  santa::commands::v1::SantaCommandResponseCode responseCode = response.code();
+
   // Serialize the response
   std::string responseData;
   if (!response.SerializeToString(&responseData)) {
@@ -613,7 +642,8 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
       LOGE(@"NATS: Failed to publish command response to %@: %s (non-fatal)", replyTopic,
            natsStatus_GetText(status));
     } else {
-      LOGD(@"NATS: Sent command response to %@ (code: %d)", replyTopic, response.code());
+      LOGD(@"NATS: Sent command response to %@ (code: %@, raw: %d)", replyTopic,
+           ResponseCodeToString(responseCode), static_cast<int>(responseCode));
     }
   });
 }
