@@ -14,9 +14,9 @@
 
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 
-#import "Source/common/SNTLogging.h"
-
 #include <google/protobuf/descriptor.h>
+
+#import "Source/common/SNTLogging.h"
 #include "commands/v1.pb.h"
 
 __BEGIN_DECLS
@@ -104,7 +104,7 @@ static NSString *CommandTypeToString(
 
 // NATS command message handler - handles serialization/deserialization and
 // dispatches to handlers
-static void commandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub, natsMsg *msg,
+static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub, natsMsg *msg,
                                       SNTPushClientNATS *self) {
   if (!self || !msg) {
     if (msg) {
@@ -183,7 +183,7 @@ __BEGIN_DECLS
 // NATS-compatible wrapper that converts void *closure to SNTPushClientNATS *
 void commandMessageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure) {
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  commandMessageHandlerImpl(nc, sub, msg, self);
+  CommandMessageHandlerImpl(nc, sub, msg, self);
 }
 
 __END_DECLS

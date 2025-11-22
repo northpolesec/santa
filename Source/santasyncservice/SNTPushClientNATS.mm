@@ -13,11 +13,14 @@
 /// limitations under the License.
 
 #import "Source/santasyncservice/SNTPushClientNATS.h"
-#import "Source/santasyncservice/SNTPushClientNATSCommands.h"
+#import "Source/santasyncservice/SNTPushClientNATS+Commands.h"
 
 #import <dispatch/dispatch.h>
 #include <string.h>
 #include <sys/cdefs.h>
+
+#include <google/protobuf/descriptor.h>
+#include "commands/v1.pb.h"
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
@@ -25,9 +28,6 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/santasyncservice/SNTSyncState.h"
-
-#include <google/protobuf/descriptor.h>
-#include "commands/v1.pb.h"
 
 __BEGIN_DECLS
 

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SNTPushClientNATSCommands_h
-#define SNTPushClientNATSCommands_h
+#ifndef SANTA__SANTASYNCSERVICE__SNTPUSHCLIENTNATS_COMMANDS_H
+#define SANTA__SANTASYNCSERVICE__SNTPUSHCLIENTNATS_COMMANDS_H
 
 #include <sys/cdefs.h>
 
@@ -28,4 +28,4 @@ void commandMessageHandler(natsConnection *nc, natsSubscription *sub,
 
 __END_DECLS
 
-#endif /* SNTPushClientNATSCommands_h */
+#endif /* SANTA__SANTASYNCSERVICE__SNTPUSHCLIENTNATS_COMMANDS_H */
