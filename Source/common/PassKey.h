@@ -12,6 +12,9 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#ifndef SANTA__COMMON__PASSKEY_H
+#define SANTA__COMMON__PASSKEY_H
+
 // This CRTP mixin class enables derived classes to instantiate private
 // instances of PassKey templates specific to them.
 //
@@ -35,3 +38,5 @@ class PassKey {
  protected:
   static PassKey<T> MakeKey() { return PassKey<T>{}; }
 };
+
+#endif  // SANTA__COMMON__PASSKEY_H

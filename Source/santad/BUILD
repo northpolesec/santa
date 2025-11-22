@@ -244,6 +244,26 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "TemporaryMonitorMode",
+    srcs = ["TemporaryMonitorMode.mm"],
+    hdrs = ["TemporaryMonitorMode.h"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":SNTNotificationQueue",
+        "//Source/common:Pinning",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTModeTransition",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:SystemResources",
+        "//Source/common:Timer",
+        "//Source/common:PassKey",
+    ],
+)
+
+objc_library(
     name = "TTYWriter",
     srcs = ["TTYWriter.mm"],
     hdrs = ["TTYWriter.h"],
@@ -810,6 +830,7 @@ objc_library(
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":TemporaryMonitorMode",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:Pinning",

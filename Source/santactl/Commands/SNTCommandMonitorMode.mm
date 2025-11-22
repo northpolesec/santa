@@ -100,19 +100,20 @@ REGISTER_COMMAND_NAME(@"monitormode")
     }];
   } else {
     [[self.daemonConn synchronousRemoteObjectProxy]
-        requestTemporaryMonitorModeWithDuration:requestedDuration
-                                          reply:^(uint32_t minutes, NSError *err) {
-                                            success = (err == nil);
-                                            if (err) {
-                                              TEE_LOGE(@"Unable to enter Monitor Mode: %@",
-                                                       err.localizedDescription);
-                                              return;
-                                            }
+        requestTemporaryMonitorModeWithDurationMinutes:requestedDuration
+                                                 reply:^(uint32_t minutes, NSError *err) {
+                                                   success = (err == nil);
+                                                   if (err) {
+                                                     TEE_LOGE(@"Unable to enter Monitor Mode: %@",
+                                                              err.localizedDescription);
+                                                     return;
+                                                   }
 
-                                            TEE_LOGI(
-                                                @"Monitor Mode temporarily authorized for %u %@",
-                                                minutes, minutes > 1 ? @"minutes" : @"minute");
-                                          }];
+                                                   TEE_LOGI(@"Monitor Mode temporarily authorized "
+                                                            @"for %u %@",
+                                                            minutes,
+                                                            minutes > 1 ? @"minutes" : @"minute");
+                                                 }];
   }
 
   exit(success ? EXIT_SUCCESS : EXIT_FAILURE);

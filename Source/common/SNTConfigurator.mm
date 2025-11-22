@@ -15,7 +15,6 @@
 
 #import "Source/common/SNTConfigurator.h"
 
-#include <mach/mach_time.h>
 #include <sys/stat.h>
 
 #include "Source/common/Pinning.h"
@@ -27,7 +26,6 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
-#import "Source/common/SystemResources.h"
 
 // Ensures the given object is an NSArray and only contains NSString value types
 static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
@@ -82,9 +80,6 @@ static NSString *const kStateStatsKey = @"Stats";
 static NSString *const kStateStatsLastSubmissionAttemptKey = @"LastAttempt";
 static NSString *const kStateStatsLastSubmissionVersionKey = @"LastVersion";
 static NSString *const kStateTempMonitorModeKey = @"TMM";
-static NSString *const kStateTempMonitorModeBootSessionUUIDKey = @"UUID";
-static NSString *const kStateTempMonitorModeDeadlineKey = @"Deadline";
-static NSString *const kStateTempMonitorModeSavedSyncURLKey = @"SyncURL";
 
 #ifdef DEBUG
 NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist";
@@ -802,17 +797,9 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 }
 
-- (void)enterTemporaryMonitorModeForSeconds:(uint32_t)duration {
+- (void)enterTemporaryMonitorMode:(NSDictionary *)temporaryMonitorModeState {
   @synchronized(self) {
-    // NB: Using continuous time so that the clock advances while the system is asleep
-    uint64_t deadline = AddNanosecondsToMachTime(duration * NSEC_PER_SEC, mach_continuous_time());
-    [self updateStateSynchronizedKey:kStateTempMonitorModeKey
-                               value:@{
-                                 kStateTempMonitorModeBootSessionUUIDKey :
-                                     [SNTSystemInfo bootSessionUUID],
-                                 kStateTempMonitorModeDeadlineKey : @(deadline),
-                                 kStateTempMonitorModeSavedSyncURLKey : self.syncBaseURL.host,
-                               }];
+    [self updateStateSynchronizedKey:kStateTempMonitorModeKey value:temporaryMonitorModeState];
     self.inTemporaryMonitorMode = YES;
   }
 }
@@ -826,22 +813,8 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 }
 
-- (NSNumber *)temporaryMonitorModeStateSecondsRemaining {
-  NSNumber *deadline = self.state[kStateTempMonitorModeKey][kStateTempMonitorModeDeadlineKey];
-  if (!deadline) {
-    return nil;
-  }
-
-  uint64_t deadlineMachTime = [deadline unsignedLongLongValue];
-  uint64_t machTime = mach_continuous_time();
-
-  // Check if time expired
-  if (deadlineMachTime <= machTime) {
-    return nil;
-  }
-
-  // Convert time remaining to seconds
-  return @(MachTimeToNanos(deadlineMachTime - machTime) / NSEC_PER_SEC);
+- (nullable NSDictionary *)savedTemporaryMonitorModeState {
+  return self.state[kStateTempMonitorModeKey];
 }
 
 - (BOOL)failClosed {
@@ -1692,36 +1665,6 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 }
 
-// When reading Temporary Monitor Mode state, all of the following
-// conditions must be true, otherwise the state is discarded:
-//   0. All types must meet expectations
-//   1. The saved boot session UUID must match the current boot session UUID
-//   2. The saved sync URL must match the current SyncBaseURL
-//   3. The current SyncBaseURL must be pinned
-- (BOOL)verifyTemporaryMonitorModeState:(NSDictionary *)tmm
-                 currentBootSessionUUID:(NSString *)currentBootSessionUUID
-                     currentSyncBaseURL:(NSURL *)currentSyncBaseURL {
-  if (![tmm[kStateTempMonitorModeBootSessionUUIDKey] isKindOfClass:[NSString class]] ||
-      ![tmm[kStateTempMonitorModeDeadlineKey] isKindOfClass:[NSNumber class]] ||
-      ![tmm[kStateTempMonitorModeSavedSyncURLKey] isKindOfClass:[NSString class]]) {
-    return NO;
-  }
-
-  if (![tmm[kStateTempMonitorModeBootSessionUUIDKey] isEqualToString:currentBootSessionUUID]) {
-    return NO;
-  }
-
-  if (![tmm[kStateTempMonitorModeSavedSyncURLKey] isEqualToString:currentSyncBaseURL.host]) {
-    return NO;
-  }
-
-  if (!santa::IsDomainPinned(currentSyncBaseURL)) {
-    return NO;
-  }
-
-  return YES;
-}
-
 - (NSDictionary *)readStateFromDisk {
   if (!self.stateAccessAuthorizerBlock()) {
     return nil;
@@ -1751,17 +1694,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 
   if ([state[kStateTempMonitorModeKey] isKindOfClass:[NSDictionary class]]) {
-    NSDictionary *tmm = state[kStateTempMonitorModeKey];
-
-    if ([self verifyTemporaryMonitorModeState:tmm
-                       currentBootSessionUUID:[SNTSystemInfo bootSessionUUID]
-                           currentSyncBaseURL:self.syncBaseURL]) {
-      newState[kStateTempMonitorModeKey] = @{
-        kStateTempMonitorModeBootSessionUUIDKey : tmm[kStateTempMonitorModeBootSessionUUIDKey],
-        kStateTempMonitorModeDeadlineKey : tmm[kStateTempMonitorModeDeadlineKey],
-        kStateTempMonitorModeSavedSyncURLKey : tmm[kStateTempMonitorModeSavedSyncURLKey],
-      };
-    }
+    newState[kStateTempMonitorModeKey] = state[kStateTempMonitorModeKey];
   }
 
   return newState;

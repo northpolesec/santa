@@ -53,7 +53,8 @@ REGISTER_COMMAND_NAME(@"sync")
           @"  --clean: Perform a clean sync, erasing all existing non-transitive rules and\n"
           @"           requesting a clean sync from the server.\n"
           @"  --clean-all: Perform a clean sync, erasing all existing rules and requesting a\n"
-          @"               clean sync from the server.");
+          @"               clean sync from the server.\n"
+          @"  --debug: Enable verbose output.\n");
 }
 
 - (void)runWithArguments:(NSArray *)arguments {

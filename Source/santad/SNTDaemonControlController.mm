@@ -46,6 +46,7 @@
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#include "Source/santad/TemporaryMonitorMode.h"
 
 using santa::AuthResultCache;
 using santa::FlushCacheMode;
@@ -64,13 +65,13 @@ double watchdogRAMPeak = 0;
 @property SNTPolicyProcessor *policyProcessor;
 @property SNTNotificationQueue *notQueue;
 @property SNTSyncdQueue *syncdQueue;
-@property SNTTimer *tempMonitorMode;
 @end
 
 @implementation SNTDaemonControlController {
   std::shared_ptr<AuthResultCache> _authResultCache;
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<WatchItems> _watchItems;
+  std::shared_ptr<santa::TemporaryMonitorMode> _temporaryMonitorMode;
 }
 
 - (instancetype)initWithAuthResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
@@ -88,21 +89,8 @@ double watchdogRAMPeak = 0;
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
 
-    _tempMonitorMode =
-        [[SNTTimer alloc] initWithMinInterval:kMinTemporaryMonitorModeMinutes * 60
-                                  maxInterval:kMaxTemporaryMonitorModeMinutes * 60
-                                         name:@"Temporary Monitor Mode"
-                                  fireOnStart:NO
-                               rescheduleMode:SNTTimerRescheduleModeTrailingEdge
-                                     qosClass:QOS_CLASS_USER_INITIATED
-                                     callback:^bool {
-                                       [[SNTConfigurator configurator] leaveTemporaryMonitorMode];
-
-                                       // Don't restart the timer
-                                       return false;
-                                     }];
-
-    [self enterTemporaryMonitorModeOnInitIfRequired];
+    _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
+        _notQueue, [[SNTConfigurator configurator] savedTemporaryMonitorModeState]);
   }
   return self;
 }
@@ -405,13 +393,8 @@ double watchdogRAMPeak = 0;
   }];
 
   [result modeTransition:^(SNTModeTransition *val) {
-    [configurator setSyncServerModeTransition:val];
-    if (val.type == SNTModeTransitionTypeRevoke) {
-      // Passing `NO` since this block already updates the mode transition
-      if ([self revokeTemporaryMonitorModeUpdateModeTransition:NO]) {
-        LOGI(@"Temporary Monitor Mode session revoked due to policy change.");
-      }
-    }
+    // The _temporaryMonitorMode object is responsible for updating configurator as appropriate
+    _temporaryMonitorMode->NewModeTransitionReceived(val);
   }];
 
   [result eventDetailURL:^(NSString *val) {
@@ -631,99 +614,27 @@ double watchdogRAMPeak = 0;
   reply(YES);
 }
 
-- (void)enterTemporaryMonitorModeOnInitIfRequired {
-  // Require at least 30 seconds left of Monitor Mode, otherwise don't bother.
-  static constexpr uint64_t kMinRemainingSeconds = 30;
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
-
-  uint32_t secsRemaining =
-      [[configurator temporaryMonitorModeStateSecondsRemaining] unsignedIntValue];
-
-  if (secsRemaining < kMinRemainingSeconds) {
-    // Let configurator do any necessary cleanup
-    [configurator leaveTemporaryMonitorMode];
-    return;
-  }
-
-  [self.tempMonitorMode startWithInterval:secsRemaining];
-  [configurator enterTemporaryMonitorModeForSeconds:secsRemaining];
-}
-
-- (void)requestTemporaryMonitorModeWithDuration:(NSNumber *)requestedDuration
-                                          reply:(void (^)(uint32_t, NSError *))reply {
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
-
-  SNTModeTransition *modeTransition = [configurator modeTransition];
-  if (modeTransition.type != SNTModeTransitionTypeOnDemand) {
-    reply(0, [SNTError createErrorWithFormat:@"This machine does not currently have a "
-                                             @"policy allowing temporary Monitor Mode."]);
-    return;
-  }
-
-  SNTClientMode clientMode = [configurator clientMode];
-  if (!(clientMode == SNTClientModeLockdown ||
-        (clientMode == SNTClientModeMonitor && [configurator inTemporaryMonitorMode]))) {
-    reply(0, [SNTError createErrorWithFormat:@"Machine must be in Lockdown Mode in order to "
-                                             @"transition to temporary Monitor Mode."]);
-    return;
-  }
-
-  if (!santa::IsDomainPinned(configurator.syncBaseURL)) {
-    reply(0, [SNTError createErrorWithFormat:@"This machine is not configured with a sync "
-                                             @"server that supports temporary Monitor Mode."]);
-  }
-
-  __block BOOL authSuccess = NO;
-  [self.notQueue authorizeTemporaryMonitorMode:^(BOOL authenticated) {
-    authSuccess = authenticated;
-  }];
-
-  if (!authSuccess) {
-    reply(0, [SNTError createErrorWithFormat:@"User authorization failed."]);
-    return;
-  }
-
-  uint32_t durationMin = [modeTransition getDurationMinutes:requestedDuration];
-
-  [self.tempMonitorMode startWithInterval:(durationMin * 60)];
-  [configurator enterTemporaryMonitorModeForSeconds:(durationMin * 60)];
-
-  reply(durationMin, nil);
+- (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber *)requestedDuration
+                                                 reply:(void (^)(uint32_t, NSError *))reply {
+  NSError *err;
+  uint32_t duration = _temporaryMonitorMode->RequestMinutes(requestedDuration, &err);
+  reply(duration, err);
 }
 
 - (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply {
-  reply([[SNTConfigurator configurator] temporaryMonitorModeStateSecondsRemaining]);
+  std::optional<uint64_t> secsRemaining = _temporaryMonitorMode->SecondsRemaining();
+  reply(secsRemaining.has_value() ? @(*secsRemaining) : nil);
 }
 
-- (BOOL)revokeTemporaryMonitorModeUpdateModeTransition:(BOOL)revokeModeTransition {
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
-
-  // Remove the mode transition policy first to prevent Monitor Mode transitions.
-  // Then, if in a temporary Monitor Mode session, end it.
-  if (revokeModeTransition) {
-    [configurator setSyncServerModeTransition:[[SNTModeTransition alloc] initRevocation]];
-  }
-
-  if (self.tempMonitorMode.isStarted) {
-    [self.tempMonitorMode stop];
-    [configurator leaveTemporaryMonitorMode];
-    return YES;
-  } else {
-    return NO;
-  }
+- (BOOL)revokeTemporaryMonitorMode {
+  return _temporaryMonitorMode->Revoke();
 }
 
 - (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply {
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
   NSError *err;
-
-  if ([configurator inTemporaryMonitorMode]) {
-    [self.tempMonitorMode stop];
-    [configurator leaveTemporaryMonitorMode];
-  } else {
+  if (!_temporaryMonitorMode->Cancel()) {
     err = [SNTError createErrorWithFormat:@"Machine is not currently in temporary Monitor Mode"];
   }
-
   reply(err);
 }
 
