@@ -16,9 +16,13 @@ objc_library(
 
 objc_library(
     name = "NATS_lib",
-    srcs = ["SNTPushClientNATS.mm"],
+    srcs = [
+        "SNTPushClientNATS.mm",
+        "SNTPushClientNATS+Commands.mm",
+    ],
     hdrs = [
         "SNTPushClientNATS.h",
+        "SNTPushClientNATS+Commands.h",
         "SNTPushNotifications.h",
     ],
     deps = [
@@ -29,6 +33,7 @@ objc_library(
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
         "@nats_c//:nats",
+        "@northpolesec_protos//commands:v1_cc_proto",
     ],
 )
 
@@ -435,6 +440,18 @@ santa_unit_test(
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
         "@OCMock",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTPushClientNATSCommandTest",
+    srcs = ["SNTPushClientNATSCommandTest.mm"],
+    deps = [
+        ":NATS_lib",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTSyncConstants",
+        "@OCMock",
+        "@northpolesec_protos//commands:v1_cc_proto",
     ],
 )
 

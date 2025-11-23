@@ -13,10 +13,14 @@
 /// limitations under the License.
 
 #import "Source/santasyncservice/SNTPushClientNATS.h"
+#import "Source/santasyncservice/SNTPushClientNATS+Commands.h"
 
 #import <dispatch/dispatch.h>
 #include <string.h>
 #include <sys/cdefs.h>
+
+#include <google/protobuf/descriptor.h>
+#include "commands/v1.pb.h"
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
@@ -32,11 +36,38 @@ __BEGIN_DECLS
 
 __END_DECLS
 
+// Helper function to convert response code to readable string using protobuf generated code
+NSString *ResponseCodeToString(santa::commands::v1::SantaCommandResponseCode code) {
+  // Try the generated _Name() function first
+  std::string name = santa::commands::v1::SantaCommandResponseCode_Name(code);
+  if (!name.empty()) {
+    return @(name.c_str());
+  }
+
+  // Fallback to descriptor API if _Name() doesn't recognize the value
+  const google::protobuf::EnumDescriptor *descriptor =
+      santa::commands::v1::SantaCommandResponseCode_descriptor();
+  if (descriptor) {
+    const google::protobuf::EnumValueDescriptor *value_desc =
+        descriptor->FindValueByNumber(static_cast<int>(code));
+    if (value_desc) {
+      std::string_view name_view = value_desc->name();
+      return [NSString stringWithUTF8String:name_view.data()];
+    }
+  }
+
+  // Last resort: return the numeric value with hex for debugging
+  return [NSString stringWithFormat:@"UNKNOWN(%d/0x%x)", static_cast<int>(code),
+                                    static_cast<unsigned int>(code)];
+}
+
 @interface SNTPushClientNATS ()
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
 @property(nonatomic) natsConnection *conn;
 // Array of natsSubscription pointers wrapped in NSValue
 @property(nonatomic) NSMutableArray<NSValue *> *tagSubscriptions;
+// Commands subscription
+@property(nonatomic) natsSubscription *commandsSubscription;
 // Single queue for connection management
 @property(nonatomic) dispatch_queue_t connectionQueue;
 // Queue for processing messages
@@ -357,7 +388,8 @@ __END_DECLS
   // Early return if nothing to disconnect
   // Note: We check self.conn directly here rather than isConnectionAlive since we want to
   // clean up even if the connection is closed but resources still exist
-  if (!self.conn && !self.isConnected && self.tagSubscriptions.count == 0) {
+  if (!self.conn && !self.isConnected && self.tagSubscriptions.count == 0 &&
+      !self.commandsSubscription) {
     if (completion) {
       dispatch_async(dispatch_get_main_queue(), completion);
     }
@@ -406,6 +438,7 @@ __END_DECLS
 
 - (void)unsubscribeAll {
   // This should only be called from within connectionQueue
+  // Failure to unsubscribe is non-fatal - client continues operating
   LOGD(@"NATS: Unsubscribing from all topics");
 
   // Unsubscribe all tag subscriptions
@@ -417,6 +450,15 @@ __END_DECLS
     }
   }
   [self.tagSubscriptions removeAllObjects];
+
+  // Unsubscribe commands subscription
+  // Failure to unsubscribe to the commands topic is non-fatal - client
+  // continues operating
+  if (self.commandsSubscription) {
+    natsSubscription_Unsubscribe(self.commandsSubscription);
+    natsSubscription_Destroy(self.commandsSubscription);
+    self.commandsSubscription = NULL;
+  }
 
   LOGD(@"NATS: All topics unsubscribed");
 }
@@ -489,6 +531,30 @@ __END_DECLS
       }
     }
   }
+
+  // Subscribe to commands topic: santa.host.<device-id>.commands
+  // Note: Failure to subscribe to commands topic is non-fatal - client continues operating
+  if (self.pushDeviceID.length > 0) {
+    NSString *commandsTopic =
+        [NSString stringWithFormat:@"santa.host.%@.commands", self.pushDeviceID];
+    LOGD(@"NATS: Subscribing to commands topic: %@", commandsTopic);
+
+    natsSubscription *commandsSub = NULL;
+    status = natsConnection_Subscribe(&commandsSub, self.conn, [commandsTopic UTF8String],
+                                      &commandMessageHandler, (__bridge void *)self);
+
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to subscribe to commands topic %@: %s (non-fatal, continuing)",
+           commandsTopic, natsStatus_GetText(status));
+      // Client continues operating even if commands subscription fails
+      // Commands will simply not be received, but other subscriptions continue
+    } else {
+      LOGI(@"NATS: Subscribed to commands topic: %@", commandsTopic);
+      self.commandsSubscription = commandsSub;
+    }
+  } else {
+    LOGW(@"NATS: Cannot subscribe to commands topic - no device ID available (non-fatal)");
+  }
 }
 
 // NATS message handler
@@ -541,6 +607,45 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   });
 
   natsMsg_Destroy(msg);
+}
+
+// Publish a command response to the reply topic
+- (void)publishResponse:(const santa::commands::v1::SantaCommandResponse &)response
+           toReplyTopic:(NSString *)replyTopic {
+  // Failures are logged but don't crash the client
+  if (!replyTopic || replyTopic.length == 0) {
+    LOGW(@"NATS: Cannot publish command response - no reply topic provided (non-fatal)");
+    return;
+  }
+
+  // Capture the response code before serialization (response may go out of scope)
+  santa::commands::v1::SantaCommandResponseCode responseCode = response.code();
+
+  // Serialize the response
+  std::string responseData;
+  if (!response.SerializeToString(&responseData)) {
+    LOGE(@"NATS: Failed to serialize command response (non-fatal)");
+    return;
+  }
+
+  // Publish asynchronously - failures are logged but don't crash
+  dispatch_async(self.connectionQueue, ^{
+    if (![self isConnectionAlive]) {
+      LOGW(@"NATS: Cannot send command response - not connected (non-fatal)");
+      return;
+    }
+
+    natsStatus status =
+        natsConnection_Publish(self.conn, [replyTopic UTF8String], responseData.data(),
+                               static_cast<int>(responseData.length()));
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to publish command response to %@: %s (non-fatal)", replyTopic,
+           natsStatus_GetText(status));
+    } else {
+      LOGD(@"NATS: Sent command response to %@ (code: %@, raw: %d)", replyTopic,
+           ResponseCodeToString(responseCode), static_cast<int>(responseCode));
+    }
+  });
 }
 
 // NATS error handler callback
