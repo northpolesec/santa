@@ -31,10 +31,11 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
  public:
   // Factory
   static std::shared_ptr<TemporaryMonitorMode> Create(SNTConfigurator *configurator,
-                                                      SNTNotificationQueue *not_queue);
+                                                      SNTNotificationQueue *notification_queue);
 
   // Construction and setup require a PassKey, can only be used internally.
-  TemporaryMonitorMode(PassKey, SNTConfigurator *configurator, SNTNotificationQueue *not_queue);
+  TemporaryMonitorMode(PassKey, SNTConfigurator *configurator,
+                       SNTNotificationQueue *notification_queue);
   void SetupFromState(PassKey, NSDictionary *tmm);
 
   // No moves, no copies
@@ -56,6 +57,8 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
   // Return true if a session was active, otherwise false.
   bool Revoke();
 
+  // Requried method of Timer mixin derived classes. Will be called when
+  // a previously started timer expires.
   bool OnTimer();
 
   // If a temporary Monitor Mode session is active, return the number of

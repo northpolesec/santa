@@ -28,8 +28,8 @@ static NSString *const kStateTempMonitorModeDeadlineKey = @"Deadline";
 static NSString *const kStateTempMonitorModeSavedSyncURLKey = @"SyncURL";
 
 std::shared_ptr<TemporaryMonitorMode> TemporaryMonitorMode::Create(
-    SNTConfigurator *configurator, SNTNotificationQueue *not_queue) {
-  auto tmm = std::make_shared<TemporaryMonitorMode>(PassKey(), configurator, not_queue);
+    SNTConfigurator *configurator, SNTNotificationQueue *notification_queue) {
+  auto tmm = std::make_shared<TemporaryMonitorMode>(PassKey(), configurator, notification_queue);
 
   // NB: SetupFromState Is split out of the constructor since it could
   // potentially start the timer, which would take a weak reference before
@@ -40,11 +40,11 @@ std::shared_ptr<TemporaryMonitorMode> TemporaryMonitorMode::Create(
 }
 
 TemporaryMonitorMode::TemporaryMonitorMode(PassKey, SNTConfigurator *configurator,
-                                           SNTNotificationQueue *not_queue)
+                                           SNTNotificationQueue *notification_queue)
     : Timer(kMinTemporaryMonitorModeMinutes, kMaxTemporaryMonitorModeMinutes,
             Timer::OnStart::kWaitOneCycle, "Temporary Monitor Mode",
             Timer::RescheduleMode::kTrailingEdge, QOS_CLASS_USER_INITIATED),
-      notification_queue_(not_queue),
+      notification_queue_(notification_queue),
       deadline_(0) {
   configurator_ = configurator;
 }
