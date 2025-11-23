@@ -451,7 +451,6 @@ objc_library(
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
-        ":SystemResources",
     ],
 )
 

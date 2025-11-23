@@ -12,12 +12,20 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-// This CRTP mixin class enables derived classes to instantiate private
-// instances of PassKey templates specific to them.
+#ifndef SANTA__COMMON__PASSKEY_H
+#define SANTA__COMMON__PASSKEY_H
+
+// This CRTP mixin class is a small variation of the PassKey idiom that
+// enables derived classes to instantiate private instances of PassKey
+// templates specific to them.
 //
 // The primary purpose is to enable std::make_unique/std::make_shared flows
 // from a factory method and disallowing the derived class to be directly
 // instantiated.
+//
+// References:
+// - https://arne-mertz.de/2016/10/passkey-idiom/
+// - https://playfulprogramming.com/posts/a-forgotten-idiom-revisited-pass-key
 //
 // Example:
 // struct Foo : public PassKey<Foo> {
@@ -35,3 +43,5 @@ class PassKey {
  protected:
   static PassKey<T> MakeKey() { return PassKey<T>{}; }
 };
+
+#endif  // SANTA__COMMON__PASSKEY_H

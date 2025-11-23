@@ -109,8 +109,8 @@ struct RuleCounts {
 ///
 /// Temporary Monitor Mode Ops
 ///
-- (void)requestTemporaryMonitorModeWithDuration:(NSNumber *)requestedDuration
-                                          reply:(void (^)(uint32_t, NSError *))reply;
+- (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber *)requestedDuration
+                                                 reply:(void (^)(uint32_t, NSError *))reply;
 - (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply;
 - (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply;
 

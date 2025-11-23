@@ -244,6 +244,39 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "TemporaryMonitorMode",
+    srcs = ["TemporaryMonitorMode.mm"],
+    hdrs = ["TemporaryMonitorMode.h"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":SNTNotificationQueue",
+        "//Source/common:PassKey",
+        "//Source/common:Pinning",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTModeTransition",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:SystemResources",
+        "//Source/common:Timer",
+    ],
+)
+
+santa_unit_test(
+    name = "TemporaryMonitorModeTest",
+    srcs = ["TemporaryMonitorModeTest.mm"],
+    deps = [
+        ":TemporaryMonitorMode",
+        ":SNTNotificationQueue",
+        "//Source/common:SNTModeTransition",
+        "//Source/common:SystemResources",
+        # "//Source/common:TestUtils",
+        "@OCMock",
+    ],
+)
+
+objc_library(
     name = "TTYWriter",
     srcs = ["TTYWriter.mm"],
     hdrs = ["TTYWriter.h"],
@@ -810,6 +843,7 @@ objc_library(
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":TemporaryMonitorMode",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:Pinning",
@@ -1659,6 +1693,7 @@ test_suite(
         ":SNTRuleTableTest",
         ":SNTSyncdQueueTest",
         ":SantadTest",
+        ":TemporaryMonitorModeTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
         "//Source/santad/ProcessTree:process_tree_test",
         "//Source/santad/ProcessTree/annotations:originator_test",

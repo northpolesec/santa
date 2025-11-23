@@ -35,11 +35,11 @@
                                  logger:(std::shared_ptr<santa::Logger>)logger
                              watchItems:(std::shared_ptr<santa::WatchItems>)watchItems;
 
-// Will immediately end any active temporary Monitor Mode session and optionally
+// Will immediately end any active temporary Monitor Mode session and
 // remove sync server mode transition settings.
 //
 // Returns YES if there was an active temporary Monitor Mode session that was
 // ended. Otherwise NO.
-- (BOOL)revokeTemporaryMonitorModeUpdateModeTransition:(BOOL)revokeModeTransition;
+- (BOOL)revokeTemporaryMonitorMode;
 
 @end
