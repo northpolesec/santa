@@ -89,8 +89,8 @@ double watchdogRAMPeak = 0;
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
 
-    _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
-        [SNTConfigurator configurator], _notQueue);
+    _temporaryMonitorMode =
+        santa::TemporaryMonitorMode::Create([SNTConfigurator configurator], _notQueue);
   }
   return self;
 }

@@ -107,7 +107,9 @@ uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialState(NSDictionary 
 
 void TemporaryMonitorMode::NewModeTransitionReceived(SNTModeTransition *mode_transition) {
   if (mode_transition.type == SNTModeTransitionTypeRevoke) {
-    Revoke();
+    if (Revoke()) {
+      LOGI(@"Temporary Monitor Mode session revoked due to policy change.");
+    }
   } else {
     [configurator_ setSyncServerModeTransition:mode_transition];
   }

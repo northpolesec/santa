@@ -252,6 +252,7 @@ objc_library(
     ],
     deps = [
         ":SNTNotificationQueue",
+        "//Source/common:PassKey",
         "//Source/common:Pinning",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
@@ -259,7 +260,6 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SystemResources",
         "//Source/common:Timer",
-        "//Source/common:PassKey",
     ],
 )
 
@@ -1675,7 +1675,6 @@ test_suite(
         ":FAAPolicyProcessorTest",
         ":MetricsTest",
         ":RateLimiterTest",
-        ":TemporaryMonitorModeTest",
         ":SNTApplicationCoreMetricsTest",
         ":SNTCompilerControllerTest",
         ":SNTDecisionCacheTest",
@@ -1694,6 +1693,7 @@ test_suite(
         ":SNTRuleTableTest",
         ":SNTSyncdQueueTest",
         ":SantadTest",
+        ":TemporaryMonitorModeTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
         "//Source/santad/ProcessTree:process_tree_test",
         "//Source/santad/ProcessTree/annotations:originator_test",
