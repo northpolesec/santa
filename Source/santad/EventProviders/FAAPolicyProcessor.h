@@ -34,6 +34,7 @@
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/santad/EventProviders/FAAWebhookClient.h"
 #include "Source/santad/EventProviders/RateLimiter.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
@@ -130,6 +131,7 @@ class FAAPolicyProcessor {
   SNTConfigurator *configurator_;
   dispatch_queue_t queue_;
   RateLimiter rate_limiter_;
+  std::unique_ptr<FAAWebhookClient> webhook_client_;
 
   virtual NSString *__strong GetCertificateHash(const es_file_t *es_file);
 

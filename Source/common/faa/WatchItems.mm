@@ -58,6 +58,8 @@ NSString *const kWatchItemConfigKeyOptionsCustomMessage = @"BlockMessage";
 NSString *const kWatchItemConfigKeyOptionsEventDetailURL = kWatchItemConfigKeyEventDetailURL;
 NSString *const kWatchItemConfigKeyOptionsEventDetailText = kWatchItemConfigKeyEventDetailText;
 NSString *const kWatchItemConfigKeyOptionsVersion = kWatchItemConfigKeyVersion;
+NSString *const kWatchItemConfigKeyOptionsWebhookURL = @"WebhookURL";
+NSString *const kWatchItemConfigKeyOptionsWebhookHeaders = @"WebhookHeaders";
 NSString *const kWatchItemConfigKeyProcesses = @"Processes";
 NSString *const kWatchItemConfigKeyProcessesBinaryPath = @"BinaryPath";
 NSString *const kWatchItemConfigKeyProcessesCertificateSha256 = @"CertificateSha256";
@@ -103,6 +105,7 @@ static constexpr NSUInteger kWatchItemConfigEventDetailTextMaxLength = 48;
 // the URL supports pseudo-format strings that can extend the length, a smaller
 // max is used here.
 static constexpr NSUInteger kWatchItemConfigEventDetailURLMaxLength = 6000;
+static constexpr NSUInteger kWatchItemConfigWebhookURLMaxLength = 6000;
 
 // Semi-arbitrary length restriction on version strings
 static constexpr NSUInteger kVersionMaxLength = 256;
@@ -489,6 +492,16 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
                          false, LenRangeValidator(0, kWatchItemConfigEventDetailTextMaxLength))) {
       return false;
     }
+
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsWebhookURL, [NSString class], err,
+                         false, LenRangeValidator(0, kWatchItemConfigWebhookURLMaxLength))) {
+      return false;
+    }
+
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsWebhookHeaders, [NSDictionary class],
+                         err, false, nil)) {
+      return false;
+    }
   }
 
   std::string policy_version;
@@ -539,6 +552,9 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
     return true;
   }
 
+  NSString *webhook_url = options[kWatchItemConfigKeyOptionsWebhookURL];
+  NSDictionary *webhook_headers = options[kWatchItemConfigKeyOptionsWebhookHeaders];
+
   switch (rule_type) {
     case WatchItemRuleType::kPathsWithAllowedProcesses: [[fallthrough]];
     case WatchItemRuleType::kPathsWithDeniedProcesses:
@@ -550,6 +566,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
             NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
             options[kWatchItemConfigKeyOptionsEventDetailURL],
             options[kWatchItemConfigKeyOptionsEventDetailText],
+            webhook_url, webhook_headers,
             std::get<SetWatchItemProcess>(proc_list)));
       }
 
@@ -563,6 +580,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
           NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
           options[kWatchItemConfigKeyOptionsEventDetailURL],
           options[kWatchItemConfigKeyOptionsEventDetailText],
+          webhook_url, webhook_headers,
           std::get<SetWatchItemProcess>(proc_list)));
 
       break;
