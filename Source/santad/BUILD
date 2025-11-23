@@ -263,6 +263,19 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "TemporaryMonitorModeTest",
+    srcs = ["TemporaryMonitorModeTest.mm"],
+    deps = [
+        ":TemporaryMonitorMode",
+        ":SNTNotificationQueue",
+        "//Source/common:SNTModeTransition",
+        "//Source/common:SystemResources",
+        # "//Source/common:TestUtils",
+        "@OCMock",
+    ],
+)
+
 objc_library(
     name = "TTYWriter",
     srcs = ["TTYWriter.mm"],
@@ -1662,6 +1675,7 @@ test_suite(
         ":FAAPolicyProcessorTest",
         ":MetricsTest",
         ":RateLimiterTest",
+        ":TemporaryMonitorModeTest",
         ":SNTApplicationCoreMetricsTest",
         ":SNTCompilerControllerTest",
         ":SNTDecisionCacheTest",

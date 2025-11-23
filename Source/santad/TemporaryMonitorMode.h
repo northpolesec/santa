@@ -30,11 +30,11 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
                              public PassKey<TemporaryMonitorMode> {
  public:
   // Factory
-  static std::shared_ptr<TemporaryMonitorMode> Create(SNTNotificationQueue *not_queue,
-                                                      NSDictionary *tmm);
+  static std::shared_ptr<TemporaryMonitorMode> Create(SNTConfigurator *configurator,
+                                                      SNTNotificationQueue *not_queue);
 
   // Construction and setup require a PassKey, can only be used internally.
-  TemporaryMonitorMode(PassKey, SNTNotificationQueue *not_queue);
+  TemporaryMonitorMode(PassKey, SNTConfigurator *configurator, SNTNotificationQueue *not_queue);
   void SetupFromState(PassKey, NSDictionary *tmm);
 
   // No moves, no copies
@@ -66,14 +66,17 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
   // any existing session. The configurator sync settings are also updated.
   void NewModeTransitionReceived(SNTModeTransition *mode_transition);
 
+  friend class TemporaryMonitorModePeer;
+
  private:
-  // Require at least 15 seconds left of Monitor Mode a previously authorized
+  // Require at least 5 seconds left of Monitor Mode a previously authorized
   // Temporary Monitor Mode session in order to re-enter. Otherwise don't bother.
-  static constexpr uint64_t kMinAllowedStateRemainingSeconds = 15;
+  static constexpr uint64_t kMinAllowedStateRemainingSeconds = 5;
 
   void Begin(uint32_t seconds);
   bool End();
-  uint64_t GetSecondsRemainingFromInitialState(NSDictionary *tmm);
+  uint64_t GetSecondsRemainingFromInitialState(NSDictionary *tmm, NSString *currentBootSessionUUID,
+                                               NSURL *syncURL);
   std::optional<uint64_t> SecondsRemaining(uint64_t deadline_mach_time);
 
   // hide the base class Start/Stop methods

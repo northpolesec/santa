@@ -28,30 +28,32 @@ static NSString *const kStateTempMonitorModeDeadlineKey = @"Deadline";
 static NSString *const kStateTempMonitorModeSavedSyncURLKey = @"SyncURL";
 
 std::shared_ptr<TemporaryMonitorMode> TemporaryMonitorMode::Create(
-    SNTNotificationQueue *not_queue, NSDictionary *tempMonitorModeState) {
-  auto tmm = std::make_shared<TemporaryMonitorMode>(PassKey(), not_queue);
+    SNTConfigurator *configurator, SNTNotificationQueue *not_queue) {
+  auto tmm = std::make_shared<TemporaryMonitorMode>(PassKey(), configurator, not_queue);
 
   // NB: SetupFromState Is split out of the constructor since it could
   // potentially start the timer, which would take a weak reference before
   // construction was complete.
-  tmm->SetupFromState(PassKey(), tempMonitorModeState);
+  tmm->SetupFromState(PassKey(), [configurator savedTemporaryMonitorModeState]);
 
   return tmm;
 }
 
-TemporaryMonitorMode::TemporaryMonitorMode(PassKey, SNTNotificationQueue *not_queue)
+TemporaryMonitorMode::TemporaryMonitorMode(PassKey, SNTConfigurator *configurator,
+                                           SNTNotificationQueue *not_queue)
     : Timer(kMinTemporaryMonitorModeMinutes, kMaxTemporaryMonitorModeMinutes,
             Timer::OnStart::kWaitOneCycle, "Temporary Monitor Mode",
             Timer::RescheduleMode::kTrailingEdge, QOS_CLASS_USER_INITIATED),
       notification_queue_(not_queue),
       deadline_(0) {
-  configurator_ = [SNTConfigurator configurator];
+  configurator_ = configurator;
 }
 
 void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
-  uint32_t secs_remaining =
-      static_cast<uint32_t>(std::min(GetSecondsRemainingFromInitialState(tmm),
-                                     static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
+  uint32_t secs_remaining = static_cast<uint32_t>(
+      std::min(GetSecondsRemainingFromInitialState(tmm, [SNTSystemInfo bootSessionUUID],
+                                                   configurator_.syncBaseURL),
+               static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
   if (secs_remaining < kMinAllowedStateRemainingSeconds) {
     [configurator_ leaveTemporaryMonitorMode];
   } else {
@@ -65,22 +67,23 @@ void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
 //   1. The saved boot session UUID must match the current boot session UUID
 //   2. The saved sync URL must match the current SyncBaseURL
 //   3. The current SyncBaseURL must be pinned
-uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialState(NSDictionary *tmm) {
+uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialState(NSDictionary *tmm,
+                                                                   NSString *currentBootSessionUUID,
+                                                                   NSURL *syncURL) {
   if (![tmm[kStateTempMonitorModeBootSessionUUIDKey] isKindOfClass:[NSString class]] ||
       ![tmm[kStateTempMonitorModeDeadlineKey] isKindOfClass:[NSNumber class]] ||
       ![tmm[kStateTempMonitorModeSavedSyncURLKey] isKindOfClass:[NSString class]]) {
     return 0;
   }
 
-  if (![tmm[kStateTempMonitorModeBootSessionUUIDKey]
-          isEqualToString:[SNTSystemInfo bootSessionUUID]]) {
+  if (![tmm[kStateTempMonitorModeBootSessionUUIDKey] isEqualToString:currentBootSessionUUID]) {
     // Reboot detected, do not attempt to re-enter Monitor Mode
     // TODO: Emit audit event
     return 0;
   }
 
-  if (![tmm[kStateTempMonitorModeSavedSyncURLKey] isEqualToString:configurator_.syncBaseURL.host] ||
-      !santa::IsDomainPinned([configurator_ syncBaseURL])) {
+  if (![tmm[kStateTempMonitorModeSavedSyncURLKey] isEqualToString:syncURL.host] ||
+      !santa::IsDomainPinned(syncURL)) {
     // SyncBaseURL changed or is not pinned, do not attempt to re-enter Monitor Mode automatically.
     // Revoke the mode transition authorization as well so the machine is no longer eligible.
     Revoke();
