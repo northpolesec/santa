@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+	"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
@@ -14,12 +15,14 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Santa Endpoint Security Extension</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>North Pole Security, Inc.</string>
 	<key>NSSystemExtensionUsageDescription</key>
 	<string>Santa knows who is naughty and nice.</string>
-    <key>NSEndpointSecurityEarlyBoot</key>
-    <true/>
+	<key>NSEndpointSecurityEarlyBoot</key>
+	<true />
 	<key>CFBundleExecutable</key>
 	<string>com.northpolesec.santa.daemon</string>
 </dict>
