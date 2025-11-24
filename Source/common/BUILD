@@ -679,7 +679,6 @@ santa_unit_test(
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
-        ":SNTStoredTemporaryMonitorModeAuditEvent",
     ],
 )
 
@@ -695,6 +694,15 @@ santa_unit_test(
     deps = [
         ":SNTFileInfo",
         ":SNTStoredExecutionEvent",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTStoredTemporaryMonitorModeAuditEventTest",
+    srcs = ["SNTStoredTemporaryMonitorModeAuditEventTest.mm"],
+    deps = [
+        ":SNTStoredEvent",
+        ":SNTStoredTemporaryMonitorModeAuditEvent",
     ],
 )
 
@@ -938,6 +946,7 @@ test_suite(
         ":SNTRuleTest",
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
+        ":SNTStoredTemporaryMonitorModeAuditEventTest",
         ":SNTTimerTest",
         ":SNTXxhashTest",
         ":SantaCacheTest",

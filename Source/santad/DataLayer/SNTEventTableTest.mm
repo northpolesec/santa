@@ -107,16 +107,16 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   return event;
 }
 
-- (SNTStoredTemporaryMonitorModeAuditEvent *)createTestTemporaryMonitorModeEnterAuditEvent {
-  return [[SNTStoredTemporaryMonitorModeAuditEvent alloc]
-      initEnterWithUUID:@"enter_uuid"
+- (SNTStoredTemporaryMonitorModeEnterAuditEvent *)createTestTemporaryMonitorModeEnterAuditEvent {
+  return [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
+      initWithUUID:@"enter_uuid"
                 seconds:123
                  reason:SNTTemporaryMonitorModeEnterReasonOnDemand];
 }
 
-- (SNTStoredTemporaryMonitorModeAuditEvent *)createTestTemporaryMonitorModeLeaveAuditEvent {
-  return [[SNTStoredTemporaryMonitorModeAuditEvent alloc]
-      initLeaveWithUUID:@"leave_uuid"
+- (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)createTestTemporaryMonitorModeLeaveAuditEvent {
+  return [[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
+      initWithUUID:@"leave_uuid"
                  reason:SNTTemporaryMonitorModeLeaveReasonSessionExpired];
 }
 
@@ -294,45 +294,33 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 }
 
 - (void)testRetrieveTemporaryMonitorModeEnterAuditEvent {
-  SNTStoredTemporaryMonitorModeAuditEvent *event =
+  SNTStoredTemporaryMonitorModeEnterAuditEvent *event =
       [self createTestTemporaryMonitorModeEnterAuditEvent];
   [self.sut addStoredEvent:event];
 
   SNTStoredFileAccessEvent *storedEvent = [self.sut pendingEvents].firstObject;
   XCTAssertNotNil(storedEvent);
-  XCTAssertTrue([storedEvent isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]);
-  XCTAssertEqual(((SNTStoredTemporaryMonitorModeAuditEvent *)storedEvent).type,
-                 SNTStoredTemporaryMonitorModeAuditEventTypeEnter);
-  XCTAssertEqualObjects(((SNTStoredTemporaryMonitorModeAuditEvent *)storedEvent).uuid,
-                        @"enter_uuid");
-  XCTAssertTrue([((SNTStoredTemporaryMonitorModeAuditEvent *)storedEvent).auditEvent
-      isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]);
+  XCTAssertTrue([storedEvent isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]);
 
   SNTStoredTemporaryMonitorModeEnterAuditEvent *tmmEnter =
-      ((SNTStoredTemporaryMonitorModeAuditEvent *)storedEvent).auditEvent;
-
+      (SNTStoredTemporaryMonitorModeEnterAuditEvent *)storedEvent;
+  XCTAssertEqualObjects(tmmEnter.uuid, @"enter_uuid");
   XCTAssertEqual(tmmEnter.reason, SNTTemporaryMonitorModeEnterReasonOnDemand);
   XCTAssertEqual(tmmEnter.seconds, 123);
 }
 
 - (void)testRetrieveTemporaryMonitorModeLeaveAuditEvent {
-  SNTStoredTemporaryMonitorModeAuditEvent *event =
+  SNTStoredTemporaryMonitorModeLeaveAuditEvent *event =
       [self createTestTemporaryMonitorModeLeaveAuditEvent];
   [self.sut addStoredEvent:event];
 
   SNTStoredFileAccessEvent *storedEvent = [self.sut pendingEvents].firstObject;
   XCTAssertNotNil(storedEvent);
   XCTAssertTrue([storedEvent isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]);
-  XCTAssertEqual(((SNTStoredTemporaryMonitorModeAuditEvent *)storedEvent).type,
-                 SNTStoredTemporaryMonitorModeAuditEventTypeLeave);
-  XCTAssertEqualObjects(((SNTStoredTemporaryMonitorModeAuditEvent *)storedEvent).uuid,
-                        @"leave_uuid");
-  XCTAssertTrue([((SNTStoredTemporaryMonitorModeAuditEvent *)storedEvent).auditEvent
-      isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]);
 
   SNTStoredTemporaryMonitorModeLeaveAuditEvent *tmmLeave =
-      ((SNTStoredTemporaryMonitorModeAuditEvent *)storedEvent).auditEvent;
-
+      (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)storedEvent;
+  XCTAssertEqualObjects(tmmLeave.uuid, @"leave_uuid");
   XCTAssertEqual(tmmLeave.reason, SNTTemporaryMonitorModeLeaveReasonSessionExpired);
 }
 

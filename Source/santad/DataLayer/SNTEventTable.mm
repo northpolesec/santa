@@ -119,8 +119,7 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
            se.process.filePath.length && [[se uniqueID] length];
   } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]) {
     SNTStoredTemporaryMonitorModeAuditEvent *se = (SNTStoredTemporaryMonitorModeAuditEvent *)event;
-    return se.uuid && (se.type == SNTStoredTemporaryMonitorModeAuditEventTypeEnter ||
-                       se.type == SNTStoredTemporaryMonitorModeAuditEventTypeLeave);
+    return se.uuid != nil;
   } else {
     return NO;
   }

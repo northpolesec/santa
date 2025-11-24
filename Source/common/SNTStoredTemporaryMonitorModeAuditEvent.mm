@@ -13,17 +13,27 @@
 /// limitations under the License.
 
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
+#include <Foundation/Foundation.h>
 
 #import "Source/common/CoderMacros.h"
 
+@interface SNTStoredTemporaryMonitorModeAuditEvent ()
+// These events should never get dropped due to a conflict. E.g., if a session is refreshed
+// multiple times, each refresh should be reported. This property will be used to compute a
+// random UUID on each instatiation to prevent caching.
+@property(readonly) NSUUID *uniqueUuid;
+@end
+;
+
 @implementation SNTStoredTemporaryMonitorModeEnterAuditEvent
 
-- (instancetype)initWithSeconds:(uint32_t)seconds
-                         reason:(SNTTemporaryMonitorModeEnterReason)reason {
-  self = [super init];
+- (instancetype)initWithUUID:(NSString *)uuid
+                     seconds:(uint32_t)seconds
+                      reason:(SNTTemporaryMonitorModeEnterReason)reason {
+  self = [super initWithUUID:uuid];
   if (self) {
-    _reason = reason;
     _seconds = seconds;
+    _reason = reason;
   }
   return self;
 }
@@ -33,12 +43,13 @@
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
+  [super encodeWithCoder:coder];
   ENCODE_BOXABLE(coder, reason);
   ENCODE_BOXABLE(coder, seconds);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
-  self = [super init];
+  self = [super initWithCoder:decoder];
   if (self) {
     DECODE_SELECTOR(decoder, reason, NSNumber, integerValue);
     DECODE_SELECTOR(decoder, seconds, NSNumber, unsignedIntValue);
@@ -46,12 +57,21 @@
   return self;
 }
 
+- (NSString *)uniqueID {
+  return [self.uniqueUuid UUIDString];
+}
+
+- (BOOL)unactionableEvent {
+  // These events should always be stored
+  return NO;
+}
+
 @end
 
 @implementation SNTStoredTemporaryMonitorModeLeaveAuditEvent
 
-- (instancetype)initWithReason:(SNTTemporaryMonitorModeLeaveReason)reason {
-  self = [super init];
+- (instancetype)initWithUUID:(NSString *)uuid reason:(SNTTemporaryMonitorModeLeaveReason)reason {
+  self = [super initWithUUID:uuid];
   if (self) {
     _reason = reason;
   }
@@ -63,66 +83,41 @@
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
+  [super encodeWithCoder:coder];
   ENCODE_BOXABLE(coder, reason);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
-  self = [super init];
+  self = [super initWithCoder:decoder];
   if (self) {
     DECODE_SELECTOR(decoder, reason, NSNumber, integerValue);
   }
   return self;
 }
 
+- (NSString *)uniqueID {
+  return [self.uniqueUuid UUIDString];
+}
+
+- (BOOL)unactionableEvent {
+  // These events should always be stored
+  return NO;
+}
+
 @end
 
+// NB: Intentionally not implementing SNTStoredEvent base class methods:
+//   - (NSString *)uniqueID
+//   - (BOOL)unactionableEvent
+// This class should not be directly instantiated. The default base class implementation
+// for these methods will throw, making it so attempting to instantiate this is not very useful.
 @implementation SNTStoredTemporaryMonitorModeAuditEvent
-
-- (instancetype)init {
-  self = [super init];
-  if (self) {
-    _uuid = [[NSUUID UUID] UUIDString];
-  }
-  return self;
-}
 
 - (instancetype)initWithUUID:(NSString *)uuid {
   self = [super init];
   if (self) {
     _uuid = uuid;
-  }
-  return self;
-}
-
-- (instancetype)initEnterWithSeconds:(uint32_t)seconds
-                              reason:(SNTTemporaryMonitorModeEnterReason)reason {
-  self = [self init];
-  if (self) {
-    _type = SNTStoredTemporaryMonitorModeAuditEventTypeEnter;
-    _auditEvent = [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc] initWithSeconds:seconds
-                                                                                 reason:reason];
-  }
-  return self;
-}
-
-- (instancetype)initEnterWithUUID:(NSString *)uuid
-                          seconds:(uint32_t)seconds
-                           reason:(SNTTemporaryMonitorModeEnterReason)reason {
-  self = [self initWithUUID:uuid];
-  if (self) {
-    _type = SNTStoredTemporaryMonitorModeAuditEventTypeEnter;
-    _auditEvent = [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc] initWithSeconds:seconds
-                                                                                 reason:reason];
-  }
-  return self;
-}
-
-- (instancetype)initLeaveWithUUID:(NSString *)uuid
-                           reason:(SNTTemporaryMonitorModeLeaveReason)reason {
-  self = [self initWithUUID:uuid];
-  if (self) {
-    _type = SNTStoredTemporaryMonitorModeAuditEventTypeLeave;
-    _auditEvent = [[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc] initWithReason:reason];
+    _uniqueUuid = [NSUUID UUID];
   }
   return self;
 }
@@ -134,31 +129,16 @@
 - (void)encodeWithCoder:(NSCoder *)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, uuid);
-  ENCODE_BOXABLE(coder, type);
-  ENCODE(coder, auditEvent);
+  ENCODE(coder, uniqueUuid);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, uuid, NSString);
-    DECODE_SELECTOR(decoder, type, NSNumber, integerValue);
-
-    NSSet *auditEventClasses =
-        [NSSet setWithObjects:[SNTStoredTemporaryMonitorModeEnterAuditEvent class],
-                              [SNTStoredTemporaryMonitorModeLeaveAuditEvent class], nil];
-    DECODE_SET(decoder, auditEvent, auditEventClasses);
+    DECODE(decoder, uniqueUuid, NSUUID);
   }
   return self;
-}
-
-- (NSString *)uniqueID {
-  return [NSString stringWithFormat:@"%@|%ld", self.uuid, self.type];
-}
-
-- (BOOL)unactionableEvent {
-  // These events should always be stored
-  return NO;
 }
 
 @end
