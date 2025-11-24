@@ -299,3 +299,52 @@ while](https://theevilbit.github.io/beyond/beyond_0011/), going back to Patrick 
 	</array>
 </dict>
 ```
+
+## Lockdown Docker Desktop Settings
+
+As seen in the [BYOB: Bring your own Blackbox - Containerized Defense Evasion
+on macOS](https://www.youtube.com/watch?v=AMbxs2Nh-Rc&t=1s) talk by [Colson
+Wilhoit](https://x.com/defsecsentinel) at OBTSv8 you can abuse the Docker
+Desktop settings files to get a container running that will evade tools buil on
+the Endpoint Security Framework. Like Colson said in the talk you can use
+Santa's FAA to block access to the Docker settings files, which prevents some
+of the attacks.
+
+
+![](/img/santa-docker.png)
+
+
+```xml
+<!-- Protect Docker Settings -->
+    <key>DockerSettings</key>
+    <dict>
+      <key>Paths</key>
+      <array>
+        <dict>
+          <key>Path</key>
+          <string>/Users/*/Library/Group Containers/group.com.docker/</string>
+          <key>IsPrefix</key>
+          <true/>
+        </dict>
+      </array>
+      <key>Options</key>
+      <dict>
+        <key>AllowReadAccess</key>
+        <true/>
+        <!-- Actually enforce blocks, not just audit -->
+        <key>AuditOnly</key>
+        <false/>
+        <key>RuleType</key>
+        <string>PathsWithAllowedProcesses</string>
+        <key>BlockMessage</key>
+        <string>Only Docker Desktop can modify these settings.</string>
+      </dict>
+      <key>Processes</key>
+      <array>
+        <dict>
+          <key>TeamID</key>
+          <string>9BNSXJN65R</string>
+        </dict>
+      </array>
+    </dict>
+```
