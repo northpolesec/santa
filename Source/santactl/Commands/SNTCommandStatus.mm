@@ -438,16 +438,6 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-25s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
       printf("  %-25s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
       printf("  %-25s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
-      // Format push notifications output
-      NSString *pushNotificationsOutput = pushNotifications;
-      if (pushServerAddress && [pushNotifications containsString:@"NPS Push Service"]) {
-        pushNotificationsOutput =
-            [NSString stringWithFormat:@"NPS Push Service (%@)", pushServerAddress];
-      }
-      printf("  %-25s | %s\n", "Push Notifications", [pushNotificationsOutput UTF8String]);
-      printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
-      printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
-      printf("  %-25s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
 
       // If push notifications are enabled, show the push notifications full
       // sync interval since it's the active configuration.
@@ -460,6 +450,17 @@ REGISTER_COMMAND_NAME(@"status")
       }
       printf("  %-25s | %s\n", "Full Sync Interval", [fullSyncIntervalStr UTF8String]);
 
+      // Format push notifications output
+      NSString *pushNotificationsOutput = pushNotifications;
+      if (pushServerAddress && [pushNotifications containsString:@"NPS Push Service"]) {
+        pushNotificationsOutput =
+            [NSString stringWithFormat:@"NPS Push Service (%@)", pushServerAddress];
+      }
+      printf("  %-25s | %s\n", "Push Notifications", [pushNotificationsOutput UTF8String]);
+
+      printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
+      printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
+      printf("  %-25s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
         printf("  %-25s | %s\n", "File Access Rules Hash",
                [(fileAccessRulesHash ?: @"null") UTF8String]);
