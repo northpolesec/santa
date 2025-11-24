@@ -310,10 +310,6 @@ the Endpoint Security Framework. Like Colson said in the talk you can use
 Santa's FAA to block access to the Docker settings files, which prevents some
 of the attacks.
 
-
-![](/img/santa-docker.png)
-
-
 ```xml
 <!-- Protect Docker Settings -->
 <key>DockerSettings</key>
