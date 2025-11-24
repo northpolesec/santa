@@ -110,14 +110,14 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 - (SNTStoredTemporaryMonitorModeEnterAuditEvent *)createTestTemporaryMonitorModeEnterAuditEvent {
   return [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
       initWithUUID:@"enter_uuid"
-                seconds:123
-                 reason:SNTTemporaryMonitorModeEnterReasonOnDemand];
+           seconds:123
+            reason:SNTTemporaryMonitorModeEnterReasonOnDemand];
 }
 
 - (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)createTestTemporaryMonitorModeLeaveAuditEvent {
   return [[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
       initWithUUID:@"leave_uuid"
-                 reason:SNTTemporaryMonitorModeLeaveReasonSessionExpired];
+            reason:SNTTemporaryMonitorModeLeaveReasonSessionExpired];
 }
 
 - (void)testAddEvent {
