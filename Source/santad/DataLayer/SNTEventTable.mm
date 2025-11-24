@@ -213,10 +213,9 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
                             [SNTStoredTemporaryMonitorModeEnterAuditEvent class],
                             [SNTStoredTemporaryMonitorModeLeaveAuditEvent class], nil];
   NSError *err;
-  SNTStoredEvent *event = [NSKeyedUnarchiver
-    unarchivedObjectOfClasses:allowedClasses
-                       fromData:eventData
-                          error:&err];
+  SNTStoredEvent *event = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+                                                              fromData:eventData
+                                                                 error:&err];
 
   if (event && !err && [self isValidStoredEvent:event]) {
     return event;
