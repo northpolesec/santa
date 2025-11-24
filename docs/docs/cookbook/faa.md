@@ -316,35 +316,35 @@ of the attacks.
 
 ```xml
 <!-- Protect Docker Settings -->
-    <key>DockerSettings</key>
+<key>DockerSettings</key>
+<dict>
+  <key>Paths</key>
+  <array>
     <dict>
-      <key>Paths</key>
-      <array>
-        <dict>
-          <key>Path</key>
-          <string>/Users/*/Library/Group Containers/group.com.docker/</string>
-          <key>IsPrefix</key>
-          <true/>
-        </dict>
-      </array>
-      <key>Options</key>
-      <dict>
-        <key>AllowReadAccess</key>
-        <true/>
-        <!-- Actually enforce blocks, not just audit -->
-        <key>AuditOnly</key>
-        <false/>
-        <key>RuleType</key>
-        <string>PathsWithAllowedProcesses</string>
-        <key>BlockMessage</key>
-        <string>Only Docker Desktop can modify these settings.</string>
-      </dict>
-      <key>Processes</key>
-      <array>
-        <dict>
-          <key>TeamID</key>
-          <string>9BNSXJN65R</string>
-        </dict>
-      </array>
+      <key>Path</key>
+      <string>/Users/*/Library/Group Containers/group.com.docker/</string>
+      <key>IsPrefix</key>
+      <true/>
     </dict>
+  </array>
+  <key>Options</key>
+  <dict>
+    <key>AllowReadAccess</key>
+    <true/>
+    <!-- Actually enforce blocks, not just audit -->
+    <key>AuditOnly</key>
+    <false/>
+    <key>RuleType</key>
+    <string>PathsWithAllowedProcesses</string>
+    <key>BlockMessage</key>
+    <string>Only Docker Desktop can modify these settings.</string>
+  </dict>
+  <key>Processes</key>
+  <array>
+    <dict>
+      <key>TeamID</key>
+      <string>9BNSXJN65R</string>
+    </dict>
+  </array>
+</dict>
 ```
