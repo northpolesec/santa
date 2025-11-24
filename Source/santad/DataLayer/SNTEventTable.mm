@@ -22,6 +22,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
 
@@ -116,6 +117,10 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
     SNTStoredFileAccessEvent *se = (SNTStoredFileAccessEvent *)event;
     return se.idx && se.ruleVersion.length && se.ruleName.length && se.accessedPath.length &&
            se.process.filePath.length && [[se uniqueID] length];
+  } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]) {
+    SNTStoredTemporaryMonitorModeAuditEvent *se = (SNTStoredTemporaryMonitorModeAuditEvent *)event;
+    return se.uuid && (se.type == SNTStoredTemporaryMonitorModeAuditEventTypeEnter ||
+                       se.type == SNTStoredTemporaryMonitorModeAuditEventTypeLeave);
   } else {
     return NO;
   }
@@ -202,10 +207,14 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
   NSData *eventData = [rs dataNoCopyForColumn:@"eventdata"];
   if (!eventData) return nil;
 
+  static NSSet *allowedClasses =
+      [NSSet setWithObjects:[SNTStoredExecutionEvent class], [SNTStoredFileAccessEvent class],
+                            [SNTStoredTemporaryMonitorModeAuditEvent class],
+                            [SNTStoredTemporaryMonitorModeEnterAuditEvent class],
+                            [SNTStoredTemporaryMonitorModeLeaveAuditEvent class], nil];
   NSError *err;
   SNTStoredEvent *event = [NSKeyedUnarchiver
-      unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTStoredExecutionEvent class],
-                                                      [SNTStoredFileAccessEvent class], nil]
+    unarchivedObjectOfClasses:allowedClasses
                        fromData:eventData
                           error:&err];
 

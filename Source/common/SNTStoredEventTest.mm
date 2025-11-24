@@ -15,6 +15,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
@@ -40,6 +41,16 @@
   faaEvent.accessedPath = @"/not/included";
   faaEvent.process.fileSHA256 = @"bar";
   XCTAssertEqualObjects([faaEvent uniqueID], @"MyRule|MyVersion|bar");
+
+  SNTStoredTemporaryMonitorModeAuditEvent *tmmAudit =
+      [[SNTStoredTemporaryMonitorModeAuditEvent alloc]
+          initEnterWithUUID:@"abc"
+                    seconds:123
+                     reason:SNTTemporaryMonitorModeEnterReasonRestart];
+  XCTAssertEqualObjects(
+      [tmmAudit uniqueID],
+      ([NSString
+          stringWithFormat:@"%@|%ld", @"abc", SNTStoredTemporaryMonitorModeAuditEventTypeEnter]));
 }
 
 - (void)testUnactionableEvent {
@@ -60,6 +71,17 @@
   XCTAssertTrue([faaEvent unactionableEvent]);
   faaEvent.decision = FileAccessPolicyDecision::kDenied;
   XCTAssertFalse([faaEvent unactionableEvent]);
+
+  // Spot check temporary Monitor Mode audit events
+  SNTStoredTemporaryMonitorModeAuditEvent *tmmAudit =
+      [[SNTStoredTemporaryMonitorModeAuditEvent alloc]
+          initEnterWithSeconds:123
+                        reason:SNTTemporaryMonitorModeEnterReasonRestart];
+  XCTAssertFalse([tmmAudit unactionableEvent]);
+  tmmAudit = [[SNTStoredTemporaryMonitorModeAuditEvent alloc]
+      initLeaveWithUUID:@"abc"
+                 reason:SNTTemporaryMonitorModeLeaveReasonRevoked];
+  XCTAssertFalse([tmmAudit unactionableEvent]);
 }
 
 - (void)testEncodeDecode {
@@ -72,6 +94,17 @@
   faaEvent.process.parent = [[SNTStoredFileAccessProcess alloc] init];
   faaEvent.process.parent.pid = @(123);
 
+  SNTStoredTemporaryMonitorModeAuditEvent *tmmAuditEnter =
+      [[SNTStoredTemporaryMonitorModeAuditEvent alloc]
+          initEnterWithUUID:@"xyz"
+                    seconds:123
+                     reason:SNTTemporaryMonitorModeEnterReasonRestart];
+
+  SNTStoredTemporaryMonitorModeAuditEvent *tmmAuditLeave =
+      [[SNTStoredTemporaryMonitorModeAuditEvent alloc]
+          initLeaveWithUUID:@"abc"
+                     reason:SNTTemporaryMonitorModeLeaveReasonRevoked];
+
   NSData *archivedExecEvent = [NSKeyedArchiver archivedDataWithRootObject:execEvent
                                                     requiringSecureCoding:YES
                                                                     error:nil];
@@ -79,24 +112,37 @@
                                                    requiringSecureCoding:YES
                                                                    error:nil];
 
+  NSData *archivedTmmEnterEvent = [NSKeyedArchiver archivedDataWithRootObject:tmmAuditEnter
+                                                        requiringSecureCoding:YES
+                                                                        error:nil];
+
+  NSData *archivedTmmLeaveEvent = [NSKeyedArchiver archivedDataWithRootObject:tmmAuditLeave
+                                                        requiringSecureCoding:YES
+                                                                        error:nil];
+
   XCTAssertNotNil(archivedExecEvent);
   XCTAssertNotNil(archivedFaaEvent);
+  XCTAssertNotNil(archivedTmmEnterEvent);
+  XCTAssertNotNil(archivedTmmLeaveEvent);
 
-  SNTStoredEvent *unarchivedExecEvent = [NSKeyedUnarchiver
-      unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTStoredExecutionEvent class],
-                                                      [SNTStoredFileAccessEvent class], nil]
-                       fromData:archivedExecEvent
-                          error:nil];
+  NSSet *allowedClasses =
+      [NSSet setWithObjects:[SNTStoredExecutionEvent class], [SNTStoredFileAccessEvent class],
+                            [SNTStoredTemporaryMonitorModeAuditEvent class],
+                            [SNTStoredTemporaryMonitorModeEnterAuditEvent class],
+                            [SNTStoredTemporaryMonitorModeLeaveAuditEvent class], nil];
+
+  SNTStoredEvent *unarchivedExecEvent =
+      [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+                                          fromData:archivedExecEvent
+                                             error:nil];
 
   XCTAssertNotNil(unarchivedExecEvent);
   XCTAssertTrue([unarchivedExecEvent isKindOfClass:[SNTStoredExecutionEvent class]]);
   XCTAssertEqualObjects(((SNTStoredExecutionEvent *)unarchivedExecEvent).fileSHA256, @"foo");
 
-  SNTStoredEvent *unarchivedFaaEvent = [NSKeyedUnarchiver
-      unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTStoredExecutionEvent class],
-                                                      [SNTStoredFileAccessEvent class], nil]
-                       fromData:archivedFaaEvent
-                          error:nil];
+  SNTStoredEvent *unarchivedFaaEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+                                                                           fromData:archivedFaaEvent
+                                                                              error:nil];
 
   XCTAssertNotNil(unarchivedFaaEvent);
   XCTAssertTrue([unarchivedFaaEvent isKindOfClass:[SNTStoredFileAccessEvent class]]);
@@ -106,6 +152,35 @@
   XCTAssertEqualObjects(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.parent.pid,
                         @(123));
   XCTAssertNil(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.parent.parent);
+
+  SNTStoredEvent *unarchivedTmmEnterEvent =
+      [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+                                          fromData:archivedTmmEnterEvent
+                                             error:nil];
+  XCTAssertNotNil(unarchivedTmmEnterEvent);
+  XCTAssertTrue(
+      [unarchivedTmmEnterEvent isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]);
+  XCTAssertTrue([((SNTStoredTemporaryMonitorModeAuditEvent *)unarchivedTmmEnterEvent).auditEvent
+      isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]);
+  XCTAssertEqualObjects(unarchivedTmmEnterEvent.uniqueID, [tmmAuditEnter uniqueID]);
+  SNTStoredTemporaryMonitorModeEnterAuditEvent *tmmEnterAuditEvent =
+      ((SNTStoredTemporaryMonitorModeAuditEvent *)unarchivedTmmEnterEvent).auditEvent;
+  XCTAssertEqual(tmmEnterAuditEvent.seconds, 123);
+  XCTAssertEqual(tmmEnterAuditEvent.reason, SNTTemporaryMonitorModeEnterReasonRestart);
+
+  SNTStoredEvent *unarchivedTmmLeaveEvent =
+      [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+                                          fromData:archivedTmmLeaveEvent
+                                             error:nil];
+  XCTAssertNotNil(unarchivedTmmLeaveEvent);
+  XCTAssertTrue(
+      [unarchivedTmmLeaveEvent isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]);
+  XCTAssertTrue([((SNTStoredTemporaryMonitorModeAuditEvent *)unarchivedTmmLeaveEvent).auditEvent
+      isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]);
+  XCTAssertEqualObjects(unarchivedTmmLeaveEvent.uniqueID, [tmmAuditLeave uniqueID]);
+  SNTStoredTemporaryMonitorModeLeaveAuditEvent *tmmLeaveAuditEvent =
+      ((SNTStoredTemporaryMonitorModeAuditEvent *)unarchivedTmmLeaveEvent).auditEvent;
+  XCTAssertEqual(tmmLeaveAuditEvent.reason, SNTTemporaryMonitorModeLeaveReasonRevoked);
 }
 
 @end

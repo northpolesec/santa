@@ -662,6 +662,16 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SNTStoredTemporaryMonitorModeAuditEvent",
+    srcs = ["SNTStoredTemporaryMonitorModeAuditEvent.mm"],
+    hdrs = ["SNTStoredTemporaryMonitorModeAuditEvent.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTStoredEvent",
+    ],
+)
+
 santa_unit_test(
     name = "SNTStoredEventTest",
     srcs = ["SNTStoredEventTest.mm"],
@@ -669,6 +679,7 @@ santa_unit_test(
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
+        ":SNTStoredTemporaryMonitorModeAuditEvent",
     ],
 )
 
