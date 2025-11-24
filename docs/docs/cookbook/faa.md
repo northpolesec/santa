@@ -305,7 +305,7 @@ while](https://theevilbit.github.io/beyond/beyond_0011/), going back to Patrick 
 As seen in the [BYOB: Bring your own Blackbox - Containerized Defense Evasion
 on macOS](https://www.youtube.com/watch?v=AMbxs2Nh-Rc&t=1s) talk by [Colson
 Wilhoit](https://x.com/defsecsentinel) at OBTSv8 you can abuse the Docker
-Desktop settings files to get a container running that will evade tools buil on
+Desktop settings files to get a container running that will evade tools built on
 the Endpoint Security Framework. Like Colson said in the talk you can use
 Santa's FAA to block access to the Docker settings files, which prevents some
 of the attacks.
