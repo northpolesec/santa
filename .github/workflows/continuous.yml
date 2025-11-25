@@ -10,6 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
 
+      # Note: Using Bazel flags documented here to reduce memory footprint:
+      # https://bazel.build/advanced/performance/memory
       - name: Check for flaky tests
         run: |
           bazel test \
