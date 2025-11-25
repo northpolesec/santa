@@ -1,7 +1,7 @@
 name: continuous
 on:
   schedule:
-    - cron: '0 7 * * *' # Every day at 7:00 UTC (3:00 EST)
+    - cron: "0 7 * * *" # Every day at 7:00 UTC (3:00 EST)
   workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
 jobs:
@@ -16,7 +16,9 @@ jobs:
             --test_strategy=exclusive \
             --test_output=errors \
             --runs_per_test 50 \
+            --discard_analysis_cache \
+            --notrack_incremental_state \
+            --nokeep_state_after_build \
             --define=SANTA_BUILD_TYPE=adhoc \
             -t- \
             :unit_tests
-
