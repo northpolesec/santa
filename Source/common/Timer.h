@@ -30,7 +30,8 @@ namespace santa {
 //   bool OnTimer(void);
 // Derived classes can prevent future timer scheduling by returning `false` from `OnTimer`.
 //
-// NB: This class is not thread safe.
+// NB: This class is thread safe. However, OnTimer implementations currently cannot call
+// back into public methods as this will create a deadlock.
 template <typename T>
 class Timer : public std::enable_shared_from_this<Timer<T>> {
  public:
@@ -63,59 +64,87 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
           { t.OnTimer() } -> std::same_as<bool>;
         }, "Classes using Timer<T> must implement 'bool OnTimer()'");
 
-    timer_queue_ = dispatch_get_global_queue(qos_class, 0);
+    timer_queue_ = dispatch_queue_create("com.northpolesec.santa.timer", DISPATCH_QUEUE_SERIAL);
+    dispatch_set_target_queue(timer_queue_, dispatch_get_global_queue(qos_class, 0));
   }
 
   virtual ~Timer() { StopTimer(); }
 
   /// Start a new timer if not already running.
-  void StartTimer() { StartTimer(false); }
+  bool StartTimer() {
+    __block bool did_start_new_timer;
+    dispatch_sync(timer_queue_, ^{
+      did_start_new_timer = StartTimerSerialized();
+    });
+    return did_start_new_timer;
+  }
 
   /// Stop the timer if running.
-  void StopTimer() { ReleaseTimerSource(); }
+  bool StopTimer() {
+    __block bool did_stop;
+    dispatch_sync(timer_queue_, ^{
+      did_stop = StopTimerSerialized();
+    });
+    return did_stop;
+  }
 
   void TimerCallback() {
     if (reschedule_mode_ == RescheduleMode::kTrailingEdge) {
       // If rescheduling on the trailing edge, Stop the timer and then
       // restart if requested.
-      StopTimer();
+      StopTimerSerialized();
       if (static_cast<T *>(this)->OnTimer()) {
-        StartTimer(true);
+        // When restarting the timer on the trailing edge, always wait one cycle.
+        StartTimerSerialized(OnStart::kWaitOneCycle);
       }
     } else {
       // If rescheduling on the leading edge, the timer will have already
       // started, but stop it if requested.
       if (!static_cast<T *>(this)->OnTimer()) {
-        StopTimer();
+        StopTimerSerialized();
       }
     }
   }
 
-  /// Set new timer parameters. If the timer is running, it will fire immediately.
-  void SetTimerInterval(uint32_t interval_seconds) {
-    interval_seconds_ = std::clamp(interval_seconds, minimum_interval_, maximum_interval_);
-    if (interval_seconds_ != interval_seconds) {
-      LOGW(@"Invalid config value for \"%s\": %u. Must be between %u and %u. Clamped to: %u.",
-           backing_config_var_.c_str(), interval_seconds, minimum_interval_, maximum_interval_,
-           interval_seconds_);
-    }
-    UpdateTimingParameters(false);
+  bool StartTimerWithInterval(uint32_t interval_seconds) {
+    __block bool did_start_new_timer;
+    dispatch_sync(timer_queue_, ^{
+      SetTimerIntervalSerialized(interval_seconds);
+      did_start_new_timer = StartTimerSerialized();
+    });
+    return did_start_new_timer;
   }
 
-  bool IsStarted() { return timer_source_ != nullptr; }
+  /// Set new timer parameters. If the timer is running, the new parameters will take effect
+  /// immediately, and may fire immediately based on the OnStart mode used during construction.
+  void SetTimerInterval(uint32_t interval_seconds) {
+    dispatch_sync(timer_queue_, ^{
+      SetTimerIntervalSerialized(interval_seconds);
+    });
+  }
+
+  bool IsStarted() const {
+    __block bool is_started;
+    dispatch_sync(timer_queue_, ^{
+      is_started = (timer_source_ != nullptr);
+    });
+    return is_started;
+  }
 
  protected:
   // Like SetTimerInterval, but doesn't clamp to min/max
   // This is a protected interface that is exposed for testing.
-  void ForceSetIntervalForTesting(uint32_t interval_seconds) {
+  void ForceSetIntervalForTestingUnsafe(uint32_t interval_seconds) {
     interval_seconds_ = interval_seconds;
-    UpdateTimingParameters(false);
+    UpdateTimingParametersSerialized(startup_option_);
   }
 
  private:
-  void StartTimer(bool is_restart) {
+  inline bool StartTimerSerialized() { return StartTimerSerialized(startup_option_); }
+
+  bool StartTimerSerialized(OnStart on_start) {
     if (timer_source_) {
-      return;  // No-op if already running
+      return false;  // No-op if already running
     }
 
     timer_source_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, timer_queue_);
@@ -127,27 +156,28 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
       }
     });
 
-    UpdateTimingParameters(is_restart);
+    UpdateTimingParametersSerialized(on_start);
 
     dispatch_resume(timer_source_);
+
+    return true;
   }
 
   /// Update the timer firing settings.
   /// In trailing edge scheduling, if the update is from a restart, will wait a full interval cycle.
   /// Otherwise, the startup delay is based on `startup_option_` to determine if
   /// the timer should fire immediately or wait a full cycle first.
-  void UpdateTimingParameters(bool is_restart) {
+  void UpdateTimingParametersSerialized(OnStart on_start) {
     if (!timer_source_) {
       return;
     }
 
     dispatch_time_t start_time;
 
-    if ((is_restart && reschedule_mode_ == RescheduleMode::kTrailingEdge) ||
-        startup_option_ == OnStart::kWaitOneCycle) {
-      start_time = dispatch_time(DISPATCH_WALLTIME_NOW, interval_seconds_ * NSEC_PER_SEC);
-    } else {
+    if (on_start == OnStart::kFireImmediately) {
       start_time = dispatch_time(DISPATCH_WALLTIME_NOW, 0);
+    } else {
+      start_time = dispatch_time(DISPATCH_WALLTIME_NOW, interval_seconds_ * NSEC_PER_SEC);
     }
 
     if (reschedule_mode_ == RescheduleMode::kTrailingEdge) {
@@ -159,11 +189,24 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
     }
   }
 
+  void SetTimerIntervalSerialized(uint32_t interval_seconds) {
+    interval_seconds_ = std::clamp(interval_seconds, minimum_interval_, maximum_interval_);
+    if (interval_seconds_ != interval_seconds) {
+      LOGW(@"Invalid config value for \"%s\": %u. Must be between %u and %u. Clamped to: %u.",
+           backing_config_var_.c_str(), interval_seconds, minimum_interval_, maximum_interval_,
+           interval_seconds_);
+    }
+    UpdateTimingParametersSerialized(startup_option_);
+  }
+
   /// Cancels the dispatch timer source.
-  inline void ReleaseTimerSource() {
+  inline bool StopTimerSerialized() {
     if (timer_source_) {
       dispatch_source_cancel(timer_source_);
       timer_source_ = nullptr;
+      return true;
+    } else {
+      return false;
     }
   }
 

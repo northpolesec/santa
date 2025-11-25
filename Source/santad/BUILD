@@ -261,6 +261,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SystemResources",
         "//Source/common:Timer",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
