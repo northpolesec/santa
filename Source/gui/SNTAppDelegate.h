@@ -18,4 +18,5 @@
 /// Initiates and manages the connection to santad
 ///
 @interface SNTAppDelegate : NSObject <NSApplicationDelegate>
+@property(strong, nonatomic) NSStatusItem *statusItem;
 @end

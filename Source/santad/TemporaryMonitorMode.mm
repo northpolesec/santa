@@ -16,9 +16,11 @@
 
 #include <mach/mach_time.h>
 
+#import "Source/common/MOLXPCConnection.h"
 #include "Source/common/Pinning.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/SystemResources.h"
 
 namespace santa {
@@ -56,6 +58,7 @@ void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
                static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
   if (secs_remaining < kMinAllowedStateRemainingSeconds) {
     [configurator_ leaveTemporaryMonitorMode];
+    [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
   } else {
     Begin(secs_remaining);
   }
@@ -176,6 +179,7 @@ std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining(uint64_t deadline
 
 void TemporaryMonitorMode::Begin(uint32_t seconds) {
   SetTimerInterval(seconds);
+  NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:seconds];
   StartTimer();
 
   uint64_t deadline = AddNanosecondsToMachTime(seconds * NSEC_PER_SEC, mach_continuous_time());
@@ -186,6 +190,9 @@ void TemporaryMonitorMode::Begin(uint32_t seconds) {
     kStateTempMonitorModeSavedSyncURLKey : configurator_.syncBaseURL.host,
   }];
   deadline_ = deadline;
+
+  id<SNTNotifierXPC> rop = [notification_queue_.notifierConnection remoteObjectProxy];
+  [rop enterTemporaryMonitorMode:expiry];
 }
 
 bool TemporaryMonitorMode::Cancel() {
@@ -201,6 +208,7 @@ bool TemporaryMonitorMode::End() {
   if (IsStarted()) {
     StopTimer();
     [configurator_ leaveTemporaryMonitorMode];
+    [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
     return true;
   } else {
     return false;
@@ -209,6 +217,7 @@ bool TemporaryMonitorMode::End() {
 
 bool TemporaryMonitorMode::OnTimer() {
   [configurator_ leaveTemporaryMonitorMode];
+  [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
 
   // Don't restart the timer
   return false;

@@ -39,6 +39,8 @@
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
 - (void)postRuleSyncNotificationForApplication:(NSString *)app;
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;
+- (void)enterTemporaryMonitorMode:(NSDate *)expiration;
+- (void)leaveTemporaryMonitorMode;
 - (void)requestAPNSToken:(void (^)(NSString *))reply;
 @end
 

@@ -39,8 +39,10 @@
 #pragma mark App Delegate methods
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-  [self setupMenu];
   self.notificationManager = [[SNTNotificationManager alloc] init];
+
+  [self setupMenu];
+  [self setupStatusBarItem];
 
   if ([SNTConfigurator configurator].enableAPNS) {
     [NSApp registerForRemoteNotifications];
@@ -206,6 +208,47 @@
   [editMenuItem setSubmenu:editMenu];
   [mainMenu addItem:editMenuItem];
   [NSApp setMainMenu:mainMenu];
+}
+
+- (void)setupStatusBarItem {
+  // Create status bar item
+  self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+
+  // Set the app icon as the status bar icon
+  NSImage *icon = [NSImage imageNamed:@"AppIcon"];
+  if (icon) {
+    icon.size = NSMakeSize(24.0, 24.0);
+  }
+  self.statusItem.button.image = icon;
+
+  // Create the menu
+  NSMenu *menu = [[NSMenu alloc] init];
+
+  // Add About menu item
+  NSMenuItem *aboutItem = [[NSMenuItem alloc] initWithTitle:@"About"
+                                                     action:@selector(aboutMenuItemClicked:)
+                                              keyEquivalent:@""];
+  aboutItem.target = self;
+  [menu addItem:aboutItem];
+
+  self.statusItem.menu = menu;
+
+  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  [daemonConn resume];
+  [[daemonConn synchronousRemoteObjectProxy]
+      temporaryMonitorModeSecondsRemaining:^(NSNumber *seconds) {
+        NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
+        [self.notificationManager enterTemporaryMonitorMode:expiry];
+      }];
+  [daemonConn invalidate];
+}
+
+- (void)aboutMenuItemClicked:(id)sender {
+  if (!self.aboutWindowController) {
+    self.aboutWindowController = [[SNTAboutWindowController alloc] init];
+  }
+  [self.aboutWindowController showWindow:self];
+  [NSApp activateIgnoringOtherApps:YES];
 }
 
 #pragma mark Push Notifications
