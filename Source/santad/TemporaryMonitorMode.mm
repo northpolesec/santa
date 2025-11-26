@@ -44,10 +44,9 @@ TemporaryMonitorMode::TemporaryMonitorMode(PassKey, SNTConfigurator *configurato
     : Timer(kMinTemporaryMonitorModeMinutes, kMaxTemporaryMonitorModeMinutes,
             Timer::OnStart::kWaitOneCycle, "Temporary Monitor Mode",
             Timer::RescheduleMode::kTrailingEdge, QOS_CLASS_USER_INITIATED),
+      configurator_(configurator),
       notification_queue_(notification_queue),
-      deadline_(0) {
-  configurator_ = configurator;
-}
+      deadline_(0) {}
 
 void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
   uint32_t secs_remaining = static_cast<uint32_t>(
@@ -57,7 +56,10 @@ void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
   if (secs_remaining < kMinAllowedStateRemainingSeconds) {
     [configurator_ leaveTemporaryMonitorMode];
   } else {
-    Begin(secs_remaining);
+    absl::MutexLock lock(&lock_);
+    BeginLocked(secs_remaining);
+    // TODO: current_uuid_ = state UUID
+    // TODO: Emit "restart" audit event
   }
 }
 
@@ -100,7 +102,7 @@ uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialState(NSDictionary 
   if (secs_remaining.has_value()) {
     return *secs_remaining;
   } else {
-    // TODO: Emit audit event
+    // TODO: Emit "expired" audit event
     return 0;
   }
 }
@@ -152,12 +154,19 @@ uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSEr
 
   uint32_t duration_min = [mode_transition getDurationMinutes:requested_duration];
 
-  Begin(duration_min * 60);
+  absl::MutexLock lock(&lock_);
+  if (BeginLocked(duration_min * 60)) {
+    // TODO: Emit "on demand" audit event
+    current_uuid_ = [NSUUID UUID];
+  } else {
+    // TODO: Emit "on demand refresh" audit event
+  }
 
   return duration_min;
 }
 
-std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining() {
+std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining() const {
+  absl::ReaderMutexLock lock(&lock_);
   if (IsStarted()) {
     return SecondsRemaining(deadline_);
   } else {
@@ -174,9 +183,8 @@ std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining(uint64_t deadline
   }
 }
 
-void TemporaryMonitorMode::Begin(uint32_t seconds) {
-  SetTimerInterval(seconds);
-  StartTimer();
+bool TemporaryMonitorMode::BeginLocked(uint32_t seconds) {
+  bool did_start_new_timer = StartTimerWithInterval(seconds);
 
   uint64_t deadline = AddNanosecondsToMachTime(seconds * NSEC_PER_SEC, mach_continuous_time());
 
@@ -185,21 +193,37 @@ void TemporaryMonitorMode::Begin(uint32_t seconds) {
     kStateTempMonitorModeDeadlineKey : @(deadline),
     kStateTempMonitorModeSavedSyncURLKey : configurator_.syncBaseURL.host,
   }];
+
   deadline_ = deadline;
+
+  return did_start_new_timer;
 }
 
 bool TemporaryMonitorMode::Cancel() {
-  return End();
+  absl::MutexLock lock(&lock_);
+  if (EndLocked()) {
+    // TODO: Emit "cancelled" audit event
+    current_uuid_ = nil;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool TemporaryMonitorMode::Revoke() {
+  absl::MutexLock lock(&lock_);
   [configurator_ setSyncServerModeTransition:[[SNTModeTransition alloc] initRevocation]];
-  return End();
+  if (EndLocked()) {
+    // TODO: Emit "revoked" audit event
+    current_uuid_ = nil;
+    return true;
+  } else {
+    return false;
+  }
 }
 
-bool TemporaryMonitorMode::End() {
-  if (IsStarted()) {
-    StopTimer();
+bool TemporaryMonitorMode::EndLocked() {
+  if (StopTimer()) {
     [configurator_ leaveTemporaryMonitorMode];
     return true;
   } else {
@@ -208,18 +232,26 @@ bool TemporaryMonitorMode::End() {
 }
 
 bool TemporaryMonitorMode::OnTimer() {
+  absl::MutexLock lock(&lock_);
   [configurator_ leaveTemporaryMonitorMode];
+
+  // TODO: Emit "expired" audit event
+  current_uuid_ = nil;
 
   // Don't restart the timer
   return false;
 }
 
-void TemporaryMonitorMode::StartTimer() {
-  Timer<TemporaryMonitorMode>::StartTimer();
-};
+bool TemporaryMonitorMode::StartTimer() {
+  return Timer<TemporaryMonitorMode>::StartTimer();
+}
 
-void TemporaryMonitorMode::StopTimer() {
-  Timer<TemporaryMonitorMode>::StopTimer();
-};
+bool TemporaryMonitorMode::StartTimerWithInterval(uint32_t interval_seconds) {
+  return Timer<TemporaryMonitorMode>::StartTimerWithInterval(interval_seconds);
+}
+
+bool TemporaryMonitorMode::StopTimer() {
+  return Timer<TemporaryMonitorMode>::StopTimer();
+}
 
 }  // namespace santa

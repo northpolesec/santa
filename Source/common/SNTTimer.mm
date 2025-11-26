@@ -76,9 +76,8 @@ class TimerBridge : public Timer<TimerBridge> {
   }
 }
 
-- (void)startWithInterval:(uint32_t)seconds {
-  _timer->SetTimerInterval(seconds);
-  _timer->StartTimer();
+- (BOOL)startWithInterval:(uint32_t)seconds {
+  return _timer->StartTimerWithInterval(seconds);
 }
 
 - (void)stop {
