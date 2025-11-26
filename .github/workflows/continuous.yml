@@ -1,7 +1,7 @@
 name: continuous
 on:
   schedule:
-    - cron: '0 7 * * *' # Every day at 7:00 UTC (3:00 EST)
+    - cron: "0 7 * * *" # Every day at 7:00 UTC (3:00 EST)
   workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
 jobs:
@@ -10,13 +10,17 @@ jobs:
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
 
+      # Note: Using Bazel flags documented here to reduce memory footprint:
+      # https://bazel.build/advanced/performance/memory
       - name: Check for flaky tests
         run: |
           bazel test \
             --test_strategy=exclusive \
             --test_output=errors \
             --runs_per_test 50 \
+            --discard_analysis_cache \
+            --notrack_incremental_state \
+            --nokeep_state_after_build \
             --define=SANTA_BUILD_TYPE=adhoc \
             -t- \
             :unit_tests
-
