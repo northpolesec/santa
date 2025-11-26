@@ -160,7 +160,8 @@ FAAPolicyProcessor::FAAPolicyProcessor(
       reads_cache_(kNumProcesses, kPerProcessSetCapacity),
       tty_message_cache_(kNumProcesses, kPerProcessSetCapacity),
       rate_limiter_(
-          RateLimiter::Create(metrics_, rate_limit_logs_per_sec, rate_limit_window_size_sec)) {
+          RateLimiter::Create(metrics_, rate_limit_logs_per_sec, rate_limit_window_size_sec)),
+      webhook_client_(std::make_unique<FAAWebhookClient>()) {
   configurator_ = [SNTConfigurator configurator];
   queue_ = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
 }
@@ -463,6 +464,16 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     SNTOverrideFileAccessAction override_action) {
   FileAccessPolicyDecision decision = ApplyOverrideToDecision(
       ApplyPolicy(msg, target, optional_policy, check_if_policy_matches_block), override_action);
+
+  // Trigger webhook if policy exists, has webhook configured, and actually matched
+  // This happens regardless of the decision (including audit-only)
+  // We only trigger if the decision is not kNoPolicy, which means the policy matched
+  if (optional_policy.has_value() && decision != FileAccessPolicyDecision::kNoPolicy) {
+    std::shared_ptr<WatchItemPolicyBase> policy = *optional_policy;
+    if (policy->webhook_url.has_value() && policy->webhook_url.value()) {
+      webhook_client_->TriggerWebhookForRuleMatch(*policy, target.path, msg);
+    }
+  }
 
   // Note: If ShouldLogDecision, it shouldn't be possible for optionalPolicy
   // to not have a value. Performing the check just in case to prevent a crash.
