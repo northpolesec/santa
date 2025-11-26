@@ -1,7 +1,12 @@
+# Continuous Testing
+#
+# Run 50 times per day, split over two runs to keep individual run times
+# lower so as not to hit action timeout conditions.
 name: continuous
 on:
   schedule:
-    - cron: "0 7 * * *" # Every day at 7:00 UTC (3:00 EST)
+    - cron: "0 10 * * *" # Every day at 10:00 UTC
+    - cron: "30 23 * * *" # Every day at 23:30 UTC
   workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
 jobs:
@@ -17,7 +22,7 @@ jobs:
           bazel test \
             --test_strategy=exclusive \
             --test_output=errors \
-            --runs_per_test 50 \
+            --runs_per_test 25 \
             --discard_analysis_cache \
             --notrack_incremental_state \
             --nokeep_state_after_build \
