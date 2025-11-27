@@ -132,6 +132,18 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   }
 
  protected:
+  // Convenience method to provide shared_from_this to derived classes
+  template <typename U>
+  std::shared_ptr<U> shared_from_base() {
+    return std::static_pointer_cast<T>(this->shared_from_this());
+  }
+
+  // Convenience method to provide weak_from_this to derived classes
+  template <typename U>
+  std::weak_ptr<U> weak_from_base() {
+    return std::weak_ptr<U>(std::static_pointer_cast<U>(this->shared_from_this()));
+  }
+
   // Like SetTimerInterval, but doesn't clamp to min/max
   // This is a protected interface that is exposed for testing.
   void ForceSetIntervalForTestingUnsafe(uint32_t interval_seconds) {

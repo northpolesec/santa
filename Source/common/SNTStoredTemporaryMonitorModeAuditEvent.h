@@ -45,6 +45,9 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
   // The machine's SyncBaseURL configuration changed which cancelled
   // an active session.
   SNTTemporaryMonitorModeLeaveReasonSyncServerChanged,
+
+  // The machine rebooted and the previous session is no longer applicable
+  SNTTemporaryMonitorModeLeaveReasonReboot,
 };
 
 // Represents a temporary Monitor Mode audit event stored in the events database.
