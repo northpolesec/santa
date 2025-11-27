@@ -213,6 +213,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   [syncd_queue reassessSyncServiceConnectionImmediately];
 
+  // Set initial telemetry mask using EnableForkAndExitLogging
+  logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(configurator.telemetry,
+                                                           configurator.enableForkAndExitLogging));
+
   NSMutableArray<SNTKVOManager *> *kvoObservers = [[NSMutableArray alloc] init];
   [kvoObservers addObjectsFromArray:@[
     [[SNTKVOManager alloc]
