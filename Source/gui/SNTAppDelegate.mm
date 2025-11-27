@@ -105,6 +105,10 @@
   [NSApp enumerateWindowsWithOptions:0
                           usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
                             if (window == closingWindow) return;
+                            // There are windows associated with the status bar item, these should
+                            // not prevent hiding the dock icon.
+                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")])
+                              return;
                             *stop = hasVisibleWindows = window.visible;
                           }];
   if (!hasVisibleWindows) {
