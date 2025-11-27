@@ -24,17 +24,14 @@
 #include "Source/common/SystemResources.h"
 #import "Source/santad/SNTNotificationQueue.h"
 
-static NSString *const kBootSessionUUIDKey = @"UUID";
-static NSString *const kDeadlineKey = @"Deadline";
-static NSString *const kSyncURLKey = @"SyncURL";
-
 namespace santa {
 class TemporaryMonitorModePeer : public TemporaryMonitorMode {
  public:
-  TemporaryMonitorModePeer(SNTConfigurator *configurator, SNTNotificationQueue *notQueue)
-      : santa::TemporaryMonitorMode(MakeKey(), configurator, notQueue) {}
+  TemporaryMonitorModePeer(SNTConfigurator *configurator, SNTNotificationQueue *notQueue,
+                           HandleAuditEventBlock block)
+      : santa::TemporaryMonitorMode(MakeKey(), configurator, notQueue, block) {}
 
-  using TemporaryMonitorMode::GetSecondsRemainingFromInitialState;
+  using TemporaryMonitorMode::GetSecondsRemainingFromInitialStateLocked;
 };
 }  // namespace santa
 
@@ -70,56 +67,79 @@ uint64_t MakeDeadline(uint64_t want) {
   NSURL *pinnedURL = [NSURL URLWithString:@"https://foo.workshop.cloud"];
   NSURL *pinnedURL2 = [NSURL URLWithString:@"https://bar.workshop.cloud"];
   NSString *testBootUUID = @"my.boot.uuid";
+  NSString *testSessionUUID = [[NSUUID UUID] UUIDString];
   uint64_t wantAtLeastSeconds = 100;
 
-  TemporaryMonitorModePeer tmm([SNTConfigurator configurator], self.mockNotQueue);
+  TemporaryMonitorModePeer tmm([SNTConfigurator configurator], self.mockNotQueue,
+                               ^(id){
+                                   // This space intentionally left blank.
+                               });
 
   NSDictionary *goodTestState = @{
-    kBootSessionUUIDKey : testBootUUID,
-    kDeadlineKey : @(MakeDeadline(wantAtLeastSeconds)),
-    kSyncURLKey : pinnedURL.host
+    kStateTempMonitorModeBootUUIDKey : testBootUUID,
+    kStateTempMonitorModeDeadlineKey : @(MakeDeadline(wantAtLeastSeconds)),
+    kStateTempMonitorModeSavedSyncURLKey : pinnedURL.host,
+    kStateTempMonitorModeSessionUUIDKey : testSessionUUID,
   };
 
   NSMutableDictionary *testState = [goodTestState copy];
-  XCTAssertGreaterThan(tmm.GetSecondsRemainingFromInitialState(testState, testBootUUID, pinnedURL),
-                       wantAtLeastSeconds);
+  XCTAssertGreaterThan(
+      tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
+      wantAtLeastSeconds);
 
   // Bad Boot Session UUID type
   testState = [goodTestState mutableCopy];
-  testState[kBootSessionUUIDKey] = @(123);
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialState(testState, testBootUUID, pinnedURL), 0);
+  testState[kStateTempMonitorModeBootUUIDKey] = @(123);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
+                 0);
 
   // Bad Deadline type
   testState = [goodTestState mutableCopy];
-  testState[kDeadlineKey] = @"123";
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialState(testState, testBootUUID, pinnedURL), 0);
+  testState[kStateTempMonitorModeDeadlineKey] = @"123";
+  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
+                 0);
+
+  // Bad Session UUID type
+  testState = [goodTestState mutableCopy];
+  testState[kStateTempMonitorModeSessionUUIDKey] = @(123);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
+                 0);
+
+  // Invalid Session UUID
+  testState = [goodTestState mutableCopy];
+  testState[kStateTempMonitorModeSessionUUIDKey] = @"ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ";
+  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
+                 0);
 
   // Bad Sync URL type type
   testState = [goodTestState mutableCopy];
-  testState[kSyncURLKey] = @(123);
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialState(testState, testBootUUID, pinnedURL), 0);
+  testState[kStateTempMonitorModeSavedSyncURLKey] = @(123);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
+                 0);
 
   // Mismatched boot session UUID
   testState = [goodTestState mutableCopy];
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialState(testState, @"xyz", pinnedURL), 0);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, @"xyz", pinnedURL), 0);
 
   // Unpinned sync URL
   testState = [goodTestState mutableCopy];
-  testState[kSyncURLKey] = unpinnedURL.host;
+  testState[kStateTempMonitorModeSavedSyncURLKey] = unpinnedURL.host;
   OCMExpect([self.mockConfigurator
       setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition *mt) {
         return mt.type == SNTModeTransitionTypeRevoke;
       }]]);
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialState(testState, testBootUUID, unpinnedURL), 0);
+  XCTAssertEqual(
+      tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, unpinnedURL), 0);
 
   // Mismatched sync URL
   testState = [goodTestState mutableCopy];
-  testState[kSyncURLKey] = pinnedURL2.host;
+  testState[kStateTempMonitorModeSavedSyncURLKey] = pinnedURL2.host;
   OCMExpect([self.mockConfigurator
       setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition *mt) {
         return mt.type == SNTModeTransitionTypeRevoke;
       }]]);
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialState(testState, testBootUUID, pinnedURL), 0);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
+                 0);
 
   XCTAssertTrue(OCMVerifyAll(self.mockConfigurator));
 }

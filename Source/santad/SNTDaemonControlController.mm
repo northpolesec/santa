@@ -35,6 +35,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTTimer.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
@@ -89,8 +90,12 @@ double watchdogRAMPeak = 0;
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
 
-    _temporaryMonitorMode =
-        santa::TemporaryMonitorMode::Create([SNTConfigurator configurator], _notQueue);
+    _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
+        [SNTConfigurator configurator], _notQueue,
+        ^(SNTStoredTemporaryMonitorModeAuditEvent *){
+            // TODO: Dropping for now. In the next PR, will get these stored
+            // in the DB to be picked up by the sync server.
+        });
   }
   return self;
 }
@@ -624,10 +629,6 @@ double watchdogRAMPeak = 0;
 - (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply {
   std::optional<uint64_t> secsRemaining = _temporaryMonitorMode->SecondsRemaining();
   reply(secsRemaining.has_value() ? @(*secsRemaining) : nil);
-}
-
-- (BOOL)revokeTemporaryMonitorMode {
-  return _temporaryMonitorMode->Revoke();
 }
 
 - (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply {
