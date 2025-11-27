@@ -53,8 +53,33 @@ REGISTER_COMMAND_NAME(@"monitormode")
   return [NSSet setWithArray:@[ @"mm" ]];
 }
 
+// Parse a time interval string into a number of minutes.
+// e.g. "10m" -> 10, "2h" -> 120, "3d" -> 3600
+- (NSTimeInterval)parseTimeInterval:(NSString *)duration {
+  NSScanner *scanner = [NSScanner scannerWithString:duration];
+  NSString *unit = nil;
+
+  NSInteger intValue = 0;
+  if ([scanner scanInteger:&intValue]) {
+    [scanner scanCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@"mhd"]
+                        intoString:&unit];
+    if (unit == nil) {
+      return intValue;
+    }
+
+    if ([unit isEqualToString:@"m"]) {
+      return intValue;
+    } else if ([unit isEqualToString:@"h"]) {
+      return intValue * 60;
+    } else if ([unit isEqualToString:@"d"]) {
+      return intValue * (60 * 24);
+    }
+  }
+  return 0;
+}
+
 - (void)runWithArguments:(NSArray *)arguments {
-  NSNumber *requestedDuration;
+  NSTimeInterval requestedDuration;
   bool shouldCancel = false;
 
   // Parse arguments
@@ -68,21 +93,15 @@ REGISTER_COMMAND_NAME(@"monitormode")
 
       arg = arguments[i];
       if (arg.length == 0) {
-        [self printErrorUsageAndExit:@"--duration requires a whole number argument"];
+        [self printErrorUsageAndExit:
+                  @"--duration requires a whole number argument or duration string"];
       }
 
-      NSCharacterSet *nonDigitCharacterSet =
-          [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
-      if ([arg rangeOfCharacterFromSet:nonDigitCharacterSet].location != NSNotFound) {
-        [self printErrorUsageAndExit:@"--duration requires a whole number argument"];
+      requestedDuration = [self parseTimeInterval:arg];
+      if (requestedDuration <= 0) {
+        [self printErrorUsageAndExit:
+                  @"--duration requires a whole number argument or duration string"];
       }
-
-      NSInteger val = [arg integerValue];
-      if (val <= 0) {
-        [self printErrorUsageAndExit:@"--duration must be greater than 0"];
-      }
-
-      requestedDuration = @(val);
     } else if ([arg caseInsensitiveCompare:@"--cancel"] == NSOrderedSame) {
       shouldCancel = true;
     }
@@ -100,7 +119,7 @@ REGISTER_COMMAND_NAME(@"monitormode")
     }];
   } else {
     [[self.daemonConn synchronousRemoteObjectProxy]
-        requestTemporaryMonitorModeWithDurationMinutes:requestedDuration
+        requestTemporaryMonitorModeWithDurationMinutes:@(requestedDuration)
                                                  reply:^(uint32_t minutes, NSError *err) {
                                                    success = (err == nil);
                                                    if (err) {
