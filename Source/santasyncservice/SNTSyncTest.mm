@@ -26,6 +26,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -817,7 +818,7 @@
                                                         fromData:eventData
                                                            error:&err];
   XCTAssertNil(err);
-  XCTAssertEqual(events.count, 3);
+  XCTAssertEqual(events.count, 5);
 
   OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
 
@@ -885,6 +886,22 @@
             XCTAssertEqualObjects(event[@"process_chain"][1][kPID], @(456));
             XCTAssertEqual([event[@"process_chain"][0][kSigningChain] count], 3);
             XCTAssertEqualObjects(event[@"access_time"], @(1753333333));
+
+            events = requestDict[@"audit_events"];
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqual(events.count, 2);
+
+              event = events[0][@"temporary_monitor_mode"];
+              XCTAssertEqualObjects(event[@"session_id"], @"my_test_enter_uuid");
+              XCTAssertEqualObjects(event[@"enter"][@"reason"], @"REASON_ON_DEMAND");
+              XCTAssertEqualObjects(event[@"enter"][@"seconds"], @"123");
+
+              event = events[1][@"temporary_monitor_mode"];
+              XCTAssertEqualObjects(event[@"session_id"], @"my_test_leave_uuid");
+              XCTAssertEqualObjects(event[@"leave"][@"reason"], @"REASON_REVOKED");
+            } else {
+              XCTAssertEqual(events.count, 0);
+            }
 
             return YES;
           }];
@@ -964,7 +981,11 @@
 
   XCTAssertTrue([sut sync]);
 
-  XCTAssertEqual(requestCount, 3);
+  if (self.syncState.isSyncV2) {
+    XCTAssertEqual(requestCount, 5);
+  } else {
+    XCTAssertEqual(requestCount, 3);
+  }
 }
 
 #pragma mark - SNTSyncRuleDownload Tests

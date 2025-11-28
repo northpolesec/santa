@@ -14,7 +14,6 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
-#include "Source/common/String.h"
 
 #import <Foundation/Foundation.h>
 
@@ -40,6 +39,7 @@
 #import "Source/common/SNTTimer.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
+#include "Source/common/String.h"
 #include "Source/common/faa/WatchItems.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -92,9 +92,9 @@ double watchdogRAMPeak = 0;
 
     _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
         [SNTConfigurator configurator], _notQueue,
-        ^(SNTStoredTemporaryMonitorModeAuditEvent *){
-            // TODO: Dropping for now. In the next PR, will get these stored
-            // in the DB to be picked up by the sync server.
+        ^(SNTStoredTemporaryMonitorModeAuditEvent *auditEvent) {
+          [[SNTDatabaseController eventTable] addStoredEvent:auditEvent];
+          [syncdQueue addStoredEvent:auditEvent];
         });
   }
   return self;
