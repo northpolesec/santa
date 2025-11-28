@@ -61,13 +61,16 @@ REGISTER_COMMAND_NAME(@"monitormode")
 
   NSInteger intValue = 0;
   if ([scanner scanInteger:&intValue]) {
-    [scanner scanCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@"mhd"]
+    [scanner scanCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@"smhd"]
                         intoString:&unit];
     if (unit == nil) {
       return intValue;
     }
 
-    if ([unit isEqualToString:@"m"]) {
+    if ([unit isEqualToString:@"s"]) {
+      // Round up and properly handle truncation: e.g. 61s -> 2 minutes
+      return (intValue + 59) / 60;
+    } else if ([unit isEqualToString:@"m"]) {
       return intValue;
     } else if ([unit isEqualToString:@"h"]) {
       return intValue * 60;
