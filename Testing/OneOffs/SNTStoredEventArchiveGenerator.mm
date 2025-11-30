@@ -34,12 +34,11 @@
 #include "Source/common/SNTFileInfo.h"
 #include "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/SNTStoredFileAccessEvent.h"
+#include "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 
 static NSString *const kOutputPath = @"/tmp/stored_event_archive.plist";
 
-int main(int argc, const char *argv[]) {
-  NSMutableArray<SNTStoredEvent *> *storedEvents = [[NSMutableArray alloc] init];
-
+void AddStoredExecutionEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
   NSError *err;
   SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes" error:&err];
   if (!fi) {
@@ -86,9 +85,13 @@ int main(int argc, const char *argv[]) {
   event.entitlements = @{@"ent1" : @"val1", @"ent2" : @"val2"};
   event.secureSigningTime = [NSDate dateWithTimeIntervalSince1970:1748829846];
   event.signingTime = [NSDate dateWithTimeIntervalSince1970:1748743446];
-  [storedEvents addObject:event];
 
-  fi = [[SNTFileInfo alloc] initWithPath:@"/bin/mkdir" error:&err];
+  [storedEvents addObject:event];
+}
+
+void AddStoredFileAccessEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
+  NSError *err;
+  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/bin/mkdir" error:&err];
   if (!fi) {
     NSLog(@"Failed to grab file info for \"mkdir\": %@", err);
     exit(EXIT_FAILURE);
@@ -116,8 +119,31 @@ int main(int argc, const char *argv[]) {
   faaEvent.process.executingUser = @"nobody";
   faaEvent.process.parent = [[SNTStoredFileAccessProcess alloc] init];
   faaEvent.process.parent.pid = @(456);
-  [storedEvents addObject:faaEvent];
 
+  [storedEvents addObject:faaEvent];
+}
+
+void AddStoredTemporaryMonitorModeAuditEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
+  // Audit event for "enter"
+  [storedEvents addObject:[[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
+                              initWithUUID:@"my_test_enter_uuid"
+                                   seconds:123
+                                    reason:SNTTemporaryMonitorModeEnterReasonOnDemand]];
+
+  // Audit event for "leave"
+  [storedEvents addObject:[[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
+                              initWithUUID:@"my_test_leave_uuid"
+                                    reason:SNTTemporaryMonitorModeLeaveReasonRevoked]];
+}
+
+int main(int argc, const char *argv[]) {
+  NSMutableArray<SNTStoredEvent *> *storedEvents = [[NSMutableArray alloc] init];
+
+  AddStoredExecutionEvents(storedEvents);
+  AddStoredFileAccessEvents(storedEvents);
+  AddStoredTemporaryMonitorModeAuditEvents(storedEvents);
+
+  NSError *err;
   NSData *data = [NSKeyedArchiver archivedDataWithRootObject:storedEvents
                                        requiringSecureCoding:YES
                                                        error:&err];
