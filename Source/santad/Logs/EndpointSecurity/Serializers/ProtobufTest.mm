@@ -399,7 +399,9 @@ void SerializeAndCheckNonESEvents(
     std::string got = ConvertMessageToJsonString(santaMsg);
     NSString *wantData = LoadTestJson(filename, esMsg.version);
 
-    XCTAssertEqualObjects([NSString stringWithUTF8String:got.c_str()], wantData);
+    XCTAssertEqualObjects([NSString stringWithUTF8String:got.c_str()], wantData,
+                          @"Result does not match expectations. Version: %d, Filename: %@",
+                          cur_version, filename);
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -1793,9 +1795,33 @@ void SerializeAndCheckNonESEvents(
         esMsg->event.open.file = &openFile;
       },
       ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
-        return serializer->SerializeFileAccess("policy_version", "policy_name", msg,
-                                               Enricher().Enrich(*msg->process), "target",
-                                               FileAccessPolicyDecision::kDenied, "abc123");
+        return serializer->SerializeFileAccess(
+            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), "target",
+            &openFile, Enricher().Enrich(openFile), FileAccessPolicyDecision::kDenied, "abc123");
+      });
+
+  SerializeAndCheckNonESEvents(
+      6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_no_event_not_enriched.json",
+      ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+        esMsg->event.open.file = &openFile;
+      },
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+        return serializer->SerializeFileAccess(
+            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), "target",
+            nullptr, santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
+            FileAccessPolicyDecision::kDenied, "abc123");
+      });
+
+  SerializeAndCheckNonESEvents(
+      6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_not_enriched.json",
+      ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+        esMsg->event.open.file = &openFile;
+      },
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+        return serializer->SerializeFileAccess(
+            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), "target",
+            &openFile, santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
+            FileAccessPolicyDecision::kDenied, "abc123");
       });
 }
 

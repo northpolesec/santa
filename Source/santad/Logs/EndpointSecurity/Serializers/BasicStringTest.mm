@@ -1263,6 +1263,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   es_file_t procFile = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &proc);
+  es_file_t targetFile = MakeESFile("bar");
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1270,7 +1271,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   std::vector<uint8_t> ret =
       BasicString::Create(nullptr, nil, false)
           ->SerializeFileAccess("v1.0", "pol_name", Message(mockESApi, &esMsg),
-                                Enricher().Enrich(*esMsg.process), "file_target",
+                                Enricher().Enrich(*esMsg.process), "file_target", &targetFile,
+                                Enricher().Enrich(targetFile),
                                 FileAccessPolicyDecision::kAllowedAuditOnly, "abc123");
   std::string got(ret.begin(), ret.end());
   std::string want =

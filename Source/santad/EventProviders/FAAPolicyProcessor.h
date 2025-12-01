@@ -63,10 +63,15 @@ class FAAPolicyProcessor {
   // Small structure to hold a complete event path target being operated upon and
   // a bool indicating whether the path is a readable target (e.g. a file being
   // opened or cloned)
+  // TODO(mlw): This structure should be moved to live with the `Message` wrapper, tying the
+  // information to the lifetime of the es_message_t.
   struct PathTarget {
     std::string path;
     bool is_readable;
     std::optional<std::pair<dev_t, ino_t>> devno_ino;
+    // This is a pointer into a live ES message.
+    // The message must remain valid while this object lives.
+    const es_file_t *event_target;
   };
 
   struct ESResult {

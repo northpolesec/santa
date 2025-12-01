@@ -77,12 +77,10 @@
    "nlink": 303,
    "ino": "304",
    "user": {
-    "uid": -2,
-    "name": "nobody"
+    "uid": -2
    },
    "group": {
-    "gid": -1,
-    "name": "nogroup"
+    "gid": -1
    },
    "rdev": 305,
    "access_time": "1970-01-01T00:06:40.000000500Z",

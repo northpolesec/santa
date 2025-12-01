@@ -181,12 +181,6 @@ static inline void EncodeFileInfo(::pbv1::FileInfo *pb_file, const es_file_t *es
   }
 }
 
-static inline void EncodeFileInfoLight(::pbv1::FileInfoLight *pb_file, std::string_view path,
-                                       bool truncated) {
-  EncodeString([pb_file] { return pb_file->mutable_path(); }, path);
-  pb_file->set_truncated(truncated);
-}
-
 static inline void EncodeFileInfoLight(::pbv1::FileInfoLight *pb_file, const es_file_t *es_file) {
   EncodePath(pb_file->mutable_path(), es_file);
   pb_file->set_truncated(es_file->path_truncated);
@@ -1364,6 +1358,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification &m
 std::vector<uint8_t> Protobuf::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
     const EnrichedProcess &enriched_process, const std::string &target,
+    const es_file_t *event_target, std::optional<santa::EnrichedFile> enriched_event_target,
     FileAccessPolicyDecision decision, std::string_view operation_id) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
@@ -1372,7 +1367,12 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
 
   EncodeProcessInfo(file_access->mutable_instigator(), msg->version, msg->process,
                     enriched_process);
-  EncodeFileInfoLight(file_access->mutable_target(), target, false);
+  if (event_target) {
+    EncodeFileInfo(file_access->mutable_target(), event_target, enriched_event_target);
+  } else {
+    EncodeFileInfo(file_access->mutable_target(),
+                   es_string_token_t{.length = target.length(), .data = target.c_str()}, false);
+  }
   EncodeString([file_access] { return file_access->mutable_policy_version(); }, policy_version);
   EncodeString([file_access] { return file_access->mutable_policy_name(); }, policy_name);
 

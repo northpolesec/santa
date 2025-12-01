@@ -54,7 +54,8 @@ static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTa
     vec.push_back({Path(esFile), isReadable,
                    isReadable ? std::make_optional<std::pair<dev_t, ino_t>>(
                                     {esFile->stat.st_dev, esFile->stat.st_ino})
-                              : std::nullopt});
+                              : std::nullopt,
+                   esFile});
   }
 }
 
@@ -62,7 +63,7 @@ static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTa
 static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
                                           const es_file_t *dir, const es_string_token_t &name) {
   if (!dir->path_truncated) {
-    vec.push_back({Path(dir) + "/" + Path(name), false, std::nullopt});
+    vec.push_back({Path(dir) + "/" + Path(name), false, std::nullopt, nullptr});
   }
 }
 
@@ -406,13 +407,18 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const P
   std::string policy_name_copy = policy.name;
   std::string policy_version_copy = policy.version;
   std::string target_path_copy = target.path;
+  const es_file_t *event_target_copy = target.event_target;
   __block Message msg_copy(msg);
 
   dispatch_async(queue_, ^{
+    Message moved_in_msg = std::move(msg_copy);
     EnrichedProcess enriched_proc =
-        enricher_->Enrich(*msg_copy->process, EnrichOptions::kLocalOnly);
-    logger_->LogFileAccess(policy_version_copy, policy_name_copy, std::move(msg_copy),
-                           std::move(enriched_proc), target_path_copy, decision);
+        enricher_->Enrich(*moved_in_msg->process, EnrichOptions::kLocalOnly);
+    std::optional<santa::EnrichedFile> enriched_event_target =
+        enricher_->Enrich(event_target_copy, EnrichOptions::kLocalOnly);
+    logger_->LogFileAccess(policy_version_copy, policy_name_copy, std::move(moved_in_msg),
+                           enriched_proc, target_path_copy, event_target_copy,
+                           std::move(enriched_event_target), decision);
   });
 }
 

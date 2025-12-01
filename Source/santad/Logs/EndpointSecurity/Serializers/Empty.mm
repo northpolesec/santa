@@ -151,12 +151,11 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedTCCModification &) {
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> Empty::SerializeFileAccess(const std::string &policy_version,
-                                                const std::string &policy_name, const Message &msg,
-                                                const EnrichedProcess &enriched_process,
-                                                const std::string &target,
-                                                FileAccessPolicyDecision decision,
-                                                std::string_view operation_id) {
+std::vector<uint8_t> Empty::SerializeFileAccess(
+    const std::string &policy_version, const std::string &policy_name, const Message &msg,
+    const EnrichedProcess &enriched_process, const std::string &target,
+    const es_file_t *event_target, std::optional<santa::EnrichedFile> enriched_event_target,
+    FileAccessPolicyDecision decision, std::string_view operation_id) {
   return {};
 }
 
