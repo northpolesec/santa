@@ -752,6 +752,30 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertTrue(cd.silentBlock);
     XCTAssertFalse(cd.cacheable);
   }
+  {
+    SNTRule *r = createCELRule(@"euid != 0");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
+  }
+  {
+    SNTRule *r = createCELRule(@"cwd != '/Users/foo'");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
+  }
 }
 
 @end
