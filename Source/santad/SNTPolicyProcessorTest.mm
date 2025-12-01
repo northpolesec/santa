@@ -671,6 +671,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         ^std::map<std::string, std::string>() {
           return std::map<std::string, std::string>{{"ENV_VARIABLE1", "value1"},
                                                     {"OTHER_ENV_VAR", "value2"}};
+        },
+        ^uid_t() {
+          return 0;
+        },
+        ^std::string() {
+          return "/";
         });
   };
 
@@ -744,6 +750,30 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertTrue(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
+  }
+  {
+    SNTRule *r = createCELRule(@"euid != 0");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
+  }
+  {
+    SNTRule *r = createCELRule(@"cwd != '/Users/foo'");
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertFalse(cd.silentBlock);
     XCTAssertFalse(cd.cacheable);
   }
 }
