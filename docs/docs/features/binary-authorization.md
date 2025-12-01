@@ -309,9 +309,9 @@ would normally be possible. A rule with this policy must also include a valid
 decision.
 
 The input to the expression will be an
-[santa.cel.v1.ExecutionContext](https://github.com/northpolesec/protos/blob/704246489aa55e6e2b60b47133a8668bc3656105/cel/v1.proto#L42)
+[santa.cel.v1.ExecutionContext](https://github.com/northpolesec/protos/blob/2a1ccb8059dccea5b4b9f9a2be77a9810cb0184d/cel/v1.proto#L42)
 and the return value must either be a
-[santa.cel.v1.ReturnValue](https://github.com/northpolesec/protos/blob/704246489aa55e6e2b60b47133a8668bc3656105/cel/v1.proto#L20)
+[santa.cel.v1.ReturnValue](https://github.com/northpolesec/protos/blob/2a1ccb8059dccea5b4b9f9a2be77a9810cb0184d/cel/v1.proto#L20)
 or a bool. If the return value is a bool, true will be treated as a
 `ReturnValue.ALLOWLIST` and false will be treated as `ReturnValue.BLOCKLIST`.
 
@@ -334,6 +334,12 @@ target.signing_time >= timestamp('2025-05-31T00:00:00Z')
 // Block all executions with DYLD_INSERT_LIBRARIES environment variable set.
 // This expression will NOT be cacheable.
 ! has(envs.DYLD_INSERT_LIBRARIES)
+
+// Only allow execution by non-root users. Requires Santa 2025.12+
+euid != 0
+
+// Disallow execution from inside /Library/LaunchDaemons. Requires Santa 2025.12+
+cwd != '/Library/LaunchDaemons'
 ```
 
 ## Rule Layering
