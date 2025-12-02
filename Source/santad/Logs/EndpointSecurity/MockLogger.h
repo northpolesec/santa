@@ -38,7 +38,7 @@ class MockLogger : public santa::Logger {
               (const std::string &policy_version,
                const std::string &policy_name, const santa::Message &msg,
                const santa::EnrichedProcess &enriched_process,
-               const std::string &target, const es_file_t *event_target,
+               size_t target_index,
                std::optional<santa::EnrichedFile> enriched_event_target,
                FileAccessPolicyDecision decision));
 };

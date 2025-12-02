@@ -68,10 +68,6 @@
   },
   "start_time": "1970-01-01T00:00:00Z"
  },
- "target": {
-  "path": "target",
-  "truncated": false
- },
  "policy_version": "policy_version",
  "policy_name": "policy_name",
  "access_type": "ACCESS_TYPE_OPEN",

@@ -367,7 +367,7 @@ void SerializeAndCheck(es_event_type_t eventType,
 
 void SerializeAndCheckNonESEvents(
     uint32_t minAssociatedESVersion, es_event_type_t eventType, NSString *filename,
-    void (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>, es_message_t *),
+    bool (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>, es_message_t *),
     std::vector<uint8_t> (^RunSerializer)(std::shared_ptr<Serializer> serializer,
                                           const Message &msg)) {
   std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -388,9 +388,13 @@ void SerializeAndCheckNonESEvents(
     esMsg.process->tty = &ttyFile;
     esMsg.version = cur_version;
 
-    messageSetup(mockESApi, &esMsg);
+    Message msg(mockESApi, &esMsg);
+    if (messageSetup(mockESApi, &esMsg)) {
+      // Prime message path targets
+      (void)msg.PathTargets();
+    }
 
-    std::vector<uint8_t> vec = RunSerializer(bs, Message(mockESApi, &esMsg));
+    std::vector<uint8_t> vec = RunSerializer(bs, std::move(msg));
 
     std::string protoStr(vec.begin(), vec.end());
 
@@ -1789,38 +1793,78 @@ void SerializeAndCheckNonESEvents(
 
 - (void)testSerializeFileAccess {
   __block es_file_t openFile = MakeESFile("open_file", MakeStat(300));
-  SerializeAndCheckNonESEvents(
-      6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access.json",
-      ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
-        esMsg->event.open.file = &openFile;
-      },
-      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
-        return serializer->SerializeFileAccess(
-            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), "target",
-            &openFile, Enricher().Enrich(openFile), FileAccessPolicyDecision::kDenied, "abc123");
-      });
+  __block es_file_t linkTargetDir = MakeESFile("tgt_link_dir", MakeStat(400));
 
   SerializeAndCheckNonESEvents(
-      6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_no_event_not_enriched.json",
-      ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access.json",
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
         esMsg->event.open.file = &openFile;
+        // Prime message path targets
+        return true;
       },
       ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
         return serializer->SerializeFileAccess(
-            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), "target",
-            nullptr, santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
-            FileAccessPolicyDecision::kDenied, "abc123");
+            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
+            Enricher().Enrich(openFile), FileAccessPolicyDecision::kDenied, "abc123");
       });
 
   SerializeAndCheckNonESEvents(
       6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_not_enriched.json",
-      ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
         esMsg->event.open.file = &openFile;
+        // Prime message path targets
+        return true;
       },
       ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
         return serializer->SerializeFileAccess(
-            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), "target",
-            &openFile, santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
+            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
+            santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
+            FileAccessPolicyDecision::kDenied, "abc123");
+      });
+
+  SerializeAndCheckNonESEvents(
+      6, ES_EVENT_TYPE_AUTH_LINK, @"file_access_target_without_file.json",
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+        esMsg->event.link.source = &openFile;
+        esMsg->event.link.target_dir = &linkTargetDir;
+        esMsg->event.link.target_filename = MakeESStringToken("tgt_link_name");
+        // Prime message path targets
+        return true;
+      },
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+        return serializer->SerializeFileAccess(
+            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 1,
+            santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
+            FileAccessPolicyDecision::kDenied, "abc123");
+      });
+
+  // This state shouldn't be possible. But ensure the code handles it.
+  SerializeAndCheckNonESEvents(
+      6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_no_event_not_enriched.json",
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+        esMsg->event.open.file = &openFile;
+        // Note: Intentionally not priming message targets
+        return false;
+      },
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+        return serializer->SerializeFileAccess(
+            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
+            santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
+            FileAccessPolicyDecision::kDenied, "abc123");
+      });
+
+  // This state shouldn't be possible. But ensure the code handles it.
+  SerializeAndCheckNonESEvents(
+      6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_bad_path_target.json",
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+        esMsg->event.open.file = &openFile;
+        // Prime message path targets
+        return true;
+      },
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+        return serializer->SerializeFileAccess(
+            "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 111,
+            santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
             FileAccessPolicyDecision::kDenied, "abc123");
       });
 }
@@ -1829,8 +1873,9 @@ void SerializeAndCheckNonESEvents(
   __block es_file_t closeFile = MakeESFile("close_file", MakeStat(300));
   SerializeAndCheckNonESEvents(
       1, ES_EVENT_TYPE_NOTIFY_CLOSE, @"allowlist.json",
-      ^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
         esMsg->event.close.target = &closeFile;
+        return false;
       },
       ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
         return serializer->SerializeAllowlist(msg, "hash_value");

@@ -81,9 +81,8 @@ std::vector<uint8_t> Serializer::SerializeMessageTemplate(const santa::EnrichedE
 
 std::vector<uint8_t> Serializer::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
-    const santa::EnrichedProcess &enriched_process, const std::string &target,
-    const es_file_t *event_target, std::optional<santa::EnrichedFile> enriched_event_target,
-    FileAccessPolicyDecision decision) {
+    const santa::EnrichedProcess &enriched_process, size_t target_index,
+    std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision) {
   // Operations are identified by:
   //   Boot Session UUID + Pid + Pidversion + Mach Time + Thread Id
   // Together, these attributes allow the same Operation ID to be computed by
@@ -106,9 +105,8 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(
   Xxhash state(common_hash_state_);
   state.Update(&operation_id_data, sizeof(operation_id_data));
 
-  return SerializeFileAccess(policy_version, policy_name, msg, enriched_process, target,
-                             event_target, std::move(enriched_event_target), decision,
-                             state.HexDigest());
+  return SerializeFileAccess(policy_version, policy_name, msg, enriched_process, target_index,
+                             std::move(enriched_event_target), decision, state.HexDigest());
 }
 
 };  // namespace santa

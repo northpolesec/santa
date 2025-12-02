@@ -153,9 +153,9 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedTCCModification &) {
 
 std::vector<uint8_t> Empty::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
-    const EnrichedProcess &enriched_process, const std::string &target,
-    const es_file_t *event_target, std::optional<santa::EnrichedFile> enriched_event_target,
-    FileAccessPolicyDecision decision, std::string_view operation_id) {
+    const EnrichedProcess &enriched_process, size_t target_index,
+    std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
+    std::string_view operation_id) {
   return {};
 }
 

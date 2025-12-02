@@ -80,14 +80,16 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   }
 
   std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
-  for (const FAAPolicyProcessor::PathTarget &target : FAAPolicyProcessor::PathTargets(msg)) {
-    targetPolicyPairs.push_back({target, procPolicy});
+  size_t idx = 0;
+  for ([[maybe_unused]] const Message::PathTarget &target : msg.PathTargets()) {
+    targetPolicyPairs.emplace_back(idx, procPolicy);
+    idx++;
   }
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
-      ^bool(const santa::WatchItemPolicyBase &base_policy,
-            const FAAPolicyProcessor::PathTarget &target, const Message &msg) {
+      ^bool(const santa::WatchItemPolicyBase &base_policy, const Message::PathTarget &target,
+            const Message &msg) {
         const ProcessWatchItemPolicy *policy =
             dynamic_cast<const ProcessWatchItemPolicy *>(&base_policy);
         if (!policy) {

@@ -68,9 +68,13 @@
   },
   "start_time": "1970-01-01T00:00:00Z"
  },
+ "target": {
+  "path": "tgt_link_dir/tgt_link_name",
+  "truncated": false
+ },
  "policy_version": "policy_version",
  "policy_name": "policy_name",
- "access_type": "ACCESS_TYPE_OPEN",
+ "access_type": "ACCESS_TYPE_LINK",
  "policy_decision": "POLICY_DECISION_DENIED",
  "operation_id": "abc123"
 }

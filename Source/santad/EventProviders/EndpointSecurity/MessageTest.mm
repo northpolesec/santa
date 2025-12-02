@@ -184,4 +184,217 @@ std::string GetProcessPath(pid_t pid) {
   }
 }
 
+- (void)testPathTargets {
+  // This test ensures that the `GetPathTargets` functions returns the
+  // expected combination of targets for each handled event variant
+  es_file_t testFile1 = MakeESFile("test_file_1", MakeStat(100));
+  es_file_t testFile2 = MakeESFile("test_file_2", MakeStat(200));
+  es_file_t testDir = MakeESFile("test_dir", MakeStat(300));
+  es_string_token_t testTok = MakeESStringToken("test_tok");
+  std::string dirTok = std::string(testDir.path.data) + "/" + std::string(testTok.data);
+
+  es_message_t esMsg;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
+    esMsg.event.open.file = &testFile1;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertTrue(targets[0].is_readable);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+    XCTAssertTrue(msg.HasPathTarget(0));
+    XCTAssertFalse(msg.HasPathTarget(1));
+  }
+
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_LINK;
+    esMsg.event.link.source = &testFile1;
+    esMsg.event.link.target_dir = &testDir;
+    esMsg.event.link.target_filename = testTok;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertFalse(targets[0].is_readable);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+    XCTAssertCppStringEqual(targets[1].path, dirTok);
+    XCTAssertFalse(targets[1].is_readable);
+    XCTAssertEqual(targets[1].unsafe_file, nullptr);
+    XCTAssertTrue(msg.HasPathTarget(0));
+    XCTAssertTrue(msg.HasPathTarget(1));
+    XCTAssertFalse(msg.HasPathTarget(2));
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
+    esMsg.event.rename.source = &testFile1;
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+      esMsg.event.rename.destination.existing_file = &testFile2;
+
+      std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+      XCTAssertEqual(targets.size(), 2);
+      XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+      XCTAssertFalse(targets[0].is_readable);
+      XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+      XCTAssertCStringEqual(targets[1].path.c_str(), testFile2.path.data);
+      XCTAssertFalse(targets[1].is_readable);
+      XCTAssertEqual(targets[1].unsafe_file, &testFile2);
+    }
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+      esMsg.event.rename.destination.new_path.dir = &testDir;
+      esMsg.event.rename.destination.new_path.filename = testTok;
+
+      std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+      XCTAssertEqual(targets.size(), 2);
+      XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+      XCTAssertFalse(targets[0].is_readable);
+      XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+      XCTAssertCppStringEqual(targets[1].path, dirTok);
+      XCTAssertFalse(targets[1].is_readable);
+      XCTAssertEqual(targets[1].unsafe_file, nullptr);
+    }
+  }
+
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_UNLINK;
+    esMsg.event.unlink.target = &testFile1;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertFalse(targets[0].is_readable);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+  }
+
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CLONE;
+    esMsg.event.clone.source = &testFile1;
+    esMsg.event.clone.target_dir = &testDir;
+    esMsg.event.clone.target_name = testTok;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertTrue(targets[0].is_readable);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+    XCTAssertCppStringEqual(targets[1].path, dirTok);
+    XCTAssertFalse(targets[1].is_readable);
+    XCTAssertEqual(targets[1].unsafe_file, nullptr);
+  }
+
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_EXCHANGEDATA;
+    esMsg.event.exchangedata.file1 = &testFile1;
+    esMsg.event.exchangedata.file2 = &testFile2;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertFalse(targets[0].is_readable);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+    XCTAssertCStringEqual(targets[1].path.c_str(), testFile2.path.data);
+    XCTAssertFalse(targets[1].is_readable);
+    XCTAssertEqual(targets[1].unsafe_file, &testFile2);
+  }
+
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CREATE;
+    esMsg.event.create.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+    esMsg.event.create.destination.new_path.dir = &testDir;
+    esMsg.event.create.destination.new_path.filename = testTok;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertCppStringEqual(targets[0].path, dirTok);
+    XCTAssertFalse(targets[0].is_readable);
+    XCTAssertEqual(targets[0].unsafe_file, nullptr);
+  }
+
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_TRUNCATE;
+    esMsg.event.truncate.target = &testFile1;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertFalse(targets[0].is_readable);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_COPYFILE;
+    esMsg.event.copyfile.source = &testFile1;
+    esMsg.event.copyfile.target_dir = &testDir;
+    esMsg.event.copyfile.target_name = testTok;
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.copyfile.target_file = nullptr;
+
+      std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+      XCTAssertEqual(targets.size(), 2);
+      XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+      XCTAssertTrue(targets[0].is_readable);
+      XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+      XCTAssertCppStringEqual(targets[1].path, dirTok);
+      XCTAssertFalse(targets[1].is_readable);
+      XCTAssertEqual(targets[1].unsafe_file, nullptr);
+    }
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.copyfile.target_file = &testFile2;
+
+      std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+      XCTAssertEqual(targets.size(), 2);
+      XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+      XCTAssertTrue(targets[0].is_readable);
+      XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+      XCTAssertCStringEqual(targets[1].path.c_str(), testFile2.path.data);
+      XCTAssertFalse(targets[1].is_readable);
+      XCTAssertEqual(targets[1].unsafe_file, &testFile2);
+    }
+  }
+
+  // Test some event type without any targets
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_OD_DELETE_GROUP;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 0);
+    XCTAssertFalse(msg.HasPathTarget(0));
+  }
+}
+
 @end

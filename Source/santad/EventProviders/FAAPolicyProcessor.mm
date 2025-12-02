@@ -40,33 +40,6 @@ static constexpr size_t kPerProcessSetCapacity = 128;
 
 static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 
-static inline std::string Path(const es_file_t *esFile) {
-  return std::string(esFile->path.data, esFile->path.length);
-}
-
-static inline std::string Path(const es_string_token_t &tok) {
-  return std::string(tok.data, tok.length);
-}
-
-static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
-                                          const es_file_t *esFile, bool isReadable = false) {
-  if (!esFile->path_truncated) {
-    vec.push_back({Path(esFile), isReadable,
-                   isReadable ? std::make_optional<std::pair<dev_t, ino_t>>(
-                                    {esFile->stat.st_dev, esFile->stat.st_ino})
-                              : std::nullopt,
-                   esFile});
-  }
-}
-
-// Note: This variant of PushBackIfNotTruncated can never be marked "is_readable"
-static inline void PushBackIfNotTruncated(std::vector<FAAPolicyProcessor::PathTarget> &vec,
-                                          const es_file_t *dir, const es_string_token_t &name) {
-  if (!dir->path_truncated) {
-    vec.push_back({Path(dir) + "/" + Path(name), false, std::nullopt, nullptr});
-  }
-}
-
 bool IsBlockDecision(FileAccessPolicyDecision decision) {
   return decision == FileAccessPolicyDecision::kDenied ||
          decision == FileAccessPolicyDecision::kDeniedInvalidSignature;
@@ -296,7 +269,7 @@ SNTCachedDecision *FAAPolicyProcessor::GetCachedDecision(const struct stat &stat
 }
 
 bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
-    const Message &msg, const PathTarget &target,
+    const Message &msg, const Message::PathTarget &target,
     const std::shared_ptr<WatchItemPolicyBase> policy) {
   // All special cases currently require the option "allow_read_access" is set
   if (!policy->allow_read_access) {
@@ -336,7 +309,7 @@ bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
 }
 
 FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
-    const Message &msg, const PathTarget &target,
+    const Message &msg, const Message::PathTarget &target,
     const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block) {
   if (!optional_policy.has_value()) {
@@ -389,8 +362,8 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
   return decision;
 }
 
-void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const PathTarget &target,
-                                      const Message &msg, FileAccessPolicyDecision decision) {
+void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const Message &msg,
+                                      size_t target_index, FileAccessPolicyDecision decision) {
   RateLimiter::Decision rate_limit_decision = rate_limiter_.Decide(msg->mach_time);
   metrics_->SetFileAccessEventMetrics(policy.version, policy.name,
                                       (rate_limit_decision == RateLimiter::Decision::kAllowed)
@@ -406,19 +379,17 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const P
   // they have proper lifetimes.
   std::string policy_name_copy = policy.name;
   std::string policy_version_copy = policy.version;
-  std::string target_path_copy = target.path;
-  const es_file_t *event_target_copy = target.event_target;
   __block Message msg_copy(msg);
 
   dispatch_async(queue_, ^{
     Message moved_in_msg = std::move(msg_copy);
+    const Message::PathTarget &target = msg.PathTargetAtIndex(target_index);
     EnrichedProcess enriched_proc =
         enricher_->Enrich(*moved_in_msg->process, EnrichOptions::kLocalOnly);
     std::optional<santa::EnrichedFile> enriched_event_target =
-        enricher_->Enrich(event_target_copy, EnrichOptions::kLocalOnly);
+        enricher_->Enrich(target.unsafe_file, EnrichOptions::kLocalOnly);
     logger_->LogFileAccess(policy_version_copy, policy_name_copy, std::move(moved_in_msg),
-                           enriched_proc, target_path_copy, event_target_copy,
-                           std::move(enriched_event_target), decision);
+                           enriched_proc, target_index, std::move(enriched_event_target), decision);
   });
 }
 
@@ -462,11 +433,13 @@ void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent *event, URLTextPair lin
 }
 
 FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
-    const Message &msg, const PathTarget &target,
-    const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
+    const Message &msg, const TargetPolicyPair &target_policy_pair,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
     SNTFileAccessDeniedBlock file_access_denied_block,
     SNTOverrideFileAccessAction override_action) {
+  const Message::PathTarget &target = msg.PathTargetAtIndex(target_policy_pair.first);
+  const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy =
+      target_policy_pair.second;
   FileAccessPolicyDecision decision = ApplyOverrideToDecision(
       ApplyPolicy(msg, target, optional_policy, check_if_policy_matches_block), override_action);
 
@@ -475,7 +448,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
   if (ShouldLogDecision(decision) && optional_policy.has_value()) {
     std::shared_ptr<WatchItemPolicyBase> policy = *optional_policy;
 
-    LogTelemetry(*policy, target, msg, decision);
+    LogTelemetry(*policy, msg, target_policy_pair.first, decision);
 
     SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
     SNTStoredFileAccessEvent *event = [[SNTStoredFileAccessEvent alloc] init];
@@ -535,9 +508,10 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
   bool cacheable = true;
 
   for (const TargetPolicyPair &target_policy_pair : target_policy_pairs) {
-    FileAccessPolicyDecision decision = ProcessTargetAndPolicy(
-        msg, target_policy_pair.first, target_policy_pair.second, check_if_policy_matches_block,
-        file_access_denied_block, overrideAction);
+    const Message::PathTarget &path_target = msg.PathTargetAtIndex(target_policy_pair.first);
+    FileAccessPolicyDecision decision =
+        ProcessTargetAndPolicy(msg, target_policy_pair, check_if_policy_matches_block,
+                               file_access_denied_block, overrideAction);
     // Populate the reads_cache_ if:
     //   1. The policy applied
     //   2. The process wasn't invalid
@@ -546,11 +520,12 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     // Note: As long as a policy allows read access, the caller's read cache can be updated
     // regardless of the RuleType of the policy.
     if (decision != FileAccessPolicyDecision::kNoPolicy &&
-        decision != FileAccessPolicyDecision::kDeniedInvalidSignature &&
-        target_policy_pair.first.devno_ino.has_value() && target_policy_pair.second.has_value() &&
+        decision != FileAccessPolicyDecision::kDeniedInvalidSignature && path_target.is_readable &&
+        path_target.unsafe_file && target_policy_pair.second.has_value() &&
         (*target_policy_pair.second)->allow_read_access) {
       reads_cache_.Set(MakeReadsCacheKey(msg->process->audit_token, client_type),
-                       *target_policy_pair.first.devno_ino);
+                       std::pair<dev_t, ino_t>({path_target.unsafe_file->stat.st_dev,
+                                                path_target.unsafe_file->stat.st_ino}));
     }
 
     policy_result =
@@ -587,82 +562,6 @@ std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateRespons
 void FAAPolicyProcessor::NotifyExit(const audit_token_t &tok, FAAClientType client_type) {
   reads_cache_.Remove(MakeReadsCacheKey(tok, client_type));
   tty_message_cache_.Remove(PidPidversion(tok));
-}
-
-std::vector<FAAPolicyProcessor::PathTarget> FAAPolicyProcessor::PathTargets(const Message &msg) {
-  std::vector<FAAPolicyProcessor::PathTarget> targets;
-  targets.reserve(2);
-
-  switch (msg->event_type) {
-    case ES_EVENT_TYPE_AUTH_CLONE:
-      PushBackIfNotTruncated(targets, msg->event.clone.source, true);
-      PushBackIfNotTruncated(targets, msg->event.clone.target_dir, msg->event.clone.target_name);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_CREATE:
-      // AUTH CREATE events should always be ES_DESTINATION_TYPE_NEW_PATH
-      if (msg->event.create.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
-        PushBackIfNotTruncated(targets, msg->event.create.destination.new_path.dir,
-                               msg->event.create.destination.new_path.filename);
-      } else {
-        LOGW(@"Unexpected destination type for create event: %d. Ignoring target.",
-             msg->event.create.destination_type);
-      }
-      break;
-
-    case ES_EVENT_TYPE_AUTH_COPYFILE:
-      PushBackIfNotTruncated(targets, msg->event.copyfile.source, true);
-      if (msg->event.copyfile.target_file) {
-        PushBackIfNotTruncated(targets, msg->event.copyfile.target_file);
-      } else {
-        PushBackIfNotTruncated(targets, msg->event.copyfile.target_dir,
-                               msg->event.copyfile.target_name);
-      }
-      break;
-
-    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
-      PushBackIfNotTruncated(targets, msg->event.exchangedata.file1);
-      PushBackIfNotTruncated(targets, msg->event.exchangedata.file2);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_LINK:
-      PushBackIfNotTruncated(targets, msg->event.link.source);
-      PushBackIfNotTruncated(targets, msg->event.link.target_dir, msg->event.link.target_filename);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_OPEN:
-      PushBackIfNotTruncated(targets, msg->event.open.file, true);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_RENAME:
-      PushBackIfNotTruncated(targets, msg->event.rename.source);
-      if (msg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
-        PushBackIfNotTruncated(targets, msg->event.rename.destination.existing_file);
-      } else if (msg->event.rename.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
-        PushBackIfNotTruncated(targets, msg->event.rename.destination.new_path.dir,
-                               msg->event.rename.destination.new_path.filename);
-      } else {
-        LOGW(@"Unexpected destination type for rename event: %d. Ignoring destination.",
-             msg->event.rename.destination_type);
-      }
-      break;
-
-    case ES_EVENT_TYPE_AUTH_TRUNCATE:
-      PushBackIfNotTruncated(targets, msg->event.truncate.target);
-      break;
-
-    case ES_EVENT_TYPE_AUTH_UNLINK:
-      PushBackIfNotTruncated(targets, msg->event.unlink.target);
-      break;
-
-    default:
-      [NSException
-           raise:@"Unexpected event type"
-          format:@"File Access Authorizer client does not handle event: %d", msg->event_type];
-      exit(EXIT_FAILURE);
-  }
-
-  return targets;
 }
 
 }  // namespace santa

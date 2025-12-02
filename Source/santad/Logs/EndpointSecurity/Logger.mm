@@ -424,13 +424,12 @@ void Logger::LogDiskDisappeared(NSDictionary *props) {
 
 void Logger::LogFileAccess(const std::string &policy_version, const std::string &policy_name,
                            const santa::Message &msg,
-                           const santa::EnrichedProcess &enriched_process,
-                           const std::string &target, const es_file_t *event_target,
+                           const santa::EnrichedProcess &enriched_process, size_t target_index,
                            std::optional<santa::EnrichedFile> enriched_event_target,
                            FileAccessPolicyDecision decision) {
   if (ShouldLog(TelemetryEvent::kFileAccess)) {
     writer_->Write(serializer_->SerializeFileAccess(policy_version, policy_name, msg,
-                                                    enriched_process, target, event_target,
+                                                    enriched_process, target_index,
                                                     std::move(enriched_event_target), decision));
   }
 }

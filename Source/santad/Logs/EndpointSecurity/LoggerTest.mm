@@ -105,16 +105,14 @@ class MockSerializer : public Empty {
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
               (const std::string &policy_version, const std::string &policy_name,
                const santa::Message &msg, const santa::EnrichedProcess &enriched_process,
-               const std::string &target, const es_file_t *event_target,
-               std::optional<santa::EnrichedFile> enriched_event_target,
+               size_t target_index, std::optional<santa::EnrichedFile> enriched_event_target,
                FileAccessPolicyDecision decision, std::string_view operation_id),
               (override));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
               (const std::string &policy_version, const std::string &policy_name,
                const santa::Message &msg, const santa::EnrichedProcess &enriched_process,
-               const std::string &target, const es_file_t *event_target,
-               std::optional<santa::EnrichedFile> enriched_event_target,
+               size_t target_index, std::optional<santa::EnrichedFile> enriched_event_target,
                FileAccessPolicyDecision decision),
               (override));
 };
@@ -350,7 +348,7 @@ class MockWriter : public santa::Writer {
 
   mockESApi->SetExpectationsRetainReleaseMessage();
   using testing::_;
-  EXPECT_CALL(*mockSerializer, SerializeFileAccess(_, _, _, _, _, _, _, _));
+  EXPECT_CALL(*mockSerializer, SerializeFileAccess(_, _, _, _, _, _, _));
   EXPECT_CALL(*mockWriter, Write);
 
   Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
@@ -358,7 +356,7 @@ class MockWriter : public santa::Writer {
           "v1", "name", Message(mockESApi, &msg),
           EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
                           EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
-          "tgt", nullptr, EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
+          0, EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
           FileAccessPolicyDecision::kDenied);
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
