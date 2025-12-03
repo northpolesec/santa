@@ -46,6 +46,9 @@ class Enricher {
       EnrichOptions options = EnrichOptions::kDefault);
   virtual EnrichedFile Enrich(const es_file_t &es_file,
                               EnrichOptions options = EnrichOptions::kDefault);
+  virtual std::optional<EnrichedFile> Enrich(
+      const es_file_t *es_file,
+      EnrichOptions options = EnrichOptions::kDefault);
 
   virtual std::optional<std::shared_ptr<std::string>> UsernameForUID(
       uid_t uid, EnrichOptions options = EnrichOptions::kDefault);

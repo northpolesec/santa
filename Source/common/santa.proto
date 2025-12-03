@@ -532,7 +532,7 @@ message FileAccess {
   optional ProcessInfo instigator = 1;
 
   // The path that was accessed
-  optional FileInfoLight target = 2;
+  optional FileInfo target = 2;
 
   // The version of the policy when the decision was made
   optional string policy_version = 3;

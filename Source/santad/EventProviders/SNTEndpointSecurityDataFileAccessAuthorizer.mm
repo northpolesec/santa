@@ -100,18 +100,20 @@ using santa::Message;
   }
 
   __block std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
-  __block auto pathTargets = FAAPolicyProcessor::PathTargets(msg);
+  __block auto pathTargets = msg.PathTargets();
 
   self.findPoliciesForTargetsBlock(^(santa::LookupPolicyBlock lookupPolicyBlock) {
+    size_t idx = 0;
     for (const auto &target : pathTargets) {
-      targetPolicyPairs.emplace_back(target, lookupPolicyBlock(target.path.c_str()));
+      targetPolicyPairs.emplace_back(idx, lookupPolicyBlock(target.path.c_str()));
+      idx++;
     }
   });
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
-      ^bool(const santa::WatchItemPolicyBase &base_policy,
-            const FAAPolicyProcessor::PathTarget &target, const Message &msg) {
+      ^bool(const santa::WatchItemPolicyBase &base_policy, const Message::PathTarget &target,
+            const Message &msg) {
         for (const santa::WatchItemProcess &process : base_policy.processes) {
           if ((*_faaPolicyProcessorProxy)->PolicyMatchesProcess(process, msg->process)) {
             return true;

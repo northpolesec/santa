@@ -60,28 +60,17 @@ enum class FAAClientType {
 
 class FAAPolicyProcessor {
  public:
-  // Small structure to hold a complete event path target being operated upon and
-  // a bool indicating whether the path is a readable target (e.g. a file being
-  // opened or cloned)
-  struct PathTarget {
-    std::string path;
-    bool is_readable;
-    std::optional<std::pair<dev_t, ino_t>> devno_ino;
-  };
-
   struct ESResult {
     es_auth_result_t auth_result;
     bool cacheable;
   };
 
-  using TargetPolicyPair =
-      std::pair<PathTarget, std::optional<std::shared_ptr<WatchItemPolicyBase>>>;
+  using TargetPolicyPair = std::pair<size_t, std::optional<std::shared_ptr<WatchItemPolicyBase>>>;
 
   /// When this block is called, the policy enforcement client must determine
   /// whether or not the given policy applies to the given ES message.
   using CheckIfPolicyMatchesBlock = bool (^)(const santa::WatchItemPolicyBase &base_policy,
-                                             const FAAPolicyProcessor::PathTarget &target,
-                                             const Message &msg);
+                                             const Message::PathTarget &target, const Message &msg);
   using URLTextPair = std::pair<NSString *, NSString *>;
   /// A block that generates custom URL and Text pairs from a given policy.
   using GenerateEventDetailLinkBlock =
@@ -112,8 +101,6 @@ class FAAPolicyProcessor {
   virtual SNTCachedDecision *__strong GetCachedDecision(const struct stat &stat_buf);
 
   virtual void ModifyRateLimiterSettings(uint32_t logs_per_sec, uint32_t window_size_sec);
-
-  static std::vector<FAAPolicyProcessor::PathTarget> PathTargets(const Message &msg);
 
  private:
   SNTDecisionCache *decision_cache_;
@@ -163,25 +150,24 @@ class FAAPolicyProcessor {
   void NotifyExit(const audit_token_t &tok, FAAClientType client_type);
 
   FileAccessPolicyDecision ProcessTargetAndPolicy(
-      const Message &msg, const PathTarget &target,
-      const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
+      const Message &msg, const TargetPolicyPair &target_policy_pair,
       CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction override_action);
 
   virtual FileAccessPolicyDecision ApplyPolicy(
-      const Message &msg, const PathTarget &target,
+      const Message &msg, const Message::PathTarget &target,
       const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
       CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock);
 
-  virtual bool PolicyAllowsReadsForTarget(const Message &msg, const PathTarget &target,
+  virtual bool PolicyAllowsReadsForTarget(const Message &msg, const Message::PathTarget &target,
                                           std::shared_ptr<WatchItemPolicyBase> policy);
 
   /// Return true if the TTY was previously messaged for the given
   /// process/policy pair. Otherwise false.
   bool HaveMessagedTTYForPolicy(const WatchItemPolicyBase &policy, const Message &msg);
 
-  void LogTelemetry(const WatchItemPolicyBase &policy, const PathTarget &target, const Message &msg,
+  void LogTelemetry(const WatchItemPolicyBase &policy, const Message &msg, size_t target_index,
                     FileAccessPolicyDecision decision);
   void LogTTY(SNTStoredFileAccessEvent *event, URLTextPair link_info, const Message &msg,
               const WatchItemPolicyBase &policy);
