@@ -219,9 +219,10 @@
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
 
   // Set the app icon as the status bar icon
-  NSImage *icon = [NSImage imageNamed:@"AppIcon"];
+  NSImage *icon = [NSImage imageNamed:@"MenuItem"];
   if (icon) {
-    icon.size = NSMakeSize(24.0, 24.0);
+    icon.size = NSMakeSize(24.0, 16.0);
+    [icon setTemplate:YES];
   }
   self.statusItem.button.image = icon;
 
