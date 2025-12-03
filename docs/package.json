@@ -14,11 +14,6 @@
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc"
   },
-  "pnpm": {
-    "overrides": {
-      "webpack-dev-server": "^5.2.1"
-    }
-  },
   "dependencies": {
     "@docusaurus/core": "3.9.2",
     "@docusaurus/plugin-client-redirects": "^3.9.2",
@@ -73,5 +68,5 @@
   "engines": {
     "node": ">=18.0"
   },
-  "packageManager": "pnpm@10.6.5+sha512.cdf928fca20832cd59ec53826492b7dc25dc524d4370b6b4adbf65803d32efaa6c1c88147c0ae4e8d579a6c9eec715757b50d4fa35eea179d868eada4ed043af"
+  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a"
 }
