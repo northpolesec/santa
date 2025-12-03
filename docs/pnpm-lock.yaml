@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  webpack-dev-server: ^5.2.1
-
 importers:
 
   .:
