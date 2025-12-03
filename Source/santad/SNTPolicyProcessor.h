@@ -28,7 +28,8 @@
 @class SNTFileInfo;
 @class SNTRuleTable;
 
-typedef std::unique_ptr<santa::cel::Activation> (^ActivationCallbackBlock)(void);
+// Use CELv2 for evaluation. v2 will always be a superset of v1.
+typedef std::unique_ptr<santa::cel::Activation<true>> (^ActivationCallbackBlock)(void);
 
 ///
 ///  Creates SNTCachedDecision objects from a SNTFileInfo object or a file path. Decisions are based

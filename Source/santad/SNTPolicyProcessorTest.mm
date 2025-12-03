@@ -659,11 +659,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELDecisions {
-  ActivationCallbackBlock activation = ^std::unique_ptr<santa::cel::Activation>() {
-    auto ef = std::make_unique<santa::cel::v1::ExecutableFile>();
+  ActivationCallbackBlock activation = ^std::unique_ptr<santa::cel::Activation<true>>() {
+    using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+    auto ef = std::make_unique<ExecutableFileT>();
     ef->mutable_signing_time()->set_seconds(1717987200);
     ef->mutable_secure_signing_time()->set_seconds(1717987200);
-    return std::make_unique<santa::cel::Activation>(
+    return std::make_unique<santa::cel::Activation<true>>(
         std::move(ef),
         ^std::vector<std::string>() {
           return std::vector<std::string>{"arg1", "arg2"};
@@ -680,10 +681,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         });
   };
 
-  SNTRule * (^createCELRule)(NSString *) = ^SNTRule *(NSString *celExpr) {
+  SNTRule * (^createCELRule)(NSString *, BOOL) = ^SNTRule *(NSString *celExpr, BOOL v2) {
     return [[SNTRule alloc]
         initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                     state:SNTRuleStateCEL
+                     state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
                       type:SNTRuleTypeBinary
                  customMsg:nil
                  customURL:nil
@@ -693,7 +694,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                      error:NULL];
   };
   {
-    SNTRule *r = createCELRule(@"target.signing_time > timestamp(1717987100)");
+    SNTRule *r = createCELRule(@"target.signing_time > timestamp(1717987100)", true);
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
@@ -705,7 +706,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertTrue(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"target.signing_time < timestamp(1717987100)");
+    SNTRule *r = createCELRule(@"target.signing_time < timestamp(1717987100)", false);
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
@@ -717,7 +718,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertTrue(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"'arg1' in args");
+    SNTRule *r = createCELRule(@"'arg1' in args", false);
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
@@ -729,7 +730,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"has(envs.ENV_VARIABLE1)");
+    SNTRule *r = createCELRule(@"has(envs.ENV_VARIABLE1)", false);
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
@@ -741,7 +742,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"'--inspect' in args ? ALLOWLIST : SILENT_BLOCKLIST");
+    SNTRule *r = createCELRule(@"'--inspect' in args ? ALLOWLIST : SILENT_BLOCKLIST", false);
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
@@ -753,7 +754,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"euid != 0");
+    SNTRule *r = createCELRule(@"euid != 0", true);
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
@@ -765,7 +766,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"cwd != '/Users/foo'");
+    SNTRule *r = createCELRule(@"cwd != '/Users/foo'", false);
     SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
@@ -773,6 +774,19 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
+  }
+  {
+    SNTRule *r = createCELRule(@"euid == 0 ? REQUIRE_TOUCHID : ALLOWLIST", true);
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertTrue(cd.holdAndAsk);
     XCTAssertFalse(cd.silentBlock);
     XCTAssertFalse(cd.cacheable);
   }
