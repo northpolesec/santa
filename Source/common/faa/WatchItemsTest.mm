@@ -85,7 +85,7 @@ class WatchItemsPeer : public WatchItems {
       : WatchItems(MakeKey(), WatchItems::DataSource::kEmbeddedConfig, nil, config, q,
                    periodic_task_complete_f) {}
 
-  using WatchItems::ForceSetIntervalForTesting;
+  using WatchItems::ForceSetIntervalForTestingUnsafe;
   using WatchItems::ReloadConfig;
   using WatchItems::SetConfig;
   using WatchItems::SetConfigPath;
@@ -348,7 +348,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertFalse(targetPolicies[0].has_value());
 
   // Begin the periodic task
-  watchItems->ForceSetIntervalForTesting(1);
+  watchItems->ForceSetIntervalForTestingUnsafe(1);
   watchItems->StartTimer();
 
   // The first run of the task starts immediately

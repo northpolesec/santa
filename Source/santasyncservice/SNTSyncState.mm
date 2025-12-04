@@ -15,4 +15,7 @@
 #import "Source/santasyncservice/SNTSyncState.h"
 
 @implementation SNTSyncState
+- (void)dealloc {
+  [self.session invalidateAndCancel];
+}
 @end

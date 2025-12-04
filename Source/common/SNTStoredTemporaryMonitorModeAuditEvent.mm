@@ -23,7 +23,6 @@
 // random UUID on each instatiation to prevent caching.
 @property(readonly) NSUUID *uniqueUuid;
 @end
-;
 
 @implementation SNTStoredTemporaryMonitorModeEnterAuditEvent
 

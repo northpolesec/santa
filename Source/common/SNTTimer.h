@@ -33,7 +33,7 @@ typedef NS_ENUM(NSInteger, SNTTimerRescheduleMode) {
                            qosClass:(qos_class_t)qosClass
                            callback:(SNTOnTimerCallback)callback;
 
-- (void)startWithInterval:(uint32_t)seconds;
+- (BOOL)startWithInterval:(uint32_t)seconds;
 - (void)stop;
 - (BOOL)isStarted;
 

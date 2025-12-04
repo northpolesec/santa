@@ -44,6 +44,12 @@ cel_runtime::CelValue Activation::CELValue(const int64_t &v,
 }
 
 template <>
+cel_runtime::CelValue Activation::CELValue(const unsigned int &v,
+                                           google::protobuf::Arena *unused_arena) {
+  return cel_runtime::CelValue::CreateUint64(v);
+}
+
+template <>
 cel_runtime::CelValue Activation::CELValue(const bool &v, google::protobuf::Arena *unused_arena) {
   return cel_runtime::CelValue::CreateBool(v);
 }
@@ -97,6 +103,10 @@ std::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view nam
     return CELValue(args_(), arena);
   } else if (name == "envs") {
     return CELValue(envs_(), arena);
+  } else if (name == "euid") {
+    return CELValue(euid_(), arena);
+  } else if (name == "cwd") {
+    return CELValue(cwd_(), arena);
   }
   return {};
 }
@@ -140,7 +150,7 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
 }
 
 bool Activation::IsResultCacheable() const {
-  return !args_.HasValue() && !envs_.HasValue();
+  return !args_.HasValue() && !envs_.HasValue() && !euid_.HasValue() && !cwd_.HasValue();
 }
 
 ::cel::Type Activation::CELType(google::protobuf::FieldDescriptor::CppType type,

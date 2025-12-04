@@ -211,6 +211,10 @@ EnrichedProcess Enricher::Enrich(const es_process_t &es_proc, EnrichOptions opti
                     : std::nullopt);
 }
 
+std::optional<EnrichedFile> Enricher::Enrich(const es_file_t *es_file, EnrichOptions options) {
+  return es_file ? std::make_optional<EnrichedFile>(Enrich(*es_file, options)) : std::nullopt;
+}
+
 EnrichedFile Enricher::Enrich(const es_file_t &es_file, EnrichOptions options) {
   // TODO(mlw): Consider having the enricher perform file hashing. This will
   // make more sense if we start including hashes in more event types.

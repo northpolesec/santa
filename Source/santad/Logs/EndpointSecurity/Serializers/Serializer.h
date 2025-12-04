@@ -90,15 +90,14 @@ class Serializer {
 
   virtual std::vector<uint8_t> SerializeFileAccess(
       const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
-      const santa::EnrichedProcess &enriched_process, const std::string &target,
-      FileAccessPolicyDecision decision, std::string_view operation_id) = 0;
+      const santa::EnrichedProcess &enriched_process, size_t target_index,
+      std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
+      std::string_view operation_id) = 0;
 
-  virtual std::vector<uint8_t> SerializeFileAccess(const std::string &policy_version,
-                                                   const std::string &policy_name,
-                                                   const santa::Message &msg,
-                                                   const santa::EnrichedProcess &enriched_process,
-                                                   const std::string &target,
-                                                   FileAccessPolicyDecision decision);
+  virtual std::vector<uint8_t> SerializeFileAccess(
+      const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
+      const santa::EnrichedProcess &enriched_process, size_t target_index,
+      std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision);
 
   virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message &,
                                                   const std::string_view) = 0;

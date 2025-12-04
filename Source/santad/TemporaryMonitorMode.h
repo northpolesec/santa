@@ -17,25 +17,37 @@
 
 #include "Source/common/PassKey.h"
 #include "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTKVOManager.h"
 #include "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/Timer.h"
 #import "Source/santad/SNTNotificationQueue.h"
+#include "absl/synchronization/mutex.h"
 
 #ifndef SANTA__SANTAD__TEMPORARYMONITORMODE_H
 #define SANTA__SANTAD__TEMPORARYMONITORMODE_H
+
+extern NSString *const kStateTempMonitorModeBootUUIDKey;
+extern NSString *const kStateTempMonitorModeDeadlineKey;
+extern NSString *const kStateTempMonitorModeSavedSyncURLKey;
+extern NSString *const kStateTempMonitorModeSessionUUIDKey;
 
 namespace santa {
 
 class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
                              public PassKey<TemporaryMonitorMode> {
  public:
+  using HandleAuditEventBlock = void (^)(SNTStoredTemporaryMonitorModeAuditEvent *);
+
   // Factory
-  static std::shared_ptr<TemporaryMonitorMode> Create(SNTConfigurator *configurator,
-                                                      SNTNotificationQueue *notification_queue);
+  static std::shared_ptr<TemporaryMonitorMode> Create(
+      SNTConfigurator *configurator, SNTNotificationQueue *notification_queue,
+      HandleAuditEventBlock handle_audit_event_block);
 
   // Construction and setup require a PassKey, can only be used internally.
   TemporaryMonitorMode(PassKey, SNTConfigurator *configurator,
-                       SNTNotificationQueue *notification_queue);
+                       SNTNotificationQueue *notification_queue,
+                       HandleAuditEventBlock handle_audit_event_block);
   void SetupFromState(PassKey, NSDictionary *tmm);
 
   // No moves, no copies
@@ -55,7 +67,7 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
   // Cancel an existing temporary Monitor Mode session and revoke any
   // stored mode transition sync setting to prevent future sessions.
   // Return true if a session was active, otherwise false.
-  bool Revoke();
+  bool Revoke(SNTTemporaryMonitorModeLeaveReason reason);
 
   // Requried method of Timer mixin derived classes. Will be called when
   // a previously started timer expires.
@@ -63,7 +75,8 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
 
   // If a temporary Monitor Mode session is active, return the number of
   // of seconds remaining. Otherwise nullopt.
-  std::optional<uint64_t> SecondsRemaining();
+  std::optional<uint64_t> SecondsRemaining() const;
+  static std::optional<uint64_t> SecondsRemaining(uint64_t deadline_mach_time);
 
   // If the mode transition was authorization was revoked, immediate cancel
   // any existing session. The configurator sync settings are also updated.
@@ -76,19 +89,27 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
   // Temporary Monitor Mode session in order to re-enter. Otherwise don't bother.
   static constexpr uint64_t kMinAllowedStateRemainingSeconds = 5;
 
-  void Begin(uint32_t seconds);
-  bool End();
-  uint64_t GetSecondsRemainingFromInitialState(NSDictionary *tmm, NSString *currentBootSessionUUID,
-                                               NSURL *syncURL);
-  std::optional<uint64_t> SecondsRemaining(uint64_t deadline_mach_time);
+  bool BeginLocked(uint32_t seconds, bool gen_uuid_on_start) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  bool EndLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  uint64_t GetSecondsRemainingFromInitialStateLocked(NSDictionary *tmm,
+                                                     NSString *currentBootSessionUUID,
+                                                     NSURL *syncURL)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  bool RevokeLocked(SNTTemporaryMonitorModeLeaveReason reason) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // hide the base class Start/Stop methods
-  void StartTimer();
-  void StopTimer();
+  bool StartTimer();
+  bool StopTimer();
+  bool StartTimerWithInterval(uint32_t interval_seconds);
 
-  SNTNotificationQueue *notification_queue_;
+  mutable absl::Mutex lock_;
+
   SNTConfigurator *configurator_;
-  uint64_t deadline_;
+  SNTNotificationQueue *notification_queue_;
+  HandleAuditEventBlock handle_audit_event_block_;
+  uint64_t deadline_ ABSL_GUARDED_BY(lock_);
+  NSUUID *current_uuid_ ABSL_GUARDED_BY(lock_);
+  NSArray<SNTKVOManager *> *kvo_;
 };
 
 }  // namespace santa

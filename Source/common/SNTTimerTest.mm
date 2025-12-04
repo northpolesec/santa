@@ -331,4 +331,31 @@
   XCTAssertSemaTrue(sema, 5, "Semaphore was not signaled after expected time");
 }
 
+- (void)testDoubleStartReturn {
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+                                              maxInterval:60
+                                                     name:@"TestTimer"
+                                              fireOnStart:NO
+                                           rescheduleMode:SNTTimerRescheduleModeLeadingEdge
+                                                 qosClass:QOS_CLASS_USER_INTERACTIVE
+                                                 callback:^BOOL(void) {
+                                                   dispatch_semaphore_signal(sema);
+                                                   return YES;
+                                                 }];
+
+  XCTAssertNotNil(timer);
+  XCTAssertFalse([timer isStarted]);
+
+  XCTAssertTrue([timer startWithInterval:2]);
+  XCTAssertTrue([timer isStarted]);
+
+  // Starting an already started timer returns false,
+  XCTAssertFalse([timer startWithInterval:4]);
+  XCTAssertSemaFalseTimeout(sema, 2, "Semaphore should not have been signaled yet");
+  XCTAssertSemaTrue(sema, 4, "Semaphore was not signaled after expected time");
+  XCTAssertTrue([timer isStarted]);
+}
+
 @end

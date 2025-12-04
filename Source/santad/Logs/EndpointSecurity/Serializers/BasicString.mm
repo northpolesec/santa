@@ -1070,8 +1070,9 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification
 
 std::vector<uint8_t> BasicString::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
-    const EnrichedProcess &enriched_process, const std::string &target,
-    FileAccessPolicyDecision decision, std::string_view operation_id) {
+    const EnrichedProcess &enriched_process, size_t target_index,
+    std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
+    std::string_view operation_id) {
   std::string str = CreateDefaultString();
 
   str.append("action=FILE_ACCESS|policy_version=");
@@ -1079,7 +1080,12 @@ std::vector<uint8_t> BasicString::SerializeFileAccess(
   str.append("|policy_name=");
   str.append(policy_name);
   str.append("|path=");
-  str.append(target);
+  if (msg.HasPathTarget(target_index)) {
+    str.append(msg.PathTargetAtIndex(target_index).path);
+  } else {
+    // This shouldn't be possible with real data
+    str.append("(error)");
+  }
   str.append("|access_type=");
   str.append(GetAccessTypeString(msg->event_type));
   str.append("|decision=");

@@ -257,10 +257,13 @@ objc_library(
         "//Source/common:Pinning",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
+        "//Source/common:SNTKVOManager",
         "//Source/common:SNTModeTransition",
+        "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SNTSystemInfo",
         "//Source/common:SystemResources",
         "//Source/common:Timer",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -268,11 +271,10 @@ santa_unit_test(
     name = "TemporaryMonitorModeTest",
     srcs = ["TemporaryMonitorModeTest.mm"],
     deps = [
-        ":TemporaryMonitorMode",
         ":SNTNotificationQueue",
+        ":TemporaryMonitorMode",
         "//Source/common:SNTModeTransition",
         "//Source/common:SystemResources",
-        # "//Source/common:TestUtils",
         "@OCMock",
     ],
 )

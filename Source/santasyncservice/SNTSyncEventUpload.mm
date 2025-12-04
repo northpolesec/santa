@@ -26,6 +26,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#include "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
@@ -33,6 +34,8 @@
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 #include "google/protobuf/arena.h"
+
+namespace pbv2 = ::santa::sync::v2;
 
 using santa::NSStringToUTF8String;
 using santa::NSStringToUTF8StringView;
@@ -47,6 +50,8 @@ std::optional<typename santa::ProtoTraits<IsV2>::EventT> MessageForExecutionEven
 template <bool IsV2>
 std::optional<typename santa::ProtoTraits<IsV2>::FileAccessEventT> MessageForFileAccessEvent(
     SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena);
+std::optional<typename ::pbv2::AuditEvent> MessageForTemporaryMonitorModeAuditEvent(
+    SNTStoredTemporaryMonitorModeAuditEvent *event, google::protobuf::Arena *arena);
 
 template <bool IsV2>
 BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch) {
@@ -91,6 +96,8 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
   google::protobuf::RepeatedPtrField<typename Traits::EventT> *uploadEvents = req->mutable_events();
   google::protobuf::RepeatedPtrField<typename Traits::FileAccessEventT> *uploadFAAEvents =
       req->mutable_file_access_events();
+  google::protobuf::RepeatedPtrField<typename Traits::AuditEventT> *uploadAuditEvents =
+      req->mutable_audit_events();
   __block BOOL success = YES;
   NSUInteger finalIdx = (events.count - 1);
 
@@ -109,6 +116,14 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
           e.has_value()) {
         uploadFAAEvents->Add(*std::move(e));
       }
+    } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]) {
+      if constexpr (IsV2) {
+        if (auto e = MessageForTemporaryMonitorModeAuditEvent(
+                (SNTStoredTemporaryMonitorModeAuditEvent *)event, pArena);
+            e.has_value()) {
+          uploadAuditEvents->Add(*std::move(e));
+        }
+      }
     } else {
       // This shouldn't be able to happen. But if it does, log a warning and continue. We still
       // want to continue on in case this is the last event being enumerated so that anything in
@@ -116,7 +131,8 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
       LOGW(@"Unexpected event type in event upload: %@", [event class]);
     }
 
-    if ((uploadEvents->size() + uploadFAAEvents->size()) >= self.syncState.eventBatchSize ||
+    if ((uploadEvents->size() + uploadFAAEvents->size() + uploadAuditEvents->size()) >=
+            self.syncState.eventBatchSize ||
         idx == finalIdx) {
       int eventsInBatch =
           req->events_size() + req->file_access_events_size() + req->audit_events_size();
@@ -334,6 +350,78 @@ std::optional<typename santa::ProtoTraits<IsV2>::FileAccessEventT> MessageForFil
   }
 
   return std::make_optional(*e);
+}
+
+void MessageForTemporaryMonitorModeEnterAuditEvent(
+    SNTStoredTemporaryMonitorModeEnterAuditEvent *event,
+    ::pbv2::TemporaryMonitorModeEnter *pbEnter) {
+  if (!pbEnter) {
+    return;
+  }
+
+  pbEnter->set_seconds(event.seconds);
+
+  switch (event.reason) {
+    case SNTTemporaryMonitorModeEnterReasonOnDemand:
+      pbEnter->set_reason(::pbv2::TemporaryMonitorModeEnter::REASON_ON_DEMAND);
+      break;
+    case SNTTemporaryMonitorModeEnterReasonOnDemandRefresh:
+      pbEnter->set_reason(::pbv2::TemporaryMonitorModeEnter::REASON_ON_DEMAND_REFRESH);
+      break;
+    case SNTTemporaryMonitorModeEnterReasonRestart:
+      pbEnter->set_reason(::pbv2::TemporaryMonitorModeEnter::REASON_RESTART);
+      break;
+    default: pbEnter->set_reason(::pbv2::TemporaryMonitorModeEnter::REASON_UNSPECIFIED); break;
+  }
+}
+
+void MessageForTemporaryMonitorModeLeaveAuditEvent(
+    SNTStoredTemporaryMonitorModeLeaveAuditEvent *event,
+    ::pbv2::TemporaryMonitorModeLeave *pbLeave) {
+  if (!pbLeave) {
+    return;
+  }
+
+  switch (event.reason) {
+    case SNTTemporaryMonitorModeLeaveReasonSessionExpired:
+      pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_EXPIRY);
+      break;
+    case SNTTemporaryMonitorModeLeaveReasonCancelled:
+      pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_CANCELLED);
+      break;
+    case SNTTemporaryMonitorModeLeaveReasonRevoked:
+      pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_REVOKED);
+      break;
+    case SNTTemporaryMonitorModeLeaveReasonSyncServerChanged:
+      pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_SYNC_SERVER_CHANGED);
+      break;
+    case SNTTemporaryMonitorModeLeaveReasonReboot:
+      pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_REBOOT);
+      break;
+    default: pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_UNSPECIFIED); break;
+  }
+}
+
+std::optional<typename ::pbv2::AuditEvent> MessageForTemporaryMonitorModeAuditEvent(
+    SNTStoredTemporaryMonitorModeAuditEvent *event, google::protobuf::Arena *arena) {
+  if (![event isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]] &&
+      ![event isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]) {
+    return std::nullopt;
+  }
+
+  auto pbAudit = google::protobuf::Arena::Create<typename ::pbv2::AuditEvent>(arena);
+  auto pbTmm = pbAudit->mutable_temporary_monitor_mode();
+  pbTmm->set_session_id(NSStringToUTF8StringView(event.uuid));
+
+  if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]) {
+    MessageForTemporaryMonitorModeEnterAuditEvent(
+        (SNTStoredTemporaryMonitorModeEnterAuditEvent *)event, pbTmm->mutable_enter());
+  } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]) {
+    MessageForTemporaryMonitorModeLeaveAuditEvent(
+        (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)event, pbTmm->mutable_leave());
+  }
+
+  return std::make_optional(*pbAudit);
 }
 
 }  // namespace

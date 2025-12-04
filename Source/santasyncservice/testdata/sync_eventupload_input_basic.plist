@@ -11,7 +11,7 @@
 			<key>$class</key>
 			<dict>
 				<key>CF$UID</key>
-				<integer>94</integer>
+				<integer>110</integer>
 			</dict>
 			<key>NS.objects</key>
 			<array>
@@ -26,6 +26,14 @@
 				<dict>
 					<key>CF$UID</key>
 					<integer>69</integer>
+				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>94</integer>
+				</dict>
+				<dict>
+					<key>CF$UID</key>
+					<integer>103</integer>
 				</dict>
 			</array>
 		</dict>
@@ -141,7 +149,7 @@
 				<integer>27</integer>
 			</dict>
 		</dict>
-		<integer>162266856</integer>
+		<integer>1358799403</integer>
 		<dict>
 			<key>$class</key>
 			<dict>
@@ -543,7 +551,7 @@
 				<integer>50</integer>
 			</dict>
 		</dict>
-		<integer>4232856234</integer>
+		<integer>2546456922</integer>
 		<dict>
 			<key>$class</key>
 			<dict>
@@ -553,7 +561,7 @@
 			<key>NS.time</key>
 			<real>773915022</real>
 		</dict>
-		<string>111cf106c21f8963ca6126eed03862447e4167f055b03cfe5f2fc6ce83248ab0</string>
+		<string>0b59d8c13a3ffdaa2fa8f53a9e78429f3eeb3ad76a45887276f840688bca138b</string>
 		<string>/Applications/Santa.app/Contents/MacOS/Santa</string>
 		<dict>
 			<key>$class</key>
@@ -590,21 +598,21 @@
 			</dict>
 		</dict>
 		<data>
-		MIIF0TCCBLmgAwIBAgIQVD/Ox7sfOEq19SZT7zeItzANBgkqhkiG9w0BAQsF
+		MIIF0TCCBLmgAwIBAgIQP8Oqibpx5f1N8l7y7f5BzTANBgkqhkiG9w0BAQsF
 		ADB1MUQwQgYDVQQDDDtBcHBsZSBXb3JsZHdpZGUgRGV2ZWxvcGVyIFJlbGF0
 		aW9ucyBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTELMAkGA1UECwwCRzMxEzAR
-		BgNVBAoMCkFwcGxlIEluYy4xCzAJBgNVBAYTAlVTMB4XDTI0MTEwODE5MjY1
-		MloXDTI1MTEwODE5MjY1MVowgZcxGjAYBgoJkiaJk/IsZAEBDApGWDYzQUFa
+		BgNVBAoMCkFwcGxlIEluYy4xCzAJBgNVBAYTAlVTMB4XDTI1MTExMjE0NTc0
+		N1oXDTI2MTExMjE0NTc0NlowgZcxGjAYBgoJkiaJk/IsZAEBDApGWDYzQUFa
 		SjhQMTMwMQYDVQQDDCpBcHBsZSBEZXZlbG9wbWVudDogTWF0dCBXaGl0ZSAo
 		UU41MjI5SlRKUikxEzARBgNVBAsMClpNQ0c3TUxEVjkxIjAgBgNVBAoMGU5v
 		cnRoIFBvbGUgU2VjdXJpdHksIEluYy4xCzAJBgNVBAYTAlVTMIIBIjANBgkq
-		hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzkzYr9cA1dmf0bPFeLdXrjX4u3uT
-		p60D2HrWVKRCDHu2m6Xah7RV7Rzu3Dvp8Fi6+grfS9+FHy4br8YIhx8vgLmC
-		ZwtTxxc0K+OA5OPoH7zIS25t/YtVIi38scGoxBz+rlOZYN0i7eL0k6HQDiKj
-		Zn6gNZotxIi68UnD1rsyYi24WDA5yEgS0wsiO/jZkEjXrrL70WbULZH9WURT
-		S348bSBpfMsX7H6unkcwGqfZ7H3d4/jmFJKmiDKZdCt5uo62ZYbkgoMTIlLu
-		gBiCjq1uWoMsWgzJEOQMQzRG7FmOYsmXhwMvvL4OHuiiHBGvLYcykdAoUzwx
-		CWhfYAKO7ndAxwIDAQABo4ICODCCAjQwDAYDVR0TAQH/BAIwADAfBgNVHSME
+		hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3MvkwmE3qU5uP7x9SyteQjEMeXkz
+		UaOnkdbEBiyNJZhjlDSnBJOjdDI/PUdXOnMGOIOa4ELOZHV1h8qW22sO3N1g
+		H/L0k3PeKVb3YaXu0YxgTcgecOGCGs2AnFzSIUSYjanIXd9CSVnXIZmIKxN2
+		GqALmqPoNLk7qAdemfHIHEnwBMsH5a/YeHnzvC0kNaiNE//z+qlOXpHBkNQJ
+		cyPwzSY4bHFkqPTmO/+AJZYNp3g+VhWirgV1012kxcXAhfruUqYTOPeodsc6
+		v1JfdO5jNsXk1sKfjNwJVOhRS6ZrwgZqxR19pIgInXfCzB4LhIre6v9tFgRm
+		2KYOmPjR0LECuQIDAQABo4ICODCCAjQwDAYDVR0TAQH/BAIwADAfBgNVHSME
 		GDAWgBQJ/sAVkPmvZAqSErkmKGMMl+ynsjBwBggrBgEFBQcBAQRkMGIwLQYI
 		KwYBBQUHMAKGIWh0dHA6Ly9jZXJ0cy5hcHBsZS5jb20vd3dkcmczLmRlcjAx
 		BggrBgEFBQcwAYYlaHR0cDovL29jc3AuYXBwbGUuY29tL29jc3AwMy13d2Ry
@@ -615,15 +623,15 @@
 		Y2VydGlmaWNhdGUgcG9saWN5IGFuZCBjZXJ0aWZpY2F0aW9uIHByYWN0aWNl
 		IHN0YXRlbWVudHMuMDcGCCsGAQUFBwIBFitodHRwczovL3d3dy5hcHBsZS5j
 		b20vY2VydGlmaWNhdGVhdXRob3JpdHkvMBYGA1UdJQEB/wQMMAoGCCsGAQUF
-		BwMDMB0GA1UdDgQWBBTMc/6zQlVEDNQYU76s2j+fBMx0kzAOBgNVHQ8BAf8E
+		BwMDMB0GA1UdDgQWBBROGE2uvyv/Od8ySP+xNPLMJYDzujAOBgNVHQ8BAf8E
 		BAMCB4AwEwYKKoZIhvdjZAYBAgEB/wQCBQAwEwYKKoZIhvdjZAYBDAEB/wQC
-		BQAwDQYJKoZIhvcNAQELBQADggEBACrEey04iqO/RJ2bUXb67BIhLdAQTGcK
-		daPHWoaPEJImCDVIr/opMIgUXjR1QZRyauxcmS1ReU2ZdQcdXuwOfh7LaVVn
-		TZhNN8JeXzasS8M4vX45A8ljWdVttHCJuys0N+H4YjOQqmCsJGNs0OTndDlZ
-		Zw/wSAHV4mXBCw8fGIiPUS4V7lcQ8y+5QJN4QoguDLXPgKSYmi/Su9lbr/Is
-		ly/ZONw4Cou9a9UMjzG5dO8sMTiZymS68Rz/HurKedKNzwhtLiq5wsIwNvX/
-		ZKiJ7JbsfB2a7GoSTbH7Y5IH6muJv8pi4QYH6EabOQeslwAexIplkxNV/wPF
-		rmWajoNcRjg=
+		BQAwDQYJKoZIhvcNAQELBQADggEBAEpCtxQpp9n8/IWJBO870pVBiHxm5Uz7
+		6jyxR+4YnHkVSPJc/RO1Z6c1N1ZTGI6hoAte2r1OjQGsp24E4kPOaap5VJkt
+		U60t418PX8/IpfoOAaD4KlN0fdwuxU/oce3Q7kcpgPXvx3oz39IKyIh1WrOC
+		vz/jYg9NPZCTQRDGSeotZFbjPS3lW7b1C9mDGaPNBUjLVParZXinj3ebC93U
+		d+4eM04A9zqyxTGE9U4q/UQqtqyY0UOaLDbldRUoIDmlyYJshuGJAiMoocq5
+		0edy8wWkV/G83AO7dwbHD23uGDTAUKOnbluyIjnDmXlEA0PkX5pttlT1eM6p
+		bLHIGvKcvUE=
 		</data>
 		<dict>
 			<key>$class</key>
@@ -707,7 +715,7 @@
 		</data>
 		<string>ZMCG7MLDV9</string>
 		<string>ZMCG7MLDV9:com.northpolesec.santa</string>
-		<string>2204178bc2869d3cbbbecea6b1527d2882a220f1</string>
+		<string>9475e1da7b1f2626387bd1dbece835d9934e9e78</string>
 		<integer>536871681</integer>
 		<integer>3</integer>
 		<dict>
@@ -840,7 +848,7 @@
 				<integer>73</integer>
 			</dict>
 		</dict>
-		<integer>3848961960</integer>
+		<integer>1103195510</integer>
 		<dict>
 			<key>$class</key>
 			<dict>
@@ -1080,6 +1088,153 @@
 			</array>
 			<key>$classname</key>
 			<string>SNTStoredFileAccessEvent</string>
+		</dict>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>102</integer>
+			</dict>
+			<key>idx</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>95</integer>
+			</dict>
+			<key>occurrenceDate</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>96</integer>
+			</dict>
+			<key>reason</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>100</integer>
+			</dict>
+			<key>seconds</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>101</integer>
+			</dict>
+			<key>uniqueUuid</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>98</integer>
+			</dict>
+			<key>uuid</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>97</integer>
+			</dict>
+		</dict>
+		<integer>4251162038</integer>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>5</integer>
+			</dict>
+			<key>NS.time</key>
+			<real>786036612.24744797</real>
+		</dict>
+		<string>my_test_enter_uuid</string>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>99</integer>
+			</dict>
+			<key>NS.uuidbytes</key>
+			<data>
+			9n/dMTnmSeCu8yUb6/2paw==
+			</data>
+		</dict>
+		<dict>
+			<key>$classes</key>
+			<array>
+				<string>NSUUID</string>
+				<string>NSObject</string>
+			</array>
+			<key>$classname</key>
+			<string>NSUUID</string>
+		</dict>
+		<integer>0</integer>
+		<integer>123</integer>
+		<dict>
+			<key>$classes</key>
+			<array>
+				<string>SNTStoredTemporaryMonitorModeEnterAuditEvent</string>
+				<string>SNTStoredTemporaryMonitorModeAuditEvent</string>
+				<string>SNTStoredEvent</string>
+				<string>NSObject</string>
+			</array>
+			<key>$classname</key>
+			<string>SNTStoredTemporaryMonitorModeEnterAuditEvent</string>
+		</dict>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>109</integer>
+			</dict>
+			<key>idx</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>104</integer>
+			</dict>
+			<key>occurrenceDate</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>105</integer>
+			</dict>
+			<key>reason</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>108</integer>
+			</dict>
+			<key>uniqueUuid</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>107</integer>
+			</dict>
+			<key>uuid</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>106</integer>
+			</dict>
+		</dict>
+		<integer>670067740</integer>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>5</integer>
+			</dict>
+			<key>NS.time</key>
+			<real>786036612.24745405</real>
+		</dict>
+		<string>my_test_leave_uuid</string>
+		<dict>
+			<key>$class</key>
+			<dict>
+				<key>CF$UID</key>
+				<integer>99</integer>
+			</dict>
+			<key>NS.uuidbytes</key>
+			<data>
+			A38Dw/8NRnKlQqoiug8zSg==
+			</data>
+		</dict>
+		<integer>2</integer>
+		<dict>
+			<key>$classes</key>
+			<array>
+				<string>SNTStoredTemporaryMonitorModeLeaveAuditEvent</string>
+				<string>SNTStoredTemporaryMonitorModeAuditEvent</string>
+				<string>SNTStoredEvent</string>
+				<string>NSObject</string>
+			</array>
+			<key>$classname</key>
+			<string>SNTStoredTemporaryMonitorModeLeaveAuditEvent</string>
 		</dict>
 		<dict>
 			<key>$classes</key>

@@ -662,6 +662,13 @@ static NSString *const kPrinterProxyPostMonterey =
         },
         ^std::map<std::string, std::string>() {
           return esApi->ExecEnvs(&esMsg->event.exec);
+        },
+        ^uid_t() {
+          return audit_token_to_euid(esMsg->event.exec.target->audit_token);
+        },
+        ^std::string() {
+          es_file_t *f = esMsg->event.exec.cwd;
+          return std::string(f->path.data, f->path.length);
         });
   };
 }

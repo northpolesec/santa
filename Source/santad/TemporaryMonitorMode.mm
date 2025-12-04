@@ -19,19 +19,23 @@
 #import "Source/common/MOLXPCConnection.h"
 #include "Source/common/Pinning.h"
 #import "Source/common/SNTError.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/SystemResources.h"
 
+NSString *const kStateTempMonitorModeBootUUIDKey = @"BootUUID";
+NSString *const kStateTempMonitorModeDeadlineKey = @"Deadline";
+NSString *const kStateTempMonitorModeSavedSyncURLKey = @"SyncURL";
+NSString *const kStateTempMonitorModeSessionUUIDKey = @"SessionUUID";
+
 namespace santa {
 
-static NSString *const kStateTempMonitorModeBootSessionUUIDKey = @"UUID";
-static NSString *const kStateTempMonitorModeDeadlineKey = @"Deadline";
-static NSString *const kStateTempMonitorModeSavedSyncURLKey = @"SyncURL";
-
 std::shared_ptr<TemporaryMonitorMode> TemporaryMonitorMode::Create(
-    SNTConfigurator *configurator, SNTNotificationQueue *notification_queue) {
-  auto tmm = std::make_shared<TemporaryMonitorMode>(PassKey(), configurator, notification_queue);
+    SNTConfigurator *configurator, SNTNotificationQueue *notification_queue,
+    HandleAuditEventBlock handle_audit_event_block) {
+  auto tmm = std::make_shared<TemporaryMonitorMode>(PassKey(), configurator, notification_queue,
+                                                    handle_audit_event_block);
 
   // NB: SetupFromState Is split out of the constructor since it could
   // potentially start the timer, which would take a weak reference before
@@ -42,25 +46,49 @@ std::shared_ptr<TemporaryMonitorMode> TemporaryMonitorMode::Create(
 }
 
 TemporaryMonitorMode::TemporaryMonitorMode(PassKey, SNTConfigurator *configurator,
-                                           SNTNotificationQueue *notification_queue)
+                                           SNTNotificationQueue *notification_queue,
+                                           HandleAuditEventBlock handle_audit_event_block)
     : Timer(kMinTemporaryMonitorModeMinutes, kMaxTemporaryMonitorModeMinutes,
             Timer::OnStart::kWaitOneCycle, "Temporary Monitor Mode",
             Timer::RescheduleMode::kTrailingEdge, QOS_CLASS_USER_INITIATED),
+      configurator_(configurator),
       notification_queue_(notification_queue),
-      deadline_(0) {
-  configurator_ = configurator;
-}
+      handle_audit_event_block_([handle_audit_event_block copy]),
+      deadline_(0) {}
 
 void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
+  std::weak_ptr<TemporaryMonitorMode> weak_self = weak_from_base<TemporaryMonitorMode>();
+  kvo_ = @[ [[SNTKVOManager alloc]
+      initWithObject:configurator_
+            selector:@selector(syncBaseURL)
+                type:[NSURL class]
+            callback:^(NSURL *oldValue, NSURL *newValue) {
+              if ((!newValue && !oldValue) ||
+                  ([newValue.absoluteString isEqualToString:oldValue.absoluteString])) {
+                return;
+              }
+
+              if (auto strong_self = weak_self.lock()) {
+                if (strong_self->Revoke(SNTTemporaryMonitorModeLeaveReasonSyncServerChanged)) {
+                  LOGI(@"Temporary Monitor Mode session revoked due to SyncBaseURL changing.");
+                }
+              }
+            }] ];
+
+  absl::MutexLock lock(&lock_);
   uint32_t secs_remaining = static_cast<uint32_t>(
-      std::min(GetSecondsRemainingFromInitialState(tmm, [SNTSystemInfo bootSessionUUID],
-                                                   configurator_.syncBaseURL),
+      std::min(GetSecondsRemainingFromInitialStateLocked(tmm, [SNTSystemInfo bootSessionUUID],
+                                                         configurator_.syncBaseURL),
                static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
   if (secs_remaining < kMinAllowedStateRemainingSeconds) {
     [configurator_ leaveTemporaryMonitorMode];
     [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
   } else {
-    Begin(secs_remaining);
+    BeginLocked(secs_remaining, false);
+    handle_audit_event_block_([[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
+        initWithUUID:[current_uuid_ UUIDString]
+             seconds:secs_remaining
+              reason:SNTTemporaryMonitorModeEnterReasonRestart]);
   }
 }
 
@@ -70,18 +98,28 @@ void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
 //   1. The saved boot session UUID must match the current boot session UUID
 //   2. The saved sync URL must match the current SyncBaseURL
 //   3. The current SyncBaseURL must be pinned
-uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialState(NSDictionary *tmm,
-                                                                   NSString *currentBootSessionUUID,
-                                                                   NSURL *syncURL) {
-  if (![tmm[kStateTempMonitorModeBootSessionUUIDKey] isKindOfClass:[NSString class]] ||
+//   4. The saved session UUID must be a valid UUID
+uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialStateLocked(
+    NSDictionary *tmm, NSString *currentBootSessionUUID, NSURL *syncURL) {
+  if (![tmm[kStateTempMonitorModeBootUUIDKey] isKindOfClass:[NSString class]] ||
       ![tmm[kStateTempMonitorModeDeadlineKey] isKindOfClass:[NSNumber class]] ||
-      ![tmm[kStateTempMonitorModeSavedSyncURLKey] isKindOfClass:[NSString class]]) {
+      ![tmm[kStateTempMonitorModeSavedSyncURLKey] isKindOfClass:[NSString class]] ||
+      ![tmm[kStateTempMonitorModeSessionUUIDKey] isKindOfClass:[NSString class]]) {
     return 0;
   }
 
-  if (![tmm[kStateTempMonitorModeBootSessionUUIDKey] isEqualToString:currentBootSessionUUID]) {
+  NSUUID *saved_uuid = [[NSUUID alloc] initWithUUIDString:tmm[kStateTempMonitorModeSessionUUIDKey]];
+  if (!saved_uuid) {
+    // Invalid config value for saved UUID
+    return 0;
+  }
+  current_uuid_ = saved_uuid;
+
+  if (![tmm[kStateTempMonitorModeBootUUIDKey] isEqualToString:currentBootSessionUUID]) {
     // Reboot detected, do not attempt to re-enter Monitor Mode
-    // TODO: Emit audit event
+    handle_audit_event_block_([[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
+        initWithUUID:[current_uuid_ UUIDString]
+              reason:SNTTemporaryMonitorModeLeaveReasonReboot]);
     return 0;
   }
 
@@ -89,8 +127,7 @@ uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialState(NSDictionary 
       !santa::IsDomainPinned(syncURL)) {
     // SyncBaseURL changed or is not pinned, do not attempt to re-enter Monitor Mode automatically.
     // Revoke the mode transition authorization as well so the machine is no longer eligible.
-    Revoke();
-    // TODO: Emit audit event
+    RevokeLocked(SNTTemporaryMonitorModeLeaveReasonSyncServerChanged);
     return 0;
   }
 
@@ -103,14 +140,16 @@ uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialState(NSDictionary 
   if (secs_remaining.has_value()) {
     return *secs_remaining;
   } else {
-    // TODO: Emit audit event
+    handle_audit_event_block_([[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
+        initWithUUID:[current_uuid_ UUIDString]
+              reason:SNTTemporaryMonitorModeLeaveReasonSessionExpired]);
     return 0;
   }
 }
 
 void TemporaryMonitorMode::NewModeTransitionReceived(SNTModeTransition *mode_transition) {
   if (mode_transition.type == SNTModeTransitionTypeRevoke) {
-    if (Revoke()) {
+    if (Revoke(SNTTemporaryMonitorModeLeaveReasonRevoked)) {
       LOGI(@"Temporary Monitor Mode session revoked due to policy change.");
     }
   } else {
@@ -155,12 +194,23 @@ uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSEr
 
   uint32_t duration_min = [mode_transition getDurationMinutes:requested_duration];
 
-  Begin(duration_min * 60);
+  absl::MutexLock lock(&lock_);
+  SNTTemporaryMonitorModeEnterReason reason;
+  if (BeginLocked(duration_min * 60, true)) {
+    reason = SNTTemporaryMonitorModeEnterReasonOnDemand;
+  } else {
+    reason = SNTTemporaryMonitorModeEnterReasonOnDemandRefresh;
+  }
+  handle_audit_event_block_([[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
+      initWithUUID:[current_uuid_ UUIDString]
+           seconds:static_cast<uint32_t>(SecondsRemaining(deadline_).value_or(0))
+            reason:reason]);
 
   return duration_min;
 }
 
-std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining() {
+std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining() const {
+  absl::ReaderMutexLock lock(&lock_);
   if (IsStarted()) {
     return SecondsRemaining(deadline_);
   } else {
@@ -177,36 +227,64 @@ std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining(uint64_t deadline
   }
 }
 
-void TemporaryMonitorMode::Begin(uint32_t seconds) {
-  SetTimerInterval(seconds);
+bool TemporaryMonitorMode::BeginLocked(uint32_t seconds, bool gen_uuid_on_start) {
   NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:seconds];
-  StartTimer();
+
+  bool did_start_new_timer = StartTimerWithInterval(seconds);
+  if (did_start_new_timer && gen_uuid_on_start) {
+    current_uuid_ = [NSUUID UUID];
+  }
 
   uint64_t deadline = AddNanosecondsToMachTime(seconds * NSEC_PER_SEC, mach_continuous_time());
 
   [configurator_ enterTemporaryMonitorMode:@{
-    kStateTempMonitorModeBootSessionUUIDKey : [SNTSystemInfo bootSessionUUID],
+    kStateTempMonitorModeBootUUIDKey : [SNTSystemInfo bootSessionUUID],
     kStateTempMonitorModeDeadlineKey : @(deadline),
     kStateTempMonitorModeSavedSyncURLKey : configurator_.syncBaseURL.host,
+    kStateTempMonitorModeSessionUUIDKey : [current_uuid_ UUIDString],
   }];
+
   deadline_ = deadline;
 
   id<SNTNotifierXPC> rop = [notification_queue_.notifierConnection remoteObjectProxy];
   [rop enterTemporaryMonitorMode:expiry];
+
+  return did_start_new_timer;
 }
 
 bool TemporaryMonitorMode::Cancel() {
-  return End();
+  absl::MutexLock lock(&lock_);
+  if (EndLocked()) {
+    handle_audit_event_block_([[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
+        initWithUUID:[current_uuid_ UUIDString]
+              reason:SNTTemporaryMonitorModeLeaveReasonCancelled]);
+    current_uuid_ = nil;
+    return true;
+  } else {
+    return false;
+  }
 }
 
-bool TemporaryMonitorMode::Revoke() {
+bool TemporaryMonitorMode::Revoke(SNTTemporaryMonitorModeLeaveReason reason) {
+  absl::MutexLock lock(&lock_);
+  return RevokeLocked(reason);
+}
+
+bool TemporaryMonitorMode::RevokeLocked(SNTTemporaryMonitorModeLeaveReason reason) {
   [configurator_ setSyncServerModeTransition:[[SNTModeTransition alloc] initRevocation]];
-  return End();
+  if (EndLocked()) {
+    handle_audit_event_block_([[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
+        initWithUUID:[current_uuid_ UUIDString]
+              reason:reason]);
+    current_uuid_ = nil;
+    return true;
+  } else {
+    return false;
+  }
 }
 
-bool TemporaryMonitorMode::End() {
-  if (IsStarted()) {
-    StopTimer();
+bool TemporaryMonitorMode::EndLocked() {
+  if (StopTimer()) {
     [configurator_ leaveTemporaryMonitorMode];
     [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
     return true;
@@ -216,19 +294,29 @@ bool TemporaryMonitorMode::End() {
 }
 
 bool TemporaryMonitorMode::OnTimer() {
+  absl::MutexLock lock(&lock_);
   [configurator_ leaveTemporaryMonitorMode];
   [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
+
+  handle_audit_event_block_([[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
+      initWithUUID:[current_uuid_ UUIDString]
+            reason:SNTTemporaryMonitorModeLeaveReasonSessionExpired]);
+  current_uuid_ = nil;
 
   // Don't restart the timer
   return false;
 }
 
-void TemporaryMonitorMode::StartTimer() {
-  Timer<TemporaryMonitorMode>::StartTimer();
-};
+bool TemporaryMonitorMode::StartTimer() {
+  return Timer<TemporaryMonitorMode>::StartTimer();
+}
 
-void TemporaryMonitorMode::StopTimer() {
-  Timer<TemporaryMonitorMode>::StopTimer();
-};
+bool TemporaryMonitorMode::StartTimerWithInterval(uint32_t interval_seconds) {
+  return Timer<TemporaryMonitorMode>::StartTimerWithInterval(interval_seconds);
+}
+
+bool TemporaryMonitorMode::StopTimer() {
+  return Timer<TemporaryMonitorMode>::StopTimer();
+}
 
 }  // namespace santa

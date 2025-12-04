@@ -29,6 +29,17 @@ class EndpointSecurityAPI;
 
 class Message {
  public:
+  // Small structure to hold event target information.
+  struct PathTarget {
+    std::string path;
+    bool is_readable;
+    // This is a pointer into an es_message_t. The message must be valid for
+    // this pointer to be valid. The interfaces in the Message class will vend
+    // pointers that are valid, and callers must not store or otherwise
+    // reference the pointer to ensure no valid access is made.
+    const es_file_t* unsafe_file;
+  };
+
   Message(std::shared_ptr<EndpointSecurityAPI> esapi,
           const es_message_t* es_msg);
   ~Message();
@@ -55,13 +66,26 @@ class Message {
   std::string ParentProcessName() const;
   std::string ParentProcessPath() const;
 
+  // This method is not thread safe until after the first completed call.
+  const std::vector<Message::PathTarget> PathTargets();
+
+  inline bool HasPathTarget(size_t index) const {
+    return index < path_targets_.size();
+  }
+
+  inline const Message::PathTarget& PathTargetAtIndex(size_t index) const {
+    return path_targets_.at(index);
+  }
+
  private:
+  std::string GetProcessName(pid_t pid) const;
+  std::string GetProcessPath(audit_token_t* tok) const;
+  void PopulatePathTargets();
+
   std::shared_ptr<EndpointSecurityAPI> esapi_;
   const es_message_t* es_msg_;
   std::optional<santa::santad::process_tree::ProcessToken> process_token_;
-
-  std::string GetProcessName(pid_t pid) const;
-  std::string GetProcessPath(audit_token_t* tok) const;
+  std::vector<PathTarget> path_targets_;
 };
 
 }  // namespace santa

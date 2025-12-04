@@ -40,6 +40,7 @@ struct ProtoTraits<false> {
   using PostflightResponseT = ::santa::sync::v1::PostflightResponse;
 
   // General Types
+  using AuditEventT = ::santa::sync::v1::AuditEvent;
   using CertificateT = ::santa::sync::v1::Certificate;
   using EntitlementInfoT = ::santa::sync::v1::EntitlementInfo;
   using EntitlementT = ::santa::sync::v1::Entitlement;
@@ -133,6 +134,7 @@ struct ProtoTraits<true> {
   using PostflightResponseT = ::santa::sync::v2::PostflightResponse;
 
   // General Types
+  using AuditEventT = ::santa::sync::v2::AuditEvent;
   using CertificateT = ::santa::sync::v2::Certificate;
   using EntitlementT = ::santa::sync::v2::Entitlement;
   using EntitlementInfoT = ::santa::sync::v2::EntitlementInfo;

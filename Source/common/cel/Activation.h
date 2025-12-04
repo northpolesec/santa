@@ -40,8 +40,9 @@ namespace cel {
 class Activation : public ::google::api::expr::runtime::BaseActivation {
  public:
   Activation(std::unique_ptr<::santa::cel::v1::ExecutableFile> file,
-             std::vector<std::string> (^args)(), std::map<std::string, std::string> (^envs)())
-      : file_(std::move(file)), args_(args), envs_(envs) {};
+             std::vector<std::string> (^args)(), std::map<std::string, std::string> (^envs)(),
+             uid_t (^euid)(), std::string (^cwd)())
+      : file_(std::move(file)), args_(args), envs_(envs), euid_(euid), cwd_(cwd) {};
   ~Activation() = default;
 
   std::optional<::google::api::expr::runtime::CelValue> FindValue(
@@ -62,6 +63,8 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   std::unique_ptr<::santa::cel::v1::ExecutableFile> file_;
   Memoizer<std::vector<std::string>> args_;
   Memoizer<std::map<std::string, std::string>> envs_;
+  Memoizer<uid_t> euid_;
+  Memoizer<std::string> cwd_;
 
   bool IsResultCacheable() const;
 
