@@ -383,7 +383,7 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const M
 
   dispatch_async(queue_, ^{
     Message moved_in_msg = std::move(msg_copy);
-    const Message::PathTarget &target = msg.PathTargetAtIndex(target_index);
+    const Message::PathTarget &target = moved_in_msg.PathTargetAtIndex(target_index);
     EnrichedProcess enriched_proc =
         enricher_->Enrich(*moved_in_msg->process, EnrichOptions::kLocalOnly);
     std::optional<santa::EnrichedFile> enriched_event_target =
