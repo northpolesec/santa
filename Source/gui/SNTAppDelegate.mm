@@ -26,6 +26,7 @@
 #import "Source/gui/SNTAboutWindowController.h"
 #import "Source/gui/SNTFileInfoView-Swift.h"
 #import "Source/gui/SNTNotificationManager.h"
+#import "Source/gui/SNTStatusItemManager.h"
 
 @interface SNTAppDelegate ()
 @property SNTAboutWindowController *aboutWindowController;
@@ -40,9 +41,20 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
   self.notificationManager = [[SNTNotificationManager alloc] init];
+  self.statusItemManager = [[SNTStatusItemManager alloc] init];
+  self.notificationManager.statusItemManager = self.statusItemManager;
+
+  // Check whether we're currently in temporary monitor mode.
+  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  [daemonConn resume];
+  [[daemonConn synchronousRemoteObjectProxy]
+      temporaryMonitorModeSecondsRemaining:^(NSNumber *seconds) {
+        NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
+        [self.statusItemManager enterMonitorModeWithExpiration:expiry];
+      }];
+  [daemonConn invalidate];
 
   [self setupMenu];
-  [self setupStatusBarItem];
 
   if ([SNTConfigurator configurator].enableAPNS) {
     [NSApp registerForRemoteNotifications];
@@ -214,47 +226,7 @@
   [NSApp setMainMenu:mainMenu];
 }
 
-- (void)setupStatusBarItem {
-  // Create status bar item
-  self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
 
-  // Set the app icon as the status bar icon
-  NSImage *icon = [NSImage imageNamed:@"MenuItem"];
-  if (icon) {
-    icon.size = NSMakeSize(24.0, 16.0);
-    [icon setTemplate:YES];
-  }
-  self.statusItem.button.image = icon;
-
-  // Create the menu
-  NSMenu *menu = [[NSMenu alloc] init];
-
-  // Add About menu item
-  NSMenuItem *aboutItem = [[NSMenuItem alloc] initWithTitle:@"About"
-                                                     action:@selector(aboutMenuItemClicked:)
-                                              keyEquivalent:@""];
-  aboutItem.target = self;
-  [menu addItem:aboutItem];
-
-  self.statusItem.menu = menu;
-
-  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
-  [daemonConn resume];
-  [[daemonConn synchronousRemoteObjectProxy]
-      temporaryMonitorModeSecondsRemaining:^(NSNumber *seconds) {
-        NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
-        [self.notificationManager enterTemporaryMonitorMode:expiry];
-      }];
-  [daemonConn invalidate];
-}
-
-- (void)aboutMenuItemClicked:(id)sender {
-  if (!self.aboutWindowController) {
-    self.aboutWindowController = [[SNTAboutWindowController alloc] init];
-  }
-  [self.aboutWindowController showWindow:self];
-  [NSApp activateIgnoringOtherApps:YES];
-}
 
 #pragma mark Push Notifications
 

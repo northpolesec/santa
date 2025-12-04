@@ -1,4 +1,5 @@
 /// Copyright 2015 Google Inc. All rights reserved.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,9 +15,11 @@
 
 #import <Cocoa/Cocoa.h>
 
+@class SNTStatusItemManager;
+
 ///
 /// Initiates and manages the connection to santad
 ///
 @interface SNTAppDelegate : NSObject <NSApplicationDelegate>
-@property(strong, nonatomic) NSStatusItem *statusItem;
+@property(strong, nonatomic) SNTStatusItemManager *statusItemManager;
 @end

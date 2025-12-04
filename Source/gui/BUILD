@@ -100,10 +100,13 @@ objc_library(
         "SNTMessageWindowController.mm",
         "SNTNotificationManager.h",
         "SNTNotificationManager.mm",
+        "SNTStatusItemManager.h",
+        "SNTStatusItemManager.mm",
         "main.mm",
     ],
     hdrs = [
         "SNTNotificationManager.h",
+        "SNTStatusItemManager.h",
     ],
     sdk_frameworks = [
         "LocalAuthentication",

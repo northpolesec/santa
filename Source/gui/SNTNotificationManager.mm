@@ -32,13 +32,13 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
-#import "Source/gui/SNTAppDelegate.h"
 #import "Source/gui/SNTBinaryMessageWindowController.h"
 #import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 #import "Source/gui/SNTDeviceMessageWindowController.h"
 #import "Source/gui/SNTFileAccessMessageWindowController.h"
 #import "Source/gui/SNTMessageView-Swift.h"
 #import "Source/gui/SNTMessageWindowController.h"
+#import "Source/gui/SNTStatusItemManager.h"
 
 @interface SNTNotificationManager ()
 
@@ -465,54 +465,11 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 }
 
 - (void)enterTemporaryMonitorMode:(NSDate *)expiration {
-  self.temporaryMonitorModeExpiration = expiration;
-
-  // Invalidate any existing timer
-  [self.temporaryMonitorModeTimer invalidate];
-
-  // Create a timer that fires every second
-  dispatch_async(dispatch_get_main_queue(), ^{
-    self.temporaryMonitorModeTimer = [NSTimer
-        scheduledTimerWithTimeInterval:1.0
-                               repeats:YES
-                                 block:^(NSTimer *timer) {
-                                   SNTAppDelegate *delegate = [NSApp delegate];
-                                   if (!self.temporaryMonitorModeExpiration) {
-                                     delegate.statusItem.button.title = @"";
-                                     return;
-                                   }
-
-                                   NSTimeInterval remainingSeconds =
-                                       [self.temporaryMonitorModeExpiration timeIntervalSinceNow];
-
-                                   // If time has expired, stop the timer
-                                   if (remainingSeconds <= 0) {
-                                     [self.temporaryMonitorModeTimer invalidate];
-                                     self.temporaryMonitorModeTimer = nil;
-                                     self.temporaryMonitorModeExpiration = nil;
-                                     delegate.statusItem.button.title = @"";
-                                     return;
-                                   }
-
-                                   NSDateComponentsFormatter *dcf =
-                                       [[NSDateComponentsFormatter alloc] init];
-                                   dcf.allowedUnits = NSCalendarUnitDay | NSCalendarUnitHour |
-                                                      NSCalendarUnitMinute;
-                                   dcf.unitsStyle = NSDateComponentsFormatterUnitsStyleAbbreviated;
-                                   delegate.statusItem.button.title =
-                                       [dcf stringFromDate:[NSDate now]
-                                                    toDate:self.temporaryMonitorModeExpiration];
-                                 }];
-  });
+  [self.statusItemManager enterMonitorModeWithExpiration:expiration];
 }
 
 - (void)leaveTemporaryMonitorMode {
-  [self.temporaryMonitorModeTimer invalidate];
-  self.temporaryMonitorModeTimer = nil;
-  self.temporaryMonitorModeExpiration = nil;
-
-  SNTAppDelegate *delegate = [NSApp delegate];
-  delegate.statusItem.button.title = @"";
+  [self.statusItemManager leaveMonitorMode];
 }
 
 // XPC handler. The sync service requests the APNS token, by way of the daemon.
