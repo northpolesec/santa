@@ -25,7 +25,9 @@
 #include "Source/common/ScopedCFTypeRef.h"
 
 using ScopedCFError = santa::ScopedCFTypeRef<CFErrorRef>;
+using ScopedCFDataRef = santa::ScopedCFTypeRef<CFDataRef>;
 using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
+using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 
 @interface MOLAuthenticatingURLSession ()
 @property NSURLSessionConfiguration *sessionConfig;
@@ -299,8 +301,8 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
                                         algorithm)) {
           algorithm = kSecKeyAlgorithmECDSASignatureMessageX962SHA256;
         }
-        return SecKeyCreateSignature(scopedPrivateKey.Unsafe(), algorithm,
-                                     (__bridge CFDataRef)dataToSign, out);
+        return ScopedCFDataRef::Assume(SecKeyCreateSignature(scopedPrivateKey.Unsafe(), algorithm,
+                                     (__bridge CFDataRef)dataToSign, out));
       });
 
       NSError *err = scopedErrorRef.BridgeRelease<NSError *>();
@@ -497,8 +499,9 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
 // the keychain an empty array will be presented instead.
 - (NSArray *)locateIntermediatesForCertificate:(MOLCertificate *)leafCert
                                        inArray:(NSArray<MOLCertificate *> *)certs {
-  SecTrustRef t = NULL;
-  OSStatus res = SecTrustCreateWithCertificates(leafCert.certRef, NULL, &t);
+  auto [res, scopedTrust] = ScopedSecTrustRef::AssumeFrom(^OSStatus(SecTrustRef *out) {
+    return SecTrustCreateWithCertificates(leafCert.certRef, NULL, out);
+  });
   if (res != errSecSuccess) {
     NSString *errMsg = CFBridgingRelease(SecCopyErrorMessageString(res, NULL));
     [self log:@"[Client Trust] Failed to create trust for locating intermediate certs: %@", errMsg];
@@ -510,9 +513,9 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
   // without calling this but the documentation is clear that
   // SecTrustGetCertificateAtIndex shouldn't be called without calling
   // SecTrustEvaluateWithError first.
-  (void)SecTrustEvaluateWithError(t, NULL);
+  (void)SecTrustEvaluateWithError(scopedTrust.Unsafe(), NULL);
 
-  NSMutableArray *certChain = CFBridgingRelease(SecTrustCopyCertificateChain(t));
+  NSMutableArray *certChain = CFBridgingRelease(SecTrustCopyCertificateChain(scopedTrust.Unsafe()));
   if (certChain.count < 2) return nil;
   return [certChain subarrayWithRange:NSMakeRange(1, certChain.count - 1)];
 }
