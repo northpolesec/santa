@@ -197,19 +197,46 @@ REGISTER_COMMAND_NAME(@"doctor")
   }
 
   dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-  NSURLSessionDataTask *task = [[authURLSession session]
-        dataTaskWithURL:[syncBaseURL URLByAppendingPathComponent:@"/preflight/santactl-doctor-test"]
-      completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        absl::Cleanup cleanup = ^{
-          dispatch_semaphore_signal(semaphore);
-        };
 
-        if (error) {
-          print(@"[-] Failed to retrieve preflight data");
-          return;
-        }
-        print(@"[+] Preflight request succeeded");
-      }];
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  // Disable user-interaction for Keychain APIs in this process.
+  // If the settings on the identity's private key are not set to provide access to this process
+  // the user will be prompted for their password, which we don't want because santasyncservice
+  // would *not* do this and would instead fail the attempt.
+  SecKeychainSetUserInteractionAllowed(false);
+#pragma clang diagnostic pop
+
+  NSMutableURLRequest *req = [[NSMutableURLRequest alloc]
+      initWithURL:[syncBaseURL URLByAppendingPathComponent:@"preflight/santactl-doctor-test"]];
+  req.HTTPMethod = @"POST";
+  NSURLSessionDataTask *task = [[authURLSession session]
+      dataTaskWithRequest:req
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+          absl::Cleanup cleanup = ^{
+            dispatch_semaphore_signal(semaphore);
+          };
+
+          if (error) {
+            print(@"[-] Failed to retrieve preflight data");
+            return;
+          }
+
+          NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+          switch (httpResponse.statusCode) {
+            case 301: {
+              NSString *location = [httpResponse valueForHTTPHeaderField:@"Location"];
+              print(@"[?] HTTP 301, new location: %s", location.UTF8String);
+              break;
+            }
+            case 200:
+            case 400:  // Treat a 400 as OK: we didn't populate any data or set an appropriate
+                       // Content-Type.
+              print(@"[+] Preflight request succeeded");
+              break;
+            default: print(@"[-] HTTP response code: %d", httpResponse.statusCode);
+          }
+        }];
   [task resume];
   dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
 
