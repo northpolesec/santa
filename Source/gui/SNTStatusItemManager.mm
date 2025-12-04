@@ -13,6 +13,10 @@
 /// limitations under the License.
 
 #import "Source/gui/SNTStatusItemManager.h"
+#include <AppKit/AppKit.h>
+#include "Source/common/SNTCommonEnums.h"
+#include "Source/common/SNTXPCSyncServiceInterface.h"
+#include <objc/NSObjCRuntime.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -23,9 +27,13 @@
 @property SNTAboutWindowController *aboutWindowController;
 @property(strong, nonatomic, readwrite) NSStatusItem *statusItem;
 
-// Timer for temporary monitor mode countdown
+// Sync items
+@property NSMenuItem *syncMenuItem;
+
+// Temporary monitor mode items
 @property(atomic, strong) NSTimer *temporaryMonitorModeTimer;
 @property(atomic, strong) NSDate *temporaryMonitorModeExpiration;
+@property NSMenuItem *temporaryMonitorModeRefreshItem;
 @property NSMenuItem *temporaryMonitorModeMenuItem;
 @end
 
@@ -54,18 +62,28 @@
   // Create the menu
   NSMenu *menu = [[NSMenu alloc] init];
 
-  // Add About menu item
-  NSMenuItem *aboutItem = [[NSMenuItem alloc] initWithTitle:@"About"
-                                                     action:@selector(aboutMenuItemClicked:)
-                                              keyEquivalent:@""];
-  aboutItem.target = self;
-  [menu addItem:aboutItem];
+  // Add version string and about menu item
+  NSString *santaVersionString = [NSString stringWithFormat:@"Santa v%@", [[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"]];
+  [menu addItem:[self menuItemWithTitle:santaVersionString andAction:nil]];
+  [menu addItem:[self menuItemWithTitle:@"About Santa" andAction:@selector(aboutMenuItemClicked:)]];
 
-  self.temporaryMonitorModeMenuItem = [[NSMenuItem alloc] initWithTitle:@"Enter Temporary Monitor Mode"
-                                                                 action:@selector(tmmMenuItemClicked:)
-                                                          keyEquivalent:@""];
-  self.temporaryMonitorModeMenuItem.target = self;
+  // Add separator
+  [menu addItem:[NSMenuItem separatorItem]];
+
+  // Add sync item
+  self.syncMenuItem = [self menuItemWithTitle:@"Sync" andAction:@selector(syncMenuItemClicked:)];
+  [menu addItem:self.syncMenuItem];
+
+  // Add separator
+  [menu addItem:[NSMenuItem separatorItem]];
+
+  // Add temporary monitor mode items
+  self.temporaryMonitorModeMenuItem = [self menuItemWithTitle:@"Enter Temporary Monitor Mode" andAction:@selector(tmmMenuItemClicked:)];
   [menu addItem:self.temporaryMonitorModeMenuItem];
+
+  self.temporaryMonitorModeRefreshItem = [self menuItemWithTitle:@"Refresh Temporary Monitor Mode" andAction:@selector(tmmRefreshItemClicked:)];
+  self.temporaryMonitorModeRefreshItem.target = nil;
+  [menu addItem:self.temporaryMonitorModeRefreshItem];
 
   self.statusItem.menu = menu;
 }
@@ -86,12 +104,25 @@
   [self showAboutWindow];
 }
 
+- (void)tmmRefreshItemClicked:(id)sender {
+  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  [daemonConn resume];
+  [[daemonConn synchronousRemoteObjectProxy] requestTemporaryMonitorModeWithDurationMinutes:0 reply:^(uint32 minutes, NSError *err) {
+    if (err) {
+      // TODO: Handle this properly
+      NSLog(@"Failed to refresh TMM");
+    }
+  }];
+  [daemonConn invalidate];
+}
+
 - (void)tmmMenuItemClicked:(id)sender {
   MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
+
   if (self.temporaryMonitorModeExpiration) {
     [[daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError *err) {
-      if (err) {
+    if (err) {
         // TODO: Handle this properly
         NSLog(@"Failed to cancel TMM");
       }
@@ -103,9 +134,44 @@
         NSLog(@"Failed to request TMM");
       }
     }];
-
   }
   [daemonConn invalidate];
+}
+
+- (void)syncMenuItemClicked:(id)sender {
+  // Disable the sync menu item until we're done.
+  self.syncMenuItem.target = nil;
+
+  MOLXPCConnection *daemonConn = [SNTXPCSyncServiceInterface configuredConnection];
+  [daemonConn resume];
+  [[daemonConn remoteObjectProxy] syncWithLogListener:nil syncType:SNTSyncTypeNormal reply:^(SNTSyncStatusType status) {
+    self.syncMenuItem.target = self;
+
+    if (status == SNTSyncStatusTypeSuccess) {
+      NSLog(@"SYNC SUCCESS");
+      [self.statusItem.button setSubviews:@[]];
+      self.statusItem.button.image  = [NSImage imageNamed:NSImageNameStatusAvailable];
+      [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:NO block:^(NSTimer * _Nonnull timer) {
+        self.statusItem.button.image = [NSImage imageNamed:@"MenuItem"];
+      }];
+    } else {
+      NSLog(@"SYNC FAIL");
+      [self.statusItem.button setSubviews:@[]];
+      self.statusItem.button.image  = [NSImage imageNamed:NSImageNameStatusUnavailable];
+      [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:NO block:^(NSTimer * _Nonnull timer) {
+        self.statusItem.button.image = [NSImage imageNamed:@"MenuItem"];
+      }];
+    }
+
+    [daemonConn invalidate];
+  }];
+
+  NSLog(@"SYNC STARTING");
+
+  NSProgressIndicator *p = [[NSProgressIndicator alloc] init];
+  p.indeterminate = YES;
+  self.statusItem.button.title = @"";
+  [self.statusItem.button addSubview:p];
 }
 
 - (void)enterMonitorModeWithExpiration:(NSDate *)expiration {
@@ -113,6 +179,10 @@
 
   // Invalidate any existing timer
   [self.temporaryMonitorModeTimer invalidate];
+
+  // Update menu options
+  self.temporaryMonitorModeMenuItem.title = @"Leave Temporary Monitor Mode";
+  self.temporaryMonitorModeRefreshItem.target = self;
 
   // Create a timer that fires every second
   dispatch_async(dispatch_get_main_queue(), ^{
@@ -142,7 +212,6 @@
                                    NSString *title = [dcf stringFromDate:[NSDate now]
                                                                   toDate:self.temporaryMonitorModeExpiration];
                                    [self updateTitle:title];
-                                   self.temporaryMonitorModeMenuItem.title = @"Leave Temporary Monitor Mode";
                                  }];
   });
 }
@@ -154,6 +223,13 @@
 
   [self updateTitle:@""];
   self.temporaryMonitorModeMenuItem.title = @"Enter Temporary Monitor Mode";
+  self.temporaryMonitorModeRefreshItem.target = nil;
+}
+
+- (NSMenuItem *)menuItemWithTitle:(NSString *)title andAction:(SEL) action {
+  NSMenuItem *i = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
+  i.target = self;
+  return i;
 }
 
 @end
