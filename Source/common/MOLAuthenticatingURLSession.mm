@@ -302,7 +302,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
           algorithm = kSecKeyAlgorithmECDSASignatureMessageX962SHA256;
         }
         return ScopedCFDataRef::Assume(SecKeyCreateSignature(scopedPrivateKey.Unsafe(), algorithm,
-                                     (__bridge CFDataRef)dataToSign, out));
+                                                             (__bridge CFDataRef)dataToSign, out));
       });
 
       NSError *err = scopedErrorRef.BridgeRelease<NSError *>();
