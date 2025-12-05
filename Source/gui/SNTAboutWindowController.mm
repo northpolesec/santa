@@ -17,6 +17,10 @@
 
 #import "Source/common/SNTConfigurator.h"
 
+@interface SNTAboutWindowController()
+@property BOOL hasBeenCentered;
+@end
+
 @implementation SNTAboutWindowController
 
 - (void)showWindow:(id)sender {
@@ -41,5 +45,17 @@
   [self.window makeKeyAndOrderFront:nil];
   [self.window center];
 }
+
+- (void)windowWillClose:(NSNotification *)notification {
+  self.hasBeenCentered = NO;
+}
+
+- (void)windowDidResize:(NSNotification *)notification {
+  if (!self.hasBeenCentered) {
+    [self.window center];
+    self.hasBeenCentered = YES;
+  }
+}
+
 
 @end
