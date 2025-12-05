@@ -31,10 +31,6 @@ NS_ASSUME_NONNULL_BEGIN
   return self;
 }
 
-- (void)windowDidResize:(NSNotification *)notification {
-  [self.window center];
-}
-
 - (void)showWindow:(id)sender {
   if (self.window) [self.window orderOut:sender];
 
