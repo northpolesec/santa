@@ -14,6 +14,10 @@
 
 #import "Source/gui/SNTMessageWindowController.h"
 
+@interface SNTMessageWindowController ()
+@property BOOL hasBeenCentered;
+@end
+
 @implementation SNTMessageWindowController
 
 - (IBAction)showWindow:(id)sender {
@@ -37,6 +41,13 @@
                                 withInterval:self.silenceFutureNotificationsPeriod];
   } else {
     [self.delegate windowDidCloseSilenceHash:nil withInterval:0];
+  }
+}
+
+- (void)windowDidResize:(NSNotification *)notification {
+  if (!self.hasBeenCentered) {
+    [self.window center];
+    self.hasBeenCentered = YES;
   }
 }
 
