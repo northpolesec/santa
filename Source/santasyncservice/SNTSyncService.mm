@@ -187,15 +187,16 @@
         [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
     [ll resume];
   }
-  [self.syncManager syncType:syncType withReply:^(SNTSyncStatusType status) {
-    if (status == SNTSyncStatusTypeSyncStarted) {
-      if (ll) [[SNTSyncBroadcaster broadcaster] addLogListener:ll];
-      return;
-    }
-    [[SNTSyncBroadcaster broadcaster] barrier];
-    if (ll) [[SNTSyncBroadcaster broadcaster] removeLogListener:ll];
-    reply(status);
-  }];
+  [self.syncManager syncType:syncType
+                   withReply:^(SNTSyncStatusType status) {
+                     if (status == SNTSyncStatusTypeSyncStarted) {
+                       if (ll) [[SNTSyncBroadcaster broadcaster] addLogListener:ll];
+                       return;
+                     }
+                     [[SNTSyncBroadcaster broadcaster] barrier];
+                     if (ll) [[SNTSyncBroadcaster broadcaster] removeLogListener:ll];
+                     reply(status);
+                   }];
 }
 
 - (void)spindown {

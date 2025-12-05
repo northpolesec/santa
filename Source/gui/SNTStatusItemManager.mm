@@ -17,8 +17,8 @@
 #import <UserNotifications/UserNotifications.h>
 
 #import "Source/common/MOLXPCConnection.h"
-#import "Source/common/SNTError.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #import "Source/gui/SNTAboutWindowController.h"
@@ -64,7 +64,9 @@
   NSMenu *menu = [[NSMenu alloc] init];
 
   // Add version string and about menu item
-  NSString *santaVersionString = [NSString stringWithFormat:@"Santa v%@", [[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"]];
+  NSString *santaVersionString = [NSString
+      stringWithFormat:@"Santa v%@",
+                       [[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"]];
   [menu addItem:[self menuItemWithTitle:santaVersionString andAction:nil]];
   [menu addItem:[self menuItemWithTitle:@"About Santa" andAction:@selector(aboutMenuItemClicked:)]];
 
@@ -79,10 +81,12 @@
   [menu addItem:[NSMenuItem separatorItem]];
 
   // Add temporary monitor mode items
-  self.temporaryMonitorModeMenuItem = [self menuItemWithTitle:@"Enter Temporary Monitor Mode" andAction:@selector(tmmMenuItemClicked:)];
+  self.temporaryMonitorModeMenuItem = [self menuItemWithTitle:@"Enter Temporary Monitor Mode"
+                                                    andAction:@selector(tmmMenuItemClicked:)];
   [menu addItem:self.temporaryMonitorModeMenuItem];
 
-  self.temporaryMonitorModeRefreshItem = [self menuItemWithTitle:@"Refresh Temporary Monitor Mode" andAction:@selector(tmmRefreshItemClicked:)];
+  self.temporaryMonitorModeRefreshItem = [self menuItemWithTitle:@"Refresh Temporary Monitor Mode"
+                                                       andAction:@selector(tmmRefreshItemClicked:)];
   self.temporaryMonitorModeRefreshItem.target = nil;
   [menu addItem:self.temporaryMonitorModeRefreshItem];
 
@@ -108,12 +112,14 @@
 - (void)tmmRefreshItemClicked:(id)sender {
   MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
-  [[daemonConn synchronousRemoteObjectProxy] requestTemporaryMonitorModeWithDurationMinutes:0 reply:^(uint32 minutes, NSError *err) {
-    if (err) {
-      // TODO: Handle this properly
-      NSLog(@"Failed to refresh TMM");
-    }
-  }];
+  [[daemonConn synchronousRemoteObjectProxy]
+      requestTemporaryMonitorModeWithDurationMinutes:0
+                                               reply:^(uint32 minutes, NSError *err) {
+                                                 if (err) {
+                                                   // TODO: Handle this properly
+                                                   NSLog(@"Failed to refresh TMM");
+                                                 }
+                                               }];
   [daemonConn invalidate];
 }
 
@@ -123,18 +129,20 @@
 
   if (self.temporaryMonitorModeExpiration) {
     [[daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError *err) {
-    if (err) {
+      if (err) {
         // TODO: Handle this properly
         NSLog(@"Failed to cancel TMM");
       }
     }];
   } else {
-    [[daemonConn synchronousRemoteObjectProxy] requestTemporaryMonitorModeWithDurationMinutes:0 reply:^(uint32 minutes, NSError *err) {
-      if (err) {
-        // TODO: Handle this properly
-        NSLog(@"Failed to request TMM");
-      }
-    }];
+    [[daemonConn synchronousRemoteObjectProxy]
+        requestTemporaryMonitorModeWithDurationMinutes:0
+                                                 reply:^(uint32 minutes, NSError *err) {
+                                                   if (err) {
+                                                     // TODO: Handle this properly
+                                                     NSLog(@"Failed to request TMM");
+                                                   }
+                                                 }];
   }
   [daemonConn invalidate];
 }
@@ -150,40 +158,64 @@
       dispatch_async(dispatch_get_main_queue(), ^{
         self.syncMenuItem.target = self;
         // Replace unavailable image with a Santa-specific failure icon
-        self.statusItem.button.image  = [NSImage imageNamed:NSImageNameStatusUnavailable];
-        [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:NO block:^(NSTimer * _Nonnull timer) {
-          self.statusItem.button.image = [NSImage imageNamed:@"MenuItem"];
-        }];
-        [self notificationWithIdentifier:@"sync_result_notification" andBody:NSLocalizedString(
-          @"Sync failed", @"Notification message shown when a sync fails")];
+        self.statusItem.button.image = [NSImage imageNamed:NSImageNameStatusUnavailable];
+        [NSTimer scheduledTimerWithTimeInterval:2.0
+                                        repeats:NO
+                                          block:^(NSTimer *_Nonnull timer) {
+                                            self.statusItem.button.image =
+                                                [NSImage imageNamed:@"MenuItem"];
+                                          }];
+        [self notificationWithIdentifier:@"sync_result_notification"
+                                 andBody:NSLocalizedString(
+                                             @"Sync failed",
+                                             @"Notification message shown when a sync fails")];
       });
     };
     [ss resume];
-    [[ss synchronousRemoteObjectProxy] syncWithLogListener:nil syncType:SNTSyncTypeNormal reply:^(SNTSyncStatusType status) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        self.syncMenuItem.target = self;
+    [[ss synchronousRemoteObjectProxy]
+        syncWithLogListener:nil
+                   syncType:SNTSyncTypeNormal
+                      reply:^(SNTSyncStatusType status) {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                          self.syncMenuItem.target = self;
 
-        if (status == SNTSyncStatusTypeSuccess) {
-          // Replace available image with a Santa-specific success icon
-          self.statusItem.button.image  = [NSImage imageNamed:NSImageNameStatusAvailable];
-          [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:NO block:^(NSTimer * _Nonnull timer) {
-            self.statusItem.button.image = [NSImage imageNamed:@"MenuItem"];
-          }];
-          [self notificationWithIdentifier:@"sync_result_notification" andBody:NSLocalizedString(
-            @"Sync completed successfully", @"Notification message shown when a sync completes successfully")];
-        } else {
-          // Replace unavailable image with a Santa-specific failure icon
-          self.statusItem.button.image  = [NSImage imageNamed:NSImageNameStatusUnavailable];
-          [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:NO block:^(NSTimer * _Nonnull timer) {
-            self.statusItem.button.image = [NSImage imageNamed:@"MenuItem"];
-          }];
-          [self notificationWithIdentifier:@"sync_result_notification" andBody:NSLocalizedString(
-            @"Sync failed", @"Notification message shown when a sync fails")];
-        }
-      });
-      ss.invalidationHandler = nil;
-      [ss invalidate];
-    }];
+                          if (status == SNTSyncStatusTypeSuccess) {
+                            // Replace available image with a Santa-specific success icon
+                            self.statusItem.button.image =
+                                [NSImage imageNamed:NSImageNameStatusAvailable];
+                            [NSTimer
+                                scheduledTimerWithTimeInterval:2.0
+                                                       repeats:NO
+                                                         block:^(NSTimer *_Nonnull timer) {
+                                                           self.statusItem.button.image =
+                                                               [NSImage imageNamed:@"MenuItem"];
+                                                         }];
+                            [self notificationWithIdentifier:@"sync_result_notification"
+                                                     andBody:NSLocalizedString(
+                                                                 @"Sync completed successfully",
+                                                                 @"Notification message shown when "
+                                                                 @"a sync completes successfully")];
+                          } else {
+                            // Replace unavailable image with a Santa-specific failure icon
+                            self.statusItem.button.image =
+                                [NSImage imageNamed:NSImageNameStatusUnavailable];
+                            [NSTimer
+                                scheduledTimerWithTimeInterval:2.0
+                                                       repeats:NO
+                                                         block:^(NSTimer *_Nonnull timer) {
+                                                           self.statusItem.button.image =
+                                                               [NSImage imageNamed:@"MenuItem"];
+                                                         }];
+                            [self notificationWithIdentifier:@"sync_result_notification"
+                                                     andBody:NSLocalizedString(
+                                                                 @"Sync failed",
+                                                                 @"Notification message shown when "
+                                                                 @"a sync fails")];
+                          }
+                        });
+                        ss.invalidationHandler = nil;
+                        [ss invalidate];
+                      }];
   });
 }
 
@@ -199,26 +231,34 @@
 
   // Create a timer that fires every second
   dispatch_async(dispatch_get_main_queue(), ^{
-    self.temporaryMonitorModeTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
-      if (!self.temporaryMonitorModeExpiration) {
-        [self leaveMonitorMode];
-        return;
-      }
+    self.temporaryMonitorModeTimer = [NSTimer
+        scheduledTimerWithTimeInterval:1.0
+                               repeats:YES
+                                 block:^(NSTimer *timer) {
+                                   if (!self.temporaryMonitorModeExpiration) {
+                                     [self leaveMonitorMode];
+                                     return;
+                                   }
 
-      NSTimeInterval remainingSeconds = [self.temporaryMonitorModeExpiration timeIntervalSinceNow];
+                                   NSTimeInterval remainingSeconds =
+                                       [self.temporaryMonitorModeExpiration timeIntervalSinceNow];
 
-      // If time has expired, stop the timer
-      if (remainingSeconds <= 0) {
-        [self leaveMonitorMode];
-        return;
-      }
+                                   // If time has expired, stop the timer
+                                   if (remainingSeconds <= 0) {
+                                     [self leaveMonitorMode];
+                                     return;
+                                   }
 
-      NSDateComponentsFormatter *dcf = [[NSDateComponentsFormatter alloc] init];
-      dcf.allowedUnits = NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute;
-      dcf.unitsStyle = NSDateComponentsFormatterUnitsStyleAbbreviated;
-      NSString *title = [dcf stringFromDate:[NSDate now] toDate:self.temporaryMonitorModeExpiration];
-      [self updateTitle:title];
-    }];
+                                   NSDateComponentsFormatter *dcf =
+                                       [[NSDateComponentsFormatter alloc] init];
+                                   dcf.allowedUnits = NSCalendarUnitDay | NSCalendarUnitHour |
+                                                      NSCalendarUnitMinute;
+                                   dcf.unitsStyle = NSDateComponentsFormatterUnitsStyleAbbreviated;
+                                   NSString *title =
+                                       [dcf stringFromDate:[NSDate now]
+                                                    toDate:self.temporaryMonitorModeExpiration];
+                                   [self updateTitle:title];
+                                 }];
   });
 }
 
@@ -232,7 +272,7 @@
   self.temporaryMonitorModeRefreshItem.target = nil;
 }
 
-- (NSMenuItem *)menuItemWithTitle:(NSString *)title andAction:(SEL) action {
+- (NSMenuItem *)menuItemWithTitle:(NSString *)title andAction:(SEL)action {
   NSMenuItem *i = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
   i.target = self;
   return i;
@@ -243,8 +283,11 @@
   content.title = @"Santa";
   content.body = body;
 
-  UNNotificationRequest *req = [UNNotificationRequest requestWithIdentifier:identifier content:content trigger:nil];
-  [[UNUserNotificationCenter currentNotificationCenter] addNotificationRequest:req withCompletionHandler:nil];
+  UNNotificationRequest *req = [UNNotificationRequest requestWithIdentifier:identifier
+                                                                    content:content
+                                                                    trigger:nil];
+  [[UNUserNotificationCenter currentNotificationCenter] addNotificationRequest:req
+                                                         withCompletionHandler:nil];
 }
 
 @end

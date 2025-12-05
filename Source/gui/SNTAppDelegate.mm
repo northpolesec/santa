@@ -226,8 +226,6 @@
   [NSApp setMainMenu:mainMenu];
 }
 
-
-
 #pragma mark Push Notifications
 
 - (void)application:(NSApplication *)application
