@@ -17,7 +17,7 @@
 
 #import "Source/common/SNTConfigurator.h"
 
-@interface SNTAboutWindowController()
+@interface SNTAboutWindowController ()
 @property BOOL hasBeenCentered;
 @end
 
@@ -56,6 +56,5 @@
     self.hasBeenCentered = YES;
   }
 }
-
 
 @end
