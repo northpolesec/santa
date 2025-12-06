@@ -21,6 +21,9 @@
 
 static const NSUInteger kChunkSize = 256 * 1024;  // 256 KiB
 
+// The value here isn't significant; the address of kStreamQueueKey is used as the key.
+static int kStreamQueueKey = 42;
+
 @interface SNTStreamingMultipartFormData () <NSStreamDelegate>
 @property(atomic) NSData *formData;
 @property(readonly) NSString *boundary;
@@ -77,6 +80,7 @@ static const NSUInteger kChunkSize = 256 * 1024;  // 256 KiB
     // The queue where the NSStreamDelegate methods will be called.
     _streamQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.multipartstream",
                                          DISPATCH_QUEUE_SERIAL);
+    dispatch_queue_set_specific(_streamQueue, &kStreamQueueKey, &kStreamQueueKey, NULL);
 
     // Create a bounded stream. This object will write to one end, and a
     // consumer will read from the other.
@@ -133,6 +137,27 @@ static const NSUInteger kChunkSize = 256 * 1024;  // 256 KiB
     });
   }
   return self;
+}
+
+- (void)dealloc {
+  NSOutputStream *output = _output;
+  dispatch_queue_t queue = _streamQueue;
+  if (output && queue) {
+    void (^cleanup)(void) = ^{
+      output.delegate = nil;
+      CFWriteStreamSetDispatchQueue((__bridge CFWriteStreamRef)output, NULL);
+      [output close];
+    };
+    // If we're already on streamQueue run cleanup directly to avoid deadlock. Otherwise,
+    // dispatch_sync to ensure we wait for any pending callbacks before dealloc completes. This is a
+    // very small race, but it can be eventually reproduced by running `testDeallocWhileStreaming`
+    // without this fix applied.
+    if (dispatch_get_specific(&kStreamQueueKey)) {
+      cleanup();
+    } else {
+      dispatch_sync(queue, cleanup);
+    }
+  }
 }
 
 - (NSData *)partWithName:(NSString *)name value:(NSString *)value {
