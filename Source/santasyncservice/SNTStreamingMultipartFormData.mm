@@ -148,7 +148,7 @@ static int kStreamQueueKey = 42;
       CFWriteStreamSetDispatchQueue((__bridge CFWriteStreamRef)output, NULL);
       [output close];
     };
-    // If we're already on streamQueue run cleanup directly to avoid deadlock. Otherwise,
+    // If we're already on streamQueue, run cleanup directly to avoid deadlock. Otherwise,
     // dispatch_sync to ensure we wait for any pending callbacks before dealloc completes. This is a
     // very small race, but it can be eventually reproduced by running `testDeallocWhileStreaming`
     // without this fix applied.
