@@ -509,6 +509,8 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":SNTPushClientNATSCommandTest",
+        ":SNTPushClientNATSConnectionTest",
         ":SNTPushClientNATSTest",
         ":SNTStreamingMultipartFormDataTest",
         ":SNTSyncConfigBundleTest",

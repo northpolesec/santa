@@ -84,7 +84,7 @@ static NSString *CommandTypeToString(
   // TODO: This is just a placeholder for now.
   santa::commands::v1::SantaCommandResponse response;
   response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-  (void))response.mutable_kill();
+  (void)response.mutable_kill();
 
   // Verify the code was set correctly
   LOGD(@"NATS: Kill response code set to: %d (%@)", static_cast<int>(response.code()),
