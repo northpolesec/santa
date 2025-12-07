@@ -17,6 +17,7 @@
 #include <google/protobuf/descriptor.h>
 
 #import "Source/common/SNTLogging.h"
+#include "absl/cleanup/cleanup.h"
 #include "commands/v1.pb.h"
 
 __BEGIN_DECLS
@@ -77,6 +78,21 @@ static NSString *CommandTypeToString(
   return response;
 }
 
+// Handle KillRequest command
+- (santa::commands::v1::SantaCommandResponse)handleKillCommand:
+    (const santa::commands::v1::KillRequest &)killRequest {
+  // TODO: This is just a placeholder for now.
+  santa::commands::v1::SantaCommandResponse response;
+  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
+  (void))response.mutable_kill();
+
+  // Verify the code was set correctly
+  LOGD(@"NATS: Kill response code set to: %d (%@)", static_cast<int>(response.code()),
+       ResponseCodeToString(response.code()));
+
+  return response;
+}
+
 // Dispatch Santa command to appropriate handler based on command type
 - (santa::commands::v1::SantaCommandResponse)dispatchSantaCommandToHandler:
     (const santa::commands::v1::SantaCommandRequest &)command {
@@ -87,6 +103,11 @@ static NSString *CommandTypeToString(
     case santa::commands::v1::SantaCommandRequest::kPing:
       LOGI(@"NATS: Dispatching PingRequest command");
       response = [self handlePingCommand:command.ping()];
+      break;
+
+    case santa::commands::v1::SantaCommandRequest::kKill:
+      LOGI(@"NATS: Dispatching KillRequest command");
+      response = [self handleKillCommand:command.kill()];
       break;
 
     case santa::commands::v1::SantaCommandRequest::COMMAND_NOT_SET:
@@ -106,15 +127,18 @@ static NSString *CommandTypeToString(
 // dispatches to handlers
 static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub, natsMsg *msg,
                                       SNTPushClientNATS *self) {
-  if (!self || !msg) {
+  absl::Cleanup glob_cleaup = ^{
+    // Destroy the message on return.
     if (msg) {
       natsMsg_Destroy(msg);
     }
+  };
+
+  if (!self || !msg) {
     return;
   }
 
   if (self.isShuttingDown) {
-    natsMsg_Destroy(msg);
     return;
   }
 
@@ -126,21 +150,15 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
 
   if (!replyTopic) {
     LOGW(@"NATS: Command message on %@ has no reply topic, ignoring", msgSubject);
-    natsMsg_Destroy(msg);
     return;
   }
 
-  // Validate message data before dispatching
-  const void *data = natsMsg_GetData(msg);
-  int dataLen = natsMsg_GetDataLength(msg);
-
-  if (!data || dataLen <= 0) {
+  if (natsMsg_GetDataLength(msg) <= 0) {
     LOGE(@"NATS: Command message on %@ has no data", msgSubject);
     // Try to send error response, but don't fail if that also fails
     santa::commands::v1::SantaCommandResponse errorResponse;
     errorResponse.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
     [self publishResponse:errorResponse toReplyTopic:replyTopic];
-    natsMsg_Destroy(msg);
     return;
   }
 
@@ -148,20 +166,14 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
   // Note: We must extract all data from msg before destroying it, as NATS owns the message
   // and will free it after this callback returns
   santa::commands::v1::SantaCommandRequest command;
-  if (!command.ParseFromArray(data, dataLen)) {
+  if (!command.ParseFromArray(natsMsg_GetData(msg), natsMsg_GetDataLength(msg))) {
     LOGE(@"NATS: Failed to parse SantaCommandRequest from message on %@", msgSubject);
     // Try to send error response, but don't fail if that also fails
     santa::commands::v1::SantaCommandResponse errorResponse;
     errorResponse.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
     [self publishResponse:errorResponse toReplyTopic:replyTopic];
-    natsMsg_Destroy(msg);
     return;
   }
-
-  // Destroy the message now - NATS owns it and will free it after callback returns anyway
-  // We've extracted all needed data (command, replyTopic, msgSubject) which are safe to capture
-  natsMsg_Destroy(msg);
-  msg = NULL;  // Prevent accidental use
 
   // Process on message queue to serialize handling of messages
   // Failures are logged but don't crash the client
