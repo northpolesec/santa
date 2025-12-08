@@ -146,9 +146,9 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
       [[self.daemonConn remoteObjectProxy] databaseRemoveEventsWithIDs:[eventIds allObjects]];
 
       [eventIds removeAllObjects];
-      req->clear_events();
-      req->clear_file_access_events();
-      req->clear_audit_events();
+      uploadEvents->Clear();
+      uploadFAAEvents->Clear();
+      uploadAuditEvents->Clear();
     }
   }];
 
