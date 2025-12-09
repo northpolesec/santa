@@ -64,7 +64,8 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
 //
 // Enter Audit event
 //
-@interface SNTStoredTemporaryMonitorModeEnterAuditEvent : SNTStoredTemporaryMonitorModeAuditEvent
+@interface SNTStoredTemporaryMonitorModeEnterAuditEvent
+    : SNTStoredTemporaryMonitorModeAuditEvent <NSSecureCoding>
 
 @property(readonly) uint32_t seconds;
 @property(readonly) SNTTemporaryMonitorModeEnterReason reason;
@@ -79,7 +80,8 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
 //
 // Leave audit event
 //
-@interface SNTStoredTemporaryMonitorModeLeaveAuditEvent : SNTStoredTemporaryMonitorModeAuditEvent
+@interface SNTStoredTemporaryMonitorModeLeaveAuditEvent
+    : SNTStoredTemporaryMonitorModeAuditEvent <NSSecureCoding>
 
 @property(readonly) SNTTemporaryMonitorModeLeaveReason reason;
 

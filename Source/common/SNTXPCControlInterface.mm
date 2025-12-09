@@ -44,8 +44,7 @@ NSString *const kBundleID = @"com.northpolesec.santa.daemon";
 }
 
 + (void)initializeControlInterface:(NSXPCInterface *)r {
-  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
-                                      [SNTStoredExecutionEvent class], nil]
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil]
         forSelector:@selector(databaseEventsPending:)
       argumentIndex:0
             ofReply:YES];
