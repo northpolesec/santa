@@ -1579,6 +1579,7 @@ santa_unit_test(
         ":Metrics",
         ":MockEndpointSecurityAPI",
         ":SNTEndpointSecurityTamperResistance",
+        "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:TestUtils",
         "//Source/common/faa:WatchItemPolicy",

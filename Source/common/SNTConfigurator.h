@@ -181,6 +181,13 @@
 @property(readonly, nonatomic) BOOL enableBadSignatureProtection;
 
 ///
+///  Enable anti-tamper process suspend/resume protection.
+///  When enabled, attempts to suspend or resume the Santa daemon process will be blocked.
+///  Defaults to NO.
+///
+@property(readonly, nonatomic) BOOL enableAntiTamperProcessSuspendResume;
+
+///
 ///  Defines how event logs are stored. Options are:
 ///    SNTEventLogTypeSyslog "syslog": Sent to ASL or ULS (if built with the 10.12 SDK or later).
 ///    SNTEventLogTypeFilelog "file": Sent to a file on disk. Use eventLogPath to specify a path.

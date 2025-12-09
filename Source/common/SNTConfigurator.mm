@@ -132,6 +132,8 @@ static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
 
 static NSString *const kEnablePageZeroProtectionKey = @"EnablePageZeroProtection";
 static NSString *const kEnableBadSignatureProtectionKey = @"EnableBadSignatureProtection";
+static NSString *const kEnableAntiTamperProcessSuspendResumeKey =
+    @"EnableAntiTamperProcessSuspendResume";
 static NSString *const kFailClosedKey = @"FailClosed";
 static NSString *const kDisableUnknownEventUploadKey = @"DisableUnknownEventUpload";
 
@@ -282,6 +284,7 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
       kEnableBadSignatureProtectionKey : number,
+      kEnableAntiTamperProcessSuspendResumeKey : number,
       kEnableStandalonePasswordFallbackKey : number,
       kEnableSilentModeKey : number,
       kEnableSilentTTYModeKey : number,
@@ -702,6 +705,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self configStateSet];
 }
 
++ (NSSet *)keyPathsForValuesAffectingEnableAntiTamperProcessSuspendResume {
+  return [self configStateSet];
+}
+
 + (NSSet *)keyPathsForValuesAffectingBlockUSBMount {
   return [self syncAndConfigStateSet];
 }
@@ -988,6 +995,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (BOOL)enableBadSignatureProtection {
   NSNumber *number = self.configState[kEnableBadSignatureProtectionKey];
   return number ? [number boolValue] : NO;
+}
+
+- (BOOL)enableAntiTamperProcessSuspendResume {
+  return [self.configState[kEnableAntiTamperProcessSuspendResumeKey] boolValue];
 }
 
 - (BOOL)enableStandalonePasswordFallback {
