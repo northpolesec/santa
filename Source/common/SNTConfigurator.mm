@@ -998,7 +998,8 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (BOOL)enableAntiTamperProcessSuspendResume {
-  return [self.configState[kEnableAntiTamperProcessSuspendResumeKey] boolValue];
+  NSNumber *number = self.configState[kEnableAntiTamperProcessSuspendResumeKey];
+  return number ? [number boolValue] : YES;
 }
 
 - (BOOL)enableStandalonePasswordFallback {
