@@ -36,7 +36,7 @@ void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NS
   g->gl_pathv = NULL;
 
   // Ensure globfree is always called
-  absl::Cleanup glob_cleaup = ^{
+  absl::Cleanup glob_cleanup = ^{
     globfree(g);
   };
 
@@ -89,7 +89,7 @@ std::vector<std::string> FindMatches(NSString *path) {
   g->gl_pathv = NULL;
 
   // Ensure globfree is always called
-  absl::Cleanup glob_cleaup = ^{
+  absl::Cleanup glob_cleanup = ^{
     globfree(g);
   };
 

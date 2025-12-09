@@ -89,52 +89,55 @@ __END_DECLS
 
 #pragma mark - Direct Configuration Tests
 
-- (void)testDirectConfigurationAndConnection {
-  // Given: Client is initialized
-  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+//
+// TODO(plm): Need to make work when running without a local NATS instance
+//
+// - (void)testDirectConfigurationAndConnection {
+//   // Given: Client is initialized
+//   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  // When: Directly configure the client
-  [self.client
-      configureWithPushServer:@"localhost"
-                    pushToken:@"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ"
-                          jwt:@"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ."
-                              @"eyJqdGkiOiJPR1NBRFVWVUdQV0NFNkk2UlNTRTdYTlpZVzRYQTRMNTZJV0NOVE9DQ0p"
-                              @"YWjdHTVNDMjdBIiwiaWF0IjoxNzYxMzk2NjM5LCJpc3MiOiJBRE40R1VISEtNR01MMk"
-                              @"QyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiO"
-                              @"iJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVR"
-                              @"SkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp"
-                              @"7fSwic3ViIjp7ImFsbG93IjpbInNhbnRhLWNsaWVudHMiLCJzYW50YS4qIiwic2FudG"
-                              @"EuaG9zdC4qIiwic2FudGEudGFnLioiLCJ3b3Jrc2hvcCJdfSwicmVzcCI6eyJtYXgiO"
-                              @"jEsInR0bCI6MH0sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUi"
-                              @"OiJ1c2VyIiwidmVyc2lvbiI6Mn19.ieJNiXBnlTPQ2sLy-A2-s-"
-                              @"mobMWO0uNH621coUax4CZDbnprqFDR2X2OUp3w62dmxcNvkQeMSnhCOckEkMgTDw"
-                 pushDeviceID:@"testmachine12345"
-                         tags:@[ @"santa-clients", @"workshop" ]];
+//   // When: Directly configure the client
+//   [self.client
+//       configureWithPushServer:@"localhost"
+//                     pushToken:@"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ"
+//                           jwt:@"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ."
+//                               @"eyJqdGkiOiJPR1NBRFVWVUdQV0NFNkk2UlNTRTdYTlpZVzRYQTRMNTZJV0NOVE9DQ0p"
+//                               @"YWjdHTVNDMjdBIiwiaWF0IjoxNzYxMzk2NjM5LCJpc3MiOiJBRE40R1VISEtNR01MMk"
+//                               @"QyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVVlTSlRCNCIsIm5hbWUiO"
+//                               @"iJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVR"
+//                               @"SkRDSEVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp"
+//                               @"7fSwic3ViIjp7ImFsbG93IjpbInNhbnRhLWNsaWVudHMiLCJzYW50YS4qIiwic2FudG"
+//                               @"EuaG9zdC4qIiwic2FudGEudGFnLioiLCJ3b3Jrc2hvcCJdfSwicmVzcCI6eyJtYXgiO"
+//                               @"jEsInR0bCI6MH0sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUi"
+//                               @"OiJ1c2VyIiwidmVyc2lvbiI6Mn19.ieJNiXBnlTPQ2sLy-A2-s-"
+//                               @"mobMWO0uNH621coUax4CZDbnprqFDR2X2OUp3w62dmxcNvkQeMSnhCOckEkMgTDw"
+//                  pushDeviceID:@"testmachine12345"
+//                          tags:@[ @"santa-clients", @"workshop" ]];
 
-  // Give async configuration time to complete
-  [NSThread sleepForTimeInterval:0.1];
+//   // Give async configuration time to complete
+//   [NSThread sleepForTimeInterval:0.1];
 
-  // Then: Verify configuration was stored correctly
-  // Check if domain suffix is disabled
-  if (getenv("SANTA_NATS_DISABLE_DOMAIN_SUFFIX")) {
-    XCTAssertEqualObjects(self.client.pushServer, @"localhost");
-  } else {
-    XCTAssertEqualObjects(self.client.pushServer, @"localhost.push.northpole.security");
-  }
+//   // Then: Verify configuration was stored correctly
+//   // Check if domain suffix is disabled
+//   if (getenv("SANTA_NATS_DISABLE_DOMAIN_SUFFIX")) {
+//     XCTAssertEqualObjects(self.client.pushServer, @"localhost");
+//   } else {
+//     XCTAssertEqualObjects(self.client.pushServer, @"localhost.push.northpole.security");
+//   }
 
-  XCTAssertEqualObjects(self.client.pushToken,
-                        @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ");
-  XCTAssertTrue([self.client.jwt hasPrefix:@"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ"]);
-  XCTAssertEqual(self.client.tags.count, 2);
+//   XCTAssertEqualObjects(self.client.pushToken,
+//                         @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ");
+//   XCTAssertTrue([self.client.jwt hasPrefix:@"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ"]);
+//   XCTAssertEqual(self.client.tags.count, 2);
 
-  // When: Explicitly connect
-  [self.client connect];
-  [NSThread sleepForTimeInterval:0.5];
+//   // When: Explicitly connect
+//   [self.client connect];
+//   [NSThread sleepForTimeInterval:0.5];
 
-  // Then: Should be connected (assuming local NATS server is running)
-  XCTAssertTrue(self.client.isConnected);
-  XCTAssertTrue(self.client.conn != NULL, @"Connection should be established");
-}
+//   // Then: Should be connected (assuming local NATS server is running)
+//   XCTAssertTrue(self.client.isConnected);
+//   XCTAssertTrue(self.client.conn != NULL, @"Connection should be established");
+// }
 
 - (void)testConnectWithoutConfiguration {
   // Given: Client is initialized but not configured
@@ -221,38 +224,41 @@ __END_DECLS
   XCTAssertEqual(self.client.tags.count, 2);
 }
 
-- (void)testConnectionWithValidNKeyAndJWT {
-  // Given: Client with valid NATS credentials
-  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+//
+// TODO(plm): Need to make work when running without a local NATS instance
+//
+// - (void)testConnectionWithValidNKeyAndJWT {
+//   // Given: Client with valid NATS credentials
+//   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  // Use the actual test credentials we generated
-  NSString *validNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
-  NSString *validJWT =
-      @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ."
-      @"eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0Ijo"
-      @"xNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVV"
-      @"lTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDS"
-      @"EVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAw"
-      @"M2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW5"
-      @"0YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3Vicy"
-      @"I6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0."
-      @"L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
+//   // Use the actual test credentials we generated
+//   NSString *validNKey = @"SUACBNSCZDJFQNXSNUMNMPHN7UY5AWS42E6VMQXVTKCU2KJYBR75MVDPJQ";
+//   NSString *validJWT =
+//       @"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ."
+//       @"eyJqdGkiOiI0N1dWSzdBUkpUV1c1NFhJSENIVDU1SlM3M1dWU1VUTUxUV1U0SUdPUlVJVUFHUVRLQkdRIiwiaWF0Ijo"
+//       @"xNzYxMzk3NjA4LCJpc3MiOiJBRE40R1VISEtNR01MMkQyQURFTFBVWUVGRjNRWU5JNERWTjZGNDNKUFA2R0k3VjRTVV"
+//       @"lTSlRCNCIsIm5hbWUiOiJ0ZXN0LW1hY2hpbmUtMTIzNDUiLCJzdWIiOiJVQ043WTQ1VzVLTkE3V01ZTVdSQVVRSkRDS"
+//       @"EVOQ1o3N1BSWVNCMkhYSENNUFRBNlBXRVZMVVRNTyIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIl9JTkJPWC5cdTAw"
+//       @"M2UiXX0sInN1YiI6eyJhbGxvdyI6WyJfSU5CT1guXHUwMDNlIiwic2FudGEtY2xpZW50cyIsInNhbnRhLioiLCJzYW5"
+//       @"0YS5ob3N0LioiLCJzYW50YS50YWcuKiIsIndvcmtzaG9wIl19LCJyZXNwIjp7Im1heCI6MSwidHRsIjowfSwic3Vicy"
+//       @"I6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0."
+//       @"L2C1512oLT6KDkgRLN8Ggl5Pa9ZQ1_a_NCqL8YZyzp9ot4PwHLHkLsGNuIgodRYi7LWybYKKIPJN1eRTxs0CDw";
 
-  [self.client configureWithPushServer:@"localhost"
-                             pushToken:validNKey
-                                   jwt:validJWT
-                          pushDeviceID:@"testmachine12345"
-                                  tags:@[ @"santa-clients", @"workshop" ]];
+//   [self.client configureWithPushServer:@"localhost"
+//                              pushToken:validNKey
+//                                    jwt:validJWT
+//                           pushDeviceID:@"testmachine12345"
+//                                   tags:@[ @"santa-clients", @"workshop" ]];
 
-  [NSThread sleepForTimeInterval:0.1];
+//   [NSThread sleepForTimeInterval:0.1];
 
-  // When: Connect with valid credentials
-  [self.client connect];
-  [NSThread sleepForTimeInterval:0.5];
+//   // When: Connect with valid credentials
+//   [self.client connect];
+//   [NSThread sleepForTimeInterval:0.5];
 
-  // Then: Should connect successfully
-  // (This will fail with invalid credentials or if NATS server doesn't accept them)
-  XCTAssertTrue(self.client.isConnected, @"Should connect with valid nkey/JWT");
-}
+//   // Then: Should connect successfully
+//   // (This will fail with invalid credentials or if NATS server doesn't accept them)
+//   XCTAssertTrue(self.client.isConnected, @"Should connect with valid nkey/JWT");
+// }
 
 @end

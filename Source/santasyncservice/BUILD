@@ -32,6 +32,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
+        "@abseil-cpp//absl/cleanup:cleanup",
         "@nats_c//:nats",
         "@northpolesec_protos//commands:v1_cc_proto",
     ],
@@ -508,6 +509,8 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":SNTPushClientNATSCommandTest",
+        ":SNTPushClientNATSConnectionTest",
         ":SNTPushClientNATSTest",
         ":SNTStreamingMultipartFormDataTest",
         ":SNTSyncConfigBundleTest",

@@ -39,6 +39,8 @@ __END_DECLS
 - (void)disconnectWithCompletion:(void (^)(void))completion;
 - (santa::commands::v1::SantaCommandResponse)handlePingCommand:
     (const santa::commands::v1::PingRequest &)pingRequest;
+- (santa::commands::v1::SantaCommandResponse)handleKillCommand:
+    (const santa::commands::v1::KillRequest &)killRequest;
 - (santa::commands::v1::SantaCommandResponse)dispatchSantaCommandToHandler:
     (const santa::commands::v1::SantaCommandRequest &)command;
 - (void)publishResponse:(const santa::commands::v1::SantaCommandResponse &)response
@@ -181,6 +183,48 @@ __END_DECLS
                  @"Ping handler should return ping response");
 }
 
+- (void)testHandleEmptyKillCommand {
+  // Given: A KillRequest
+  santa::commands::v1::KillRequest killRequest;
+
+  // When: Handling the kill command
+  santa::commands::v1::SantaCommandResponse response = [self.client handleKillCommand:killRequest];
+
+  // Then: Should return a successful response
+  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
+                 @"Kill command should return successful code");
+  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kKill,
+                 @"Kill command should return kill response");
+}
+
+- (void)testCommandHandlerEmptyKillRequest {
+  // Given: A valid KillRequest protobuf message
+  santa::commands::v1::SantaCommandRequest command;
+  command.mutable_kill();
+
+  std::string commandData;
+  BOOL serialized = command.SerializeToString(&commandData);
+
+  // Then: Should serialize successfully
+  XCTAssertTrue(serialized, @"Failed to serialize KillRequest");
+  XCTAssertGreaterThan(commandData.length(), 0, @"Serialized data should not be empty");
+
+  // Verify deserialization
+  santa::commands::v1::SantaCommandRequest deserialized;
+  BOOL parsed = deserialized.ParseFromString(commandData);
+
+  XCTAssertTrue(parsed, @"Failed to parse serialized KillRequest");
+  XCTAssertTrue(deserialized.has_kill(), @"Command should have kill field set");
+
+  // Verify the kill handler works with the deserialized command
+  santa::commands::v1::SantaCommandResponse response =
+      [self.client handleKillCommand:deserialized.kill()];
+  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
+                 @"Kill handler should return successful code");
+  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kKill,
+                 @"Kill handler should return kill response");
+}
+
 - (void)testCommandHandlerUnknownCommand {
   // Given: A command with no known type set
   santa::commands::v1::SantaCommandRequest command;
@@ -199,6 +243,7 @@ __END_DECLS
 
   XCTAssertTrue(parsed, @"Failed to parse serialized empty command");
   XCTAssertFalse(deserialized.has_ping(), @"Command should not have ping field set");
+  XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
 
   // Test dispatch with unknown command
   santa::commands::v1::SantaCommandResponse response =
