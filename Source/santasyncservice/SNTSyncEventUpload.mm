@@ -45,12 +45,12 @@ namespace {
 template <bool IsV2>
 BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch);
 template <bool IsV2>
-std::optional<typename santa::ProtoTraits<IsV2>::EventT> MessageForExecutionEvent(
-    SNTStoredExecutionEvent *event, google::protobuf::Arena *arena);
+typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(SNTStoredExecutionEvent *event,
+                                                                    google::protobuf::Arena *arena);
 template <bool IsV2>
-std::optional<typename santa::ProtoTraits<IsV2>::FileAccessEventT> MessageForFileAccessEvent(
+typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
     SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena);
-std::optional<typename ::pbv2::AuditEvent> MessageForTemporaryMonitorModeAuditEvent(
+::pbv2::AuditEvent *MessageForTemporaryMonitorModeAuditEvent(
     SNTStoredTemporaryMonitorModeAuditEvent *event, google::protobuf::Arena *arena);
 
 template <bool IsV2>
@@ -107,21 +107,18 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
     if (event.idx) [eventIds addObject:event.idx];
 
     if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
-      if (auto e = MessageForExecutionEvent<IsV2>((SNTStoredExecutionEvent *)event, pArena);
-          e.has_value()) {
-        uploadEvents->Add(*std::move(e));
+      if (auto e = MessageForExecutionEvent<IsV2>((SNTStoredExecutionEvent *)event, pArena)) {
+        uploadEvents->UnsafeArenaAddAllocated(e);
       }
     } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
-      if (auto e = MessageForFileAccessEvent<IsV2>((SNTStoredFileAccessEvent *)event, pArena);
-          e.has_value()) {
-        uploadFAAEvents->Add(*std::move(e));
+      if (auto e = MessageForFileAccessEvent<IsV2>((SNTStoredFileAccessEvent *)event, pArena)) {
+        uploadFAAEvents->UnsafeArenaAddAllocated(e);
       }
     } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]) {
       if constexpr (IsV2) {
         if (auto e = MessageForTemporaryMonitorModeAuditEvent(
-                (SNTStoredTemporaryMonitorModeAuditEvent *)event, pArena);
-            e.has_value()) {
-          uploadAuditEvents->Add(*std::move(e));
+                (SNTStoredTemporaryMonitorModeAuditEvent *)event, pArena)) {
+          uploadAuditEvents->UnsafeArenaAddAllocated(e);
         }
       }
     } else {
@@ -162,7 +159,7 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
 }
 
 template <bool IsV2>
-std::optional<typename santa::ProtoTraits<IsV2>::EventT> MessageForExecutionEvent(
+typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
     SNTStoredExecutionEvent *event, google::protobuf::Arena *arena) {
   using Traits = santa::ProtoTraits<IsV2>;
   auto e = google::protobuf::Arena::Create<typename Traits::EventT>(arena);
@@ -198,14 +195,14 @@ std::optional<typename santa::ProtoTraits<IsV2>::EventT> MessageForExecutionEven
     case SNTEventStateBlockTeamID: e->set_decision(Traits::BLOCK_TEAMID); break;
     case SNTEventStateBlockSigningID: e->set_decision(Traits::BLOCK_SIGNINGID); break;
     case SNTEventStateBlockCDHash: e->set_decision(Traits::BLOCK_CDHASH); break;
-    case SNTEventStateAllowTransitive: return std::nullopt;
-    case SNTEventStateAllowLocalBinary: return std::nullopt;
-    case SNTEventStateAllowLocalSigningID: return std::nullopt;
-    case SNTEventStateAllowPendingTransitive: return std::nullopt;
-    case SNTEventStateBlockLongPath: return std::nullopt;
-    case SNTEventStateAllow: return std::nullopt;
-    case SNTEventStateBlock: return std::nullopt;
-    case SNTEventStateUnknown: return std::nullopt;
+    case SNTEventStateAllowTransitive: return nullptr;
+    case SNTEventStateAllowLocalBinary: return nullptr;
+    case SNTEventStateAllowLocalSigningID: return nullptr;
+    case SNTEventStateAllowPendingTransitive: return nullptr;
+    case SNTEventStateBlockLongPath: return nullptr;
+    case SNTEventStateAllow: return nullptr;
+    case SNTEventStateBlock: return nullptr;
+    case SNTEventStateUnknown: return nullptr;
     case SNTEventStateBundleBinary:
       e->set_decision(Traits::BUNDLE_BINARY);
       e->clear_execution_time();
@@ -278,11 +275,11 @@ std::optional<typename santa::ProtoTraits<IsV2>::EventT> MessageForExecutionEven
   // TODO: Add support the for Standalone Approval field so that a sync service
   // can be notified that a user self approved a binary.
 
-  return std::make_optional(*e);
+  return e;
 }
 
 template <bool IsV2>
-std::optional<typename santa::ProtoTraits<IsV2>::FileAccessEventT> MessageForFileAccessEvent(
+typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
     SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena) {
   using Traits = santa::ProtoTraits<IsV2>;
   auto e = google::protobuf::Arena::Create<typename Traits::FileAccessEventT>(arena);
@@ -302,10 +299,10 @@ std::optional<typename santa::ProtoTraits<IsV2>::FileAccessEventT> MessageForFil
     case FileAccessPolicyDecision::kAllowedAuditOnly:
       e->set_decision(Traits::FILE_ACCESS_DECISION_AUDIT_ONLY);
       break;
-    case FileAccessPolicyDecision::kNoPolicy: return std::nullopt;
-    case FileAccessPolicyDecision::kAllowed: return std::nullopt;
-    case FileAccessPolicyDecision::kAllowedReadAccess: return std::nullopt;
-    default: return std::nullopt;
+    case FileAccessPolicyDecision::kNoPolicy: return nullptr;
+    case FileAccessPolicyDecision::kAllowed: return nullptr;
+    case FileAccessPolicyDecision::kAllowedReadAccess: return nullptr;
+    default: return nullptr;
   }
 
   SNTStoredFileAccessProcess *p = event.process;
@@ -349,7 +346,7 @@ std::optional<typename santa::ProtoTraits<IsV2>::FileAccessEventT> MessageForFil
     p = p.parent;
   }
 
-  return std::make_optional(*e);
+  return e;
 }
 
 void MessageForTemporaryMonitorModeEnterAuditEvent(
@@ -402,11 +399,11 @@ void MessageForTemporaryMonitorModeLeaveAuditEvent(
   }
 }
 
-std::optional<typename ::pbv2::AuditEvent> MessageForTemporaryMonitorModeAuditEvent(
+::pbv2::AuditEvent *MessageForTemporaryMonitorModeAuditEvent(
     SNTStoredTemporaryMonitorModeAuditEvent *event, google::protobuf::Arena *arena) {
   if (![event isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]] &&
       ![event isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]) {
-    return std::nullopt;
+    return nullptr;
   }
 
   auto pbAudit = google::protobuf::Arena::Create<typename ::pbv2::AuditEvent>(arena);
@@ -421,7 +418,7 @@ std::optional<typename ::pbv2::AuditEvent> MessageForTemporaryMonitorModeAuditEv
         (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)event, pbTmm->mutable_leave());
   }
 
-  return std::make_optional(*pbAudit);
+  return pbAudit;
 }
 
 }  // namespace
