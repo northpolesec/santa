@@ -241,4 +241,22 @@ using santa::ScopedFile;
   XCTAssertTrue([stringBody containsString:@"application/test"]);
 }
 
+- (void)testDeallocWhileStreaming {
+  auto file = ScopedFile::CreateTemporary();
+  __block SNTStreamingMultipartFormData *mp =
+      [[SNTStreamingMultipartFormData alloc] initWithFormParts:@{@"key" : @"value"}
+                                                         files:@[ file->Reader() ]
+                                                filesTotalSize:0
+                                              filesContentType:nil
+                                                      fileName:@"test"];
+  dispatch_queue_t deallocQueue =
+      dispatch_queue_create("com.northpolesec.santa.test.dealloc", DISPATCH_QUEUE_SERIAL);
+  XCTestExpectation *expectation = [self expectationWithDescription:@"stream deallocated"];
+  dispatch_async(deallocQueue, ^{
+    mp = nil;
+    [expectation fulfill];
+  });
+  [self waitForExpectationsWithTimeout:10.0 handler:nil];
+}
+
 @end
