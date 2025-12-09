@@ -183,7 +183,8 @@
 ///
 ///  Enable anti-tamper process suspend/resume protection.
 ///  When enabled, attempts to suspend or resume the Santa daemon process will be blocked.
-///  Defaults to NO.
+///  Defaults to YES.
+///  This will be removed in the near future.
 ///
 @property(readonly, nonatomic) BOOL enableAntiTamperProcessSuspendResume;
 

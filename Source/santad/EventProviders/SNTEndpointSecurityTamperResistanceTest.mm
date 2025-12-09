@@ -266,6 +266,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
 
     for (const auto &kv : pidsToResultProcSuspendResume) {
+      OCMExpect([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(NO);
       Message msg(mockESApi, &esMsg);
       es_process_t target_proc = MakeESProcess(&file);
       target_proc.audit_token = MakeAuditToken(kv.first.first, 42);
@@ -286,10 +287,10 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
   // Check PROC_SUSPEND_RESUME tamper events - EnableAntiTamperProcessSuspendResume = YES
   {
-    OCMStub([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(YES);
     esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
 
     for (const auto &kv : pidsToResultProcSuspendResume) {
+      OCMExpect([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(YES);
       Message msg(mockESApi, &esMsg);
       es_process_t target_proc = MakeESProcess(&file);
       target_proc.audit_token = MakeAuditToken(kv.first.first, 42);
