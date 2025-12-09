@@ -13,24 +13,24 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include <EndpointSecurity/ESTypes.h>
+#import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
+
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <stdlib.h>
-#include "Source/common/SNTCommonEnums.h"
 
 #include <map>
 #include <memory>
 #include <set>
 
+#import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Client.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #import "Source/santad/Metrics.h"
 
 using santa::Client;
@@ -49,15 +49,21 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 @end
 
 @interface SNTEndpointSecurityTamperResistanceTest : XCTestCase
+@property id mockConfigurator;
 @end
 
 @implementation SNTEndpointSecurityTamperResistanceTest
+
+- (void)setUp {
+  self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+}
 
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
   std::set<es_event_type_t> expectedEventSubs{
       ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -112,9 +118,17 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       {&fileBenign, ES_AUTH_RESULT_ALLOW},
   };
 
-  std::map<std::pair<pid_t, pid_t>, es_auth_result_t> pidsToResult{
+  // Signals targeting the Santa process are denied, unless from launchd
+  std::map<std::pair<pid_t, pid_t>, es_auth_result_t> pidsToResultSignal{
       {{getpid(), 31838}, ES_AUTH_RESULT_DENY},
       {{getpid(), 1}, ES_AUTH_RESULT_ALLOW},
+      {{435, 98381}, ES_AUTH_RESULT_ALLOW},
+  };
+
+  // pid_suspend/pid_resume targeting the Santa process are denied
+  std::map<std::pair<pid_t, pid_t>, es_auth_result_t> pidsToResultProcSuspendResume{
+      {{getpid(), 31838}, ES_AUTH_RESULT_DENY},
+      {{getpid(), 1}, ES_AUTH_RESULT_DENY},
       {{435, 98381}, ES_AUTH_RESULT_ALLOW},
   };
 
@@ -226,11 +240,61 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_SIGNAL;
 
-    for (const auto &kv : pidsToResult) {
+    for (const auto &kv : pidsToResultSignal) {
       Message msg(mockESApi, &esMsg);
       es_process_t target_proc = MakeESProcess(&file);
       target_proc.audit_token = MakeAuditToken(kv.first.first, 42);
       esMsg.event.signal.target = &target_proc;
+      esMsg.process->audit_token = MakeAuditToken(kv.first.second, 42);
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check PROC_SUSPEND_RESUME tamper events - EnableAntiTamperProcessSuspendResume = NO
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
+
+    for (const auto &kv : pidsToResultProcSuspendResume) {
+      Message msg(mockESApi, &esMsg);
+      es_process_t target_proc = MakeESProcess(&file);
+      target_proc.audit_token = MakeAuditToken(kv.first.first, 42);
+      esMsg.event.proc_suspend_resume.target = &target_proc;
+      esMsg.process->audit_token = MakeAuditToken(kv.first.second, 42);
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_ALLOW);
+      XCTAssertEqual(gotCachable, YES);
+    }
+  }
+
+  // Check PROC_SUSPEND_RESUME tamper events - EnableAntiTamperProcessSuspendResume = YES
+  {
+    OCMStub([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(YES);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
+
+    for (const auto &kv : pidsToResultProcSuspendResume) {
+      Message msg(mockESApi, &esMsg);
+      es_process_t target_proc = MakeESProcess(&file);
+      target_proc.audit_token = MakeAuditToken(kv.first.first, 42);
+      esMsg.event.proc_suspend_resume.target = &target_proc;
       esMsg.process->audit_token = MakeAuditToken(kv.first.second, 42);
 
       [mockTamperClient

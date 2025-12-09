@@ -27,6 +27,7 @@
 #include <tuple>
 #include <unordered_set>
 
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/String.h"
 #include "Source/common/faa/WatchItemPolicy.h"
@@ -216,6 +217,17 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
       break;
     }
 
+    case ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME: {
+      if ([[SNTConfigurator configurator] enableAntiTamperProcessSuspendResume] &&
+          audit_token_to_pid(esMsg->event.proc_suspend_resume.target->audit_token) == getpid()) {
+        LOGE(@"Preventing attempt to suspend/resume Santa (type: %d. from PID %d, %s)",
+             esMsg->event.proc_suspend_resume.type, audit_token_to_pid(esMsg->process->audit_token),
+             esMsg->process->executable->path.data);
+        result = ES_AUTH_RESULT_DENY;
+      }
+      break;
+    }
+
     case ES_EVENT_TYPE_AUTH_SIGNAL: {
       if (esMsg->event.signal.sig == 0) {
         // Signal 0 doesn't actually get sent to the process, it is only used to
@@ -274,6 +286,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
                                     ES_EVENT_TYPE_AUTH_UNLINK,
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,
+                                    ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   }];
 }
 
