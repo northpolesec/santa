@@ -272,12 +272,11 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       esMsg.event.proc_suspend_resume.target = &target_proc;
       esMsg.process->audit_token = MakeAuditToken(kv.first.second, 42);
 
-      [mockTamperClient
-               handleMessage:std::move(msg)
-          recordEventMetrics:^(EventDisposition d) {
-            XCTAssertEqual(d, EventDisposition::kDropped);
-            dispatch_semaphore_signal(semaMetrics);
-          }];
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kDropped);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_ALLOW);
