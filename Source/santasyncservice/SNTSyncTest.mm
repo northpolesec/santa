@@ -69,6 +69,7 @@
 @interface SNTSyncTest : XCTestCase
 @property SNTSyncState *syncState;
 @property id<SNTDaemonControlXPC> daemonConnRop;
+@property id configMock;
 @end
 
 // The SNTSyncTestV2 subclass will re-run all tests with `self.syncState.isSyncV2 == YES`
@@ -96,9 +97,9 @@
   OCMStub([self.syncState.daemonConn remoteObjectProxy]).andReturn(self.daemonConnRop);
   OCMStub([self.syncState.daemonConn synchronousRemoteObjectProxy]).andReturn(self.daemonConnRop);
 
-  id configMock = OCMClassMock([SNTConfigurator class]);
-  OCMStub([configMock configurator]).andReturn(configMock);
-  OCMStub([configMock syncEnableProtoTransfer]).andReturn(NO);
+  self.configMock = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.configMock configurator]).andReturn(self.configMock);
+  OCMStub([self.configMock syncEnableProtoTransfer]).andReturn(NO);
 
   id siMock = OCMClassMock([SNTSystemInfo class]);
   OCMStub([siMock serialNumber]).andReturn(@"QYGF4QM373");
@@ -978,6 +979,12 @@
             requestCount++;
             return YES;
           }];
+
+  // For this test we want to use proto transfer - we don't need to decode the result
+  // and this helps check that repeated fields have proper bit consistency.
+  self.configMock = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.configMock configurator]).andReturn(self.configMock);
+  OCMStub([self.configMock syncEnableProtoTransfer]).andReturn(YES);
 
   XCTAssertTrue([sut sync]);
 
