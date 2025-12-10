@@ -256,6 +256,20 @@ objc_library(
 )
 
 objc_library(
+    name = "CodeSigningIdentifierUtils",
+    srcs = ["CodeSigningIdentifierUtils.mm"],
+    hdrs = ["CodeSigningIdentifierUtils.h"],
+)
+
+santa_unit_test(
+    name = "CodeSigningIdentifierUtilsTest",
+    srcs = ["CodeSigningIdentifierUtilsTest.mm"],
+    deps = [
+        ":CodeSigningIdentifierUtils",
+    ],
+)
+
+objc_library(
     name = "RingBuffer",
     hdrs = ["RingBuffer.h"],
     deps = [
@@ -925,6 +939,7 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":CodeSigningIdentifierUtilsTest",
         ":EncodeEntitlementsTest",
         ":KeychainTest",
         ":MOLAuthenticatingURLSessionTest",
