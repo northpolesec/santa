@@ -31,7 +31,7 @@ bool IsValidTeamID(NSString *tid) {
 }
 
 bool IsValidSigningID(NSString *sid) {
-  if ([sid hasPrefix:kPlatformTeamIDPrefix] && sid.length > kPlatformTeamIDPrefix.length) {
+  if (sid.length > kPlatformTeamIDPrefix.length && [sid hasPrefix:kPlatformTeamIDPrefix]) {
     return true;
   } else if (sid.length > kTeamIDLength + 1 && [sid characterAtIndex:kTeamIDLength] == ':') {
     return IsValidTeamID([sid substringToIndex:kTeamIDLength]);
