@@ -468,6 +468,24 @@ objc_library(
 )
 
 objc_library(
+    name = "FAAWebhookClient",
+    srcs = ["EventProviders/FAAWebhookClient.mm"],
+    hdrs = ["EventProviders/FAAWebhookClient.h"],
+    deps = [
+        ":EndpointSecurityMessage",
+        ":SNTDecisionCache",
+        "//Source/common:AuditUtilities",
+        "//Source/common:SNTBlockMessage",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:String",
+        "//Source/common/faa:WatchItemPolicy",
+    ],
+)
+
+objc_library(
     name = "FAAPolicyProcessor",
     srcs = ["EventProviders/FAAPolicyProcessor.mm"],
     hdrs = ["EventProviders/FAAPolicyProcessor.h"],
@@ -493,6 +511,7 @@ objc_library(
         "//Source/common:SantaVnode",
         "//Source/common:String",
         "//Source/common/faa:WatchItemPolicy",
+        ":FAAWebhookClient",
     ],
 )
 
