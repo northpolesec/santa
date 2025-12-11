@@ -631,6 +631,25 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTKillCommand",
+    srcs = ["SNTKillCommand.mm"],
+    hdrs = ["SNTKillCommand.h"],
+    deps = [
+        ":CoderMacros",
+        ":CodeSigningIdentifierUtils",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTKillCommandTest",
+    srcs = ["SNTKillCommandTest.mm"],
+    deps = [
+        ":SNTKillCommand",
+        ":CodeSigningIdentifierUtils",
+    ],
+)
+
+objc_library(
     name = "CoderMacros",
     hdrs = ["CoderMacros.h"],
 )
@@ -956,6 +975,7 @@ test_suite(
         ":SNTExportConfigurationTest",
         ":SNTFileInfoTest",
         ":SNTKVOManagerTest",
+        ":SNTKillCommandTest",
         ":SNTMetricSetTest",
         ":SNTModeTransitionTest",
         ":SNTRuleTest",
