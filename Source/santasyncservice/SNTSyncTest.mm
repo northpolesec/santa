@@ -1028,7 +1028,7 @@
                     fileAccessRules:OCMOCK_ANY
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSyncService
-                              reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
+                              reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null], nil])]);
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
   [sut sync];
@@ -1080,7 +1080,7 @@
                     fileAccessRules:OCMOCK_ANY
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSyncService
-                              reply:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
+                              reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null], nil])]);
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
   [sut sync];

@@ -290,9 +290,15 @@ REGISTER_COMMAND_NAME(@"rule")
                       fileAccessRules:nil
                           ruleCleanup:cleanupType
                                source:SNTRuleAddSourceSantactl
-                                reply:^(NSError *error) {
-                                  TEE_LOGE(@"Failed to delete rules: %@\n",
-                                           error.localizedDescription);
+                                reply:^(BOOL success, NSArray<NSError *> *errors) {
+                                  if (success) {
+                                    TEE_LOGE(@"Rules were deleted, with the following warnings:");
+                                  } else {
+                                    TEE_LOGE(@"Failed to delete rules:");
+                                  }
+                                  for (NSError *e in errors) {
+                                    TEE_LOGE(@"\t%@", e.localizedDescription);
+                                  }
                                   exit(EXIT_FAILURE);
                                 }];
     exit(EXIT_SUCCESS);
@@ -394,12 +400,20 @@ REGISTER_COMMAND_NAME(@"rule")
                     fileAccessRules:nil
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSantactl
-                              reply:^(NSError *error) {
-                                if (error) {
-                                  TEE_LOGE(@"Failed to modify rules: %@",
-                                           error.localizedFailureReason);
+                              reply:^(BOOL success, NSArray<NSError *> *errors) {
+                                if (!errors) {
+                                  TEE_LOGE(@"Failed to modify rules:");
+                                  for (NSError *e in errors) {
+                                    TEE_LOGE(@"\t%@", e.localizedFailureReason);
+                                  }
                                   exit(1);
                                 } else {
+                                  if (errors.count > 0) {
+                                    TEE_LOGE(@"Rules were modified but with the following issues:");
+                                    for (NSError *e in errors) {
+                                      TEE_LOGE(@"\t%@", e.localizedFailureReason);
+                                    }
+                                  }
                                   NSString *ruleType;
                                   switch (newRule.type) {
                                     case SNTRuleTypeCertificate:
@@ -498,13 +512,17 @@ REGISTER_COMMAND_NAME(@"rule")
                     fileAccessRules:nil
                         ruleCleanup:cleanupType
                              source:SNTRuleAddSourceSantactl
-                              reply:^(NSError *error) {
-                                if (error) {
-                                  TEE_LOGE(@"Failed to modify rules: %@",
-                                           error.localizedFailureReason);
-                                  exit(1);
+                              reply:^(BOOL success, NSArray<NSError *> *errors) {
+                                if (success) {
+                                  TEE_LOGE(@"Rules were modified but with the following issues:");
+                                } else {
+                                  TEE_LOGE(@"Failed to modify rules:");
                                 }
-                                exit(0);
+                                for (NSError *e in errors) {
+                                  TEE_LOGE(@"\t%@", e.localizedFailureReason);
+                                }
+
+                                exit(success == NO ? EXIT_FAILURE : EXIT_SUCCESS);
                               }];
 }
 

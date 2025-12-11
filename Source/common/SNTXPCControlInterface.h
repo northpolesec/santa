@@ -42,7 +42,7 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                       fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
                           ruleCleanup:(SNTRuleCleanup)cleanupType
                                source:(SNTRuleAddSource)source
-                                reply:(void (^)(NSError *error))reply;
+                                reply:(void (^)(BOOL, NSArray<NSError *> *error))reply;
 - (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent *> *events))reply;
 - (void)databaseRemoveEventsWithIDs:(NSArray *)ids;
 - (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule *> *rules, NSError *error))reply;

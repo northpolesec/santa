@@ -61,6 +61,12 @@ NSString *const kBundleID = @"com.northpolesec.santa.daemon";
       argumentIndex:1
             ofReply:NO];
 
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [NSError class], nil]
+        forSelector:@selector(databaseRuleAddExecutionRules:
+                                            fileAccessRules:ruleCleanup:source:reply:)
+      argumentIndex:1
+            ofReply:YES];
+
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTRule class], nil]
         forSelector:@selector(retrieveAllExecutionRules:)
       argumentIndex:0

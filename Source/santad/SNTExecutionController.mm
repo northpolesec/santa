@@ -628,10 +628,16 @@ static NSString *const kPrinterProxyPostMonterey =
     return;
   }
 
-  [self.ruleTable addExecutionRules:@[ newRule ] ruleCleanup:SNTRuleCleanupNone error:&err];
-  if (err) {
-    LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,
-         err.localizedDescription);
+  NSArray<NSError *> *errors;
+  BOOL success = [self.ruleTable addExecutionRules:@[ newRule ]
+                                       ruleCleanup:SNTRuleCleanupNone
+                                            errors:&errors];
+  if (errors.count > 0 || !success) {
+    LOGW(@"%@ enocuntered while adding a rule in standalone mode for: %@:",
+         success ? @"Issues" : @"Errors", se.filePath);
+    for (NSError *error in errors) {
+      LOGE(@"\t %@", error.localizedDescription);
+    }
   }
 
   // TODO: Notify the sync service of the new rule.

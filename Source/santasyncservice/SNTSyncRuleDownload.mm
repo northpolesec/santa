@@ -418,14 +418,16 @@ void ProcessDeprecatedBundleNotificationsForRule(
   // Tell santad to add the new rules to the database.
   // Wait until finished or until 5 minutes pass.
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  __block NSError *error;
+  __block NSArray<NSError *> *errors;
+  __block BOOL success;
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddExecutionRules:newRules.executionRules
                     fileAccessRules:newRules.fileAccessRules
                         ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
                              source:SNTRuleAddSourceSyncService
-                              reply:^(NSError *e) {
-                                error = e;
+                              reply:^(BOOL didSucceed, NSArray<NSError *> *e) {
+                                errors = e;
+                                success = didSucceed;
                                 dispatch_semaphore_signal(sema);
                               }];
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_SEC))) {
@@ -433,10 +435,17 @@ void ProcessDeprecatedBundleNotificationsForRule(
     return NO;
   }
 
-  if (error) {
-    SLOGE(@"Failed to add rule(s) to database: %@", error.localizedDescription);
-    SLOGD(@"Failure reason: %@", error.localizedFailureReason);
+  if (!success) {
+    SLOGE(@"Failed to add rule(s) to database:");
+    for (NSError *e in errors) {
+      SLOGE(@"\t%@. Reason: %@", e.localizedDescription, e.localizedFailureReason);
+    }
     return NO;
+  } else if (errors.count > 0) {
+    SLOGW(@"Added rule(s) to database but with the following reported issues:");
+    for (NSError *e in errors) {
+      SLOGW(@"\t%@. Reason: %@", e.localizedDescription, e.localizedFailureReason);
+    }
   }
 
   // Tell santad to record a successful rules sync and wait for it to finish.
