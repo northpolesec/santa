@@ -511,7 +511,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (BOOL)addFileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
                       toDB:(FMDatabase *)db
-                     error:(NSError **)error {
+                    errors:(NSMutableArray<NSError *> *)errors {
   for (SNTFileAccessRule *rule in fileAccessRules) {
     // FAA rules must:
     // 1. Be the right type
@@ -520,30 +520,29 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     if (![rule isKindOfClass:[SNTFileAccessRule class]] || rule.name.length == 0 ||
         ((rule.state == SNTFileAccessRuleStateAdd && rule.details.length == 0) &&
          (rule.state != SNTFileAccessRuleStateRemove))) {
-      [SNTError populateError:error
-                     withCode:SNTErrorCodeRuleInvalid
-                      message:@"File access rule array contained invalid entry"
-                       detail:rule.description];
+      [errors
+          addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
+                                          message:@"File access rule array contained invalid entry"
+                                           detail:rule.description]];
       return NO;
     }
 
     if (rule.state == SNTFileAccessRuleStateRemove) {
       if (![db executeUpdate:@"DELETE FROM file_access_rules WHERE name=?", rule.name]) {
-        [SNTError populateError:error
-                       withCode:SNTErrorCodeRemoveRuleFailed
-                        message:@"A database error occurred while deleting a file access rule"
-                         detail:[db lastErrorMessage]];
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRemoveRuleFailed
+                                                message:@"A database error occurred while deleting "
+                                                        @"a file access rule"
+                                                 detail:[db lastErrorMessage]]];
         return NO;
       }
     } else {
       if (![db executeUpdate:@"INSERT OR REPLACE INTO file_access_rules (name, rule_data) "
                              @"VALUES (?, ?)",
                              rule.name, rule.details]) {
-        [SNTError
-            populateError:error
-                 withCode:SNTErrorCodeInsertOrReplaceRuleFailed
-                  message:@"A database error occurred while inserting/replacing a file access rule"
-                   detail:[db lastErrorMessage]];
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                                                message:@"A database error occurred while "
+                                                        @"inserting/replacing a file access rule"
+                                                 detail:[db lastErrorMessage]]];
         return NO;
       }
     }
@@ -554,24 +553,26 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
                      toDB:(FMDatabase *)db
-                    error:(NSError **)error {
+                   errors:(NSMutableArray<NSError *> *)errors {
   for (SNTRule *rule in executionRules) {
     if (![rule isKindOfClass:[SNTRule class]] || rule.identifier.length == 0 ||
         rule.state == SNTRuleStateUnknown || rule.type == SNTRuleTypeUnknown) {
-      [SNTError populateError:error
-                     withCode:SNTErrorCodeRuleInvalid
-                      message:@"Execution rule array contained invalid entry"
-                       detail:rule.description];
+      [errors
+          addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
+                                          message:@"Execution rule array contained invalid entry"
+                                           detail:rule.description]];
+
       return NO;
     }
 
     if (rule.state == SNTRuleStateCEL && _celEvaluator) {
       auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
       if (!celExpr.ok()) {
-        [SNTError populateError:error
-                       withCode:SNTErrorCodeRuleInvalidCELExpression
-                        message:@"Rule array contained rule with invalid CEL expression"
-                         detail:santa::StringToNSString(celExpr.status().message())];
+        [errors addObject:
+                    [SNTError
+                        createErrorWithCode:SNTErrorCodeRuleInvalidCELExpression
+                                    message:@"Rule array contained rule with invalid CEL expression"
+                                     detail:santa::StringToNSString(celExpr.status().message())]];
         continue;
       }
     }
@@ -579,10 +580,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     if (rule.state == SNTRuleStateRemove) {
       if (![db executeUpdate:@"DELETE FROM execution_rules WHERE identifier=? AND type=?",
                              rule.identifier, @(rule.type)]) {
-        [SNTError populateError:error
-                       withCode:SNTErrorCodeRemoveRuleFailed
-                        message:@"A database error occurred while deleting a rule"
-                         detail:[db lastErrorMessage]];
+        [errors addObject:[SNTError
+                              createErrorWithCode:SNTErrorCodeRemoveRuleFailed
+                                          message:@"A database error occurred while deleting a rule"
+                                           detail:[db lastErrorMessage]]];
         return NO;
       }
     } else {
@@ -592,10 +593,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                              @"VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
                              rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
                              rule.customURL, @(rule.timestamp), rule.comment, rule.celExpr]) {
-        [SNTError populateError:error
-                       withCode:SNTErrorCodeInsertOrReplaceRuleFailed
-                        message:@"A database error occurred while inserting/replacing a rule"
-                         detail:[db lastErrorMessage]];
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                                                message:@"A database error occurred while "
+                                                        @"inserting/replacing a rule"
+                                                 detail:[db lastErrorMessage]]];
         return NO;
       }
     }
@@ -606,28 +607,29 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
               ruleCleanup:(SNTRuleCleanup)cleanupType
-                    error:(NSError **)error {
+                   errors:(NSArray<NSError *> **)errors {
   return [self addExecutionRules:executionRules
                  fileAccessRules:nil
                      ruleCleanup:cleanupType
-                           error:error];
+                          errors:errors];
 }
 
 - (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
           fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
               ruleCleanup:(SNTRuleCleanup)cleanupType
-                    error:(NSError **)error {
+                   errors:(NSArray<NSError *> **)errors {
   // Only accept an empty rules array if the cleanup-type is not none.
   if (executionRules.count == 0 && fileAccessRules.count == 0 &&
       cleanupType == SNTRuleCleanupNone) {
-    [SNTError populateError:error
-                   withCode:SNTErrorCodeEmptyRuleArray
-                     format:@"Empty execution and file access rule arrays"];
+    if (errors) {
+      *errors = @[ [SNTError createErrorWithCode:SNTErrorCodeEmptyRuleArray
+                                          format:@"Empty execution and file access rule arrays"] ];
+    }
     return NO;
   }
 
   __block BOOL failed = NO;
-  __block NSError *blockErr;
+  __block NSMutableArray<NSError *> *blockErrors = [NSMutableArray array];
   __block NSString *faaRulesHashBefore;
   __block NSString *faaRulesHashAfter;
   __block int64_t faaRuleCount = 0;
@@ -657,12 +659,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
         break;
     }
 
-    if (![self addExecutionRules:executionRules toDB:db error:&blockErr]) {
+    if (![self addExecutionRules:executionRules toDB:db errors:blockErrors]) {
       *rollback = failed = YES;
       return;
     }
 
-    if (![self addFileAccessRules:fileAccessRules toDB:db error:&blockErr]) {
+    if (![self addFileAccessRules:fileAccessRules toDB:db errors:blockErrors]) {
       *rollback = failed = YES;
       return;
     }
@@ -675,8 +677,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     faaRuleCount = [self fileAccessRuleCountSerialized:db];
   }];
 
-  if (blockErr && error) {
-    *error = blockErr;
+  if (blockErrors.count > 0 && errors) {
+    *errors = [blockErrors copy];
   }
 
   // If the DB updated successfully, call the "rules changed" callback if appropriate

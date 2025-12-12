@@ -33,6 +33,14 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
                            }];
 }
 
++ (nullable NSError *)createErrorWithCode:(SNTErrorCode)code
+                                  message:(nonnull NSString *)msg
+                                   detail:(nonnull NSString *)detail {
+  NSError *err;
+  [self populateError:&err withCode:code message:msg detail:detail];
+  return err;
+}
+
 + (void)populateError:(NSError **)error
              withCode:(SNTErrorCode)code
                format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(3, 4) {
@@ -46,6 +54,20 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
   *error = [NSError errorWithDomain:SantaErrorDomain
                                code:code
                            userInfo:@{NSLocalizedDescriptionKey : msg}];
+}
+
++ (nullable NSError *)createErrorWithCode:(SNTErrorCode)code
+                                   format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(2, 3) {
+  NSError *error;
+
+  va_list args;
+  va_start(args, format);
+  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+  va_end(args);
+
+  [self populateError:&error withCode:code format:@"%@", msg];
+
+  return error;
 }
 
 + (void)populateError:(NSError **)error

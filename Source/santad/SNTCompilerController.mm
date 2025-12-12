@@ -175,9 +175,13 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
              targetFile.SHA256);
       } else {
         // Add the new rule to the rules database.
-        NSError *err;
-        if (![ruleTable addExecutionRules:@[ rule ] ruleCleanup:SNTRuleCleanupNone error:&err]) {
-          LOGE(@"Unable to add new transitive rule to database: %@", err.localizedDescription);
+        NSArray<NSError *> *errors;
+        if (![ruleTable addExecutionRules:@[ rule ]
+                              ruleCleanup:SNTRuleCleanupNone
+                                   errors:&errors]) {
+          for (NSError *error in errors) {
+            LOGE(@"Unable to add new transitive rule to database: %@", error.localizedDescription);
+          }
         } else {
           logger->LogAllowlist(esMsg, [targetFile.SHA256 UTF8String]);
         }

@@ -94,21 +94,21 @@
 ///  @param executionRules Array of SNTRule objects to add.
 ///  @param fileAccessRules Array of SNTFileAccessRule objects to add.
 ///  @param ruleCleanup Rule cleanup type to perform (e.g. all, none, non-transitive).
-///  @param error When returning NO, will be filled with appropriate error.
+///  @param errors When returning NO, will be filled with an array of errors.
 ///  @return YES if adding all rules passed, NO if any were rejected.
 ///
 - (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
           fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
               ruleCleanup:(SNTRuleCleanup)cleanupType
-                    error:(NSError **)error;
+                   errors:(NSArray<NSError *> **)errors;
 
 ///
-/// Wrapper for `addExecutionRules:fileAccessRules:ruleCleanup:error:` when there are no
+/// Wrapper for `addExecutionRules:fileAccessRules:ruleCleanup:errors:` when there are no
 /// file access rules to add.
 ///
 - (BOOL)addExecutionRules:(NSArray<SNTRule *> *)rules
               ruleCleanup:(SNTRuleCleanup)cleanupType
-                    error:(NSError **)error;
+                   errors:(NSArray<NSError *> **)errors;
 
 ///
 ///  Checks the given array of rules to see if adding any of them to the rules database would

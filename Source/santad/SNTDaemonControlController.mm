@@ -158,7 +158,7 @@ double watchdogRAMPeak = 0;
                       fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
                           ruleCleanup:(SNTRuleCleanup)cleanupType
                                source:(SNTRuleAddSource)source
-                                reply:(void (^)(NSError *error))reply {
+                                reply:(void (^)(BOOL, NSArray<NSError *> *error))reply {
 #ifndef DEBUG
   SNTConfigurator *config = [SNTConfigurator configurator];
   if (source == SNTRuleAddSourceSantactl && (config.syncBaseURL || config.staticRules.count > 0)) {
@@ -180,11 +180,11 @@ double watchdogRAMPeak = 0;
   BOOL flushCache = ((cleanupType != SNTRuleCleanupNone) || (fileAccessRules.count > 0) ||
                      [ruleTable addedRulesShouldFlushDecisionCache:executionRules]);
 
-  NSError *error;
-  [ruleTable addExecutionRules:executionRules
-               fileAccessRules:fileAccessRules
-                   ruleCleanup:cleanupType
-                         error:&error];
+  NSArray<NSError *> *errors;
+  BOOL success = [ruleTable addExecutionRules:executionRules
+                              fileAccessRules:fileAccessRules
+                                  ruleCleanup:cleanupType
+                                       errors:&errors];
 
   // Whenever we add rules, we can also check for and remove outdated transitive rules.
   [ruleTable removeOutdatedTransitiveRules];
@@ -195,7 +195,7 @@ double watchdogRAMPeak = 0;
     self->_authResultCache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
   }
 
-  reply(error);
+  reply(success, errors);
 }
 
 - (void)databaseEventCount:(void (^)(int64_t count))reply {
