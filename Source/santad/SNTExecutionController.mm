@@ -633,7 +633,7 @@ static NSString *const kPrinterProxyPostMonterey =
                                        ruleCleanup:SNTRuleCleanupNone
                                             errors:&errors];
   if (errors.count > 0 || !success) {
-    LOGW(@"%@ enocuntered while adding a rule in standalone mode for: %@:",
+    LOGW(@"%@ encountered while adding a rule in standalone mode for: %@:",
          success ? @"Issues" : @"Errors", se.filePath);
     for (NSError *error in errors) {
       LOGE(@"\t %@", error.localizedDescription);
