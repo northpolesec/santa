@@ -32,6 +32,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
+        "//Source/common:String",
         "@abseil-cpp//absl/cleanup:cleanup",
         "@nats_c//:nats",
         "@northpolesec_protos//commands:v1_cc_proto",

@@ -12,6 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#import <Foundation/Foundation.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
@@ -19,7 +20,6 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
-
 #include "commands/v1.pb.h"
 
 __BEGIN_DECLS
@@ -29,6 +29,8 @@ __BEGIN_DECLS
 
 __END_DECLS
 
+namespace pbv1 = ::santa::commands::v1;
+
 // Expose private methods for testing
 @interface SNTPushClientNATS (Testing)
 @property(nonatomic) natsConnection *conn;
@@ -37,13 +39,16 @@ __END_DECLS
 @property(nonatomic) dispatch_queue_t messageQueue;
 @property(nonatomic, copy) NSString *pushDeviceID;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
-- (santa::commands::v1::SantaCommandResponse)handlePingCommand:
-    (const santa::commands::v1::PingRequest &)pingRequest;
-- (santa::commands::v1::SantaCommandResponse)handleKillCommand:
-    (const santa::commands::v1::KillRequest &)killRequest;
-- (santa::commands::v1::SantaCommandResponse)dispatchSantaCommandToHandler:
-    (const santa::commands::v1::SantaCommandRequest &)command;
-- (void)publishResponse:(const santa::commands::v1::SantaCommandResponse &)response
+- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
+                                      (const ::pbv1::SantaCommandRequest &)command
+                                                        onArena:(google::protobuf::Arena *)arena;
+- (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
            toReplyTopic:(NSString *)replyTopic;
 @end
 
@@ -51,12 +56,15 @@ __END_DECLS
 @property id mockConfigurator;
 @property id mockSyncDelegate;
 @property SNTPushClientNATS *client;
+@property google::protobuf::Arena *arena;
 @end
 
 @implementation SNTPushClientNATSCommandTest
 
 - (void)setUp {
   [super setUp];
+
+  self.arena = new google::protobuf::Arena();
 
   // Mock configurator
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
@@ -73,6 +81,8 @@ __END_DECLS
   [self.client disconnectWithCompletion:nil];
   self.client = nil;
   [self.mockConfigurator stopMocking];
+  delete self.arena;
+  self.arena = nullptr;
   [super tearDown];
 }
 
@@ -84,8 +94,7 @@ __END_DECLS
   // This test verifies the serialization logic works correctly
 
   // When: Creating a response
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
+  ::pbv1::SantaCommandResponse response;
   response.mutable_ping();
 
   std::string responseData;
@@ -99,37 +108,8 @@ __END_DECLS
 - (void)testPublishCommandResponseError {
   // Given: Error response
   // When: Creating an error response
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
-
-  std::string responseData;
-  BOOL serialized = response.SerializeToString(&responseData);
-
-  // Then: Should serialize successfully
-  XCTAssertTrue(serialized, @"Failed to serialize error response");
-  XCTAssertGreaterThan(responseData.length(), 0, @"Serialized data should not be empty");
-}
-
-- (void)testSendCommandSuccess {
-  // Given: Success message
-  // When: Creating a success response
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-  response.mutable_ping();
-
-  std::string responseData;
-  BOOL serialized = response.SerializeToString(&responseData);
-
-  // Then: Should serialize successfully
-  XCTAssertTrue(serialized, @"Failed to serialize success response");
-  XCTAssertGreaterThan(responseData.length(), 0, @"Serialized data should not be empty");
-}
-
-- (void)testSendCommandError {
-  // Given: Error message
-  // When: Creating an error response
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
+  ::pbv1::SantaCommandResponse response;
+  response.set_error(::pbv1::SantaCommandResponse::ERROR_UNSPECIFIED);
 
   std::string responseData;
   BOOL serialized = response.SerializeToString(&responseData);
@@ -143,21 +123,20 @@ __END_DECLS
 
 - (void)testHandlePingCommand {
   // Given: A PingRequest
-  santa::commands::v1::PingRequest pingRequest;
+  ::pbv1::PingRequest pingRequest;
 
   // When: Handling the ping command
-  santa::commands::v1::SantaCommandResponse response = [self.client handlePingCommand:pingRequest];
+  ::pbv1::PingResponse *response = [self.client handlePingRequest:pingRequest
+                                                  withCommandUUID:@"uuid"
+                                                          onArena:self.arena];
 
   // Then: Should return a successful response
-  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Ping command should return successful code");
-  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
-                 @"Ping command should return ping response");
+  XCTAssertNotEqual(response, nullptr, @"Response should not be nil");
 }
 
 - (void)testCommandHandlerPingRequest {
   // Given: A valid PingRequest protobuf message
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
   command.mutable_ping();
 
   std::string commandData;
@@ -168,38 +147,35 @@ __END_DECLS
   XCTAssertGreaterThan(commandData.length(), 0, @"Serialized data should not be empty");
 
   // Verify deserialization
-  santa::commands::v1::SantaCommandRequest deserialized;
+  ::pbv1::SantaCommandRequest deserialized;
   BOOL parsed = deserialized.ParseFromString(commandData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized PingRequest");
   XCTAssertTrue(deserialized.has_ping(), @"Command should have ping field set");
 
   // Verify the ping handler works with the deserialized command
-  santa::commands::v1::SantaCommandResponse response =
-      [self.client handlePingCommand:deserialized.ping()];
-  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Ping handler should return successful code");
-  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
-                 @"Ping handler should return ping response");
+  ::pbv1::PingResponse *response = [self.client handlePingRequest:deserialized.ping()
+                                                  withCommandUUID:@"uuid"
+                                                          onArena:self.arena];
+  XCTAssertNotEqual(response, nullptr, @"Ping handler should return ping response");
 }
 
 - (void)testHandleEmptyKillCommand {
   // Given: A KillRequest
-  santa::commands::v1::KillRequest killRequest;
+  ::pbv1::KillRequest killRequest;
 
   // When: Handling the kill command
-  santa::commands::v1::SantaCommandResponse response = [self.client handleKillCommand:killRequest];
+  ::pbv1::KillResponse *response = [self.client handleKillRequest:killRequest
+                                                  withCommandUUID:@"uuid"
+                                                          onArena:self.arena];
 
   // Then: Should return a successful response
-  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Kill command should return successful code");
-  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kKill,
-                 @"Kill command should return kill response");
+  XCTAssertNotEqual(response, nullptr, @"Kill command should return kill response");
 }
 
 - (void)testCommandHandlerEmptyKillRequest {
   // Given: A valid KillRequest protobuf message
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
   command.mutable_kill();
 
   std::string commandData;
@@ -210,24 +186,23 @@ __END_DECLS
   XCTAssertGreaterThan(commandData.length(), 0, @"Serialized data should not be empty");
 
   // Verify deserialization
-  santa::commands::v1::SantaCommandRequest deserialized;
+  ::pbv1::SantaCommandRequest deserialized;
   BOOL parsed = deserialized.ParseFromString(commandData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized KillRequest");
   XCTAssertTrue(deserialized.has_kill(), @"Command should have kill field set");
 
   // Verify the kill handler works with the deserialized command
-  santa::commands::v1::SantaCommandResponse response =
-      [self.client handleKillCommand:deserialized.kill()];
-  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Kill handler should return successful code");
-  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kKill,
-                 @"Kill handler should return kill response");
+  ::pbv1::KillResponse *response = [self.client handleKillRequest:deserialized.kill()
+                                                  withCommandUUID:@"uuid"
+                                                          onArena:self.arena];
+  XCTAssertNotEqual(response, nullptr, @"Kill handler should return kill response");
 }
 
-- (void)testCommandHandlerUnknownCommand {
+- (void)testCommandHandlerBadUUID {
   // Given: A command with no known type set
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid("bad_uuid");
   // Don't set any command type
 
   std::string commandData;
@@ -238,7 +213,7 @@ __END_DECLS
   XCTAssertGreaterThanOrEqual(commandData.length(), 0, @"Serialized data can be empty");
 
   // Verify deserialization
-  santa::commands::v1::SantaCommandRequest deserialized;
+  ::pbv1::SantaCommandRequest deserialized;
   BOOL parsed = deserialized.ParseFromString(commandData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized empty command");
@@ -246,10 +221,38 @@ __END_DECLS
   XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
 
   // Test dispatch with unknown command
-  santa::commands::v1::SantaCommandResponse response =
-      [self.client dispatchSantaCommandToHandler:deserialized];
-  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR,
-                 @"Unknown command should return error code");
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+                                                                              onArena:self.arena];
+  XCTAssertTrue(response->has_error());
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
+}
+
+- (void)testCommandHandlerUnknownCommand {
+  // Given: A command with no known type set
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  // Don't set any command type
+
+  std::string commandData;
+  BOOL serialized = command.SerializeToString(&commandData);
+
+  // Then: Should serialize successfully (empty command)
+  XCTAssertTrue(serialized, @"Failed to serialize empty command");
+  XCTAssertGreaterThanOrEqual(commandData.length(), 0, @"Serialized data can be empty");
+
+  // Verify deserialization
+  ::pbv1::SantaCommandRequest deserialized;
+  BOOL parsed = deserialized.ParseFromString(commandData);
+
+  XCTAssertTrue(parsed, @"Failed to parse serialized empty command");
+  XCTAssertFalse(deserialized.has_ping(), @"Command should not have ping field set");
+  XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
+
+  // Test dispatch with unknown command
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+                                                                              onArena:self.arena];
+  XCTAssertTrue(response->has_error());
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
 }
 
 - (void)testCommandHandlerInvalidProtobuf {
@@ -257,7 +260,7 @@ __END_DECLS
   std::string invalidData = "invalid protobuf data";
 
   // When: Trying to parse invalid data
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
   BOOL parsed = command.ParseFromString(invalidData);
 
   // Then: Should fail to parse
@@ -268,7 +271,7 @@ __END_DECLS
   // Given: Command message with no reply topic
   // Note: In real handler, message without reply topic would be ignored
   // This test verifies the command can be serialized/deserialized
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
   command.mutable_ping();
 
   std::string commandData;
@@ -280,8 +283,7 @@ __END_DECLS
 
 - (void)testCommandResponseSerialization {
   // Given: Command response for ping
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
+  ::pbv1::SantaCommandResponse response;
   response.mutable_ping();
 
   std::string responseData;
@@ -292,20 +294,19 @@ __END_DECLS
   XCTAssertGreaterThan(responseData.length(), 0, @"Serialized data should not be empty");
 
   // Verify deserialization
-  santa::commands::v1::SantaCommandResponse deserialized;
+  ::pbv1::SantaCommandResponse deserialized;
   BOOL parsed = deserialized.ParseFromString(responseData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized ping response");
-  XCTAssertEqual(deserialized.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Code should be SUCCESSFUL");
-  XCTAssertEqual(deserialized.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
+  XCTAssertFalse(deserialized.has_error());
+  XCTAssertEqual(deserialized.result_case(), ::pbv1::SantaCommandResponse::kPing,
                  @"Result should be ping");
 }
 
 - (void)testCommandResponseErrorSerialization {
   // Given: Error response
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
+  ::pbv1::SantaCommandResponse response;
+  response.set_error(::pbv1::SantaCommandResponse::ERROR_DESERIALIZATION);
 
   std::string responseData;
   BOOL serialized = response.SerializeToString(&responseData);
@@ -314,20 +315,18 @@ __END_DECLS
   XCTAssertTrue(serialized, @"Failed to serialize error response");
 
   // Verify deserialization
-  santa::commands::v1::SantaCommandResponse deserialized;
+  ::pbv1::SantaCommandResponse deserialized;
   BOOL parsed = deserialized.ParseFromString(responseData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized error response");
-  XCTAssertEqual(deserialized.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR,
-                 @"Code should be ERROR");
-  XCTAssertEqual(deserialized.result_case(),
-                 santa::commands::v1::SantaCommandResponse::RESULT_NOT_SET,
+  XCTAssertEqual(deserialized.error(), ::pbv1::SantaCommandResponse::ERROR_DESERIALIZATION);
+  XCTAssertEqual(deserialized.result_case(), ::pbv1::SantaCommandResponse::RESULT_NOT_SET,
                  @"Result should not be set for error");
 }
 
 - (void)testPingRequestSerialization {
   // Given: PingRequest command
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
   command.mutable_ping();
 
   std::string commandData;
@@ -337,7 +336,7 @@ __END_DECLS
   XCTAssertTrue(serialized, @"Failed to serialize PingRequest");
 
   // Verify deserialization
-  santa::commands::v1::SantaCommandRequest deserialized;
+  ::pbv1::SantaCommandRequest deserialized;
   BOOL parsed = deserialized.ParseFromString(commandData);
 
   XCTAssertTrue(parsed, @"Failed to parse serialized PingRequest");
@@ -348,37 +347,38 @@ __END_DECLS
 
 - (void)testDispatchSantaCommandToHandlerPing {
   // Given: A PingRequest command
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
   command.mutable_ping();
 
   // When: Dispatching the command
-  santa::commands::v1::SantaCommandResponse response =
-      [self.client dispatchSantaCommandToHandler:command];
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
 
   // Then: Should return a successful ping response
-  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Ping command should return successful code");
-  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
+  XCTAssertFalse(response->has_error());
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kPing,
                  @"Ping command should return ping response");
 }
 
 - (void)testDispatchSantaCommandToHandlerUnknown {
   // Given: A command with no known type set
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
   // Don't set any command type
 
   // When: Dispatching the command
-  santa::commands::v1::SantaCommandResponse response =
-      [self.client dispatchSantaCommandToHandler:command];
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
 
   // Then: Should return an error response
-  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR,
-                 @"Unknown command should return error code");
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
 }
 
 - (void)testDispatchSantaCommandToHandlerWithPingRequest {
   // Given: A valid PingRequest protobuf message
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
   command.mutable_ping();
 
   std::string commandData;
@@ -386,18 +386,17 @@ __END_DECLS
   XCTAssertTrue(serialized, @"Failed to serialize PingRequest");
 
   // Deserialize
-  santa::commands::v1::SantaCommandRequest deserialized;
+  ::pbv1::SantaCommandRequest deserialized;
   BOOL parsed = deserialized.ParseFromString(commandData);
   XCTAssertTrue(parsed, @"Failed to parse serialized PingRequest");
 
   // When: Dispatching the deserialized command
-  santa::commands::v1::SantaCommandResponse response =
-      [self.client dispatchSantaCommandToHandler:deserialized];
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+                                                                              onArena:self.arena];
 
   // Then: Should return a successful ping response
-  XCTAssertEqual(response.code(), santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL,
-                 @"Ping command should return successful code");
-  XCTAssertEqual(response.result_case(), santa::commands::v1::SantaCommandResponse::kPing,
+  XCTAssertFalse(response->has_error());
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kPing,
                  @"Ping command should return ping response");
 }
 
