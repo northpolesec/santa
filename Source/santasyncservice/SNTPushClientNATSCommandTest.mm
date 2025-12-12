@@ -20,7 +20,6 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
-
 #include "commands/v1.pb.h"
 
 __BEGIN_DECLS
@@ -40,12 +39,15 @@ namespace pbv1 = ::santa::commands::v1;
 @property(nonatomic) dispatch_queue_t messageQueue;
 @property(nonatomic, copy) NSString *pushDeviceID;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
-- (::pbv1::SantaCommandResponse)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
-                                  withCommandUUID:(NSString *)uuid;
-- (::pbv1::SantaCommandResponse)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
-                                  withCommandUUID:(NSString *)uuid;
-- (::pbv1::SantaCommandResponse)dispatchSantaCommandToHandler:
-    (const ::pbv1::SantaCommandRequest &)command;
+- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
+                                      (const ::pbv1::SantaCommandRequest &)command
+                                                        onArena:(google::protobuf::Arena *)arena;
 - (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
            toReplyTopic:(NSString *)replyTopic;
 @end
@@ -54,12 +56,15 @@ namespace pbv1 = ::santa::commands::v1;
 @property id mockConfigurator;
 @property id mockSyncDelegate;
 @property SNTPushClientNATS *client;
+@property google::protobuf::Arena *arena;
 @end
 
 @implementation SNTPushClientNATSCommandTest
 
 - (void)setUp {
   [super setUp];
+
+  self.arena = new google::protobuf::Arena();
 
   // Mock configurator
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
@@ -76,6 +81,8 @@ namespace pbv1 = ::santa::commands::v1;
   [self.client disconnectWithCompletion:nil];
   self.client = nil;
   [self.mockConfigurator stopMocking];
+  delete self.arena;
+  self.arena = nullptr;
   [super tearDown];
 }
 
@@ -119,13 +126,12 @@ namespace pbv1 = ::santa::commands::v1;
   ::pbv1::PingRequest pingRequest;
 
   // When: Handling the ping command
-  ::pbv1::SantaCommandResponse response = [self.client handlePingRequest:pingRequest
-                                                         withCommandUUID:@"uuid"];
+  ::pbv1::PingResponse *response = [self.client handlePingRequest:pingRequest
+                                                  withCommandUUID:@"uuid"
+                                                          onArena:self.arena];
 
   // Then: Should return a successful response
-  XCTAssertFalse(response.has_error());
-  XCTAssertEqual(response.result_case(), ::pbv1::SantaCommandResponse::kPing,
-                 @"Ping command should return ping response");
+  XCTAssertNotEqual(response, nullptr, @"Response should not be nil");
 }
 
 - (void)testCommandHandlerPingRequest {
@@ -148,11 +154,10 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertTrue(deserialized.has_ping(), @"Command should have ping field set");
 
   // Verify the ping handler works with the deserialized command
-  ::pbv1::SantaCommandResponse response = [self.client handlePingRequest:deserialized.ping()
-                                                         withCommandUUID:@"uuid"];
-  XCTAssertFalse(response.has_error());
-  XCTAssertEqual(response.result_case(), ::pbv1::SantaCommandResponse::kPing,
-                 @"Ping handler should return ping response");
+  ::pbv1::PingResponse *response = [self.client handlePingRequest:deserialized.ping()
+                                                  withCommandUUID:@"uuid"
+                                                          onArena:self.arena];
+  XCTAssertNotEqual(response, nullptr, @"Ping handler should return ping response");
 }
 
 - (void)testHandleEmptyKillCommand {
@@ -160,13 +165,12 @@ namespace pbv1 = ::santa::commands::v1;
   ::pbv1::KillRequest killRequest;
 
   // When: Handling the kill command
-  ::pbv1::SantaCommandResponse response = [self.client handleKillRequest:killRequest
-                                                         withCommandUUID:@"uuid"];
+  ::pbv1::KillResponse *response = [self.client handleKillRequest:killRequest
+                                                  withCommandUUID:@"uuid"
+                                                          onArena:self.arena];
 
   // Then: Should return a successful response
-  XCTAssertFalse(response.has_error());
-  XCTAssertEqual(response.result_case(), ::pbv1::SantaCommandResponse::kKill,
-                 @"Kill command should return kill response");
+  XCTAssertNotEqual(response, nullptr, @"Kill command should return kill response");
 }
 
 - (void)testCommandHandlerEmptyKillRequest {
@@ -189,11 +193,10 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertTrue(deserialized.has_kill(), @"Command should have kill field set");
 
   // Verify the kill handler works with the deserialized command
-  ::pbv1::SantaCommandResponse response = [self.client handleKillRequest:deserialized.kill()
-                                                         withCommandUUID:@"uuid"];
-  XCTAssertFalse(response.has_error());
-  XCTAssertEqual(response.result_case(), ::pbv1::SantaCommandResponse::kKill,
-                 @"Kill handler should return kill response");
+  ::pbv1::KillResponse *response = [self.client handleKillRequest:deserialized.kill()
+                                                  withCommandUUID:@"uuid"
+                                                          onArena:self.arena];
+  XCTAssertNotEqual(response, nullptr, @"Kill handler should return kill response");
 }
 
 - (void)testCommandHandlerBadUUID {
@@ -218,9 +221,10 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
 
   // Test dispatch with unknown command
-  ::pbv1::SantaCommandResponse response = [self.client dispatchSantaCommandToHandler:deserialized];
-  XCTAssertTrue(response.has_error());
-  XCTAssertEqual(response.error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+                                                                              onArena:self.arena];
+  XCTAssertTrue(response->has_error());
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
 }
 
 - (void)testCommandHandlerUnknownCommand {
@@ -245,9 +249,10 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
 
   // Test dispatch with unknown command
-  ::pbv1::SantaCommandResponse response = [self.client dispatchSantaCommandToHandler:deserialized];
-  XCTAssertTrue(response.has_error());
-  XCTAssertEqual(response.error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+                                                                              onArena:self.arena];
+  XCTAssertTrue(response->has_error());
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
 }
 
 - (void)testCommandHandlerInvalidProtobuf {
@@ -347,11 +352,12 @@ namespace pbv1 = ::santa::commands::v1;
   command.mutable_ping();
 
   // When: Dispatching the command
-  ::pbv1::SantaCommandResponse response = [self.client dispatchSantaCommandToHandler:command];
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
 
   // Then: Should return a successful ping response
-  XCTAssertFalse(response.has_error());
-  XCTAssertEqual(response.result_case(), ::pbv1::SantaCommandResponse::kPing,
+  XCTAssertFalse(response->has_error());
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kPing,
                  @"Ping command should return ping response");
 }
 
@@ -362,10 +368,11 @@ namespace pbv1 = ::santa::commands::v1;
   // Don't set any command type
 
   // When: Dispatching the command
-  ::pbv1::SantaCommandResponse response = [self.client dispatchSantaCommandToHandler:command];
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
 
   // Then: Should return an error response
-  XCTAssertEqual(response.error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
 }
 
 - (void)testDispatchSantaCommandToHandlerWithPingRequest {
@@ -384,11 +391,12 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertTrue(parsed, @"Failed to parse serialized PingRequest");
 
   // When: Dispatching the deserialized command
-  ::pbv1::SantaCommandResponse response = [self.client dispatchSantaCommandToHandler:deserialized];
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+                                                                              onArena:self.arena];
 
   // Then: Should return a successful ping response
-  XCTAssertFalse(response.has_error());
-  XCTAssertEqual(response.result_case(), ::pbv1::SantaCommandResponse::kPing,
+  XCTAssertFalse(response->has_error());
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kPing,
                  @"Ping command should return ping response");
 }
 

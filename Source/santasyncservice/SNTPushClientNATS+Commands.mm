@@ -44,62 +44,72 @@ using santa::StringToNSString;
 
 // Category for command handling methods
 @interface SNTPushClientNATS (Commands)
-- (::pbv1::SantaCommandResponse)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
-                                  withCommandUUID:(NSString *)uuid;
-- (::pbv1::SantaCommandResponse)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
-                                  withCommandUUID:(NSString *)uuid;
-- (::pbv1::SantaCommandResponse)dispatchSantaCommandToHandler:
-    (const ::pbv1::SantaCommandRequest &)command;
+- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
+                                      (const ::pbv1::SantaCommandRequest &)command
+                                                        onArena:(google::protobuf::Arena *)arena;
 @end
 
 @implementation SNTPushClientNATS (Commands)
 
 // Handle PingRequest command
 // Always returns a successful response. Failures are handled by the caller.
-- (::pbv1::SantaCommandResponse)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
-                                  withCommandUUID:(NSString *)uuid {
-  ::pbv1::SantaCommandResponse response;
-  response.mutable_ping();
-  return response;
+- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena {
+  return google::protobuf::Arena::Create<::pbv1::PingResponse>(arena);
 }
 
 // Handle KillRequest command
-- (::pbv1::SantaCommandResponse)handleKillRequest:(const ::pbv1::KillRequest &)pbRequest
-                                  withCommandUUID:(NSString *)uuid {
+- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)pbRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena {
   // TODO: This is just a placeholder for now.
-  ::pbv1::SantaCommandResponse response;
-  (void)response.mutable_kill();
-  return response;
+  return google::protobuf::Arena::Create<::pbv1::KillResponse>(arena);
 }
 
 // Dispatch Santa command to appropriate handler based on command type
-- (::pbv1::SantaCommandResponse)dispatchSantaCommandToHandler:
-    (const ::pbv1::SantaCommandRequest &)command {
-  ::pbv1::SantaCommandResponse response;
+- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
+                                      (const ::pbv1::SantaCommandRequest &)command
+                                                        onArena:(google::protobuf::Arena *)arena {
+  auto response = google::protobuf::Arena::Create<::pbv1::SantaCommandResponse>(arena);
 
   NSString *uuid = StringToNSString(command.uuid());
   if (![[NSUUID alloc] initWithUUIDString:uuid]) {
     LOGE(@"NATS: Invalid command uuid: \"%@\"", uuid);
-    response.set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
+    response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
     return response;
   }
 
   ::pbv1::SantaCommandRequest::CommandCase commandCase = command.command_case();
   switch (commandCase) {
-    case ::pbv1::SantaCommandRequest::kPing:
+    case ::pbv1::SantaCommandRequest::kPing: {
       LOGI(@"NATS: Dispatching PingRequest command");
-      response = [self handlePingRequest:command.ping() withCommandUUID:uuid];
+      auto *pingResponse = [self handlePingRequest:command.ping()
+                                   withCommandUUID:uuid
+                                           onArena:arena];
+      response->set_allocated_ping(pingResponse);
       break;
+    }
 
-    case ::pbv1::SantaCommandRequest::kKill:
+    case ::pbv1::SantaCommandRequest::kKill: {
       LOGI(@"NATS: Dispatching KillRequest command");
-      response = [self handleKillRequest:command.kill() withCommandUUID:uuid];
+      auto *killResponse = [self handleKillRequest:command.kill()
+                                   withCommandUUID:uuid
+                                           onArena:arena];
+      response->set_allocated_kill(killResponse);
       break;
+    }
 
     case ::pbv1::SantaCommandRequest::COMMAND_NOT_SET:
     default:
       LOGE(@"NATS: Unknown or unset command type: %d", static_cast<int>(commandCase));
-      response.set_error(::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+      response->set_error(::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
       break;
   }
 
@@ -167,10 +177,12 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
       return;
     }
 
-    ::pbv1::SantaCommandResponse response = [self dispatchSantaCommandToHandler:command];
+    google::protobuf::Arena arena;
+    ::pbv1::SantaCommandResponse *response = [self dispatchSantaCommandToHandler:command
+                                                                         onArena:&arena];
 
     // Publish the response
-    [self publishResponse:response toReplyTopic:replyTopic];
+    [self publishResponse:*response toReplyTopic:replyTopic];
   });
 }
 
