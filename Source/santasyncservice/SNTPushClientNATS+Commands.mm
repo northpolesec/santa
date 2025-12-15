@@ -17,6 +17,7 @@
 #include <google/protobuf/descriptor.h>
 
 #import "Source/common/SNTLogging.h"
+#include "Source/common/String.h"
 #include "absl/cleanup/cleanup.h"
 #include "commands/v1.pb.h"
 
@@ -27,19 +28,8 @@ __BEGIN_DECLS
 
 __END_DECLS
 
-// Forward declaration - implementation is in SNTPushClientNATS.mm
-NSString *ResponseCodeToString(santa::commands::v1::SantaCommandResponseCode code);
-
-// Helper function to convert command type to readable string
-// Note: CommandCase is not a protobuf enum, so we use a switch for readability
-static NSString *CommandTypeToString(
-    santa::commands::v1::SantaCommandRequest::CommandCase commandCase) {
-  switch (commandCase) {
-    case santa::commands::v1::SantaCommandRequest::kPing: return @"Ping";
-    case santa::commands::v1::SantaCommandRequest::COMMAND_NOT_SET: return @"NOT_SET";
-    default: return [NSString stringWithFormat:@"UNKNOWN(%d)", static_cast<int>(commandCase)];
-  }
-}
+namespace pbv1 = ::santa::commands::v1;
+using santa::StringToNSString;
 
 // Forward declaration of private interface to access private properties
 @interface SNTPushClientNATS ()
@@ -48,73 +38,78 @@ static NSString *CommandTypeToString(
 @property(nonatomic) dispatch_queue_t connectionQueue;
 @property(nonatomic) natsConnection *conn;
 - (BOOL)isConnectionAlive;
-- (void)publishResponse:(const santa::commands::v1::SantaCommandResponse &)response
+- (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
            toReplyTopic:(NSString *)replyTopic;
 @end
 
 // Category for command handling methods
 @interface SNTPushClientNATS (Commands)
-- (santa::commands::v1::SantaCommandResponse)handlePingCommand:
-    (const santa::commands::v1::PingRequest &)pingRequest;
-- (santa::commands::v1::SantaCommandResponse)dispatchSantaCommandToHandler:
-    (const santa::commands::v1::SantaCommandRequest &)command;
+- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
+                                      (const ::pbv1::SantaCommandRequest &)command
+                                                        onArena:(google::protobuf::Arena *)arena;
 @end
 
 @implementation SNTPushClientNATS (Commands)
 
 // Handle PingRequest command
 // Always returns a successful response. Failures are handled by the caller.
-- (santa::commands::v1::SantaCommandResponse)handlePingCommand:
-    (const santa::commands::v1::PingRequest &)pingRequest {
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-  response.mutable_ping();
-
-  // Verify the code was set correctly
-  santa::commands::v1::SantaCommandResponseCode code = response.code();
-  LOGD(@"NATS: Ping response code set to: %d (%@)", static_cast<int>(code),
-       ResponseCodeToString(code));
-
-  return response;
+- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena {
+  return google::protobuf::Arena::Create<::pbv1::PingResponse>(arena);
 }
 
 // Handle KillRequest command
-- (santa::commands::v1::SantaCommandResponse)handleKillCommand:
-    (const santa::commands::v1::KillRequest &)killRequest {
+- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)pbRequest
+                            withCommandUUID:(NSString *)uuid
+                                    onArena:(google::protobuf::Arena *)arena {
   // TODO: This is just a placeholder for now.
-  santa::commands::v1::SantaCommandResponse response;
-  response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_SUCCESSFUL);
-  (void)response.mutable_kill();
-
-  // Verify the code was set correctly
-  LOGD(@"NATS: Kill response code set to: %d (%@)", static_cast<int>(response.code()),
-       ResponseCodeToString(response.code()));
-
-  return response;
+  return google::protobuf::Arena::Create<::pbv1::KillResponse>(arena);
 }
 
 // Dispatch Santa command to appropriate handler based on command type
-- (santa::commands::v1::SantaCommandResponse)dispatchSantaCommandToHandler:
-    (const santa::commands::v1::SantaCommandRequest &)command {
-  santa::commands::v1::SantaCommandResponse response;
+- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
+                                      (const ::pbv1::SantaCommandRequest &)command
+                                                        onArena:(google::protobuf::Arena *)arena {
+  auto response = google::protobuf::Arena::Create<::pbv1::SantaCommandResponse>(arena);
 
-  santa::commands::v1::SantaCommandRequest::CommandCase commandCase = command.command_case();
+  NSString *uuid = StringToNSString(command.uuid());
+  if (![[NSUUID alloc] initWithUUIDString:uuid]) {
+    LOGE(@"NATS: Invalid command uuid: \"%@\"", uuid);
+    response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
+    return response;
+  }
+
+  ::pbv1::SantaCommandRequest::CommandCase commandCase = command.command_case();
   switch (commandCase) {
-    case santa::commands::v1::SantaCommandRequest::kPing:
+    case ::pbv1::SantaCommandRequest::kPing: {
       LOGI(@"NATS: Dispatching PingRequest command");
-      response = [self handlePingCommand:command.ping()];
+      auto *pingResponse = [self handlePingRequest:command.ping()
+                                   withCommandUUID:uuid
+                                           onArena:arena];
+      response->set_allocated_ping(pingResponse);
       break;
+    }
 
-    case santa::commands::v1::SantaCommandRequest::kKill:
+    case ::pbv1::SantaCommandRequest::kKill: {
       LOGI(@"NATS: Dispatching KillRequest command");
-      response = [self handleKillCommand:command.kill()];
+      auto *killResponse = [self handleKillRequest:command.kill()
+                                   withCommandUUID:uuid
+                                           onArena:arena];
+      response->set_allocated_kill(killResponse);
       break;
+    }
 
-    case santa::commands::v1::SantaCommandRequest::COMMAND_NOT_SET:
+    case ::pbv1::SantaCommandRequest::COMMAND_NOT_SET:
     default:
-      LOGE(@"NATS: Unknown or unset command type: %@ (%d)", CommandTypeToString(commandCase),
-           static_cast<int>(commandCase));
-      response.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
+      LOGE(@"NATS: Unknown or unset command type: %d", static_cast<int>(commandCase));
+      response->set_error(::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
       break;
   }
 
@@ -156,8 +151,8 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
   if (natsMsg_GetDataLength(msg) <= 0) {
     LOGE(@"NATS: Command message on %@ has no data", msgSubject);
     // Try to send error response, but don't fail if that also fails
-    santa::commands::v1::SantaCommandResponse errorResponse;
-    errorResponse.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
+    ::pbv1::SantaCommandResponse errorResponse;
+    errorResponse.set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
     [self publishResponse:errorResponse toReplyTopic:replyTopic];
     return;
   }
@@ -165,12 +160,12 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
   // Deserialize the message to SantaCommandRequest
   // Note: We must extract all data from msg before destroying it, as NATS owns the message
   // and will free it after this callback returns
-  santa::commands::v1::SantaCommandRequest command;
+  ::pbv1::SantaCommandRequest command;
   if (!command.ParseFromArray(natsMsg_GetData(msg), natsMsg_GetDataLength(msg))) {
     LOGE(@"NATS: Failed to parse SantaCommandRequest from message on %@", msgSubject);
     // Try to send error response, but don't fail if that also fails
-    santa::commands::v1::SantaCommandResponse errorResponse;
-    errorResponse.set_code(santa::commands::v1::SANTA_COMMAND_RESPONSE_CODE_ERROR);
+    ::pbv1::SantaCommandResponse errorResponse;
+    errorResponse.set_error(::pbv1::SantaCommandResponse::ERROR_DESERIALIZATION);
     [self publishResponse:errorResponse toReplyTopic:replyTopic];
     return;
   }
@@ -182,11 +177,12 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
       return;
     }
 
-    santa::commands::v1::SantaCommandResponse response =
-        [self dispatchSantaCommandToHandler:command];
+    google::protobuf::Arena arena;
+    ::pbv1::SantaCommandResponse *response = [self dispatchSantaCommandToHandler:command
+                                                                         onArena:&arena];
 
     // Publish the response
-    [self publishResponse:response toReplyTopic:replyTopic];
+    [self publishResponse:*response toReplyTopic:replyTopic];
   });
 }
 

@@ -36,17 +36,19 @@ __BEGIN_DECLS
 
 __END_DECLS
 
+namespace pbv1 = ::santa::commands::v1;
+
 // Helper function to convert response code to readable string using protobuf generated code
-NSString *ResponseCodeToString(santa::commands::v1::SantaCommandResponseCode code) {
+NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   // Try the generated _Name() function first
-  std::string name = santa::commands::v1::SantaCommandResponseCode_Name(code);
+  std::string name = ::pbv1::SantaCommandResponse::Error_Name(code);
   if (!name.empty()) {
     return @(name.c_str());
   }
 
   // Fallback to descriptor API if _Name() doesn't recognize the value
   const google::protobuf::EnumDescriptor *descriptor =
-      santa::commands::v1::SantaCommandResponseCode_descriptor();
+      ::pbv1::SantaCommandResponse::Error_descriptor();
   if (descriptor) {
     const google::protobuf::EnumValueDescriptor *value_desc =
         descriptor->FindValueByNumber(static_cast<int>(code));
@@ -610,7 +612,7 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
 }
 
 // Publish a command response to the reply topic
-- (void)publishResponse:(const santa::commands::v1::SantaCommandResponse &)response
+- (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
            toReplyTopic:(NSString *)replyTopic {
   // Failures are logged but don't crash the client
   if (!replyTopic || replyTopic.length == 0) {
@@ -619,7 +621,7 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   }
 
   // Capture the response code before serialization (response may go out of scope)
-  santa::commands::v1::SantaCommandResponseCode responseCode = response.code();
+  ::pbv1::SantaCommandResponse::Error error = response.error();
 
   // Serialize the response
   std::string responseData;
@@ -643,7 +645,7 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
            natsStatus_GetText(status));
     } else {
       LOGD(@"NATS: Sent command response to %@ (code: %@, raw: %d)", replyTopic,
-           ResponseCodeToString(responseCode), static_cast<int>(responseCode));
+           ResponseCodeToString(error), static_cast<int>(error));
     }
   });
 }
