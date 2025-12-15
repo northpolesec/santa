@@ -635,8 +635,8 @@ objc_library(
     srcs = ["SNTKillCommand.mm"],
     hdrs = ["SNTKillCommand.h"],
     deps = [
-        ":CoderMacros",
         ":CodeSigningIdentifierUtils",
+        ":CoderMacros",
     ],
 )
 
@@ -644,8 +644,8 @@ santa_unit_test(
     name = "SNTKillCommandTest",
     srcs = ["SNTKillCommandTest.mm"],
     deps = [
-        ":SNTKillCommand",
         ":CodeSigningIdentifierUtils",
+        ":SNTKillCommand",
     ],
 )
 
@@ -822,6 +822,7 @@ objc_library(
         ":SNTConfigBundle",
         ":SNTConfigurator",
         ":SNTFileAccessRule",
+        ":SNTKillCommand",
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",

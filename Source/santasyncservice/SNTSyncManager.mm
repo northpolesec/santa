@@ -445,7 +445,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   syncState.machineOwner = config.machineOwner;
   if (syncState.machineOwner.length == 0) {
     syncState.machineOwner = @"";
-    SLOGW(@"Missing Machine Owner.");
+    SLOGD(@"Missing Machine Owner.");
   }
   syncState.machineOwnerGroups = config.machineOwnerGroups;
 
