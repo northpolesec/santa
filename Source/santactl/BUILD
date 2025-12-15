@@ -62,6 +62,18 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTCommandCommand",
+    srcs = ["Commands/SNTCommandCommand.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTKillCommand",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
     name = "SNTCommandMonitorMode",
     srcs = ["Commands/SNTCommandMonitorMode.mm"],
     deps = [
@@ -96,6 +108,7 @@ objc_library(
     sdk_dylibs = ["libz"],
     sdk_frameworks = ["IOKit"],
     deps = [
+        ":SNTCommandCommand",
         ":SNTCommandInstall",
         ":SNTCommandMonitorMode",
         ":SNTCommandPrintLog",
