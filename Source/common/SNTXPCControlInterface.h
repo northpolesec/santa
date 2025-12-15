@@ -15,6 +15,7 @@
 
 #import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTFileAccessRule.h"
+#import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
@@ -63,6 +64,11 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)retrieveStatsState:(void (^)(NSDate *, NSString *))reply;
 // Have santad save the latest stats state information
 - (void)saveStatsSubmissionAttemptTime:(NSDate *)timestamp version:(NSString *)version;
+
+///
+/// Command ops
+///
+- (void)killProcesses:(SNTKillRequest *)killRequest reply:(void (^)(SNTKillResponse *))reply;
 
 ///
 /// Control Ops

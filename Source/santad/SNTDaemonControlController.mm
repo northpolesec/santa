@@ -422,6 +422,12 @@ double watchdogRAMPeak = 0;
   [[SNTConfigurator configurator] saveStatsSubmissionAttemptTime:timestamp version:version];
 }
 
+#pragma mark Command Ops
+
+- (void)killProcesses:(SNTKillRequest *)killRequest reply:(void (^)(SNTKillResponse *))reply {
+  reply(nil);
+}
+
 #pragma mark Metrics Ops
 
 - (void)metrics:(void (^)(NSDictionary *))reply {

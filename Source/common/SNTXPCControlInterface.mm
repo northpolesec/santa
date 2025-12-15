@@ -71,6 +71,12 @@ NSString *const kBundleID = @"com.northpolesec.santa.daemon";
         forSelector:@selector(retrieveAllExecutionRules:)
       argumentIndex:0
             ofReply:YES];
+
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTKillResponse class],
+                                      [SNTKilledProcess class], nil]
+        forSelector:@selector(killProcesses:reply:)
+      argumentIndex:0
+            ofReply:YES];
 }
 
 + (NSXPCInterface *)controlInterface {
