@@ -837,13 +837,33 @@ objc_library(
     name = "KillingMachine",
     srcs = ["KillingMachine.mm"],
     hdrs = ["KillingMachine.h"],
+    sdk_dylibs = [
+        "bsm",
+    ],
     deps = [
-        "//Source/common:SystemResources",
+        "//Source/common:CodeSigningIdentifierUtils",
+        "//Source/common:SNTKillCommand",
+        "//Source/common:SNTLogging",
         "//Source/common:SNTSystemInfo",
         "//Source/common:String",
+        "//Source/common:SystemResources",
+        "@abseil-cpp//absl/cleanup:cleanup",
+    ],
+)
+
+santa_unit_test(
+    name = "KillingMachineTest",
+    srcs = [
+        "KillingMachineTest.mm",
+    ],
+    deps = [
+        ":KillingMachine",
         "//Source/common:CodeSigningIdentifierUtils",
-        "//Source/common:SNTLogging",
         "//Source/common:SNTKillCommand",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:String",
+        "//Source/common:SystemResources",
         "@abseil-cpp//absl/cleanup:cleanup",
     ],
 )
@@ -855,8 +875,8 @@ objc_library(
     deps = [
         ":AuthResultCache",
         ":EndpointSecurityLogger",
-        ":SNTDatabaseController",
         ":KillingMachine",
+        ":SNTDatabaseController",
         ":SNTEventTable",
         ":SNTNotificationQueue",
         ":SNTPolicyProcessor",
@@ -1694,6 +1714,7 @@ test_suite(
         ":EndpointSecurityWriterFileTest",
         ":EndpointSecurityWriterSpoolTest",
         ":FAAPolicyProcessorTest",
+        ":KillingMachineTest",
         ":MetricsTest",
         ":RateLimiterTest",
         ":SNTApplicationCoreMetricsTest",
