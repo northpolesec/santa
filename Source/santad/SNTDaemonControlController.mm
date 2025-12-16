@@ -167,7 +167,7 @@ double watchdogRAMPeak = 0;
                    withCode:SNTErrorCodeManualRulesDisabled
                     message:@"Rejected by the Santa daemon"
                      detail:@"SyncBaseURL or StaticRules are set"];
-    reply(error);
+    reply(NO, @[ error ]);
     return;
   }
 #endif
