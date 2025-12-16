@@ -6,9 +6,13 @@ import { default as DeprecatedBadgeBase } from "@site/src/components/DeprecatedB
 export interface versioned {
   versionAdded?: string;
   versionDeprecated?: string;
+  versionRemoved?: string;
 }
 
 export default function DeprecatedBadge({ k }: { k: versioned }): ReactNode {
+  if (k.versionRemoved) {
+    return <></>;
+  }
   return k.versionDeprecated ? (
     <DeprecatedBadgeBase deprecated={k.versionDeprecated} />
   ) : (

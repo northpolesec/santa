@@ -38,9 +38,10 @@ export type SantaConfigKey = {
   // If the type is "dict", this specifies the possible fields inside the dict.
   subFields?: SantaConfigKey[];
 
-  // What version of Santa added/deprecated support for this key.
+  // What version of Santa added/deprecated/removed support for this key.
   versionAdded?: string;
   versionDeprecated?: string;
+  versionRemoved?: string;
 
   // If set, will be called to determine if the key should be displayed in the
   // config generator. All existing values are passed in, so that the function
@@ -59,9 +60,10 @@ export type SantaPossibleValue = {
   // An optional description associated with this value.
   description?: string;
 
-  // What version of Santa added/deprecated support for this value.
+  // What version of Santa added/deprecated/removed support for this value.
   versionAdded?: string;
   versionDeprecated?: string;
+  versionRemoved?: string;
 };
 
 // SantaConfigKeyGroups represents all of the possible configuration options
@@ -298,12 +300,10 @@ sequences will be replaced in the final URL:
     },
     {
       key: "EnableForkAndExitLogging",
-      description: `If true, Santa will log \`FORK\` and \`EXIT\` events.
-
-Use the new \`Telemetry\` key instead.`,
+      description: `This key is no longer supported. Use the new \`Telemetry\` key instead.`,
       type: "bool",
-      defaultValue: false,
       versionDeprecated: "2024.11",
+      versionRemoved: "2025.12",
     },
     {
       key: "EventLogType",
