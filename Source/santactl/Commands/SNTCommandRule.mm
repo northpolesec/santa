@@ -16,6 +16,7 @@
 #import <CommonCrypto/CommonDigest.h>
 #import <Foundation/Foundation.h>
 #import <Kernel/kern/cs_blobs.h>
+#include <stdlib.h>
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -292,14 +293,21 @@ REGISTER_COMMAND_NAME(@"rule")
                                source:SNTRuleAddSourceSantactl
                                 reply:^(BOOL success, NSArray<NSError *> *errors) {
                                   if (success) {
-                                    TEE_LOGE(@"Rules were deleted, with the following warnings:");
+                                    TEE_LOGI(@"Rules were successfully deleted.");
+                                    if (errors.count > 0) {
+                                      TEE_LOGE(@"The following warnings were emitted:");
+                                      for (NSError *e in errors) {
+                                        TEE_LOGW(@"\t%@", e.localizedDescription);
+                                      }
+                                    }
                                   } else {
                                     TEE_LOGE(@"Failed to delete rules:");
+                                    for (NSError *e in errors) {
+                                      TEE_LOGE(@"\t%@", e.localizedDescription);
+                                    }
                                   }
-                                  for (NSError *e in errors) {
-                                    TEE_LOGE(@"\t%@", e.localizedDescription);
-                                  }
-                                  exit(EXIT_FAILURE);
+
+                                  exit(success == NO ? EXIT_FAILURE : EXIT_SUCCESS);
                                 }];
     exit(EXIT_SUCCESS);
   }
@@ -401,51 +409,40 @@ REGISTER_COMMAND_NAME(@"rule")
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSantactl
                               reply:^(BOOL success, NSArray<NSError *> *errors) {
-                                if (!errors) {
+                                if (!success) {
                                   TEE_LOGE(@"Failed to modify rules:");
                                   for (NSError *e in errors) {
                                     TEE_LOGE(@"\t%@", e.localizedFailureReason);
                                   }
-                                  exit(1);
-                                } else {
-                                  if (errors.count > 0) {
-                                    TEE_LOGE(@"Rules were modified but with the following issues:");
-                                    for (NSError *e in errors) {
-                                      TEE_LOGE(@"\t%@", e.localizedFailureReason);
-                                    }
-                                  }
-                                  NSString *ruleType;
-                                  switch (newRule.type) {
-                                    case SNTRuleTypeCertificate:
-                                      ruleType = @"Certificate SHA-256";
-                                      break;
-                                    case SNTRuleTypeBinary: {
-                                      ruleType = @"SHA-256";
-                                      break;
-                                    }
-                                    case SNTRuleTypeTeamID: {
-                                      ruleType = @"Team ID";
-                                      break;
-                                    }
-                                    case SNTRuleTypeSigningID: {
-                                      ruleType = @"Signing ID";
-                                      break;
-                                    }
-                                    case SNTRuleTypeCDHash: {
-                                      ruleType = @"CDHash";
-                                      break;
-                                    }
-                                    default: ruleType = @"(Unknown type)";
-                                  }
-                                  if (newRule.state == SNTRuleStateRemove) {
-                                    printf("Removed rule for %s: %s.\n", [ruleType UTF8String],
-                                           [newRule.identifier UTF8String]);
-                                  } else {
-                                    printf("Added rule for %s: %s.\n", [ruleType UTF8String],
-                                           [newRule.identifier UTF8String]);
-                                  }
-                                  exit(0);
+                                  exit(EXIT_FAILURE);
                                 }
+
+                                if (errors.count > 0) {
+                                  TEE_LOGW(@"Rules were modified but with the following issues:");
+                                  for (NSError *e in errors) {
+                                    TEE_LOGW(@"\t%@", e.localizedFailureReason);
+                                  }
+                                }
+
+                                NSString *ruleType;
+                                switch (newRule.type) {
+                                  case SNTRuleTypeCertificate:
+                                    ruleType = @"Certificate SHA-256";
+                                    break;
+                                  case SNTRuleTypeBinary: ruleType = @"SHA-256"; break;
+                                  case SNTRuleTypeTeamID: ruleType = @"Team ID"; break;
+                                  case SNTRuleTypeSigningID: ruleType = @"Signing ID"; break;
+                                  case SNTRuleTypeCDHash: ruleType = @"CDHash"; break;
+                                  default: ruleType = @"(Unknown type)"; break;
+                                }
+                                if (newRule.state == SNTRuleStateRemove) {
+                                  printf("Removed rule for %s: %s.\n", [ruleType UTF8String],
+                                         [newRule.identifier UTF8String]);
+                                } else {
+                                  printf("Added rule for %s: %s.\n", [ruleType UTF8String],
+                                         [newRule.identifier UTF8String]);
+                                }
+                                exit(EXIT_SUCCESS);
                               }];
 }
 
