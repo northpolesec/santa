@@ -834,6 +834,21 @@ objc_library(
 )
 
 objc_library(
+    name = "KillingMachine",
+    srcs = ["KillingMachine.mm"],
+    hdrs = ["KillingMachine.h"],
+    deps = [
+        "//Source/common:SystemResources",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:String",
+        "//Source/common:CodeSigningIdentifierUtils",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTKillCommand",
+        "@abseil-cpp//absl/cleanup:cleanup",
+    ],
+)
+
+objc_library(
     name = "SNTDaemonControlController",
     srcs = ["SNTDaemonControlController.mm"],
     hdrs = ["SNTDaemonControlController.h"],
@@ -841,6 +856,7 @@ objc_library(
         ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":SNTDatabaseController",
+        ":KillingMachine",
         ":SNTEventTable",
         ":SNTNotificationQueue",
         ":SNTPolicyProcessor",

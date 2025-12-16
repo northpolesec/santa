@@ -28,6 +28,7 @@
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTFileAccessRule.h"
+#import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTModeTransition.h"
@@ -43,6 +44,7 @@
 #include "Source/common/faa/WatchItems.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/santad/KillingMachine.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
@@ -66,6 +68,7 @@ double watchdogRAMPeak = 0;
 @property SNTPolicyProcessor *policyProcessor;
 @property SNTNotificationQueue *notQueue;
 @property SNTSyncdQueue *syncdQueue;
+@property dispatch_queue_t commandQ;
 @end
 
 @implementation SNTDaemonControlController {
@@ -89,6 +92,9 @@ double watchdogRAMPeak = 0;
     _watchItems = std::move(watchItems);
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
+
+    _commandQ = dispatch_queue_create("com.northpolesec.santa.cmdq", DISPATCH_QUEUE_SERIAL);
+    dispatch_set_target_queue(_commandQ, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
 
     _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
         [SNTConfigurator configurator], _notQueue,
@@ -425,7 +431,9 @@ double watchdogRAMPeak = 0;
 #pragma mark Command Ops
 
 - (void)killProcesses:(SNTKillRequest *)killRequest reply:(void (^)(SNTKillResponse *))reply {
-  reply(nil);
+  dispatch_async(self.commandQ, ^{
+    reply(santa::KillingMachine(killRequest));
+  });
 }
 
 #pragma mark Metrics Ops
