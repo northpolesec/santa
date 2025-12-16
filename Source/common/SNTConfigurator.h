@@ -784,11 +784,6 @@
 @property(nonatomic) BOOL disableUnknownEventUpload;
 
 ///
-///  If true, forks and exits will be logged. Defaults to false.
-///
-@property(readonly, nonatomic) BOOL enableForkAndExitLogging;
-
-///
 ///  If true, ignore actions from other endpoint security clients. Defaults to false. This only
 ///  applies when running as a sysx.
 ///
