@@ -77,16 +77,11 @@ inline TelemetryEvent operator~(TelemetryEvent rhs) {
   return static_cast<TelemetryEvent>(~static_cast<std::underlying_type_t<TelemetryEvent>>(rhs));
 }
 
-// Create a `TelemetryEvent` bitmask based on the `Telemetry` and
-// `EnableForkAndExitLogging` configuration values. The `Telemetry` event
-// array takes precedence over `EnableForkAndExitLogging`.
+// Create a `TelemetryEvent` bitmask based on the `Telemetry` configuration value.
 //
 // If `Telemetry` is set, the events specified will be used.
 // If `Telemetry` is not set, `everything` (all events) are assumed.
-// When `Telemetry` is not set, `EnableForkAndExitLogging` willbe checked. If
-// `false`, the `FORK` and `EXIT` bits will be cleared from the mask.
-TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry,
-                                        BOOL enableForkAndExitLogging);
+TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry);
 
 // Returns the appropriate `TelemetryEvent` enum value for a given ES event
 TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event);

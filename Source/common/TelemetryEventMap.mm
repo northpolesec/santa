@@ -66,8 +66,7 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
   }
 }
 
-TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry,
-                                        BOOL enableForkAndExitLogging) {
+TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry) {
   TelemetryEvent mask = TelemetryEvent::kNone;
 
   if (telemetry) {
@@ -76,10 +75,6 @@ TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry,
     }
   } else {
     mask = TelemetryEvent::kEverything;
-
-    if (enableForkAndExitLogging == false) {
-      mask &= (~TelemetryEvent::kFork & ~TelemetryEvent::kExit);
-    }
   }
 
   return mask;

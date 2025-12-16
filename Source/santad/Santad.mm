@@ -508,25 +508,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                 LOGI(@"Telemetry changed: %@ -> %@", [oldValue componentsJoinedByString:@","],
                      [newValue componentsJoinedByString:@","]);
-                logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(
-                    newValue, configurator.enableForkAndExitLogging));
+                logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(newValue));
               }],
-    [[SNTKVOManager alloc] initWithObject:configurator
-                                 selector:@selector(enableForkAndExitLogging)
-                                     type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
-                                   BOOL oldBool = [oldValue boolValue];
-                                   BOOL newBool = [newValue boolValue];
-
-                                   if (oldBool == newBool) {
-                                     return;
-                                   }
-
-                                   LOGI(@"EnableForkAndExitLogging changed: %d -> %d", oldBool,
-                                        newBool);
-                                   logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(
-                                       configurator.telemetry, newBool));
-                                 }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(enableSilentTTYMode)
                                      type:[NSNumber class]

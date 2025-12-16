@@ -163,7 +163,6 @@ static NSString *const kTelemetryExportMaxFilesPerBatch = @"TelemetryExportMaxFi
 
 static NSString *const kEnableMachineIDDecoration = @"EnableMachineIDDecoration";
 
-static NSString *const kEnableForkAndExitLogging = @"EnableForkAndExitLogging";
 static NSString *const kIgnoreOtherEndpointSecurityClients = @"IgnoreOtherEndpointSecurityClients";
 static NSString *const kTelemetryKey = @"Telemetry";
 
@@ -343,7 +342,6 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kTelemetryExportBatchThresholdSizeMB : number,
       kTelemetryExportMaxFilesPerBatch : number,
       kEnableMachineIDDecoration : number,
-      kEnableForkAndExitLogging : number,
       kIgnoreOtherEndpointSecurityClients : number,
       kFCMProject : string,
       kFCMEntity : string,
@@ -667,10 +665,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 + (NSSet *)keyPathsForValuesAffectingDisableUnknownEventUpload {
   return [self syncAndConfigStateSet];
-}
-
-+ (NSSet *)keyPathsForValuesAffectingEnableForkAndExitLogging {
-  return [self configStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingIgnoreOtherEndpointSecurityClients {
@@ -1368,11 +1362,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)setDisableUnknownEventUpload:(BOOL)enabled {
   [self updateSyncStateForKey:kDisableUnknownEventUploadKey value:@(enabled)];
-}
-
-- (BOOL)enableForkAndExitLogging {
-  NSNumber *number = self.configState[kEnableForkAndExitLogging];
-  return number ? [number boolValue] : NO;
 }
 
 // This method returns only the values that are of the expected string type.

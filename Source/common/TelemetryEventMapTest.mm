@@ -68,23 +68,20 @@ using santa::TelemetryEvent;
 
   for (const auto &[event_name, want] : eventNameToMask) {
     TelemetryEvent got =
-        TelemetryConfigToBitmask(@[ [NSString stringWithUTF8String:event_name.data()] ], false);
+        TelemetryConfigToBitmask(@[ [NSString stringWithUTF8String:event_name.data()] ]);
     XCTAssertEqual(got, want);
   }
 
   // Test some arbitrary sets of events return expected bitmasks
-  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"everything" ], true), TelemetryEvent::kEverything);
-  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"none" ], true), TelemetryEvent::kNone);
-  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"execution", @"fork", @"exit" ], true),
+  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"everything" ]), TelemetryEvent::kEverything);
+  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"none" ]), TelemetryEvent::kNone);
+  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"execution", @"fork", @"exit" ]),
                  TelemetryEvent::kExecution | TelemetryEvent::kFork | TelemetryEvent::kExit);
-  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"bundle", @"close", @"allowList" ], false),
+  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"bundle", @"close", @"allowList" ]),
                  TelemetryEvent::kBundle | TelemetryEvent::kClose | TelemetryEvent::kAllowlist);
 
-  // When telemetry config is nil, returned bitmask is dependent
-  // upon enableForkAndExitLogging being true or false
-  XCTAssertEqual(TelemetryConfigToBitmask(nil, true), TelemetryEvent::kEverything);
-  XCTAssertEqual(TelemetryConfigToBitmask(nil, false),
-                 TelemetryEvent::kEverything & ~TelemetryEvent::kFork & ~TelemetryEvent::kExit);
+  // When telemetry config is nil, all events should be set
+  XCTAssertEqual(TelemetryConfigToBitmask(nil), TelemetryEvent::kEverything);
 }
 
 - (void)testESEventToTelemetryEvent {

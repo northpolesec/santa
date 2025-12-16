@@ -5,10 +5,11 @@ import { default as AddedBadgeBase } from "@site/src/components/AddedBadge/Added
 export interface versioned {
   versionAdded?: string;
   versionDeprecated?: string;
+  versionRemoved?: string;
 }
 
 export default function AddedBadge({ k }: { k: versioned }): ReactNode {
-  if (k.versionDeprecated) {
+  if (k.versionDeprecated || k.versionRemoved) {
     return <></>;
   }
   return k.versionAdded ? <AddedBadgeBase added={k.versionAdded} /> : <></>;

@@ -13,6 +13,7 @@ import { SantaConfigKey, SantaPossibleValue } from "@site/src/lib/santaconfig";
 import TypeBadge from "./TypeBadge";
 import AddedBadge from "./AddedBadge";
 import DeprecatedBadge from "./DeprecatedBadge";
+import RemovedBadge from "./RemovedBadge";
 
 function AllowedValues({
   values,
@@ -32,6 +33,7 @@ function AllowedValues({
 
             <DeprecatedBadge k={value} />
             <AddedBadge k={value} />
+            <RemovedBadge k={value} />
           </li>
         ))}
       </ul>
@@ -50,6 +52,7 @@ function ConfigKey({ k }: { k: SantaConfigKey }): ReactNode {
               <TypeBadge k={k} />
               <DeprecatedBadge k={k} />
               <AddedBadge k={k} />
+              <RemovedBadge k={k} />
             </span>
           </Heading>
         </header>

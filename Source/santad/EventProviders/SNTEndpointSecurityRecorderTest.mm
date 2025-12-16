@@ -476,7 +476,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   [self handleMessageShouldLog:NO shouldRemoveFromCache:NO withBlock:testBlock];
 
-  // EXIT, EnableForkAndExitLogging is false
+  // EXIT, message handled
   testBlock = ^(
       es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
       SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
@@ -497,12 +497,13 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
     XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
   };
 
+  // Use a bitmask without EXIT specified
   [self handleMessageShouldLog:NO
          shouldRemoveFromCache:NO
                      withBlock:testBlock
-                 telemetryMask:santa::TelemetryConfigToBitmask(nil, false)];
+                 telemetryMask:santa::TelemetryConfigToBitmask(@[ @"execution" ])];
 
-  // FORK, EnableForkAndExitLogging is true
+  // FORK, message handled
   testBlock = ^(
       es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
       SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
@@ -523,10 +524,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
     XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
   };
 
-  [self handleMessageShouldLog:YES
-         shouldRemoveFromCache:NO
-                     withBlock:testBlock
-                 telemetryMask:santa::TelemetryConfigToBitmask(nil, true)];
+  [self handleMessageShouldLog:YES shouldRemoveFromCache:NO withBlock:testBlock];
 
   XCTAssertTrue(OCMVerifyAll(self.mockConfigurator));
 }

@@ -16,6 +16,7 @@ To preview changes to the site, ensure you have NodeJS installed (use homebrew)
 and run:
 
 ```
+$ cd docs/
 $ pnpm i
 $ pnpm start
 ```
@@ -23,4 +24,3 @@ $ pnpm start
 Docusuarus will start serving on localhost, usually on port 3000. It will also
 open the docs site in your browser. While the command is running any changes
 you make will immediately be reflected on this local server.
-
