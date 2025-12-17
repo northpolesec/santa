@@ -431,6 +431,7 @@ double watchdogRAMPeak = 0;
 #pragma mark Command Ops
 
 - (void)killProcesses:(SNTKillRequest *)killRequest reply:(void (^)(SNTKillResponse *))reply {
+  // Perform work asynchronously to not hold up processing other XPC messages
   dispatch_async(self.commandQ, ^{
     reply(santa::KillingMachine(killRequest));
   });

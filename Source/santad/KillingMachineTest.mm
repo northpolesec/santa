@@ -51,7 +51,7 @@ extern bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_fun
 
 @implementation KillingMachineTest
 
-- (void)testCDHashMatcherSuccess2 {
+- (void)testCDHashMatcherSuccess {
   std::vector<uint8_t> actualCDhash = {0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x01, 0x23,
                                        0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98};
 
