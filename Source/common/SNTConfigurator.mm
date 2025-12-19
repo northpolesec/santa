@@ -123,6 +123,7 @@ static NSString *const kUnknownBlockMessage = @"UnknownBlockMessage";
 static NSString *const kBannedBlockMessage = @"BannedBlockMessage";
 static NSString *const kBannedUSBBlockMessage = @"BannedUSBBlockMessage";
 static NSString *const kRemountUSBBlockMessage = @"RemountUSBBlockMessage";
+static NSString *const kBannedNetworkMountBlockMessage = @"BannedNetworkMountBlockMessage";
 
 static NSString *const kModeNotificationMonitor = @"ModeNotificationMonitor";
 static NSString *const kModeNotificationLockdown = @"ModeNotificationLockdown";
@@ -195,6 +196,8 @@ static NSString *const kEnabledProcessAnnotations = @"EnabledProcessAnnotations"
 static NSString *const kClientModeKey = @"ClientMode";
 static NSString *const kBlockUSBMountKey = @"BlockUSBMount";
 static NSString *const kRemountUSBModeKey = @"RemountUSBMode";
+static NSString *const kBlockNetworkMountKey = @"BlockNetworkMount";
+static NSString *const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
 static NSString *const kEnableTransitiveRulesKey = @"EnableTransitiveRules";
 static NSString *const kEnableTransitiveRulesKeyDeprecated = @"EnableTransitiveWhitelisting";
 static NSString *const kAllowedPathRegexKey = @"AllowedPathRegex";
@@ -253,6 +256,9 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
       kRemountUSBModeKey : array,
+      kBlockNetworkMountKey : number,
+      kBannedNetworkMountBlockMessage : string,
+      kAllowedNetworkMountHosts : array,
       kFullSyncLastSuccess : date,
       kRuleSyncLastSuccess : date,
       kSyncCleanRequiredDeprecated : number,
@@ -280,6 +286,9 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
       kRemountUSBModeKey : array,
+      kBlockNetworkMountKey : number,
+      kBannedNetworkMountBlockMessage : string,
+      kAllowedNetworkMountHosts : array,
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
       kEnableBadSignatureProtectionKey : number,
@@ -721,6 +730,18 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 + (NSSet *)keyPathsForValuesAffectingUsbBlockMessage {
   return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBlockNetworkMount {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBannedNetworkMountBlockMessage {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingAllowedNetworkMountHosts {
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingOverrideFileAccessActionKey {
@@ -1432,7 +1453,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   return NO;
 }
 
-- (void)setBlockUSBMount:(BOOL)enabled {
+- (void)setSyncServerBlockUSBMount:(BOOL)enabled {
   [self updateSyncStateForKey:kBlockUSBMountKey value:@(enabled)];
 }
 
@@ -1441,6 +1462,49 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (n) return [n boolValue];
 
   return [self.configState[kBlockUSBMountKey] boolValue];
+}
+
+- (void)setSyncServerBannedNetworkMountBlockMessage:(NSString *)msg {
+  [self updateSyncStateForKey:kBannedNetworkMountBlockMessage value:msg];
+}
+
+- (nullable NSString *)bannedNetworkMountBlockMessage {
+  return self.syncState[kBannedNetworkMountBlockMessage]
+             ?: self.configState[kBannedNetworkMountBlockMessage];
+}
+
+- (void)setSyncServerBlockNetworkMount:(BOOL)enabled {
+  [self updateSyncStateForKey:kBlockNetworkMountKey value:@(enabled)];
+}
+
+- (BOOL)blockNetworkMount {
+  NSNumber *n = self.syncState[kBlockNetworkMountKey];
+  if (n) return [n boolValue];
+
+  return [self.configState[kBlockNetworkMountKey] boolValue];
+}
+
+- (void)setSyncServerAllowedNetworkMountHosts:(NSArray<NSString *> *)args {
+  [self updateSyncStateForKey:kAllowedNetworkMountHosts value:args];
+}
+
+- (NSArray<NSString *> *)allowedNetworkMountHosts {
+  NSArray<NSString *> *hosts = self.syncState[kAllowedNetworkMountHosts];
+  if (!hosts) {
+    hosts = (NSArray<NSString *> *)self.configState[kAllowedNetworkMountHosts];
+    if (!hosts) {
+      return nil;
+    }
+  }
+
+  for (NSString *host in hosts) {
+    if (![host isKindOfClass:[NSString class]]) {
+      LOGE(@"Unexpected type in AllowedNetworkMountHosts: %@", [host class]);
+      return nil;
+    }
+  }
+
+  return hosts;
 }
 
 - (void)setSyncServerOverrideFileAccessAction:(NSString *)action {

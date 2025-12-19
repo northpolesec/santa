@@ -25,6 +25,9 @@
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
 @property NSArray *remountUSBMode;
+@property NSNumber *blockNetworkMount;
+@property NSString *bannedNetworkMountBlockMessage;
+@property NSArray<NSString *> *allowedNetworkMountHosts;
 @property NSNumber *enableBundles;
 @property NSNumber *enableTransitiveRules;
 @property NSNumber *enableAllEventUpload;
@@ -51,6 +54,9 @@
   ENCODE(coder, blocklistRegex);
   ENCODE(coder, blockUSBMount);
   ENCODE(coder, remountUSBMode);
+  ENCODE(coder, blockNetworkMount);
+  ENCODE(coder, bannedNetworkMountBlockMessage);
+  ENCODE(coder, allowedNetworkMountHosts);
   ENCODE(coder, enableBundles);
   ENCODE(coder, enableTransitiveRules);
   ENCODE(coder, enableAllEventUpload);
@@ -73,6 +79,9 @@
     DECODE(decoder, blocklistRegex, NSString);
     DECODE(decoder, blockUSBMount, NSNumber);
     DECODE_ARRAY(decoder, remountUSBMode, NSString);
+    DECODE(decoder, blockNetworkMount, NSNumber);
+    DECODE(decoder, bannedNetworkMountBlockMessage, NSString);
+    DECODE_ARRAY(decoder, allowedNetworkMountHosts, NSString);
     DECODE(decoder, enableBundles, NSNumber);
     DECODE(decoder, enableTransitiveRules, NSNumber);
     DECODE(decoder, enableAllEventUpload, NSNumber);
@@ -121,6 +130,24 @@
 - (void)remountUSBMode:(void (^)(NSArray *))block {
   if (self.remountUSBMode) {
     block(self.remountUSBMode);
+  }
+}
+
+- (void)blockNetworkMount:(void (^)(BOOL))block {
+  if (self.blockNetworkMount) {
+    block([self.blockNetworkMount boolValue]);
+  }
+}
+
+- (void)bannedNetworkMountBlockMessage:(void (^)(NSString *))block {
+  if (self.bannedNetworkMountBlockMessage) {
+    block(self.bannedNetworkMountBlockMessage);
+  }
+}
+
+- (void)allowedNetworkMountHosts:(void (^)(NSArray<NSString *> *))block {
+  if (self.allowedNetworkMountHosts) {
+    block(self.allowedNetworkMountHosts);
   }
 }
 

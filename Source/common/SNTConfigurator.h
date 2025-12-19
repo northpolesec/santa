@@ -483,7 +483,7 @@
 
 ///
 /// This is the message shown to the user when a USB storage device's mount is denied
-/// from the BlockUSB configuration setting. If not configured, a reasonable
+/// from the BlockUSBMount configuration setting. If not configured, a reasonable
 /// default is provided.
 ///
 @property(nullable, readonly, nonatomic) NSString *bannedUSBBlockMessage;
@@ -494,6 +494,19 @@
 /// configuration settings. If not configured, a reasonable default is provided.
 ///
 @property(nullable, readonly, nonatomic) NSString *remountUSBBlockMessage;
+
+///
+/// This is the message shown to the user when a network share mount is denied
+/// due to the BlockNetworkMount configuration setting. If not configured, a
+/// reasonable default is provided.
+///
+@property(nullable, readonly, nonatomic) NSString *bannedNetworkMountBlockMessage;
+
+///
+///  Set the message to be shown when a network mount is blocked as
+///  received from a sync server.
+///
+- (void)setSyncServerBannedNetworkMountBlockMessage:(nullable NSString *)msg;
 
 ///
 ///  The notification text to display when the client goes into MONITOR mode.
@@ -675,13 +688,39 @@
 ///
 /// USB Mount Blocking. Defaults to false.
 ///
-@property(nonatomic) BOOL blockUSBMount;
+@property(nonatomic, readonly) BOOL blockUSBMount;
+
+///
+///  Set the block USB mount state as received from a sync server.
+///
+- (void)setSyncServerBlockUSBMount:(BOOL)enabled;
 
 ///
 /// Comma-separated `$ mount -o` arguments used for forced remounting of USB devices. Default
 /// to fully allow/deny without remounting if unset.
 ///
 @property(nullable, nonatomic) NSArray<NSString *> *remountUSBMode;
+
+///
+/// Network Mount Blocking. Defaults to false.
+/// Note: This feature is only on macOS 15+.
+///
+@property(readonly) BOOL blockNetworkMount;
+
+///
+///  Set the block network mount state as received from a sync server.
+///
+- (void)setSyncServerBlockNetworkMount:(BOOL)enabled;
+
+//
+/// Set of hosts that are allowed to be mounted when blockNetworkMount is true.
+///
+@property(readonly, nullable) NSArray<NSString *> *allowedNetworkMountHosts;
+
+///
+///  Set the explicitly allowed hosts when network mounts are blocked.
+///
+- (void)setSyncServerAllowedNetworkMountHosts:(nullable NSArray<NSString *> *)hosts;
 
 ///
 /// If set, defines the action that should be taken on existing USB mounts when

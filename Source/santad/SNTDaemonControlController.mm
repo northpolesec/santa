@@ -357,11 +357,23 @@ double watchdogRAMPeak = 0;
   }];
 
   [result blockUSBMount:^(BOOL val) {
-    [configurator setBlockUSBMount:val];
+    [configurator setSyncServerBlockUSBMount:val];
   }];
 
   [result remountUSBMode:^(NSArray *val) {
     [configurator setRemountUSBMode:val];
+  }];
+
+  [result blockNetworkMount:^(BOOL val) {
+    [configurator setSyncServerBlockNetworkMount:val];
+  }];
+
+  [result bannedNetworkMountBlockMessage:^(NSString *val) {
+    [configurator setSyncServerBannedNetworkMountBlockMessage:val];
+  }];
+
+  [result allowedNetworkMountHosts:^(NSArray<NSString *> *val) {
+    [configurator setSyncServerAllowedNetworkMountHosts:val];
   }];
 
   [result enableBundles:^(BOOL val) {

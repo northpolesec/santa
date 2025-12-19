@@ -79,6 +79,9 @@
 @property NSNumber *blockUSBMount;
 // Array of mount args for the forced remounting feature.
 @property NSArray *remountUSBMode;
+@property NSNumber *blockNetworkMount;
+@property NSString *bannedNetworkMountBlockMessage;
+@property NSArray<NSString *> *allowedNetworkMountHosts;
 @property NSString *overrideFileAccessAction;
 @property SNTExportConfiguration *exportConfig;
 @property SNTModeTransition *modeTransition;

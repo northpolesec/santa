@@ -26,6 +26,9 @@
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
 @property NSArray *remountUSBMode;
+@property NSNumber *blockNetworkMount;
+@property NSString *bannedNetworkMountBlockMessage;
+@property NSArray<NSString *> *allowedNetworkMountHosts;
 @property NSNumber *enableBundles;
 @property NSNumber *enableTransitiveRules;
 @property NSNumber *enableAllEventUpload;
@@ -48,6 +51,9 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.blocklistRegex = syncState.blocklistRegex;
   bundle.blockUSBMount = syncState.blockUSBMount;
   bundle.remountUSBMode = syncState.remountUSBMode;
+  bundle.blockNetworkMount = syncState.blockNetworkMount;
+  bundle.bannedNetworkMountBlockMessage = syncState.bannedNetworkMountBlockMessage;
+  bundle.allowedNetworkMountHosts = syncState.allowedNetworkMountHosts;
   bundle.enableBundles = syncState.enableBundles;
   bundle.enableTransitiveRules = syncState.enableTransitiveRules;
   bundle.enableAllEventUpload = syncState.enableAllEventUpload;
