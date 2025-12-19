@@ -286,9 +286,6 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
       kRemountUSBModeKey : array,
-      kBlockNetworkMountKey : number,
-      kBannedNetworkMountBlockMessage : string,
-      kAllowedNetworkMountHosts : array,
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
       kEnableBadSignatureProtectionKey : number,
@@ -733,15 +730,15 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingBlockNetworkMount {
-  return [self syncAndConfigStateSet];
+  return [self syncStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingBannedNetworkMountBlockMessage {
-  return [self syncAndConfigStateSet];
+  return [self syncStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingAllowedNetworkMountHosts {
-  return [self syncAndConfigStateSet];
+  return [self syncStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingOverrideFileAccessActionKey {
@@ -1469,8 +1466,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (nullable NSString *)bannedNetworkMountBlockMessage {
-  return self.syncState[kBannedNetworkMountBlockMessage]
-             ?: self.configState[kBannedNetworkMountBlockMessage];
+  return self.syncState[kBannedNetworkMountBlockMessage];
 }
 
 - (void)setSyncServerBlockNetworkMount:(BOOL)enabled {
@@ -1478,10 +1474,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (BOOL)blockNetworkMount {
-  NSNumber *n = self.syncState[kBlockNetworkMountKey];
-  if (n) return [n boolValue];
-
-  return [self.configState[kBlockNetworkMountKey] boolValue];
+  return [self.syncState[kBlockNetworkMountKey] boolValue];
 }
 
 - (void)setSyncServerAllowedNetworkMountHosts:(NSArray<NSString *> *)args {
@@ -1491,10 +1484,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (NSArray<NSString *> *)allowedNetworkMountHosts {
   NSArray<NSString *> *hosts = self.syncState[kAllowedNetworkMountHosts];
   if (!hosts) {
-    hosts = (NSArray<NSString *> *)self.configState[kAllowedNetworkMountHosts];
-    if (!hosts) {
-      return nil;
-    }
+    return nil;
   }
 
   for (NSString *host in hosts) {
