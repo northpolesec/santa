@@ -1489,7 +1489,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 
   for (NSString *host in hosts) {
     if (![host isKindOfClass:[NSString class]]) {
-      LOGE(@"Unexpected type in AllowedNetworkMountHosts: %@", [host class]);
+      LOGE(@"Unexpected type in %@: %@", kAllowedNetworkMountHosts, [host class]);
       return nil;
     }
   }
