@@ -28,6 +28,9 @@
 - (void)blocklistRegex:(void (^)(NSString *))block;
 - (void)blockUSBMount:(void (^)(BOOL))block;
 - (void)remountUSBMode:(void (^)(NSArray *))block;
+- (void)blockNetworkMount:(void (^)(BOOL))block;
+- (void)bannedNetworkMountBlockMessage:(void (^)(NSString *))block;
+- (void)allowedNetworkMountHosts:(void (^)(NSArray<NSString *> *))block;
 - (void)enableBundles:(void (^)(BOOL))block;
 - (void)enableTransitiveRules:(void (^)(BOOL))block;
 - (void)enableAllEventUpload:(void (^)(BOOL))block;

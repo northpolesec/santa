@@ -29,11 +29,15 @@
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
 @property NSArray *remountUSBMode;
+@property NSNumber *blockNetworkMount;
+@property NSString *bannedNetworkMountBlockMessage;
+@property NSArray<NSString *> *allowedNetworkMountHosts;
 @property NSNumber *enableBundles;
 @property NSNumber *enableTransitiveRules;
 @property NSNumber *enableAllEventUpload;
 @property NSNumber *disableUnknownEventUpload;
 @property NSString *overrideFileAccessAction;
+@property SNTExportConfiguration *exportConfiguration;
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
 @property SNTModeTransition *modeTransition;
@@ -82,6 +86,15 @@
   syncState.eventDetailText = @"Click Button";
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.eventDetailText, syncState.eventDetailText);
+
+  syncState.blockNetworkMount = @(YES);
+  syncState.bannedNetworkMountBlockMessage = @"banban";
+  syncState.allowedNetworkMountHosts = @[ @"0.0.0.0", @"localhost" ];
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertTrue([bundle.blockNetworkMount boolValue]);
+  XCTAssertEqualObjects(bundle.bannedNetworkMountBlockMessage,
+                        syncState.bannedNetworkMountBlockMessage);
+  XCTAssertEqualObjects(bundle.allowedNetworkMountHosts, syncState.allowedNetworkMountHosts);
 }
 
 - (void)testRuleSyncConfigBundle {
@@ -96,11 +109,15 @@
   XCTAssertNil(bundle.blocklistRegex);
   XCTAssertNil(bundle.blockUSBMount);
   XCTAssertNil(bundle.remountUSBMode);
+  XCTAssertNil(bundle.blockNetworkMount);
+  XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
+  XCTAssertNil(bundle.allowedNetworkMountHosts);
   XCTAssertNil(bundle.enableBundles);
   XCTAssertNil(bundle.enableTransitiveRules);
   XCTAssertNil(bundle.enableAllEventUpload);
   XCTAssertNil(bundle.disableUnknownEventUpload);
   XCTAssertNil(bundle.overrideFileAccessAction);
+  XCTAssertNil(bundle.exportConfiguration);
   XCTAssertNil(bundle.fullSyncLastSuccess);
   XCTAssertNil(bundle.modeTransition);
   XCTAssertNil(bundle.eventDetailURL);
@@ -124,11 +141,15 @@
   XCTAssertNil(bundle.blocklistRegex);
   XCTAssertNil(bundle.blockUSBMount);
   XCTAssertNil(bundle.remountUSBMode);
+  XCTAssertNil(bundle.blockNetworkMount);
+  XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
+  XCTAssertNil(bundle.allowedNetworkMountHosts);
   XCTAssertNil(bundle.enableBundles);
   XCTAssertNil(bundle.enableTransitiveRules);
   XCTAssertNil(bundle.enableAllEventUpload);
   XCTAssertNil(bundle.disableUnknownEventUpload);
   XCTAssertNil(bundle.overrideFileAccessAction);
+  XCTAssertNil(bundle.exportConfiguration);
   XCTAssertNil(bundle.fullSyncLastSuccess);
   XCTAssertNil(bundle.ruleSyncLastSuccess);
   XCTAssertNil(bundle.modeTransition);

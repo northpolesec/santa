@@ -15,6 +15,8 @@
 
 #import "Source/santasyncservice/SNTSyncPreflight.h"
 
+#include <string>
+
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -76,6 +78,8 @@ The following table expands upon the above logic to list most of the permutation
 */
 
 namespace {
+
+void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *syncState);
 
 template <bool IsV2>
 BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
@@ -253,64 +257,6 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     }
   }
 
-  // Extract NATS push notification configuration (only available in v2)
-  if constexpr (IsV2) {
-    LOGD(@"Preflight: Processing push notification configuration");
-    if (!resp.push_server().empty()) {
-      self.syncState.pushServer = StringToNSString(resp.push_server());
-      LOGD(@"Preflight: Push server: %@", self.syncState.pushServer);
-    }
-
-    if (!resp.push_key().empty()) {
-      self.syncState.pushNKey = StringToNSString(resp.push_key());
-    }
-
-    if (!resp.push_token().empty()) {
-      self.syncState.pushJWT = StringToNSString(resp.push_token());
-    }
-
-    if (!resp.push_deviceid().empty()) {
-      self.syncState.pushDeviceID = StringToNSString(resp.push_deviceid());
-      LOGI(@"Preflight: Received push device ID: %@", self.syncState.pushDeviceID);
-    } else {
-      LOGW(@"Preflight: No push device ID received from server");
-    }
-
-    if (resp.push_tags_size() > 0) {
-      NSMutableArray *tags = [NSMutableArray arrayWithCapacity:resp.push_tags_size()];
-      for (const auto &tag : resp.push_tags()) {
-        [tags addObject:StringToNSString(tag)];
-      }
-      self.syncState.pushTags = [tags copy];
-    }
-  }
-
-  if constexpr (IsV2) {
-    if (resp.has_mode_transition()) {
-      switch (resp.mode_transition().transition_case()) {
-        case ::pbv2::ModeTransition::kRevoke:
-          self.syncState.modeTransition = [[SNTModeTransition alloc] initRevocation];
-          break;
-
-        case ::pbv2::ModeTransition::kOnDemandMonitorMode: {
-          auto &odmm = resp.mode_transition().on_demand_monitor_mode();
-          if (odmm.has_default_duration_minutes()) {
-            self.syncState.modeTransition =
-                [[SNTModeTransition alloc] initOnDemandMinutes:odmm.max_minutes()
-                                               defaultDuration:odmm.default_duration_minutes()];
-          } else {
-            self.syncState.modeTransition =
-                [[SNTModeTransition alloc] initOnDemandMinutes:odmm.max_minutes()];
-          }
-
-          break;
-        }
-
-        default: break;
-      }
-    }
-  }
-
   if (resp.has_event_detail_url()) {
     self.syncState.eventDetailURL = StringToNSString(resp.event_detail_url());
   }
@@ -369,7 +315,84 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     self.syncState.syncType = SNTSyncTypeNormal;
   }
 
+  if constexpr (IsV2) {
+    HandleV2Responses(resp, self.syncState);
+  }
+
   return YES;
+}
+
+void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *syncState) {
+  // Extract NATS push notification configuration
+  LOGD(@"Preflight: Processing push notification configuration");
+  if (!resp.push_server().empty()) {
+    syncState.pushServer = StringToNSString(resp.push_server());
+    LOGD(@"Preflight: Push server: %@", syncState.pushServer);
+  }
+
+  if (!resp.push_key().empty()) {
+    syncState.pushNKey = StringToNSString(resp.push_key());
+  }
+
+  if (!resp.push_token().empty()) {
+    syncState.pushJWT = StringToNSString(resp.push_token());
+  }
+
+  if (!resp.push_deviceid().empty()) {
+    syncState.pushDeviceID = StringToNSString(resp.push_deviceid());
+    LOGI(@"Preflight: Received push device ID: %@", syncState.pushDeviceID);
+  } else {
+    LOGW(@"Preflight: No push device ID received from server");
+  }
+
+  if (resp.push_tags_size() > 0) {
+    NSMutableArray *tags = [NSMutableArray arrayWithCapacity:resp.push_tags_size()];
+    for (const auto &tag : resp.push_tags()) {
+      [tags addObject:StringToNSString(tag)];
+    }
+    syncState.pushTags = [tags copy];
+  }
+
+  if (resp.has_mode_transition()) {
+    switch (resp.mode_transition().transition_case()) {
+      case ::pbv2::ModeTransition::kRevoke:
+        syncState.modeTransition = [[SNTModeTransition alloc] initRevocation];
+        break;
+
+      case ::pbv2::ModeTransition::kOnDemandMonitorMode: {
+        auto &odmm = resp.mode_transition().on_demand_monitor_mode();
+        if (odmm.has_default_duration_minutes()) {
+          syncState.modeTransition =
+              [[SNTModeTransition alloc] initOnDemandMinutes:odmm.max_minutes()
+                                             defaultDuration:odmm.default_duration_minutes()];
+        } else {
+          syncState.modeTransition =
+              [[SNTModeTransition alloc] initOnDemandMinutes:odmm.max_minutes()];
+        }
+
+        break;
+      }
+
+      default: break;
+    }
+  }
+
+  // Similar to `block_usb_mount`, `allowed_network_mount_hosts` state can change
+  // only when `block_network_mount` is set.
+  if (resp.has_block_network_mount()) {
+    syncState.blockNetworkMount = @(resp.block_network_mount());
+
+    NSMutableArray<NSString *> *hosts = [NSMutableArray array];
+    for (const std::string &host : resp.allowed_network_mount_hosts()) {
+      [hosts addObject:StringToNSString(host)];
+    }
+    syncState.allowedNetworkMountHosts = [hosts copy];
+  }
+
+  if (resp.has_banned_network_mount_block_message()) {
+    syncState.bannedNetworkMountBlockMessage =
+        StringToNSString(resp.banned_network_mount_block_message());
+  }
 }
 
 }  // namespace

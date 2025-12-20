@@ -28,6 +28,9 @@
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
 @property NSArray *remountUSBMode;
+@property NSNumber *blockNetworkMount;
+@property NSString *bannedNetworkMountBlockMessage;
+@property NSArray<NSString *> *allowedNetworkMountHosts;
 @property NSNumber *enableBundles;
 @property NSNumber *enableTransitiveRules;
 @property NSNumber *enableAllEventUpload;
@@ -37,6 +40,8 @@
 @property NSDate *fullSyncLastSuccess;
 @property NSDate *ruleSyncLastSuccess;
 @property SNTModeTransition *modeTransition;
+@property NSString *eventDetailURL;
+@property NSString *eventDetailText;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -46,7 +51,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 15;
+  exp.expectedFulfillmentCount = 20;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -56,6 +61,9 @@
   bundle.blocklistRegex = @"block";
   bundle.blockUSBMount = @(YES);
   bundle.remountUSBMode = @[ @"foo" ];
+  bundle.blockNetworkMount = @(YES);
+  bundle.bannedNetworkMountBlockMessage = @"Network mount blocked";
+  bundle.allowedNetworkMountHosts = @[ @"example.com", @"localhost" ];
   bundle.enableBundles = @(YES);
   bundle.enableTransitiveRules = @(YES);
   bundle.enableAllEventUpload = @(NO);
@@ -67,6 +75,8 @@
       initWithURL:[NSURL URLWithString:@"https://example.com/upload"]
        formValues:@{@"key1" : @"value1", @"key2" : @"value2"}];
   bundle.modeTransition = [[SNTModeTransition alloc] initOnDemandMinutes:4 defaultDuration:2];
+  bundle.eventDetailURL = @"https://example.com/details";
+  bundle.eventDetailText = @"View Details";
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -95,6 +105,21 @@
 
   [bundle remountUSBMode:^(NSArray *val) {
     XCTAssertEqualObjects(val, @[ @"foo" ]);
+    [exp fulfill];
+  }];
+
+  [bundle blockNetworkMount:^(BOOL val) {
+    XCTAssertNotEqual(val, NO);
+    [exp fulfill];
+  }];
+
+  [bundle bannedNetworkMountBlockMessage:^(NSString *val) {
+    XCTAssertEqualObjects(val, @"Network mount blocked");
+    [exp fulfill];
+  }];
+
+  [bundle allowedNetworkMountHosts:^(NSArray<NSString *> *val) {
+    XCTAssertEqualObjects(val, (@[ @"example.com", @"localhost" ]));
     [exp fulfill];
   }];
 
@@ -147,6 +172,16 @@
     [exp fulfill];
   }];
 
+  [bundle eventDetailURL:^(NSString *val) {
+    XCTAssertEqualObjects(val, @"https://example.com/details");
+    [exp fulfill];
+  }];
+
+  [bundle eventDetailText:^(NSString *val) {
+    XCTAssertEqualObjects(val, @"View Details");
+    [exp fulfill];
+  }];
+
   // Low timeout because code above is synchronous
   [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
@@ -158,64 +193,77 @@
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
 
   [bundle clientMode:^(SNTClientMode val) {
-    XCTAssertEqual(val, SNTClientModeLockdown);
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle syncType:^(SNTSyncType val) {
-    XCTAssertEqual(val, SNTSyncTypeNormal);
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle allowlistRegex:^(NSString *val) {
-    XCTAssertEqualObjects(val, @"allow");
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle blocklistRegex:^(NSString *val) {
-    XCTAssertEqualObjects(val, @"block");
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle blockUSBMount:^(BOOL val) {
-    XCTAssertNotEqual(val, NO);
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle remountUSBMode:^(NSArray *val) {
-    XCTAssertEqualObjects(val, @[ @"foo" ]);
+    XCTFail(@"This shouldn't be called");
+    [exp fulfill];
+  }];
+
+  [bundle blockNetworkMount:^(BOOL val) {
+    XCTFail(@"This shouldn't be called");
+    [exp fulfill];
+  }];
+
+  [bundle bannedNetworkMountBlockMessage:^(NSString *val) {
+    XCTFail(@"This shouldn't be called");
+    [exp fulfill];
+  }];
+
+  [bundle allowedNetworkMountHosts:^(NSArray<NSString *> *val) {
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle enableBundles:^(BOOL val) {
-    XCTAssertNotEqual(val, NO);
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle enableTransitiveRules:^(BOOL val) {
-    XCTAssertNotEqual(val, NO);
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle enableAllEventUpload:^(BOOL val) {
-    XCTAssertNotEqual(val, NO);
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle disableUnknownEventUpload:^(BOOL val) {
-    XCTAssertNotEqual(val, NO);
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle overrideFileAccessAction:^(NSString *val) {
-    XCTAssertEqualObjects(val, @"disable");
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle exportConfiguration:^(SNTExportConfiguration *val) {
-    XCTAssertEqualObjects(val.url, [NSURL URLWithString:@"https://example.com/upload"]);
-    XCTAssertEqualObjects(val.formValues[@"key1"], @"value1");
-    XCTAssertEqualObjects(val.formValues[@"key2"], @"value2");
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
@@ -225,14 +273,22 @@
   }];
 
   [bundle ruleSyncLastSuccess:^(NSDate *val) {
-    XCTAssertEqualObjects(val, [NSDate now]);
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 
   [bundle modeTransition:^(SNTModeTransition *val) {
-    XCTAssertEqual(val.type, SNTModeTransitionTypeOnDemand);
-    XCTAssertEqualObjects(val.maxMinutes, @(2));
-    XCTAssertEqualObjects(val.defaultDurationMinutes, @(4));
+    XCTFail(@"This shouldn't be called");
+    [exp fulfill];
+  }];
+
+  [bundle eventDetailURL:^(NSString *val) {
+    XCTFail(@"This shouldn't be called");
+    [exp fulfill];
+  }];
+
+  [bundle eventDetailText:^(NSString *val) {
+    XCTFail(@"This shouldn't be called");
     [exp fulfill];
   }];
 

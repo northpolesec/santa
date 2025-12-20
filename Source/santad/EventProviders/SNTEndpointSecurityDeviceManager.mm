@@ -29,6 +29,7 @@
 #include <sys/param.h>
 #include <sys/ucred.h>
 
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
@@ -66,6 +67,7 @@ static NSString *const kMetricStartupDiskOperationSuccess = @"Success";
 @property DASessionRef diskArbSession;
 @property(nonatomic, readonly) dispatch_queue_t diskQueue;
 @property dispatch_semaphore_t diskSema;
+@property SNTConfigurator *configurator;
 
 @end
 
@@ -194,6 +196,7 @@ NS_ASSUME_NONNULL_BEGIN
     _authResultCache = authResultCache;
     _blockUSBMount = blockUSBMount;
     _remountArgs = remountUSBMode;
+    _configurator = [SNTConfigurator configurator];
 
     _diskQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.disk_queue", DISPATCH_QUEUE_SERIAL);
@@ -222,7 +225,7 @@ NS_ASSUME_NONNULL_BEGIN
   return self;
 }
 
-- (uint32_t)updatedMountFlags:(struct statfs *)sfs {
+- (uint32_t)updatedMountFlags:(const struct statfs *)sfs {
   uint32_t mask = sfs->f_flags | mountArgsToMask(self.remountArgs);
 
   // NB: APFS mounts get MNT_JOURNALED implicitly set. However, mount_apfs
@@ -437,11 +440,22 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (es_auth_result_t)handleAuthMount:(const Message &)m {
-  struct statfs *eventStatFS;
+  const struct statfs *eventStatFS;
+  bool isNetworkMount = false;
 
   switch (m->event_type) {
-    case ES_EVENT_TYPE_AUTH_MOUNT: eventStatFS = m->event.mount.statfs; break;
-    case ES_EVENT_TYPE_AUTH_REMOUNT: eventStatFS = m->event.remount.statfs; break;
+    case ES_EVENT_TYPE_AUTH_MOUNT:
+      eventStatFS = m->event.mount.statfs;
+      if (m->event.mount.disposition == ES_MOUNT_DISPOSITION_NETWORK) {
+        isNetworkMount = true;
+      }
+      break;
+    case ES_EVENT_TYPE_AUTH_REMOUNT:
+      eventStatFS = m->event.remount.statfs;
+      if (m->event.remount.disposition == ES_MOUNT_DISPOSITION_NETWORK) {
+        isNetworkMount = true;
+      }
+      break;
     default:
       // This is a programming error
       LOGE(@"Unexpected Event Type passed to DeviceManager handleAuthMount: %d", m->event_type);
@@ -453,6 +467,15 @@ NS_ASSUME_NONNULL_BEGIN
        @"%u",
        m->process->executable->path.data, pid, eventStatFS->f_flags);
 
+  if (isNetworkMount) {
+    return [self handleAuthNetworkMount:m from:@(eventStatFS->f_mntfromname)];
+  } else {
+    return [self handleAuthDeviceMount:m eventStatFS:eventStatFS];
+  }
+}
+
+- (es_auth_result_t)handleAuthDeviceMount:(const Message &)m
+                              eventStatFS:(const struct statfs *)eventStatFS {
   DADiskRef disk = DADiskCreateFromBSDName(NULL, self.diskArbSession, eventStatFS->f_mntfromname);
   CFAutorelease(disk);
 
@@ -499,6 +522,36 @@ NS_ASSUME_NONNULL_BEGIN
                            (__bridge void *)sema, (CFStringRef *)argv);
 
   free(argv);
+}
+
+- (es_auth_result_t)handleAuthNetworkMount:(const Message &)m from:(NSString *)mountFromName {
+  if (!self.configurator.blockNetworkMount) {
+    return ES_AUTH_RESULT_ALLOW;
+  }
+
+  NSURL *fromURL = [NSURL URLWithString:mountFromName];
+  if (!fromURL.host) {
+    if (self.configurator.failClosed) {
+      LOGW(@"Network share prevented from mounting: %s (by: %s). Unable to extract host "
+           @"information and \"FailClosed\" is configured.",
+           mountFromName.UTF8String, m->process->executable->path.data);
+      return ES_AUTH_RESULT_DENY;
+    } else {
+      LOGW(@"Network share allowed to mount: %s (by: %s). Unable to extract host "
+           @"information and \"FailClosed\" is not configured.",
+           mountFromName.UTF8String, m->process->executable->path.data);
+      return ES_AUTH_RESULT_ALLOW;
+    }
+  }
+
+  if ([self.configurator.allowedNetworkMountHosts containsObject:fromURL.host]) {
+    LOGI(@"Network share mounted because on the allowlist: %@", mountFromName);
+    return ES_AUTH_RESULT_ALLOW;
+  }
+
+  LOGW(@"Network share prevented from mounting: %@ (by: %s)", mountFromName,
+       m->process->executable->path.data);
+  return ES_AUTH_RESULT_DENY;
 }
 
 @end
