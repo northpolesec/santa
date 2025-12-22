@@ -740,6 +740,48 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "SNTProcessChain",
+    srcs = ["SNTProcessChain.mm"],
+    hdrs = ["SNTProcessChain.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTStoredEvent",
+        ":MOLCertificate",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTProcessChainTest",
+    srcs = ["SNTProcessChainTest.mm"],
+    deps = [
+        ":MOLCertificate",
+        ":SNTProcessChain",
+    ],
+)
+
+objc_library(
+    name = "SNTStoredNetworkMountEvent",
+    srcs = ["SNTStoredNetworkMountEvent.mm"],
+    hdrs = ["SNTStoredNetworkMountEvent.h"],
+    module_name = "santa_common_SNTStoredNetworkMountEvent",
+    deps = [
+        ":CoderMacros",
+        ":SNTStoredEvent",
+        ":SNTProcessChain",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTStoredNetworkMountEventTest",
+    srcs = ["SNTStoredNetworkMountEventTest.mm"],
+    deps = [
+        ":SNTProcessChain",
+        ":SNTStoredEvent",
+        ":SNTStoredNetworkMountEvent",
+    ],
+)
+
+objc_library(
     name = "SNTConfigState",
     srcs = ["SNTConfigState.mm"],
     hdrs = ["SNTConfigState.h"],
@@ -979,9 +1021,11 @@ test_suite(
         ":SNTKillCommandTest",
         ":SNTMetricSetTest",
         ":SNTModeTransitionTest",
+        ":SNTProcessChainTest",
         ":SNTRuleTest",
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
+        ":SNTStoredNetworkMountEventTest",
         ":SNTStoredTemporaryMonitorModeAuditEventTest",
         ":SNTTimerTest",
         ":SNTXxhashTest",
