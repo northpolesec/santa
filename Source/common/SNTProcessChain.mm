@@ -56,8 +56,7 @@
 }
 
 - (NSString *)description {
-  return [NSString
-      stringWithFormat:@"SNTProcessChain (pid: %@): %@", self.pid, self.filePath];
+  return [NSString stringWithFormat:@"SNTProcessChain (pid: %@): %@", self.pid, self.filePath];
 }
 
 @end

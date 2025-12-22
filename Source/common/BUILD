@@ -745,8 +745,8 @@ objc_library(
     hdrs = ["SNTProcessChain.h"],
     deps = [
         ":CoderMacros",
-        ":SNTStoredEvent",
         ":MOLCertificate",
+        ":SNTStoredEvent",
     ],
 )
 
@@ -766,8 +766,8 @@ objc_library(
     module_name = "santa_common_SNTStoredNetworkMountEvent",
     deps = [
         ":CoderMacros",
-        ":SNTStoredEvent",
         ":SNTProcessChain",
+        ":SNTStoredEvent",
     ],
 )
 

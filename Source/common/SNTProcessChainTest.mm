@@ -50,8 +50,8 @@
   // Unarchive the chain
   NSSet *allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
   SNTProcessChain *decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
-                                                                       fromData:archivedChain
-                                                                          error:nil];
+                                                                      fromData:archivedChain
+                                                                         error:nil];
 
   XCTAssertNotNil(decodedChain);
   XCTAssertEqualObjects(decodedChain.filePath, @"/usr/bin/mount_smbfs");
@@ -90,8 +90,8 @@
   // Unarchive
   NSSet *allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
   SNTProcessChain *decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
-                                                                       fromData:archivedChain
-                                                                          error:nil];
+                                                                      fromData:archivedChain
+                                                                         error:nil];
 
   XCTAssertNotNil(decodedChain);
   XCTAssertEqualObjects(decodedChain.filePath, @"/usr/bin/mount");
@@ -132,8 +132,8 @@
   // Unarchive
   NSSet *allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
   SNTProcessChain *decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
-                                                                       fromData:archivedChain
-                                                                          error:nil];
+                                                                      fromData:archivedChain
+                                                                         error:nil];
 
   XCTAssertNotNil(decodedChain);
   XCTAssertEqualObjects(decodedChain.filePath, @"/usr/bin/curl");
@@ -166,8 +166,8 @@
 
   NSSet *allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
   SNTProcessChain *decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
-                                                                       fromData:archivedChain
-                                                                          error:nil];
+                                                                      fromData:archivedChain
+                                                                         error:nil];
 
   XCTAssertNotNil(decodedChain);
   XCTAssertEqualObjects(decodedChain.filePath, @"/usr/bin/test");

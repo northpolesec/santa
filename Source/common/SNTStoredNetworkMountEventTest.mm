@@ -70,8 +70,8 @@
   XCTAssertNotNil(archivedEvent);
 
   // Unarchive the event
-  NSSet *allowedClasses = [NSSet setWithObjects:[SNTStoredNetworkMountEvent class],
-                                                [SNTProcessChain class], nil];
+  NSSet *allowedClasses =
+      [NSSet setWithObjects:[SNTStoredNetworkMountEvent class], [SNTProcessChain class], nil];
   SNTStoredEvent *unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                         fromData:archivedEvent
                                                                            error:nil];
@@ -99,9 +99,8 @@
 
   // Verify parent process
   XCTAssertNotNil(decodedEvent.process.parent);
-  XCTAssertEqualObjects(
-      decodedEvent.process.parent.filePath,
-      @"/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder");
+  XCTAssertEqualObjects(decodedEvent.process.parent.filePath,
+                        @"/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder");
   XCTAssertEqualObjects(decodedEvent.process.parent.pid, @(100));
   XCTAssertNil(decodedEvent.process.parent.parent);
 }
@@ -120,8 +119,8 @@
 
   XCTAssertNotNil(archivedEvent);
 
-  NSSet *allowedClasses = [NSSet setWithObjects:[SNTStoredNetworkMountEvent class],
-                                                [SNTProcessChain class], nil];
+  NSSet *allowedClasses =
+      [NSSet setWithObjects:[SNTStoredNetworkMountEvent class], [SNTProcessChain class], nil];
   SNTStoredEvent *unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                         fromData:archivedEvent
                                                                            error:nil];
