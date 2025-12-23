@@ -59,8 +59,25 @@
                          pid:(int)pid
                   pidversion:(int)pidversion
              bootSessionUUID:(NSString *)bootSessionUUID {
-  if (pid == 0 || pidversion == 0 || ![[NSUUID alloc] initWithUUIDString:bootSessionUUID]) {
+  if (pid == 0 || pidversion == 0) {
     return nil;
+  } else {
+    // Validate the UUID and normalize it to not have hyphens and be lowercase.
+    if ([[NSUUID alloc] initWithUUIDString:bootSessionUUID]) {
+      // If we have a long form UUID, shorten it.
+      bootSessionUUID = [[bootSessionUUID stringByReplacingOccurrencesOfString:@"-" withString:@""]
+          lowercaseString];
+    } else {
+      // If an NSUUID could not be initialized, see if it is the short version
+      static NSCharacterSet *nonHex = [[NSCharacterSet
+          characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
+      if (bootSessionUUID.length == 32 &&
+          [bootSessionUUID rangeOfCharacterFromSet:nonHex].location == NSNotFound) {
+        bootSessionUUID = [bootSessionUUID lowercaseString];
+      } else {
+        return nil;
+      }
+    }
   }
 
   self = [super initWithUUID:uuid];

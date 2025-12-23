@@ -48,7 +48,9 @@
 
 - (void)testSNTKillRequestRunningProcessValidInit {
   NSString *uuid = [[NSUUID UUID] UUIDString];
-  NSString *bootUUID = [[NSUUID UUID] UUIDString];
+  NSString *bootUUID = @"2470862D-9913-4B95-A2BB-556EDC163069";
+  NSString *bootUUIDWant = [[bootUUID stringByReplacingOccurrencesOfString:@"-"
+                                                                withString:@""] lowercaseString];
   int pid = 1234;
   int pidversion = 5678;
 
@@ -61,7 +63,7 @@
   XCTAssertEqualObjects(request.uuid, uuid);
   XCTAssertEqual(request.pid, pid);
   XCTAssertEqual(request.pidversion, pidversion);
-  XCTAssertEqualObjects(request.bootSessionUUID, bootUUID);
+  XCTAssertEqualObjects(request.bootSessionUUID, bootUUIDWant);
 
   // Invalid pid
   request = [[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
@@ -85,6 +87,13 @@
                                                bootSessionUUID:@"not-a-uuid"];
   XCTAssertNil(request);
 
+  // Shortened UUID is valid
+  request = [[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
+                                                           pid:pid
+                                                    pidversion:pidversion
+                                               bootSessionUUID:[bootUUIDWant uppercaseString]];
+  XCTAssertEqualObjects(request.bootSessionUUID, bootUUIDWant);
+
   // Encode/Decode
   request = [[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
                                                            pid:pid
@@ -104,7 +113,7 @@
   XCTAssertEqualObjects(decoded.uuid, uuid);
   XCTAssertEqual(decoded.pid, pid);
   XCTAssertEqual(decoded.pidversion, pidversion);
-  XCTAssertEqualObjects(decoded.bootSessionUUID, bootUUID);
+  XCTAssertEqualObjects(decoded.bootSessionUUID, bootUUIDWant);
 }
 
 - (void)testSNTKillRequestCDHashValidInit {
