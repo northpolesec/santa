@@ -15,7 +15,6 @@
 #import "Source/common/SNTStoredNetworkMountEvent.h"
 
 #include "Source/common/CoderMacros.h"
-#import "Source/common/SNTProcessChain.h"
 
 @implementation SNTStoredNetworkMountEvent
 
