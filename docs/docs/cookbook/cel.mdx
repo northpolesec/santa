@@ -94,3 +94,23 @@ attach the following CEL program:
 args.join(" ").contains("-setremotelogin on") ||
 args.join(" ").contains("-setremoteappleevents on") ? BLOCKLIST : ALLOWLIST
 ```
+
+## Prevent Users from Mounting Time Machine Snapshots
+
+As was presented at [Kawaiicon 2025](https://kawaiicon.org/) by [Calum Hall](https://www.youtube.com/watch?v=hIeNuqq12sk&t=1390s), Time Machine snapshots can be used to bypass [File Access Authorization rules](https://www.youtube.com/watch?v=hIeNuqq12sk&t=1390s).
+
+You can stop the taking of local snapshots by creating a signing ID for
+`platform:com.apple.tmutil` and attaching the following CEL program:
+
+```clike
+('localsnapshot' in args ? BLOCKLIST : ALLOWLIST
+```
+
+Alternativelly if you can stop the mount of local snapshots with a signing ID rule
+`platform:com.apple.mount_apfs` with the following CEL program
+
+
+```clike
+'-s' in args && 
+  args.exists(arg, arg.contains("com.apple.TimeMachine.")) ? BLOCKLIST : ALLOWLIST
+```
