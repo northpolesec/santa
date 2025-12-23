@@ -42,5 +42,6 @@
 - (void)modeTransition:(void (^)(SNTModeTransition *))block;
 - (void)eventDetailURL:(void (^)(NSString *))block;
 - (void)eventDetailText:(void (^)(NSString *))block;
+- (void)enableNotificationSilences:(void (^)(BOOL))block;
 
 @end
