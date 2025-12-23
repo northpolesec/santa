@@ -14,7 +14,7 @@
 
 #import <Foundation/Foundation.h>
 
-#import "Source/common/MOLCertificate.h"
+@class MOLCertificate;
 
 @interface SNTProcessChain : NSObject <NSSecureCoding>
 

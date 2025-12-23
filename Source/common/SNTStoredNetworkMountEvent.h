@@ -14,9 +14,9 @@
 
 #import <Foundation/Foundation.h>
 
-#include "Source/common/SNTProcessChain.h"
 #include "Source/common/SNTStoredEvent.h"
 
+@class SNTProcessChain;
 @interface SNTStoredNetworkMountEvent : SNTStoredEvent <NSSecureCoding>
 
 @property NSString *mountFromName;
