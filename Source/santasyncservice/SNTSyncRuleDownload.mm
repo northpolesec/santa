@@ -14,6 +14,7 @@
 ///    limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncRuleDownload.h"
+#include "Source/common/SNTCommonEnums.h"
 
 #include <Foundation/Foundation.h>
 
@@ -314,7 +315,7 @@ SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT &rule)
     case Traits::BLOCKLIST: state = SNTRuleStateBlock; break;
     case Traits::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
     case Traits::REMOVE: state = SNTRuleStateRemove; break;
-    case Traits::CEL: state = SNTRuleStateCEL; break;
+    case Traits::CEL: state = (IsV2) ? SNTRuleStateCELv2 : SNTRuleStateCEL; break;
     default: LOGE(@"Failed to process rule with unknown policy: %d", rule.policy()); return nil;
   }
 

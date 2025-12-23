@@ -78,6 +78,7 @@ typedef NS_ENUM(NSInteger, SNTRuleState) {
   SNTRuleStateAllowLocalSigningID = 8,
 
   SNTRuleStateCEL = 9,
+  SNTRuleStateCELv2 = 10,
 };
 
 typedef NS_ENUM(NSInteger, SNTClientMode) {

@@ -32,11 +32,11 @@
 #include "Source/common/cel/Activation.h"
 
 namespace cel_runtime = ::google::api::expr::runtime;
-namespace pbv1 = ::santa::cel::v1;
 
 namespace santa {
 namespace cel {
 
+template <bool IsV2>
 static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
     google::protobuf::Arena *arena) {
   // Create a compiler builder with the generated descriptor pool for protos.
@@ -58,13 +58,14 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
     return result;
   }
 
-  // Link the reflection for needed messages to that the CEL compiler can
+  // Link the reflection for needed messages so that the CEL compiler can
   // recognize them.
-  google::protobuf::LinkMessageReflection<::pbv1::ExecutionContext>();
+  using ExecutionContextT = typename CELProtoTraits<IsV2>::ExecutionContextT;
+  google::protobuf::LinkMessageReflection<ExecutionContextT>();
 
   // Add all the possible variables to the type checker.
   ::cel::TypeCheckerBuilder &checker_builder = builder->GetCheckerBuilder();
-  for (const auto &variable : Activation::GetVariables(arena)) {
+  for (const auto &variable : Activation<IsV2>::GetVariables(arena)) {
     if (auto result =
             checker_builder.AddVariable(::cel::MakeVariableDecl(variable.first, variable.second));
         !result.ok()) {
@@ -76,17 +77,19 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
   return builder->Build();
 }
 
-absl::StatusOr<std::unique_ptr<Evaluator>> Evaluator::Create() {
+template <bool IsV2>
+absl::StatusOr<std::unique_ptr<Evaluator<IsV2>>> Evaluator<IsV2>::Create() {
   std::unique_ptr<google::protobuf::Arena> arena = std::make_unique<google::protobuf::Arena>();
 
-  auto compiler = CreateCompiler(arena.get());
+  auto compiler = CreateCompiler<IsV2>(arena.get());
   if (!compiler.ok()) {
     return compiler.status();
   }
-  return std::make_unique<Evaluator>(std::move(*compiler), std::move(arena));
+  return std::make_unique<Evaluator<IsV2>>(std::move(*compiler), std::move(arena));
 }
 
-absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile(
+template <bool IsV2>
+absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::Compile(
     absl::string_view expr) {
   if (!compiler_) {
     return absl::InvalidArgumentError("Evaluator not properly initialized");
@@ -135,8 +138,9 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator::Compile
   return expression_plan;
 };
 
-absl::StatusOr<std::pair<::santa::cel::v1::ReturnValue, bool>> Evaluator::Evaluate(
-    const ::cel_runtime::CelExpression *expression_plan, const Activation &activation) {
+template <bool IsV2>
+absl::StatusOr<std::pair<typename Evaluator<IsV2>::ReturnValue, bool>> Evaluator<IsV2>::Evaluate(
+    const ::cel_runtime::CelExpression *expression_plan, const ActivationT &activation) {
   // Evaluate the parsed expression.
   absl::StatusOr<cel_runtime::CelValue> result =
       expression_plan->Evaluate(activation, arena_.get());
@@ -150,27 +154,36 @@ absl::StatusOr<std::pair<::santa::cel::v1::ReturnValue, bool>> Evaluator::Evalua
   // Everything else is an error.
   if (bool value; result->GetValue(&value)) {
     if (value) {
-      return {{pbv1::ReturnValue::ALLOWLIST, activation.IsResultCacheable()}};
+      return {{Traits::ALLOWLIST, activation.IsResultCacheable()}};
     }
-    return {{pbv1::ReturnValue::BLOCKLIST, activation.IsResultCacheable()}};
-  } else if (int64_t value; result->GetValue(&value) && pbv1::ReturnValue_IsValid((int)value)) {
-    return {{static_cast<pbv1::ReturnValue>(value), activation.IsResultCacheable()}};
+    return {{Traits::BLOCKLIST, activation.IsResultCacheable()}};
+  } else if (int64_t value; result->GetValue(&value)) {
+    // Check if the value is a valid ReturnValue enum
+    auto descriptor = Traits::ReturnValue_descriptor();
+    if (descriptor->FindValueByNumber((int)value) != nullptr) {
+      return {{static_cast<ReturnValue>(value), activation.IsResultCacheable()}};
+    }
   } else if (const cel_runtime::CelError * value; result->GetValue(&value)) {
     return absl::InvalidArgumentError(value->message());
-  } else {
-    return absl::InvalidArgumentError(absl::StrCat(
-        "expected 'santa.cel.v1.ReturnValue' result got '", result->DebugString(), "'"));
   }
+
+  return absl::InvalidArgumentError(
+      absl::StrCat("expected 'ReturnValue' result got '", result->DebugString(), "'"));
 }
 
-absl::StatusOr<std::pair<::santa::cel::v1::ReturnValue, bool>> Evaluator::CompileAndEvaluate(
-    absl::string_view cel_expr, const Activation &activation) {
+template <bool IsV2>
+absl::StatusOr<std::pair<typename Evaluator<IsV2>::ReturnValue, bool>>
+Evaluator<IsV2>::CompileAndEvaluate(absl::string_view cel_expr, const ActivationT &activation) {
   absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> expr = Compile(cel_expr);
   if (!expr.ok()) {
     return expr.status();
   }
   return Evaluate(expr->get(), activation);
 }
+
+// Explicit template instantiations
+template class Evaluator<false>;  // v1
+template class Evaluator<true>;   // v2
 
 }  // namespace cel
 }  // namespace santa

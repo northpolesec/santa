@@ -70,11 +70,16 @@ static id ValueOrNull(id value) {
       @"The following application has been blocked from<br />executing because it has "
       @"been deemed malicious or against policy",
       @"The default message to show the user when a banned application is blocked");
+  NSString *defaultStandaloneMessage = NSLocalizedString(
+      @"The following application requires authorization before it can be used",
+      @"The default message to show the user when a program requires TouchID/password");
 
   if (customMessage.length) {
     return [self formatMessage:customMessage
                   withFallback:event.decision == SNTEventStateBlockUnknown ? defaultBlockedMessage
                                                                            : defaultBannedMessage];
+  } else if (event.holdAndAsk) {
+    return [self formatMessage:customMessage withFallback:defaultStandaloneMessage];
   } else if (event.decision == SNTEventStateBlockUnknown) {
     return [self formatMessage:[[SNTConfigurator configurator] unknownBlockMessage]
                   withFallback:defaultBlockedMessage];

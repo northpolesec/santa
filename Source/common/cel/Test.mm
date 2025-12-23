@@ -13,6 +13,7 @@
 /// limitations under the License.
 
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/CELProtoTraits.h"
 #include "Source/common/cel/Evaluator.h"
 
 #import <Foundation/Foundation.h>
@@ -22,10 +23,7 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "cel/v1.pb.h"
 #include "google/protobuf/arena.h"
-
-namespace pbv1 = ::santa::cel::v1;
 
 @interface CELTest : XCTestCase
 @end
@@ -33,9 +31,12 @@ namespace pbv1 = ::santa::cel::v1;
 @implementation CELTest
 
 - (void)testBasic {
-  auto f = std::make_unique<::pbv1::ExecutableFile>();
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+
+  auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
-  santa::cel::Activation activation(
+  santa::cel::Activation<true> activation(
       std::move(f),
       ^std::vector<std::string>() {
         return {"hello", "world"};
@@ -50,7 +51,7 @@ namespace pbv1 = ::santa::cel::v1;
         return "/";
       });
 
-  auto sut = santa::cel::Evaluator::Create();
+  auto sut = santa::cel::Evaluator<true>::Create();
   if (!sut.ok()) {
     XCTFail("Failed to create evaluator: %s", sut.status().message().data());
   }
@@ -67,7 +68,7 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
       XCTAssertEqual(result.value().second, true);
     }
   }
@@ -78,7 +79,7 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
       XCTAssertEqual(result.value().second, true);
     }
   }
@@ -93,13 +94,13 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
       XCTAssertEqual(result.value().second, true);
     }
 
-    auto f2 = std::make_unique<::pbv1::ExecutableFile>();
+    auto f2 = std::make_unique<ExecutableFileT>();
     f2->mutable_signing_time()->set_seconds(1716916129);
-    santa::cel::Activation activation2(
+    santa::cel::Activation<true> activation2(
         std::move(f2),
         ^std::vector<std::string>() {
           return {"hello", "world"};
@@ -118,7 +119,7 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result2.ok()) {
       XCTFail("Failed to evaluate: %s", result2.status().message().data());
     } else {
-      XCTAssertEqual(result2.value().first, pbv1::ReturnValue::BLOCKLIST);
+      XCTAssertEqual(result2.value().first, ReturnValue::BLOCKLIST);
       XCTAssertEqual(result2.value().second, true);
     }
   }
@@ -128,7 +129,7 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
       XCTAssertEqual(result.value().second, false);
     }
   }
@@ -139,14 +140,14 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, pbv1::ReturnValue::BLOCKLIST);
+      XCTAssertEqual(result.value().first, ReturnValue::BLOCKLIST);
       XCTAssertEqual(result.value().second, false);
     }
   }
   {
     // Test memoization
     __block int argsCallCount = 0;
-    santa::cel::Activation activation(
+    santa::cel::Activation<true> activation(
         std::move(f),
         ^std::vector<std::string>() {
           argsCallCount++;
@@ -167,7 +168,7 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
       XCTAssertEqual(result.value().second, false);
     }
     XCTAssertEqual(argsCallCount, 1);
@@ -178,7 +179,56 @@ namespace pbv1 = ::santa::cel::v1;
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, pbv1::ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().second, false);
+    }
+  }
+}
+
+- (void)testV2Only {
+  auto argsFn = ^std::vector<std::string>() {
+    return {"hello", "world"};
+  };
+  auto envsFn = ^std::map<std::string, std::string>() {
+    return {{"DYLD_INSERT_LIBRARIES", "1"}};
+  };
+  auto euidFn = ^uid_t() {
+    return 0;
+  };
+  auto cwdFn = ^std::string() {
+    return "/";
+  };
+
+  {
+    // V1
+    auto f = std::make_unique<santa::cel::CELProtoTraits<false>::ExecutableFileT>();
+    f->mutable_signing_time()->set_seconds(1748436989);
+    santa::cel::Activation<false> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn);
+    auto sut = santa::cel::Evaluator<false>::Create();
+    XCTAssertTrue(sut.ok());
+
+    // V1 does not support the TOUCHID return value
+    auto result =
+        sut.value()->CompileAndEvaluate("euid == 0 ? REQUIRE_TOUCHID : BLOCKLIST", activation);
+    XCTAssertFalse(result.ok());
+  }
+
+  {
+    // V2
+    using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+    auto f = std::make_unique<santa::cel::CELProtoTraits<true>::ExecutableFileT>();
+    f->mutable_signing_time()->set_seconds(1748436989);
+    santa::cel::Activation<true> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn);
+    auto sut = santa::cel::Evaluator<true>::Create();
+    XCTAssertTrue(sut.ok());
+
+    // V2 _does_ support the TOUCHID return value
+    auto result =
+        sut.value()->CompileAndEvaluate("euid == 0 ? REQUIRE_TOUCHID : BLOCKLIST", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().first, ReturnValue::REQUIRE_TOUCHID);
       XCTAssertEqual(result.value().second, false);
     }
   }

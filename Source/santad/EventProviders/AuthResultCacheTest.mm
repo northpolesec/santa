@@ -177,20 +177,13 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondAllowCompiler));
   XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondDeny));
   XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondHold));
-  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionHoldAllowed));
-  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionHoldDenied));
   XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionUnset);
 
   XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRequestBinary));
   XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
 
   // Items in the `SNTActionRequestBinary` state cannot reenter the same state
-  // or the SNTActionHoldAllowed/SNTActionHoldDenied states
   XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRequestBinary));
-  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
-  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionHoldAllowed));
-  XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
-  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionHoldDenied));
   XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRequestBinary);
 
   std::vector<SNTAction> allowedTransitions = {
@@ -230,12 +223,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
     XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRespondHold));
     XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionRespondHold);
 
-    // Now assert the allowed transition
-    // Note: hold transitions converted to SNTActionRespondAllow/SNTActionRespondDeny states
+    // Now assert the allowed transition returns YES and that the cache entry is removed.
     XCTAssertTrue(cache->AddToCache(&rootFile, transition));
-    XCTAssertEqual(cache->CheckCache(&rootFile), transition == SNTActionHoldAllowed
-                                                     ? SNTActionRespondAllow
-                                                     : SNTActionRespondDeny);
+    XCTAssertEqual(cache->CheckCache(&rootFile), SNTActionUnset);
   }
 
   // Ensure improper transitions from the hold state are disallowed

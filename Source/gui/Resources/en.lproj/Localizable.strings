@@ -16,14 +16,14 @@
 /* Default text for Approve */
 "Approve" = "Approve";
 
-/* Authorize temporary Monitor Mode exception */
-"authorize temporary Monitor Mode" = "authorize temporary Monitor Mode";
-
 /* Authorize execution of an application with Signing ID or Path */
 "authorize execution of %@" = "authorize execution of %@";
 
 /* Authorize execution of an application with name */
 "authorize execution of the application %@" = "authorize execution of the application %@";
+
+/* Authorize temporary Monitor Mode exception */
+"authorize temporary Monitor Mode" = "authorize temporary Monitor Mode";
 
 /* No comment provided by engineer. */
 "Binary Path" = "Binary Path";
@@ -33,6 +33,9 @@
 
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
+
+/* No comment provided by engineer. */
+"Clean Sync" = "Clean Sync";
 
 /* Copy Details */
 "Copy Details" = "Copy Details";
@@ -56,7 +59,7 @@
 "Label after time period picker" = "\U2800";
 
 /* No comment provided by engineer. */
-"Label before time period picker" = "Prevent future notifications for this application for ";
+"Label before time period picker" = "Prevent future notifications for this application for";
 
 /* More Details button */
 "More Details" = "More Details";
@@ -130,6 +133,9 @@
 /* The default message to show the user when a banned application is blocked */
 "The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "The following application has been blocked from<br />executing because it has been deemed malicious or against policy";
 
+/* The default message to show the user when a program requires TouchID/password */
+"The following application requires authorization before it can be used" = "The following application requires authorization before it can be used";
+
 /* The default message to show the user when a USB device is blocked from mounting */
 "The following device has been blocked from mounting" = "The following device has been blocked from mounting";
 
@@ -159,4 +165,3 @@
 
 /* Version in About view */
 "Version **%@**" = "Version **%@**";
-

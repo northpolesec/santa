@@ -80,6 +80,7 @@
 
   ENCODE(coder, executingUser);
   ENCODE_BOXABLE(coder, decision);
+  ENCODE_BOXABLE(coder, holdAndAsk);
   ENCODE(coder, pid);
   ENCODE(coder, ppid);
   ENCODE(coder, parentName);
@@ -123,6 +124,7 @@
 
     DECODE(decoder, executingUser, NSString);
     DECODE_SELECTOR(decoder, decision, NSNumber, unsignedLongLongValue);
+    DECODE_SELECTOR(decoder, holdAndAsk, NSNumber, boolValue);
     DECODE(decoder, pid, NSNumber);
     DECODE(decoder, ppid, NSNumber);
     DECODE(decoder, parentName, NSString);

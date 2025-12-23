@@ -34,6 +34,9 @@
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
 
+/* No comment provided by engineer. */
+"Clean Sync" = "Synchronisierung bereinigen";
+
 /* Copy Details */
 "Copy Details" = "Details kopieren";
 
@@ -144,6 +147,9 @@
 
 /* The default message to show the user when a banned application is blocked */
 "The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "Die folgende Applikation wurde blockiert,<br />weil er als schädlich oder gegen die Politik eingestuft wurde";
+
+/* The default message to show the user when a program requires TouchID/password */
+"The following application requires authorization before it can be used" = "Die folgende Anwendung erfordert eine Autorisierung, bevor sie verwendet werden kann";
 
 /* The default message to show the user when a USB device is blocked from mounting */
 "The following device has been blocked from mounting" = "Das Mounten des folgenden Geräts wurde blockiert";

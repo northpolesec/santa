@@ -89,6 +89,9 @@
 /// The decision santad returned.
 @property SNTEventState decision;
 
+/// The decision depends on the user approving execution.
+@property BOOL holdAndAsk;
+
 /// NSArray of logged in users when the decision was made.
 @property(nullable) NSArray *loggedInUsers;
 

@@ -243,6 +243,24 @@
   XCTAssertEqual(errors.firstObject.code, SNTErrorCodeRuleInvalidCELExpression);
 }
 
+- (void)testCELExpressionVersion {
+  SNTRule *r = [[SNTRule alloc] init];
+  r.identifier = @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258";
+  r.type = SNTRuleTypeCertificate;
+  r.state = SNTRuleStateCEL;
+  r.celExpr = @"euid == 0 ? REQUIRE_TOUCHID : ALLOWLIST";
+
+  NSArray<NSError *> *errors;
+  XCTAssertTrue([self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone errors:&errors]);
+  XCTAssertEqual(errors.count, 1);
+  XCTAssertEqual(errors.firstObject.code, SNTErrorCodeRuleInvalidCELExpression);
+
+  errors = nil;
+  r.state = SNTRuleStateCELv2;
+  XCTAssertTrue([self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone errors:&errors]);
+  XCTAssertEqual(errors.count, 0);
+}
+
 - (void)testAddRemoveFetchFileAccessRule {
   // Add some file access rules
   NSArray<NSError *> *errors;
