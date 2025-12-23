@@ -39,6 +39,7 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSNumber *enableNotificationSilences;
 @end
 
 @implementation SNTConfigBundle
@@ -68,6 +69,7 @@
   ENCODE(coder, modeTransition);
   ENCODE(coder, eventDetailURL);
   ENCODE(coder, eventDetailText);
+  ENCODE(coder, enableNotificationSilences);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -93,6 +95,7 @@
     DECODE(decoder, modeTransition, SNTModeTransition);
     DECODE(decoder, eventDetailURL, NSString);
     DECODE(decoder, eventDetailText, NSString);
+    DECODE(decoder, enableNotificationSilences, NSNumber);
   }
   return self;
 }
@@ -213,6 +216,12 @@
 - (void)eventDetailText:(void (^)(NSString *))block {
   if (self.eventDetailText) {
     block(self.eventDetailText);
+  }
+}
+
+- (void)enableNotificationSilences:(void (^)(BOOL))block {
+  if (self.enableNotificationSilences) {
+    block([self.enableNotificationSilences boolValue]);
   }
 }
 

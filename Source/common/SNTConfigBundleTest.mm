@@ -42,6 +42,7 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSNumber *enableNotificationSilences;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -51,7 +52,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 20;
+  exp.expectedFulfillmentCount = 21;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -77,6 +78,7 @@
   bundle.modeTransition = [[SNTModeTransition alloc] initOnDemandMinutes:4 defaultDuration:2];
   bundle.eventDetailURL = @"https://example.com/details";
   bundle.eventDetailText = @"View Details";
+  bundle.enableNotificationSilences = @(YES);
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -182,118 +184,101 @@
     [exp fulfill];
   }];
 
+  [bundle enableNotificationSilences:^(BOOL val) {
+    XCTAssertTrue(val);
+    [exp fulfill];
+  }];
+
   // Low timeout because code above is synchronous
   [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
 
 - (void)testGettersWithoutValues {
-  __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.inverted = YES;
-
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle syncType:^(SNTSyncType val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle allowlistRegex:^(NSString *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle blocklistRegex:^(NSString *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle blockUSBMount:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle remountUSBMode:^(NSArray *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle blockNetworkMount:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle bannedNetworkMountBlockMessage:^(NSString *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle allowedNetworkMountHosts:^(NSArray<NSString *> *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle enableBundles:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle enableTransitiveRules:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle enableAllEventUpload:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle disableUnknownEventUpload:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle overrideFileAccessAction:^(NSString *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle exportConfiguration:^(SNTExportConfiguration *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle fullSyncLastSuccess:^(NSDate *val) {
     XCTAssertEqualObjects(val, [NSDate now]);
-    [exp fulfill];
   }];
 
   [bundle ruleSyncLastSuccess:^(NSDate *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle modeTransition:^(SNTModeTransition *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle eventDetailURL:^(NSString *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
   [bundle eventDetailText:^(NSString *val) {
     XCTFail(@"This shouldn't be called");
-    [exp fulfill];
   }];
 
-  // Low timeout because code above is synchronous
-  [self waitForExpectationsWithTimeout:0.1 handler:NULL];
+  [bundle enableNotificationSilences:^(BOOL val) {
+    XCTFail(@"This shouldn't be called");
+  }];
 }
 
 @end

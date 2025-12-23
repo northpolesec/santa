@@ -302,6 +302,25 @@ objc_library(
 )
 
 objc_library(
+    name = "DaemonConfigBundle",
+    srcs = ["DaemonConfigBundle.mm"],
+    hdrs = ["DaemonConfigBundle.h"],
+    deps = [
+        "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTConfigurator",
+    ],
+)
+
+santa_unit_test(
+    name = "DaemonConfigBundleTest",
+    srcs = ["DaemonConfigBundleTest.mm"],
+    deps = [
+        ":DaemonConfigBundle",
+        "@OCMock",
+    ],
+)
+
+objc_library(
     name = "SNTExecutionController",
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
@@ -1667,6 +1686,7 @@ test_suite(
     name = "unit_tests",
     tests = [
         ":AuthResultCacheTest",
+        ":DaemonConfigBundleTest",
         ":EndpointSecurityClientTest",
         ":EndpointSecurityEnricherTest",
         ":EndpointSecurityLoggerTest",
