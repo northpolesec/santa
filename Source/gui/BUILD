@@ -83,6 +83,20 @@ swift_library(
     ],
 )
 
+swift_library(
+    name = "SNTNetworkMountMessageWindowView",
+    srcs = [
+        "SNTNetworkMountMessageWindowView.swift",
+    ],
+    generates_header = 1,
+    deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTStoredNetworkMountEvent",
+    ],
+)
+
 objc_library(
     name = "SantaGUI_lib",
     srcs = [
@@ -98,6 +112,8 @@ objc_library(
         "SNTFileAccessMessageWindowController.mm",
         "SNTMessageWindowController.h",
         "SNTMessageWindowController.mm",
+        "SNTNetworkMountMessageWindowController.h",
+        "SNTNetworkMountMessageWindowController.mm",
         "SNTNotificationManager.h",
         "SNTNotificationManager.mm",
         "main.mm",
@@ -118,11 +134,13 @@ objc_library(
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         ":SNTFileInfoView",
+        ":SNTNetworkMountMessageWindowView",
         "//Source/common:CertificateHelpers",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigBundle",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
@@ -131,6 +149,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTXPCControlInterface",

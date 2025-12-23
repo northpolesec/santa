@@ -17,8 +17,10 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTDeviceEvent.h"
+#import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
@@ -27,6 +29,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent *event);
+typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
 
 /*
  * Manages DiskArbitration and EndpointSecurity to monitor/block/remount USB
@@ -38,10 +41,12 @@ typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent *event);
 @property(nonatomic, readwrite) BOOL blockUSBMount;
 @property(nonatomic, readwrite, nullable) NSArray<NSString *> *remountArgs;
 @property(nonatomic, nullable) SNTDeviceBlockCallback deviceBlockCallback;
+@property(nonatomic, nullable) SNTNetworkMountCallback networkMountCallback;
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::Metrics>)metrics
                        logger:(std::shared_ptr<santa::Logger>)logger
+                     enricher:(std::shared_ptr<santa::Enricher>)enricher
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                 blockUSBMount:(BOOL)blockUSBMount
                remountUSBMode:(nullable NSArray<NSString *> *)remountUSBMode

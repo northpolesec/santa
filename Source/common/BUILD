@@ -472,6 +472,7 @@ objc_library(
     name = "SNTConfigBundle",
     srcs = ["SNTConfigBundle.mm"],
     hdrs = ["SNTConfigBundle.h"],
+    module_name = "santa_common_SNTConfigBundle",
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
@@ -879,6 +880,7 @@ objc_library(
     hdrs = ["SNTXPCNotifierInterface.h"],
     deps = [
         ":SNTCommonEnums",
+        ":SNTConfigBundle",
         ":SNTConfigState",
         ":SNTXPCBundleServiceInterface",
     ],

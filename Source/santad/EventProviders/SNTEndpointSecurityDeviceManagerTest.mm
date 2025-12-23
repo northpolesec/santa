@@ -29,11 +29,13 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
+#import "Source/common/SNTStoredNetworkMountEvent.h"
 #include "Source/common/TestUtils.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/DiskArbitrationTestUtil.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/santad/EventProviders/EndpointSecurity/MockEnricher.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDeviceManager.h"
 #include "Source/santad/Metrics.h"
@@ -124,10 +126,13 @@ class MockAuthResultCache : public AuthResultCache {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
 
+  auto mockEnricher = std::make_shared<santa::MockEnricher>();
+
   SNTEndpointSecurityDeviceManager *deviceManager = [[SNTEndpointSecurityDeviceManager alloc]
            initWithESAPI:mockESApi
                  metrics:nullptr
                   logger:nullptr
+                enricher:mockEnricher
          authResultCache:nullptr
            blockUSBMount:false
           remountUSBMode:nil
@@ -199,6 +204,7 @@ class MockAuthResultCache : public AuthResultCache {
 
   [partialDeviceManager stopMocking];
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockEnricher.get());
 }
 
 - (void)testUSBBlockDisabled {
@@ -351,6 +357,7 @@ class MockAuthResultCache : public AuthResultCache {
            initWithESAPI:mockESApi
                  metrics:nullptr
                   logger:nullptr
+                enricher:nullptr
          authResultCache:mockAuthCache
            blockUSBMount:YES
           remountUSBMode:nil
@@ -515,6 +522,192 @@ class MockAuthResultCache : public AuthResultCache {
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)triggerTestNetworkMountEvent:(es_event_type_t)eventType
+                        mountFromURL:(NSString *)mountFromURL
+                  expectedAuthResult:(es_auth_result_t)expectedAuthResult
+                  deviceManagerSetup:(void (^)(SNTEndpointSecurityDeviceManager *))setupDMCallback
+                networkMountCallback:(void (^)(SNTStoredNetworkMountEvent *))networkMountCallback {
+  struct statfs fs = {0};
+  NSString *test_mntonname = @"/Volumes/NetworkShare";
+
+  strncpy(fs.f_mntfromname, [mountFromURL UTF8String], sizeof(fs.f_mntfromname));
+  strncpy(fs.f_mntonname, [test_mntonname UTF8String], sizeof(fs.f_mntonname));
+  strncpy(fs.f_fstypename, "smbfs", sizeof(fs.f_fstypename));
+  fs.f_type = 0;  // Network mount type
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+
+  auto mockEnricher = std::make_shared<santa::MockEnricher>();
+
+  SNTEndpointSecurityDeviceManager *deviceManager = [[SNTEndpointSecurityDeviceManager alloc]
+           initWithESAPI:mockESApi
+                 metrics:nullptr
+                  logger:nullptr
+                enricher:mockEnricher
+         authResultCache:nullptr
+           blockUSBMount:false
+          remountUSBMode:nil
+      startupPreferences:SNTDeviceManagerStartupPreferencesNone];
+
+  setupDMCallback(deviceManager);
+
+  if (networkMountCallback) {
+    deviceManager.networkMountCallback = networkMountCallback;
+  }
+
+  // Stub the log method since a mock `Logger` object isn't used.
+  id partialDeviceManager = OCMPartialMock(deviceManager);
+  OCMStub([partialDeviceManager logDiskAppeared:OCMOCK_ANY]);
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+
+  // This test is sensitive to ~1s processing budget.
+  // Set a 5s headroom and 6s deadline
+  deviceManager.minAllowedHeadroom = 5 * NSEC_PER_SEC;
+  deviceManager.maxAllowedHeadroom = 5 * NSEC_PER_SEC;
+  es_message_t esMsg = MakeESMessage(eventType, &proc, ActionType::Auth, 6000);
+
+  dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
+
+  __block int retainCount = 0;
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  EXPECT_CALL(*mockESApi, ReleaseMessage).WillRepeatedly(^{
+    if (retainCount == 0) {
+      XCTFail(@"Under retain!");
+    }
+    retainCount--;
+    if (retainCount == 0) {
+      dispatch_semaphore_signal(sema);
+    }
+  });
+  EXPECT_CALL(*mockESApi, RetainMessage).WillRepeatedly(^{
+    retainCount++;
+  });
+
+  if (eventType == ES_EVENT_TYPE_AUTH_MOUNT) {
+    esMsg.event.mount.statfs = &fs;
+    esMsg.event.mount.disposition = ES_MOUNT_DISPOSITION_NETWORK;
+  } else if (eventType == ES_EVENT_TYPE_AUTH_REMOUNT) {
+    esMsg.event.remount.statfs = &fs;
+    esMsg.event.remount.disposition = ES_MOUNT_DISPOSITION_NETWORK;
+  } else {
+    // Programming error. Fail the test.
+    XCTFail(@"Unhandled event type in test: %d", eventType);
+  }
+
+  XCTestExpectation *mountExpectation =
+      [self expectationWithDescription:@"Wait for response from ES"];
+
+  EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, expectedAuthResult, false))
+      .WillOnce(testing::InvokeWithoutArgs(^bool {
+        [mountExpectation fulfill];
+        return true;
+      }));
+
+  [deviceManager
+           handleMessage:Message(mockESApi, &esMsg)
+      recordEventMetrics:^(EventDisposition d) {
+        XCTAssertEqual(d, [self.mockConfigurator blockNetworkMount] ? EventDisposition::kProcessed
+                                                                    : EventDisposition::kDropped);
+        dispatch_semaphore_signal(semaMetrics);
+      }];
+
+  [self waitForExpectations:@[ mountExpectation ] timeout:60.0];
+
+  XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+  XCTAssertSemaTrue(sema, 5, "Failed waiting for message to be processed...");
+
+  [partialDeviceManager stopMocking];
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testNetworkMountBlocked {
+  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+
+  XCTestExpectation *expectation =
+      [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
+
+  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+      mountFromURL:@"smb://server.example.com/share"
+      expectedAuthResult:ES_AUTH_RESULT_DENY
+      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+      }
+      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+        XCTAssertEqualObjects(event.mountFromName, @"smb://server.example.com/share");
+        XCTAssertEqualObjects(event.mountOnName, @"/Volumes/NetworkShare");
+        XCTAssertEqualObjects(event.fsType, @"smbfs");
+        [expectation fulfill];
+      }];
+
+  [self waitForExpectations:@[ expectation ] timeout:60.0];
+}
+
+- (void)testNetworkMountAllowedByHost {
+  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[ @"server.example.com" ]);
+
+  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+      mountFromURL:@"smb://server.example.com/share"
+      expectedAuthResult:ES_AUTH_RESULT_ALLOW
+      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+      }
+      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+        XCTFail(@"Callback should not be called for allowed mount");
+      }];
+}
+
+- (void)testNetworkMountDisabled {
+  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(NO);
+
+  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+      mountFromURL:@"smb://server.example.com/share"
+      expectedAuthResult:ES_AUTH_RESULT_ALLOW
+      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+      }
+      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+        XCTFail(@"Callback should not be called when blocking is disabled");
+      }];
+}
+
+- (void)testNetworkMountFailClosedWithInvalidURL {
+  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+  OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
+  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+
+  XCTestExpectation *expectation =
+      [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
+
+  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+      mountFromURL:@"invalid_url_format"
+      expectedAuthResult:ES_AUTH_RESULT_DENY
+      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+      }
+      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+        XCTAssertEqualObjects(event.mountFromName, @"invalid_url_format");
+        [expectation fulfill];
+      }];
+
+  [self waitForExpectations:@[ expectation ] timeout:60.0];
+}
+
+- (void)testNetworkMountFailOpenWithInvalidURL {
+  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
+  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+
+  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+      mountFromURL:@"invalid_url_format"
+      expectedAuthResult:ES_AUTH_RESULT_ALLOW
+      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+      }
+      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+        XCTFail(@"Callback should not be called when failing open");
+      }];
 }
 
 @end

@@ -16,12 +16,14 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTXPCBundleServiceInterface.h"
 
 @class SNTDeviceEvent;
-@class SNTStoredFileAccessEvent;
 @class SNTStoredExecutionEvent;
+@class SNTStoredFileAccessEvent;
+@class SNTStoredNetworkMountEvent;
 
 /// Protocol implemented by SantaGUI and utilized by santad
 @protocol SNTNotifierXPC
@@ -31,6 +33,8 @@
                   configState:(SNTConfigState *)configState
                      andReply:(void (^)(BOOL authenticated))reply;
 - (void)postUSBBlockNotification:(SNTDeviceEvent *)event;
+- (void)postNetworkMountNotification:(SNTStoredNetworkMountEvent *)event
+                        configBundle:(SNTConfigBundle *)configBundle;
 - (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent *)event
                           customMessage:(NSString *)message
                               customURL:(NSString *)url

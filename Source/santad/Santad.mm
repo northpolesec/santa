@@ -24,11 +24,13 @@
 #import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/faa/WatchItems.h"
+#include "Source/santad/DaemonConfigBundle.h"
 #include "Source/santad/DataLayer/SNTEventTable.h"
 #include "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
@@ -98,6 +100,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
       [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:esapi
                                                       metrics:metrics
                                                        logger:logger
+                                                     enricher:enricher
                                               authResultCache:auth_result_cache
                                                 blockUSBMount:[configurator blockUSBMount]
                                                remountUSBMode:[configurator remountUSBMode]
@@ -105,6 +108,13 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event) {
     [[notifier_queue.notifierConnection remoteObjectProxy] postUSBBlockNotification:event];
+  };
+
+  device_client.networkMountCallback = ^(SNTStoredNetworkMountEvent *event) {
+    [[notifier_queue.notifierConnection remoteObjectProxy]
+        postNetworkMountNotification:event
+                        configBundle:santa::NetworkMountConfigBundle(
+                                         [SNTConfigurator configurator])];
   };
 
   SNTEndpointSecurityRecorder *monitor_client =
