@@ -15,6 +15,8 @@
 #ifndef SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MOCKENRICHER_H
 #define SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MOCKENRICHER_H
 
+#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
