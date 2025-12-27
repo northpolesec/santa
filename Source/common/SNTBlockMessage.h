@@ -49,6 +49,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (NSAttributedString *)attributedBlockMessageForDeviceEvent:(nullable SNTDeviceEvent *)event;
 
++ (NSAttributedString *)attributedBlockMessageForNetworkMountEventWithCustomMessage:
+    (nullable NSString *)customMsg;
+
 ///
 ///  Return a URL generated from the EventDetailURL configuration key
 ///  after replacing templates in the URL with values from the event.

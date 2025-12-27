@@ -28,6 +28,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -39,6 +40,7 @@
 #import "Source/gui/SNTFileAccessMessageWindowController.h"
 #import "Source/gui/SNTMessageView-Swift.h"
 #import "Source/gui/SNTMessageWindowController.h"
+#import "Source/gui/SNTNetworkMountMessageWindowController.h"
 
 @interface SNTNotificationManager ()
 
@@ -430,6 +432,20 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   }
   SNTDeviceMessageWindowController *pendingMsg =
       [[SNTDeviceMessageWindowController alloc] initWithEvent:event];
+
+  [self queueMessage:pendingMsg enableSilences:YES];
+}
+
+- (void)postNetworkMountNotification:(SNTStoredNetworkMountEvent *)event
+                        configBundle:(SNTConfigBundle *)configBundle {
+  if (!event) {
+    LOGI(@"Error: Missing event object in message received from daemon!");
+    return;
+  }
+
+  SNTNetworkMountMessageWindowController *pendingMsg =
+      [[SNTNetworkMountMessageWindowController alloc] initWithEvent:event
+                                                       configBundle:configBundle];
 
   [self queueMessage:pendingMsg enableSilences:YES];
 }

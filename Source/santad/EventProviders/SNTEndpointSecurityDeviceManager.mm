@@ -29,12 +29,17 @@
 #include <sys/param.h>
 #include <sys/ucred.h>
 
+#include "Source/common/AuditUtilities.h"
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
+#import "Source/common/SNTProcessChain.h"
+#include "Source/common/String.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Metrics.h"
+#include "Source/santad/SNTDecisionCache.h"
 
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;
@@ -178,12 +183,14 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation SNTEndpointSecurityDeviceManager {
   std::shared_ptr<AuthResultCache> _authResultCache;
+  std::shared_ptr<santa::Enricher> _enricher;
   std::shared_ptr<Logger> _logger;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::Metrics>)metrics
                        logger:(std::shared_ptr<Logger>)logger
+                     enricher:(std::shared_ptr<santa::Enricher>)enricher
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                 blockUSBMount:(BOOL)blockUSBMount
                remountUSBMode:(nullable NSArray<NSString *> *)remountUSBMode
@@ -192,8 +199,9 @@ NS_ASSUME_NONNULL_BEGIN
                       metrics:std::move(metrics)
                     processor:santa::Processor::kDeviceManager];
   if (self) {
-    _logger = logger;
-    _authResultCache = authResultCache;
+    _logger = std::move(logger);
+    _enricher = std::move(enricher);
+    _authResultCache = std::move(authResultCache);
     _blockUSBMount = blockUSBMount;
     _remountArgs = remountUSBMode;
     _configurator = [SNTConfigurator configurator];
@@ -408,9 +416,26 @@ NS_ASSUME_NONNULL_BEGIN
     return;
   }
 
-  if (!self.blockUSBMount) {
-    // TODO: We should also unsubscribe from events when this isn't set, but
-    // this is generally a low-volume event type.
+  BOOL isNetworkMount;
+
+  switch (esMsg->event_type) {
+    case ES_EVENT_TYPE_AUTH_MOUNT:
+      isNetworkMount = (esMsg->event.mount.disposition == ES_MOUNT_DISPOSITION_NETWORK);
+      break;
+    case ES_EVENT_TYPE_AUTH_REMOUNT:
+      isNetworkMount = (esMsg->event.remount.disposition == ES_MOUNT_DISPOSITION_NETWORK);
+      break;
+    default:
+      // This is a programming error
+      LOGE(@"Unexpected Event Type passed to DeviceManager handleMessage: %d", esMsg->event_type);
+      exit(EXIT_FAILURE);
+  }
+
+  if ((isNetworkMount && !self.configurator.blockNetworkMount) ||
+      (!isNetworkMount && !self.blockUSBMount)) {
+    // TODO: We should also unsubscribe from events when these aren't set, but
+    // this is generally a low-volume event type and handling dynamic subscriptions adds
+    // a lot of code complexity.
     [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:false];
     recordEventMetrics(EventDisposition::kDropped);
     return;
@@ -418,7 +443,7 @@ NS_ASSUME_NONNULL_BEGIN
 
   [self processMessage:std::move(esMsg)
                handler:^(Message msg) {
-                 es_auth_result_t result = [self handleAuthMount:msg];
+                 es_auth_result_t result = [self handleAuthMount:msg isNetworkMount:isNetworkMount];
                  [self respondToMessage:msg withAuthResult:result cacheable:false];
                  recordEventMetrics(EventDisposition::kProcessed);
                }];
@@ -439,23 +464,12 @@ NS_ASSUME_NONNULL_BEGIN
   }];
 }
 
-- (es_auth_result_t)handleAuthMount:(const Message &)m {
+- (es_auth_result_t)handleAuthMount:(const Message &)m isNetworkMount:(BOOL)isNetworkMount {
   const struct statfs *eventStatFS;
-  bool isNetworkMount = false;
 
   switch (m->event_type) {
-    case ES_EVENT_TYPE_AUTH_MOUNT:
-      eventStatFS = m->event.mount.statfs;
-      if (m->event.mount.disposition == ES_MOUNT_DISPOSITION_NETWORK) {
-        isNetworkMount = true;
-      }
-      break;
-    case ES_EVENT_TYPE_AUTH_REMOUNT:
-      eventStatFS = m->event.remount.statfs;
-      if (m->event.remount.disposition == ES_MOUNT_DISPOSITION_NETWORK) {
-        isNetworkMount = true;
-      }
-      break;
+    case ES_EVENT_TYPE_AUTH_MOUNT: eventStatFS = m->event.mount.statfs; break;
+    case ES_EVENT_TYPE_AUTH_REMOUNT: eventStatFS = m->event.remount.statfs; break;
     default:
       // This is a programming error
       LOGE(@"Unexpected Event Type passed to DeviceManager handleAuthMount: %d", m->event_type);
@@ -468,7 +482,7 @@ NS_ASSUME_NONNULL_BEGIN
        m->process->executable->path.data, pid, eventStatFS->f_flags);
 
   if (isNetworkMount) {
-    return [self handleAuthNetworkMount:m from:@(eventStatFS->f_mntfromname)];
+    return [self handleAuthNetworkMount:m eventStatFS:eventStatFS];
   } else {
     return [self handleAuthDeviceMount:m eventStatFS:eventStatFS];
   }
@@ -524,10 +538,13 @@ NS_ASSUME_NONNULL_BEGIN
   free(argv);
 }
 
-- (es_auth_result_t)handleAuthNetworkMount:(const Message &)m from:(NSString *)mountFromName {
+- (es_auth_result_t)handleAuthNetworkMount:(const Message &)m
+                               eventStatFS:(const struct statfs *)eventStatFS {
   if (!self.configurator.blockNetworkMount) {
     return ES_AUTH_RESULT_ALLOW;
   }
+
+  NSString *mountFromName = @(eventStatFS->f_mntfromname);
 
   NSURL *fromURL = [NSURL URLWithString:mountFromName];
   if (!fromURL.host) {
@@ -535,6 +552,9 @@ NS_ASSUME_NONNULL_BEGIN
       LOGW(@"Network share prevented from mounting: %s (by: %s). Unable to extract host "
            @"information and \"FailClosed\" is configured.",
            mountFromName.UTF8String, m->process->executable->path.data);
+      if (self.networkMountCallback) {
+        self.networkMountCallback([self makeNetworkMountEventForMessage:m eventStatFS:eventStatFS]);
+      }
       return ES_AUTH_RESULT_DENY;
     } else {
       LOGW(@"Network share allowed to mount: %s (by: %s). Unable to extract host "
@@ -549,9 +569,45 @@ NS_ASSUME_NONNULL_BEGIN
     return ES_AUTH_RESULT_ALLOW;
   }
 
-  LOGW(@"Network share prevented from mounting: %@ (by: %s)", mountFromName,
-       m->process->executable->path.data);
+  LOGW(@"Network share prevented from mounting: %@ (type: %u: %s, by: %s)", mountFromName,
+       eventStatFS->f_type, eventStatFS->f_fstypename, m->process->executable->path.data);
+  if (self.networkMountCallback) {
+    self.networkMountCallback([self makeNetworkMountEventForMessage:m eventStatFS:eventStatFS]);
+  }
+
   return ES_AUTH_RESULT_DENY;
+}
+
+- (SNTStoredNetworkMountEvent *)makeNetworkMountEventForMessage:(const Message &)m
+                                                    eventStatFS:(const struct statfs *)eventStatFS {
+  SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
+
+  event.mountFromName = @(eventStatFS->f_mntfromname);
+  event.mountOnName = @(eventStatFS->f_mntonname);
+  event.fsType = @(eventStatFS->f_fstypename);
+
+  SNTCachedDecision *cd =
+      [[SNTDecisionCache sharedCache] cachedDecisionForFile:m->process->executable->stat];
+
+  event.process.filePath = @(m->process->executable->path.data);
+  event.process.cdhash = cd.cdhash;
+  event.process.fileSHA256 = cd.sha256;
+  event.process.signingID = cd.signingID;
+  event.process.teamID = cd.teamID;
+  event.process.signingChain = cd.certChain;
+  event.process.pid = @(santa::Pid(m->process->audit_token));
+  event.process.pidversion = @(santa::Pidversion(m->process->audit_token));
+  event.process.executingUserID = @(santa::EffectiveUser(m->process->audit_token));
+  if (auto username = _enricher->UsernameForUID(santa::EffectiveUser(m->process->audit_token))) {
+    event.process.executingUser = santa::StringToNSString(**username);
+  }
+
+  event.process.parent = [[SNTProcessChain alloc] init];
+  event.process.parent.filePath = santa::StringToNSString(m.ParentProcessPath());
+  event.process.parent.pid = @(santa::Pid(m->process->parent_audit_token));
+  event.process.parent.pidversion = @(santa::Pidversion(m->process->parent_audit_token));
+
+  return event;
 }
 
 @end

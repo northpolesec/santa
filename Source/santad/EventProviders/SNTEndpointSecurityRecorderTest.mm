@@ -35,6 +35,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/santad/EventProviders/EndpointSecurity/MockEnricher.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
 #include "Source/santad/Metrics.h"
@@ -42,19 +43,12 @@
 
 using santa::AuthResultCache;
 using santa::EnrichedMessage;
-using santa::Enricher;
 using santa::EventDisposition;
-using santa::Logger;
 using santa::Message;
 using santa::PrefixTree;
 using santa::Processor;
 using santa::TelemetryEvent;
 using santa::Unit;
-
-class MockEnricher : public Enricher {
- public:
-  MOCK_METHOD(std::unique_ptr<EnrichedMessage>, Enrich, (Message &&));
-};
 
 class MockAuthResultCache : public AuthResultCache {
  public:
@@ -182,7 +176,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   std::unique_ptr<EnrichedMessage> enrichedMsg = std::make_unique<EnrichedMessage>(EnrichedMessage(
       santa::EnrichedExit(Message(mockESApi, &fakeEnrichedMsg), santa::EnrichedProcess())));
 
-  auto mockEnricher = std::make_shared<MockEnricher>();
+  auto mockEnricher = std::make_shared<santa::MockEnricher>();
 
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   if (shouldRemoveFromCache) {

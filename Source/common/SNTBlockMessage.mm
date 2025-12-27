@@ -111,6 +111,15 @@ static id ValueOrNull(id value) {
                            withFallback:defaultBannedMessage];
 }
 
++ (NSAttributedString *)attributedBlockMessageForNetworkMountEventWithCustomMessage:
+    (NSString *)customMsg {
+  NSString *defaultBannedMessage =
+      NSLocalizedString(@"The following network share has been blocked from mounting",
+                        @"The default message to show the user when a network mount is blocked");
+
+  return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBannedMessage];
+}
+
 + (NSString *)stringFromHTML:(NSString *)html {
   NSError *error;
   NSXMLNodeOptions options = NSXMLDocumentIncludeContentTypeDeclaration |
