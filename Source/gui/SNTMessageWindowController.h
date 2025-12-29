@@ -22,6 +22,7 @@
 
 @interface SNTMessageWindowController : NSWindowController <NSWindowDelegate>
 
++ (NSWindow *)defaultWindow;
 - (IBAction)showWindow:(id)sender;
 - (IBAction)closeWindow:(id)sender;
 
