@@ -44,10 +44,10 @@
 "Dismiss" = "Ignorieren";
 
 /* No comment provided by engineer. */
-"Dismiss & Silence" = "Ignorieren & Stummschalten";
+"Destination" = "Ziel";
 
 /* No comment provided by engineer. */
-"Destination" = "Ziel";
+"Dismiss & Silence" = "Ignorieren & Stummschalten";
 
 /* No comment provided by engineer. */
 "Drop for application info" = "Zum Anzeigen der App-Informationen ablegen";

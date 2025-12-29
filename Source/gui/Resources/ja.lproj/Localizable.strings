@@ -44,10 +44,10 @@
 "Dismiss" = "閉じる";
 
 /* No comment provided by engineer. */
-"Dismiss & Silence" = "閉じて通知を停止";
+"Destination" = "マウント先";
 
 /* No comment provided by engineer. */
-"Destination" = "マウント先";
+"Dismiss & Silence" = "閉じて通知を停止";
 
 /* No comment provided by engineer. */
 "Drop for application info" = "アプリ情報のためにドロップ";
