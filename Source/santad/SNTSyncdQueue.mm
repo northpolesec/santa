@@ -176,7 +176,13 @@
   }
 
   [self dispatchBlockOnSyncdQueue:^{
-    [self.syncConnection.remoteObjectProxy postEventsToSyncServer:events];
+    [self.syncConnection.remoteObjectProxy
+        postEventsToSyncServer:events
+                         reply:^(BOOL success) {
+                           if (!success) {
+                             _uploadBackoff->remove(santa::NSStringToUTF8String(backoffHashKey));
+                           }
+                         }];
   }];
 }
 
