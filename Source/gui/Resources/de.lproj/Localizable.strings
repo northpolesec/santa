@@ -40,6 +40,9 @@
 /* Copy Details */
 "Copy Details" = "Details kopieren";
 
+/* No comment provided by engineer. */
+"Destination" = "Ziel";
+
 /* Dismiss button in more details dialog */
 "Dismiss" = "Ignorieren";
 
@@ -56,6 +59,9 @@
 "Filename" = "Dateiname";
 
 /* No comment provided by engineer. */
+"FS Type" = "FS-Typ";
+
+/* No comment provided by engineer. */
 "Label after time period picker" = "\U2800";
 
 /* No comment provided by engineer. */
@@ -66,6 +72,9 @@
 
 /* No comment provided by engineer. */
 "More Info..." = "Mehr Informationen...";
+
+/* No comment provided by engineer. */
+"Network Share" = "Netzwerkfreigabe";
 
 /* Default text for Open button */
 "Open..." = "Öffnen...";
@@ -156,6 +165,9 @@
 
 /* The default message to show the user when a USB device is remounted with reduced permissions */
 "The following device has been remounted with reduced permissions" = "Das folgende Gerät wurde mit reduzierten Berechtigungen gemountet";
+
+/* The default message to show the user when a network share mount is blocked */
+"The following network share has been blocked from mounting" = "Das Mounten der folgenden Netzwerkfreigabe wurde blockiert";
 
 /* No comment provided by engineer. */
 "unknown" = "unbekannt";

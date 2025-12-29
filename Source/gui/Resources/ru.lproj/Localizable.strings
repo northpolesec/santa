@@ -40,6 +40,9 @@
 /* Copy Details */
 "Copy Details" = "Копия Подробности";
 
+/* No comment provided by engineer. */
+"Destination" = "Точка монтирования";
+
 /* Dismiss button in more details dialog */
 "Dismiss" = "Увольте";
 
@@ -56,6 +59,9 @@
 "Filename" = "Имя файла";
 
 /* No comment provided by engineer. */
+"FS Type" = "Тип ФС";
+
+/* No comment provided by engineer. */
 "Label after time period picker" = "\U2800";
 
 /* No comment provided by engineer. */
@@ -66,6 +72,9 @@
 
 /* No comment provided by engineer. */
 "More Info..." = "Дополнительная информация...";
+
+/* No comment provided by engineer. */
+"Network Share" = "Сетевой ресурс";
 
 /* Default text for Open button */
 "Open..." = "Открыть...";
@@ -156,6 +165,9 @@
 
 /* The default message to show the user when a USB device is remounted with reduced permissions */
 "The following device has been remounted with reduced permissions" = "Следующее устройство было перемонтировано с пониженными разрешениями";
+
+/* The default message to show the user when a network share mount is blocked */
+"The following network share has been blocked from mounting" = "Монтирование следующего сетевого ресурса было заблокировано";
 
 /* No comment provided by engineer. */
 "unknown" = "неизвестно";

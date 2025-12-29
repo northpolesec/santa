@@ -566,16 +566,21 @@ objc_library(
     deps = [
         ":AuthResultCache",
         ":EndpointSecurityAPI",
+        ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
+        "//Source/common:AuditUtilities",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
+        "//Source/common:SNTProcessChain",
+        "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:String",
     ],
 )
 
@@ -949,6 +954,7 @@ objc_library(
     hdrs = ["Santad.h"],
     deps = [
         ":AuthResultCache",
+        ":DaemonConfigBundle",
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
@@ -977,6 +983,7 @@ objc_library(
         "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:TelemetryEventMap",
@@ -1101,6 +1108,17 @@ objc_library(
         ":EndpointSecurityClient",
         ":EndpointSecurityMessage",
         "//Source/common/faa:WatchItemPolicy",
+        "@googletest//:gtest",
+    ],
+)
+
+objc_library(
+    name = "MockEnricher",
+    testonly = 1,
+    hdrs = ["EventProviders/EndpointSecurity/MockEnricher.h"],
+    deps = [
+        ":EndpointSecurityEnrichedTypes",
+        ":EndpointSecurityEnricher",
         "@googletest//:gtest",
     ],
 )
@@ -1659,6 +1677,7 @@ santa_unit_test(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":MockEndpointSecurityAPI",
+        ":MockEnricher",
         ":MockLogger",
         ":SNTCompilerController",
         ":SNTEndpointSecurityRecorder",
@@ -1687,6 +1706,7 @@ santa_unit_test(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":MockEndpointSecurityAPI",
+        ":MockEnricher",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityDeviceManager",
         "//Source/common:SNTCommonEnums",

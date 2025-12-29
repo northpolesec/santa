@@ -80,17 +80,8 @@
 - (void)showWindow:(id)sender {
   if (self.window) [self.window orderOut:sender];
 
-  self.window =
-      [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                  styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskTitled
-                                    backing:NSBackingStoreBuffered
-                                      defer:NO];
-  self.window.titlebarAppearsTransparent = YES;
-  self.window.movableByWindowBackground = YES;
-  self.window.releasedWhenClosed = YES;
-  [self.window standardWindowButton:NSWindowZoomButton].hidden = YES;
-  [self.window standardWindowButton:NSWindowCloseButton].hidden = YES;
-  [self.window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
+  self.window = [SNTMessageWindowController defaultWindow];
+
   self.window.contentViewController = [SNTBinaryMessageWindowViewFactory
       createWithWindow:self.window
                  event:self.event

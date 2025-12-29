@@ -20,6 +20,24 @@
 
 @implementation SNTMessageWindowController
 
++ (NSWindow *)defaultWindow {
+  NSWindow *window =
+      [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
+                                  styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
+                                            NSWindowStyleMaskTitled
+                                    backing:NSBackingStoreBuffered
+                                      defer:NO];
+
+  window.titlebarAppearsTransparent = YES;
+  window.movableByWindowBackground = YES;
+  window.releasedWhenClosed = YES;
+  [window standardWindowButton:NSWindowZoomButton].hidden = YES;
+  [window standardWindowButton:NSWindowCloseButton].hidden = YES;
+  [window standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
+
+  return window;
+}
+
 - (IBAction)showWindow:(id)sender {
   [self.window setLevel:NSPopUpMenuWindowLevel];
   [self.window setMovableByWindowBackground:YES];
