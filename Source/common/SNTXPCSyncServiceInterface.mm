@@ -22,7 +22,7 @@
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
                                       [SNTStoredExecutionEvent class],
                                       [SNTStoredFileAccessEvent class], nil]
-        forSelector:@selector(postEventsToSyncServer:)
+        forSelector:@selector(postEventsToSyncServer:reply:)
       argumentIndex:0
             ofReply:NO];
 

@@ -18,10 +18,15 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTXPCSyncServiceInterface.h"
 
 @interface SNTSyncdQueue (Testing)
+@property dispatch_queue_t syncdQueue;
+@property MOLXPCConnection *syncConnection;
+
 - (BOOL)backoffForPrimaryHash:(NSString *)hash;
 - (void)dispatchBlockOnSyncdQueue:(void (^)(void))block;
 @end
@@ -102,6 +107,46 @@
     [sut addStoredEvent:fe];
   }
   OCMVerify(times(2), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
+}
+
+- (void)testAddEventsRemovesBackoffOnFailure {
+  SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
+
+  id mockConnection = OCMClassMock([MOLXPCConnection class]);
+  id mockProxy = OCMProtocolMock(@protocol(SNTSyncServiceXPC));
+  OCMStub([mockConnection remoteObjectProxy]).andReturn(mockProxy);
+  OCMStub([mockConnection isConnected]).andReturn(YES);
+  sut.syncConnection = mockConnection;
+
+  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+  se.fileSHA256 = @"abc123";
+
+  // First attempt: Post event, capture the reply block but don't invoke it yet
+  __block void (^replyBlock)(BOOL) = nil;
+  OCMStub([mockProxy postEventsToSyncServer:[OCMArg any]
+                                      reply:[OCMArg checkWithBlock:^BOOL(id obj) {
+                                        replyBlock = obj;
+                                        return YES;
+                                      }]]);
+  [sut addStoredEvent:se];
+  dispatch_sync(sut.syncdQueue, ^{
+                });
+  OCMVerify(times(1), [mockProxy postEventsToSyncServer:[OCMArg any] reply:[OCMArg any]]);
+
+  // Second attempt: Event should be dropped due to backoff
+  [sut addStoredEvent:se];
+  dispatch_sync(sut.syncdQueue, ^{
+                });
+  OCMVerify(times(1), [mockProxy postEventsToSyncServer:[OCMArg any] reply:[OCMArg any]]);
+
+  // Now simulate the first upload failing, which should remove the backoff
+  replyBlock(NO);
+
+  // Third attempt: Since backoff was removed, event should be dispatched again
+  [sut addStoredEvent:se];
+  dispatch_sync(sut.syncdQueue, ^{
+                });
+  OCMVerify(times(2), [mockProxy postEventsToSyncServer:[OCMArg any] reply:[OCMArg any]]);
 }
 
 @end
