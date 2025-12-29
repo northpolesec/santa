@@ -73,7 +73,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 }
 
 @interface SNTRuleTable () {
-  std::unique_ptr<santa::cel::Evaluator> _celEvaluator;
+  std::unique_ptr<santa::cel::Evaluator<false>> _celEvaluator;
+  std::unique_ptr<santa::cel::Evaluator<true>> _celV2Evaluator;
 }
 @property MOLCodesignChecker *santadCSInfo;
 @property MOLCodesignChecker *launchdCSInfo;
@@ -309,11 +310,18 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
 
-  auto celEval = santa::cel::Evaluator::Create();
+  auto celEval = santa::cel::Evaluator<false>::Create();
   if (celEval.ok()) {
     _celEvaluator = std::move(celEval.value());
   } else {
     LOGE(@"Failed to create CEL evaluator: %s", std::string(celEval.status().message()).c_str());
+  }
+
+  auto celEvalV2 = santa::cel::Evaluator<true>::Create();
+  if (celEvalV2.ok()) {
+    _celV2Evaluator = std::move(celEvalV2.value());
+  } else {
+    LOGE(@"Failed to create CELv2 evaluator: %s", std::string(celEval.status().message()).c_str());
   }
 
   // Setup critical system binaries
@@ -565,8 +573,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       return NO;
     }
 
-    if (rule.state == SNTRuleStateCEL && _celEvaluator) {
-      auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
+    if (rule.state == SNTRuleStateCEL || rule.state == SNTRuleStateCELv2) {
+      absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> celExpr;
+
+      if (rule.state == SNTRuleStateCEL && _celEvaluator != nullptr) {
+        celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
+      } else if (rule.state == SNTRuleStateCELv2 && _celV2Evaluator != nullptr) {
+        celExpr = _celV2Evaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
+      }
       if (!celExpr.ok()) {
         [errors addObject:
                     [SNTError

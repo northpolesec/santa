@@ -148,6 +148,9 @@
 /* The default message to show the user when a banned application is blocked */
 "The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "Наступну програму було заблоковано для виконання,<br />через те, що вона була визнана шкідливою або такою, що суперечить політиці";
 
+/* The default message to show the user when a program requires TouchID/password */
+"The following application requires authorization before it can be used" = "Наступна програма вимагає авторизації перед використанням";
+
 /* The default message to show the user when a USB device is blocked from mounting */
 "The following device has been blocked from mounting" = "Наступний пристрій заблоковано для встановлення";
 

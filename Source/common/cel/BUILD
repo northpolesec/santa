@@ -15,6 +15,7 @@ objc_library(
     ],
     hdrs = [
         "Activation.h",
+        "CELProtoTraits.h",
         "Evaluator.h",
     ],
     deps = [
@@ -46,6 +47,7 @@ objc_library(
         "@cel-cpp//internal:status_macros",
         "@cel-cpp//parser",
         "@northpolesec_protos//cel:v1_cc_proto",
+        "@northpolesec_protos//celv2:v2_cc_proto",
     ],
 )
 
@@ -56,6 +58,6 @@ santa_unit_test(
         ":CEL",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
-        "@northpolesec_protos//cel:v1_cc_proto",
+        "@northpolesec_protos//celv2:v2_cc_proto",
     ],
 )

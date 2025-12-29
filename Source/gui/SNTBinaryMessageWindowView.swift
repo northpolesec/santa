@@ -286,7 +286,7 @@ struct SNTBinaryMessageWindowView: View {
       }
 
       // Display the standalone error message to the user if one is provided.
-      if configState.clientMode == .standalone {
+      if event?.holdAndAsk ?? false {
         let (canAuthz, err) = CanAuthorizeWithTouchID()
         if !canAuthz {
           if let errMsg = err {
@@ -296,7 +296,7 @@ struct SNTBinaryMessageWindowView: View {
       }
 
       HStack(spacing: 15.0) {
-        if shouldAddStandaloneButton() {
+        if shouldAddStandaloneButton(event) {
           StandaloneButton(action: standAloneButton)
         } else if shouldAddOpenButton() {
           OpenEventButton(
@@ -317,25 +317,17 @@ struct SNTBinaryMessageWindowView: View {
     .fixedSize()
   }
 
-  func shouldAddStandaloneButton() -> Bool {
-    var shouldDisplay = configState.clientMode == .standalone
+  func shouldAddStandaloneButton(_ event: SNTStoredExecutionEvent?) -> Bool {
+    if event?.holdAndAsk ?? false == false {
+      return false
+    }
 
     let (canAuthz, _) = CanAuthorizeWithTouchID()
     if !canAuthz {
-      shouldDisplay = false
+      return false
     }
 
-    let blockedUnknownEvent = SNTEventState.blockUnknown;
-
-    // Only display the standalone button if the event is for a block that fell
-    // was the result of a fall through.
-    if let decision = event?.decision {
-      if decision != blockedUnknownEvent {
-        shouldDisplay = false
-      }
-    }
-
-    return shouldDisplay
+    return true
   }
 
   func shouldAddOpenButton() -> Bool {

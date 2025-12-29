@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "Source/common/Memoizer.h"
-#include "cel/v1.pb.h"
+#include "Source/common/cel/CELProtoTraits.h"
 
 #include "absl/strings/string_view.h"
 
@@ -36,12 +36,16 @@ namespace santa {
 namespace cel {
 
 // SantaActivation is a CEL activation that provides lookups of values from the
-// santa.pb.cel.v1.Context message, and easy access to variables for return values.
+// ExecutionContext message, and easy access to variables for return values.
+template <bool IsV2>
 class Activation : public ::google::api::expr::runtime::BaseActivation {
  public:
-  Activation(std::unique_ptr<::santa::cel::v1::ExecutableFile> file,
-             std::vector<std::string> (^args)(), std::map<std::string, std::string> (^envs)(),
-             uid_t (^euid)(), std::string (^cwd)())
+  using Traits = CELProtoTraits<IsV2>;
+  using ExecutableFileT = typename Traits::ExecutableFileT;
+  using ReturnValue = typename Traits::ReturnValue;
+
+  Activation(std::unique_ptr<ExecutableFileT> file, std::vector<std::string> (^args)(),
+             std::map<std::string, std::string> (^envs)(), uid_t (^euid)(), std::string (^cwd)())
       : file_(std::move(file)), args_(args), envs_(envs), euid_(euid), cwd_(cwd) {};
   ~Activation() = default;
 
@@ -57,10 +61,11 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   static std::vector<std::pair<absl::string_view, ::cel::Type>> GetVariables(
       google::protobuf::Arena *arena);
 
+  template <bool V2>
   friend class Evaluator;
 
  private:
-  std::unique_ptr<::santa::cel::v1::ExecutableFile> file_;
+  std::unique_ptr<ExecutableFileT> file_;
   Memoizer<std::vector<std::string>> args_;
   Memoizer<std::map<std::string, std::string>> envs_;
   Memoizer<uid_t> euid_;
