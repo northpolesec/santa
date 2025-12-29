@@ -117,8 +117,8 @@
   return self;
 }
 
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events {
-  [self.syncManager postEventsToSyncServer:events];
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events reply:(void (^)(BOOL))reply {
+  [self.syncManager postEventsToSyncServer:events reply:reply];
 }
 
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event

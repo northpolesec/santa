@@ -1087,17 +1087,19 @@
                                                                reply:([OCMArg invokeBlock])]);
   [sut sync];
 
+  SNTRuleState state = self.syncState.isSyncV2 ? SNTRuleStateCELv2 : SNTRuleStateCEL;
+
   // Both rules should get sent to the daemon. It will reject the second one.
   NSArray *rules = @[
     [[SNTRule alloc]
         initWithIdentifier:@"AAAAAAAAAA"
-                     state:SNTRuleStateCEL
+                     state:state
                       type:SNTRuleTypeTeamID
                  customMsg:nil
                  customURL:nil
                    celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"],
     [[SNTRule alloc] initWithIdentifier:@"BBBBBBBBBB"
-                                  state:SNTRuleStateCEL
+                                  state:state
                                    type:SNTRuleTypeTeamID
                               customMsg:nil
                               customURL:nil

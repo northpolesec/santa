@@ -34,6 +34,9 @@
 /* No comment provided by engineer. */
 "CDHash" = "CDハッシュ";
 
+/* No comment provided by engineer. */
+"Clean Sync" = "クリーン同期";
+
 /* Copy Details */
 "Copy Details" = "詳細をコピー";
 
@@ -153,6 +156,9 @@
 
 /* The default message to show the user when a banned application is blocked */
 "The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "以下のアプリケーションは、悪意のあるプログラムまたはポリシーに反すると判断されました、<br />実行がブロックされました";
+
+/* The default message to show the user when a program requires TouchID/password */
+"The following application requires authorization before it can be used" = "以下のアプリケーションは、使用前に認証が必要です";
 
 /* The default message to show the user when a USB device is blocked from mounting */
 "The following device has been blocked from mounting" = "次のデバイスのマウントがブロックされました";

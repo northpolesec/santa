@@ -55,5 +55,6 @@
 @property BOOL silentBlock;
 
 @property BOOL cacheable;
+@property BOOL holdAndAsk;
 
 @end

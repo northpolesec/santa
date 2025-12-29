@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTPolicyProcessor.h"
+#include "Source/common/SNTCommonEnums.h"
 
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
@@ -57,7 +58,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 }
 
 @interface SNTPolicyProcessor () {
-  std::unique_ptr<santa::cel::Evaluator> celEvaluator_;
+  std::unique_ptr<santa::cel::Evaluator<true>> celEvaluator_;
 }
 @property SNTRuleTable *ruleTable;
 @property SNTConfigurator *configurator;
@@ -70,7 +71,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   if (self) {
     _configurator = [SNTConfigurator configurator];
 
-    auto evaluator = santa::cel::Evaluator::Create();
+    auto evaluator = santa::cel::Evaluator<true>::Create();
     if (evaluator.ok()) {
       celEvaluator_ = std::move(*evaluator);
     } else {
@@ -99,7 +100,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   SNTRuleState state = rule.state;
   SNTRuleType type = rule.type;
 
-  if (state == SNTRuleStateCEL && activationCallback) {
+  if ((state == SNTRuleStateCEL || state == SNTRuleStateCELv2) && activationCallback) {
     auto activation = activationCallback();
     auto evalResult = self->celEvaluator_->CompileAndEvaluate(
         santa::NSStringToUTF8StringView(rule.celExpr), *activation);
@@ -116,16 +117,21 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       return NO;
     }
 
-    ::santa::cel::v1::ReturnValue returnValue = evalResult->first;
+    using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+    ReturnValue returnValue = evalResult->first;
     LOGD(@"Ran CEL program and received result: %d (cacheable %d)", returnValue,
          evalResult->second);
     switch (returnValue) {
-      case santa::cel::v1::ReturnValue::ALLOWLIST: state = SNTRuleStateAllow; break;
-      case santa::cel::v1::ReturnValue::ALLOWLIST_COMPILER:
-        state = SNTRuleStateAllowTransitive;
+      case ReturnValue::ALLOWLIST: state = SNTRuleStateAllow; break;
+      case ReturnValue::ALLOWLIST_COMPILER: state = SNTRuleStateAllowTransitive; break;
+      case ReturnValue::BLOCKLIST: state = SNTRuleStateBlock; break;
+      case ReturnValue::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
+      case ReturnValue::REQUIRE_TOUCHID:
+        // REQUIRE_TOUCHID responses are not cacheable.
+        cd.holdAndAsk = YES;
+        cd.cacheable = NO;
+        state = SNTRuleStateBlock;
         break;
-      case santa::cel::v1::ReturnValue::BLOCKLIST: state = SNTRuleStateBlock; break;
-      case santa::cel::v1::ReturnValue::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
       default: break;
     }
     if (!evalResult->second) {
@@ -179,8 +185,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
           case SNTRuleTypeBinary: cd.decision = SNTEventStateAllowBinary; break;
           case SNTRuleTypeSigningID: cd.decision = SNTEventStateAllowSigningID; break;
           default:
-            // Programming error. Something's marked as a compiler that shouldn't
-            // be.
+            // Programming error. Something's marked as a compiler that shouldn't be.
             LOGE(@"Invalid compiler rule type %ld", type);
             [NSException
                  raise:@"Invalid compiler rule type"
@@ -191,10 +196,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       }
       break;
     case SNTRuleStateAllowTransitive:
-      // If transitive rules are disabled, then we treat
-      // SNTRuleStateAllowTransitive rules as if a matching rule was not found
-      // and set the state to unknown. Otherwise the decision map will have already set
-      // the EventState to SNTEventStateAllowTransitive.
+      // If transitive rules are disabled, then we treat SNTRuleStateAllowTransitive rules
+      // as if a matching rule was not found and set the state to unknown. Otherwise the
+      // decision map will have already set the EventState to SNTEventStateAllowTransitive.
       if (!enableTransitiveRules) {
         cd.decision = SNTEventStateUnknown;
         return NO;
@@ -350,7 +354,7 @@ static void UpdateCachedDecisionSigningInfo(
 
   switch (mode) {
     case SNTClientModeMonitor: cd.decision = SNTEventStateAllowUnknown; return cd;
-    case SNTClientModeStandalone: [[fallthrough]];
+    case SNTClientModeStandalone: cd.holdAndAsk = YES; [[fallthrough]];
     case SNTClientModeLockdown: cd.decision = SNTEventStateBlockUnknown; return cd;
     default: cd.decision = SNTEventStateBlockUnknown; return cd;
   }

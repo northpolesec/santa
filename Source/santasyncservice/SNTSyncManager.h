@@ -68,7 +68,7 @@
 ///
 ///  Handle SNTSyncServiceXPC messages forwarded from SNTSyncService.
 ///
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events;
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events reply:(void (^)(BOOL))reply;
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;

@@ -336,11 +336,9 @@ static NSString *const kPrinterProxyPostMonterey =
   BOOL stoppedProc = false;
   std::pair<pid_t, int> pidAndVersion =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
-  bool holdAndAsk = false;
   // Only allow a user in standalone mode to override a block if an
   // explicit block rule is not set when using a sync service.
-  if (cd.decision == SNTEventStateBlockUnknown &&
-      configState.clientMode == SNTClientModeStandalone) {
+  if (cd.holdAndAsk) {
     // In standalone mode we want hold off on making a decision until the user has had a chance to
     // approve. ES won't let us do this, we'd hit the response deadline. Instead, we suspend the
     // new process to stop the binary from executing but we respond to ES with an allow decision.
@@ -349,7 +347,6 @@ static NSString *const kPrinterProxyPostMonterey =
     _procSignalCache->set(pidAndVersion, true);
     stoppedProc = self.processControlBlock(newProcPid, ProcessControl::Suspend);
     postAction(SNTActionRespondHold);
-    holdAndAsk = true;
   } else {
     // Respond with the decision.
     postAction(action);
@@ -367,6 +364,7 @@ static NSString *const kPrinterProxyPostMonterey =
     se.fileSHA256 = cd.sha256;
     se.filePath = binInfo.path;
     se.decision = cd.decision;
+    se.holdAndAsk = cd.holdAndAsk;
 
     se.signingChain = cd.certChain;
     se.teamID = cd.teamID;
@@ -433,7 +431,7 @@ static NSString *const kPrinterProxyPostMonterey =
 
       if (!cd.silentBlock) {
         _ttyWriter->Write(targetProc, ^NSString * {
-          if (holdAndAsk) {
+          if (cd.holdAndAsk) {
             if (stoppedProc) {
               return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
                      @"binary until approval is granted in the GUI...\n";
@@ -465,14 +463,17 @@ static NSString *const kPrinterProxyPostMonterey =
 
         NotificationReplyBlock replyBlock = nil;
 
-        if (holdAndAsk) {
+        if (cd.holdAndAsk) {
           replyBlock = ^(BOOL authenticated) {
             LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                  authenticated);
             if (authenticated) {
-              // Create a rule for the binary that was allowed by the user in
-              // standalone mode and notify the sync service.
-              [self createRuleForStandaloneModeEvent:se];
+              if (cd.decisionClientMode == SNTClientModeStandalone &&
+                  cd.decision == SNTEventStateBlockUnknown) {
+                // Create a rule for the binary that was allowed by the user in
+                // standalone mode and notify the sync service.
+                [self createRuleForStandaloneModeEvent:se];
+              }
 
               if (stoppedProc) {
                 _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
@@ -652,8 +653,9 @@ static NSString *const kPrinterProxyPostMonterey =
 - (ActivationCallbackBlock)createActivationBlockForMessage:(const santa::Message &)esMsg
                                                  andCSInfo:(nullable MOLCodesignChecker *)csInfo {
   std::shared_ptr<santa::EndpointSecurityAPI> esApi = esMsg.ESAPI();
-  return ^std::unique_ptr<santa::cel::Activation>() {
-    auto f = std::make_unique<santa::cel::v1::ExecutableFile>();
+  return ^std::unique_ptr<santa::cel::Activation<true>>() {
+    using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+    auto f = std::make_unique<ExecutableFileT>();
     if (csInfo.signingTime) {
       f->mutable_signing_time()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
     }
@@ -661,7 +663,7 @@ static NSString *const kPrinterProxyPostMonterey =
       f->mutable_secure_signing_time()->set_seconds(csInfo.secureSigningTime.timeIntervalSince1970);
     }
 
-    return std::make_unique<santa::cel::Activation>(
+    return std::make_unique<santa::cel::Activation<true>>(
         std::move(f),
         ^std::vector<std::string>() {
           return esApi->ExecArgs(&esMsg->event.exec);

@@ -32,65 +32,96 @@ namespace cel_runtime = ::google::api::expr::runtime;
 namespace santa {
 namespace cel {
 
+// Helper functions for CELValue - these need to be specialized before being used in template
+// methods
+
+namespace {
+template <typename T>
+cel_runtime::CelValue CreateCELValue(const T &v, google::protobuf::Arena *arena);
+
 template <>
-cel_runtime::CelValue Activation::CELValue(const int &v, google::protobuf::Arena *unused_arena) {
+[[maybe_unused]] cel_runtime::CelValue CreateCELValue<int>(const int &v,
+                                                           google::protobuf::Arena *) {
   return cel_runtime::CelValue::CreateInt64(v);
 }
 
 template <>
-cel_runtime::CelValue Activation::CELValue(const int64_t &v,
-                                           google::protobuf::Arena *unused_arena) {
+[[maybe_unused]] cel_runtime::CelValue CreateCELValue<int64_t>(const int64_t &v,
+                                                               google::protobuf::Arena *) {
   return cel_runtime::CelValue::CreateInt64(v);
 }
 
 template <>
-cel_runtime::CelValue Activation::CELValue(const unsigned int &v,
-                                           google::protobuf::Arena *unused_arena) {
+[[maybe_unused]] cel_runtime::CelValue CreateCELValue<unsigned int>(const unsigned int &v,
+                                                                    google::protobuf::Arena *) {
   return cel_runtime::CelValue::CreateUint64(v);
 }
 
 template <>
-cel_runtime::CelValue Activation::CELValue(const bool &v, google::protobuf::Arena *unused_arena) {
+[[maybe_unused]] cel_runtime::CelValue CreateCELValue<bool>(const bool &v,
+                                                            google::protobuf::Arena *) {
   return cel_runtime::CelValue::CreateBool(v);
 }
 
 template <>
-cel_runtime::CelValue Activation::CELValue(const double &v, google::protobuf::Arena *unused_arena) {
+[[maybe_unused]] cel_runtime::CelValue CreateCELValue<double>(const double &v,
+                                                              google::protobuf::Arena *) {
   return cel_runtime::CelValue::CreateDouble(v);
 }
 
 template <>
-cel_runtime::CelValue Activation::CELValue(const std::string &v, google::protobuf::Arena *arena) {
+[[maybe_unused]] cel_runtime::CelValue CreateCELValue<std::string>(const std::string &v,
+                                                                   google::protobuf::Arena *arena) {
   return cel_runtime::CelValue::CreateString(
       cel_runtime::CelValue::StringHolder(arena->Create<std::string>(arena, v)));
 }
 
 template <typename T>
-cel_runtime::CelValue Activation::CELValue(const std::vector<T> &v,
-                                           google::protobuf::Arena *arena) {
+cel_runtime::CelValue CreateCELValue(const std::vector<T> &v, google::protobuf::Arena *arena) {
   std::vector<cel_runtime::CelValue> values;
   for (const auto &value : v) {
-    values.push_back(CELValue(value, arena));
+    values.push_back(CreateCELValue(value, arena));
   }
-
   return cel_runtime::CelValue::CreateList(
       arena->Create<cel_runtime::ContainerBackedListImpl>(arena, values));
 }
 
 template <typename K, typename V>
-cel_runtime::CelValue Activation::CELValue(const std::map<K, V> &v,
-                                           google::protobuf::Arena *arena) {
+cel_runtime::CelValue CreateCELValue(const std::map<K, V> &v, google::protobuf::Arena *arena) {
   cel_runtime::CelMapBuilder *builder = arena->Create<cel_runtime::CelMapBuilder>(arena);
   for (const auto &pair : v) {
-    (void)builder->Add(CELValue(pair.first, arena), CELValue(pair.second, arena));
+    (void)builder->Add(CreateCELValue(pair.first, arena), CreateCELValue(pair.second, arena));
   }
   return cel_runtime::CelValue::CreateMap(builder);
 }
+}  // namespace
 
-std::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view name,
-                                                           google::protobuf::Arena *arena) const {
+// Template methods that delegate to the helper functions
+template <bool IsV2>
+template <typename T>
+cel_runtime::CelValue Activation<IsV2>::CELValue(const T &v, google::protobuf::Arena *arena) {
+  return CreateCELValue(v, arena);
+}
+
+template <bool IsV2>
+template <typename T>
+cel_runtime::CelValue Activation<IsV2>::CELValue(const std::vector<T> &v,
+                                                 google::protobuf::Arena *arena) {
+  return CreateCELValue(v, arena);
+}
+
+template <bool IsV2>
+template <typename K, typename V>
+cel_runtime::CelValue Activation<IsV2>::CELValue(const std::map<K, V> &v,
+                                                 google::protobuf::Arena *arena) {
+  return CreateCELValue(v, arena);
+}
+
+template <bool IsV2>
+std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
+    absl::string_view name, google::protobuf::Arena *arena) const {
   // Handle the ReturnValue values.
-  auto retDescriptor = santa::cel::v1::ReturnValue_descriptor();
+  auto retDescriptor = Traits::ReturnValue_descriptor();
   auto retValue = retDescriptor->FindValueByName(name);
   if (retValue != nullptr) {
     return CELValue(retValue->number(), arena);
@@ -111,7 +142,8 @@ std::optional<cel_runtime::CelValue> Activation::FindValue(absl::string_view nam
   return {};
 }
 
-std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
+template <bool IsV2>
+std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVariables(
     google::protobuf::Arena *arena) {
   std::vector<std::pair<absl::string_view, ::cel::Type>> v;
 
@@ -119,14 +151,14 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
   // ALLOWLIST or BLOCKLIST in their CEL expressions without having to use the
   // proto package name prefix. Start from value number 1 to avoid the
   // UNSPECIFIED value.
-  auto retDescriptor = ::santa::cel::v1::ReturnValue_descriptor();
+  auto retDescriptor = Traits::ReturnValue_descriptor();
   for (int i = 1; i < retDescriptor->value_count(); i++) {
     auto value = retDescriptor->value(i);
     v.push_back({value->name(), ::cel::IntType()});
   }
 
   // Now add all the fields from the CELContext message.
-  auto ctxDescriptor = santa::cel::v1::ExecutionContext::descriptor();
+  auto ctxDescriptor = Traits::ExecutionContext_descriptor();
   for (int i = 0; i < ctxDescriptor->field_count(); i++) {
     auto field = ctxDescriptor->field(i);
 
@@ -149,12 +181,14 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation::GetVariables(
   return v;
 }
 
-bool Activation::IsResultCacheable() const {
+template <bool IsV2>
+bool Activation<IsV2>::IsResultCacheable() const {
   return !args_.HasValue() && !envs_.HasValue() && !euid_.HasValue() && !cwd_.HasValue();
 }
 
-::cel::Type Activation::CELType(google::protobuf::FieldDescriptor::CppType type,
-                                const google::protobuf::Descriptor *messageType) {
+template <bool IsV2>
+::cel::Type Activation<IsV2>::CELType(google::protobuf::FieldDescriptor::CppType type,
+                                      const google::protobuf::Descriptor *messageType) {
   switch (type) {
     case ::google::protobuf::FieldDescriptor::CPPTYPE_STRING: return ::cel::StringType();
     case ::google::protobuf::FieldDescriptor::CPPTYPE_MESSAGE:
@@ -169,6 +203,10 @@ bool Activation::IsResultCacheable() const {
     case ::google::protobuf::FieldDescriptor::CPPTYPE_FLOAT: return ::cel::DoubleType();
   }
 }
+
+// Explicit template instantiations
+template class Activation<false>;  // v1
+template class Activation<true>;   // v2
 
 }  // namespace cel
 }  // namespace santa

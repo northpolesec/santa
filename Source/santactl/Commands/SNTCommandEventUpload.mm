@@ -177,7 +177,9 @@ REGISTER_COMMAND_NAME(@"eventupload")
   };
   [ss resume];
   printf("Uploading %lu events...\n", events.count);
-  [[ss synchronousRemoteObjectProxy] postEventsToSyncServer:events];
+  [[ss synchronousRemoteObjectProxy] postEventsToSyncServer:events
+                                                      reply:^(BOOL){
+                                                      }];
   printf("Done\n");
   exit(0);
 }
