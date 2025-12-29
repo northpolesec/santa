@@ -89,6 +89,8 @@ def main():
   if not base_loc_keys:
     raise UserWarning('Failed to parse base localization')
 
+  exit_code = 0
+
   # Loop over all the discovered localizations
   for lang in find_localizations('Source/gui/Resources'):
     pl = plist_from_lang(lang)
@@ -109,6 +111,11 @@ def main():
     print(f'Missing: {len(missing_keys)}, {missing_keys}')
     print(f'Extraneous: {len(extra_keys)}, {extra_keys}')
     print(f'Complete: {complete:.2f}%')
+
+    if len(missing_keys) > 0 or len(extra_keys) > 0:
+      exit_code = 1
+
+  sys.exit(exit_code)
 
 
 if __name__ == '__main__':
