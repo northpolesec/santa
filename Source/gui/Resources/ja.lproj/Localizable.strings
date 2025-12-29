@@ -44,6 +44,9 @@
 "Dismiss & Silence" = "閉じて通知を停止";
 
 /* No comment provided by engineer. */
+"Destination" = "マウント先";
+
+/* No comment provided by engineer. */
 "Drop for application info" = "アプリ情報のためにドロップ";
 
 /* No comment provided by engineer. */
@@ -51,6 +54,9 @@
 
 /* No comment provided by engineer. */
 "Filename" = "ファイル名";
+
+/* No comment provided by engineer. */
+"FS Type" = "ファイルシステム種別";
 
 /* No comment provided by engineer. */
 "Label after time period picker" = "停止します";
@@ -63,6 +69,9 @@
 
 /* No comment provided by engineer. */
 "More Info..." = "詳細情報…";
+
+/* No comment provided by engineer. */
+"Network Share" = "ネットワーク共有";
 
 /* Default text for Open button */
 "Open..." = "開く…";
@@ -150,6 +159,9 @@
 
 /* The default message to show the user when a USB device is remounted with reduced permissions */
 "The following device has been remounted with reduced permissions" = "次のデバイスは権限を制限して再マウントされました";
+
+/* The default message to show the user when a network share mount is blocked */
+"The following network share has been blocked from mounting" = "次のネットワーク共有のマウントがブロックされました";
 
 /* No comment provided by engineer. */
 "unknown" = "不明";

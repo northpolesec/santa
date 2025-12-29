@@ -44,6 +44,9 @@
 "Dismiss & Silence" = "Dismiss & Silence";
 
 /* No comment provided by engineer. */
+"Destination" = "Destination";
+
+/* No comment provided by engineer. */
 "Drop for application info" = "Drop for application info";
 
 /* No comment provided by engineer. */
@@ -51,6 +54,9 @@
 
 /* No comment provided by engineer. */
 "Filename" = "Filename";
+
+/* No comment provided by engineer. */
+"FS Type" = "FS Type";
 
 /* No comment provided by engineer. */
 "Label after time period picker" = "\U2800";
@@ -63,6 +69,9 @@
 
 /* No comment provided by engineer. */
 "More Info..." = "More Info...";
+
+/* No comment provided by engineer. */
+"Network Share" = "Network Share";
 
 /* Default text for Open button */
 "Open..." = "Open...";
@@ -135,6 +144,9 @@
 
 /* The default message to show the user when a USB device is remounted with reduced permissions */
 "The following device has been remounted with reduced permissions" = "The following device has been remounted with reduced permissions";
+
+/* The default message to show the user when a network share mount is blocked */
+"The following network share has been blocked from mounting" = "The following network share has been blocked from mounting";
 
 /* No comment provided by engineer. */
 "The postflight check failed. Please check your network connection and try again." = "The postflight check failed. Please check your network connection and try again.";
