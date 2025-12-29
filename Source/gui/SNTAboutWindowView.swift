@@ -36,8 +36,14 @@ struct SNTAboutWindowView: View {
       }
 
       // Calling .init explicitly to get Markdown rendering
-      let versionString = NSLocalizedString("Version **%@**", comment: "Version in About view")
-      Text(.init(String(format: versionString, v))).padding(10.0)
+      let versionString = String.localizedStringWithFormat(
+        NSLocalizedString(
+          "Version **%@**",
+          comment: "Version in About view"
+        ),
+        v
+      )
+      Text(.init(versionString)).padding(10.0)
 
       HStack {
         if c.moreInfoURL?.absoluteString.isEmpty == false {
