@@ -40,11 +40,11 @@
 /* Copy Details */
 "Copy Details" = "詳細をコピー";
 
-/* Dismiss button in more details dialog */
-"Dismiss" = "閉じる";
-
 /* No comment provided by engineer. */
 "Destination" = "マウント先";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "閉じる";
 
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "閉じて通知を停止";

@@ -40,11 +40,11 @@
 /* Copy Details */
 "Copy Details" = "Details kopieren";
 
-/* Dismiss button in more details dialog */
-"Dismiss" = "Ignorieren";
-
 /* No comment provided by engineer. */
 "Destination" = "Ziel";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "Ignorieren";
 
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Ignorieren & Stummschalten";

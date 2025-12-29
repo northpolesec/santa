@@ -40,14 +40,14 @@
 /* Copy Details */
 "Copy Details" = "Copy Details";
 
+/* No comment provided by engineer. */
+"Destination" = "Destination";
+
 /* Dismiss button in more details dialog */
 "Dismiss" = "Dismiss";
 
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Dismiss & Silence";
-
-/* No comment provided by engineer. */
-"Destination" = "Destination";
 
 /* No comment provided by engineer. */
 "Drop for application info" = "Drop for application info";

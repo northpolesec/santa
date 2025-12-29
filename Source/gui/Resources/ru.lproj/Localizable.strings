@@ -40,11 +40,11 @@
 /* Copy Details */
 "Copy Details" = "Копия Подробности";
 
-/* Dismiss button in more details dialog */
-"Dismiss" = "Увольте";
-
 /* No comment provided by engineer. */
 "Destination" = "Точка монтирования";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "Увольте";
 
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Отказ и молчание";

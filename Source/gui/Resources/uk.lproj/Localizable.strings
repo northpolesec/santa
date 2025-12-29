@@ -40,11 +40,11 @@
 /* Copy Details */
 "Copy Details" = "Деталі копіювання";
 
-/* Dismiss button in more details dialog */
-"Dismiss" = "Звільнити";
-
 /* No comment provided by engineer. */
 "Destination" = "Точка монтування";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "Звільнити";
 
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Звільнити і замовкнути";
