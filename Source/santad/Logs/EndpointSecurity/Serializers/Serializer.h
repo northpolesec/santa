@@ -104,7 +104,7 @@ class Serializer {
 
   virtual std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) = 0;
 
-  virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *) = 0;
+  virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *, bool) = 0;
   virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) = 0;
 
  private:

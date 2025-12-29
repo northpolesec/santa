@@ -1423,7 +1423,8 @@ std::vector<uint8_t> Protobuf::SerializeBundleHashingEvent(SNTStoredExecutionEve
   return FinalizeProto(santa_msg);
 }
 
-static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDictionary *props) {
+static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDictionary *props,
+                       bool allowed) {
   pb_disk->set_action(action);
 
   NSString *dmg_path = nil;
@@ -1446,8 +1447,9 @@ static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDict
   EncodeString([pb_disk] { return pb_disk->mutable_serial(); }, serial);
   EncodeString([pb_disk] { return pb_disk->mutable_bus(); }, props[@"DADeviceProtocol"]);
   EncodeString([pb_disk] { return pb_disk->mutable_dmg_path(); }, dmg_path);
-  EncodeString([pb_disk] { return pb_disk->mutable_mount_from(); },
-               MountFromName([props[@"DAVolumePath"] path]));
+  EncodeString(
+      [pb_disk] { return pb_disk->mutable_mount_from(); },
+      allowed ? MountFromName([props[@"DAVolumePath"] path]) : props[santa::kMountFromNameKey]);
 
   if (props[@"DAAppearanceTime"]) {
     // Note: `DAAppearanceTime` is set via `CFAbsoluteTimeGetCurrent`, which uses the defined
@@ -1467,11 +1469,12 @@ static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDict
   }
 }
 
-std::vector<uint8_t> Protobuf::SerializeDiskAppeared(NSDictionary *props) {
+std::vector<uint8_t> Protobuf::SerializeDiskAppeared(NSDictionary *props, bool allowed) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena);
 
-  EncodeDisk(santa_msg->mutable_disk(), ::pbv1::Disk::ACTION_APPEARED, props);
+  EncodeDisk(santa_msg->mutable_disk(),
+             allowed ? ::pbv1::Disk::ACTION_APPEARED : ::pbv1::Disk::ACTION_BLOCKED, props);
 
   return FinalizeProto(santa_msg);
 }

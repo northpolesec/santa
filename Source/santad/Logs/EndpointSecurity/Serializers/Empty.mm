@@ -167,7 +167,7 @@ std::vector<uint8_t> Empty::SerializeBundleHashingEvent(SNTStoredExecutionEvent 
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeDiskAppeared(NSDictionary *props) {
+std::vector<uint8_t> Empty::SerializeDiskAppeared(NSDictionary *props, bool) {
   return {};
 }
 

@@ -24,6 +24,9 @@
 
 namespace santa {
 
+// Key constant for when the MountFromName is manually supplied
+extern NSString *const kMountFromNameKey;
+
 static inline NSString *NonNull(NSString *str) {
   return str ?: @"";
 }

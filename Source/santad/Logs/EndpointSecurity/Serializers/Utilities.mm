@@ -31,6 +31,8 @@ extern "C" CFURLRef __nullable SecTranslocateCreateOriginalPathForURL(CFURLRef t
 
 namespace santa {
 
+NSString *const kMountFromNameKey = @"SNTMountFromName";
+
 NSString *OriginalPathForTranslocation(const es_process_t *es_proc) {
   // Cache vnodes that have been determined to not be translocated
   static SantaCache<SantaVnode, bool> isNotTranslocatedCache(1024);

@@ -410,9 +410,9 @@ void Logger::LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events) 
   }
 }
 
-void Logger::LogDiskAppeared(NSDictionary *props) {
+void Logger::LogDiskAppeared(NSDictionary *props, bool allowed) {
   if (ShouldLog(TelemetryEvent::kDisk)) {
-    writer_->Write(serializer_->SerializeDiskAppeared(props));
+    writer_->Write(serializer_->SerializeDiskAppeared(props, allowed));
   }
 }
 

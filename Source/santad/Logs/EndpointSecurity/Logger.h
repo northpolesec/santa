@@ -81,7 +81,7 @@ class Logger : public Timer<Logger> {
 
   void LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events);
 
-  void LogDiskAppeared(NSDictionary *props);
+  void LogDiskAppeared(NSDictionary *props, bool allowed);
   void LogDiskDisappeared(NSDictionary *props);
 
   virtual void LogFileAccess(const std::string &policy_version, const std::string &policy_name,

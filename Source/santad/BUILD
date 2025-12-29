@@ -569,6 +569,7 @@ objc_library(
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
+        ":EndpointSecuritySerializerUtilities",
         ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
