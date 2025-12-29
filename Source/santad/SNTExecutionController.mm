@@ -336,7 +336,6 @@ static NSString *const kPrinterProxyPostMonterey =
   BOOL stoppedProc = false;
   std::pair<pid_t, int> pidAndVersion =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
-  bool holdAndAsk = false;
   // Only allow a user in standalone mode to override a block if an
   // explicit block rule is not set when using a sync service.
   if (cd.holdAndAsk) {
@@ -348,7 +347,6 @@ static NSString *const kPrinterProxyPostMonterey =
     _procSignalCache->set(pidAndVersion, true);
     stoppedProc = self.processControlBlock(newProcPid, ProcessControl::Suspend);
     postAction(SNTActionRespondHold);
-    holdAndAsk = true;
   } else {
     // Respond with the decision.
     postAction(action);
@@ -433,7 +431,7 @@ static NSString *const kPrinterProxyPostMonterey =
 
       if (!cd.silentBlock) {
         _ttyWriter->Write(targetProc, ^NSString * {
-          if (holdAndAsk) {
+          if (cd.holdAndAsk) {
             if (stoppedProc) {
               return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
                      @"binary until approval is granted in the GUI...\n";
@@ -465,7 +463,7 @@ static NSString *const kPrinterProxyPostMonterey =
 
         NotificationReplyBlock replyBlock = nil;
 
-        if (holdAndAsk) {
+        if (cd.holdAndAsk) {
           replyBlock = ^(BOOL authenticated) {
             LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                  authenticated);
