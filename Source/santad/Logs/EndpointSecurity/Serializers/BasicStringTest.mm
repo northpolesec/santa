@@ -1329,7 +1329,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   XCTAssertCppStringEqual(got, want);
 }
 
-- (void)testSerializeDiskAppeared {
+- (void)testSerializeDiskAppearedAllowed {
   NSDictionary *props = @{
     @"DADevicePath" : @"",
     @"DADeviceVendor" : @"vendor",
@@ -1346,7 +1346,8 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
   OCMStub([self.mockConfigurator enableMachineIDDecoration]).andReturn(NO);
 
-  std::vector<uint8_t> ret = BasicString::Create(nullptr, nil, false)->SerializeDiskAppeared(props);
+  std::vector<uint8_t> ret =
+      BasicString::Create(nullptr, nil, false)->SerializeDiskAppeared(props, true);
   std::string got(ret.begin(), ret.end());
 
   std::string want = "action=DISKAPPEAR|mount=/|volume=|bsdname=bsd|fs=apfs"
@@ -1354,6 +1355,31 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
                      "|appearance=2040-09-09T09:09:09.000Z|mountfrom=/";
 
   XCTAssertCppStringBeginsWith(got, want);
+}
+
+- (void)testSerializeDiskAppearedBlocked {
+  NSDictionary *props = @{
+    @"DADevicePath" : @"",
+    @"DADeviceVendor" : @"vendor",
+    @"DADeviceModel" : @"model",
+    @"DAAppearanceTime" : @(1252487349),  // 2009-09-09 09:09:09
+    @"DAVolumePath" : [NSURL URLWithString:@"/Volumes/USB"],
+    @"DAMediaBSDName" : @"disk2s1",
+    @"DAVolumeKind" : @"msdos",
+    @"DADeviceProtocol" : @"USB",
+    @"SNTMountFromName" : @"/dev/disk2s1",
+  };
+
+  std::vector<uint8_t> ret =
+      BasicString::Create(nullptr, nil, false)->SerializeDiskAppeared(props, false);
+  std::string got(ret.begin(), ret.end());
+
+  std::string want =
+      "action=DISK_BLOCKED|mount=/Volumes/USB|volume=|bsdname=disk2s1|fs=msdos"
+      "|model=vendor model|serial=|bus=USB|dmgpath="
+      "|appearance=2040-09-09T09:09:09.000Z|mountfrom=/dev/disk2s1|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
 }
 
 - (void)testSerializeDiskDisappeared {

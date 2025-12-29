@@ -99,7 +99,7 @@ class MockSerializer : public Empty {
   MOCK_METHOD(std::vector<uint8_t>, SerializeAllowlist, (const Message &, const std::string_view));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeBundleHashingEvent, (SNTStoredExecutionEvent *));
-  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary *));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary *, bool));
   MOCK_METHOD(std::vector<uint8_t>, SerializeDiskDisappeared, (NSDictionary *));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
@@ -320,7 +320,7 @@ class MockWriter : public santa::Writer {
   EXPECT_CALL(*mockWriter, Write);
 
   Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
-      .LogDiskAppeared(@{@"key" : @"value"});
+      .LogDiskAppeared(@{@"key" : @"value"}, true);
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());

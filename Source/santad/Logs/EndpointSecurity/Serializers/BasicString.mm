@@ -1180,8 +1180,6 @@ std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props, boo
   if (allowed) {
     str.append([NonNull(MountFromName([props[@"DAVolumePath"] path])) UTF8String]);
   } else {
-    LOGE(@"pull from new key... %@ = %@", santa::kMountFromNameKey,
-         props[santa::kMountFromNameKey]);
     str.append([NonNull(props[santa::kMountFromNameKey]) UTF8String]);
   }
 

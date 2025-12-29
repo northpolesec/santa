@@ -45,7 +45,7 @@ using santa::Empty;
 
   XCTAssertEqual(e->SerializeAllowlist(*(santa::Message *)&fake, "").size(), 0);
   XCTAssertEqual(e->SerializeBundleHashingEvent(nil).size(), 0);
-  XCTAssertEqual(e->SerializeDiskAppeared(nil).size(), 0);
+  XCTAssertEqual(e->SerializeDiskAppeared(nil, true).size(), 0);
   XCTAssertEqual(e->SerializeDiskDisappeared(nil).size(), 0);
 }
 
