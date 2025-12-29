@@ -139,10 +139,25 @@
                 });
   OCMVerify(times(1), [mockProxy postEventsToSyncServer:[OCMArg any] reply:[OCMArg any]]);
 
-  // Now simulate the first upload failing, which should remove the backoff
+  // Simulate the first upload failing, which should remove the backoff
   replyBlock(NO);
 
   // Third attempt: Since backoff was removed, event should be dispatched again
+  [sut addStoredEvent:se];
+  dispatch_sync(sut.syncdQueue, ^{
+                });
+  OCMVerify(times(2), [mockProxy postEventsToSyncServer:[OCMArg any] reply:[OCMArg any]]);
+
+  // Fourth attempt: Event should be dropped due to backoff
+  [sut addStoredEvent:se];
+  dispatch_sync(sut.syncdQueue, ^{
+                });
+  OCMVerify(times(2), [mockProxy postEventsToSyncServer:[OCMArg any] reply:[OCMArg any]]);
+
+  // Now simulate the second upload succeeding, which should keep the backoff
+  replyBlock(YES);
+
+  // Fifth attempt: Event should still be dropped due to backoff (success keeps backoff)
   [sut addStoredEvent:se];
   dispatch_sync(sut.syncdQueue, ^{
                 });
