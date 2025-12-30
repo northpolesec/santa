@@ -79,7 +79,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 SNTExecutionController *exec_controller,
                 std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
                 std::shared_ptr<TTYWriter> tty_writer,
-                std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree) {
+                std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
+                std::shared_ptr<santa::EntitlementsFilter> entitlements_filter) {
   SNTConfigurator *configurator = [SNTConfigurator configurator];
 
   SNTDaemonControlController *dc =
@@ -460,9 +461,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 LOGI(@"EntitlementsTeamIDFilter changed: '%@' -> '%@'. Flushing caches.", oldValue,
                      newValue);
 
-                // Get the value from the configurator since that method ensures proper structure
-                [exec_controller
-                    updateEntitlementsTeamIDFilter:[configurator entitlementsTeamIDFilter]];
+                // Get the value from the configurator since it will ensures proper types
+                entitlements_filter->UpdateTeamIDFilter([configurator entitlementsTeamIDFilter]);
 
                 // Clear the AuthResultCache, then clear the ES cache to ensure
                 // future execs get SNTCachedDecision entitlement values filtered
@@ -483,9 +483,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 LOGI(@"EntitlementsPrefixFilter changed: '%@' -> '%@'. Flushing caches.", oldValue,
                      newValue);
 
-                // Get the value from the configurator since that method ensures proper structure
-                [exec_controller
-                    updateEntitlementsPrefixFilter:[configurator entitlementsPrefixFilter]];
+                // Get the value from the configurator since it will ensures proper types
+                entitlements_filter->UpdatePrefixFilter([configurator entitlementsPrefixFilter]);
 
                 // Clear the AuthResultCache, then clear the ES cache to ensure
                 // future execs get SNTCachedDecision entitlement values filtered
@@ -767,6 +766,12 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 #else
   (void)tamper_client;  // Prevent unused variable issues in debug builds
 #endif  // DEBUG
+
+  // Kickoff pre-populating the decision cache. This is done after the Authorizer ES client
+  // is enabled to ensure that there is no gap between getting the list of processes to
+  // backill and the authorizer handling new execs.
+  [[SNTDecisionCache sharedCache]
+      backfillDecisionCacheAsyncWithEntitlementsFilter:entitlements_filter];
 
   // Start monitoring any watched items
   watch_items->StartTimer();

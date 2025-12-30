@@ -45,6 +45,7 @@ void SantadMain(
     SNTExecutionController* exec_controller,
     std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
     std::shared_ptr<santa::TTYWriter> tty_writer,
-    std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree);
+    std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
+    std::shared_ptr<santa::EntitlementsFilter> entitlements_filter);
 
 #endif

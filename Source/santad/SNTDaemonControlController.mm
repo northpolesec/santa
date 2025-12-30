@@ -47,7 +47,6 @@
 #include "Source/santad/KillingMachine.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTNotificationQueue.h"
-#import "Source/santad/SNTPolicyProcessor.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TemporaryMonitorMode.h"
 
@@ -65,7 +64,6 @@ double watchdogCPUPeak = 0;
 double watchdogRAMPeak = 0;
 
 @interface SNTDaemonControlController ()
-@property SNTPolicyProcessor *policyProcessor;
 @property SNTNotificationQueue *notQueue;
 @property SNTSyncdQueue *syncdQueue;
 @property dispatch_queue_t commandQ;
@@ -86,8 +84,6 @@ double watchdogRAMPeak = 0;
   self = [super init];
   if (self) {
     _logger = logger;
-    _policyProcessor =
-        [[SNTPolicyProcessor alloc] initWithRuleTable:[SNTDatabaseController ruleTable]];
     _authResultCache = authResultCache;
     _watchItems = std::move(watchItems);
     _notQueue = notQueue;

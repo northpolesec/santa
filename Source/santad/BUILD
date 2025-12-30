@@ -119,13 +119,20 @@ objc_library(
     srcs = ["SNTDecisionCache.mm"],
     hdrs = ["SNTDecisionCache.h"],
     deps = [
+        ":EntitlementsFilter",
         ":SNTDatabaseController",
         ":SNTRuleTable",
+        "//Source/common:AuditUtilities",
+        "//Source/common:CodeSigningIdentifierUtils",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
+        "//Source/common:SystemResources",
     ],
 )
 
@@ -209,6 +216,7 @@ objc_library(
     srcs = ["SNTPolicyProcessor.mm"],
     hdrs = ["SNTPolicyProcessor.h"],
     deps = [
+        ":EntitlementsFilter",
         ":SNTRuleTable",
         "//Source/common:CertificateHelpers",
         "//Source/common:MOLCertificate",
@@ -321,6 +329,27 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "EntitlementsFilter",
+    srcs = ["EntitlementsFilter.mm"],
+    hdrs = ["EntitlementsFilter.h"],
+    deps = [
+        "//Source/common:PrefixTree",
+        "//Source/common:SNTDeepCopy",
+        "//Source/common:String",
+        "//Source/common:Unit",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+santa_unit_test(
+    name = "EntitlementsFilterTest",
+    srcs = ["EntitlementsFilterTest.mm"],
+    deps = [
+        ":EntitlementsFilter",
+    ],
+)
+
+objc_library(
     name = "SNTExecutionController",
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
@@ -343,8 +372,6 @@ objc_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTDeepCopy",
-        "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
@@ -494,6 +521,7 @@ objc_library(
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
+        ":EntitlementsFilter",
         ":Metrics",
         ":RateLimiter",
         ":SNTDecisionCache",
@@ -904,7 +932,6 @@ objc_library(
         ":SNTDatabaseController",
         ":SNTEventTable",
         ":SNTNotificationQueue",
-        ":SNTPolicyProcessor",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":TemporaryMonitorMode",
@@ -1003,6 +1030,7 @@ objc_library(
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
+        ":EntitlementsFilter",
         ":Metrics",
         ":ProcessControl",
         ":SNTCompilerController",
@@ -1754,6 +1782,7 @@ test_suite(
         ":EndpointSecuritySerializerUtilitiesTest",
         ":EndpointSecurityWriterFileTest",
         ":EndpointSecurityWriterSpoolTest",
+        ":EntitlementsFilterTest",
         ":FAAPolicyProcessorTest",
         ":KillingMachineTest",
         ":MetricsTest",

@@ -18,6 +18,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessControl.h"
+#import "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/TTYWriter.h"
 
 const static NSString *kBlockBinary = @"BlockBinary";
@@ -66,8 +67,7 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
                     notifierQueue:(SNTNotificationQueue *)notifierQueue
                        syncdQueue:(SNTSyncdQueue *)syncdQueue
                         ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-         entitlementsPrefixFilter:(NSArray<NSString *> *)prefixFilter
-         entitlementsTeamIDFilter:(NSArray<NSString *> *)teamIDFilter
+                  policyProcessor:(SNTPolicyProcessor *)policyProcessor
               processControlBlock:(santa::ProcessControlBlock)processControlBlock;
 
 ///
@@ -100,9 +100,6 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 ///  @return bool True if the event should be processed, otherwise false.
 ///
 - (bool)synchronousShouldProcessExecEvent:(const santa::Message &)esMsg;
-
-- (void)updateEntitlementsPrefixFilter:(NSArray<NSString *> *)filter;
-- (void)updateEntitlementsTeamIDFilter:(NSArray<NSString *> *)filter;
 
 @property(nonatomic, readonly) SNTRuleTable *ruleTable;
 

@@ -15,6 +15,7 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
+#include <memory>
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTCommonEnums.h"
@@ -22,6 +23,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #include "Source/common/cel/Activation.h"
+#include "Source/santad/EntitlementsFilter.h"
 
 @class MOLCodesignChecker;
 @class SNTCachedDecision;
@@ -41,7 +43,9 @@ typedef std::unique_ptr<santa::cel::Activation<true>> (^ActivationCallbackBlock)
 ///
 ///  @param ruleTable The rule table to be used for every decision
 ///
-- (nullable instancetype)initWithRuleTable:(nonnull SNTRuleTable *)ruleTable;
+- (nullable instancetype)initWithRuleTable:(nonnull SNTRuleTable *)ruleTable
+                        entitlementsFilter:
+                            (std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter;
 
 ///
 ///  Convenience initializer. Will obtain the teamID and construct the signingID
@@ -51,14 +55,11 @@ typedef std::unique_ptr<santa::cel::Activation<true>> (^ActivationCallbackBlock)
 ///  only guaranteed for the duration of the call to the block. Do not perform
 ///  any async processing without extending their lifetimes.
 ///
-- (nonnull SNTCachedDecision *)
-           decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                 targetProcess:(nonnull const es_process_t *)targetProc
-                   configState:(nonnull SNTConfigState *)configState
-            activationCallback:(nullable ActivationCallbackBlock)activationCallback
-    entitlementsFilterCallback:(NSDictionary *_Nullable (^_Nonnull)(
-                                   const char *_Nullable teamID,
-                                   NSDictionary *_Nullable entitlements))entitlementsFilterCallback;
+- (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                                     targetProcess:(nonnull const es_process_t *)targetProc
+                                       configState:(nonnull SNTConfigState *)configState
+                                activationCallback:
+                                    (nullable ActivationCallbackBlock)activationCallback;
 
 ///
 /// Updates a decision for a given file and agent configuration.
