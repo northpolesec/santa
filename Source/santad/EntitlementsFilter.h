@@ -50,11 +50,11 @@ class EntitlementsFilter {
   void UpdatePrefixFilter(NSArray<NSString *> *filter);
 
  private:
-  void UpdateTeamIDFilterLocked(NSArray<NSString *> *filter);
-  void UpdatePrefixFilterLocked(NSArray<NSString *> *filter);
+  void UpdateTeamIDFilterLocked(NSArray<NSString *> *filter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void UpdatePrefixFilterLocked(NSArray<NSString *> *filter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  std::set<std::string> teamid_filter_;
-  santa::PrefixTree<santa::Unit> prefix_filter_;
+  std::set<std::string> teamid_filter_ ABSL_GUARDED_BY(lock_);
+  santa::PrefixTree<santa::Unit> prefix_filter_ ABSL_GUARDED_BY(lock_);
   absl::Mutex lock_;
 };
 
