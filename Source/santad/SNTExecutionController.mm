@@ -37,8 +37,6 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTDeepCopy.h"
-#import "Source/common/SNTDropRootPrivs.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
@@ -53,7 +51,6 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
-#import "Source/santad/SNTPolicyProcessor.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #include "absl/synchronization/mutex.h"
 
@@ -64,23 +61,6 @@ using santa::TTYWriter;
 using santa::Unit;
 
 static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account for null terminator
-
-void UpdateTeamIDFilterLocked(std::set<std::string> &filterSet, NSArray<NSString *> *filter) {
-  filterSet.clear();
-
-  for (NSString *prefix in filter) {
-    filterSet.insert(santa::NSStringToUTF8String(prefix));
-  }
-}
-
-void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
-                              NSArray<NSString *> *filter) {
-  tree->Reset();
-
-  for (NSString *item in filter) {
-    tree->InsertPrefix(item.UTF8String, Unit{});
-  }
-}
 
 @interface SNTExecutionController ()
 @property SNTEventTable *eventTable;
@@ -96,9 +76,6 @@ void UpdatePrefixFilterLocked(std::unique_ptr<PrefixTree<Unit>> &tree,
 
 @implementation SNTExecutionController {
   std::shared_ptr<TTYWriter> _ttyWriter;
-  absl::Mutex _entitlementFilterMutex;
-  std::set<std::string> _entitlementsTeamIDFilter;
-  std::unique_ptr<PrefixTree<Unit>> _entitlementsPrefixFilter;
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
 }
 
@@ -117,8 +94,7 @@ static NSString *const kPrinterProxyPostMonterey =
                     notifierQueue:(SNTNotificationQueue *)notifierQueue
                        syncdQueue:(SNTSyncdQueue *)syncdQueue
                         ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
-         entitlementsPrefixFilter:(NSArray<NSString *> *)entitlementsPrefixFilter
-         entitlementsTeamIDFilter:(NSArray<NSString *> *)entitlementsTeamIDFilter
+                  policyProcessor:(SNTPolicyProcessor *)policyProcessor
               processControlBlock:(santa::ProcessControlBlock)processControlBlock {
   self = [super init];
   if (self) {
@@ -127,7 +103,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _notifierQueue = notifierQueue;
     _syncdQueue = syncdQueue;
     _ttyWriter = std::move(ttyWriter);
-    _policyProcessor = [[SNTPolicyProcessor alloc] initWithRuleTable:_ruleTable];
+    _policyProcessor = policyProcessor;
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _processControlBlock = processControlBlock;
 
@@ -142,23 +118,8 @@ static NSString *const kPrinterProxyPostMonterey =
     _events = [metricSet counterWithName:@"/santa/events"
                               fieldNames:@[ @"action_response" ]
                                 helpText:@"Events processed by Santa per response"];
-
-    self->_entitlementsPrefixFilter = std::make_unique<PrefixTree<Unit>>();
-
-    UpdatePrefixFilterLocked(self->_entitlementsPrefixFilter, entitlementsPrefixFilter);
-    UpdateTeamIDFilterLocked(self->_entitlementsTeamIDFilter, entitlementsTeamIDFilter);
   }
   return self;
-}
-
-- (void)updateEntitlementsPrefixFilter:(NSArray<NSString *> *)filter {
-  absl::MutexLock lock(&self->_entitlementFilterMutex);
-  UpdatePrefixFilterLocked(self->_entitlementsPrefixFilter, filter);
-}
-
-- (void)updateEntitlementsTeamIDFilter:(NSArray<NSString *> *)filter {
-  absl::MutexLock lock(&self->_entitlementFilterMutex);
-  UpdateTeamIDFilterLocked(self->_entitlementsTeamIDFilter, filter);
 }
 
 - (void)incrementEventCounters:(SNTEventState)eventType {
@@ -272,44 +233,13 @@ static NSString *const kPrinterProxyPostMonterey =
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
   SNTCachedDecision *cd = [self.policyProcessor
-             decisionForFileInfo:binInfo
-                   targetProcess:targetProc
-                     configState:configState
-              activationCallback:
-                  [self createActivationBlockForMessage:esMsg
-                                              andCSInfo:[binInfo codesignCheckerWithError:NULL]]
-      entitlementsFilterCallback:^NSDictionary *(const char *teamID, NSDictionary *entitlements) {
-        if (!entitlements) {
-          return nil;
-        }
-
-        absl::ReaderMutexLock lock(&self->_entitlementFilterMutex);
-
-        if (teamID && self->_entitlementsTeamIDFilter.count(std::string(teamID)) > 0) {
-          // Dropping entitlement logging for configured TeamID
-          return nil;
-        }
-
-        if (self->_entitlementsPrefixFilter->NodeCount() == 0) {
-          // Copying full entitlements for TeamID
-          return [entitlements sntDeepCopy];
-        } else {
-          // Filtering entitlements for TeamID
-          NSMutableDictionary *filtered = [NSMutableDictionary dictionary];
-
-          [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
-            if (!self->_entitlementsPrefixFilter->HasPrefix(key.UTF8String)) {
-              if ([obj isKindOfClass:[NSArray class]] || [obj isKindOfClass:[NSDictionary class]]) {
-                [filtered setObject:[obj sntDeepCopy] forKey:key];
-              } else {
-                [filtered setObject:[obj copy] forKey:key];
-              }
-            }
-          }];
-
-          return filtered.count > 0 ? filtered : nil;
-        }
-      }];
+      decisionForFileInfo:binInfo
+            targetProcess:targetProc
+              configState:configState
+       activationCallback:[self
+                              createActivationBlockForMessage:esMsg
+                                                    andCSInfo:[binInfo
+                                                                  codesignCheckerWithError:NULL]]];
 
   cd.codesigningFlags = targetProc->codesigning_flags;
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);

@@ -26,6 +26,7 @@
 #import "Source/common/SNTMetricSet.h"
 #include "Source/common/Unit.h"
 #include "Source/common/faa/WatchItems.h"
+#include "Source/santad/EntitlementsFilter.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
@@ -59,7 +60,8 @@ class SantadDeps {
       SNTExecutionController *exec_controller,
       std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
       std::shared_ptr<santa::TTYWriter> tty_writer,
-      std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree);
+      std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
+      std::shared_ptr<santa::EntitlementsFilter> entitlements_filter);
 
   std::shared_ptr<santa::AuthResultCache> AuthResultCache();
   std::shared_ptr<santa::Enricher> Enricher();
@@ -75,6 +77,7 @@ class SantadDeps {
   std::shared_ptr<santa::PrefixTree<santa::Unit>> PrefixTree();
   std::shared_ptr<santa::TTYWriter> TTYWriter();
   std::shared_ptr<santa::santad::process_tree::ProcessTree> ProcessTree();
+  std::shared_ptr<santa::EntitlementsFilter> EntitlementsFilter();
 
  private:
   std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
@@ -83,7 +86,6 @@ class SantadDeps {
   std::shared_ptr<santa::WatchItems> watch_items_;
   std::shared_ptr<santa::Enricher> enricher_;
   std::shared_ptr<santa::AuthResultCache> auth_result_cache_;
-
   MOLXPCConnection *control_connection_;
   SNTCompilerController *compiler_controller_;
   SNTNotificationQueue *notifier_queue_;
@@ -92,6 +94,7 @@ class SantadDeps {
   std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree_;
   std::shared_ptr<santa::TTYWriter> tty_writer_;
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree_;
+  std::shared_ptr<santa::EntitlementsFilter> entitlements_filter_;
 };
 
 }  // namespace santa

@@ -18,14 +18,17 @@
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SantaVnode.h"
+#include "Source/santad/EntitlementsFilter.h"
 
 @interface SNTDecisionCache : NSObject
 
 + (instancetype)sharedCache;
 
-- (void)cacheDecision:(SNTCachedDecision *)cd;
+- (bool)cacheDecision:(SNTCachedDecision *)cd;
 - (SNTCachedDecision *)cachedDecisionForFile:(const struct stat &)statInfo;
 - (void)forgetCachedDecisionForVnode:(SantaVnode)vnode;
 - (SNTCachedDecision *)resetTimestampForCachedDecision:(const struct stat &)statInfo;
+- (void)backfillDecisionCacheAsyncWithEntitlementsFilter:
+    (std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter;
 
 @end

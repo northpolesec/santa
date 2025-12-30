@@ -24,6 +24,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Source/common/CodeSigningIdentifierUtils.h"
 #import "Source/common/Glob.h"
 #import "Source/common/PrefixTree.h"
 #import "Source/common/SNTError.h"
@@ -32,9 +33,6 @@
 #include "absl/container/flat_hash_set.h"
 
 namespace santa {
-
-static constexpr NSUInteger kTeamIDLength = 10;
-static NSString *const kPlatformTeamID = @"platform";
 
 // Forward declarations
 enum class WatchItemPathType;

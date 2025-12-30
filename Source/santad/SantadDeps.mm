@@ -28,11 +28,13 @@
 #include "Source/common/faa/WatchItems.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/santad/EntitlementsFilter.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/ProcessTree/annotations/originator.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTDatabaseController.h"
 #include "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;
@@ -98,14 +100,20 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
+  std::shared_ptr<santa::EntitlementsFilter> entitlements_filter = EntitlementsFilter::Create(
+      configurator.entitlementsTeamIDFilter, configurator.entitlementsPrefixFilter);
+
+  SNTPolicyProcessor *policy_processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:rule_table
+                                 entitlementsFilter:entitlements_filter];
+
   SNTExecutionController *exec_controller =
       [[SNTExecutionController alloc] initWithRuleTable:rule_table
                                              eventTable:event_table
                                           notifierQueue:notifier_queue
                                              syncdQueue:syncd_queue
                                               ttyWriter:tty_writer
-                               entitlementsPrefixFilter:[configurator entitlementsPrefixFilter]
-                               entitlementsTeamIDFilter:[configurator entitlementsTeamIDFilter]
+                                        policyProcessor:policy_processor
                                     processControlBlock:processControlBlock];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
@@ -215,7 +223,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   return std::make_unique<SantadDeps>(
       esapi, std::move(logger), std::move(metrics), std::move(watch_items),
       std::move(auth_result_cache), control_connection, compiler_controller, notifier_queue,
-      syncd_queue, exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree));
+      syncd_queue, exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree),
+      std::move(entitlements_filter));
 }
 
 SantadDeps::SantadDeps(
@@ -225,7 +234,8 @@ SantadDeps::SantadDeps(
     SNTCompilerController *compiler_controller, SNTNotificationQueue *notifier_queue,
     SNTSyncdQueue *syncd_queue, SNTExecutionController *exec_controller,
     std::shared_ptr<::PrefixTree<Unit>> prefix_tree, std::shared_ptr<::TTYWriter> tty_writer,
-    std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree)
+    std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
+    std::shared_ptr<santa::EntitlementsFilter> entitlements_filter)
     : esapi_(std::move(esapi)),
       logger_(std::move(logger)),
       metrics_(std::move(metrics)),
@@ -239,7 +249,8 @@ SantadDeps::SantadDeps(
       exec_controller_(exec_controller),
       prefix_tree_(prefix_tree),
       tty_writer_(std::move(tty_writer)),
-      process_tree_(std::move(process_tree)) {}
+      process_tree_(std::move(process_tree)),
+      entitlements_filter_(std::move(entitlements_filter)) {}
 
 std::shared_ptr<::AuthResultCache> SantadDeps::AuthResultCache() {
   return auth_result_cache_;
@@ -294,6 +305,10 @@ std::shared_ptr<::TTYWriter> SantadDeps::TTYWriter() {
 
 std::shared_ptr<santa::santad::process_tree::ProcessTree> SantadDeps::ProcessTree() {
   return process_tree_;
+}
+
+std::shared_ptr<santa::EntitlementsFilter> SantadDeps::EntitlementsFilter() {
+  return entitlements_filter_;
 }
 
 }  // namespace santa

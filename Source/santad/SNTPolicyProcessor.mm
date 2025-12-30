@@ -59,6 +59,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 
 @interface SNTPolicyProcessor () {
   std::unique_ptr<santa::cel::Evaluator<true>> celEvaluator_;
+  std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter_;
 }
 @property SNTRuleTable *ruleTable;
 @property SNTConfigurator *configurator;
@@ -82,10 +83,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   return self;
 }
 
-- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable {
+- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable
+               entitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter {
   self = [self init];
   if (self) {
     _ruleTable = ruleTable;
+    entitlementsFilter_ = std::move(entitlementsFilter);
   }
   return self;
 }
@@ -360,15 +363,11 @@ static void UpdateCachedDecisionSigningInfo(
   }
 }
 
-- (nonnull SNTCachedDecision *)
-           decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                 targetProcess:(nonnull const es_process_t *)targetProc
-                   configState:(nonnull SNTConfigState *)configState
-            activationCallback:(nullable ActivationCallbackBlock)activationCallback
-    entitlementsFilterCallback:
-        (NSDictionary *_Nullable (^_Nonnull)(const char *_Nullable teamID,
-                                             NSDictionary *_Nullable entitlements))
-            entitlementsFilterCallback {
+- (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
+                                     targetProcess:(nonnull const es_process_t *)targetProc
+                                       configState:(nonnull SNTConfigState *)configState
+                                activationCallback:
+                                    (nullable ActivationCallbackBlock)activationCallback {
   NSString *signingID;
   NSString *teamID;
   NSString *cdhash;
@@ -431,7 +430,7 @@ static void UpdateCachedDecisionSigningInfo(
       }
       activationCallback:activationCallback
       entitlementsFilterCallback:^NSDictionary *(NSDictionary *entitlements) {
-        return entitlementsFilterCallback(entitlementsFilterTeamID, entitlements);
+        return entitlementsFilter_->Filter(entitlementsFilterTeamID, entitlements);
       }];
 }
 

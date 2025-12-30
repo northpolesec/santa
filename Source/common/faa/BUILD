@@ -11,6 +11,7 @@ objc_library(
     name = "WatchItemPolicy",
     hdrs = ["WatchItemPolicy.h"],
     deps = [
+        "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:Glob",
         "//Source/common:PrefixTree",
         "//Source/common:SNTError",

@@ -142,7 +142,8 @@ int main(int argc, char *argv[]) {
     SantadMain(deps->ESAPI(), deps->Logger(), deps->Metrics(), deps->WatchItems(), deps->Enricher(),
                deps->AuthResultCache(), deps->ControlConnection(), deps->CompilerController(),
                deps->NotifierQueue(), deps->SyncdQueue(), deps->ExecController(),
-               deps->PrefixTree(), deps->TTYWriter(), deps->ProcessTree());
+               deps->PrefixTree(), deps->TTYWriter(), deps->ProcessTree(),
+               deps->EntitlementsFilter());
   }
 
   return 0;

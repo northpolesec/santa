@@ -30,11 +30,13 @@
 #include "Source/common/TestUtils.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/santad/EntitlementsFilter.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTExecutionController.h"
+#import "Source/santad/SNTPolicyProcessor.h"
 
 using santa::Message;
 
@@ -76,7 +78,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   self.mockDecisionCache = OCMStrictClassMock([SNTDecisionCache class]);
   OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
-  OCMStub([self.mockDecisionCache cacheDecision:OCMOCK_ANY]);
+  OCMStub([self.mockDecisionCache cacheDecision:OCMOCK_ANY]).andReturn(YES);
 
   [[SNTMetricSet sharedInstance] reset];
 
@@ -101,13 +103,18 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   self.mockRuleDatabase = OCMClassMock([SNTRuleTable class]);
   self.mockEventDatabase = OCMClassMock([SNTEventTable class]);
 
+  std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter =
+      santa::EntitlementsFilter::Create(@[], @[]);
+  SNTPolicyProcessor *policyProcessor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:self.mockRuleDatabase
+                                 entitlementsFilter:entitlementsFilter];
+
   self.sut = [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                                     eventTable:self.mockEventDatabase
                                                  notifierQueue:nil
                                                     syncdQueue:nil
                                                      ttyWriter:santa::TTYWriter::Create(true)
-                                      entitlementsPrefixFilter:nil
-                                      entitlementsTeamIDFilter:nil
+                                               policyProcessor:policyProcessor
                                            processControlBlock:santa::ProdSuspendResumeBlock()];
 }
 
