@@ -26,6 +26,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkMountEvent.h"
 #include "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -52,6 +53,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
     SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena);
 ::pbv2::AuditEvent *MessageForTemporaryMonitorModeAuditEvent(
     SNTStoredTemporaryMonitorModeAuditEvent *event, google::protobuf::Arena *arena);
+::pbv2::NetworkMountEvent *MessageForNetworkMountEvent(SNTStoredNetworkMountEvent *event,
+                                                       google::protobuf::Arena *arena);
 
 template <bool IsV2>
 BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch) {
@@ -98,6 +101,10 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
       req->mutable_file_access_events();
   google::protobuf::RepeatedPtrField<typename Traits::AuditEventT> *uploadAuditEvents =
       req->mutable_audit_events();
+  google::protobuf::RepeatedPtrField<::pbv2::NetworkMountEvent> *uploadNetworkMountEvents;
+  if constexpr (IsV2) {
+    uploadNetworkMountEvents = req->mutable_network_mount_events();
+  }
   __block BOOL success = YES;
   NSUInteger finalIdx = (events.count - 1);
 
@@ -121,6 +128,12 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
           uploadAuditEvents->UnsafeArenaAddAllocated(e);
         }
       }
+    } else if ([event isKindOfClass:[SNTStoredNetworkMountEvent class]]) {
+      if constexpr (IsV2) {
+        if (auto e = MessageForNetworkMountEvent((SNTStoredNetworkMountEvent *)event, pArena)) {
+          uploadNetworkMountEvents->UnsafeArenaAddAllocated(e);
+        }
+      }
     } else {
       // This shouldn't be able to happen. But if it does, log a warning and continue. We still
       // want to continue on in case this is the last event being enumerated so that anything in
@@ -128,12 +141,14 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
       LOGW(@"Unexpected event type in event upload: %@", [event class]);
     }
 
-    if ((uploadEvents->size() + uploadFAAEvents->size() + uploadAuditEvents->size()) >=
-            self.syncState.eventBatchSize ||
-        idx == finalIdx) {
-      int eventsInBatch =
-          req->events_size() + req->file_access_events_size() + req->audit_events_size();
-      if (!PerformRequest<IsV2>(self, req, eventsInBatch)) {
+    int totalEventCount =
+        uploadEvents->size() + uploadFAAEvents->size() + uploadAuditEvents->size();
+    if constexpr (IsV2) {
+      totalEventCount += uploadNetworkMountEvents->size();
+    }
+
+    if (totalEventCount >= self.syncState.eventBatchSize || idx == finalIdx) {
+      if (!PerformRequest<IsV2>(self, req, totalEventCount)) {
         success = NO;
         *stop = YES;
         return;
@@ -146,6 +161,9 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
       uploadEvents->Clear();
       uploadFAAEvents->Clear();
       uploadAuditEvents->Clear();
+      if constexpr (IsV2) {
+        uploadNetworkMountEvents->Clear();
+      }
     }
   }];
 
@@ -347,6 +365,20 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
   }
 
   return e;
+}
+
+::pbv2::NetworkMountEvent *MessageForNetworkMountEvent(SNTStoredNetworkMountEvent *event,
+                                                       google::protobuf::Arena *arena) {
+  auto pbNetworkMountEvent =
+      google::protobuf::Arena::Create<typename ::pbv2::NetworkMountEvent>(arena);
+
+  pbNetworkMountEvent->set_uuid(NSStringToUTF8String(event.uuid));
+  pbNetworkMountEvent->set_mount_from(
+      NSStringToUTF8String([event sanitizedMountFromRemovingCredentials]));
+  pbNetworkMountEvent->set_mount_on(NSStringToUTF8String(event.mountOnName));
+  pbNetworkMountEvent->set_fs_type(NSStringToUTF8String(event.fsType));
+
+  return pbNetworkMountEvent;
 }
 
 void MessageForTemporaryMonitorModeEnterAuditEvent(

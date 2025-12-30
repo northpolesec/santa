@@ -29,12 +29,13 @@
 
 #include <cstdlib>
 
-#include "Source/common/MOLCodesignChecker.h"
-#include "Source/common/SNTCommonEnums.h"
-#include "Source/common/SNTFileInfo.h"
-#include "Source/common/SNTStoredExecutionEvent.h"
-#include "Source/common/SNTStoredFileAccessEvent.h"
-#include "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
+#import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkMountEvent.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 
 static NSString *const kOutputPath = @"/tmp/stored_event_archive.plist";
 
@@ -136,12 +137,63 @@ void AddStoredTemporaryMonitorModeAuditEvents(NSMutableArray<SNTStoredEvent *> *
                                     reason:SNTTemporaryMonitorModeLeaveReasonRevoked]];
 }
 
+void AddStoredNetworkMountEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
+  NSError *err;
+  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/sbin/mount" error:&err];
+  if (!fi) {
+    NSLog(@"Failed to grab file info for \"mount\": %@", err);
+    exit(EXIT_FAILURE);
+  }
+
+  MOLCodesignChecker *csc = [fi codesignCheckerWithError:&err];
+  if (!csc) {
+    NSLog(@"Failed to grab codesign info for \"mount\": %@", err);
+    exit(EXIT_FAILURE);
+  }
+
+  // First network mount event - SMB share
+  SNTStoredNetworkMountEvent *event1 = [[SNTStoredNetworkMountEvent alloc] init];
+  event1.mountFromName = @"//server.example.com/share";
+  event1.mountOnName = @"/Volumes/share";
+  event1.fsType = @"smbfs";
+  event1.process.filePath = fi.path;
+  event1.process.fileSHA256 = fi.SHA256;
+  event1.process.cdhash = csc.cdhash;
+  event1.process.signingID = csc.signingID;
+  event1.process.signingChain = csc.certificates;
+  event1.process.teamID = csc.teamID;
+  event1.process.pid = @(789);
+  event1.process.pidversion = @(1);
+  event1.process.executingUserID = @(501);
+  event1.process.executingUser = @"testuser";
+
+  // Second network mount event - NFS share
+  SNTStoredNetworkMountEvent *event2 = [[SNTStoredNetworkMountEvent alloc] init];
+  event2.mountFromName = @"nfs-server.example.com:/export/data";
+  event2.mountOnName = @"/Volumes/nfs-data";
+  event2.fsType = @"nfs";
+  event2.process.filePath = fi.path;
+  event2.process.fileSHA256 = fi.SHA256;
+  event2.process.cdhash = csc.cdhash;
+  event2.process.signingID = csc.signingID;
+  event2.process.signingChain = csc.certificates;
+  event2.process.teamID = csc.teamID;
+  event2.process.pid = @(890);
+  event2.process.pidversion = @(1);
+  event2.process.executingUserID = @(502);
+  event2.process.executingUser = @"admin";
+
+  [storedEvents addObject:event1];
+  [storedEvents addObject:event2];
+}
+
 int main(int argc, const char *argv[]) {
   NSMutableArray<SNTStoredEvent *> *storedEvents = [[NSMutableArray alloc] init];
 
   AddStoredExecutionEvents(storedEvents);
   AddStoredFileAccessEvents(storedEvents);
   AddStoredTemporaryMonitorModeAuditEvents(storedEvents);
+  AddStoredNetworkMountEvents(storedEvents);
 
   NSError *err;
   NSData *data = [NSKeyedArchiver archivedDataWithRootObject:storedEvents

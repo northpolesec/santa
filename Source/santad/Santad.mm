@@ -112,6 +112,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   };
 
   device_client.networkMountCallback = ^(SNTStoredNetworkMountEvent *event) {
+    [syncd_queue addStoredEvent:event];
     [[notifier_queue.notifierConnection remoteObjectProxy]
         postNetworkMountNotification:event
                         configBundle:santa::NetworkMountConfigBundle(
