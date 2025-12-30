@@ -461,7 +461,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 LOGI(@"EntitlementsTeamIDFilter changed: '%@' -> '%@'. Flushing caches.", oldValue,
                      newValue);
 
-                // Get the value from the configurator since it will ensures proper types
+                // Get the value from the configurator since it ensures proper types
                 entitlements_filter->UpdateTeamIDFilter([configurator entitlementsTeamIDFilter]);
 
                 // Clear the AuthResultCache, then clear the ES cache to ensure
@@ -483,7 +483,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 LOGI(@"EntitlementsPrefixFilter changed: '%@' -> '%@'. Flushing caches.", oldValue,
                      newValue);
 
-                // Get the value from the configurator since it will ensures proper types
+                // Get the value from the configurator since it ensures proper types
                 entitlements_filter->UpdatePrefixFilter([configurator entitlementsPrefixFilter]);
 
                 // Clear the AuthResultCache, then clear the ES cache to ensure
