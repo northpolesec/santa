@@ -25,6 +25,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
+#import "Source/common/SNTSyncStateAccessor.h"
 #import "Source/common/SNTSystemInfo.h"
 
 // Ensures the given object is an NSArray and only contains NSString value types
@@ -50,7 +51,7 @@ static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
 @property(readonly, nonatomic) NSDictionary *forcedConfigKeyTypes;
 
 /// Holds the configurations from a sync server and mobileconfig.
-@property(atomic) NSDictionary *syncState;
+@property(atomic) SNTSyncStateAccessor *syncState;
 @property(atomic) NSMutableDictionary *configState;
 @property(atomic) NSDictionary *state;
 
@@ -83,6 +84,7 @@ static NSString *const kStateTempMonitorModeKey = @"TMM";
 
 #ifdef DEBUG
 NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist";
+NSString *const kSyncStateOverrideFilePath = @"/var/db/santa/sync-state-overrides.plist";
 #endif
 
 /// The domain used by mobileconfig.
@@ -381,7 +383,15 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
 
     _configState = [self readForcedConfig];
 
-    _syncState = [self readSyncStateFromDisk] ?: [NSMutableDictionary dictionary];
+    NSDictionary *syncStateDict = [self readSyncStateFromDisk] ?: @{};
+    NSDictionary *overridesDict = nil;
+#ifdef DEBUG
+    overridesDict = [self readSyncStateOverridesFromDisk] ?: @{};
+#endif
+
+    _syncState = [[SNTSyncStateAccessor alloc] initWithSyncState:syncStateDict
+                                                        overrides:overridesDict];
+
     if ([self migrateDeprecatedSyncStateKeys]) {
       // Save the updated sync state if any keys were migrated.
       [self saveSyncStateToDisk];
@@ -1593,9 +1603,13 @@ static SNTConfigurator *sharedConfigurator = nil;
 ///
 - (void)updateSyncStateForKey:(NSString *)key value:(id)value {
   dispatch_async(dispatch_get_main_queue(), ^{
-    NSMutableDictionary *syncState = self.syncState.mutableCopy;
-    syncState[key] = value;
-    self.syncState = syncState;
+    // Update the accessor's underlying sync state
+    [self.syncState updateSyncStateValue:value forKey:key];
+
+    // Trigger KVO
+    [self willChangeValueForKey:@"syncState"];
+    [self didChangeValueForKey:@"syncState"];
+
     [self saveSyncStateToDisk];
   });
 }
@@ -1624,6 +1638,40 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 ///
+///  Read the saved sync state overrides (DEBUG only).
+///
+- (NSDictionary *)readSyncStateOverridesFromDisk {
+#ifdef DEBUG
+  if ([[[NSProcessInfo processInfo] processName] isEqualToString:@"xctest"] &&
+      ![[[NSProcessInfo processInfo] environment] objectForKey:@"ENABLE_CONFIG_OVERRIDES"]) {
+    return nil;
+  }
+
+  if (!self.syncStateAccessAuthorizerBlock()) {
+    return nil;
+  }
+
+  NSMutableDictionary *overrides =
+      [NSMutableDictionary dictionaryWithContentsOfFile:kSyncStateOverrideFilePath];
+
+  // Type validation (same pattern as readSyncStateFromDisk)
+  for (NSString *key in overrides.allKeys) {
+    if (self.syncServerKeyTypes[key] == [NSRegularExpression class]) {
+      NSString *pattern = [overrides[key] isKindOfClass:[NSString class]] ? overrides[key] : nil;
+      overrides[key] = [self expressionForPattern:pattern];
+    } else if (![overrides[key] isKindOfClass:self.syncServerKeyTypes[key]]) {
+      LOGW(@"Sync state override key '%@' has invalid type, ignoring", key);
+      overrides[key] = nil;
+    }
+  }
+
+  return overrides;
+#else
+  return nil;
+#endif
+}
+
+///
 ///  Migrate any deprecated sync state keys/values to alternative keys/values.
 ///
 ///  Returns YES if any keys were migrated. Otherwise NO.
@@ -1634,7 +1682,7 @@ static SNTConfigurator *sharedConfigurator = nil;
     return NO;
   }
 
-  NSMutableDictionary *syncState = self.syncState.mutableCopy;
+  NSMutableDictionary *syncState = self.syncState.underlyingSyncState.mutableCopy;
 
   // If the kSyncTypeRequired key exists, its current value will take precedence.
   // Otherwise, migrate the old value to be compatible with the new logic.
@@ -1647,7 +1695,9 @@ static SNTConfigurator *sharedConfigurator = nil;
   // Delete the deprecated key
   syncState[kSyncCleanRequiredDeprecated] = nil;
 
-  self.syncState = syncState;
+  // Create a new accessor with the migrated sync state, preserving any overrides
+  self.syncState = [[SNTSyncStateAccessor alloc] initWithSyncState:syncState
+                                                          overrides:self.syncState.underlyingOverrides];
 
   return YES;
 }
@@ -1660,17 +1710,18 @@ static SNTConfigurator *sharedConfigurator = nil;
     return;
   }
 
-  NSMutableDictionary *syncState = self.syncState.mutableCopy;
-  syncState[kAllowedPathRegexKey] = [syncState[kAllowedPathRegexKey] pattern];
-  syncState[kBlockedPathRegexKey] = [syncState[kBlockedPathRegexKey] pattern];
-  [syncState writeToFile:self.syncStateFilePath atomically:YES];
+  // Extract underlying sync state dictionary (not overrides)
+  NSMutableDictionary *syncStateToSave = self.syncState.underlyingSyncState.mutableCopy;
+  syncStateToSave[kAllowedPathRegexKey] = [syncStateToSave[kAllowedPathRegexKey] pattern];
+  syncStateToSave[kBlockedPathRegexKey] = [syncStateToSave[kBlockedPathRegexKey] pattern];
+  [syncStateToSave writeToFile:self.syncStateFilePath atomically:YES];
   [[NSFileManager defaultManager] setAttributes:@{NSFilePosixPermissions : @0600}
                                    ofItemAtPath:self.syncStateFilePath
                                           error:NULL];
 }
 
 - (void)clearSyncState {
-  self.syncState = [NSMutableDictionary dictionary];
+  self.syncState = [[SNTSyncStateAccessor alloc] initWithSyncState:@{} overrides:nil];
   // TODO: Start a timer to flush the state to disk. On startup, Santa should
   // check for the presence of the state file and, if no SyncBaseURL is
   // configured, start the timer to clear sync state and flush to disk.
@@ -1884,7 +1935,8 @@ static SNTConfigurator *sharedConfigurator = nil;
                                              object:nil];
 #ifdef DEBUG
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-    [self watchOverridesFile];
+    [self watchOverridesFile];  // Existing config overrides
+    [self watchSyncStateOverridesFile];  // NEW
   });
 #endif
 }
@@ -1919,6 +1971,57 @@ static SNTConfigurator *sharedConfigurator = nil;
     [self watchOverridesFile];
   });
   dispatch_resume(source);
+}
+
+- (void)watchSyncStateOverridesFile {
+  // Don't block if file doesn't exist (it's optional)
+  if (![[NSFileManager defaultManager] fileExistsAtPath:kSyncStateOverrideFilePath]) {
+    return;
+  }
+
+  [self syncStateOverridesChanged];
+
+  int descriptor = open([kSyncStateOverrideFilePath fileSystemRepresentation], O_EVTONLY);
+  if (descriptor < 0) {
+    return;
+  }
+
+  dispatch_source_t source =
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE, descriptor,
+                             DISPATCH_VNODE_WRITE | DISPATCH_VNODE_RENAME | DISPATCH_VNODE_DELETE,
+                             dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+
+  dispatch_source_set_event_handler(source, ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [self syncStateOverridesChanged];
+    });
+    unsigned long events = dispatch_source_get_data(source);
+    if ((events & DISPATCH_VNODE_DELETE) || (events & DISPATCH_VNODE_RENAME)) {
+      dispatch_source_cancel(source);
+    }
+  });
+
+  dispatch_source_set_cancel_handler(source, ^{
+    close(descriptor);
+    [self watchSyncStateOverridesFile];
+  });
+
+  dispatch_resume(source);
+}
+
+- (void)syncStateOverridesChanged {
+  SEL handler = @selector(handleSyncStateOverrideChange);
+  [NSObject cancelPreviousPerformRequestsWithTarget:self selector:handler object:nil];
+  [self performSelector:handler withObject:nil afterDelay:1.0f];
+}
+
+- (void)handleSyncStateOverrideChange {
+  NSDictionary *newOverrides = [self readSyncStateOverridesFromDisk] ?: @{};
+  [self.syncState replaceAllOverrides:newOverrides];
+
+  // Trigger KVO
+  [self willChangeValueForKey:@"syncState"];
+  [self didChangeValueForKey:@"syncState"];
 }
 #endif
 

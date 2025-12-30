@@ -449,6 +449,15 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTSyncStateAccessor",
+    srcs = ["SNTSyncStateAccessor.mm"],
+    hdrs = ["SNTSyncStateAccessor.h"],
+    sdk_frameworks = [
+        "Foundation",
+    ],
+)
+
+objc_library(
     name = "SNTConfigurator",
     srcs = ["SNTConfigurator.mm"],
     hdrs = ["SNTConfigurator.h"],
@@ -464,6 +473,7 @@ objc_library(
         ":SNTModeTransition",
         ":SNTRule",
         ":SNTStrengthify",
+        ":SNTSyncStateAccessor",
         ":SNTSystemInfo",
     ],
 )
@@ -953,6 +963,14 @@ santa_unit_test(
         ":SNTCommonEnums",
         ":SNTConfigurator",
         "@OCMock",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTSyncStateAccessorTest",
+    srcs = ["SNTSyncStateAccessorTest.mm"],
+    deps = [
+        ":SNTSyncStateAccessor",
     ],
 )
 
