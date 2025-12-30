@@ -89,7 +89,7 @@ class Protobuf : public Serializer {
 
   std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) override;
 
-  std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *) override;
+  std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *, bool) override;
   std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) override;
 
  private:

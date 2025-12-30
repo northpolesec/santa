@@ -1915,7 +1915,7 @@ void SerializeAndCheckNonESEvents(
   XCTAssertEqualObjects(@(pbBundle.path().c_str()), se.filePath);
 }
 
-- (void)testSerializeDiskAppeared {
+- (void)testSerializeDiskAppearedAllowed {
   NSDictionary *props = @{
     @"DADevicePath" : @"",
     @"DADeviceVendor" : @"vendor",
@@ -1927,7 +1927,7 @@ void SerializeAndCheckNonESEvents(
     @"DADeviceProtocol" : @"usb",
   };
 
-  std::vector<uint8_t> vec = Protobuf::Create(nullptr, nil)->SerializeDiskAppeared(props);
+  std::vector<uint8_t> vec = Protobuf::Create(nullptr, nil)->SerializeDiskAppeared(props, true);
   std::string protoStr(vec.begin(), vec.end());
 
   ::pbv1::SantaMessage santaMsg;
@@ -1951,6 +1951,36 @@ void SerializeAndCheckNonESEvents(
   // Note: `DAAppearanceTime` is treated as a reference time since 2001 and is converted to a
   // reference time of 1970. Skip the calculation in the test here, just ensure the value is set.
   XCTAssertGreaterThan(pbDisk.appearance().seconds(), 1);
+}
+
+- (void)testSerializeDiskAppearedBlocked {
+  NSDictionary *props = @{
+    @"DAVolumePath" : [NSURL URLWithString:@"/Volumes/USB"],
+    @"DAVolumeKind" : @"smbfs",
+    @"SNTMountFromName" : @"/dev/disk2s1",
+  };
+
+  std::vector<uint8_t> vec = Protobuf::Create(nullptr, nil)->SerializeDiskAppeared(props, false);
+  std::string protoStr(vec.begin(), vec.end());
+
+  ::pbv1::SantaMessage santaMsg;
+  XCTAssertTrue(santaMsg.ParseFromString(protoStr));
+  XCTAssertTrue(santaMsg.has_disk());
+
+  const ::pbv1::Disk &pbDisk = santaMsg.disk();
+
+  XCTAssertEqual(pbDisk.action(), ::pbv1::Disk::ACTION_BLOCKED);
+
+  XCTAssertEqualObjects(@(pbDisk.mount().c_str()), [props[@"DAVolumePath"] path]);
+  XCTAssertEqualObjects(@(pbDisk.fs().c_str()), props[@"DAVolumeKind"]);
+  XCTAssertEqualObjects(@(pbDisk.mount_from().c_str()), props[@"SNTMountFromName"]);
+  XCTAssertFalse(pbDisk.has_volume());
+  XCTAssertFalse(pbDisk.has_bsd_name());
+  XCTAssertFalse(pbDisk.has_model());
+  XCTAssertFalse(pbDisk.has_serial());
+  XCTAssertFalse(pbDisk.has_bus());
+  XCTAssertFalse(pbDisk.has_dmg_path());
+  XCTAssertFalse(pbDisk.has_appearance());
 }
 
 - (void)testSerializeDiskDisppeared {

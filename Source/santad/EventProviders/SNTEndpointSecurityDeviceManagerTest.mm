@@ -61,7 +61,7 @@ class MockAuthResultCache : public AuthResultCache {
 
 @interface SNTEndpointSecurityDeviceManager (Testing)
 - (instancetype)init;
-- (void)logDiskAppeared:(NSDictionary *)props;
+- (void)logDiskAppeared:(NSDictionary *)props allowed:(bool)allowed;
 - (BOOL)shouldOperateOnDisk:(DADiskRef)disk;
 - (void)performStartupTasks:(SNTDeviceManagerStartupPreferences)startupPrefs;
 - (uint32_t)updatedMountFlags:(struct statfs *)sfs;
@@ -142,7 +142,8 @@ class MockAuthResultCache : public AuthResultCache {
 
   // Stub the log method since a mock `Logger` object isn't used.
   id partialDeviceManager = OCMPartialMock(deviceManager);
-  OCMStub([partialDeviceManager logDiskAppeared:OCMOCK_ANY]);
+  OCMStub([partialDeviceManager logDiskAppeared:OCMOCK_ANY allowed:OCMOCK_ANY])
+      .ignoringNonObjectArgs();
 
   [self.mockDA insert:disk];
 
@@ -560,7 +561,8 @@ class MockAuthResultCache : public AuthResultCache {
 
   // Stub the log method since a mock `Logger` object isn't used.
   id partialDeviceManager = OCMPartialMock(deviceManager);
-  OCMStub([partialDeviceManager logDiskAppeared:OCMOCK_ANY]);
+  OCMStub([partialDeviceManager logDiskAppeared:OCMOCK_ANY allowed:OCMOCK_ANY])
+      .ignoringNonObjectArgs();
 
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);

@@ -462,6 +462,7 @@ message Disk {
     ACTION_UNKNOWN = 0;
     ACTION_APPEARED = 1;
     ACTION_DISAPPEARED = 2;
+    ACTION_BLOCKED = 3;
   }
   optional Action action = 1;
 

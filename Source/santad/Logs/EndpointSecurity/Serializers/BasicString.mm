@@ -1135,7 +1135,7 @@ std::vector<uint8_t> BasicString::SerializeBundleHashingEvent(SNTStoredExecution
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props) {
+std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props, bool allowed) {
   NSString *dmg_path = nil;
   NSString *serial = nil;
   if ([props[@"DADeviceModel"] isEqual:@"Disk Image"]) {
@@ -1153,7 +1153,11 @@ std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props) {
                                                                         doubleValue]]];
 
   std::string str = CreateDefaultString();
-  str.append("action=DISKAPPEAR");
+  if (allowed) {
+    str.append("action=DISKAPPEAR");
+  } else {
+    str.append("action=DISK_BLOCKED");
+  }
   str.append("|mount=");
   str.append([NonNull([props[@"DAVolumePath"] path]) UTF8String]);
   str.append("|volume=");
@@ -1173,7 +1177,11 @@ std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props) {
   str.append("|appearance=");
   str.append([NonNull(appearanceDateString) UTF8String]);
   str.append("|mountfrom=");
-  str.append([NonNull(MountFromName([props[@"DAVolumePath"] path])) UTF8String]);
+  if (allowed) {
+    str.append([NonNull(MountFromName([props[@"DAVolumePath"] path])) UTF8String]);
+  } else {
+    str.append([NonNull(props[santa::kMountFromNameKey]) UTF8String]);
+  }
 
   return FinalizeString(str);
 }

@@ -38,6 +38,7 @@
 #import "Source/common/SNTProcessChain.h"
 #include "Source/common/String.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #include "Source/santad/Metrics.h"
 #include "Source/santad/SNTDecisionCache.h"
 
@@ -65,7 +66,7 @@ static NSString *const kMetricStartupDiskOperationSuccess = @"Success";
 
 @interface SNTEndpointSecurityDeviceManager ()
 
-- (void)logDiskAppeared:(NSDictionary *)props;
+- (void)logDiskAppeared:(NSDictionary *)props allowed:(bool)allowed;
 - (void)logDiskDisappeared:(NSDictionary *)props;
 
 @property SNTMetricCounter *startupDiskMetrics;
@@ -101,7 +102,7 @@ void DiskAppearedCallback(DADiskRef disk, void *context) {
   if (![props[@"DAVolumeMountable"] boolValue]) return;
   SNTEndpointSecurityDeviceManager *dm = (__bridge SNTEndpointSecurityDeviceManager *)context;
 
-  [dm logDiskAppeared:props];
+  [dm logDiskAppeared:props allowed:true];
 }
 
 void DiskDescriptionChangedCallback(DADiskRef disk, CFArrayRef keys, void *context) {
@@ -111,7 +112,7 @@ void DiskDescriptionChangedCallback(DADiskRef disk, CFArrayRef keys, void *conte
   if (props[@"DAVolumePath"]) {
     SNTEndpointSecurityDeviceManager *dm = (__bridge SNTEndpointSecurityDeviceManager *)context;
 
-    [dm logDiskAppeared:props];
+    [dm logDiskAppeared:props allowed:true];
   }
 }
 
@@ -393,8 +394,8 @@ NS_ASSUME_NONNULL_BEGIN
   }
 }
 
-- (void)logDiskAppeared:(NSDictionary *)props {
-  self->_logger->LogDiskAppeared(props);
+- (void)logDiskAppeared:(NSDictionary *)props allowed:(bool)allowed {
+  self->_logger->LogDiskAppeared(props, allowed);
 }
 
 - (void)logDiskDisappeared:(NSDictionary *)props {
@@ -515,6 +516,11 @@ NS_ASSUME_NONNULL_BEGIN
     LOGI(@"SNTEndpointSecurityDeviceManager: remounting device '%s'->'%s', flags (%u) -> (%u)",
          eventStatFS->f_mntfromname, eventStatFS->f_mntonname, eventStatFS->f_flags, newMode);
     [self remount:disk mountMode:newMode semaphore:nil];
+  } else {
+    // The mount is going to be blocked, log it
+    NSMutableDictionary *props = [CFBridgingRelease(DADiskCopyDescription(disk)) mutableCopy];
+    props[santa::kMountFromNameKey] = event.mntfromname;
+    [self logDiskAppeared:[props copy] allowed:false];
   }
 
   if (self.deviceBlockCallback) {
@@ -538,6 +544,23 @@ NS_ASSUME_NONNULL_BEGIN
   free(argv);
 }
 
+- (void)handleBlockedNetworkMount:(const Message &)m
+                      eventStatFS:(const struct statfs *)eventStatFS {
+  SNTStoredNetworkMountEvent *storedEvent = [self makeNetworkMountEventForMessage:m
+                                                                      eventStatFS:eventStatFS];
+
+  if (self.networkMountCallback) {
+    self.networkMountCallback(storedEvent);
+  }
+
+  NSMutableDictionary *props = [NSMutableDictionary dictionary];
+  props[santa::kMountFromNameKey] = storedEvent.mountFromName;
+  props[@"DAVolumePath"] = [NSURL URLWithString:storedEvent.mountOnName];
+  props[@"DAVolumeKind"] = storedEvent.fsType;
+
+  [self logDiskAppeared:[props copy] allowed:false];
+}
+
 - (es_auth_result_t)handleAuthNetworkMount:(const Message &)m
                                eventStatFS:(const struct statfs *)eventStatFS {
   if (!self.configurator.blockNetworkMount) {
@@ -552,9 +575,7 @@ NS_ASSUME_NONNULL_BEGIN
       LOGW(@"Network share prevented from mounting: %s (by: %s). Unable to extract host "
            @"information and \"FailClosed\" is configured.",
            mountFromName.UTF8String, m->process->executable->path.data);
-      if (self.networkMountCallback) {
-        self.networkMountCallback([self makeNetworkMountEventForMessage:m eventStatFS:eventStatFS]);
-      }
+      [self handleBlockedNetworkMount:m eventStatFS:eventStatFS];
       return ES_AUTH_RESULT_DENY;
     } else {
       LOGW(@"Network share allowed to mount: %s (by: %s). Unable to extract host "
@@ -571,9 +592,8 @@ NS_ASSUME_NONNULL_BEGIN
 
   LOGW(@"Network share prevented from mounting: %@ (type: %u: %s, by: %s)", mountFromName,
        eventStatFS->f_type, eventStatFS->f_fstypename, m->process->executable->path.data);
-  if (self.networkMountCallback) {
-    self.networkMountCallback([self makeNetworkMountEventForMessage:m eventStatFS:eventStatFS]);
-  }
+
+  [self handleBlockedNetworkMount:m eventStatFS:eventStatFS];
 
   return ES_AUTH_RESULT_DENY;
 }
