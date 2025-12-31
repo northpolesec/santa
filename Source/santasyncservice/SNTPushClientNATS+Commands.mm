@@ -37,9 +37,6 @@ using santa::StringToNSString;
 // Semi-arbitrary number of seconds to wait for santad to finish killing processes
 static constexpr int64_t kKillResponseTimeoutSeconds = 90;
 
-// Maximum allowed age for command timestamps (5 minutes)
-static constexpr int64_t kMaxCommandAgeSeconds = 300;
-
 namespace {
 
 bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest &command, NSData *hmacKey) {
@@ -148,6 +145,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 - (BOOL)isConnectionAlive;
 - (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
            toReplyTopic:(NSString *)replyTopic;
+- (BOOL)checkAndRecordNonce:(NSString *)uuid;
 @end
 
 // Category for command handling methods
@@ -277,6 +275,12 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   if (![[NSUUID alloc] initWithUUIDString:uuid]) {
     LOGE(@"NATS: Invalid command uuid: \"%@\"", uuid);
     response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
+    return response;
+  }
+
+  if (![self checkAndRecordNonce:uuid]) {
+    LOGE(@"NATS: Command rejected - nonce already used (uuid: %@)", uuid);
+    response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
     return response;
   }
 
