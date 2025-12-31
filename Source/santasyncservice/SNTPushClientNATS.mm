@@ -84,6 +84,7 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 @property(nonatomic, copy) NSString *jwt;
 @property(nonatomic, copy) NSString *pushDeviceID;
 @property(nonatomic, copy) NSArray<NSString *> *tags;
+@property(nonatomic, copy) NSData *hmacKey;
 // Connection retry state
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
 @property(atomic) NSInteger retryAttempt;
@@ -845,6 +846,12 @@ static void closedCallback(natsConnection *nc, void *closure) {
     if (!syncState.pushDeviceID) [missing addObject:@"device ID"];
     LOGW(@"NATS: Missing required push configuration from preflight: %@",
          [missing componentsJoinedByString:@", "]);
+  }
+
+  if (syncState.pushHMACKey) {
+    self.hmacKey = syncState.pushHMACKey;
+  } else {
+    LOGW(@"NATS: No push HMAC key received from preflight");
   }
 
   // Update sync interval to avoid polling Workshop.

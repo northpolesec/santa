@@ -14,6 +14,7 @@
 
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 
+#include <CommonCrypto/CommonHMAC.h>
 #include <google/protobuf/descriptor.h>
 
 #include "Source/common/SNTKillCommand.h"
@@ -36,7 +37,60 @@ using santa::StringToNSString;
 // Semi-arbitrary number of seconds to wait for santad to finish killing processes
 static constexpr int64_t kKillResponseTimeoutSeconds = 90;
 
+// Maximum allowed age for command timestamps (5 minutes)
+static constexpr int64_t kMaxCommandAgeSeconds = 300;
+
 namespace {
+
+bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest &command, NSData *hmacKey) {
+  if (hmacKey.length == 0) {
+    LOGE(@"NATS: HMAC verification failed - no key available");
+    return false;
+  }
+
+  if (command.hmac().length() != CC_SHA256_DIGEST_LENGTH) {
+    LOGE(@"NATS: HMAC verification failed - invalid HMAC length (%zu)", command.hmac().length());
+    return false;
+  }
+
+  // Create a copy of the command and clear the HMAC field for verification
+  ::pbv1::SantaCommandRequest commandCopy = command;
+  commandCopy.clear_hmac();
+
+  std::string serialized;
+  if (!commandCopy.SerializeToString(&serialized)) {
+    LOGE(@"NATS: HMAC verification failed - could not serialize command");
+    return false;
+  }
+
+  unsigned char computedHMAC[CC_SHA256_DIGEST_LENGTH];
+  CCHmac(kCCHmacAlgSHA256, hmacKey.bytes, hmacKey.length, serialized.data(), serialized.size(),
+         computedHMAC);
+
+  // Constant-time comparison
+  if (timingsafe_bcmp(computedHMAC, command.hmac().data(), CC_SHA256_DIGEST_LENGTH) != 0) {
+    LOGE(@"NATS: HMAC verification failed - signature mismatch");
+    return false;
+  }
+
+  LOGD(@"NATS: HMAC verification succeeded");
+  return true;
+}
+
+bool VerifyCommandRequestTimestamp(const ::pbv1::SantaCommandRequest &command) {
+  int64_t now = static_cast<int64_t>(time(nullptr));
+  int64_t issued_at = command.issued_at();
+  int64_t age = now - issued_at;
+
+  // Check if command is too old or from too far in the future. Some skew is permitted.
+  if (age > kMaxCommandAgeSeconds || age < -kMaxCommandAgeSeconds) {
+    LOGE(@"NATS: Timestamp verification failed (age: %lld seconds)", age);
+    return false;
+  }
+
+  LOGD(@"NATS: Timestamp verification succeeded (age: %lld seconds)", age);
+  return true;
+}
 
 void SetKillResponseError(SNTKillResponseError error, ::pbv1::KillResponse *pbResponse) {
   switch (error) {
@@ -89,6 +143,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 @property(nonatomic) dispatch_queue_t connectionQueue;
 @property(nonatomic) natsConnection *conn;
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
+@property(nonatomic, copy) NSData *hmacKey;
 
 - (BOOL)isConnectionAlive;
 - (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
@@ -204,6 +259,19 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                                       (const ::pbv1::SantaCommandRequest &)command
                                                         onArena:(google::protobuf::Arena *)arena {
   auto response = google::protobuf::Arena::Create<::pbv1::SantaCommandResponse>(arena);
+
+  // Verify HMAC signature first
+  if (!VerifyCommandRequestHMAC(command, self.hmacKey)) {
+    LOGE(@"NATS: Command rejected - HMAC verification failed");
+    response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
+    return response;
+  }
+
+  if (!VerifyCommandRequestTimestamp(command)) {
+    LOGE(@"NATS: Command rejected - timestamp verification failed");
+    response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
+    return response;
+  }
 
   NSString *uuid = StringToNSString(command.uuid());
   if (![[NSUUID alloc] initWithUUIDString:uuid]) {
