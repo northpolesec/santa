@@ -38,9 +38,6 @@ __END_DECLS
 
 namespace pbv1 = ::santa::commands::v1;
 
-// Maximum age in seconds for command timestamps (5 minutes)
-const int64_t kMaxCommandAgeSeconds = 300;
-
 // Helper function to convert response code to readable string using protobuf generated code
 NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   // Try the generated _Name() function first
@@ -128,30 +125,6 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   if (self.conn && self.isConnected) {
     LOGW(@"NATS: Client deallocated without proper disconnect");
   }
-}
-
-// Check and record a nonce (UUID) for replay protection
-// Returns YES if the nonce is new, NO if it's a replay
-// Note: Must be called from messageQueue for thread safety
-- (BOOL)checkAndRecordNonce:(NSString *)uuid {
-  // Rotate cache if needed (lazy rotation)
-  // Lazy rotation is fine for now because command volume will be very low.
-  int64_t now = time(nullptr);
-  if (now - self.lastRotationTime >= kMaxCommandAgeSeconds) {
-    LOGD(@"NATS: Rotating nonce cache (current: %lu, previous: %lu)",
-         (unsigned long)self.currentNonces.count, (unsigned long)self.previousNonces.count);
-    self.previousNonces = self.currentNonces;
-    self.currentNonces = [NSMutableSet set];
-    self.lastRotationTime = now;
-  }
-
-  // Check for replay
-  if ([self.currentNonces containsObject:uuid] || [self.previousNonces containsObject:uuid]) {
-    return NO;
-  }
-
-  [self.currentNonces addObject:uuid];
-  return YES;
 }
 
 - (void)configureWithPushServer:(NSString *)server

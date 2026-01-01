@@ -14,9 +14,6 @@
 
 #import "Source/santasyncservice/SNTPushNotifications.h"
 
-// Maximum age in seconds for command timestamps (5 minutes)
-extern const int64_t kMaxCommandAgeSeconds;
-
 @interface SNTPushClientNATS : NSObject <SNTPushNotificationsClientDelegate>
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
 @property(nonatomic, readonly, copy) NSString *pushServer;

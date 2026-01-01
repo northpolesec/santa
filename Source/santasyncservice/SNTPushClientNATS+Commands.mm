@@ -37,6 +37,13 @@ using santa::StringToNSString;
 // Semi-arbitrary number of seconds to wait for santad to finish killing processes
 static constexpr int64_t kKillResponseTimeoutSeconds = 90;
 
+// Maximum age in seconds for command timestamps (5 minutes)
+static constexpr int64_t kMaxCommandAgeSeconds = 300;
+
+// Maximum size of the nonce cache
+// Semi-arbitrary cap, averaging 1 command per second per time window
+static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
+
 namespace {
 
 bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest &command, NSData *hmacKey) {
@@ -141,11 +148,13 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 @property(nonatomic) natsConnection *conn;
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
 @property(nonatomic, copy) NSData *hmacKey;
+@property(nonatomic) NSMutableSet<NSString *> *currentNonces;
+@property(nonatomic) NSMutableSet<NSString *> *previousNonces;
+@property(nonatomic) int64_t lastRotationTime;
 
 - (BOOL)isConnectionAlive;
 - (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
            toReplyTopic:(NSString *)replyTopic;
-- (BOOL)checkAndRecordNonce:(NSString *)uuid;
 @end
 
 // Category for command handling methods
@@ -159,9 +168,39 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 - (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
                                       (const ::pbv1::SantaCommandRequest &)command
                                                         onArena:(google::protobuf::Arena *)arena;
+- (BOOL)checkAndRecordNonce:(NSString *)uuid;
 @end
 
 @implementation SNTPushClientNATS (Commands)
+
+// Check and record a nonce (UUID) for replay protection
+// Returns YES if the nonce is new, NO if it's a replay
+// Note: Must be called from messageQueue for thread safety
+- (BOOL)checkAndRecordNonce:(NSString *)uuid {
+  // Rotate cache if needed (lazy rotation)
+  // Lazy rotation is fine for now because command volume will be very low.
+  int64_t now = time(nullptr);
+  if (now - self.lastRotationTime >= kMaxCommandAgeSeconds) {
+    LOGD(@"NATS: Rotating nonce cache (current: %lu, previous: %lu)",
+         (unsigned long)self.currentNonces.count, (unsigned long)self.previousNonces.count);
+    self.previousNonces = self.currentNonces;
+    self.currentNonces = [NSMutableSet set];
+    self.lastRotationTime = now;
+  }
+
+  // Throttle number of allowed commands per time window
+  if (self.currentNonces.count > kMaxCommandNonceCacheCount) {
+    return NO;
+  }
+
+  // Check for replay
+  if ([self.currentNonces containsObject:uuid] || [self.previousNonces containsObject:uuid]) {
+    return NO;
+  }
+
+  [self.currentNonces addObject:uuid];
+  return YES;
+}
 
 // Handle PingRequest command
 // Always returns a successful response. Failures are handled by the caller.
