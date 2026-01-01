@@ -189,7 +189,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   }
 
   // Throttle number of allowed commands per time window
-  if (self.currentNonces.count > kMaxCommandNonceCacheCount) {
+  if (self.currentNonces.count >= kMaxCommandNonceCacheCount) {
     return NO;
   }
 
