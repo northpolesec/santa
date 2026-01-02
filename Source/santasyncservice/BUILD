@@ -1,6 +1,6 @@
 load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
 load("@rules_cc//cc:defs.bzl", "objc_library")
-load("//:helper.bzl", "santa_unit_test")
+load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION", "santa_unit_test")
 
 licenses(["notice"])
 
@@ -427,7 +427,7 @@ macos_command_line_application(
         "--options library,kill,runtime",
     ],
     infoplists = ["Info.plist"],
-    minimum_os_version = "14.0",
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",

@@ -103,7 +103,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
       // developer tools do this to avoid lots of write syscalls, e.g. go's
       // tool chain. We log this so the compiler controller can take that into
       // account.
-      if (esMsg->event.close.modified || esMsg->event.close.was_mapped_writable) {
+      if (!esMsg->event.close.modified && !esMsg->event.close.was_mapped_writable) {
         // Ignore unmodified files
         // Note: Do not record metrics in this case. These are not considered "drops"
         // because this is not a failure case. Ideally we would tell ES to not send

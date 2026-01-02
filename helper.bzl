@@ -5,6 +5,9 @@ load("@rules_apple//apple:resources.bzl", "apple_resource_group")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 
+# Minimum macOS version required for Santa binaries
+SANTA_MINIMUM_OS_VERSION = "14.0"
+
 def run_command(name, cmd, **kwargs):
     """A rule to run a command."""
     native.genrule(
@@ -25,7 +28,7 @@ def santa_unit_test(
         deps = [],
         data = [],
         size = "medium",
-        minimum_os_version = "14.0",
+        minimum_os_version = SANTA_MINIMUM_OS_VERSION,
         resources = [],
         structured_resources = [],
         copts = [],
