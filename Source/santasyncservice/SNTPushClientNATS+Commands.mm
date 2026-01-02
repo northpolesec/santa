@@ -14,6 +14,7 @@
 
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 
+#include <CommonCrypto/CommonHMAC.h>
 #include <google/protobuf/descriptor.h>
 
 #include "Source/common/SNTKillCommand.h"
@@ -36,7 +37,64 @@ using santa::StringToNSString;
 // Semi-arbitrary number of seconds to wait for santad to finish killing processes
 static constexpr int64_t kKillResponseTimeoutSeconds = 90;
 
+// Maximum age in seconds for command timestamps (5 minutes)
+static constexpr int64_t kMaxCommandAgeSeconds = 300;
+
+// Maximum size of the nonce cache
+// Semi-arbitrary cap, averaging 1 command per second per time window
+static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
+
 namespace {
+
+bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest &command, NSData *hmacKey) {
+  if (hmacKey.length == 0) {
+    LOGE(@"NATS: HMAC verification failed - no key available");
+    return false;
+  }
+
+  if (command.hmac().length() != CC_SHA256_DIGEST_LENGTH) {
+    LOGE(@"NATS: HMAC verification failed - invalid HMAC length (%zu)", command.hmac().length());
+    return false;
+  }
+
+  // Create a copy of the command and clear the HMAC field for verification
+  ::pbv1::SantaCommandRequest commandCopy = command;
+  commandCopy.clear_hmac();
+
+  std::string serialized;
+  if (!commandCopy.SerializeToString(&serialized)) {
+    LOGE(@"NATS: HMAC verification failed - could not serialize command");
+    return false;
+  }
+
+  unsigned char computedHMAC[CC_SHA256_DIGEST_LENGTH];
+  CCHmac(kCCHmacAlgSHA256, hmacKey.bytes, hmacKey.length, serialized.data(), serialized.size(),
+         computedHMAC);
+
+  // Constant-time comparison
+  if (timingsafe_bcmp(computedHMAC, command.hmac().data(), CC_SHA256_DIGEST_LENGTH) != 0) {
+    LOGE(@"NATS: HMAC verification failed - signature mismatch");
+    return false;
+  }
+
+  LOGD(@"NATS: HMAC verification succeeded");
+  return true;
+}
+
+bool VerifyCommandRequestTimestamp(const ::pbv1::SantaCommandRequest &command) {
+  int64_t now = static_cast<int64_t>(time(nullptr));
+  int64_t issued_at = command.issued_at();
+  int64_t age = now - issued_at;
+
+  // Check if command is too old or from too far in the future. Some skew is permitted.
+  if (age > kMaxCommandAgeSeconds || age < -kMaxCommandAgeSeconds) {
+    LOGE(@"NATS: Timestamp verification failed (age: %lld seconds)", age);
+    return false;
+  }
+
+  LOGD(@"NATS: Timestamp verification succeeded (age: %lld seconds)", age);
+  return true;
+}
 
 void SetKillResponseError(SNTKillResponseError error, ::pbv1::KillResponse *pbResponse) {
   switch (error) {
@@ -89,6 +147,10 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 @property(nonatomic) dispatch_queue_t connectionQueue;
 @property(nonatomic) natsConnection *conn;
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
+@property(nonatomic, copy) NSData *hmacKey;
+@property(nonatomic) NSMutableSet<NSString *> *currentNonces;
+@property(nonatomic) NSMutableSet<NSString *> *previousNonces;
+@property(nonatomic) int64_t lastRotationTime;
 
 - (BOOL)isConnectionAlive;
 - (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
@@ -106,9 +168,39 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 - (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
                                       (const ::pbv1::SantaCommandRequest &)command
                                                         onArena:(google::protobuf::Arena *)arena;
+- (BOOL)checkAndRecordNonce:(NSString *)uuid;
 @end
 
 @implementation SNTPushClientNATS (Commands)
+
+// Check and record a nonce (UUID) for replay protection
+// Returns YES if the nonce is new, NO if it's a replay
+// Note: Must be called from messageQueue for thread safety
+- (BOOL)checkAndRecordNonce:(NSString *)uuid {
+  // Rotate cache if needed (lazy rotation)
+  // Lazy rotation is fine for now because command volume will be very low.
+  int64_t now = time(nullptr);
+  if (now - self.lastRotationTime >= kMaxCommandAgeSeconds) {
+    LOGD(@"NATS: Rotating nonce cache (current: %lu, previous: %lu)",
+         (unsigned long)self.currentNonces.count, (unsigned long)self.previousNonces.count);
+    self.previousNonces = self.currentNonces;
+    self.currentNonces = [NSMutableSet set];
+    self.lastRotationTime = now;
+  }
+
+  // Throttle number of allowed commands per time window
+  if (self.currentNonces.count >= kMaxCommandNonceCacheCount) {
+    return NO;
+  }
+
+  // Check for replay
+  if ([self.currentNonces containsObject:uuid] || [self.previousNonces containsObject:uuid]) {
+    return NO;
+  }
+
+  [self.currentNonces addObject:uuid];
+  return YES;
+}
 
 // Handle PingRequest command
 // Always returns a successful response. Failures are handled by the caller.
@@ -205,10 +297,29 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                                                         onArena:(google::protobuf::Arena *)arena {
   auto response = google::protobuf::Arena::Create<::pbv1::SantaCommandResponse>(arena);
 
+  // Verify HMAC signature first
+  if (!VerifyCommandRequestHMAC(command, self.hmacKey)) {
+    LOGE(@"NATS: Command rejected - HMAC verification failed");
+    response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
+    return response;
+  }
+
+  if (!VerifyCommandRequestTimestamp(command)) {
+    LOGE(@"NATS: Command rejected - timestamp verification failed");
+    response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
+    return response;
+  }
+
   NSString *uuid = StringToNSString(command.uuid());
   if (![[NSUUID alloc] initWithUUIDString:uuid]) {
     LOGE(@"NATS: Invalid command uuid: \"%@\"", uuid);
     response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
+    return response;
+  }
+
+  if (![self checkAndRecordNonce:uuid]) {
+    LOGE(@"NATS: Command rejected - nonce already used (uuid: %@)", uuid);
+    response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
     return response;
   }
 

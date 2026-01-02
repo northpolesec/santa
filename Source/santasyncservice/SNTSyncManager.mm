@@ -338,6 +338,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       NSUInteger oldInterval = self.pushNotifications.fullSyncInterval;
       [self.pushNotifications handlePreflightSyncState:syncState];
 
+      // Clear all push credentials from syncState after handoff to push client
+      // These are no longer needed and should not be accessible to other sync stages
+      syncState.pushNKey = nil;
+      syncState.pushJWT = nil;
+      syncState.pushHMACKey = nil;
+
       // If push interval changed, mark log the difference.
       if (oldInterval != self.pushNotifications.fullSyncInterval) {
         LOGD(

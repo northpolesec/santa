@@ -54,6 +54,7 @@
 @property(copy) NSString *pushJWT;              // JWT for authentication
 @property(copy) NSString *pushDeviceID;         // Device ID for NATS subscription
 @property(copy) NSArray<NSString *> *pushTags;  // Tags to subscribe to
+@property(copy) NSData *pushHMACKey;            // HMAC key for validating push commands
 
 /// Full sync interval in seconds while listening for push notifications, defaults to
 /// kDefaultPushNotificationsFullSyncInterval.
