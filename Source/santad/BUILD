@@ -1,6 +1,6 @@
 load("@rules_apple//apple:macos.bzl", "macos_bundle")
 load("@rules_cc//cc:defs.bzl", "objc_library")
-load("//:helper.bzl", "santa_unit_test")
+load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION", "santa_unit_test")
 
 package(
     default_visibility = [":__subpackages__"],
@@ -1104,7 +1104,7 @@ macos_bundle(
         "//Source/common:CommitHash",
     ],
     linkopts = ["-execute"],
-    minimum_os_version = "13.0",
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:daemon_dev",

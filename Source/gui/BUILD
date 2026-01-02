@@ -1,7 +1,7 @@
 load("@rules_apple//apple:macos.bzl", "macos_application")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("@rules_swift//swift:swift.bzl", "swift_library")
-load("//:helper.bzl", "santa_unit_test")
+load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION", "santa_unit_test")
 
 licenses(["notice"])
 
@@ -184,7 +184,7 @@ macos_application(
         "Info.plist",
         "//Source/common:CommitHash",
     ],
-    minimum_os_version = "13.0",
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",
@@ -221,7 +221,7 @@ macos_application(
     bundle_id = "com.northpolesec.santatestgui",
     bundle_name = "SantaTestGUI",
     infoplists = ["Info.plist"],
-    minimum_os_version = "14.0",
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     strings = glob(["Resources/**/*.strings"]),
     version = "//:version",
     deps = [":SNTTestGUI_lib"],

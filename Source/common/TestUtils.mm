@@ -132,6 +132,8 @@ uint32_t MaxSupportedESMessageVersionForCurrentOS() {
   //            6 | 13.0
   //            7 | 13.3
   //            8 | 15.0
+  //            9 | 15.5
+  //           10 | 26.0
   if (@available(macOS 15.0, *)) {
     return 8;
   } else if (@available(macOS 13.3, *)) {
@@ -287,7 +289,6 @@ uint32_t MinSupportedESMessageVersion(es_event_type_t event_type) {
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD:
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: return 6;
 
-#if HAVE_MACOS_14
     // The following events are available beginning in macOS 14.0
     case ES_EVENT_TYPE_NOTIFY_PROFILE_ADD:
     case ES_EVENT_TYPE_NOTIFY_PROFILE_REMOVE:
@@ -309,7 +310,6 @@ uint32_t MinSupportedESMessageVersion(es_event_type_t event_type) {
     case ES_EVENT_TYPE_NOTIFY_OD_DELETE_USER:
     case ES_EVENT_TYPE_NOTIFY_OD_DELETE_GROUP:
     case ES_EVENT_TYPE_NOTIFY_XPC_CONNECT: return 7;
-#endif
 
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return 8;
