@@ -198,6 +198,7 @@ struct WatchItemPolicyBase {
                       bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                       std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
+                      NSString *wu = nil, NSDictionary *wh = nil,
                       SetWatchItemProcess procs = {})
       : name(n),
         version(v),
@@ -211,6 +212,8 @@ struct WatchItemPolicyBase {
         // overriding global setting in order to hide the button.
         event_detail_url(edu == nil ? std::nullopt : std::make_optional<NSString *>(edu)),
         event_detail_text(edt.length == 0 ? std::nullopt : std::make_optional<NSString *>(edt)),
+        webhook_url(wu == nil ? std::nullopt : std::make_optional<NSString *>(wu)),
+        webhook_headers(wh == nil ? std::nullopt : std::make_optional<NSDictionary *>(wh)),
         processes(std::move(procs)) {}
 
   virtual ~WatchItemPolicyBase() = default;
@@ -241,6 +244,8 @@ struct WatchItemPolicyBase {
   std::optional<std::string> custom_message;
   std::optional<NSString *> event_detail_url;
   std::optional<NSString *> event_detail_text;
+  std::optional<NSString *> webhook_url;
+  std::optional<NSDictionary *> webhook_headers;
   SetWatchItemProcess processes;
 };
 
@@ -253,8 +258,9 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
                       bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                       std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
+                      NSString *wu = nil, NSDictionary *wh = nil,
                       SetWatchItemProcess procs = {})
-      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs)),
+      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, wu, wh, std::move(procs)),
         path(p),
         path_type(pt) {}
 
@@ -283,8 +289,9 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
                          bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                          bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                          std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
+                         NSString *wu = nil, NSDictionary *wh = nil,
                          SetWatchItemProcess procs = {})
-      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs)),
+      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, wu, wh, std::move(procs)),
         path_type_pairs(std::move(pt)),
         tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
     // Build tree

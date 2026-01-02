@@ -184,6 +184,35 @@ The `Options` dictionary within each rule supports the following keys:
 
 - `EnableSilentTTYMode` (optional): Boolean. When `true`, violations are logged, but no notification is sent to the controlling TTY. Defaults to `false`.
 
+- `WebhookURL` (optional): URL template for webhook notifications. When configured, a POST request will be sent to this URL whenever the rule matches (including audit-only rules). Supports the same [variable substitution placeholders](#eventdetailurl-and-webhookurl-placeholders) as `EventDetailURL`. The webhook is sent asynchronously and will not block the file access decision.
+
+- `WebhookHeaders` (optional): Dictionary of custom HTTP headers to include in webhook requests. Keys are header names and values are header values (both must be strings). Useful for authentication tokens or other custom headers required by your webhook endpoint.
+
+### Webhook Example
+
+The following example shows how to configure a webhook for a rule:
+
+```xml
+<key>Options</key>
+<dict>
+	<key>RuleType</key>
+	<string>PathsWithAllowedProcesses</string>
+	<key>AuditOnly</key>
+	<true/>
+	<key>WebhookURL</key>
+	<string>https://my-server/webhooks/faa/%rule_name%/%file_identifier%</string>
+	<key>WebhookHeaders</key>
+	<dict>
+		<key>Authorization</key>
+		<string>Bearer my-token</string>
+		<key>X-Custom-Header</key>
+		<string>custom-value</string>
+	</dict>
+</dict>
+```
+
+When this rule matches, a POST request will be sent to the webhook URL with the specified headers. The URL will have placeholders replaced with actual values (e.g., `%rule_name%` will be replaced with the rule name, `%file_identifier%` with the SHA-256 of the accessing process).
+
 ## Rule Type Selection
 
 Choose your rule type based on what you're protecting:
@@ -197,12 +226,16 @@ Choose your rule type based on what you're protecting:
 
 **Process-centric example**: Prevent AirDrop processes from reading files in folders containing sensitive corporate data.
 
-## EventDetailURL placeholders
+## EventDetailURL and WebhookURL placeholders
 
 When an FAA rule blocks access to a file, the user will be presented with a block notification dialog. On this dialog a
 button can be displayed which will take the user to a page with more information about that event. For the button to
 appear you must populate the `EventDetailURL` field, either at the top-level of the configuration or in an individual
-rule. This URL can contain placeholders, which will be populated at runtime; the supported placeholders are:
+rule. This URL can contain placeholders, which will be populated at runtime.
+
+The `WebhookURL` option also supports the same placeholders and will be triggered whenever a rule matches (including audit-only rules).
+
+The supported placeholders are:
 
 | Placeholder         | Description                                                                                                               |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
