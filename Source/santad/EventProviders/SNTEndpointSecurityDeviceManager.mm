@@ -603,6 +603,8 @@ NS_ASSUME_NONNULL_BEGIN
   SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
 
   event.mountFromName = @(eventStatFS->f_mntfromname);
+  // Sanitize password from mount URL to prevent it from being logged or stored
+  event.mountFromName = [event sanitizedMountFromRemovingPassword];
   event.mountOnName = @(eventStatFS->f_mntonname);
   event.fsType = @(eventStatFS->f_fstypename);
 

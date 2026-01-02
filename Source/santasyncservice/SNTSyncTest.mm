@@ -26,6 +26,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -819,7 +820,7 @@
                                                         fromData:eventData
                                                            error:&err];
   XCTAssertNil(err);
-  XCTAssertEqual(events.count, 5);
+  XCTAssertEqual(events.count, 7);
 
   OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
 
@@ -835,7 +836,7 @@
             NSDictionary *event = events[0];
             XCTAssertEqualObjects(
                 event[kFileSHA256],
-                @"c242e98be0b2f297430ab37f6ec83a380fa108551d27e3ff35892bb0b58b2f23");
+                @"fb2c6a695f556367f141f0c069695078c5e35e9154de35cb0fbd017af5be194e");
             XCTAssertEqualObjects(event[kFileName], @"yes");
             XCTAssertEqualObjects(event[kFilePath], @"/usr/bin");
             XCTAssertEqualObjects(event[kDecision], @"ALLOW_SIGNINGID");
@@ -861,7 +862,7 @@
 
             XCTAssertNil(event[kTeamID]);
             XCTAssertEqualObjects(event[kSigningID], @"platform:com.apple.yes");
-            XCTAssertEqualObjects(event[kCDHash], @"c15b76ca2885fbb54adbfe041536f1c65af94feb");
+            XCTAssertEqualObjects(event[kCDHash], @"e6088e2df9163416c1d66a0c0bc74dfe34419fa7");
 
             event = events[1];
             XCTAssertEqualObjects(event[kFileName], @"Santa");
@@ -882,7 +883,7 @@
             XCTAssertEqual(((NSArray *)event[@"process_chain"]).count, 2);
             XCTAssertEqualObjects(event[@"process_chain"][0][kFilePath], @"/bin/mkdir");
             XCTAssertEqualObjects(event[@"process_chain"][0][kCDHash],
-                                  @"0e923b9487572b38d65ff68f9c2919a4118318e0");
+                                  @"dda76477475094e82d21fd5e219e4b526a72661b");
             XCTAssertEqualObjects(event[@"process_chain"][0][kPID], @(123));
             XCTAssertEqualObjects(event[@"process_chain"][1][kPID], @(456));
             XCTAssertEqual([event[@"process_chain"][0][kSigningChain] count], 3);
@@ -900,6 +901,25 @@
               event = events[1][@"temporary_monitor_mode"];
               XCTAssertEqualObjects(event[@"session_id"], @"my_test_leave_uuid");
               XCTAssertEqualObjects(event[@"leave"][@"reason"], @"REASON_REVOKED");
+            } else {
+              XCTAssertEqual(events.count, 0);
+            }
+
+            events = requestDict[@"network_mount_events"];
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqual(events.count, 2);
+
+              event = events[0];
+              XCTAssertNotNil(event[@"uuid"]);
+              XCTAssertEqualObjects(event[@"mount_from"], @"//server.example.com/share");
+              XCTAssertEqualObjects(event[@"mount_on"], @"/Volumes/share");
+              XCTAssertEqualObjects(event[@"fs_type"], @"smbfs");
+
+              event = events[1];
+              XCTAssertNotNil(event[@"uuid"]);
+              XCTAssertEqualObjects(event[@"mount_from"], @"nfs-server.example.com:/export/data");
+              XCTAssertEqualObjects(event[@"mount_on"], @"/Volumes/nfs-data");
+              XCTAssertEqualObjects(event[@"fs_type"], @"nfs");
             } else {
               XCTAssertEqual(events.count, 0);
             }
@@ -989,7 +1009,7 @@
   XCTAssertTrue([sut sync]);
 
   if (self.syncState.isSyncV2) {
-    XCTAssertEqual(requestCount, 5);
+    XCTAssertEqual(requestCount, 7);
   } else {
     XCTAssertEqual(requestCount, 3);
   }
