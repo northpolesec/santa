@@ -12,10 +12,10 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#import <CommonCrypto/CommonHMAC.h>
 #import <Foundation/Foundation.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
-#import <CommonCrypto/CommonHMAC.h>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTSyncConstants.h"
@@ -533,8 +533,8 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertTrue(command.SerializeToString(&serialized));
 
   unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
-  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length,
-         serialized.data(), serialized.size(), hmac);
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized.data(),
+         serialized.size(), hmac);
   command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
 
   // When: Dispatching the command with old timestamp
@@ -562,8 +562,8 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertTrue(command.SerializeToString(&serialized));
 
   unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
-  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length,
-         serialized.data(), serialized.size(), hmac);
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized.data(),
+         serialized.size(), hmac);
   command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
 
   // When: Dispatching the command with future timestamp
@@ -589,8 +589,8 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertTrue(command.SerializeToString(&serialized));
 
   unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
-  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length,
-         serialized.data(), serialized.size(), hmac);
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized.data(),
+         serialized.size(), hmac);
   command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
 
   // When: Dispatching the command without timestamp
@@ -616,12 +616,12 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   std::string serialized1;
   XCTAssertTrue(command1.SerializeToString(&serialized1));
   unsigned char hmac1[CC_SHA256_DIGEST_LENGTH];
-  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length,
-         serialized1.data(), serialized1.size(), hmac1);
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized1.data(),
+         serialized1.size(), hmac1);
   command1.set_hmac(hmac1, CC_SHA256_DIGEST_LENGTH);
 
   ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command1
-                                                                                onArena:self.arena];
+                                                                               onArena:self.arena];
   XCTAssertFalse(response1->has_error(), @"Command just within the limit should be accepted");
 
   // Test timestamp in future just within the limit
@@ -634,13 +634,14 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   std::string serialized2;
   XCTAssertTrue(command2.SerializeToString(&serialized2));
   unsigned char hmac2[CC_SHA256_DIGEST_LENGTH];
-  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length,
-         serialized2.data(), serialized2.size(), hmac2);
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized2.data(),
+         serialized2.size(), hmac2);
   command2.set_hmac(hmac2, CC_SHA256_DIGEST_LENGTH);
 
   ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:command2
-                                                                                onArena:self.arena];
-  XCTAssertFalse(response2->has_error(), @"Command just within the future limit should be accepted");
+                                                                               onArena:self.arena];
+  XCTAssertFalse(response2->has_error(),
+                 @"Command just within the future limit should be accepted");
 }
 
 #pragma mark - Nonce Cache Tests
@@ -655,7 +656,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
   // When: Dispatching the command the first time
   ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
-                                                                                onArena:self.arena];
+                                                                               onArena:self.arena];
 
   // Then: Should succeed
   XCTAssertFalse(response1->has_error(), @"First command should succeed");
@@ -663,7 +664,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
   // When: Dispatching the same command again (replay attack)
   ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:command
-                                                                                onArena:self.arena];
+                                                                               onArena:self.arena];
 
   // Then: Should be rejected with INVALID_DATA error
   XCTAssertTrue(response2->has_error(), @"Replay should be rejected");
@@ -680,7 +681,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
-                                                                                onArena:self.arena];
+                                                                               onArena:self.arena];
   XCTAssertFalse(response1->has_error(), @"First command should succeed");
 
   // When: Forcing a cache rotation (by manipulating lastRotationTime)
@@ -695,7 +696,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&newCommand];
 
   ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:newCommand
-                                                                                onArena:self.arena];
+                                                                               onArena:self.arena];
   XCTAssertFalse(response2->has_error(), @"New command should succeed and trigger rotation");
 
   // Then: The original UUID should still be rejected (now in previousNonces)
@@ -705,7 +706,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&replayCommand];
 
   ::pbv1::SantaCommandResponse *response3 = [self.client dispatchSantaCommandToHandler:replayCommand
-                                                                                onArena:self.arena];
+                                                                               onArena:self.arena];
   XCTAssertTrue(response3->has_error(), @"UUID in previousNonces should still be rejected");
   XCTAssertEqual(response3->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
 }
@@ -719,7 +720,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
-                                                                                onArena:self.arena];
+                                                                               onArena:self.arena];
   XCTAssertFalse(response1->has_error(), @"First command should succeed");
 
   // When: Forcing TWO cache rotations
@@ -746,7 +747,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&replayCommand];
 
   ::pbv1::SantaCommandResponse *response4 = [self.client dispatchSantaCommandToHandler:replayCommand
-                                                                                onArena:self.arena];
+                                                                               onArena:self.arena];
   XCTAssertFalse(response4->has_error(),
                  @"UUID should be accepted after aging out of two-generation cache");
   XCTAssertEqual(response4->result_case(), ::pbv1::SantaCommandResponse::kPing);
@@ -769,7 +770,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
     [self signCommandRequest:&command];
 
     ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
-                                                                                 onArena:self.arena];
+                                                                                onArena:self.arena];
     XCTAssertFalse(response->has_error(), @"Command %lu should succeed (within limit)", i + 1);
   }
 
