@@ -427,7 +427,7 @@ macos_command_line_application(
         "--options library,kill,runtime",
     ],
     infoplists = ["Info.plist"],
-    minimum_os_version = "13.0",
+    minimum_os_version = "14.0",
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",

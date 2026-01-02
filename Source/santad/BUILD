@@ -1104,7 +1104,7 @@ macos_bundle(
         "//Source/common:CommitHash",
     ],
     linkopts = ["-execute"],
-    minimum_os_version = "13.0",
+    minimum_os_version = "14.0",
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:daemon_dev",

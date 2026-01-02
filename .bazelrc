@@ -29,9 +29,6 @@ build --per_file_copt=.*cel-cpp.*@-Wno-deprecated-declarations
 build --per_file_copt=.*cel-cpp.*@-Wno-nullability-completeness
 build --per_file_copt=.*cel-cpp.*@-Wno-unused-function
 
-# boringssl has some warnings we need to not treat as errors on macOS 13
-build --per_file_copt=.*boringssl.*@-Wno-deprecated-volatile
-
 # protobuf v33.0 introduced a large number of warnings when building
 # the dependency about the use of newly deprecated functions.
 build --per_file_copt=external/protos\+.*@-Wno-deprecated-declarations

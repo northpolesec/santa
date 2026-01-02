@@ -18,13 +18,6 @@
 
 #include <Availability.h>
 
-#if defined(MAC_OS_VERSION_14_0) && \
-    MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_14_0
-#define HAVE_MACOS_14 1
-#else
-#undef HAVE_MACOS_14
-#endif
-
 // Note: MAC_OS_X_VERSION_MAX_ALLOWED (non-underscore version) stopped
 // being correctly defined in the macOS 15 SDK. (FB15780730)
 #if defined(MAC_OS_VERSION_15_0) && \
