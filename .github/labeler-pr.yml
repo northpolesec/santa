@@ -8,7 +8,7 @@ workflows:
 
 configurator:
   - changed-files:
-    - any-glob-to-any-file: 'Source/common/SNTConfigurator.*'
+    - any-glob-to-any-file: 'src/common/SNTConfigurator.*'
 
 lang/objc:
   - changed-files:
@@ -24,29 +24,29 @@ lang/swift:
 
 comp/common:
   - changed-files:
-    - any-glob-to-any-file: "Source/common/**"
+    - any-glob-to-any-file: "src/common/**"
 
 comp/gui:
   - changed-files:
-    - any-glob-to-any-file: "Source/gui/**"
+    - any-glob-to-any-file: "src/gui/**"
 
 comp/santabundleservice:
   - changed-files:
-    - any-glob-to-any-file: "Source/santabundleservice/**"
+    - any-glob-to-any-file: "src/santabundleservice/**"
 
 comp/santactl:
   - changed-files:
-    - any-glob-to-any-file: "Source/santactl/**"
+    - any-glob-to-any-file: "src/santactl/**"
 
 comp/santad:
   - changed-files:
-    - any-glob-to-any-file: "Source/santad/**"
+    - any-glob-to-any-file: "src/santad/**"
 
 comp/santametricservice:
   - changed-files:
-    - any-glob-to-any-file: "Source/santametricservice/**"
+    - any-glob-to-any-file: "src/santametricservice/**"
 
 comp/santasyncservice:
   - changed-files:
-    - any-glob-to-any-file: "Source/santasyncservice/**"
+    - any-glob-to-any-file: "src/santasyncservice/**"
 

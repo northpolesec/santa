@@ -4,8 +4,8 @@ on:
     branches:
       - main
     paths:
-      - "Source/**"
-      - "Testing/**"
+      - "src/**"
+      - "tools/**"
       - MODULE.bazel
       - BUILD
       - helper.bzl
@@ -27,7 +27,7 @@ jobs:
           sudo update-alternatives --set clang-format /usr/bin/clang-format-19
           clang-format --version
       - name: Run linters
-        run: ./Testing/lint.sh
+        run: ./tools/lint.sh
 
   check_localization:
     name: "Check Localization"
@@ -36,11 +36,11 @@ jobs:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
       - name: Check missing localization strings
         run: |
-          ./Testing/localization.py
+          ./tools/localization.py
           if [[ -n "$(git diff)" ]]; then
             git diff
             echo "Base localization has not been updated. Please run:"
-            echo "    ./Testing/localization.py"
+            echo "    ./tools/localization.py"
             echo "and commit any changes it makes."
             exit 1 # return an error if localization.py made changes
           fi
@@ -87,14 +87,14 @@ jobs:
               --define=SANTA_BUILD_TYPE=adhoc \
               --remote_cache=https://storage.googleapis.com/santa-build-cache \
               --google_default_credentials \
-              //Source/gui:Santa
+              //src/gui:Santa
           else
             bazel build \
               --verbose_failures \
               --sandbox_debug \
               --apple_generate_dsym \
               --define=SANTA_BUILD_TYPE=adhoc \
-              //Source/gui:Santa
+              //src/gui:Santa
           fi
       - name: Test
         run: |

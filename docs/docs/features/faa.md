@@ -380,7 +380,7 @@ action=FILE_ACCESS|policy_version=v0.1-experimental|policy_name=UserFoo|path=/Us
 
 When the `EventLogType` configuration key is set to `protobuf`, a log is emitted
 with the `FileAccess` message in the
-[santa.proto](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto)
+[santa.proto](https://github.com/northpolesec/santa/blob/main/src/common/santa.proto)
 schema.
 
 ## Best Practices

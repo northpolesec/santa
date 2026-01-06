@@ -346,12 +346,12 @@ The `EventLogType` key determines how event logs are stored:
 - **protobuf**: Uses a maildir-like format on disk
 
    The format of protobuf messages is available in the [proto
-   schema](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto).
+   schema](https://github.com/northpolesec/santa/blob/main/src/common/santa.proto).
 
 - **json**: Writes one JSON object per line to a file
 
    The format of protobuf messages is available in the [proto
-   schema](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto).
+   schema](https://github.com/northpolesec/santa/blob/main/src/common/santa.proto).
 
    JSON logs are created by first creating protobuf messages and then converting
    to JSON. Because JSON output requires this conversion, it is a less

@@ -1,0 +1,52 @@
+#import <XCTest/XCTest.h>
+
+#import "src/santametricservice/formats/SNTMetricFormatTestHelper.h"
+#import "src/santametricservice/formats/SNTMetricRawJSONFormat.h"
+
+@interface SNTMetricRawJSONFormatTest : XCTestCase
+@end
+
+@implementation SNTMetricRawJSONFormatTest
+
+- (void)testMetricsConversionToJSON {
+  NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
+  SNTMetricRawJSONFormat *formatter = [[SNTMetricRawJSONFormat alloc] init];
+  NSError *err = nil;
+  NSArray<NSData *> *output = [formatter convert:validMetricsDict
+                                    endTimestamp:[NSDate date]
+                                           error:&err];
+
+  XCTAssertEqual(1, output.count);
+  XCTAssertNotNil(output[0]);
+  XCTAssertNil(err);
+
+  NSDictionary *jsonDict = [NSJSONSerialization JSONObjectWithData:output[0]
+                                                           options:NSJSONReadingAllowFragments
+                                                             error:&err];
+  XCTAssertNotNil(jsonDict);
+
+  NSString *path = [[NSBundle bundleForClass:[self class]] resourcePath];
+  path = [path stringByAppendingPathComponent:@"testdata/json/test.json"];
+
+  NSData *goldenFileData = [NSData dataWithContentsOfFile:path];
+
+  XCTAssertNotNil(goldenFileData, @"unable to open / read golden file");
+
+  NSDictionary *expectedJSONDict =
+      [NSJSONSerialization JSONObjectWithData:goldenFileData
+                                      options:NSJSONReadingAllowFragments
+                                        error:&err];
+
+  XCTAssertNotNil(expectedJSONDict);
+  XCTAssertEqualObjects(expectedJSONDict, jsonDict, @"generated JSON does not match golden file.");
+}
+
+- (void)testPassingANilOrNullErrorDoesNotCrash {
+  SNTMetricRawJSONFormat *formatter = [[SNTMetricRawJSONFormat alloc] init];
+  NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
+
+  [formatter convert:validMetricsDict endTimestamp:[NSDate date] error:nil];
+  [formatter convert:validMetricsDict endTimestamp:[NSDate date] error:NULL];
+}
+
+@end

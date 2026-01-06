@@ -1,0 +1,118 @@
+/// Copyright 2022 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///     https://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
+#include <EndpointSecurity/EndpointSecurity.h>
+#import <OCMock/OCMock.h>
+#import <XCTest/XCTest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#include <sys/fcntl.h>
+#include <sys/types.h>
+#include <cstring>
+#include <utility>
+
+#include <array>
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <optional>
+#include <variant>
+
+#import "src/common/SNTConfigurator.h"
+#include "src/common/TestUtils.h"
+#include "src/santad/event_providers/endpoint_security/MockEndpointSecurityAPI.h"
+#import "src/santad/event_providers/SNTEndpointSecurityDataFileAccessAuthorizer.h"
+
+void SetExpectationsForDataFileAccessAuthorizerInit(
+    std::shared_ptr<MockEndpointSecurityAPI> mockESApi) {
+  EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
+}
+
+@interface SNTEndpointSecurityDataFileAccessAuthorizer (Testing)
+- (void)disable;
+
+@property bool isSubscribed;
+@end
+
+@interface SNTEndpointSecurityDataFileAccessAuthorizerTest : XCTestCase
+@property id mockConfigurator;
+@end
+
+@implementation SNTEndpointSecurityDataFileAccessAuthorizerTest
+
+- (void)setUp {
+  [super setUp];
+
+  self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+}
+
+- (void)tearDown {
+  [super tearDown];
+}
+
+- (void)testEnable {
+  std::set<es_event_type_t> expectedEventSubs = {
+      ES_EVENT_TYPE_AUTH_CLONE,        ES_EVENT_TYPE_AUTH_COPYFILE, ES_EVENT_TYPE_AUTH_CREATE,
+      ES_EVENT_TYPE_AUTH_EXCHANGEDATA, ES_EVENT_TYPE_AUTH_LINK,     ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_RENAME,       ES_EVENT_TYPE_AUTH_TRUNCATE, ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_NOTIFY_EXIT,
+  };
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  EXPECT_CALL(*mockESApi, ClearCache)
+      .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
+                 .WillOnce(testing::Return(true)))
+      .WillOnce(testing::Return(true));
+
+  id fileAccessClient = [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
+      initWithESAPI:mockESApi
+            metrics:nullptr
+          processor:santa::Processor::kDataFileAccessAuthorizer];
+
+  [fileAccessClient enable];
+
+  for (const auto &event : expectedEventSubs) {
+    XCTAssertNoThrow(santa::EventTypeToString(event));
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testDisable {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  SetExpectationsForDataFileAccessAuthorizerInit(mockESApi);
+
+  SNTEndpointSecurityDataFileAccessAuthorizer *accessClient =
+      [[SNTEndpointSecurityDataFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                                 metrics:nullptr
+                                                                  logger:nullptr
+                                                                enricher:nullptr
+                                                      faaPolicyProcessor:nil
+                                                               ttyWriter:nullptr
+                                             findPoliciesForTargetsBlock:nil];
+
+  EXPECT_CALL(*mockESApi, UnsubscribeAll);
+  EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
+
+  accessClient.isSubscribed = true;
+  [accessClient disable];
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+@end

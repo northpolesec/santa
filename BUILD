@@ -10,11 +10,11 @@ licenses(["notice"])
 
 exports_files([
     "LICENSE",
-    "Conf/install_services.sh",
-    "Conf/com.northpolesec.santa.bundleservice.plist",
-    "Conf/com.northpolesec.santa.metricservice.plist",
-    "Conf/com.northpolesec.santa.plist",
-    "Conf/com.northpolesec.santa.syncservice.plist",
+    "conf/install_services.sh",
+    "conf/com.northpolesec.santa.bundleservice.plist",
+    "conf/com.northpolesec.santa.metricservice.plist",
+    "conf/com.northpolesec.santa.plist",
+    "conf/com.northpolesec.santa.syncservice.plist",
 ])
 
 exports_files(["LICENSE"])
@@ -94,17 +94,17 @@ launchctl load /Library/LaunchAgents/com.northpolesec.santa.plist
 run_command(
     name = "reload",
     srcs = [
-        "//Source/gui:Santa",
+        "//src/gui:Santa",
     ],
     cmd = """
 set -e
 
 rm -rf /tmp/bazel_santa_reload
 unzip -d /tmp/bazel_santa_reload \
-    $${BUILD_WORKSPACE_DIRECTORY}/bazel-out/*$(COMPILATION_MODE)*/bin/Source/gui/Santa.zip >/dev/null
+    $${BUILD_WORKSPACE_DIRECTORY}/bazel-out/*$(COMPILATION_MODE)*/bin/src/gui/Santa.zip >/dev/null
 echo "You may be asked for your password for sudo"
-sudo BINARIES=/tmp/bazel_santa_reload CONF=$${BUILD_WORKSPACE_DIRECTORY}/Conf \
-    $${BUILD_WORKSPACE_DIRECTORY}/Conf/install.sh
+sudo BINARIES=/tmp/bazel_santa_reload CONF=${BUILD_WORKSPACE_DIRECTORY}/conf \
+    ${BUILD_WORKSPACE_DIRECTORY}/conf/install.sh
 rm -rf /tmp/bazel_santa_reload
 echo "Time to stop being naughty"
 """,
@@ -116,22 +116,22 @@ echo "Time to stop being naughty"
 genrule(
     name = "release",
     srcs = [
-        "//Source/gui:Santa",
-        "Conf/install.sh",
-        "Conf/uninstall.sh",
-        "Conf/com.northpolesec.santa.bundleservice.plist",
-        "Conf/com.northpolesec.santa.metricservice.plist",
-        "Conf/com.northpolesec.santa.syncservice.plist",
-        "Conf/com.northpolesec.santa.plist",
-        "Conf/com.northpolesec.santa.newsyslog.conf",
-        "Conf/Package/Distribution.xml",
-        "Conf/Package/notarization_tool.sh",
-        "Conf/Package/package.sh",
-        "Conf/Package/package_and_sign.sh",
-        "Conf/Package/postinstall",
-        "Conf/Package/preinstall",
-        "Conf/Package/migration.sh",
-        "Conf/com.northpolesec.santa.migration.plist",
+        "//src/gui:Santa",
+        "conf/install.sh",
+        "conf/uninstall.sh",
+        "conf/com.northpolesec.santa.bundleservice.plist",
+        "conf/com.northpolesec.santa.metricservice.plist",
+        "conf/com.northpolesec.santa.syncservice.plist",
+        "conf/com.northpolesec.santa.plist",
+        "conf/com.northpolesec.santa.newsyslog.conf",
+        "conf/Package/Distribution.xml",
+        "conf/Package/notarization_tool.sh",
+        "conf/Package/package.sh",
+        "conf/Package/package_and_sign.sh",
+        "conf/Package/postinstall",
+        "conf/Package/preinstall",
+        "conf/Package/migration.sh",
+        "conf/com.northpolesec.santa.migration.plist",
     ],
     outs = ["santa-release.tar.gz"],
     cmd = select({
@@ -235,16 +235,16 @@ genrule(
 test_suite(
     name = "unit_tests",
     tests = [
-        "//Source/common:unit_tests",
-        "//Source/gui:unit_tests",
-        "//Source/santactl:unit_tests",
-        "//Source/santad:unit_tests",
-        "//Source/santametricservice:unit_tests",
-        "//Source/santasyncservice:unit_tests",
+        "//src/common:unit_tests",
+        "//src/gui:unit_tests",
+        "//src/santactl:unit_tests",
+        "//src/santad:unit_tests",
+        "//src/santametricservice:unit_tests",
+        "//src/santasyncservice:unit_tests",
 
         # Trigger a build of one-off utils. This won't run anything but helps ensure
         # code changes don't break them.
-        "//Testing/OneOffs:BuildOnly",
+        "//tools/one_offs:BuildOnly",
     ],
 )
 
@@ -254,6 +254,6 @@ refresh_compile_commands(
     # targets cause issues when constructing compile commands for generated
     # code.
     targets = {
-        "//Source/...": "",
+        "//src/...": "",
     },
 )
