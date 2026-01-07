@@ -19,6 +19,8 @@
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/gui/SNTMessageWindowController.h"
 
+@class SNTStatusItemManager;
+
 ///
 ///  Keeps track of pending notifications and ensures only one is presented to the user at a time.
 ///
@@ -26,4 +28,5 @@
     : NSObject <SNTMessageWindowControllerDelegate, SNTNotifierXPC, SNTBundleServiceProgressXPC>
 
 @property NSXPCListenerEndpoint *notificationListener;
+@property(weak, nonatomic) SNTStatusItemManager *statusItemManager;
 @end

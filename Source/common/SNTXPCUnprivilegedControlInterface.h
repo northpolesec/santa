@@ -113,6 +113,7 @@ struct RuleCounts {
                                                  reply:(void (^)(uint32_t, NSError *))reply;
 - (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply;
 - (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply;
+- (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply;
 
 @end
 

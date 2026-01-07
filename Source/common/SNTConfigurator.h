@@ -540,6 +540,13 @@
 ///
 @property(readonly, nonatomic) BOOL funFontsOnSpecificDays;
 
+///
+///  If set to true, the menu bar item will be shown.
+///
+///  Defaults to YES.
+///
+@property(readonly, nonatomic) BOOL enableMenuItem;
+
 #pragma mark - Sync Settings
 
 ///

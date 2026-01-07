@@ -116,10 +116,9 @@ objc_library(
         "SNTNetworkMountMessageWindowController.mm",
         "SNTNotificationManager.h",
         "SNTNotificationManager.mm",
+        "SNTStatusItemManager.h",
+        "SNTStatusItemManager.mm",
         "main.mm",
-    ],
-    hdrs = [
-        "SNTNotificationManager.h",
     ],
     sdk_frameworks = [
         "LocalAuthentication",
@@ -168,7 +167,7 @@ macos_application(
         "//Source/santad:com.northpolesec.santa.daemon": "Library/SystemExtensions",
         "Resources/Fonts/StarJedi.ttf": ".",
     },
-    app_icons = glob(["Resources/Images.xcassets/**"]),
+    app_icons = glob(["Resources/Assets.xcassets/**"]),
     bundle_id = "com.northpolesec.santa",
     bundle_name = "Santa",
     codesignopts = [
@@ -217,7 +216,7 @@ macos_application(
     additional_contents = {
         "Resources/Fonts/StarJedi.ttf": ".",
     },
-    app_icons = glob(["Resources/Images.xcassets/**"]),
+    app_icons = glob(["Resources/Assets.xcassets/**"]),
     bundle_id = "com.northpolesec.santatestgui",
     bundle_name = "SantaTestGUI",
     infoplists = ["Info.plist"],

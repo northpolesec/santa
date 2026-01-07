@@ -48,6 +48,12 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeEmptyRuleArray = 510,
   SNTErrorCodeInsertOrReplaceRuleFailed = 511,
   SNTErrorCodeRemoveRuleFailed = 512,
+
+  // TMM Errors
+  SNTErrorCodeTMMNoPolicy = 610,
+  SNTErrorCodeTMMNotInLockdown = 611,
+  SNTErrorCodeTMMInvalidSyncServer = 612,
+  SNTErrorCodeTMMAuthFailed = 613,
 };
 
 @interface SNTError : NSObject

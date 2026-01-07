@@ -168,18 +168,21 @@
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
                    syncType:(SNTSyncType)syncType
                       reply:(void (^)(SNTSyncStatusType))reply {
-  MOLXPCConnection *ll = [[MOLXPCConnection alloc] initClientWithListener:logListener];
-  ll.remoteInterface =
-      [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
-  [ll resume];
+  MOLXPCConnection *ll;
+  if (logListener) {
+    ll = [[MOLXPCConnection alloc] initClientWithListener:logListener];
+    ll.remoteInterface =
+        [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
+    [ll resume];
+  }
   [self.syncManager syncType:syncType
                    withReply:^(SNTSyncStatusType status) {
                      if (status == SNTSyncStatusTypeSyncStarted) {
-                       [[SNTSyncBroadcaster broadcaster] addLogListener:ll];
+                       if (ll) [[SNTSyncBroadcaster broadcaster] addLogListener:ll];
                        return;
                      }
                      [[SNTSyncBroadcaster broadcaster] barrier];
-                     [[SNTSyncBroadcaster broadcaster] removeLogListener:ll];
+                     if (ll) [[SNTSyncBroadcaster broadcaster] removeLogListener:ll];
                      reply(status);
                    }];
 }

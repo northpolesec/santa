@@ -55,6 +55,21 @@
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "同期サービスへの接続に失敗しました。後ほどもう一度お試しください。";
 
+/* Error shown when user tries to enter TMM and an unknown error occurred. */
+"Failed to enter temporary monitor mode: an unknown error occurred" = "一時的なモニターモードへの切り替えに失敗しました: 不明なエラーが発生しました";
+
+/* Error message shown when user tries to enter TMM but authorization failed */
+"Failed to enter temporary monitor mode: authorization failed" = "一時的なモニターモードへの切り替えに失敗しました: 認証に失敗しました";
+
+/* Error message shown when user tries to enter TMM while not in lockdown */
+"Failed to enter temporary monitor mode: not currently in lockdown" = "一時的なモニターモードへの切り替えに失敗しました: 現在ロックダウンモードではありません";
+
+/* Error message shown when user tries to enter TMM while not using Workshop */
+"Failed to enter temporary monitor mode: not using a supported sync server" = "一時的なモニターモードへの切り替えに失敗しました: サポートされている同期サーバーを使用していません";
+
+/* Error message shown when user tries to enter TMM mode without a policy */
+"Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "一時的なモニターモードへの切り替えに失敗しました: このマシンには現在、一時的なモニターモードを許可するポリシーがありません";
+
 /* No comment provided by engineer. */
 "Filename" = "ファイル名";
 
@@ -120,6 +135,12 @@
 
 /* No comment provided by engineer. */
 "Sync" = "同期";
+
+/* Notification message shown when a sync completes successfully */
+"Sync completed successfully" = "同期が正常に完了しました";
+
+/* Notification message shown when a sync fails */
+"Sync failed" = "同期に失敗しました";
 
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "イベントのアップロードに失敗しました。ネットワーク接続を確認して、もう一度お試しください。";

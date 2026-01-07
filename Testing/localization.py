@@ -17,6 +17,7 @@ def base_localization(write_out=False):
   ]
   files_to_localize.append('Source/common/SNTBlockMessage.mm')
   files_to_localize.append('Source/gui/SNTNotificationManager.mm')
+  files_to_localize.append('Source/gui/SNTStatusItemManager.mm')
 
   subprocess.check_call(
       ['/usr/bin/genstrings', '-SwiftUI', '-u'] + files_to_localize

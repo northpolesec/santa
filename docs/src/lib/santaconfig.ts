@@ -150,6 +150,13 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
       defaultValue: false,
     },
     {
+      key: "EnableMenuItem",
+      description: `If true, Santa will show an item in the macOS menu bar to allow syncing and management of
+        temporary monitor mode`,
+      type: "bool",
+      defaultVlaue: true,
+    },
+    {
       key: "AboutText",
       description: `The text to display when the user opens Santa.app. If unset, the default text will be displayed`,
       type: "string",

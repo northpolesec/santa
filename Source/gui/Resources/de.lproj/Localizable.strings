@@ -55,6 +55,21 @@
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Verbindung zum Synchronisierungsdienst fehlgeschlagen. Bitte versuchen Sie es später erneut.";
 
+/* Error shown when user tries to enter TMM and an unknown error occurred. */
+"Failed to enter temporary monitor mode: an unknown error occurred" = "Wechsel in den temporären Monitor-Modus fehlgeschlagen: Ein unbekannter Fehler ist aufgetreten";
+
+/* Error message shown when user tries to enter TMM but authorization failed */
+"Failed to enter temporary monitor mode: authorization failed" = "Wechsel in den temporären Monitor-Modus fehlgeschlagen: Autorisierung fehlgeschlagen";
+
+/* Error message shown when user tries to enter TMM while not in lockdown */
+"Failed to enter temporary monitor mode: not currently in lockdown" = "Wechsel in den temporären Monitor-Modus fehlgeschlagen: Derzeit nicht im Lockdown-Modus";
+
+/* Error message shown when user tries to enter TMM while not using Workshop */
+"Failed to enter temporary monitor mode: not using a supported sync server" = "Wechsel in den temporären Monitor-Modus fehlgeschlagen: Kein unterstützter Sync-Server wird verwendet";
+
+/* Error message shown when user tries to enter TMM mode without a policy */
+"Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Wechsel in den temporären Monitor-Modus fehlgeschlagen: Auf diesem Gerät ist keine Richtlinie vorhanden, die den temporären Monitor-Modus erlaubt";
+
 /* No comment provided by engineer. */
 "Filename" = "Dateiname";
 
@@ -120,6 +135,12 @@
 
 /* No comment provided by engineer. */
 "Sync" = "Synchronisieren";
+
+/* Notification message shown when a sync completes successfully */
+"Sync completed successfully" = "Synchronisierung erfolgreich abgeschlossen";
+
+/* Notification message shown when a sync fails */
+"Sync failed" = "Synchronisierung fehlgeschlagen";
 
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "Der Upload des Ereignisses ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.";
