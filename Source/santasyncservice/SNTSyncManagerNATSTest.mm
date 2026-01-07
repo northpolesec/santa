@@ -17,7 +17,6 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTSyncManager.h"
@@ -51,10 +50,9 @@
 }
 
 - (void)testSyncManagerInitializesNATSClientWhenEnabled {
-  // Given: FCM is disabled, NATS is enabled (default), APNS is disabled, and syncBaseURL is pinned
+  // Given: FCM is disabled, NATS is enabled (default), and syncBaseURL is pinned
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(YES);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
@@ -70,7 +68,6 @@
   // Given: Both FCM and NATS are enabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
   OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(YES);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
@@ -82,27 +79,10 @@
   XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientFCM class]]);
 }
 
-- (void)testSyncManagerFallsBackToAPNSWhenNATSDisabled {
-  // Given: FCM is disabled, NATS is disabled, and APNS is enabled
-  OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
-  OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(NO);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(YES);
-  OCMStub([self.mockConfigurator syncBaseURL])
-      .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
-
-  // When: Sync manager is initialized
-  self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
-
-  // Then: Push notifications should be APNS client
-  XCTAssertNotNil(self.syncManager.pushNotifications);
-  XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]);
-}
-
 - (void)testSyncManagerNoPushClientWhenAllDisabled {
   // Given: All push notification systems are disabled
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(NO);
-  OCMStub([self.mockConfigurator enableAPNS]).andReturn(NO);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
