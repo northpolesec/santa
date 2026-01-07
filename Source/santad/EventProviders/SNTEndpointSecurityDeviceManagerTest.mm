@@ -340,6 +340,53 @@ class MockAuthResultCache : public AuthResultCache {
   XCTAssertFalse([self.mockDA.insertedDevices allValues][0].wasMounted);
 }
 
+// Test that USB4/Thunderbolt external SSDs (PCI-Express protocol) are properly blocked.
+// These devices report as non-removable, non-ejectable, and use PCI-Express protocol,
+// but should still be subject to mount restrictions since they are external.
+// See: https://github.com/northpolesec/santa/issues/719
+- (void)testUSB4ThunderboltExternalSSDBlocked {
+  NSArray *wantRemountArgs = @[ @"noexec", @"rdonly" ];
+  // USB4/Thunderbolt SSDs report as PCI-Express, non-removable, non-ejectable, but NOT internal
+  NSDictionary *diskInfo = @{
+    (__bridge NSString *)kDADiskDescriptionDeviceProtocolKey : @"PCI-Express",
+    (__bridge NSString *)kDADiskDescriptionDeviceInternalKey : @NO,
+    (__bridge NSString *)kDADiskDescriptionMediaRemovableKey : @NO,
+    (__bridge NSString *)kDADiskDescriptionMediaEjectableKey : @NO,
+    (__bridge NSString *)kDADiskDescriptionMediaKindKey : @"IOMedia",
+  };
+
+  XCTestExpectation *expectation =
+      [self expectationWithDescription:
+                @"Wait for SNTEndpointSecurityDeviceManager's blockCallback to trigger"];
+
+  __block NSString *gotmntonname, *gotmntfromname;
+  __block NSArray<NSString *> *gotRemountedArgs;
+
+  [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+            diskInfoOverrides:diskInfo
+           expectedAuthResult:ES_AUTH_RESULT_DENY
+           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+             dm.blockUSBMount = YES;
+             dm.remountArgs = wantRemountArgs;
+
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event) {
+               gotRemountedArgs = event.remountArgs;
+               gotmntonname = event.mntonname;
+               gotmntfromname = event.mntfromname;
+               [expectation fulfill];
+             };
+           }];
+
+  XCTAssertEqual(self.mockDA.insertedDevices.count, 1);
+  XCTAssertTrue([self.mockDA.insertedDevices allValues][0].wasMounted);
+
+  [self waitForExpectations:@[ expectation ] timeout:60.0];
+
+  XCTAssertEqualObjects(gotRemountedArgs, wantRemountArgs);
+  XCTAssertEqualObjects(gotmntonname, @"/Volumes/KATE'S 4G");
+  XCTAssertEqualObjects(gotmntfromname, @"/dev/disk2s1");
+}
+
 - (void)testNotifyUnmountFlushesCache {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
