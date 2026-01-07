@@ -436,7 +436,7 @@ NS_ASSUME_NONNULL_BEGIN
         exit(EXIT_FAILURE);
     }
   }
-#endif
+#endif  // HAVE_MACOS_15
 
   if ((isNetworkMount && !self.configurator.blockNetworkMount) ||
       (!isNetworkMount && !self.blockUSBMount)) {

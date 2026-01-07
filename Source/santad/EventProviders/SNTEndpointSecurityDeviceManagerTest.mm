@@ -26,6 +26,7 @@
 #include <memory>
 #include <set>
 
+#include "Source/common/Platform.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
@@ -525,6 +526,8 @@ class MockAuthResultCache : public AuthResultCache {
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
+#if HAVE_MACOS_15
+
 - (void)triggerTestNetworkMountEvent:(es_event_type_t)eventType
                         mountFromURL:(NSString *)mountFromURL
                   expectedAuthResult:(es_auth_result_t)expectedAuthResult
@@ -711,5 +714,7 @@ class MockAuthResultCache : public AuthResultCache {
         XCTFail(@"Callback should not be called when failing open");
       }];
 }
+
+#endif  // HAVE_MACOS_15
 
 @end

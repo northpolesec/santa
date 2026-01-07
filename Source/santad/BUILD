@@ -1741,6 +1741,7 @@ santa_unit_test(
         ":MockEnricher",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityDeviceManager",
+        "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
