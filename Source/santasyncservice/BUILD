@@ -1,6 +1,6 @@
 load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
 load("@rules_cc//cc:defs.bzl", "objc_library")
-load("//:helper.bzl", "santa_unit_test")
+load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION", "santa_unit_test")
 
 licenses(["notice"])
 
@@ -191,8 +191,6 @@ santa_unit_test(
 objc_library(
     name = "sync_lib",
     srcs = [
-        "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
         "SNTStreamingMultipartFormData.h",
@@ -256,8 +254,6 @@ objc_library(
 santa_unit_test(
     name = "SNTSyncTest",
     srcs = [
-        "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
@@ -333,8 +329,6 @@ santa_unit_test(
     name = "SNTSyncManagerTest",
     srcs = [
         "ProtoTraits.h",
-        "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
@@ -430,7 +424,7 @@ macos_command_line_application(
         "--options library,kill,runtime",
     ],
     infoplists = ["Info.plist"],
-    minimum_os_version = "13.0",
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,
         "//conditions:default": "//profiles:santa_dev",

@@ -84,6 +84,12 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 @property(nonatomic, copy) NSString *jwt;
 @property(nonatomic, copy) NSString *pushDeviceID;
 @property(nonatomic, copy) NSArray<NSString *> *tags;
+@property(nonatomic, copy) NSData *hmacKey;
+// Nonce cache for replay protection
+// Two-generation cache with lazy rotation
+@property(nonatomic) NSMutableSet<NSString *> *currentNonces;
+@property(nonatomic) NSMutableSet<NSString *> *previousNonces;
+@property(nonatomic) int64_t lastRotationTime;
 // Connection retry state
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
 @property(atomic) NSInteger retryAttempt;
@@ -102,6 +108,10 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     _messageQueue =
         dispatch_queue_create("com.northpolesec.santa.nats.message", DISPATCH_QUEUE_SERIAL);
     _tagSubscriptions = [NSMutableArray array];
+
+    _currentNonces = [NSMutableSet set];
+    _previousNonces = [NSMutableSet set];
+    _lastRotationTime = time(nullptr);
 
     // Don't connect immediately - wait for preflight to provide configuration
     LOGI(@"NATS push client: Initialized, waiting for preflight configuration");
@@ -818,7 +828,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
 
 #pragma mark - SNTPushNotificationsClientDelegate
 - (NSString *)token {
-  // NATS doesn't use tokens like APNS/FCM
+  // NATS doesn't use tokens like FCM
   return [[SNTConfigurator configurator] machineID];
 }
 
@@ -845,6 +855,12 @@ static void closedCallback(natsConnection *nc, void *closure) {
     if (!syncState.pushDeviceID) [missing addObject:@"device ID"];
     LOGW(@"NATS: Missing required push configuration from preflight: %@",
          [missing componentsJoinedByString:@", "]);
+  }
+
+  if (syncState.pushHMACKey) {
+    self.hmacKey = syncState.pushHMACKey;
+  } else {
+    LOGW(@"NATS: No push HMAC key received from preflight");
   }
 
   // Update sync interval to avoid polling Workshop.

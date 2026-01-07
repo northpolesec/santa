@@ -26,6 +26,7 @@
 #include <memory>
 #include <set>
 
+#include "Source/common/Platform.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
@@ -525,6 +526,8 @@ class MockAuthResultCache : public AuthResultCache {
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
+#if HAVE_MACOS_15
+
 - (void)triggerTestNetworkMountEvent:(es_event_type_t)eventType
                         mountFromURL:(NSString *)mountFromURL
                   expectedAuthResult:(es_auth_result_t)expectedAuthResult
@@ -628,88 +631,110 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testNetworkMountBlocked {
-  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
-  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
 
-  XCTestExpectation *expectation =
-      [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
+    XCTestExpectation *expectation =
+        [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
 
-  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-      mountFromURL:@"smb://server.example.com/share"
-      expectedAuthResult:ES_AUTH_RESULT_DENY
-      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-      }
-      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
-        XCTAssertEqualObjects(event.mountFromName, @"smb://server.example.com/share");
-        XCTAssertEqualObjects(event.mountOnName, @"/Volumes/NetworkShare");
-        XCTAssertEqualObjects(event.fsType, @"smbfs");
-        [expectation fulfill];
-      }];
+    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+        mountFromURL:@"smb://server.example.com/share"
+        expectedAuthResult:ES_AUTH_RESULT_DENY
+        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+        }
+        networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+          XCTAssertEqualObjects(event.mountFromName, @"smb://server.example.com/share");
+          XCTAssertEqualObjects(event.mountOnName, @"/Volumes/NetworkShare");
+          XCTAssertEqualObjects(event.fsType, @"smbfs");
+          [expectation fulfill];
+        }];
 
-  [self waitForExpectations:@[ expectation ] timeout:60.0];
+    [self waitForExpectations:@[ expectation ] timeout:60.0];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
 }
 
 - (void)testNetworkMountAllowedByHost {
-  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
-  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[ @"server.example.com" ]);
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[ @"server.example.com" ]);
 
-  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-      mountFromURL:@"smb://server.example.com/share"
-      expectedAuthResult:ES_AUTH_RESULT_ALLOW
-      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-      }
-      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
-        XCTFail(@"Callback should not be called for allowed mount");
-      }];
+    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+        mountFromURL:@"smb://server.example.com/share"
+        expectedAuthResult:ES_AUTH_RESULT_ALLOW
+        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+        }
+        networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+          XCTFail(@"Callback should not be called for allowed mount");
+        }];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
 }
 
 - (void)testNetworkMountDisabled {
-  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(NO);
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(NO);
 
-  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-      mountFromURL:@"smb://server.example.com/share"
-      expectedAuthResult:ES_AUTH_RESULT_ALLOW
-      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-      }
-      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
-        XCTFail(@"Callback should not be called when blocking is disabled");
-      }];
+    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+        mountFromURL:@"smb://server.example.com/share"
+        expectedAuthResult:ES_AUTH_RESULT_ALLOW
+        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+        }
+        networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+          XCTFail(@"Callback should not be called when blocking is disabled");
+        }];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
 }
 
 - (void)testNetworkMountFailClosedWithInvalidURL {
-  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
-  OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
-  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+    OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
+    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
 
-  XCTestExpectation *expectation =
-      [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
+    XCTestExpectation *expectation =
+        [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
 
-  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-      mountFromURL:@"invalid_url_format"
-      expectedAuthResult:ES_AUTH_RESULT_DENY
-      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-      }
-      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
-        XCTAssertEqualObjects(event.mountFromName, @"invalid_url_format");
-        [expectation fulfill];
-      }];
+    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+        mountFromURL:@"invalid_url_format"
+        expectedAuthResult:ES_AUTH_RESULT_DENY
+        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+        }
+        networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+          XCTAssertEqualObjects(event.mountFromName, @"invalid_url_format");
+          [expectation fulfill];
+        }];
 
-  [self waitForExpectations:@[ expectation ] timeout:60.0];
+    [self waitForExpectations:@[ expectation ] timeout:60.0];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
 }
 
 - (void)testNetworkMountFailOpenWithInvalidURL {
-  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
-  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
-  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+    OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
+    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
 
-  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-      mountFromURL:@"invalid_url_format"
-      expectedAuthResult:ES_AUTH_RESULT_ALLOW
-      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-      }
-      networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
-        XCTFail(@"Callback should not be called when failing open");
-      }];
+    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+        mountFromURL:@"invalid_url_format"
+        expectedAuthResult:ES_AUTH_RESULT_ALLOW
+        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+        }
+        networkMountCallback:^(SNTStoredNetworkMountEvent *event) {
+          XCTFail(@"Callback should not be called when failing open");
+        }];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
 }
+
+#endif  // HAVE_MACOS_15
 
 @end

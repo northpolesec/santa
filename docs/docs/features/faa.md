@@ -8,10 +8,6 @@ File Access Authorization is a feature that lets Santa control which processes
 are allowed access to read/write files. This can be used to monitor and log
 access or even block access altogether.
 
-:::note[IMPORTANT]
-This feature is only supported on macOS 13 and above.
-:::
-
 ![File-access authorization notification dialog](/img/faa-dialog_dark.png#dark)
 ![File-access authorization notification dialog](/img/faa-dialog_light.png#light)
 

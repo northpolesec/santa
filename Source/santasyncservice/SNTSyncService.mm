@@ -88,18 +88,6 @@
 
     self.kvoWatchers = @[
       [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
-                                   selector:@selector(enableAPNS)
-                                       type:[NSNumber class]
-                                   callback:^(NSNumber *oldValue, NSNumber *newValue) {
-                                     BOOL oldBool = [oldValue boolValue];
-                                     BOOL newBool = [newValue boolValue];
-
-                                     if (oldBool != newBool) {
-                                       LOGI(@"EnableAPNS changed: %d -> %d", oldBool, newBool);
-                                       [self spindown];
-                                     }
-                                   }],
-      [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
                                    selector:@selector(enablePushNotifications)
                                        type:[NSNumber class]
                                    callback:^(NSNumber *oldValue, NSNumber *newValue) {
@@ -199,14 +187,6 @@
 - (void)spindown {
   LOGI(@"Spinning down.");
   exit(0);
-}
-
-- (void)APNSTokenChanged {
-  [self.syncManager APNSTokenChanged];
-}
-
-- (void)handleAPNSMessage:(NSDictionary *)message {
-  [self.syncManager handleAPNSMessage:message];
 }
 
 - (void)statSubmissionThread {

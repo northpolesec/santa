@@ -1,6 +1,6 @@
 load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
 load("@rules_cc//cc:defs.bzl", "objc_library")
-load("//:helper.bzl", "santa_unit_test")
+load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION", "santa_unit_test")
 
 package(
     default_visibility = ["//:santa_package_group"],
@@ -53,7 +53,7 @@ macos_command_line_application(
         "--options library,kill,runtime",
     ],
     infoplists = None,
-    minimum_os_version = "15.0",
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = None,
     version = "//:version",
     visibility = ["//:santa_package_group"],
@@ -68,7 +68,7 @@ macos_command_line_application(
         "--options library,kill,runtime",
     ],
     infoplists = None,
-    minimum_os_version = "15.0",
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = None,
     version = "//:version",
     visibility = ["//:santa_package_group"],

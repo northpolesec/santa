@@ -12,6 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#import <CommonCrypto/CommonHMAC.h>
 #import <Foundation/Foundation.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
@@ -31,6 +32,10 @@ __END_DECLS
 
 namespace pbv1 = ::santa::commands::v1;
 
+// Constants from SNTPushClientNATS+Commands.mm
+static constexpr int64_t kMaxCommandAgeSeconds = 300;
+static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
+
 // Expose private methods for testing
 @interface SNTPushClientNATS (Testing)
 @property(nonatomic) natsConnection *conn;
@@ -38,6 +43,10 @@ namespace pbv1 = ::santa::commands::v1;
 @property(nonatomic) dispatch_queue_t connectionQueue;
 @property(nonatomic) dispatch_queue_t messageQueue;
 @property(nonatomic, copy) NSString *pushDeviceID;
+@property(nonatomic, copy) NSData *hmacKey;
+@property(nonatomic) NSMutableSet<NSString *> *currentNonces;
+@property(nonatomic) NSMutableSet<NSString *> *previousNonces;
+@property(nonatomic) int64_t lastRotationTime;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
 - (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
                             withCommandUUID:(NSString *)uuid
@@ -57,6 +66,10 @@ namespace pbv1 = ::santa::commands::v1;
 @property id mockSyncDelegate;
 @property SNTPushClientNATS *client;
 @property google::protobuf::Arena *arena;
+@property NSData *testHMACKey;
+
+// Helper method to sign a command request with HMAC
+- (void)signCommandRequest:(::pbv1::SantaCommandRequest *)command;
 @end
 
 @implementation SNTPushClientNATSCommandTest
@@ -75,6 +88,16 @@ namespace pbv1 = ::santa::commands::v1;
 
   // Create client
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+
+  // Set up test HMAC key (32 bytes for SHA256)
+  const char *keyString = "test_hmac_key_for_unit_tests_32";
+  self.testHMACKey = [NSData dataWithBytes:keyString length:32];
+  self.client.hmacKey = self.testHMACKey;
+
+  // Ensure the nonce caches are in an expected initial state
+  self.client.currentNonces = [NSMutableSet set];
+  self.client.previousNonces = [NSMutableSet set];
+  self.client.lastRotationTime = time(nullptr);
 }
 
 - (void)tearDown {
@@ -84,6 +107,26 @@ namespace pbv1 = ::santa::commands::v1;
   delete self.arena;
   self.arena = nullptr;
   [super tearDown];
+}
+
+#pragma mark - Helper Methods
+
+- (void)signCommandRequest:(::pbv1::SantaCommandRequest *)command {
+  // Prep the command to be signed - set the current time and clear any existing hmac.
+  command->set_issued_at(time(nullptr));
+  command->clear_hmac();
+
+  std::string serialized;
+  if (!command->SerializeToString(&serialized)) {
+    XCTFail(@"Failed to serialize command for HMAC signing");
+    return;
+  }
+
+  unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized.data(),
+         serialized.size(), hmac);
+
+  command->set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
 }
 
 #pragma mark - Command Response Publishing Tests
@@ -200,17 +243,20 @@ namespace pbv1 = ::santa::commands::v1;
 }
 
 - (void)testCommandHandlerBadUUID {
-  // Given: A command with no known type set
+  // Given: A command with a bad UUID
   ::pbv1::SantaCommandRequest command;
   command.set_uuid("bad_uuid");
   // Don't set any command type
 
+  // Sign the command with HMAC
+  [self signCommandRequest:&command];
+
   std::string commandData;
   BOOL serialized = command.SerializeToString(&commandData);
 
-  // Then: Should serialize successfully (empty command)
-  XCTAssertTrue(serialized, @"Failed to serialize empty command");
-  XCTAssertGreaterThanOrEqual(commandData.length(), 0, @"Serialized data can be empty");
+  // Then: Should serialize successfully
+  XCTAssertTrue(serialized, @"Failed to serialize command");
+  XCTAssertGreaterThan(commandData.length(), 0, @"Serialized data should not be empty");
 
   // Verify deserialization
   ::pbv1::SantaCommandRequest deserialized;
@@ -220,7 +266,7 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertFalse(deserialized.has_ping(), @"Command should not have ping field set");
   XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
 
-  // Test dispatch with unknown command
+  // Test dispatch with bad UUID
   ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
                                                                               onArena:self.arena];
   XCTAssertTrue(response->has_error());
@@ -228,23 +274,25 @@ namespace pbv1 = ::santa::commands::v1;
 }
 
 - (void)testCommandHandlerUnknownCommand {
-  // Given: A command with no known type set
+  // Given: A command with a valid UUID but no known type set
   ::pbv1::SantaCommandRequest command;
   command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
   // Don't set any command type
 
+  [self signCommandRequest:&command];
+
   std::string commandData;
   BOOL serialized = command.SerializeToString(&commandData);
 
-  // Then: Should serialize successfully (empty command)
-  XCTAssertTrue(serialized, @"Failed to serialize empty command");
-  XCTAssertGreaterThanOrEqual(commandData.length(), 0, @"Serialized data can be empty");
+  // Then: Should serialize successfully
+  XCTAssertTrue(serialized, @"Failed to serialize command");
+  XCTAssertGreaterThan(commandData.length(), 0, @"Serialized data should not be empty");
 
   // Verify deserialization
   ::pbv1::SantaCommandRequest deserialized;
   BOOL parsed = deserialized.ParseFromString(commandData);
 
-  XCTAssertTrue(parsed, @"Failed to parse serialized empty command");
+  XCTAssertTrue(parsed, @"Failed to parse serialized command");
   XCTAssertFalse(deserialized.has_ping(), @"Command should not have ping field set");
   XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
 
@@ -351,6 +399,8 @@ namespace pbv1 = ::santa::commands::v1;
   command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
   command.mutable_ping();
 
+  [self signCommandRequest:&command];
+
   // When: Dispatching the command
   ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
@@ -367,6 +417,8 @@ namespace pbv1 = ::santa::commands::v1;
   command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
   // Don't set any command type
 
+  [self signCommandRequest:&command];
+
   // When: Dispatching the command
   ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
@@ -380,6 +432,8 @@ namespace pbv1 = ::santa::commands::v1;
   ::pbv1::SantaCommandRequest command;
   command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
   command.mutable_ping();
+
+  [self signCommandRequest:&command];
 
   std::string commandData;
   BOOL serialized = command.SerializeToString(&commandData);
@@ -398,6 +452,359 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertFalse(response->has_error());
   XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kPing,
                  @"Ping command should return ping response");
+}
+
+#pragma mark - HMAC Verification Tests
+
+- (void)testHMACVerificationInvalidSignature {
+  // Given: A command with an invalid HMAC signature
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_ping();
+  [self signCommandRequest:&command];
+
+  // Corrupt the HMAC by flipping a byte
+  std::string hmac = command.hmac();
+  hmac[0] ^= 0xFF;
+  command.set_hmac(hmac);
+
+  // When: Dispatching the command with corrupted HMAC
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should be rejected with INVALID_DATA error
+  XCTAssertTrue(response->has_error(), @"Command with invalid HMAC should be rejected");
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA,
+                 @"Invalid HMAC should return INVALID_DATA error");
+}
+
+- (void)testHMACVerificationMissingSignature {
+  // Given: A command without HMAC signature
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_ping();
+  command.set_issued_at(time(nullptr));
+
+  // When: Dispatching the command without HMAC
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should be rejected with INVALID_DATA error
+  XCTAssertTrue(response->has_error(), @"Command without HMAC should be rejected");
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA,
+                 @"Missing HMAC should return INVALID_DATA error");
+}
+
+- (void)testHMACVerificationWrongLength {
+  // Given: A command with incorrect HMAC length
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_ping();
+  command.set_issued_at(time(nullptr));
+
+  // Set HMAC with wrong length (16 bytes instead of 32)
+  unsigned char shortHmac[16] = {0};
+  command.set_hmac(shortHmac, 16);
+
+  // When: Dispatching the command with wrong HMAC length
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should be rejected with INVALID_DATA error
+  XCTAssertTrue(response->has_error(), @"Command with wrong HMAC length should be rejected");
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA,
+                 @"Wrong HMAC length should return INVALID_DATA error");
+}
+
+#pragma mark - Timestamp Verification Tests
+
+- (void)testTimestampVerificationTooOld {
+  // Given: A command with timestamp older than kMaxCommandAgeSeconds seconds
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_ping();
+
+  // Set timestamp to just over the limit
+  command.set_issued_at(time(nullptr) - (kMaxCommandAgeSeconds + 1));
+
+  // Sign with the old timestamp
+  command.clear_hmac();
+  std::string serialized;
+  XCTAssertTrue(command.SerializeToString(&serialized));
+
+  unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized.data(),
+         serialized.size(), hmac);
+  command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
+
+  // When: Dispatching the command with old timestamp
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should be rejected with INVALID_DATA error
+  XCTAssertTrue(response->has_error(), @"Command with old timestamp should be rejected");
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA,
+                 @"Old timestamp should return INVALID_DATA error");
+}
+
+- (void)testTimestampVerificationFromFuture {
+  // Given: A command with timestamp from far future (>kMaxCommandAgeSeconds seconds)
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_ping();
+
+  // Set timestamp to (kMaxCommandAgeSeconds + 1) seconds in the future
+  command.set_issued_at(time(nullptr) + (kMaxCommandAgeSeconds + 1));
+
+  // Sign with the future timestamp
+  command.clear_hmac();
+  std::string serialized;
+  XCTAssertTrue(command.SerializeToString(&serialized));
+
+  unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized.data(),
+         serialized.size(), hmac);
+  command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
+
+  // When: Dispatching the command with future timestamp
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should be rejected with INVALID_DATA error
+  XCTAssertTrue(response->has_error(), @"Command with future timestamp should be rejected");
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA,
+                 @"Future timestamp should return INVALID_DATA error");
+}
+
+- (void)testTimestampVerificationMissing {
+  // Given: A command without timestamp (issued_at = 0)
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_ping();
+  // Don't set issued_at (defaults to 0)
+
+  // Sign without timestamp
+  command.clear_hmac();
+  std::string serialized;
+  XCTAssertTrue(command.SerializeToString(&serialized));
+
+  unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized.data(),
+         serialized.size(), hmac);
+  command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
+
+  // When: Dispatching the command without timestamp
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should be rejected with INVALID_DATA error
+  XCTAssertTrue(response->has_error(), @"Command without timestamp should be rejected");
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA,
+                 @"Missing timestamp should return INVALID_DATA error");
+}
+
+- (void)testTimestampVerificationWithinBounds {
+  // Given: Commands with timestamps at the edge of acceptable range
+
+  // Test timestamp just within the limit
+  ::pbv1::SantaCommandRequest command1;
+  command1.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command1.mutable_ping();
+  command1.set_issued_at(time(nullptr) - (kMaxCommandAgeSeconds - 1));
+
+  command1.clear_hmac();
+  std::string serialized1;
+  XCTAssertTrue(command1.SerializeToString(&serialized1));
+  unsigned char hmac1[CC_SHA256_DIGEST_LENGTH];
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized1.data(),
+         serialized1.size(), hmac1);
+  command1.set_hmac(hmac1, CC_SHA256_DIGEST_LENGTH);
+
+  ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command1
+                                                                               onArena:self.arena];
+  XCTAssertFalse(response1->has_error(), @"Command just within the limit should be accepted");
+
+  // Test timestamp in future just within the limit
+  ::pbv1::SantaCommandRequest command2;
+  command2.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command2.mutable_ping();
+  command2.set_issued_at(time(nullptr) + (kMaxCommandAgeSeconds - 1));
+
+  command2.clear_hmac();
+  std::string serialized2;
+  XCTAssertTrue(command2.SerializeToString(&serialized2));
+  unsigned char hmac2[CC_SHA256_DIGEST_LENGTH];
+  CCHmac(kCCHmacAlgSHA256, self.testHMACKey.bytes, self.testHMACKey.length, serialized2.data(),
+         serialized2.size(), hmac2);
+  command2.set_hmac(hmac2, CC_SHA256_DIGEST_LENGTH);
+
+  ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:command2
+                                                                               onArena:self.arena];
+  XCTAssertFalse(response2->has_error(),
+                 @"Command just within the future limit should be accepted");
+}
+
+#pragma mark - Nonce Cache Tests
+
+- (void)testNonceReplayProtection {
+  // Given: A PingRequest command with a specific UUID
+  NSString *testUUID = [[NSUUID UUID] UUIDString];
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid(testUUID.UTF8String);
+  command.mutable_ping();
+  [self signCommandRequest:&command];
+
+  // When: Dispatching the command the first time
+  ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
+                                                                               onArena:self.arena];
+
+  // Then: Should succeed
+  XCTAssertFalse(response1->has_error(), @"First command should succeed");
+  XCTAssertEqual(response1->result_case(), ::pbv1::SantaCommandResponse::kPing);
+
+  // When: Dispatching the same command again (replay attack)
+  ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:command
+                                                                               onArena:self.arena];
+
+  // Then: Should be rejected with INVALID_DATA error
+  XCTAssertTrue(response2->has_error(), @"Replay should be rejected");
+  XCTAssertEqual(response2->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA,
+                 @"Replay should return INVALID_DATA error");
+}
+
+- (void)testNonceCacheRotation {
+  // Given: A command that succeeds
+  NSString *testUUID = [[NSUUID UUID] UUIDString];
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid(testUUID.UTF8String);
+  command.mutable_ping();
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
+                                                                               onArena:self.arena];
+  XCTAssertFalse(response1->has_error(), @"First command should succeed");
+
+  // When: Forcing a cache rotation (by manipulating lastRotationTime)
+  // Simulate time passing ((kMaxCommandAgeSeconds + 1) seconds)
+  self.client.lastRotationTime = time(nullptr) - (kMaxCommandAgeSeconds + 1);
+
+  // Send a new command to trigger rotation
+  NSString *newUUID = [[NSUUID UUID] UUIDString];
+  ::pbv1::SantaCommandRequest newCommand;
+  newCommand.set_uuid(newUUID.UTF8String);
+  newCommand.mutable_ping();
+  [self signCommandRequest:&newCommand];
+
+  ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:newCommand
+                                                                               onArena:self.arena];
+  XCTAssertFalse(response2->has_error(), @"New command should succeed and trigger rotation");
+
+  // Then: The original UUID should still be rejected (now in previousNonces)
+  ::pbv1::SantaCommandRequest replayCommand;
+  replayCommand.set_uuid(testUUID.UTF8String);
+  replayCommand.mutable_ping();
+  [self signCommandRequest:&replayCommand];
+
+  ::pbv1::SantaCommandResponse *response3 = [self.client dispatchSantaCommandToHandler:replayCommand
+                                                                               onArena:self.arena];
+  XCTAssertTrue(response3->has_error(), @"UUID in previousNonces should still be rejected");
+  XCTAssertEqual(response3->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
+}
+
+- (void)testNonceCacheDoubleRotation {
+  // Given: A command that succeeds
+  NSString *oldUUID = [[NSUUID UUID] UUIDString];
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid(oldUUID.UTF8String);
+  command.mutable_ping();
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
+                                                                               onArena:self.arena];
+  XCTAssertFalse(response1->has_error(), @"First command should succeed");
+
+  // When: Forcing TWO cache rotations
+  // First rotation
+  self.client.lastRotationTime = time(nullptr) - (kMaxCommandAgeSeconds + 1);
+  ::pbv1::SantaCommandRequest command2;
+  command2.set_uuid([[[NSUUID UUID] UUIDString] UTF8String]);
+  command2.mutable_ping();
+  [self signCommandRequest:&command2];
+  [self.client dispatchSantaCommandToHandler:command2 onArena:self.arena];
+
+  // Second rotation
+  self.client.lastRotationTime = time(nullptr) - (kMaxCommandAgeSeconds + 1);
+  ::pbv1::SantaCommandRequest command3;
+  command3.set_uuid([[[NSUUID UUID] UUIDString] UTF8String]);
+  command3.mutable_ping();
+  [self signCommandRequest:&command3];
+  [self.client dispatchSantaCommandToHandler:command3 onArena:self.arena];
+
+  // Then: The original UUID should now be accepted again (aged out of cache)
+  ::pbv1::SantaCommandRequest replayCommand;
+  replayCommand.set_uuid(oldUUID.UTF8String);
+  replayCommand.mutable_ping();
+  [self signCommandRequest:&replayCommand];
+
+  ::pbv1::SantaCommandResponse *response4 = [self.client dispatchSantaCommandToHandler:replayCommand
+                                                                               onArena:self.arena];
+  XCTAssertFalse(response4->has_error(),
+                 @"UUID should be accepted after aging out of two-generation cache");
+  XCTAssertEqual(response4->result_case(), ::pbv1::SantaCommandResponse::kPing);
+}
+
+- (void)testNonceCacheThrottling {
+  // Given: A client with an empty nonce cache
+  // When: Sending more commands than the max cache size
+  NSUInteger maxCommands = kMaxCommandNonceCacheCount;
+  NSMutableArray<NSString *> *uuids = [NSMutableArray array];
+
+  // Send maxCommands commands - all should succeed
+  for (NSUInteger i = 0; i < maxCommands; i++) {
+    NSString *uuid = [[NSUUID UUID] UUIDString];
+    [uuids addObject:uuid];
+
+    ::pbv1::SantaCommandRequest command;
+    command.set_uuid(uuid.UTF8String);
+    command.mutable_ping();
+    [self signCommandRequest:&command];
+
+    ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                                onArena:self.arena];
+    XCTAssertFalse(response->has_error(), @"Command %lu should succeed (within limit)", i + 1);
+  }
+
+  // Then: The next command should be throttled
+  ::pbv1::SantaCommandRequest throttledCommand;
+  throttledCommand.set_uuid([[[NSUUID UUID] UUIDString] UTF8String]);
+  throttledCommand.mutable_ping();
+  [self signCommandRequest:&throttledCommand];
+
+  ::pbv1::SantaCommandResponse *throttledResponse =
+      [self.client dispatchSantaCommandToHandler:throttledCommand onArena:self.arena];
+
+  XCTAssertTrue(throttledResponse->has_error(), @"Command over limit should be throttled");
+  XCTAssertEqual(throttledResponse->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA,
+                 @"Throttled command should return INVALID_DATA error");
+}
+
+- (void)testNonceCachePreviousGenerationReplay {
+  // Given: Add a UUID directly to the previousNonces cache
+  NSString *previousUUID = [[NSUUID UUID] UUIDString];
+  [self.client.previousNonces addObject:previousUUID];
+
+  // When: Attempting to use that UUID
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid(previousUUID.UTF8String);
+  command.mutable_ping();
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should be rejected
+  XCTAssertTrue(response->has_error(), @"UUID in previousNonces should be rejected");
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
 }
 
 @end

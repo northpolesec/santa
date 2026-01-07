@@ -353,6 +353,12 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
     syncState.pushTags = [tags copy];
   }
 
+  if (!resp.push_hmac_key().empty()) {
+    syncState.pushHMACKey = [NSData dataWithBytes:resp.push_hmac_key().data()
+                                           length:resp.push_hmac_key().size()];
+    LOGD(@"Preflight: Received push HMAC key (%zu bytes)", resp.push_hmac_key().size());
+  }
+
   if (resp.has_mode_transition()) {
     switch (resp.mode_transition().transition_case()) {
       case ::pbv2::ModeTransition::kRevoke:

@@ -423,8 +423,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
                                                        r.type == SNTRuleTypeTeamID ? @"TeamID"
                                                                                    : @"SigningID"];
                                 } else {
-                                  if (r)
-                                    output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
+                                  if (r) output = [r stringifyWithColor:cmd.prettyOutput];
                                 }
                                 dispatch_semaphore_signal(sema);
                               }];
