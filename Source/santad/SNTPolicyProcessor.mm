@@ -58,7 +58,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 }
 
 @interface SNTPolicyProcessor () {
-  std::unique_ptr<santa::cel::Evaluator<true>> celEvaluator_;
+  std::unique_ptr<santa::cel::Evaluator<false>> celEvaluatorV1_;
+  std::unique_ptr<santa::cel::Evaluator<true>> celEvaluatorV2_;
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter_;
 }
 @property SNTRuleTable *ruleTable;
@@ -72,12 +73,20 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   if (self) {
     _configurator = [SNTConfigurator configurator];
 
-    auto evaluator = santa::cel::Evaluator<true>::Create();
-    if (evaluator.ok()) {
-      celEvaluator_ = std::move(*evaluator);
+    auto evaluatorV1 = santa::cel::Evaluator<false>::Create();
+    if (evaluatorV1.ok()) {
+      celEvaluatorV1_ = std::move(*evaluatorV1);
     } else {
-      LOGW(@"Failed to create CEL evaluator: %s",
-           std::string(evaluator.status().message()).c_str());
+      LOGW(@"Failed to create CEL v1 evaluator: %s",
+           std::string(evaluatorV1.status().message()).c_str());
+    }
+
+    auto evaluatorV2 = santa::cel::Evaluator<true>::Create();
+    if (evaluatorV2.ok()) {
+      celEvaluatorV2_ = std::move(*evaluatorV2);
+    } else {
+      LOGW(@"Failed to create CEL v2 evaluator: %s",
+           std::string(evaluatorV2.status().message()).c_str());
     }
   }
   return self;
@@ -104,9 +113,26 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   SNTRuleType type = rule.type;
 
   if ((state == SNTRuleStateCEL || state == SNTRuleStateCELv2) && activationCallback) {
-    auto activation = activationCallback();
-    auto evalResult = self->celEvaluator_->CompileAndEvaluate(
-        santa::NSStringToUTF8StringView(rule.celExpr), *activation);
+    bool useV2 = (state == SNTRuleStateCELv2);
+    auto activation = activationCallback(useV2);
+
+    absl::StatusOr<std::pair<int, bool>> evalResult;
+
+    if (useV2) {
+      auto *v2Activation = static_cast<santa::cel::Activation<true> *>(activation.get());
+      // In debug builds, ensure the returned type matches expectations, but no
+      // need to pay the RTTI cost in release builds since the number of returned
+      // types is small and should rarely change.
+      assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
+      evalResult = self->celEvaluatorV2_->CompileAndEvaluate(
+          santa::NSStringToUTF8StringView(rule.celExpr), *v2Activation);
+    } else {
+      auto *v1Activation = static_cast<santa::cel::Activation<false> *>(activation.get());
+      assert(dynamic_cast<santa::cel::Activation<false> *>(activation.get()) != nullptr);
+      evalResult = self->celEvaluatorV1_->CompileAndEvaluate(
+          santa::NSStringToUTF8StringView(rule.celExpr), *v1Activation);
+    }
+
     if (!evalResult.ok()) {
       LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
            std::string(evalResult.status().message()).c_str());
@@ -120,23 +146,35 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       return NO;
     }
 
-    using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
-    ReturnValue returnValue = evalResult->first;
-    LOGD(@"Ran CEL program and received result: %d (cacheable %d)", returnValue,
-         evalResult->second);
-    switch (returnValue) {
-      case ReturnValue::ALLOWLIST: state = SNTRuleStateAllow; break;
-      case ReturnValue::ALLOWLIST_COMPILER: state = SNTRuleStateAllowTransitive; break;
-      case ReturnValue::BLOCKLIST: state = SNTRuleStateBlock; break;
-      case ReturnValue::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
-      case ReturnValue::REQUIRE_TOUCHID:
-        // REQUIRE_TOUCHID responses are not cacheable.
-        cd.holdAndAsk = YES;
-        cd.cacheable = NO;
-        state = SNTRuleStateBlock;
-        break;
-      default: break;
+    LOGD(@"Ran CEL program and received result: %d (cacheable %d)",
+         static_cast<int>(evalResult->first), evalResult->second);
+
+    if (useV2) {
+      using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+      switch (static_cast<ReturnValue>(evalResult->first)) {
+        case ReturnValue::ALLOWLIST: state = SNTRuleStateAllow; break;
+        case ReturnValue::ALLOWLIST_COMPILER: state = SNTRuleStateAllowTransitive; break;
+        case ReturnValue::BLOCKLIST: state = SNTRuleStateBlock; break;
+        case ReturnValue::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
+        case ReturnValue::REQUIRE_TOUCHID:
+          // REQUIRE_TOUCHID responses are not cacheable.
+          cd.holdAndAsk = YES;
+          cd.cacheable = NO;
+          state = SNTRuleStateBlock;
+          break;
+        default: break;
+      }
+    } else {
+      using ReturnValue = santa::cel::CELProtoTraits<false>::ReturnValue;
+      switch (static_cast<ReturnValue>(evalResult->first)) {
+        case ReturnValue::ALLOWLIST: state = SNTRuleStateAllow; break;
+        case ReturnValue::ALLOWLIST_COMPILER: state = SNTRuleStateAllowTransitive; break;
+        case ReturnValue::BLOCKLIST: state = SNTRuleStateBlock; break;
+        case ReturnValue::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
+        default: break;
+      }
     }
+
     if (!evalResult->second) {
       cd.cacheable = NO;
     }

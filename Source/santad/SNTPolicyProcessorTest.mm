@@ -659,26 +659,36 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELDecisions {
-  ActivationCallbackBlock activation = ^std::unique_ptr<santa::cel::Activation<true>>() {
-    using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
-    auto ef = std::make_unique<ExecutableFileT>();
-    ef->mutable_signing_time()->set_seconds(1717987200);
-    ef->mutable_secure_signing_time()->set_seconds(1717987200);
-    return std::make_unique<santa::cel::Activation<true>>(
-        std::move(ef),
-        ^std::vector<std::string>() {
-          return std::vector<std::string>{"arg1", "arg2"};
-        },
-        ^std::map<std::string, std::string>() {
-          return std::map<std::string, std::string>{{"ENV_VARIABLE1", "value1"},
-                                                    {"OTHER_ENV_VAR", "value2"}};
-        },
-        ^uid_t() {
-          return 0;
-        },
-        ^std::string() {
-          return "/";
-        });
+  ActivationCallbackBlock activation =
+      ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
+    auto makeActivation =
+        [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
+      using ExecutableFileT = typename santa::cel::CELProtoTraits<IsV2>::ExecutableFileT;
+      auto ef = std::make_unique<ExecutableFileT>();
+      ef->mutable_signing_time()->set_seconds(1717987200);
+      ef->mutable_secure_signing_time()->set_seconds(1717987200);
+      return std::make_unique<santa::cel::Activation<IsV2>>(
+          std::move(ef),
+          ^std::vector<std::string>() {
+            return std::vector<std::string>{"arg1", "arg2"};
+          },
+          ^std::map<std::string, std::string>() {
+            return std::map<std::string, std::string>{{"ENV_VARIABLE1", "value1"},
+                                                      {"OTHER_ENV_VAR", "value2"}};
+          },
+          ^uid_t() {
+            return 0;
+          },
+          ^std::string() {
+            return "/";
+          });
+    };
+
+    if (useV2) {
+      return makeActivation.operator()<true>();
+    } else {
+      return makeActivation.operator()<false>();
+    }
   };
 
   SNTRule * (^createCELRule)(NSString *, BOOL) = ^SNTRule *(NSString *celExpr, BOOL v2) {

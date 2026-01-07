@@ -30,8 +30,11 @@
 @class SNTFileInfo;
 @class SNTRuleTable;
 
-// Use CELv2 for evaluation. v2 will always be a superset of v1.
-typedef std::unique_ptr<santa::cel::Activation<true>> (^ActivationCallbackBlock)(void);
+// Block type that returns a santa::cel::Activation object for the given Message
+// and MOLCodesignChecker object. The block defines a bool parameter that determines
+// whether to create a v1 or v2 activation object.
+using ActivationCallbackBlock =
+    std::unique_ptr<::google::api::expr::runtime::BaseActivation> (^)(bool useV2);
 
 ///
 ///  Creates SNTCachedDecision objects from a SNTFileInfo object or a file path. Decisions are based
