@@ -16,6 +16,7 @@ objc_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
     ],
 )
