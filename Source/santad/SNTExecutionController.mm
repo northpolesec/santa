@@ -575,7 +575,8 @@ static NSString *const kPrinterProxyPostMonterey =
 }
 
 // Create a block that returns a santa::cel::Activation object for the given Message
-// and MOLCodesignChecker object.
+// and MOLCodesignChecker object. The block defines a bool parameter that determines
+// whether to create a v1 or v2 activation object.
 //
 // Note: The returned block captures a reference to the Message object and must
 // not use it after the Message object is destroyed. Care must be taken to not
@@ -583,31 +584,45 @@ static NSString *const kPrinterProxyPostMonterey =
 - (ActivationCallbackBlock)createActivationBlockForMessage:(const santa::Message &)esMsg
                                                  andCSInfo:(nullable MOLCodesignChecker *)csInfo {
   std::shared_ptr<santa::EndpointSecurityAPI> esApi = esMsg.ESAPI();
-  return ^std::unique_ptr<santa::cel::Activation<true>>() {
-    using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
-    auto f = std::make_unique<ExecutableFileT>();
-    if (csInfo.signingTime) {
-      f->mutable_signing_time()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
-    }
-    if (csInfo.secureSigningTime) {
-      f->mutable_secure_signing_time()->set_seconds(csInfo.secureSigningTime.timeIntervalSince1970);
-    }
 
-    return std::make_unique<santa::cel::Activation<true>>(
-        std::move(f),
-        ^std::vector<std::string>() {
-          return esApi->ExecArgs(&esMsg->event.exec);
-        },
-        ^std::map<std::string, std::string>() {
-          return esApi->ExecEnvs(&esMsg->event.exec);
-        },
-        ^uid_t() {
-          return audit_token_to_euid(esMsg->event.exec.target->audit_token);
-        },
-        ^std::string() {
-          es_file_t *f = esMsg->event.exec.cwd;
-          return std::string(f->path.data, f->path.length);
-        });
+  return ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
+    auto makeActivation =
+        [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
+      using Traits = santa::cel::CELProtoTraits<IsV2>;
+      using ExecutableFileT = typename Traits::ExecutableFileT;
+
+      auto f = std::make_unique<ExecutableFileT>();
+
+      if (csInfo.signingTime) {
+        f->mutable_signing_time()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
+      }
+      if (csInfo.secureSigningTime) {
+        f->mutable_secure_signing_time()->set_seconds(
+            csInfo.secureSigningTime.timeIntervalSince1970);
+      }
+
+      return std::make_unique<santa::cel::Activation<IsV2>>(
+          std::move(f),
+          ^std::vector<std::string>() {
+            return esApi->ExecArgs(&esMsg->event.exec);
+          },
+          ^std::map<std::string, std::string>() {
+            return esApi->ExecEnvs(&esMsg->event.exec);
+          },
+          ^uid_t() {
+            return audit_token_to_euid(esMsg->event.exec.target->audit_token);
+          },
+          ^std::string() {
+            es_file_t *f = esMsg->event.exec.cwd;
+            return std::string(f->path.data, f->path.length);
+          });
+    };
+
+    if (useV2) {
+      return makeActivation.operator()<true>();
+    } else {
+      return makeActivation.operator()<false>();
+    }
   };
 }
 
