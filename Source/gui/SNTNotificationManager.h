@@ -26,7 +26,4 @@
     : NSObject <SNTMessageWindowControllerDelegate, SNTNotifierXPC, SNTBundleServiceProgressXPC>
 
 @property NSXPCListenerEndpoint *notificationListener;
-- (void)didRegisterForAPNS:(NSString *)deviceToken;
-- (void)didUnregisterForAPNS;
-- (void)APNSTokenChanged;
 @end

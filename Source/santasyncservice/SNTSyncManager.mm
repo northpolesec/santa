@@ -27,7 +27,6 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
-#import "Source/santasyncservice/SNTPushClientAPNS.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
@@ -82,9 +81,6 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       LOGD(@"Using NATS push notifications");
       // Use NATS this will only work for V2 sync clients.
       _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
-    } else if (config.enableAPNS) {
-      LOGD(@"Using APNS push notifications");
-      _pushNotifications = [[SNTPushClientAPNS alloc] initWithSyncDelegate:self];
     }
 
     _fullSyncTimer = [self createSyncTimerWithBlock:^{
@@ -193,18 +189,6 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     return;
   }
   reply(nil);
-}
-
-- (void)APNSTokenChanged {
-  if ([self.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]) {
-    [(SNTPushClientAPNS *)self.pushNotifications APNSTokenChanged];
-  }
-}
-
-- (void)handleAPNSMessage:(NSDictionary *)message {
-  if ([self.pushNotifications isKindOfClass:[SNTPushClientAPNS class]]) {
-    [(SNTPushClientAPNS *)self.pushNotifications handleAPNSMessage:message];
-  }
 }
 
 #pragma mark sync control / SNTPushNotificationsDelegate methods

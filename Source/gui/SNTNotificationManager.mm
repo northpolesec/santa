@@ -53,11 +53,6 @@
 // A serial queue for holding hashBundleBinaries requests
 @property dispatch_queue_t hashBundleBinariesQueue;
 
-// The APNS device token. If configured, the GUI app registers with APNS. Once the registration is
-// complete, the app delegate will notify this class. Any pending requests for the token will then
-// be processed.
-@property(atomic) NSString *APNSDeviceToken;
-
 @end
 
 @implementation SNTNotificationManager
@@ -474,33 +469,6 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [SNTAuthorizationHelper authorizeTemporaryMonitorModeWithReplyBlock:^(BOOL success) {
     reply(success);
   }];
-}
-
-// XPC handler. The sync service requests the APNS token, by way of the daemon.
-- (void)requestAPNSToken:(void (^)(NSString *))reply {
-  reply(self.APNSDeviceToken);
-}
-
-- (void)didRegisterForAPNS:(NSString *)deviceToken {
-  self.APNSDeviceToken = deviceToken;
-  [self APNSTokenChanged];
-}
-
-- (void)didUnregisterForAPNS {
-  self.APNSDeviceToken = nil;
-  [self APNSTokenChanged];
-};
-
-- (void)APNSTokenChanged {
-  // Only message the sync service if a sync server is configured. The message
-  // is sent whether or not APNS is enabled so that the sync service can clear
-  // the token if EnableAPNS was toggled off.
-  SNTConfigurator *config = [SNTConfigurator configurator];
-  if (!config.syncBaseURL) return;
-  MOLXPCConnection *syncConn = [SNTXPCSyncServiceInterface configuredConnection];
-  [syncConn resume];
-  [[syncConn remoteObjectProxy] APNSTokenChanged];
-  [syncConn invalidate];
 }
 
 #pragma mark SNTBundleServiceProgressXPC protocol methods

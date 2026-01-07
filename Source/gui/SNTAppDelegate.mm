@@ -31,7 +31,6 @@
 @property SNTAboutWindowController *aboutWindowController;
 @property SNTNotificationManager *notificationManager;
 @property MOLXPCConnection *daemonListener;
-@property SNTKVOManager *kvoEnableAPNS;
 @end
 
 @implementation SNTAppDelegate
@@ -41,31 +40,6 @@
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
   [self setupMenu];
   self.notificationManager = [[SNTNotificationManager alloc] init];
-
-  if ([SNTConfigurator configurator].enableAPNS) {
-    [NSApp registerForRemoteNotifications];
-  }
-
-  // Watch for changes to the EnableAPNS configuration key
-  self.kvoEnableAPNS =
-      [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
-                                   selector:@selector(enableAPNS)
-                                       type:[NSNumber class]
-                                   callback:^(NSNumber *oldValue, NSNumber *newValue) {
-                                     BOOL oldBool = [oldValue boolValue];
-                                     BOOL newBool = [newValue boolValue];
-
-                                     if (oldBool == newBool) {
-                                       return;
-                                     }
-
-                                     if (newBool) {
-                                       [NSApp registerForRemoteNotifications];
-                                     } else {
-                                       [NSApp unregisterForRemoteNotifications];
-                                       [self.notificationManager didUnregisterForAPNS];
-                                     }
-                                   }];
 
   NSNotificationCenter *workspaceNotifications = [[NSWorkspace sharedWorkspace] notificationCenter];
 
@@ -179,10 +153,6 @@
   // Now wait for the connection to come in.
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
     [self attemptDaemonReconnection];
-  } else {
-    // Let the sync service know the APNS token may have changed. The sync service will call back on
-    // the above listener to get the updated token.
-    [self.notificationManager APNSTokenChanged];
   }
 }
 
@@ -206,33 +176,6 @@
   [editMenuItem setSubmenu:editMenu];
   [mainMenu addItem:editMenuItem];
   [NSApp setMainMenu:mainMenu];
-}
-
-#pragma mark Push Notifications
-
-- (void)application:(NSApplication *)application
-    didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)tokenData {
-  NSMutableString *deviceToken = [NSMutableString stringWithCapacity:tokenData.length * 2];
-  const unsigned char *bytes = static_cast<const unsigned char *>(tokenData.bytes);
-  for (NSUInteger i = 0; i < tokenData.length; ++i) {
-    [deviceToken appendFormat:@"%02x", bytes[i]];
-  }
-  LOGD(@"APNS Token: %@", deviceToken);
-  [self.notificationManager didRegisterForAPNS:deviceToken];
-}
-
-- (void)application:(NSApplication *)application
-    didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
-  LOGE(@"Failed to register with APNS: %@", error);
-}
-
-- (void)application:(NSApplication *)application
-    didReceiveRemoteNotification:(NSDictionary<NSString *, id> *)message {
-  LOGD(@"APNS Message: %@", message);
-  MOLXPCConnection *syncConn = [SNTXPCSyncServiceInterface configuredConnection];
-  [syncConn resume];
-  [[syncConn remoteObjectProxy] handleAPNSMessage:message];
-  [syncConn invalidate];
 }
 
 @end

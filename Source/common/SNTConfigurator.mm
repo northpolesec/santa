@@ -173,8 +173,6 @@ static NSString *const kFCMProject = @"FCMProject";
 static NSString *const kFCMEntity = @"FCMEntity";
 static NSString *const kFCMAPIKey = @"FCMAPIKey";
 
-static NSString *const kEnableAPNS = @"EnableAPNS";
-
 static NSString *const kEnablePushNotifications = @"EnablePushNotifications";
 static NSString *const kEnableNATS =
     @"EnableNATS";  // Deprecated: alias for EnablePushNotifications
@@ -352,7 +350,6 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kFCMProject : string,
       kFCMEntity : string,
       kFCMAPIKey : string,
-      kEnableAPNS : number,
       kEnablePushNotifications : number,
       kEnableNATS : number,  // Deprecated: alias for EnablePushNotifications, kept for config key
                              // compatibility
@@ -690,10 +687,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingFcmEnabled {
-  return [self configStateSet];
-}
-
-+ (NSSet *)keyPathsForValuesAffectingEnableAPNS {
   return [self configStateSet];
 }
 
@@ -1423,12 +1416,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (BOOL)fcmEnabled {
   return (self.fcmProject.length && self.fcmEntity.length && self.fcmAPIKey.length);
-}
-
-- (BOOL)enableAPNS {
-  // TODO: Consider supporting enablement from the sync server.
-  NSNumber *number = self.configState[kEnableAPNS];
-  return [number boolValue];
 }
 
 - (BOOL)enablePushNotifications {
