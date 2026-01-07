@@ -602,6 +602,7 @@ objc_library(
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         "//Source/common:AuditUtilities",
+        "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
