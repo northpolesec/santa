@@ -72,10 +72,8 @@
     return self.mountFromName;
   }
 
-  NSURL *url = [NSURL URLWithString:self.mountFromName];
-  if (url && (url.user || url.password)) {
-    NSURLComponents *components = [NSURLComponents componentsWithURL:url
-                                             resolvingAgainstBaseURL:NO];
+  NSURLComponents *components = [NSURLComponents componentsWithString:self.mountFromName];
+  if (components && (components.URL || components.password)) {
     components.user = nil;
     components.password = nil;
     NSURL *sanitizedURL = [components URL];
