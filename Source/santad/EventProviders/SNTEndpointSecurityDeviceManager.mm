@@ -30,6 +30,7 @@
 #include <sys/ucred.h>
 
 #include "Source/common/AuditUtilities.h"
+#include "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
@@ -417,20 +418,25 @@ NS_ASSUME_NONNULL_BEGIN
     return;
   }
 
-  BOOL isNetworkMount;
+  BOOL isNetworkMount = NO;
 
-  switch (esMsg->event_type) {
-    case ES_EVENT_TYPE_AUTH_MOUNT:
-      isNetworkMount = (esMsg->event.mount.disposition == ES_MOUNT_DISPOSITION_NETWORK);
-      break;
-    case ES_EVENT_TYPE_AUTH_REMOUNT:
-      isNetworkMount = (esMsg->event.remount.disposition == ES_MOUNT_DISPOSITION_NETWORK);
-      break;
-    default:
-      // This is a programming error
-      LOGE(@"Unexpected Event Type passed to DeviceManager handleMessage: %d", esMsg->event_type);
-      exit(EXIT_FAILURE);
+#if HAVE_MACOS_15
+  // The `disposition` field only exists on message version 8 and newer (macOS 15)
+  if (esMsg->version >= 8) {
+    switch (esMsg->event_type) {
+      case ES_EVENT_TYPE_AUTH_MOUNT:
+        isNetworkMount = (esMsg->event.mount.disposition == ES_MOUNT_DISPOSITION_NETWORK);
+        break;
+      case ES_EVENT_TYPE_AUTH_REMOUNT:
+        isNetworkMount = (esMsg->event.remount.disposition == ES_MOUNT_DISPOSITION_NETWORK);
+        break;
+      default:
+        // This is a programming error
+        LOGE(@"Unexpected Event Type passed to DeviceManager handleMessage: %d", esMsg->event_type);
+        exit(EXIT_FAILURE);
+    }
   }
+#endif  // HAVE_MACOS_15
 
   if ((isNetworkMount && !self.configurator.blockNetworkMount) ||
       (!isNetworkMount && !self.blockUSBMount)) {
