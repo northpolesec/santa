@@ -658,7 +658,7 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply {
-  reply(_temporaryMonitorMode->Available(nullptr));
+  reply(_temporaryMonitorMode->Available(nil));
 }
 
 @end
