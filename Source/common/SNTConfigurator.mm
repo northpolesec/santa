@@ -130,6 +130,7 @@ static NSString *const kModeNotificationLockdown = @"ModeNotificationLockdown";
 static NSString *const kModeNotificationStandalone = @"ModeNotificationStandalone";
 static NSString *const kEnableNotificationSilences = @"EnableNotificationSilences";
 static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
+static NSString *const kEnableMenuItem = @"EnableMenuItem";
 
 static NSString *const kEnablePageZeroProtectionKey = @"EnablePageZeroProtection";
 static NSString *const kEnableBadSignatureProtectionKey = @"EnableBadSignatureProtection";
@@ -305,6 +306,7 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kModeNotificationStandalone : string,
       kEnableNotificationSilences : number,
       kFunFontsOnSpecificDays : number,
+      kEnableMenuItem : number,
       kStaticRulesKey : array,
       kSyncBaseURLKey : string,
       kSyncEnableProtoTransfer : number,
@@ -547,6 +549,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingFunFontsOnSpecificDays {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingEnableMenuItem {
   return [self configStateSet];
 }
 
@@ -1085,6 +1091,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (BOOL)funFontsOnSpecificDays {
   return [self.configState[kFunFontsOnSpecificDays] boolValue];
+}
+
+- (BOOL)enableMenuItem {
+  NSNumber *number = self.configState[kEnableMenuItem];
+  return number ? [number boolValue] : YES;
 }
 
 - (NSString *)syncClientAuthCertificateFile {

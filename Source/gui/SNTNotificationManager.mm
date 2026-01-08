@@ -33,7 +33,6 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
-#import "Source/gui/SNTAppDelegate.h"
 #import "Source/gui/SNTBinaryMessageWindowController.h"
 #import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 #import "Source/gui/SNTDeviceMessageWindowController.h"
@@ -41,6 +40,7 @@
 #import "Source/gui/SNTMessageView-Swift.h"
 #import "Source/gui/SNTMessageWindowController.h"
 #import "Source/gui/SNTNetworkMountMessageWindowController.h"
+#import "Source/gui/SNTStatusItemManager.h"
 
 @interface SNTNotificationManager ()
 
@@ -52,6 +52,10 @@
 
 // A serial queue for holding hashBundleBinaries requests
 @property dispatch_queue_t hashBundleBinariesQueue;
+
+// Timer for temporary monitor mode countdown
+@property(atomic, strong) NSTimer *temporaryMonitorModeTimer;
+@property(atomic, strong) NSDate *temporaryMonitorModeExpiration;
 
 @end
 
@@ -469,6 +473,18 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [SNTAuthorizationHelper authorizeTemporaryMonitorModeWithReplyBlock:^(BOOL success) {
     reply(success);
   }];
+}
+
+- (void)enterTemporaryMonitorMode:(NSDate *)expiration {
+  [self.statusItemManager enterMonitorModeWithExpiration:expiration];
+}
+
+- (void)leaveTemporaryMonitorMode {
+  [self.statusItemManager leaveMonitorMode];
+}
+
+- (void)temporaryMonitorModePolicyAvailable:(BOOL)available {
+  [self.statusItemManager setTemporaryMonitorModePolicyAvailable:available];
 }
 
 #pragma mark SNTBundleServiceProgressXPC protocol methods

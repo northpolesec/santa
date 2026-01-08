@@ -55,6 +55,21 @@
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Failed to connect to the sync service. Please try again later.";
 
+/* Error shown when user tries to enter TMM and an unknown error occurred. */
+"Failed to enter temporary monitor mode: an unknown error occurred" = "Failed to enter temporary monitor mode: an unknown error occurred";
+
+/* Error message shown when user tries to enter TMM but authorization failed */
+"Failed to enter temporary monitor mode: authorization failed" = "Failed to enter temporary monitor mode: authorization failed";
+
+/* Error message shown when user tries to enter TMM while not in lockdown */
+"Failed to enter temporary monitor mode: not currently in lockdown" = "Failed to enter temporary monitor mode: not currently in lockdown";
+
+/* Error message shown when user tries to enter TMM while not using Workshop */
+"Failed to enter temporary monitor mode: not using a supported sync server" = "Failed to enter temporary monitor mode: not using a supported sync server";
+
+/* Error message shown when user tries to enter TMM mode without a policy */
+"Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode";
+
 /* No comment provided by engineer. */
 "Filename" = "Filename";
 
@@ -130,6 +145,12 @@
 /* No comment provided by engineer. */
 "Sync" = "Sync";
 
+/* Notification message shown when a sync completes successfully */
+"Sync completed successfully" = "Sync completed successfully";
+
+/* Notification message shown when a sync fails */
+"Sync failed" = "Sync failed";
+
 /* No comment provided by engineer. */
 "Team ID" = "Team ID";
 
@@ -151,7 +172,7 @@
 /* The default message to show the user when a USB device is remounted with reduced permissions */
 "The following device has been remounted with reduced permissions" = "The following device has been remounted with reduced permissions";
 
-/* The default message to show the user when a network share mount is blocked */
+/* The default message to show the user when a network mount is blocked */
 "The following network share has been blocked from mounting" = "The following network share has been blocked from mounting";
 
 /* No comment provided by engineer. */
@@ -177,3 +198,4 @@
 
 /* Version in About view */
 "Version **%@**" = "Version **%@**";
+

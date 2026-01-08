@@ -16,10 +16,12 @@
 
 #include <mach/mach_time.h>
 
+#import "Source/common/MOLXPCConnection.h"
 #include "Source/common/Pinning.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/SystemResources.h"
 
 NSString *const kStateTempMonitorModeBootUUIDKey = @"BootUUID";
@@ -80,6 +82,7 @@ void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
                static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
   if (secs_remaining < kMinAllowedStateRemainingSeconds) {
     [configurator_ leaveTemporaryMonitorMode];
+    [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
   } else {
     BeginLocked(secs_remaining, false);
     handle_audit_event_block_([[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
@@ -152,30 +155,44 @@ void TemporaryMonitorMode::NewModeTransitionReceived(SNTModeTransition *mode_tra
   } else {
     [configurator_ setSyncServerModeTransition:mode_transition];
   }
+
+  // Notify the GUI about policy availability
+  [[notification_queue_.notifierConnection remoteObjectProxy]
+      temporaryMonitorModePolicyAvailable:(mode_transition.type == SNTModeTransitionTypeOnDemand)];
 }
 
-uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSError **err) {
+bool TemporaryMonitorMode::Available(NSError **err) {
   SNTModeTransition *mode_transition = [configurator_ modeTransition];
   if (mode_transition.type != SNTModeTransitionTypeOnDemand) {
     [SNTError populateError:err
-                 withFormat:@"This machine does not currently have a "
+                   withCode:SNTErrorCodeTMMNoPolicy
+                     format:@"This machine does not currently have a "
                             @"policy allowing temporary Monitor Mode."];
-    return 0;
+    return false;
   }
 
   SNTClientMode clientMode = [configurator_ clientMode];
   if (!(clientMode == SNTClientModeLockdown ||
         (clientMode == SNTClientModeMonitor && [configurator_ inTemporaryMonitorMode]))) {
     [SNTError populateError:err
-                 withFormat:@"Machine must be in Lockdown Mode in order to "
+                   withCode:SNTErrorCodeTMMNotInLockdown
+                     format:@"Machine must be in Lockdown Mode in order to "
                             @"transition to temporary Monitor Mode."];
-    return 0;
+    return false;
   }
 
   if (!santa::IsDomainPinned(configurator_.syncBaseURL)) {
     [SNTError populateError:err
-                 withFormat:@"This machine is not configured with a sync "
+                   withCode:SNTErrorCodeTMMInvalidSyncServer
+                     format:@"This machine is not configured with a sync "
                             @"server that supports temporary Monitor Mode."];
+    return false;
+  }
+  return true;
+};
+
+uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSError **err) {
+  if (!Available(err)) {
     return 0;
   }
 
@@ -185,10 +202,13 @@ uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSEr
   }];
 
   if (!auth_success) {
-    [SNTError populateError:err withFormat:@"User authorization failed."];
+    [SNTError populateError:err
+                   withCode:SNTErrorCodeTMMAuthFailed
+                     format:@"User authorization failed."];
     return 0;
   }
 
+  SNTModeTransition *mode_transition = [configurator_ modeTransition];
   uint32_t duration_min = [mode_transition getDurationMinutes:requested_duration];
 
   absl::MutexLock lock(&lock_);
@@ -241,6 +261,9 @@ bool TemporaryMonitorMode::BeginLocked(uint32_t seconds, bool gen_uuid_on_start)
 
   deadline_ = deadline;
 
+  id<SNTNotifierXPC> rop = [notification_queue_.notifierConnection remoteObjectProxy];
+  [rop enterTemporaryMonitorMode:[NSDate dateWithTimeIntervalSinceNow:seconds]];
+
   return did_start_new_timer;
 }
 
@@ -278,6 +301,7 @@ bool TemporaryMonitorMode::RevokeLocked(SNTTemporaryMonitorModeLeaveReason reaso
 bool TemporaryMonitorMode::EndLocked() {
   if (StopTimer()) {
     [configurator_ leaveTemporaryMonitorMode];
+    [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
     return true;
   } else {
     return false;
@@ -287,6 +311,7 @@ bool TemporaryMonitorMode::EndLocked() {
 bool TemporaryMonitorMode::OnTimer() {
   absl::MutexLock lock(&lock_);
   [configurator_ leaveTemporaryMonitorMode];
+  [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
 
   handle_audit_event_block_([[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
       initWithUUID:[current_uuid_ UUIDString]

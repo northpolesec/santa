@@ -55,6 +55,21 @@
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Не удалось подключиться к службе синхронизации. Пожалуйста, попробуйте позже.";
 
+/* Error shown when user tries to enter TMM and an unknown error occurred. */
+"Failed to enter temporary monitor mode: an unknown error occurred" = "Не удалось перейти во временный режим монитора: произошла неизвестная ошибка";
+
+/* Error message shown when user tries to enter TMM but authorization failed */
+"Failed to enter temporary monitor mode: authorization failed" = "Не удалось перейти во временный режим монитора: ошибка авторизации";
+
+/* Error message shown when user tries to enter TMM while not in lockdown */
+"Failed to enter temporary monitor mode: not currently in lockdown" = "Не удалось перейти во временный режим монитора: в данный момент не в режиме блокировки";
+
+/* Error message shown when user tries to enter TMM while not using Workshop */
+"Failed to enter temporary monitor mode: not using a supported sync server" = "Не удалось перейти во временный режим монитора: не используется поддерживаемый сервер синхронизации";
+
+/* Error message shown when user tries to enter TMM mode without a policy */
+"Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Не удалось перейти во временный режим монитора: на этом компьютере в настоящее время нет политики, разрешающей временный режим монитора";
+
 /* No comment provided by engineer. */
 "Filename" = "Имя файла";
 
@@ -129,6 +144,12 @@
 
 /* No comment provided by engineer. */
 "Sync" = "Синхронизация";
+
+/* Notification message shown when a sync completes successfully */
+"Sync completed successfully" = "Синхронизация успешно завершена";
+
+/* Notification message shown when a sync fails */
+"Sync failed" = "Ошибка синхронизации";
 
 /* No comment provided by engineer. */
 "Team ID" = "ID команды";

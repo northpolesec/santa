@@ -26,6 +26,7 @@
 #import "Source/gui/SNTAboutWindowController.h"
 #import "Source/gui/SNTFileInfoView-Swift.h"
 #import "Source/gui/SNTNotificationManager.h"
+#import "Source/gui/SNTStatusItemManager.h"
 
 @interface SNTAppDelegate ()
 @property SNTAboutWindowController *aboutWindowController;
@@ -38,8 +39,27 @@
 #pragma mark App Delegate methods
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-  [self setupMenu];
   self.notificationManager = [[SNTNotificationManager alloc] init];
+  self.statusItemManager = [[SNTStatusItemManager alloc] init];
+  self.notificationManager.statusItemManager = self.statusItemManager;
+
+  // Check whether temporary monitor mode is available and if we're currently in it.
+  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  [daemonConn resume];
+  [[daemonConn synchronousRemoteObjectProxy]
+      checkTemporaryMonitorModePolicyAvailable:^(BOOL available) {
+        [self.statusItemManager setTemporaryMonitorModePolicyAvailable:available];
+      }];
+  [[daemonConn synchronousRemoteObjectProxy]
+      temporaryMonitorModeSecondsRemaining:^(NSNumber *seconds) {
+        if (seconds) {
+          NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
+          [self.statusItemManager enterMonitorModeWithExpiration:expiry];
+        }
+      }];
+  [daemonConn invalidate];
+
+  [self setupMenu];
 
   NSNotificationCenter *workspaceNotifications = [[NSWorkspace sharedWorkspace] notificationCenter];
 
@@ -77,6 +97,10 @@
   [NSApp enumerateWindowsWithOptions:0
                           usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
                             if (window == closingWindow) return;
+                            // There are windows associated with the status bar item, these should
+                            // not prevent hiding the dock icon.
+                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")])
+                              return;
                             *stop = hasVisibleWindows = window.visible;
                           }];
   if (!hasVisibleWindows) {
