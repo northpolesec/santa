@@ -19,10 +19,23 @@
 
 @interface SNTStoredNetworkMountEvent : SNTStoredEvent <NSSecureCoding>
 
+@property NSString *uuid;
 @property NSString *mountFromName;
 @property NSString *mountOnName;
 @property NSString *fsType;
 
 @property SNTProcessChain *process;
+
+// Returns a sanitized version of mountFromName with both username and password removed.
+// If mountFromName is not a valid URL or contains no credentials, returns the original string.
+//
+// Example: "//admin:password@192.168.64.2:445/share" -> "//192.168.64.2:445/share"
+- (NSString *)sanitizedMountFromRemovingCredentials;
+
+// Returns a sanitized version of mountFromName with only the password removed (username preserved).
+// If mountFromName is not a valid URL or contains no password, returns the original string.
+//
+// Example: "//admin:password@192.168.64.2:445/share" -> "//admin@192.168.64.2:445/share"
+- (NSString *)sanitizedMountFromRemovingPassword;
 
 @end

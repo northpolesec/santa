@@ -136,4 +136,48 @@
   XCTAssertNil(decodedEvent.process);
 }
 
+- (void)testSanitizedMountFrom {
+  SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
+
+  // Test with both username and password
+  event.mountFromName = @"//admin:password@192.168.64.2:445/share";
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingCredentials], @"//192.168.64.2:445/share");
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingPassword],
+                        @"//admin@192.168.64.2:445/share");
+
+  // Test with only username (no password)
+  event.mountFromName = @"//admin@192.168.64.2:445/share";
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingCredentials], @"//192.168.64.2:445/share");
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingPassword],
+                        @"//admin@192.168.64.2:445/share");
+
+  // Test with no credentials
+  event.mountFromName = @"//192.168.64.2:445/share";
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingCredentials], @"//192.168.64.2:445/share");
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingPassword], @"//192.168.64.2:445/share");
+
+  // Test with NFS-style path (not a valid URL)
+  event.mountFromName = @"nfs-server.example.com:/export/data";
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingCredentials],
+                        @"nfs-server.example.com:/export/data");
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingPassword],
+                        @"nfs-server.example.com:/export/data");
+
+  // Test with nil
+  event.mountFromName = nil;
+  XCTAssertNil([event sanitizedMountFromRemovingCredentials]);
+  XCTAssertNil([event sanitizedMountFromRemovingPassword]);
+
+  // Test with proper URL scheme
+  event.mountFromName = @"smb://user:pass@server.com/share";
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingCredentials], @"smb://server.com/share");
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingPassword], @"smb://user@server.com/share");
+
+  // Test edge case: password with special characters (properly percent-encoded)
+  event.mountFromName = @"//admin:p%40ssw0rd!@192.168.64.2:445/share";
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingCredentials], @"//192.168.64.2:445/share");
+  XCTAssertEqualObjects([event sanitizedMountFromRemovingPassword],
+                        @"//admin@192.168.64.2:445/share");
+}
+
 @end

@@ -78,32 +78,4 @@
                        deliverImmediately:YES]);
 }
 
-- (void)testDidRegisterForAPNS {
-  SNTNotificationManager *nm = [[SNTNotificationManager alloc] init];
-
-  // The manager has not registered with APNS, the token in the reply block should be nil.
-  __block NSString *token;
-  [nm requestAPNSToken:^(NSString *reply) {
-    token = reply;
-  }];
-  NSString *wantToken;
-  XCTAssertEqualObjects(token, wantToken);
-
-  // Register with APNS, the token should now be returned.
-  wantToken = @"123";
-  token = nil;
-  [nm didRegisterForAPNS:wantToken];
-  [nm requestAPNSToken:^(NSString *reply) {
-    token = reply;
-  }];
-  XCTAssertEqualObjects(token, wantToken);
-
-  // Subsequent requests should also return the token.
-  token = nil;
-  [nm requestAPNSToken:^(NSString *reply) {
-    token = reply;
-  }];
-  XCTAssertEqualObjects(token, wantToken);
-}
-
 @end

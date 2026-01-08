@@ -828,7 +828,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
 
 #pragma mark - SNTPushNotificationsClientDelegate
 - (NSString *)token {
-  // NATS doesn't use tokens like APNS/FCM
+  // NATS doesn't use tokens like FCM
   return [[SNTConfigurator configurator] machineID];
 }
 

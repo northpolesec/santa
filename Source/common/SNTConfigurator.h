@@ -863,16 +863,9 @@
 @property(readonly, nonatomic) BOOL fcmEnabled;
 
 ///
-///  Set to true to use APNS. Defaults to false.
-///  If fcmEnabled and enableAPNS are both enabled, only enableAPNS will be used.
-///
-@property(readonly, nonatomic) BOOL enableAPNS;
-
-///
 ///  Set to true to use NATS push notifications. Defaults to true.
-///  NATS takes precedence over APNS if enabled, but not FCM.
 ///
-///  This can only used with Workshop and SyncV2.
+///  This can only be used with Workshop and SyncV2.
 ///
 @property(readonly, nonatomic) BOOL enablePushNotifications;
 

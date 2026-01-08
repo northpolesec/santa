@@ -191,8 +191,6 @@ santa_unit_test(
 objc_library(
     name = "sync_lib",
     srcs = [
-        "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
         "SNTStreamingMultipartFormData.h",
@@ -237,6 +235,7 @@ objc_library(
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
@@ -255,8 +254,6 @@ objc_library(
 santa_unit_test(
     name = "SNTSyncTest",
     srcs = [
-        "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
@@ -302,6 +299,7 @@ santa_unit_test(
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
@@ -331,8 +329,6 @@ santa_unit_test(
     name = "SNTSyncManagerTest",
     srcs = [
         "ProtoTraits.h",
-        "SNTPushClientAPNS.h",
-        "SNTPushClientAPNS.mm",
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
         "SNTPushNotifications.h",
@@ -374,6 +370,7 @@ santa_unit_test(
         "//Source/common:SNTStoredEvent",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",

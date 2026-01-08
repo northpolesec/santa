@@ -73,7 +73,5 @@
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 - (void)pushNotificationServerAddress:(void (^)(NSString *))reply;
-- (void)APNSTokenChanged;
-- (void)handleAPNSMessage:(NSDictionary *)message;
 
 @end

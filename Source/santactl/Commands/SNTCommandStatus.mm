@@ -190,15 +190,7 @@ REGISTER_COMMAND_NAME(@"status")
           case SNTPushNotificationStatusDisabled: pushNotifications = @"Disabled"; break;
           case SNTPushNotificationStatusDisconnected: pushNotifications = @"Disconnected"; break;
           case SNTPushNotificationStatusConnected: {
-            // Determine if using APNS or FCM
-            if ([configurator fcmEnabled]) {
-              pushNotifications = @"FCM";
-            } else if ([configurator enableAPNS]) {
-              pushNotifications = @"APNS";
-            } else {
-              pushNotifications = @"Connected";
-            }
-            break;
+            pushNotifications = @"FCM";
           }
           case SNTPushNotificationStatusConnectedNATS: {
             pushNotifications = @"NPS Push Service";
@@ -331,8 +323,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"full_sync_interval_seconds" : @(fullSyncInterval),
       } mutableCopy];
 
-      if (configurator.fcmEnabled || configurator.enablePushNotifications ||
-          configurator.enableAPNS) {
+      if (configurator.fcmEnabled || configurator.enablePushNotifications) {
         stats[@"sync"][@"push_notifications_full_sync_interval_seconds"] =
             @(pushNotificationsFullSyncInterval);
       }
@@ -442,8 +433,7 @@ REGISTER_COMMAND_NAME(@"status")
       // If push notifications are enabled, show the push notifications full
       // sync interval since it's the active configuration.
       NSString *fullSyncIntervalStr = FormatInterval(fullSyncInterval);
-      if (configurator.fcmEnabled || configurator.enablePushNotifications ||
-          configurator.enableAPNS) {
+      if (configurator.fcmEnabled || configurator.enablePushNotifications) {
         fullSyncIntervalStr =
             [NSString stringWithFormat:@"%@ (with Push Notifications)",
                                        FormatInterval(pushNotificationsFullSyncInterval)];
