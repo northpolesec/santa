@@ -107,19 +107,6 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
       [[SNTPolicyProcessor alloc] initWithRuleTable:rule_table
                                  entitlementsFilter:entitlements_filter];
 
-  SNTExecutionController *exec_controller =
-      [[SNTExecutionController alloc] initWithRuleTable:rule_table
-                                             eventTable:event_table
-                                          notifierQueue:notifier_queue
-                                             syncdQueue:syncd_queue
-                                              ttyWriter:tty_writer
-                                        policyProcessor:policy_processor
-                                    processControlBlock:processControlBlock];
-  if (!exec_controller) {
-    LOGE(@"Failed to initialize exec controller.");
-    exit(EXIT_FAILURE);
-  }
-
   std::shared_ptr<::PrefixTree<Unit>> prefix_tree = std::make_shared<::PrefixTree<Unit>>();
 
   // TODO(bur): Add KVO handling for fileChangesPrefixFilters.
@@ -135,13 +122,34 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
+  // Create process tree and enricher early so they can be used by Logger
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
+  std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>> annotators;
+
+  for (NSString *annotation in [configurator enabledProcessAnnotations]) {
+    if ([[annotation lowercaseString] isEqualToString:@"originator"]) {
+      annotators.emplace_back(std::make_unique<santa::santad::process_tree::OriginatorAnnotator>());
+    } else {
+      LOGW(@"Unrecognized process annotation %@", annotation);
+    }
+  }
+
+  auto tree_status = santa::santad::process_tree::CreateTree(std::move(annotators));
+  if (!tree_status.ok()) {
+    LOGE(@"Failed to create process tree: %@", @(tree_status.status().ToString().c_str()));
+    exit(EXIT_FAILURE);
+  }
+  process_tree = *tree_status;
+
+  std::shared_ptr<::Enricher> enricher = std::make_shared<::Enricher>(process_tree);
+
   size_t spool_file_threshold_bytes = [configurator spoolDirectoryFileSizeThresholdKB] * 1024;
   size_t spool_dir_threshold_bytes = [configurator spoolDirectorySizeThresholdMB] * 1024 * 1024;
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
   uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
 
-  std::unique_ptr<::Logger> logger = Logger::Create(
-      esapi, syncd_queue,
+  std::shared_ptr<::Logger> logger = Logger::Create(
+      esapi, enricher, syncd_queue,
       ^SNTExportConfiguration *() {
         return [configurator exportConfig];
       },
@@ -153,6 +161,20 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
       [configurator telemetryExportMaxFilesPerBatch]);
   if (!logger) {
     LOGE(@"Failed to create logger.");
+    exit(EXIT_FAILURE);
+  }
+
+  SNTExecutionController *exec_controller =
+      [[SNTExecutionController alloc] initWithRuleTable:rule_table
+                                             eventTable:event_table
+                                          notifierQueue:notifier_queue
+                                             syncdQueue:syncd_queue
+                                                 logger:logger
+                                              ttyWriter:tty_writer
+                                        policyProcessor:policy_processor
+                                    processControlBlock:processControlBlock];
+  if (!exec_controller) {
+    LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);
   }
 
@@ -202,34 +224,17 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
-  std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>> annotators;
-
-  for (NSString *annotation in [configurator enabledProcessAnnotations]) {
-    if ([[annotation lowercaseString] isEqualToString:@"originator"]) {
-      annotators.emplace_back(std::make_unique<santa::santad::process_tree::OriginatorAnnotator>());
-    } else {
-      LOGW(@"Unrecognized process annotation %@", annotation);
-    }
-  }
-
-  auto tree_status = santa::santad::process_tree::CreateTree(std::move(annotators));
-  if (!tree_status.ok()) {
-    LOGE(@"Failed to create process tree: %@", @(tree_status.status().ToString().c_str()));
-    exit(EXIT_FAILURE);
-  }
-  process_tree = *tree_status;
-
   return std::make_unique<SantadDeps>(
-      esapi, std::move(logger), std::move(metrics), std::move(watch_items),
+      esapi, std::move(enricher), std::move(logger), std::move(metrics), std::move(watch_items),
       std::move(auth_result_cache), control_connection, compiler_controller, notifier_queue,
       syncd_queue, exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree),
       std::move(entitlements_filter));
 }
 
 SantadDeps::SantadDeps(
-    std::shared_ptr<EndpointSecurityAPI> esapi, std::unique_ptr<::Logger> logger,
-    std::shared_ptr<::Metrics> metrics, std::shared_ptr<::WatchItems> watch_items,
+    std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<::Enricher> enricher,
+    std::shared_ptr<::Logger> logger, std::shared_ptr<::Metrics> metrics,
+    std::shared_ptr<::WatchItems> watch_items,
     std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection *control_connection,
     SNTCompilerController *compiler_controller, SNTNotificationQueue *notifier_queue,
     SNTSyncdQueue *syncd_queue, SNTExecutionController *exec_controller,
@@ -240,7 +245,7 @@ SantadDeps::SantadDeps(
       logger_(std::move(logger)),
       metrics_(std::move(metrics)),
       watch_items_(std::move(watch_items)),
-      enricher_(std::make_shared<::Enricher>(process_tree)),
+      enricher_(std::move(enricher)),
       auth_result_cache_(std::move(auth_result_cache)),
       control_connection_(control_connection),
       compiler_controller_(compiler_controller),

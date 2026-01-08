@@ -59,12 +59,13 @@ static constexpr uint32_t kMaxTelemetryExportIntervalSecs = 3600;
 
 // Translate configured log type to appropriate Serializer/Writer pairs
 std::unique_ptr<Logger> Logger::Create(
-    std::shared_ptr<EndpointSecurityAPI> esapi, SNTSyncdQueue *syncd_queue,
-    GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
-    SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
-    NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
-    uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds,
-    uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
+    std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Enricher> enricher,
+    SNTSyncdQueue *syncd_queue, GetExportConfigBlock getExportConfigBlock,
+    TelemetryEvent telemetry_mask, SNTEventLogType log_type, SNTDecisionCache *decision_cache,
+    NSString *event_log_path, NSString *spool_log_path, size_t spool_dir_size_threshold,
+    size_t spool_file_size_threshold, uint64_t spool_flush_timeout_ms,
+    uint32_t telemetry_export_seconds, uint32_t telemetry_export_timeout_seconds,
+    uint32_t telemetry_export_batch_threshold_size_mb,
     uint32_t telemetry_export_max_files_per_batch) {
   std::shared_ptr<santa::Serializer> serializer;
   std::shared_ptr<santa::Writer> writer;
@@ -122,23 +123,25 @@ std::unique_ptr<Logger> Logger::Create(
   }
 
   auto logger = std::make_unique<Logger>(
-      syncd_queue, getExportConfigBlock, telemetry_mask, telemetry_export_timeout_seconds,
-      telemetry_export_batch_threshold_size_mb, telemetry_export_max_files_per_batch,
-      std::move(serializer), std::move(writer));
+      std::move(enricher), syncd_queue, getExportConfigBlock, telemetry_mask,
+      telemetry_export_timeout_seconds, telemetry_export_batch_threshold_size_mb,
+      telemetry_export_max_files_per_batch, std::move(serializer), std::move(writer));
 
   logger->SetTimerInterval(telemetry_export_seconds);
 
   return logger;
 }
 
-Logger::Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock get_export_config_block,
-               TelemetryEvent telemetry_mask, uint32_t telemetry_export_timeout_seconds,
+Logger::Logger(std::shared_ptr<santa::Enricher> enricher, SNTSyncdQueue *syncd_queue,
+               GetExportConfigBlock get_export_config_block, TelemetryEvent telemetry_mask,
+               uint32_t telemetry_export_timeout_seconds,
                uint32_t telemetry_export_batch_threshold_size_mb,
                uint32_t telemetry_export_max_files_per_batch,
                std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer)
     : Timer<Logger>(kMinTelemetryExportIntervalSecs, kMaxTelemetryExportIntervalSecs,
                     Timer::OnStart::kFireImmediately, "TelemetryExportIntervalSec",
                     Logger::RescheduleMode::kTrailingEdge),
+      enricher_(std::move(enricher)),
       syncd_queue_(syncd_queue),
       get_export_config_block_(get_export_config_block),
       telemetry_mask_(telemetry_mask),
@@ -408,6 +411,22 @@ void Logger::LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events) 
       writer_->Write(serializer_->SerializeBundleHashingEvent(se));
     }
   }
+}
+
+void Logger::LogExecution(const Message &msg) {
+  if (ShouldLog(TelemetryEvent::kExecution)) {
+    std::unique_ptr<EnrichedMessage> enriched = enricher_->Enrich(Message(msg));
+    if (enriched) {
+      writer_->Write(serializer_->SerializeMessage(std::move(enriched)));
+    }
+  }
+}
+
+std::unique_ptr<EnrichedMessage> Logger::EnrichExecution(const Message &msg) {
+  if (!ShouldLog(TelemetryEvent::kExecution)) {
+    return nullptr;
+  }
+  return enricher_->Enrich(Message(msg));
 }
 
 void Logger::LogDiskAppeared(NSDictionary *props, bool allowed) {

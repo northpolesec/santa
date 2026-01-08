@@ -17,6 +17,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/TTYWriter.h"
@@ -66,6 +67,7 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
                        eventTable:(SNTEventTable *)eventTable
                     notifierQueue:(SNTNotificationQueue *)notifierQueue
                        syncdQueue:(SNTSyncdQueue *)syncdQueue
+                           logger:(std::shared_ptr<santa::Logger>)logger
                         ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
                   policyProcessor:(SNTPolicyProcessor *)policyProcessor
               processControlBlock:(santa::ProcessControlBlock)processControlBlock;

@@ -113,6 +113,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                                                     eventTable:self.mockEventDatabase
                                                  notifierQueue:nil
                                                     syncdQueue:nil
+                                                        logger:nullptr
                                                      ttyWriter:santa::TTYWriter::Create(true)
                                                policyProcessor:policyProcessor
                                            processControlBlock:santa::ProdSuspendResumeBlock()];

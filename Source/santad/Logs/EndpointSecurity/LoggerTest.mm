@@ -80,7 +80,7 @@ class LoggerPeer : public Logger {
   using Logger::writer_;
 
   LoggerPeer(std::unique_ptr<Logger> l)
-      : Logger(nil, nil, TelemetryEvent::kEverything, l->export_timeout_secs_->load(),
+      : Logger(nullptr, nil, nil, TelemetryEvent::kEverything, l->export_timeout_secs_->load(),
                static_cast<uint32_t>(l->export_batch_threshold_size_bytes_->load() / 1024 / 1024),
                l->export_max_files_per_batch_->load(), std::move(l->serializer_),
                std::move(l->writer_)) {}
@@ -192,57 +192,57 @@ class MockWriter : public santa::Writer {
   // Ensure that the factory method creates expected serializers/writers pairs
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
-  XCTAssertEqual(nullptr, Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  XCTAssertEqual(nullptr, Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                          (SNTEventLogType)123, nil, @"/tmp/temppy", @"/tmp/spool",
                                          1, 1, 1, 1, 1, 1, 1));
 
-  LoggerPeer logger(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  LoggerPeer logger(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                    SNTEventLogTypeFilelog, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                    1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.serializer_));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<File>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeSyslog, nil, @"/tmp/temppy", @"/tmp/spool", 1,
                                      1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.serializer_));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Syslog>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeNull, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                      1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Empty>(logger.serializer_));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Null>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobuf, nil, @"/tmp/temppy", @"/tmp/spool", 1,
                                      1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr,
                     std::dynamic_pointer_cast<Spool<::fsspool::AnyBatcher>>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobufStream, nil, @"/tmp/temppy",
                                      @"/tmp/spool", 1, 1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Spool<::fsspool::UncompressedStreamBatcher>>(
                                  logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobufStreamGzip, nil, @"/tmp/temppy",
                                      @"/tmp/spool", 1, 1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr,
                     std::dynamic_pointer_cast<Spool<::fsspool::GzipStreamBatcher>>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobufStreamZstd, nil, @"/tmp/temppy",
                                      @"/tmp/spool", 1, 1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr,
                     std::dynamic_pointer_cast<Spool<::fsspool::ZstdStreamBatcher>>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeJSON, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                      1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
@@ -269,7 +269,7 @@ class MockWriter : public santa::Writer {
     EXPECT_CALL(*mockSerializer, SerializeMessage(testing::A<const EnrichedClose &>())).Times(1);
     EXPECT_CALL(*mockWriter, Write).Times(1);
 
-    Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
+    Logger(nullptr, nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
         .Log(std::move(enrichedMsg));
   }
 
@@ -289,7 +289,7 @@ class MockWriter : public santa::Writer {
   EXPECT_CALL(*mockSerializer, SerializeAllowlist(testing::_, hash));
   EXPECT_CALL(*mockWriter, Write);
 
-  Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
+  Logger(nullptr, nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
       .LogAllowlist(Message(mockESApi, &msg), hash);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -305,7 +305,7 @@ class MockWriter : public santa::Writer {
   EXPECT_CALL(*mockSerializer, SerializeBundleHashingEvent).Times((int)[events count]);
   EXPECT_CALL(*mockWriter, Write).Times((int)[events count]);
 
-  Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
+  Logger(nullptr, nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
       .LogBundleHashingEvents(events);
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
@@ -319,7 +319,7 @@ class MockWriter : public santa::Writer {
   EXPECT_CALL(*mockSerializer, SerializeDiskAppeared);
   EXPECT_CALL(*mockWriter, Write);
 
-  Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
+  Logger(nullptr, nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
       .LogDiskAppeared(@{@"key" : @"value"}, true);
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
@@ -333,7 +333,7 @@ class MockWriter : public santa::Writer {
   EXPECT_CALL(*mockSerializer, SerializeDiskDisappeared);
   EXPECT_CALL(*mockWriter, Write);
 
-  Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
+  Logger(nullptr, nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
       .LogDiskDisappeared(@{@"key" : @"value"});
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
@@ -351,7 +351,7 @@ class MockWriter : public santa::Writer {
   EXPECT_CALL(*mockSerializer, SerializeFileAccess(_, _, _, _, _, _, _));
   EXPECT_CALL(*mockWriter, Write);
 
-  Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
+  Logger(nullptr, nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
       .LogFileAccess(
           "v1", "name", Message(mockESApi, &msg),
           EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
@@ -365,7 +365,7 @@ class MockWriter : public santa::Writer {
 
 - (void)testExportTracker {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  LoggerPeer logger(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  LoggerPeer logger(Logger::Create(mockESApi, nullptr, nil, nil, TelemetryEvent::kEverything,
                                    SNTEventLogTypeNull, nil, @"", @"", 1, 1, 1, 1, 1, 1, 1));
 
   // Nothing in the map initially
@@ -439,8 +439,8 @@ class MockWriter : public santa::Writer {
   NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
   NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
 
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
-               nullptr, mockWriter);
+  LoggerPeer l(nullptr, self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5,
+               1, 10, nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
       .WillOnce(Return(f1.UTF8String))
@@ -470,8 +470,8 @@ class MockWriter : public santa::Writer {
 
   [self setExportExpectationSize:25 success:NO];
 
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
-               nullptr, mockWriter);
+  LoggerPeer l(nullptr, self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5,
+               1, 10, nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
       .WillOnce(Return(f1.UTF8String))
@@ -506,8 +506,8 @@ class MockWriter : public santa::Writer {
   [self setExportExpectationSize:15 success:YES];
   [self setExportExpectationSize:70 success:YES];
 
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
-               nullptr, mockWriter);
+  LoggerPeer l(nullptr, self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5,
+               1, 10, nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
       .WillOnce(Return(f1.UTF8String))
@@ -549,8 +549,8 @@ class MockWriter : public santa::Writer {
   [self setExportExpectationSize:40 success:YES];
 
   // Limit to 3 opened files
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
-               nullptr, mockWriter);
+  LoggerPeer l(nullptr, self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5,
+               1, 3, nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
       .WillOnce(Return(f1.UTF8String))
@@ -582,8 +582,8 @@ class MockWriter : public santa::Writer {
   NSString *f1 = [self createTestFile:@"f1" contentSize:5];
   NSString *f2 = [self createTestFile:@"f2" contentSize:10];
 
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
-               nullptr, mockWriter);
+  LoggerPeer l(nullptr, self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5,
+               1, 3, nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
       .WillOnce(Return(f1.UTF8String))
@@ -619,8 +619,8 @@ class MockWriter : public santa::Writer {
   [self setExportExpectationSize:(40 + oneMB) success:YES];
 
   // Limit to 3 opened files
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
-               nullptr, mockWriter);
+  LoggerPeer l(nullptr, self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5,
+               1, 10, nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
       .WillOnce(Return(f1.UTF8String))
@@ -657,8 +657,8 @@ class MockWriter : public santa::Writer {
   [self setExportExpectationSize:15 success:NO];
 
   // Limit to 2 opened files
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 2,
-               nullptr, mockWriter);
+  LoggerPeer l(nullptr, self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5,
+               1, 2, nullptr, mockWriter);
 
   // Note: std::nullopt is never returned as the export loops don't continue
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -695,7 +695,8 @@ class MockWriter : public santa::Writer {
 }
 
 - (void)testExportSettingsClamp {
-  LoggerPeer l(nil, self.exportConfigBlock, TelemetryEvent::kNone, 5, 1, 2, nullptr, nullptr);
+  LoggerPeer l(nullptr, nil, self.exportConfigBlock, TelemetryEvent::kNone, 5, 1, 2, nullptr,
+               nullptr);
 
   // Export batch threshold size must be between 1 and 5120 MB
   constexpr uint64_t mb_multiplier = 1024 * 1024;
