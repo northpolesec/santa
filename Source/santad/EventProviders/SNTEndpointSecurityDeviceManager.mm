@@ -250,6 +250,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)shouldOperateOnDisk:(DADiskRef)disk {
   NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
 
+  // Handle cases like time machine mounts where a disk info is not present.
+  if (!diskInfo) {
+    return false;
+  }
+
   BOOL isInternal = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceInternalKey] boolValue];
   BOOL isRemovable = [diskInfo[(__bridge NSString *)kDADiskDescriptionMediaRemovableKey] boolValue];
   BOOL isEjectable = [diskInfo[(__bridge NSString *)kDADiskDescriptionMediaEjectableKey] boolValue];
