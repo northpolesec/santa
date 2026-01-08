@@ -250,6 +250,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)shouldOperateOnDisk:(DADiskRef)disk {
   NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
 
+  // Handle cases like time machine mounts where a disk info is not present.
+  if (!diskInfo) {
+    return false;
+  }
+
   BOOL isInternal = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceInternalKey] boolValue];
   BOOL isRemovable = [diskInfo[(__bridge NSString *)kDADiskDescriptionMediaRemovableKey] boolValue];
   BOOL isEjectable = [diskInfo[(__bridge NSString *)kDADiskDescriptionMediaEjectableKey] boolValue];
@@ -273,8 +278,15 @@ NS_ASSUME_NONNULL_BEGIN
     return false;
   }
 
-  // We are okay with operations for devices that are non-removable as long as
-  // they are NOT a USB device, or an SD Card.
+  // If the device is external (not internal and not virtual), operate on it.
+  // This catches USB4/Thunderbolt/PCI-Express external drives that may not
+  // be flagged as removable or ejectable.
+  if (!isInternal && !isVirtual) {
+    return true;
+  }
+
+  // For remaining devices (which would be internal/virtual SD cards that
+  // passed the first check), only skip if they're also non-removable.
   if (!isRemovable && !isEjectable && !isUSB && !isSecureDigital) {
     return false;
   }
