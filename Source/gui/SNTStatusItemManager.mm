@@ -294,12 +294,6 @@
                             [self
                                 setMenuItemImageWithTintColor:[NSColor
                                                                   colorNamed:@"SyncSuccessColor"]];
-                            [NSTimer
-                                scheduledTimerWithTimeInterval:2.0
-                                                       repeats:NO
-                                                         block:^(NSTimer *_Nonnull timer) {
-                                                           [self setMenuItemImageWithTintColor:nil];
-                                                         }];
                             [self notificationWithIdentifier:@"sync_result_notification"
                                                      andBody:NSLocalizedString(
                                                                  @"Sync completed successfully",
@@ -310,18 +304,19 @@
                             [self
                                 setMenuItemImageWithTintColor:[NSColor
                                                                   colorNamed:@"SyncFailureColor"]];
-                            [NSTimer
-                                scheduledTimerWithTimeInterval:2.0
-                                                       repeats:NO
-                                                         block:^(NSTimer *_Nonnull timer) {
-                                                           [self setMenuItemImageWithTintColor:nil];
-                                                         }];
                             [self notificationWithIdentifier:@"sync_result_notification"
                                                      andBody:NSLocalizedString(
                                                                  @"Sync failed",
                                                                  @"Notification message shown when "
                                                                  @"a sync fails")];
                           }
+
+                          [NSTimer
+                              scheduledTimerWithTimeInterval:2.0
+                                                     repeats:NO
+                                                       block:^(NSTimer *_Nonnull timer) {
+                                                         [self setMenuItemImageWithTintColor:nil];
+                                                       }];
                         });
                         ss.invalidationHandler = nil;
                         [ss invalidate];

@@ -73,6 +73,11 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
   // a previously started timer expires.
   bool OnTimer();
 
+  // Return whether temporary monitor mode is available: a policy is set,
+  // the sync domain is pinned and the current client mode can transition.
+  // When returning false, the optional err parameter may be populated.
+  bool Available(NSError **err);
+
   // If a temporary Monitor Mode session is active, return the number of
   // of seconds remaining. Otherwise nullopt.
   std::optional<uint64_t> SecondsRemaining() const;

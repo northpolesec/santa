@@ -154,7 +154,8 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
       description: `If true, Santa will show an item in the macOS menu bar to allow syncing and management of
         temporary monitor mode`,
       type: "bool",
-      defaultVlaue: true,
+      defaultValue: true,
+      versionAdded: "2026.1",
     },
     {
       key: "AboutText",

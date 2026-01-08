@@ -658,8 +658,7 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply {
-  SNTModeTransition *modeTransition = [[SNTConfigurator configurator] modeTransition];
-  reply(modeTransition.type == SNTModeTransitionTypeOnDemand);
+  reply(_temporaryMonitorMode->Available(nullptr));
 }
 
 @end

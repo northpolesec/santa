@@ -157,19 +157,18 @@ void TemporaryMonitorMode::NewModeTransitionReceived(SNTModeTransition *mode_tra
   }
 
   // Notify the GUI about policy availability
-  BOOL policyAvailable = (mode_transition.type == SNTModeTransitionTypeOnDemand);
   [[notification_queue_.notifierConnection remoteObjectProxy]
-      temporaryMonitorModePolicyAvailable:policyAvailable];
+      temporaryMonitorModePolicyAvailable:(mode_transition.type == SNTModeTransitionTypeOnDemand)];
 }
 
-uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSError **err) {
+bool TemporaryMonitorMode::Available(NSError **err) {
   SNTModeTransition *mode_transition = [configurator_ modeTransition];
   if (mode_transition.type != SNTModeTransitionTypeOnDemand) {
     [SNTError populateError:err
                    withCode:SNTErrorCodeTMMNoPolicy
                      format:@"This machine does not currently have a "
                             @"policy allowing temporary Monitor Mode."];
-    return 0;
+    return false;
   }
 
   SNTClientMode clientMode = [configurator_ clientMode];
@@ -179,7 +178,7 @@ uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSEr
                    withCode:SNTErrorCodeTMMNotInLockdown
                      format:@"Machine must be in Lockdown Mode in order to "
                             @"transition to temporary Monitor Mode."];
-    return 0;
+    return false;
   }
 
   if (!santa::IsDomainPinned(configurator_.syncBaseURL)) {
@@ -187,6 +186,13 @@ uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSEr
                    withCode:SNTErrorCodeTMMInvalidSyncServer
                      format:@"This machine is not configured with a sync "
                             @"server that supports temporary Monitor Mode."];
+    return false;
+  }
+  return true;
+};
+
+uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSError **err) {
+  if (!Available(err)) {
     return 0;
   }
 
@@ -202,6 +208,7 @@ uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSEr
     return 0;
   }
 
+  SNTModeTransition *mode_transition = [configurator_ modeTransition];
   uint32_t duration_min = [mode_transition getDurationMinutes:requested_duration];
 
   absl::MutexLock lock(&lock_);
@@ -238,8 +245,6 @@ std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining(uint64_t deadline
 }
 
 bool TemporaryMonitorMode::BeginLocked(uint32_t seconds, bool gen_uuid_on_start) {
-  NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:seconds];
-
   bool did_start_new_timer = StartTimerWithInterval(seconds);
   if (did_start_new_timer && gen_uuid_on_start) {
     current_uuid_ = [NSUUID UUID];
@@ -257,7 +262,7 @@ bool TemporaryMonitorMode::BeginLocked(uint32_t seconds, bool gen_uuid_on_start)
   deadline_ = deadline;
 
   id<SNTNotifierXPC> rop = [notification_queue_.notifierConnection remoteObjectProxy];
-  [rop enterTemporaryMonitorMode:expiry];
+  [rop enterTemporaryMonitorMode:[NSDate dateWithTimeIntervalSinceNow:seconds]];
 
   return did_start_new_timer;
 }
