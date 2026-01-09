@@ -288,10 +288,6 @@ absl::StatusOr<std::shared_ptr<ProcessTree>> CreateTree(
     seen.emplace(std::type_index(typeid(annotator)));
   }
 
-  if (seen.empty()) {
-    return nullptr;
-  }
-
   auto tree = std::make_shared<ProcessTree>(std::move(annotations));
   if (auto status = tree->Backfill(); !status.ok()) {
     return status;
@@ -308,9 +304,15 @@ Tokens
 ProcessToken::ProcessToken(std::shared_ptr<ProcessTree> tree,
                            std::vector<struct Pid> pids)
     : tree_(std::move(tree)), pids_(std::move(pids)) {
-  tree_->RetainProcess(pids);
+  if (tree_) {
+    tree_->RetainProcess(pids_);
+  }
 }
 
-ProcessToken::~ProcessToken() { tree_->ReleaseProcess(pids_); }
+ProcessToken::~ProcessToken() {
+  if (tree_) {
+    tree_->ReleaseProcess(pids_);
+  }
+}
 
 }  // namespace santa::santad::process_tree

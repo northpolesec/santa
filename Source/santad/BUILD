@@ -254,6 +254,7 @@ objc_library(
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
+        "//Source/santad/ProcessTree:process_tree",
         "@FMDB",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@northpolesec_protos//cel:v1_cc_proto",
@@ -401,6 +402,8 @@ objc_library(
         "//Source/common:SantaVnode",
         "//Source/common:String",
         "//Source/common:Unit",
+        "//Source/santad/ProcessTree:process",
+        "//Source/santad/ProcessTree:process_tree",
         "@abseil-cpp//absl/synchronization",
     ],
 )

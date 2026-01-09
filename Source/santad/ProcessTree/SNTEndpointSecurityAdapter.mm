@@ -17,6 +17,7 @@
 #import <Foundation/Foundation.h>
 #include <bsm/libbsm.h>
 
+#include "Source/common/String.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessTree/process_tree.h"
@@ -48,14 +49,25 @@ void InformFromESEvent(ProcessTree &tree, const Message &msg) {
         args.push_back(std::string(arg.data, arg.length));
       }
 
-      es_string_token_t executable = msg->event.exec.target->executable->path;
+      const es_process_t *target = msg->event.exec.target;
+      es_string_token_t executable = target->executable->path;
+
+      // Extract code signing info from the target process
+      CodeSigningInfo cs_info{
+          .signing_id = std::string(target->signing_id.data, target->signing_id.length),
+          .team_id = std::string(target->team_id.data, target->team_id.length),
+          .cdhash = santa::BufToHexString(target->cdhash, sizeof(target->cdhash)),
+          .is_platform_binary = target->is_platform_binary,
+      };
+
       tree.HandleExec(
-          msg->mach_time, **proc, PidFromAuditToken(msg->event.exec.target->audit_token),
+          msg->mach_time, **proc, PidFromAuditToken(target->audit_token),
           (struct Program){.executable = std::string(executable.data, executable.length),
-                           .arguments = args},
+                           .arguments = args,
+                           .code_signing = cs_info},
           (struct Cred){
-              .uid = audit_token_to_euid(msg->event.exec.target->audit_token),
-              .gid = audit_token_to_egid(msg->event.exec.target->audit_token),
+              .uid = audit_token_to_euid(target->audit_token),
+              .gid = audit_token_to_egid(target->audit_token),
           });
 
       break;

@@ -24,6 +24,7 @@
 #import "Source/common/SNTRuleIdentifiers.h"
 #include "Source/common/cel/Activation.h"
 #include "Source/santad/EntitlementsFilter.h"
+#include "Source/santad/ProcessTree/process_tree.h"
 
 @class MOLCodesignChecker;
 @class SNTCachedDecision;
@@ -45,10 +46,13 @@ using ActivationCallbackBlock =
 
 ///
 ///  @param ruleTable The rule table to be used for every decision
+///  @param entitlementsFilter The entitlements filter to be used for filtering entitlements
+///  @param processTree The process tree for ancestry lookups
 ///
-- (nullable instancetype)initWithRuleTable:(nonnull SNTRuleTable *)ruleTable
-                        entitlementsFilter:
-                            (std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter;
+- (nullable instancetype)
+     initWithRuleTable:(nonnull SNTRuleTable *)ruleTable
+    entitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter
+           processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
 
 ///
 ///  Convenience initializer. Will obtain the teamID and construct the signingID

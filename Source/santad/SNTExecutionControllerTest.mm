@@ -17,6 +17,7 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <dispatch/dispatch.h>
+#include "Source/santad/ProcessTree/process_tree.h"
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -108,7 +109,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
       santa::EntitlementsFilter::Create(@[], @[]);
   SNTPolicyProcessor *policyProcessor =
       [[SNTPolicyProcessor alloc] initWithRuleTable:self.mockRuleDatabase
-                                 entitlementsFilter:entitlementsFilter];
+                                 entitlementsFilter:entitlementsFilter
+                                        processTree:nullptr];
 
   self.sut = [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                                     eventTable:self.mockEventDatabase
@@ -117,7 +119,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                                                         logger:nullptr
                                                      ttyWriter:santa::TTYWriter::Create(true)
                                                policyProcessor:policyProcessor
-                                           processControlBlock:santa::ProdSuspendResumeBlock()];
+                                           processControlBlock:santa::ProdSuspendResumeBlock()
+                                                   processTree:nullptr];
 }
 
 - (void)tearDown {
@@ -791,6 +794,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
       .ignoringNonObjectArgs()
       .andReturn(holdAndAskDecision);
 
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
+
   SNTExecutionController *controller =
       [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                              eventTable:self.mockEventDatabase
@@ -799,7 +804,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                                                  logger:loggerBlock
                                               ttyWriter:santa::TTYWriter::Create(true)
                                         policyProcessor:mockPolicyProcessor
-                                    processControlBlock:processControl];
+                                    processControlBlock:processControl
+                                            processTree:processTree];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -897,6 +903,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
         [invocation setReturnValue:&currentDecision];
       });
 
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
+
   SNTExecutionController *controller =
       [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                              eventTable:self.mockEventDatabase
@@ -905,7 +913,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                                                  logger:loggerBlock
                                               ttyWriter:santa::TTYWriter::Create(true)
                                         policyProcessor:mockPolicyProcessor
-                                    processControlBlock:processControl];
+                                    processControlBlock:processControl
+                                            processTree:processTree];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -997,7 +1006,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                                                  logger:nullptr
                                               ttyWriter:santa::TTYWriter::Create(true)
                                         policyProcessor:nil
-                                    processControlBlock:santa::ProdSuspendResumeBlock()];
+                                    processControlBlock:santa::ProdSuspendResumeBlock()
+                                            processTree:nullptr];
 
   // Just verify that flush doesn't crash - the cache internals are private
   XCTAssertNoThrow([controller flushTouchIDApprovalCache]);
