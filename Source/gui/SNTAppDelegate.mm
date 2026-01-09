@@ -43,22 +43,6 @@
   self.statusItemManager = [[SNTStatusItemManager alloc] init];
   self.notificationManager.statusItemManager = self.statusItemManager;
 
-  // Check whether temporary monitor mode is available and if we're currently in it.
-  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
-  [daemonConn resume];
-  [[daemonConn synchronousRemoteObjectProxy]
-      checkTemporaryMonitorModePolicyAvailable:^(BOOL available) {
-        [self.statusItemManager setTemporaryMonitorModePolicyAvailable:available];
-      }];
-  [[daemonConn synchronousRemoteObjectProxy]
-      temporaryMonitorModeSecondsRemaining:^(NSNumber *seconds) {
-        if (seconds) {
-          NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
-          [self.statusItemManager enterMonitorModeWithExpiration:expiry];
-        }
-      }];
-  [daemonConn invalidate];
-
   [self setupMenu];
 
   NSNotificationCenter *workspaceNotifications = [[NSWorkspace sharedWorkspace] notificationCenter];

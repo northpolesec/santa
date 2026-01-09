@@ -20,6 +20,7 @@ struct SNTAboutWindowView: View {
   let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
 
   @State private var isDragging = false
+  @State private var menuItemEnabled: Bool = true
 
   var body: some View {
     SNTMessageView() {
@@ -69,10 +70,23 @@ struct SNTAboutWindowView: View {
         """
       )
       .font(.system(size: 10.0, weight: .regular))
-      .padding([.bottom], 10.0)
       .foregroundColor(.secondary)
       .multilineTextAlignment(.center)
       .padding(10.0)
+
+      Toggle(isOn: $menuItemEnabled) {
+        Text("Show menu bar icon")
+      }
+      .toggleStyle(.checkbox)
+      .onChange(of: menuItemEnabled) {
+        updateMenuItemEnabled(menuItemEnabled)
+      }
+      .controlSize(.small)
+      .padding([.bottom], 10.0)
+
+    }
+    .onAppear {
+      menuItemEnabled = effectiveMenuItemEnabled()
     }
     .overlay(draggingOverlay, alignment: .top)
     .dropDestination(for: URL.self) { items, location in
@@ -115,6 +129,19 @@ struct SNTAboutWindowView: View {
       NSWorkspace.shared.open(u)
     }
     w?.close()
+  }
+
+  /// Returns the effective menu item enabled state, considering user override and admin config.
+  func effectiveMenuItemEnabled() -> Bool {
+    if let userOverride = UserDefaults.standard.object(forKey: kEnableMenuItemUserOverride) as? Bool {
+      return userOverride
+    }
+    return c.enableMenuItem
+  }
+
+  /// Updates the user's menu item enabled override.
+  func updateMenuItemEnabled(_ enabled: Bool) {
+    UserDefaults.standard.set(enabled, forKey: kEnableMenuItemUserOverride)
   }
 }
 
