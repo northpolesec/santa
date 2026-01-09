@@ -171,6 +171,7 @@ macos_application(
     bundle_id = "com.northpolesec.santa",
     bundle_name = "Santa",
     codesignopts = [
+        "--timestamp=none",
         "--force",
         "--options library,kill,runtime",
     ],
