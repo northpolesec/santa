@@ -1091,6 +1091,7 @@ macos_bundle(
     bundle_extension = "systemextension",
     bundle_id = "com.northpolesec.santa.daemon",
     codesignopts = [
+        "--timestamp=none",
         "--force",
         "--options library,kill,runtime",
     ],
