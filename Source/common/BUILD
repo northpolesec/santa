@@ -6,7 +6,7 @@ load("//:helper.bzl", "santa_unit_test")
 # Common is the folder containing all the code that's shared between multiple
 # components, so every library in this package is visible to the whole group.
 package(
-    default_visibility = ["//:santa_package_group"],
+    default_visibility = ["//visibility:public"],
 )
 
 licenses(["notice"])

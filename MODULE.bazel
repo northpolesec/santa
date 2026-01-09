@@ -33,7 +33,7 @@ use_repo(non_module_deps, "nats_c")
 # The maintainer claims to still be around, but nothing is getting merged:
 #   https://github.com/hedronvision/bazel-compile-commands-extractor/issues/232#issuecomment-2512931043
 #   https://github.com/hedronvision/bazel-compile-commands-extractor/issues/240
-bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
+bazel_dep(name = "hedron_compile_commands")
 git_override(
     module_name = "hedron_compile_commands",
     commit = "f5fbd4cee671d8d908f37c83abaf70fba5928fc7",
