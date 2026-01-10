@@ -152,7 +152,7 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
     {
       key: "EnableMenuItem",
       description: `If true, Santa will show an item in the macOS menu bar to allow syncing and management of
-        temporary monitor mode`,
+        temporary monitor mode by default. Users are able to show/hide the menu item from the About window.`,
       type: "bool",
       defaultValue: true,
       versionAdded: "2026.1",

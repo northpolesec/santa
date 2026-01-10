@@ -547,6 +547,9 @@
 ///
 @property(readonly, nonatomic) BOOL enableMenuItem;
 
+/// User defaults key for user override of the menu item enabled setting.
+extern NSString *_Nonnull const kEnableMenuItemUserOverride;
+
 #pragma mark - Sync Settings
 
 ///

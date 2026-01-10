@@ -57,6 +57,12 @@
                                          type:[NSNumber class]
                                      callback:^(NSNumber *oldValue, NSNumber *newValue) {
                                        STRONGIFY(self);
+                                       // If user has an override, admin config changes don't affect
+                                       // the menu item visibility
+                                       if ([self userMenuItemEnabledOverride]) {
+                                         return;
+                                       }
+
                                        BOOL oldBool = [oldValue boolValue];
                                        BOOL newBool = newValue ? [newValue boolValue] : YES;
 
@@ -70,6 +76,11 @@
                                          [self removeStatusBarItem];
                                        }
                                      }];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(userMenuItemOverrideChanged:)
+                                                 name:NSUserDefaultsDidChangeNotification
+                                               object:nil];
   }
   return self;
 }
@@ -96,8 +107,8 @@
 }
 
 - (void)setupStatusBarItem {
-  // Only create status bar item if enabled in configuration
-  if (![SNTConfigurator configurator].enableMenuItem) {
+  // Only create status bar item if enabled (considering user override and admin config)
+  if (![self effectiveMenuItemEnabled]) {
     return;
   }
 
@@ -145,6 +156,28 @@
   [menu addItem:self.temporaryMonitorModeRefreshItem];
 
   self.statusItem.menu = menu;
+
+  dispatch_async(dispatch_get_global_queue(0, 0), ^{
+    [self retrieveTMMState];
+  });
+}
+
+- (void)retrieveTMMState {
+  // Check whether temporary monitor mode is available and if we're currently in it.
+  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  [daemonConn resume];
+  [[daemonConn synchronousRemoteObjectProxy]
+      checkTemporaryMonitorModePolicyAvailable:^(BOOL available) {
+        [self setTemporaryMonitorModePolicyAvailable:available];
+      }];
+  [[daemonConn synchronousRemoteObjectProxy]
+      temporaryMonitorModeSecondsRemaining:^(NSNumber *seconds) {
+        if (seconds) {
+          NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
+          [self enterMonitorModeWithExpiration:expiry];
+        }
+      }];
+  [daemonConn invalidate];
 }
 
 - (void)removeStatusBarItem {
@@ -398,6 +431,28 @@
                                                                     trigger:nil];
   [[UNUserNotificationCenter currentNotificationCenter] addNotificationRequest:req
                                                          withCompletionHandler:nil];
+}
+
+#pragma mark - User Menu Item Override
+
+- (NSNumber *)userMenuItemEnabledOverride {
+  return [[NSUserDefaults standardUserDefaults] objectForKey:kEnableMenuItemUserOverride];
+}
+
+/// Returns YES if the menu item should be enabled, considering user override and admin config.
+- (BOOL)effectiveMenuItemEnabled {
+  NSNumber *userOverride = [self userMenuItemEnabledOverride];
+  return userOverride ? [userOverride boolValue] : [SNTConfigurator configurator].enableMenuItem;
+}
+
+/// The override state was changed, re-evaluate whether the menu item should be shown.
+- (void)userMenuItemOverrideChanged:(NSNotification *)notification {
+  BOOL enabled = [self effectiveMenuItemEnabled];
+  if (enabled) {
+    [self setupStatusBarItem];
+  } else {
+    [self removeStatusBarItem];
+  }
 }
 
 @end

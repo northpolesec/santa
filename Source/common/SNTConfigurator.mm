@@ -81,6 +81,9 @@ static NSString *const kStateStatsLastSubmissionAttemptKey = @"LastAttempt";
 static NSString *const kStateStatsLastSubmissionVersionKey = @"LastVersion";
 static NSString *const kStateTempMonitorModeKey = @"TMM";
 
+/// User defaults key for user override of the menu item enabled setting.
+NSString *const kEnableMenuItemUserOverride = @"EnableMenuItemUserOverride";
+
 #ifdef DEBUG
 NSString *const kConfigOverrideFilePath = @"/var/db/santa/config-overrides.plist";
 #endif
