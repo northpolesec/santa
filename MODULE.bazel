@@ -22,6 +22,15 @@ git_override(
     remote = "https://github.com/northpolesec/protos",
 )
 
+# Santa Network Extension
+# By default, points to a stub that provides an empty implementation.
+# Maintainers can inject the real implementation at build time.
+bazel_dep(name = "santanetd", version = "1.0.0")
+local_path_override(
+    module_name = "santanetd",
+    path = "stubs/santanetd",
+)
+
 # FMDB
 non_module_deps = use_extension("//deps:non_module_deps.bzl", "non_module_deps")
 use_repo(non_module_deps, "FMDB")
