@@ -5,6 +5,19 @@ load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION", "santa_unit_test")
 
 licenses(["notice"])
 
+# Hook for build-time injection of Santa's network capabilities from external repo.
+label_flag(
+    name = "network_extension_bundle",
+    build_setting_default = ":no_network_extension",
+)
+
+# Empty filegroup used to keep Santa buildable without access to the external repo.
+filegroup(
+    name = "no_network_extension",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+
 swift_library(
     name = "SNTMessageView",
     srcs = ["SNTMessageView.swift"],
@@ -165,6 +178,7 @@ macos_application(
         "//Source/santametricservice": "MacOS",
         "//Source/santasyncservice": "MacOS",
         "//Source/santad:com.northpolesec.santa.daemon": "Library/SystemExtensions",
+        ":network_extension_bundle": "Library/SystemExtensions",
         "Resources/Fonts/StarJedi.ttf": ".",
     },
     app_icons = glob(["Resources/Assets.xcassets/**"]),
