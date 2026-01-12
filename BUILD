@@ -30,6 +30,7 @@ apple_bundle_version(
     },
     fallback_build_label = "santa_9999.1.1",
     short_version_string = "{release}",
+    visibility = ["//visibility:public"],
 )
 
 # Used to detect release builds
