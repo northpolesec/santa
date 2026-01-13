@@ -27,7 +27,6 @@
 #include "Source/common/Timer.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
@@ -55,18 +54,16 @@ class Logger : public Timer<Logger> {
   };
 
   static std::unique_ptr<Logger> Create(
-      std::shared_ptr<santa::EndpointSecurityAPI> esapi, std::shared_ptr<santa::Enricher> enricher,
-      SNTSyncdQueue *syncd_queue, GetExportConfigBlock getExportConfigBlock,
-      TelemetryEvent telemetry_mask, SNTEventLogType log_type, SNTDecisionCache *decision_cache,
-      NSString *event_log_path, NSString *spool_log_path, size_t spool_dir_size_threshold,
-      size_t spool_file_size_threshold, uint64_t spool_flush_timeout_ms,
-      uint32_t telemetry_export_seconds, uint32_t telemetry_export_timeout_seconds,
-      uint32_t telemetry_export_batch_threshold_size_mb,
+      std::shared_ptr<santa::EndpointSecurityAPI> esapi, SNTSyncdQueue *syncd_queue,
+      GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
+      SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
+      NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
+      uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds,
+      uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
       uint32_t telemetry_export_max_files_per_batch);
 
-  Logger(std::shared_ptr<santa::Enricher> enricher, SNTSyncdQueue *syncd_queue,
-         GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
-         uint32_t telemetry_export_timeout_seconds,
+  Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock getExportConfigBlock,
+         TelemetryEvent telemetry_mask, uint32_t telemetry_export_timeout_seconds,
          uint32_t telemetry_export_batch_threshold_size_mb,
          uint32_t telemetry_export_max_files_per_batch,
          std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer);
@@ -83,12 +80,6 @@ class Logger : public Timer<Logger> {
   void LogAllowlist(const santa::Message &msg, const std::string_view hash);
 
   void LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events);
-
-  void LogExecution(const santa::Message &msg);
-
-  // Pre-enrich a message for later logging. Returns nullptr if enrichment fails
-  // or if execution telemetry is disabled.
-  std::unique_ptr<santa::EnrichedMessage> EnrichExecution(const santa::Message &msg);
 
   void LogDiskAppeared(NSDictionary *props, bool allowed);
   void LogDiskDisappeared(NSDictionary *props);
@@ -170,7 +161,6 @@ class Logger : public Timer<Logger> {
 
   void ExportTelemetrySerialized();
 
-  std::shared_ptr<santa::Enricher> enricher_;
   SNTSyncdQueue *syncd_queue_;
   GetExportConfigBlock get_export_config_block_;
   TelemetryEvent telemetry_mask_;

@@ -355,7 +355,6 @@ objc_library(
     hdrs = ["SNTExecutionController.h"],
     deps = [
         ":EndpointSecurityAPI",
-        ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":ProcessControl",
         ":SNTDecisionCache",
@@ -829,7 +828,6 @@ objc_library(
     deps = [
         ":EndpointSecurityAPI",
         ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityEnricher",
         ":EndpointSecurityMessage",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerBasicString",

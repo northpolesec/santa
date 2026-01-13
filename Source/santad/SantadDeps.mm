@@ -30,6 +30,8 @@
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EntitlementsFilter.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
+#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessTree/annotations/originator.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTDatabaseController.h"
@@ -122,6 +124,27 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
+  size_t spool_file_threshold_bytes = [configurator spoolDirectoryFileSizeThresholdKB] * 1024;
+  size_t spool_dir_threshold_bytes = [configurator spoolDirectorySizeThresholdMB] * 1024 * 1024;
+  uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
+  uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
+
+  std::shared_ptr<::Logger> logger = Logger::Create(
+      esapi, syncd_queue,
+      ^SNTExportConfiguration *() {
+        return [configurator exportConfig];
+      },
+      TelemetryConfigToBitmask([configurator telemetry]), [configurator eventLogType],
+      [SNTDecisionCache sharedCache], [configurator eventLogPath], [configurator spoolDirectory],
+      spool_dir_threshold_bytes, spool_file_threshold_bytes, spool_flush_timeout_ms,
+      telemetry_export_frequency_secs, [configurator telemetryExportTimeoutSec],
+      [configurator telemetryExportBatchThresholdSizeMB],
+      [configurator telemetryExportMaxFilesPerBatch]);
+  if (!logger) {
+    LOGE(@"Failed to create logger.");
+    exit(EXIT_FAILURE);
+  }
+
   // Create process tree and enricher early so they can be used by Logger
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
   std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>> annotators;
@@ -143,33 +166,17 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
 
   std::shared_ptr<::Enricher> enricher = std::make_shared<::Enricher>(process_tree);
 
-  size_t spool_file_threshold_bytes = [configurator spoolDirectoryFileSizeThresholdKB] * 1024;
-  size_t spool_dir_threshold_bytes = [configurator spoolDirectorySizeThresholdMB] * 1024 * 1024;
-  uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
-  uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
-
-  std::shared_ptr<::Logger> logger = Logger::Create(
-      esapi, enricher, syncd_queue,
-      ^SNTExportConfiguration *() {
-        return [configurator exportConfig];
-      },
-      TelemetryConfigToBitmask([configurator telemetry]), [configurator eventLogType],
-      [SNTDecisionCache sharedCache], [configurator eventLogPath], [configurator spoolDirectory],
-      spool_dir_threshold_bytes, spool_file_threshold_bytes, spool_flush_timeout_ms,
-      telemetry_export_frequency_secs, [configurator telemetryExportTimeoutSec],
-      [configurator telemetryExportBatchThresholdSizeMB],
-      [configurator telemetryExportMaxFilesPerBatch]);
-  if (!logger) {
-    LOGE(@"Failed to create logger.");
-    exit(EXIT_FAILURE);
-  }
+  LogExecutionBlock logBlock = ^(const santa::Message &esMsg) {
+    std::unique_ptr<santa::EnrichedMessage> enrichedMsg = enricher->Enrich(santa::Message(esMsg));
+    logger->Log(std::move(enrichedMsg));
+  };
 
   SNTExecutionController *exec_controller =
       [[SNTExecutionController alloc] initWithRuleTable:rule_table
                                              eventTable:event_table
                                           notifierQueue:notifier_queue
                                              syncdQueue:syncd_queue
-                                                 logger:logger
+                                                 logger:logBlock
                                               ttyWriter:tty_writer
                                         policyProcessor:policy_processor
                                     processControlBlock:processControlBlock];
@@ -225,16 +232,14 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   }
 
   return std::make_unique<SantadDeps>(
-      esapi, std::move(enricher), std::move(logger), std::move(metrics), std::move(watch_items),
-      std::move(auth_result_cache), control_connection, compiler_controller, notifier_queue,
-      syncd_queue, exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree),
-      std::move(entitlements_filter));
+      esapi, logger, std::move(metrics), std::move(watch_items), std::move(auth_result_cache),
+      control_connection, compiler_controller, notifier_queue, syncd_queue, exec_controller,
+      prefix_tree, std::move(tty_writer), std::move(process_tree), std::move(entitlements_filter));
 }
 
 SantadDeps::SantadDeps(
-    std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<::Enricher> enricher,
-    std::shared_ptr<::Logger> logger, std::shared_ptr<::Metrics> metrics,
-    std::shared_ptr<::WatchItems> watch_items,
+    std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<::Logger> logger,
+    std::shared_ptr<::Metrics> metrics, std::shared_ptr<::WatchItems> watch_items,
     std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection *control_connection,
     SNTCompilerController *compiler_controller, SNTNotificationQueue *notifier_queue,
     SNTSyncdQueue *syncd_queue, SNTExecutionController *exec_controller,
@@ -245,7 +250,7 @@ SantadDeps::SantadDeps(
       logger_(std::move(logger)),
       metrics_(std::move(metrics)),
       watch_items_(std::move(watch_items)),
-      enricher_(std::move(enricher)),
+      enricher_(std::make_shared<::Enricher>(process_tree)),
       auth_result_cache_(std::move(auth_result_cache)),
       control_connection_(control_connection),
       compiler_controller_(compiler_controller),

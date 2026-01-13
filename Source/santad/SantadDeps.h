@@ -50,7 +50,6 @@ class SantadDeps {
 
   SantadDeps(
       std::shared_ptr<santa::EndpointSecurityAPI> esapi,
-      std::shared_ptr<santa::Enricher> enricher,
       std::shared_ptr<santa::Logger> logger,
       std::shared_ptr<santa::Metrics> metrics,
       std::shared_ptr<santa::WatchItems> watch_items,
