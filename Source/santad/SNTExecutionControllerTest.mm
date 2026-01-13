@@ -36,6 +36,7 @@
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTExecutionController.h"
+#import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 
 using santa::Message;
@@ -728,6 +729,122 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   [self validateExecEvent:SNTActionRespondAllow];
   OCMVerify(never(), [self.mockEventDatabase addStoredEvent:OCMOCK_ANY]);
   [self checkMetricCounters:kAllowUnknown expected:@1];
+}
+
+- (void)validateHoldAndAskWithApproval:(BOOL)approved
+                       initialDecision:(SNTEventState)initialState
+                      expectedDecision:(SNTEventState)expectedState
+                         expectedExtra:(NSString *)expectedExtra
+                        expectedAction:(SNTAction)expectedAction
+                       expectedControl:(santa::ProcessControl)expectedControl {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+
+  // Create mock notifier queue that captures the reply block
+  id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  __block NotificationReplyBlock capturedReplyBlock = nil;
+  OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
+                    withCustomMessage:OCMOCK_ANY
+                            customURL:OCMOCK_ANY
+                          configState:OCMOCK_ANY
+                             andReply:OCMOCK_ANY])
+      .andDo(^(NSInvocation *invocation) {
+        __unsafe_unretained NotificationReplyBlock block;
+        [invocation getArgument:&block atIndex:6];
+        capturedReplyBlock = [block copy];
+      });
+
+  __block BOOL loggerCalled = NO;
+  LogExecutionBlock loggerBlock = ^(const Message &esMsg) {
+    loggerCalled = YES;
+  };
+
+  // Set initial to opposite of expected to verify it changes
+  __block santa::ProcessControl capturedControl =
+      approved ? santa::ProcessControl::Kill : santa::ProcessControl::Resume;
+  santa::ProcessControlBlock processControl = ^bool(pid_t pid, santa::ProcessControl control) {
+    capturedControl = control;
+    return true;
+  };
+
+  // Create mock policy processor with holdAndAsk decision
+  id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
+  SNTCachedDecision *holdAndAskDecision = [[SNTCachedDecision alloc] init];
+  holdAndAskDecision.decision = initialState;
+  holdAndAskDecision.holdAndAsk = YES;
+  holdAndAskDecision.decisionClientMode = SNTClientModeLockdown;
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
+                                     targetProcess:&procExec
+                                       configState:OCMOCK_ANY
+                                activationCallback:OCMOCK_ANY])
+      .ignoringNonObjectArgs()
+      .andReturn(holdAndAskDecision);
+
+  SNTExecutionController *controller =
+      [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
+                                             eventTable:self.mockEventDatabase
+                                          notifierQueue:mockNotifierQueue
+                                             syncdQueue:nil
+                                                 logger:loggerBlock
+                                              ttyWriter:santa::TTYWriter::Create(true)
+                                        policyProcessor:mockPolicyProcessor
+                                    processControlBlock:processControl];
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  __block SNTAction resultAction = SNTActionUnset;
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                       postAction:^bool(SNTAction action) {
+                         resultAction = action;
+                         return true;
+                       }];
+  }
+
+  XCTAssertNotNil(capturedReplyBlock, @"Reply block should have been captured from notifier queue");
+  capturedReplyBlock(approved);
+
+  XCTAssertEqual(holdAndAskDecision.decision, expectedState);
+  XCTAssertEqualObjects(holdAndAskDecision.decisionExtra, expectedExtra);
+  XCTAssertFalse(holdAndAskDecision.holdAndAsk);
+  XCTAssertTrue(loggerCalled);
+  XCTAssertEqual(capturedControl, expectedControl);
+  XCTAssertEqual(resultAction, expectedAction);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockNotifierQueue stopMocking];
+  [mockPolicyProcessor stopMocking];
+}
+
+- (void)testHoldAndAskTouchIDApproved {
+  [self validateHoldAndAskWithApproval:YES
+                       initialDecision:SNTEventStateBlockSigningID
+                      expectedDecision:SNTEventStateAllowSigningID
+                         expectedExtra:@"TouchID Approved"
+                        expectedAction:SNTActionHoldAllowed
+                       expectedControl:santa::ProcessControl::Resume];
+}
+
+- (void)testHoldAndAskTouchIDDenied {
+  [self validateHoldAndAskWithApproval:NO
+                       initialDecision:SNTEventStateBlockUnknown
+                      expectedDecision:SNTEventStateBlockUnknown
+                         expectedExtra:@"TouchID Denied"
+                        expectedAction:SNTActionHoldDenied
+                       expectedControl:santa::ProcessControl::Kill];
 }
 
 @end
