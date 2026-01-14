@@ -412,6 +412,9 @@ static NSString *const kPrinterProxyPostMonterey =
         NotificationReplyBlock replyBlock = nil;
 
         if (cd.holdAndAsk) {
+          // Copy the esMsg to ensure that when the passed-in ref goes away
+          // we're still holding a valid Message object inside the replyBlock.
+          __block Message esMsgCopy(esMsg);
           replyBlock = ^(BOOL authenticated) {
             LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                  authenticated);
@@ -451,7 +454,7 @@ static NSString *const kPrinterProxyPostMonterey =
             [[SNTDecisionCache sharedCache] cacheDecision:cd];
 
             // Log the execution event (since NOTIFY was suppressed during holdAndAsk)
-            self->_logger(esMsg);
+            self->_logger(std::move(esMsgCopy));
 
             _procSignalCache->remove(pidAndVersion);
             postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied);

@@ -52,7 +52,7 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 @class SNTRuleTable;
 @class SNTSyncdQueue;
 
-using LogExecutionBlock = void (^)(const santa::Message &esMsg);
+using LogExecutionBlock = void (^)(santa::Message esMsg);
 
 ///
 ///  SNTExecutionController is responsible for handling binary execution requests:

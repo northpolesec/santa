@@ -166,7 +166,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
 
   std::shared_ptr<::Enricher> enricher = std::make_shared<::Enricher>(process_tree);
 
-  LogExecutionBlock logBlock = ^(const santa::Message &esMsg) {
+  LogExecutionBlock logBlock = ^(santa::Message esMsg) {
     std::unique_ptr<santa::EnrichedMessage> enrichedMsg = enricher->Enrich(santa::Message(esMsg));
     logger->Log(std::move(enrichedMsg));
   };
