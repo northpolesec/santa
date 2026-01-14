@@ -1,3 +1,6 @@
 # Stub module for santanetd
 
-module(name = "santanetd", version = "1.0.0")
+module(
+    name = "santanetd",
+    version = "1.0.0",
+)
