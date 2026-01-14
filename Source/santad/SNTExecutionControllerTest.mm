@@ -756,7 +756,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
       });
 
   __block BOOL loggerCalled = NO;
-  LogExecutionBlock loggerBlock = ^(const Message &esMsg) {
+  LogExecutionBlock loggerBlock = ^(Message esMsg) {
     loggerCalled = YES;
   };
 
