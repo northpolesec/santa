@@ -134,6 +134,7 @@ static NSString *const kModeNotificationStandalone = @"ModeNotificationStandalon
 static NSString *const kEnableNotificationSilences = @"EnableNotificationSilences";
 static NSString *const kBrandingCompanyName = @"BrandingCompanyName";
 static NSString *const kBrandingCompanyLogo = @"BrandingCompanyLogo";
+static NSString *const kBrandingCompanyLogoDark = @"BrandingCompanyLogoDark";
 static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
 static NSString *const kEnableMenuItem = @"EnableMenuItem";
 
@@ -372,6 +373,9 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kEntitlementsTeamIDFilterKey : array,
       kEnabledProcessAnnotations : array,
       kTelemetryKey : array,
+      kBrandingCompanyName : string,
+      kBrandingCompanyLogo : string,
+      kBrandingCompanyLogoDark : string,
     };
 
     _syncStateFilePath = syncStateFilePath;
@@ -554,6 +558,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingBrandingCompanyLogo {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBrandingCompanyLogoDark {
   return [self configStateSet];
 }
 
@@ -1113,6 +1121,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSURL *)brandingCompanyLogo {
   NSString *logoVal = self.configState[kBrandingCompanyLogo];
+  return [NSURL URLWithString:logoVal];
+}
+
+- (NSURL *)brandingCompanyLogoDark {
+  NSString *logoVal = self.configState[kBrandingCompanyLogoDark];
   return [NSURL URLWithString:logoVal];
 }
 

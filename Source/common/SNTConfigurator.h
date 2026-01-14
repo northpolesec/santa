@@ -541,9 +541,20 @@
 ///  after the words "Managed by:". The image is limited to 48x48px
 ///  but a larger image will be scaled down to fit.
 ///
-///  This feature only works on macOS 13.0+
+///  If set, this value will override `BrandingCompanyName`.
 ///
 @property(nullable, readonly, nonatomic) NSURL *brandingCompanyLogo;
+
+///
+///  If this value is set to a valid URL referencing an image file,
+///  this logo will be displayed at the bottom of the Santa events UI
+///  after the words "Managed by:". The image is limited to 48x48px
+///  but a larger image will be scaled down to fit.
+///
+///  If set, and the UI will be shown in dark mode, this value will
+///  override both `BrandingCompanyLogo` and `BrandingCompanyName`.
+///
+@property(nullable, readonly, nonatomic) NSURL *brandingCompanyLogoDark;
 
 ///
 ///  If this value is set, the text will be appended to the end of the

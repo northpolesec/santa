@@ -71,31 +71,58 @@ public struct SNTMessageView<Content: View>: View {
     .padding([.leading, .trailing], 40.0)
     .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
 
-    HStack(spacing: 3.0) {
-      SNTBrandingView()
-    }.padding(10.0).fixedSize()
+    SNTBrandingView()
   }
 }
 
 public struct SNTBrandingView: View {
   let c = SNTConfigurator.configurator()
+  @Environment(\.colorScheme) var colorScheme
 
   public var body: some View {
-    if #available(macOS 13.0, *), let url = c.brandingCompanyLogo, let nsi = NSImage(contentsOf: url) {
-      Text("Managed by:").font(.footnote).fixedSize()
-      ViewThatFits {
-        Image(nsImage: nsi)
-
-        Image(nsImage: nsi)
-          .resizable()
-          .scaledToFit()
-      }.frame(maxWidth: 96.0, maxHeight: 32.0)
+    // If in dark mode and dark logo is set, use it
+    if colorScheme == .dark, let url = c.brandingCompanyLogoDark, let nsi = NSImage(contentsOf: url) {
+      HStack {
+        Spacer()
+        HStack(spacing: 5.0) {
+          Text("Managed by:").font(.footnote).fixedSize()
+          Image(nsImage: nsi)
+            .resizable()
+            .scaledToFit()
+            .frame(maxHeight: 32.0)
+        }
+        Spacer()
+      }
+      .padding(.top, 10.0)
+      .padding(.bottom, 28.0)
+    } else if let url = c.brandingCompanyLogo, let nsi = NSImage(contentsOf: url) {
+      HStack {
+        Spacer()
+        HStack(spacing: 5.0) {
+          Text("Managed by:").font(.footnote).fixedSize()
+          Image(nsImage: nsi)
+            .resizable()
+            .scaledToFit()
+            .frame(maxHeight: 32.0)
+        }
+        Spacer()
+      }
+      .padding(.top, 10.0)
+      .padding(.bottom, 28.0)
     } else if let companyName = c.brandingCompanyName {
-      Text("Managed by:").font(.footnote).fixedSize()
-      Text(verbatim: companyName).font(.footnote).fontWeight(.bold).fixedSize()
-      Spacer()
+      HStack {
+        Spacer()
+        HStack(spacing: 0) {
+          Text("Managed by: ").font(.footnote).fixedSize()
+          Text(verbatim: companyName).font(.footnote).fontWeight(.bold).fixedSize()
+        }
+        Spacer()
+      }
+      .padding(.top, 10.0)
+      .padding(.bottom, 28.0)
     } else {
       Spacer()
+        .frame(height: 28.0)
     }
   }
 }
