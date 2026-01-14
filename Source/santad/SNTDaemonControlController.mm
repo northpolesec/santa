@@ -646,7 +646,7 @@ double watchdogRAMPeak = 0;
   // Verify the network extension bundle exists
   NSString *netdBundlePath =
       [@(kSantaAppPath) stringByAppendingString:@"/Contents/Library/SystemExtensions/"
-                                                 @"com.northpolesec.santa.netd.systemextension"];
+                                                @"com.northpolesec.santa.netd.systemextension"];
 
   NSFileManager *fm = [NSFileManager defaultManager];
   BOOL isDir;
