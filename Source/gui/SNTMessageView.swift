@@ -72,6 +72,7 @@ public struct SNTMessageView<Content: View>: View {
     .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
 
     SNTBrandingView()
+      .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
   }
 }
 
@@ -89,8 +90,10 @@ public struct SNTBrandingView: View {
           Image(nsImage: nsi)
             .resizable()
             .scaledToFit()
-            .frame(maxHeight: 32.0)
+            .frame(height: 32.0)
+            .fixedSize()
         }
+        .fixedSize()
         Spacer()
       }
       .padding(.top, 10.0)
@@ -103,8 +106,10 @@ public struct SNTBrandingView: View {
           Image(nsImage: nsi)
             .resizable()
             .scaledToFit()
-            .frame(maxHeight: 32.0)
+            .frame(height: 32.0)
+            .fixedSize()
         }
+        .fixedSize()
         Spacer()
       }
       .padding(.top, 10.0)
