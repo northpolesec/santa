@@ -537,7 +537,7 @@
 
 ///
 ///  If set, the logo that will be displayed on Santa UI. The image will be
-///  scaled down appropriately to fit within image bounds.
+///  scaled down appropriately to fit within image bounds (currently 84x28 pixels).
 ///
 ///  Supported URL schemes:
 ///    - file:// for local file paths
@@ -552,7 +552,7 @@
 ///
 ///  If set, the logo that will be displayed on Santa UI when the UI will be
 ///  shown in dark mode. The image will be scaled down appropriately to fit
-///  within image bounds.
+///  within image bounds (currently 84x28 pixels).
 ///
 ///  Supported URL schemes:
 ///    - file:// for local file paths
