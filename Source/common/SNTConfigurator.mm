@@ -64,6 +64,9 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 // Re-declare read/write for KVO
 @property BOOL inTemporaryMonitorMode;
 
+// Internal boot session tracking
+@property(nullable) NSString *lastBootUUID;
+
 @end
 
 @implementation SNTConfigurator
@@ -80,6 +83,7 @@ static NSString *const kStateStatsKey = @"Stats";
 static NSString *const kStateStatsLastSubmissionAttemptKey = @"LastAttempt";
 static NSString *const kStateStatsLastSubmissionVersionKey = @"LastVersion";
 static NSString *const kStateTempMonitorModeKey = @"TMM";
+static NSString *const kStateLastBootUUIDKey = @"LastBootUUID";
 
 /// User defaults key for user override of the menu item enabled setting.
 NSString *const kEnableMenuItemUserOverride = @"EnableMenuItemUserOverride";
@@ -392,6 +396,15 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
     if (self.stateAccessAuthorizerBlock()) {
       [self migrateDeprecatedStatsStatePath:oldStateFilePath];
       _state = [self readStateFromDisk] ?: [NSDictionary dictionary];
+
+      // Check if this is first launch after boot before updating the UUID
+      NSString *currentBootUUID = [SNTSystemInfo bootSessionUUID];
+      if (![currentBootUUID isEqualToString:_lastBootUUID]) {
+        // If the lastBootUUID wasn't set, it is indeterminate whether or not this is truly the
+        // first launch after boot. Treat this as a "No".
+        _isFirstLaunchAfterBoot = (_lastBootUUID != nil);
+        [self updateLastBootUUID:currentBootUUID];
+      }
     }
 
     [self startWatchingDefaults];
@@ -836,6 +849,13 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (nullable NSDictionary *)savedTemporaryMonitorModeState {
   return self.state[kStateTempMonitorModeKey];
+}
+
+- (void)updateLastBootUUID:(NSString *)bootUUID {
+  @synchronized(self) {
+    [self updateStateSynchronizedKey:kStateLastBootUUIDKey value:bootUUID];
+    _lastBootUUID = bootUUID;
+  }
 }
 
 - (BOOL)failClosed {
@@ -1756,6 +1776,11 @@ static SNTConfigurator *sharedConfigurator = nil;
     newState[kStateTempMonitorModeKey] = state[kStateTempMonitorModeKey];
   }
 
+  if ([state[kStateLastBootUUIDKey] isKindOfClass:[NSString class]]) {
+    _lastBootUUID = state[kStateLastBootUUIDKey];
+    newState[kStateLastBootUUIDKey] = _lastBootUUID;
+  }
+
   return newState;
 }
 
@@ -1772,7 +1797,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   _lastStatsSubmissionVersion = version;
 }
 
-- (void)updateStateSynchronizedKey:(NSString *)key value:(NSDictionary *)value {
+- (void)updateStateSynchronizedKey:(NSString *)key value:(id)value {
   NSMutableDictionary *newState = [self.state mutableCopy];
 
   newState[key] = value;
