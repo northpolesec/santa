@@ -265,7 +265,7 @@ sequences will be replaced in the final URL:
     {
       key: "BrandingCompanyLogo",
       description: `A URL referencing a logo image to display on Santa UIs. The image will be scaled down
-        appropriately to fit within image bounds. If set, this overrides \`BrandingCompanyName\`.
+        appropriately to fit within image bounds (currently 84x28 pixels). If set, this overrides \`BrandingCompanyName\`.
 
 **Supported URL schemes:**
 - \`file://\` - Local file path (e.g., \`file:///Library/Application%20Support/MyOrg/logo.png\`)
@@ -279,7 +279,7 @@ sequences will be replaced in the final URL:
       key: "BrandingCompanyLogoDark",
       description: `A URL referencing a logo image to display on Santa UIs. When the UI is displayed in dark
         mode and this is set, it overrides both \`BrandingCompanyLogo\` and \`BrandingCompanyName\`.
-        The image will be scaled down appropriately to fit within image bounds.
+        The image will be scaled down appropriately to fit within image bounds (currently 84x28 pixels).
 
 **Supported URL schemes:**
 - \`file://\` - Local file path (e.g., \`file:///Library/Application%20Support/MyOrg/logo-dark.png\`)
