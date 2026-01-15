@@ -111,36 +111,32 @@ public struct SNTBrandingView: View {
   let c = SNTConfigurator.configurator()
   @Environment(\.colorScheme) var colorScheme
 
-  public var body: some View {
-    // If in dark mode and dark logo is set, use it
-    if colorScheme == .dark, let url = c.brandingCompanyLogoDark, let nsi = NSImage(contentsOf: url) {
-      HStack {
-        Spacer()
-        HStack(spacing: 5.0) {
-          Text("Managed by:").font(.footnote).fixedSize()
-          ConstrainedImage(image: nsi, maxWidth: 96.0, maxHeight: 32.0)
-        }
-        Spacer()
+  @ViewBuilder
+  private var brandingContent: some View {
+    // Select the appropriate logo based on color scheme
+    let logoImage: NSImage? = {
+      if colorScheme == .dark, let url = c.brandingCompanyLogoDark {
+        return NSImage(contentsOf: url)
+      } else if let url = c.brandingCompanyLogo {
+        return NSImage(contentsOf: url)
       }
-      .padding(.top, 10.0)
-      .padding(.bottom, 28.0)
-    } else if let url = c.brandingCompanyLogo, let nsi = NSImage(contentsOf: url) {
-      HStack {
-        Spacer()
-        HStack(spacing: 5.0) {
-          Text("Managed by:").font(.footnote).fixedSize()
-          ConstrainedImage(image: nsi, maxWidth: 96.0, maxHeight: 32.0)
-        }
-        Spacer()
-      }
-      .padding(.top, 10.0)
-      .padding(.bottom, 28.0)
+      return nil
+    }()
+
+    if let nsi = logoImage {
+      ConstrainedImage(image: nsi, maxWidth: 78.0, maxHeight: 26.0)
     } else if let companyName = c.brandingCompanyName {
+      TextWithLimit(companyName).font(.footnote).fontWeight(.bold).fixedSize()
+    }
+  }
+
+  public var body: some View {
+    if c.brandingCompanyLogoDark != nil || c.brandingCompanyLogo != nil || c.brandingCompanyName != nil {
       HStack {
         Spacer()
-        HStack(spacing: 0) {
-          Text("Managed by: ").font(.footnote).fixedSize()
-          Text(verbatim: companyName).font(.footnote).fontWeight(.bold).fixedSize()
+        VStack(spacing: 4.0) {
+          Text("Managed by:").font(.footnote).fixedSize()
+          brandingContent
         }
         Spacer()
       }

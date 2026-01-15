@@ -1121,12 +1121,22 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSURL *)brandingCompanyLogo {
   NSString *logoVal = self.configState[kBrandingCompanyLogo];
-  return [NSURL URLWithString:logoVal];
+  NSURL *url = [NSURL URLWithString:logoVal];
+  // Only allow file and data URLs so as not to affect UI when offline
+  if (url && ([url.scheme isEqualToString:@"file"] || [url.scheme isEqualToString:@"data"])) {
+    return url;
+  }
+  return nil;
 }
 
 - (NSURL *)brandingCompanyLogoDark {
   NSString *logoVal = self.configState[kBrandingCompanyLogoDark];
-  return [NSURL URLWithString:logoVal];
+  NSURL *url = [NSURL URLWithString:logoVal];
+    // Only allow file and data URLs so as not to affect UI when offline
+  if (url && ([url.scheme isEqualToString:@"file"] || [url.scheme isEqualToString:@"data"])) {
+    return url;
+  }
+  return nil;
 }
 
 - (NSString *)brandingCompanyName {
