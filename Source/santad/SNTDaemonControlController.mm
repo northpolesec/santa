@@ -274,6 +274,10 @@ double watchdogRAMPeak = 0;
 
 #pragma mark Config Ops
 
+- (void)isSyncV2Enabled:(void (^)(BOOL))reply {
+  reply([[SNTConfigurator configurator] isSyncV2Enabled]);
+}
+
 - (void)watchdogInfo:(void (^)(uint64_t, uint64_t, double, double))reply {
   reply(watchdogCPUEvents, watchdogRAMEvents, watchdogCPUPeak, watchdogRAMPeak);
 }
@@ -315,6 +319,13 @@ double watchdogRAMPeak = 0;
 
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply {
   reply([[SNTConfigurator configurator] remountUSBMode]);
+}
+
+- (void)blockNetworkMount:(void (^)(NSNumber *))reply {
+  // If blocking network mounts is enabled, respond with the number of
+  // host exceptions, otherwise nil.
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  reply(configurator.blockNetworkMount ? @(configurator.allowedNetworkMountHosts.count) : nil);
 }
 
 - (void)enableBundles:(void (^)(BOOL))reply {

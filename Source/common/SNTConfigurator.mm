@@ -1432,6 +1432,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   return (self.fcmProject.length && self.fcmEntity.length && self.fcmAPIKey.length);
 }
 
+- (BOOL)isSyncV2Enabled {
+  return santa::IsDomainPinned([self syncBaseURL]);
+}
+
 - (BOOL)enablePushNotifications {
   // TODO: Consider supporting enablement from the sync server.
   // Check new key first, then fall back to deprecated key for backward compatibility
@@ -1443,9 +1447,8 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (deprecatedValue != nil) {
     return [deprecatedValue boolValue];
   }
-  // Default to true when neither key is set, and the SyncBaseURL is a pinned
-  // Workshop URL.
-  if (santa::IsDomainPinned([self syncBaseURL])) {
+  // Default to true when neither key is set, and SyncV2 is enabled.
+  if ([self isSyncV2Enabled]) {
     return YES;
   }
   return NO;
