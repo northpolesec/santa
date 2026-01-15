@@ -36,11 +36,14 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 + (NSString *)shortHelpText {
-  return @"Instruct the daemon to install Santa.app.";
+  return @"Instruct the daemon to install Santa.app or santanetd.";
 }
 
 + (NSString *)longHelpText {
-  return @"Instruct the daemon to install Santa.app.\n";
+  return @"Instruct the daemon to install Santa.app.\n"
+         @"Options:\n"
+         @"  --network-extension:  Install and activate the santanetd content filter instead.\n"
+         @"                        WARNING: All network connections will reset.\n";
 }
 
 + (BOOL)isHidden {
@@ -48,6 +51,55 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
+  BOOL installNetworkExtension = NO;
+
+  for (NSString *arg in arguments) {
+    if ([arg caseInsensitiveCompare:@"--network-extension"] == NSOrderedSame) {
+      installNetworkExtension = YES;
+      break;
+    }
+  }
+
+  if (installNetworkExtension) {
+    [self installNetworkExtension];
+  } else {
+    [self installSantaApp];
+  }
+
+  // Each install action is responsible for exiting appropriately
+  exit(EXIT_FAILURE);
+}
+
+- (void)installNetworkExtension {
+  int64_t secondsToWait = 60;
+
+  TEE_LOGI(@"Requesting Santa network extension installation...");
+  TEE_LOGI(@"...Waiting for up to %lld seconds...", secondsToWait);
+  TEE_LOGI(@"NOTE: All network connections will reset when the extension activates.");
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block BOOL success = NO;
+  [[self.daemonConn remoteObjectProxy] installNetworkExtension:^(BOOL success) {
+    if (success) {
+      TEE_LOGI(@"Network extension installation was successful");
+      success = YES;
+    } else {
+      TEE_LOGW(@"Network extension installation unsuccessful. Please consult logs.");
+    }
+
+    dispatch_semaphore_signal(sema);
+  }];
+
+  if (dispatch_semaphore_wait(sema,
+                              dispatch_time(DISPATCH_TIME_NOW, secondsToWait * NSEC_PER_SEC)) > 0) {
+    TEE_LOGW(@"Timed out waiting for network extension install to complete.");
+    exit(EXIT_FAILURE);
+  }
+
+  exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
+}
+
+- (void)installSantaApp {
   NSString *installFromPath = @"/var/db/santa/migration/Santa.app";
   int64_t secondsToWait = 15;
 

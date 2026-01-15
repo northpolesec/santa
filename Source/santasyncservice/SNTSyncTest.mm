@@ -893,14 +893,20 @@
             if (self.syncState.isSyncV2) {
               XCTAssertEqual(events.count, 2);
 
-              event = events[0][@"temporary_monitor_mode"];
-              XCTAssertEqualObjects(event[@"session_id"], @"my_test_enter_uuid");
-              XCTAssertEqualObjects(event[@"enter"][@"reason"], @"REASON_ON_DEMAND");
-              XCTAssertEqualObjects(event[@"enter"][@"seconds"], @"123");
+              event = events[0];
+              XCTAssertEqualObjects(event[@"timestamp"], @"1767128207");
+              XCTAssertEqualObjects(event[@"temporary_monitor_mode"][@"session_id"],
+                                    @"my_test_enter_uuid");
+              XCTAssertEqualObjects(event[@"temporary_monitor_mode"][@"enter"][@"reason"],
+                                    @"REASON_ON_DEMAND");
+              XCTAssertEqualObjects(event[@"temporary_monitor_mode"][@"enter"][@"seconds"], @"123");
 
-              event = events[1][@"temporary_monitor_mode"];
-              XCTAssertEqualObjects(event[@"session_id"], @"my_test_leave_uuid");
-              XCTAssertEqualObjects(event[@"leave"][@"reason"], @"REASON_REVOKED");
+              event = events[1];
+              XCTAssertEqualObjects(event[@"timestamp"], @"1767128207");
+              XCTAssertEqualObjects(event[@"temporary_monitor_mode"][@"session_id"],
+                                    @"my_test_leave_uuid");
+              XCTAssertEqualObjects(event[@"temporary_monitor_mode"][@"leave"][@"reason"],
+                                    @"REASON_REVOKED");
             } else {
               XCTAssertEqual(events.count, 0);
             }

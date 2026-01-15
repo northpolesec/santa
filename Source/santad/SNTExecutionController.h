@@ -52,6 +52,8 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
 @class SNTRuleTable;
 @class SNTSyncdQueue;
 
+using LogExecutionBlock = void (^)(santa::Message esMsg);
+
 ///
 ///  SNTExecutionController is responsible for handling binary execution requests:
 ///    + Uses SNTPolicyProcessor to make a decision about whether to allow or deny the binary.
@@ -66,6 +68,7 @@ const static NSString *kBlockLongPath = @"BlockLongPath";
                        eventTable:(SNTEventTable *)eventTable
                     notifierQueue:(SNTNotificationQueue *)notifierQueue
                        syncdQueue:(SNTSyncdQueue *)syncdQueue
+                           logger:(LogExecutionBlock)logger
                         ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
                   policyProcessor:(SNTPolicyProcessor *)policyProcessor
               processControlBlock:(santa::ProcessControlBlock)processControlBlock;

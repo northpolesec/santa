@@ -16,6 +16,7 @@
 #import <SystemExtensions/SystemExtensions.h>
 
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/gui/SNTAppDelegate.h"
 
@@ -29,25 +30,25 @@
 - (OSSystemExtensionReplacementAction)request:(OSSystemExtensionRequest *)request
                   actionForReplacingExtension:(OSSystemExtensionProperties *)oldExt
                                 withExtension:(OSSystemExtensionProperties *)newExt {
-  NSLog(@"SystemExtension \"%@\" request for replacement", request.identifier);
+  LOGI(@"SystemExtension \"%@\" request for replacement", request.identifier);
   return OSSystemExtensionReplacementActionReplace;
 }
 
 - (void)requestNeedsUserApproval:(OSSystemExtensionRequest *)request {
-  NSLog(@"SystemExtension \"%@\" request needs user approval", request.identifier);
+  LOGI(@"SystemExtension \"%@\" request needs user approval", request.identifier);
 
   // If the sysx is not authorized, don't wait around. macOS will start the sysx once authorized.
   exit(1);
 }
 
 - (void)request:(OSSystemExtensionRequest *)request didFailWithError:(NSError *)error {
-  NSLog(@"SystemExtension \"%@\" request did fail: %@", request.identifier, error);
+  LOGE(@"SystemExtension \"%@\" request did fail: %@", request.identifier, error);
   exit((int)error.code);
 }
 
 - (void)request:(OSSystemExtensionRequest *)request
     didFinishWithResult:(OSSystemExtensionRequestResult)result {
-  NSLog(@"SystemExtension \"%@\" request did finish: %ld", request.identifier, (long)result);
+  LOGI(@"SystemExtension \"%@\" request did finish: %ld", request.identifier, (long)result);
   exit(0);
 }
 
@@ -55,39 +56,48 @@
 
 int main(int argc, const char *argv[]) {
   @autoreleasepool {
-    NSNumber *sysxOperation;
+    OSSystemExtensionRequest *req;
     NSArray *args = [NSProcessInfo processInfo].arguments;
+    dispatch_queue_t q = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
+
     if ([args containsObject:@"--load-system-extension"]) {
-      sysxOperation = @(1);
+      LOGI(@"Requesting Santa System Extension activation");
+      req = [OSSystemExtensionRequest
+          activationRequestForExtension:[SNTXPCControlInterface santaExtensionBundleID]
+                                  queue:q];
     } else if ([args containsObject:@"--unload-system-extension"]) {
-      sysxOperation = @(2);
-    }
-    if (sysxOperation) {
-      NSString *e = [SNTXPCControlInterface systemExtensionID];
-      dispatch_queue_t q = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0);
-      OSSystemExtensionRequest *req;
-      if (sysxOperation.intValue == 1) {
-        NSLog(@"Requesting SystemExtension activation");
-        req = [OSSystemExtensionRequest activationRequestForExtension:e queue:q];
-      } else if (sysxOperation.intValue == 2) {
-        NSLog(@"Requesting SystemExtension deactivation");
-        req = [OSSystemExtensionRequest deactivationRequestForExtension:e queue:q];
-      }
-      if (req) {
-        SNTSystemExtensionDelegate *ed = [[SNTSystemExtensionDelegate alloc] init];
-        req.delegate = ed;
-        [[OSSystemExtensionManager sharedManager] submitRequest:req];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 60), q, ^{
-          exit(1);
-        });
-        [[NSRunLoop mainRunLoop] run];
-      }
+      LOGI(@"Requesting Santa System Extension deactivation");
+      req = [OSSystemExtensionRequest
+          deactivationRequestForExtension:[SNTXPCControlInterface santaExtensionBundleID]
+                                    queue:q];
+    } else if ([args containsObject:@"--load-network-extension"]) {
+      LOGI(@"Requesting Santa Network Extension (Content Filter) activation");
+      LOGW(@"WARNING: All network connections will reset when filter activates");
+      req = [OSSystemExtensionRequest
+          activationRequestForExtension:[SNTXPCControlInterface santanetdExtensionBundleID]
+                                  queue:q];
+    } else if ([args containsObject:@"--unload-network-extension"]) {
+      LOGI(@"Requesting Santa Network Extension (Content Filter) deactivation");
+      req = [OSSystemExtensionRequest
+          deactivationRequestForExtension:[SNTXPCControlInterface santanetdExtensionBundleID]
+                                    queue:q];
     }
 
-    NSApplication *app = [NSApplication sharedApplication];
-    SNTAppDelegate *delegate = [[SNTAppDelegate alloc] init];
-    [app setDelegate:delegate];
-    [app finishLaunching];
-    [app run];
+    if (req) {
+      SNTSystemExtensionDelegate *ed = [[SNTSystemExtensionDelegate alloc] init];
+      req.delegate = ed;
+      [[OSSystemExtensionManager sharedManager] submitRequest:req];
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 60), q, ^{
+        LOGW(@"Timed out waiting for Santa system extension operation");
+        exit(1);
+      });
+      [[NSRunLoop mainRunLoop] run];
+    } else {
+      NSApplication *app = [NSApplication sharedApplication];
+      SNTAppDelegate *delegate = [[SNTAppDelegate alloc] init];
+      [app setDelegate:delegate];
+      [app finishLaunching];
+      [app run];
+    }
   }
 }

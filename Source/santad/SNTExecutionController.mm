@@ -74,7 +74,23 @@ static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account fo
 @property dispatch_queue_t eventQueue;
 @end
 
+// Convert a block decision to the corresponding allow decision, preserving the rule type.
+static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
+  switch (blockDecision) {
+    case SNTEventStateBlockUnknown: return SNTEventStateAllowUnknown;
+    case SNTEventStateBlockBinary: return SNTEventStateAllowBinary;
+    case SNTEventStateBlockCertificate: return SNTEventStateAllowCertificate;
+    case SNTEventStateBlockScope: return SNTEventStateAllowScope;
+    case SNTEventStateBlockTeamID: return SNTEventStateAllowTeamID;
+    case SNTEventStateBlockSigningID: return SNTEventStateAllowSigningID;
+    case SNTEventStateBlockCDHash: return SNTEventStateAllowCDHash;
+    case SNTEventStateBlockLongPath: return SNTEventStateAllowUnknown;  // No direct equivalent
+    default: return SNTEventStateAllowUnknown;
+  }
+}
+
 @implementation SNTExecutionController {
+  LogExecutionBlock _logger;
   std::shared_ptr<TTYWriter> _ttyWriter;
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
 }
@@ -93,6 +109,7 @@ static NSString *const kPrinterProxyPostMonterey =
                        eventTable:(SNTEventTable *)eventTable
                     notifierQueue:(SNTNotificationQueue *)notifierQueue
                        syncdQueue:(SNTSyncdQueue *)syncdQueue
+                           logger:(LogExecutionBlock)logger
                         ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
                   policyProcessor:(SNTPolicyProcessor *)policyProcessor
               processControlBlock:(santa::ProcessControlBlock)processControlBlock {
@@ -102,6 +119,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _eventTable = eventTable;
     _notifierQueue = notifierQueue;
     _syncdQueue = syncdQueue;
+    _logger = logger;
     _ttyWriter = std::move(ttyWriter);
     _policyProcessor = policyProcessor;
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
@@ -394,6 +412,9 @@ static NSString *const kPrinterProxyPostMonterey =
         NotificationReplyBlock replyBlock = nil;
 
         if (cd.holdAndAsk) {
+          // Copy the esMsg to ensure that when the passed-in ref goes away
+          // we're still holding a valid Message object inside the replyBlock.
+          __block Message esMsgCopy(esMsg);
           replyBlock = ^(BOOL authenticated) {
             LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                  authenticated);
@@ -405,6 +426,11 @@ static NSString *const kPrinterProxyPostMonterey =
                 [self createRuleForStandaloneModeEvent:se];
               }
 
+              // Update decision to reflect that it was allowed via TouchID,
+              // preserving the rule type (e.g., BlockSigningID -> AllowSigningID)
+              cd.decision = BlockToAllowDecision(cd.decision);
+              cd.decisionExtra = @"TouchID Approved";
+
               if (stoppedProc) {
                 _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
               }
@@ -412,6 +438,9 @@ static NSString *const kPrinterProxyPostMonterey =
               // Allow the binary to begin running.
               self.processControlBlock(newProcPid, ProcessControl::Resume);
             } else {
+              // Decision stays as-is when TouchID is denied, just populate the extra field.
+              cd.decisionExtra = @"TouchID Denied";
+
               // The user did not approve, so kill the stopped process.
               if (stoppedProc) {
                 _ttyWriter->Write(targetProc,
@@ -419,6 +448,13 @@ static NSString *const kPrinterProxyPostMonterey =
               }
               self.processControlBlock(newProcPid, ProcessControl::Kill);
             }
+
+            // Clear holdAndAsk and update cache so it's recorded as a final decision
+            cd.holdAndAsk = NO;
+            [[SNTDecisionCache sharedCache] cacheDecision:cd];
+
+            // Log the execution event (since NOTIFY was suppressed during holdAndAsk)
+            self->_logger(std::move(esMsgCopy));
 
             _procSignalCache->remove(pidAndVersion);
             postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied);
