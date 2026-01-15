@@ -25,6 +25,7 @@
 
 #include "Source/common/Platform.h"
 #include "Source/common/PrefixTree.h"
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/TestUtils.h"
@@ -40,6 +41,7 @@
 #include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
 #include "Source/santad/Metrics.h"
 #import "Source/santad/SNTCompilerController.h"
+#import "Source/santad/SNTDecisionCache.h"
 
 using santa::AuthResultCache;
 using santa::EnrichedMessage;
@@ -573,6 +575,217 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXIT;
   XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), nullptr);
+}
+
+- (void)testHandleExecWithHoldAndAskSkipsLogging {
+  // When NOTIFY_EXEC arrives with holdAndAsk pending in the decision cache,
+  // logging should be skipped because it will be logged after TouchID authentication.
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t execFile = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t execProc = MakeESProcess(&execFile);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc, ActionType::Notify);
+  esMsg.event.exec.target = &execProc;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  auto mockEnricher = std::make_shared<santa::MockEnricher>();
+  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
+  auto mockLogger = std::make_shared<MockLogger>();
+  mockLogger->SetTelemetryMask(TelemetryEvent::kEverything);
+  auto prefixTree = std::make_shared<PrefixTree<Unit>>();
+
+  // Enricher and Logger should NOT be called when holdAndAsk is set
+  EXPECT_CALL(*mockEnricher, Enrich).Times(0);
+  EXPECT_CALL(*mockLogger, Log).Times(0);
+
+  // Mock decision cache to return a decision with holdAndAsk=YES
+  id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
+  OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.holdAndAsk = YES;
+  OCMStub([mockDecisionCache cachedDecisionForFile:esMsg.event.exec.target->executable->stat])
+      .ignoringNonObjectArgs()
+      .andReturn(cd);
+
+  id mockCC = OCMStrictClassMock([SNTCompilerController class]);
+  Message msg(mockESApi, &esMsg);
+  OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
+
+  SNTEndpointSecurityRecorder *recorderClient =
+      [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
+                                                 metrics:nullptr
+                                                  logger:mockLogger
+                                                enricher:mockEnricher
+                                      compilerController:mockCC
+                                         authResultCache:mockAuthCache
+                                              prefixTree:prefixTree
+                                             processTree:nullptr];
+
+  __block BOOL metricsRecorded = NO;
+  [recorderClient handleMessage:Message(mockESApi, &esMsg)
+             recordEventMetrics:^(EventDisposition d) {
+               metricsRecorded = YES;
+             }];
+
+  // Metrics callback should not have been called (we returned early)
+  XCTAssertFalse(metricsRecorded);
+
+  XCTAssertTrue(OCMVerifyAll(mockCC));
+  XCTBubbleMockVerifyAndClearExpectations(mockEnricher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockLogger.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+
+  [mockCC stopMocking];
+  [mockDecisionCache stopMocking];
+}
+
+- (void)testHandleExecWithoutHoldAndAskLogsNormally {
+  // When NOTIFY_EXEC arrives without holdAndAsk set, logging should proceed normally.
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t execFile = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t execProc = MakeESProcess(&execFile);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc, ActionType::Notify);
+  esMsg.event.exec.target = &execProc;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  // Create a fake enriched message
+  es_message_t fakeEnrichedMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXIT, NULL);
+  std::unique_ptr<EnrichedMessage> enrichedMsg = std::make_unique<EnrichedMessage>(EnrichedMessage(
+      santa::EnrichedExit(Message(mockESApi, &fakeEnrichedMsg), santa::EnrichedProcess())));
+
+  auto mockEnricher = std::make_shared<santa::MockEnricher>();
+  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
+  auto mockLogger = std::make_shared<MockLogger>();
+  mockLogger->SetTelemetryMask(TelemetryEvent::kEverything);
+  auto prefixTree = std::make_shared<PrefixTree<Unit>>();
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  // Enricher and Logger SHOULD be called when holdAndAsk is not set
+  EXPECT_CALL(*mockEnricher, Enrich).WillOnce(testing::Return(std::move(enrichedMsg)));
+  EXPECT_CALL(*mockLogger, Log).WillOnce(testing::InvokeWithoutArgs(^() {
+    dispatch_semaphore_signal(sema);
+  }));
+
+  // Mock decision cache to return a decision with holdAndAsk=NO
+  id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
+  OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.holdAndAsk = NO;
+  OCMStub([mockDecisionCache cachedDecisionForFile:esMsg.event.exec.target->executable->stat])
+      .ignoringNonObjectArgs()
+      .andReturn(cd);
+
+  id mockCC = OCMStrictClassMock([SNTCompilerController class]);
+  Message msg(mockESApi, &esMsg);
+  OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
+
+  SNTEndpointSecurityRecorder *recorderClient =
+      [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
+                                                 metrics:nullptr
+                                                  logger:mockLogger
+                                                enricher:mockEnricher
+                                      compilerController:mockCC
+                                         authResultCache:mockAuthCache
+                                              prefixTree:prefixTree
+                                             processTree:nullptr];
+
+  dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
+  [recorderClient handleMessage:Message(mockESApi, &esMsg)
+             recordEventMetrics:^(EventDisposition d) {
+               XCTAssertEqual(d, EventDisposition::kProcessed);
+               dispatch_semaphore_signal(semaMetrics);
+             }];
+
+  XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+  XCTAssertSemaTrue(sema, 5, "Log wasn't called within expected time window");
+
+  XCTAssertTrue(OCMVerifyAll(mockCC));
+  XCTBubbleMockVerifyAndClearExpectations(mockEnricher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockLogger.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+
+  [mockCC stopMocking];
+  [mockDecisionCache stopMocking];
+}
+
+- (void)testHandleExecWithNoCachedDecisionLogsNormally {
+  // When NOTIFY_EXEC arrives with no cached decision, logging should proceed normally.
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t execFile = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t execProc = MakeESProcess(&execFile);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc, ActionType::Notify);
+  esMsg.event.exec.target = &execProc;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  // Create a fake enriched message
+  es_message_t fakeEnrichedMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXIT, NULL);
+  std::unique_ptr<EnrichedMessage> enrichedMsg = std::make_unique<EnrichedMessage>(EnrichedMessage(
+      santa::EnrichedExit(Message(mockESApi, &fakeEnrichedMsg), santa::EnrichedProcess())));
+
+  auto mockEnricher = std::make_shared<santa::MockEnricher>();
+  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
+  auto mockLogger = std::make_shared<MockLogger>();
+  mockLogger->SetTelemetryMask(TelemetryEvent::kEverything);
+  auto prefixTree = std::make_shared<PrefixTree<Unit>>();
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  // Enricher and Logger SHOULD be called when no cached decision exists
+  EXPECT_CALL(*mockEnricher, Enrich).WillOnce(testing::Return(std::move(enrichedMsg)));
+  EXPECT_CALL(*mockLogger, Log).WillOnce(testing::InvokeWithoutArgs(^() {
+    dispatch_semaphore_signal(sema);
+  }));
+
+  // Mock decision cache to return nil
+  id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
+  OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
+  OCMStub([mockDecisionCache cachedDecisionForFile:esMsg.event.exec.target->executable->stat])
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
+
+  id mockCC = OCMStrictClassMock([SNTCompilerController class]);
+  Message msg(mockESApi, &esMsg);
+  OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
+
+  SNTEndpointSecurityRecorder *recorderClient =
+      [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
+                                                 metrics:nullptr
+                                                  logger:mockLogger
+                                                enricher:mockEnricher
+                                      compilerController:mockCC
+                                         authResultCache:mockAuthCache
+                                              prefixTree:prefixTree
+                                             processTree:nullptr];
+
+  dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
+  [recorderClient handleMessage:Message(mockESApi, &esMsg)
+             recordEventMetrics:^(EventDisposition d) {
+               XCTAssertEqual(d, EventDisposition::kProcessed);
+               dispatch_semaphore_signal(semaMetrics);
+             }];
+
+  XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+  XCTAssertSemaTrue(sema, 5, "Log wasn't called within expected time window");
+
+  XCTAssertTrue(OCMVerifyAll(mockCC));
+  XCTBubbleMockVerifyAndClearExpectations(mockEnricher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockLogger.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+
+  [mockCC stopMocking];
+  [mockDecisionCache stopMocking];
 }
 
 @end

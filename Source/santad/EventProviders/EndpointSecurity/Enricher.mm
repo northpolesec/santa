@@ -48,6 +48,7 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
       return std::make_unique<EnrichedMessage>(EnrichedExchange(
           std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.exchangedata.file1),
           Enrich(*es_msg->event.exchangedata.file2)));
+    case ES_EVENT_TYPE_AUTH_EXEC:
     case ES_EVENT_TYPE_NOTIFY_EXEC:
       return std::make_unique<EnrichedMessage>(EnrichedExec(
           std::move(es_msg), Enrich(*es_msg->process), Enrich(*es_msg->event.exec.target),

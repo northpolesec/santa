@@ -28,6 +28,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/Metrics.h"
 #include "Source/santad/ProcessTree/process_tree.h"
+#import "Source/santad/SNTDecisionCache.h"
 
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;
@@ -126,6 +127,16 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
   if (!_logger->ShouldLog(santa::ESEventToTelemetryEvent(esMsg->event_type))) {
     recordEventMetrics(EventDisposition::kDropped);
     return;
+  }
+
+  // For NOTIFY_EXEC with holdAndAsk pending, skip logging here.
+  // The event will be logged after TouchID authentication completes.
+  if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXEC) {
+    SNTCachedDecision *cd = [[SNTDecisionCache sharedCache]
+        cachedDecisionForFile:esMsg->event.exec.target->executable->stat];
+    if (cd && cd.holdAndAsk) {
+      return;
+    }
   }
 
   switch (esMsg->event_type) {
