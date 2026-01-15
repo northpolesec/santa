@@ -76,6 +76,37 @@ public struct SNTMessageView<Content: View>: View {
   }
 }
 
+// Special struct to help ensure an image is appropriately sized and
+// the bounding box is appropriately limited to the final image size.
+struct ConstrainedImage: View {
+  let image: NSImage
+  let maxWidth: CGFloat
+  let maxHeight: CGFloat
+
+  private var constrainedSize: (width: CGFloat, height: CGFloat) {
+    let size = image.size
+    let aspectRatio = size.width / size.height
+
+    if size.width / maxWidth > size.height / maxHeight {
+      // Width is the limiting factor
+      let width = min(size.width, maxWidth)
+      let height = width / aspectRatio
+      return (width, height)
+    } else {
+      // Height is the limiting factor
+      let height = min(size.height, maxHeight)
+      let width = height * aspectRatio
+      return (width, height)
+    }
+  }
+
+  var body: some View {
+    Image(nsImage: image)
+      .resizable()
+      .frame(width: constrainedSize.width, height: constrainedSize.height)
+  }
+}
+
 public struct SNTBrandingView: View {
   let c = SNTConfigurator.configurator()
   @Environment(\.colorScheme) var colorScheme
@@ -87,13 +118,8 @@ public struct SNTBrandingView: View {
         Spacer()
         HStack(spacing: 5.0) {
           Text("Managed by:").font(.footnote).fixedSize()
-          Image(nsImage: nsi)
-            .resizable()
-            .scaledToFit()
-            .frame(height: 32.0)
-            .fixedSize()
+          ConstrainedImage(image: nsi, maxWidth: 96.0, maxHeight: 32.0)
         }
-        .fixedSize()
         Spacer()
       }
       .padding(.top, 10.0)
@@ -103,13 +129,8 @@ public struct SNTBrandingView: View {
         Spacer()
         HStack(spacing: 5.0) {
           Text("Managed by:").font(.footnote).fixedSize()
-          Image(nsImage: nsi)
-            .resizable()
-            .scaledToFit()
-            .frame(height: 32.0)
-            .fixedSize()
+          ConstrainedImage(image: nsi, maxWidth: 96.0, maxHeight: 32.0)
         }
-        .fixedSize()
         Spacer()
       }
       .padding(.top, 10.0)
