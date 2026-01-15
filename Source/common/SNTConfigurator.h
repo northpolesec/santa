@@ -967,4 +967,9 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 - (void)saveStatsSubmissionAttemptTime:(nullable NSDate *)timestamp
                                version:(nullable NSString *)version;
 
+///
+/// Returns true if the system has rebooted since the last time santad was run.
+///
+@property(readonly, nonatomic) BOOL isFirstLaunchAfterBoot;
+
 @end
