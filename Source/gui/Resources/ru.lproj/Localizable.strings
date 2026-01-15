@@ -82,6 +82,9 @@
 /* No comment provided by engineer. */
 "Label before time period picker" = "Предотвращение будущих уведомлений для этого приложения для ";
 
+/* Label shown before company branding */
+"Managed by:" = "Управляется:";
+
 /* More Details button */
 "More Details" = "Подробнее";
 

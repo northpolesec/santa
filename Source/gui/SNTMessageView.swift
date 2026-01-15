@@ -124,7 +124,7 @@ public struct SNTBrandingView: View {
     }()
 
     if let nsi = logoImage {
-      ConstrainedImage(image: nsi, maxWidth: 78.0, maxHeight: 26.0)
+      ConstrainedImage(image: nsi, maxWidth: 84.0, maxHeight: 28.0)
     } else if let companyName = c.brandingCompanyName {
       TextWithLimit(companyName).font(.footnote).fontWeight(.bold).fixedSize()
     }
@@ -135,7 +135,7 @@ public struct SNTBrandingView: View {
       HStack {
         Spacer()
         VStack(spacing: 4.0) {
-          Text("Managed by:").font(.footnote).fixedSize()
+          Text("Managed by:", comment: "Label shown before company branding").font(.footnote).fixedSize()
           brandingContent
         }
         Spacer()
