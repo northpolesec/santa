@@ -632,6 +632,35 @@ double watchdogRAMPeak = 0;
   [self reloadSystemExtension];
 }
 
+- (void)reloadNetworkExtension {
+  LOGI(@"Trigger Santa Network Extension (Content Filter) activation");
+  NSTask *t = [[NSTask alloc] init];
+  t.launchPath = [@(kSantaAppPath) stringByAppendingString:@"/Contents/MacOS/Santa"];
+  t.arguments = @[ @"--load-network-extension" ];
+  [t launch];
+}
+
+- (void)installNetworkExtension:(void (^)(BOOL))reply {
+  LOGI(@"Trigger santanetd (network extension) installation");
+
+  // Verify the network extension bundle exists
+  NSString *netdBundlePath =
+      [@(kSantaAppPath) stringByAppendingString:@"/Contents/Library/SystemExtensions/"
+                                                @"com.northpolesec.santa.netd.systemextension"];
+
+  NSFileManager *fm = [NSFileManager defaultManager];
+  BOOL isDir;
+  if (![fm fileExistsAtPath:netdBundlePath isDirectory:&isDir] || !isDir) {
+    LOGE(@"Network extension bundle not found at: %@", netdBundlePath);
+    reply(NO);
+    return;
+  }
+
+  reply(YES);
+
+  [self reloadNetworkExtension];
+}
+
 - (void)exportTelemetryWithReply:(void (^)(BOOL))reply {
   _logger->ExportTelemetry();
   reply(YES);

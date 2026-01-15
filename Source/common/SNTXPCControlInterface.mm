@@ -23,7 +23,8 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 
-NSString *const kBundleID = @"com.northpolesec.santa.daemon";
+static NSString *const kSantaExtensionBundleID = @"com.northpolesec.santa.daemon";
+static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.netd";
 
 @implementation SNTXPCControlInterface
 
@@ -31,16 +32,20 @@ NSString *const kBundleID = @"com.northpolesec.santa.daemon";
 #ifdef SANTAADHOC
   // The mach service for an adhoc signed ES sysx uses the "endpoint-security" prefix instead of
   // the teamid. In Santa's case it will be endpoint-security.com.northpolesec.santa.daemon.xpc.
-  return [NSString stringWithFormat:@"endpoint-security.%@.xpc", kBundleID];
+  return [NSString stringWithFormat:@"endpoint-security.%@.xpc", kSantaExtensionBundleID];
 #else
   MOLCodesignChecker *cs = [[MOLCodesignChecker alloc] initWithSelf];
   // "teamid.com.northpolesec.santa.daemon.xpc"
-  return [NSString stringWithFormat:@"%@.%@.xpc", cs.teamID, kBundleID];
+  return [NSString stringWithFormat:@"%@.%@.xpc", cs.teamID, kSantaExtensionBundleID];
 #endif
 }
 
-+ (NSString *)systemExtensionID {
-  return kBundleID;
++ (NSString *)santaExtensionBundleID {
+  return kSantaExtensionBundleID;
+}
+
++ (NSString *)santanetdExtensionBundleID {
+  return kSantanetdExtensionBundleID;
 }
 
 + (void)initializeControlInterface:(NSXPCInterface *)r {

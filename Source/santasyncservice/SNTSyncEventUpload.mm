@@ -439,6 +439,8 @@ void MessageForTemporaryMonitorModeLeaveAuditEvent(
   }
 
   auto pbAudit = google::protobuf::Arena::Create<typename ::pbv2::AuditEvent>(arena);
+  pbAudit->set_timestamp([[event occurrenceDate] timeIntervalSince1970]);
+
   auto pbTmm = pbAudit->mutable_temporary_monitor_mode();
   pbTmm->set_session_id(NSStringToUTF8StringView(event.uuid));
 
