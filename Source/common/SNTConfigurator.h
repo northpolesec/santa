@@ -536,6 +536,43 @@
 @property(readonly, nonatomic) BOOL enableNotificationSilences;
 
 ///
+///  If set, the logo that will be displayed on Santa UI. The image will be
+///  scaled down appropriately to fit within image bounds (currently 84x28 pixels).
+///
+///  Supported URL schemes:
+///    - file:// for local file paths
+///    - data: for base64-encoded image data (e.g., data:image/png;base64,...)
+///
+///  HTTP/HTTPS URLs are not supported.
+///
+///  If set, this value will override `BrandingCompanyName`.
+///
+@property(nullable, readonly, nonatomic) NSURL *brandingCompanyLogo;
+
+///
+///  If set, the logo that will be displayed on Santa UI when the UI will be
+///  shown in dark mode. The image will be scaled down appropriately to fit
+///  within image bounds (currently 84x28 pixels).
+///
+///  Supported URL schemes:
+///    - file:// for local file paths
+///    - data: for base64-encoded image data (e.g., data:image/png;base64,...)
+///
+///  HTTP/HTTPS URLs are not supported.
+///
+///  If set, and the UI will be shown in dark mode, this value will
+///  override both `BrandingCompanyLogo` and `BrandingCompanyName`.
+///
+@property(nullable, readonly, nonatomic) NSURL *brandingCompanyLogoDark;
+
+///
+///  If this value is set, the text will be be shown on Santa UI.
+///
+///  This setting is ignored if brandingCompanyLogo/brandingCompanyLogoDark are set.
+///
+@property(nullable, readonly, nonatomic) NSString *brandingCompanyName;
+
+///
 ///  If this is set to true, the UI will use different fonts on April 1st, May 4th and October 31st.
 ///
 @property(readonly, nonatomic) BOOL funFontsOnSpecificDays;

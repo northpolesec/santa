@@ -136,6 +136,9 @@ static NSString *const kModeNotificationMonitor = @"ModeNotificationMonitor";
 static NSString *const kModeNotificationLockdown = @"ModeNotificationLockdown";
 static NSString *const kModeNotificationStandalone = @"ModeNotificationStandalone";
 static NSString *const kEnableNotificationSilences = @"EnableNotificationSilences";
+static NSString *const kBrandingCompanyName = @"BrandingCompanyName";
+static NSString *const kBrandingCompanyLogo = @"BrandingCompanyLogo";
+static NSString *const kBrandingCompanyLogoDark = @"BrandingCompanyLogoDark";
 static NSString *const kFunFontsOnSpecificDays = @"FunFontsOnSpecificDays";
 static NSString *const kEnableMenuItem = @"EnableMenuItem";
 
@@ -374,6 +377,9 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kEntitlementsTeamIDFilterKey : array,
       kEnabledProcessAnnotations : array,
       kTelemetryKey : array,
+      kBrandingCompanyName : string,
+      kBrandingCompanyLogo : string,
+      kBrandingCompanyLogoDark : string,
     };
 
     _syncStateFilePath = syncStateFilePath;
@@ -561,6 +567,18 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEnableNotificationSilences {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBrandingCompanyLogo {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBrandingCompanyLogoDark {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBrandingCompanyName {
   return [self configStateSet];
 }
 
@@ -1119,6 +1137,30 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (BOOL)enableMenuItem {
   NSNumber *number = self.configState[kEnableMenuItem];
   return number ? [number boolValue] : YES;
+}
+
+- (NSURL *)brandingCompanyLogo {
+  NSString *logoVal = self.configState[kBrandingCompanyLogo];
+  NSURL *url = [NSURL URLWithString:logoVal];
+  // Only allow file and data URLs so as not to affect UI when offline
+  if (url && ([url.scheme isEqualToString:@"file"] || [url.scheme isEqualToString:@"data"])) {
+    return url;
+  }
+  return nil;
+}
+
+- (NSURL *)brandingCompanyLogoDark {
+  NSString *logoVal = self.configState[kBrandingCompanyLogoDark];
+  NSURL *url = [NSURL URLWithString:logoVal];
+  // Only allow file and data URLs so as not to affect UI when offline
+  if (url && ([url.scheme isEqualToString:@"file"] || [url.scheme isEqualToString:@"data"])) {
+    return url;
+  }
+  return nil;
+}
+
+- (NSString *)brandingCompanyName {
+  return self.configState[kBrandingCompanyName];
 }
 
 - (NSString *)syncClientAuthCertificateFile {

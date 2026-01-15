@@ -256,6 +256,45 @@ sequences will be replaced in the final URL:
       defaultValue: true,
       versionAdded: "2025.2",
     },
+    {
+      key: "BrandingCompanyName",
+      description: `The company name to display on Santa UIs. This setting is ignored if \`BrandingCompanyLogo\` is set.`,
+      type: "string",
+      versionAdded: "2026.1",
+    },
+    {
+      key: "BrandingCompanyLogo",
+      description: `A URL referencing a logo image to display on Santa UIs. The image will be scaled down
+        appropriately to fit within image bounds (currently 84x28 pixels). If set, this overrides \`BrandingCompanyName\`.
+
+**Supported URL schemes:**
+- \`file://\` - Local file path (e.g., \`file:///Library/Application%20Support/MyOrg/logo.png\`)
+- \`data:\` - Base64-encoded image data (e.g., \`data:image/png;base64,iVBORw0KG...\`)
+
+**Note:** HTTP/HTTPS URLs are not supported.`,
+      type: "string",
+      versionAdded: "2026.1",
+    },
+    {
+      key: "BrandingCompanyLogoDark",
+      description: `A URL referencing a logo image to display on Santa UIs. When the UI is displayed in dark
+        mode and this is set, it overrides both \`BrandingCompanyLogo\` and \`BrandingCompanyName\`.
+        The image will be scaled down appropriately to fit within image bounds (currently 84x28 pixels).
+
+**Supported URL schemes:**
+- \`file://\` - Local file path (e.g., \`file:///Library/Application%20Support/MyOrg/logo-dark.png\`)
+- \`data:\` - Base64-encoded image data (e.g., \`data:image/png;base64,iVBORw0KG...\`)
+
+**Note:** HTTP/HTTPS URLs are not supported.`,
+      type: "string",
+      versionAdded: "2026.1",
+    },
+    {
+      key: "FunFontsOnSpecificDays",
+      description: `If true, the Santa UI will use special images/fonts on certain holidays.`,
+      type: "bool",
+      defaultValue: false,
+    },
   ],
   telemetry: [
     {

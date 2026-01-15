@@ -312,9 +312,7 @@ struct SNTBinaryMessageWindowView: View {
           action: dismissButton
         )
       }
-      Spacer()
-    }
-    .fixedSize()
+    }.fixedSize()
   }
 
   func shouldAddStandaloneButton(_ event: SNTStoredExecutionEvent?) -> Bool {

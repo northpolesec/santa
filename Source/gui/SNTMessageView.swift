@@ -69,8 +69,83 @@ public struct SNTMessageView<Content: View>: View {
       content
     }
     .padding([.leading, .trailing], 40.0)
-    .padding([.bottom], 10.0)
     .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
+
+    SNTBrandingView()
+      .frame(maxWidth: MAX_OUTER_VIEW_WIDTH)
+  }
+}
+
+// Special struct to help ensure an image is appropriately sized and
+// the bounding box is appropriately limited to the final image size.
+struct ConstrainedImage: View {
+  let image: NSImage
+  let maxWidth: CGFloat
+  let maxHeight: CGFloat
+
+  private var constrainedSize: (width: CGFloat, height: CGFloat) {
+    let size = image.size
+    let aspectRatio = size.width / size.height
+
+    if size.width / maxWidth > size.height / maxHeight {
+      // Width is the limiting factor
+      let width = min(size.width, maxWidth)
+      let height = width / aspectRatio
+      return (width, height)
+    } else {
+      // Height is the limiting factor
+      let height = min(size.height, maxHeight)
+      let width = height * aspectRatio
+      return (width, height)
+    }
+  }
+
+  var body: some View {
+    Image(nsImage: image)
+      .resizable()
+      .frame(width: constrainedSize.width, height: constrainedSize.height)
+  }
+}
+
+public struct SNTBrandingView: View {
+  let c = SNTConfigurator.configurator()
+  @Environment(\.colorScheme) var colorScheme
+
+  @ViewBuilder
+  private var brandingContent: some View {
+    // Select the appropriate logo based on color scheme
+    let logoImage: NSImage? = {
+      if colorScheme == .dark, let url = c.brandingCompanyLogoDark {
+        return NSImage(contentsOf: url)
+      } else if let url = c.brandingCompanyLogo {
+        return NSImage(contentsOf: url)
+      }
+      return nil
+    }()
+
+    if let nsi = logoImage {
+      ConstrainedImage(image: nsi, maxWidth: 84.0, maxHeight: 28.0)
+    } else if let companyName = c.brandingCompanyName {
+      TextWithLimit(companyName).font(.footnote).fontWeight(.bold).fixedSize()
+    }
+  }
+
+  public var body: some View {
+    if c.brandingCompanyLogoDark != nil || c.brandingCompanyLogo != nil || c.brandingCompanyName != nil {
+      HStack {
+        Spacer()
+        VStack(spacing: 4.0) {
+          Text("Managed by:", comment: "Label shown before company branding").font(.footnote).fixedSize()
+          brandingContent
+        }
+        Spacer()
+      }
+      .padding(.top, 10.0)
+      .padding(.bottom, 28.0)
+    } else {
+      Spacer()
+        .frame(height: 28.0)
+    }
   }
 }
 

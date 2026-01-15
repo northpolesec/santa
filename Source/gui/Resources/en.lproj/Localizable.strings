@@ -82,6 +82,9 @@
 /* No comment provided by engineer. */
 "Label before time period picker" = "Prevent future notifications for this application for";
 
+/* Label shown before company branding */
+"Managed by:" = "Managed by:";
+
 /* More Details button */
 "More Details" = "More Details";
 
