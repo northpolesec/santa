@@ -74,6 +74,11 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 ///
 - (void)installSantaApp:(NSString *)appPath reply:(void (^)(BOOL))reply;
 
+///
+/// Network Extension Ops
+///
+- (void)installNetworkExtension:(void (^)(BOOL))reply;
+
 @end
 
 @interface SNTXPCControlInterface : NSObject
@@ -84,9 +89,14 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 + (NSString *)serviceID;
 
 ///
-///  Returns the SystemExtension ID for this service.
+///  Returns the Santa Endpoint Security SystemExtension bundle ID.
 ///
-+ (NSString *)systemExtensionID;
++ (NSString *)santaExtensionBundleID;
+
+///
+///  Returns the Santa Network Extension (santanetd) bundle ID.
+///
++ (NSString *)santanetdExtensionBundleID;
 
 ///
 ///  Returns an initialized NSXPCInterface for the SNTUnprivilegedDaemonControlXPC protocol.
