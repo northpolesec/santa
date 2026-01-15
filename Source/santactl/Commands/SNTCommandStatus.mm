@@ -255,6 +255,18 @@ REGISTER_COMMAND_NAME(@"status")
     remountUSBMode = response;
   }];
 
+  __block BOOL isSyncV2Enabled = NO;
+  [rop isSyncV2Enabled:^(BOOL val) {
+    isSyncV2Enabled = val;
+  }];
+
+  __block NSNumber *networkMountExceptions;
+  if (isSyncV2Enabled) {
+    [rop blockNetworkMount:^(NSNumber *numExceptions) {
+      networkMountExceptions = numExceptions;
+    }];
+  }
+
   // Format dates
   NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
   dateFormatter.dateFormat = @"yyyy/MM/dd HH:mm:ss Z";
@@ -307,6 +319,13 @@ REGISTER_COMMAND_NAME(@"status")
         @"cdhash_rules" : @(ruleCounts.cdhash),
       },
     } mutableCopy];
+
+    if (isSyncV2Enabled) {
+      NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
+      daemon[@"block_network_mounts"] = @(networkMountExceptions != nil);
+      daemon[@"network_mount_host_exceptions"] = @([networkMountExceptions intValue]);
+      stats[@"daemon"] = daemon;
+    }
 
     if (syncURLStr.length) {
       stats[@"sync"] = [@{
@@ -387,6 +406,15 @@ REGISTER_COMMAND_NAME(@"status")
     }
     printf("  %-25s | %s\n", "On Start USB Options",
            StartupOptionToString(configurator.onStartUSBOptions).UTF8String);
+    if (isSyncV2Enabled) {
+      printf("  %-25s | %s", "Network Mount Blocking", (networkMountExceptions ? "Yes" : "No"));
+      if (networkMountExceptions) {
+        printf(" (%d host exception%s)\n", [networkMountExceptions intValue],
+               [networkMountExceptions intValue] == 1 ? "" : "s");
+      } else {
+        printf("\n");
+      }
+    }
     printf("  %-25s | %lld\n", "Static Rules", staticRuleCount);
     printf("  %-25s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
     printf("  %-25s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);

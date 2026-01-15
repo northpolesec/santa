@@ -61,6 +61,7 @@ struct RuleCounts {
 ///
 ///  Config ops
 ///
+- (void)isSyncV2Enabled:(void (^)(BOOL))reply;
 - (void)watchdogInfo:(void (^)(uint64_t, uint64_t, double, double))reply;
 - (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString *,
                                   santa::WatchItems::DataSource dataSource, NSString *,
@@ -73,6 +74,7 @@ struct RuleCounts {
 - (void)enableTransitiveRules:(void (^)(BOOL))reply;
 - (void)blockUSBMount:(void (^)(BOOL))reply;
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply;
+- (void)blockNetworkMount:(void (^)(NSNumber *))reply;
 
 ///
 /// FAA Retrieval ops

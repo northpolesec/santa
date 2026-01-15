@@ -553,6 +553,11 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 #pragma mark - Sync Settings
 
 ///
+/// Returns whether or not Santa is able to use private Sync V2 features
+///
+- (BOOL)isSyncV2Enabled;
+
+///
 ///  The base URL of the sync server.
 ///
 @property(nullable, readonly, nonatomic) NSURL *syncBaseURL;
