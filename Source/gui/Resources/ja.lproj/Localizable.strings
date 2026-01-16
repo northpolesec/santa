@@ -16,6 +16,9 @@
 /* Default text for Approve */
 "Approve" = "許可する";
 
+/* Message for reset silences confirmation dialog */
+"Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "すべての通知の停止設定をリセットしてもよろしいですか？以前停止した通知が再び届くようになります。";
+
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "一時的なモニターモードを許可する";
 
@@ -30,6 +33,9 @@
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "バンドルハッシュ";
+
+/* Cancel button title */
+"Cancel" = "キャンセル";
 
 /* No comment provided by engineer. */
 "CDHash" = "CDハッシュ";
@@ -114,6 +120,12 @@
 
 /* Notification message shown when an unknown app has been unblocked */
 "Requested application can now be run" = "リクエストされたアプリケーションが実行できるようになりました。";
+
+/* Reset button title */
+"Reset" = "リセット";
+
+/* Title for reset silences confirmation dialog */
+"Reset Silences" = "通知停止をリセット";
 
 /* No comment provided by engineer. */
 "Rule Name" = "ルール名";

@@ -16,6 +16,9 @@
 /* Default text for Approve */
 "Approve" = "Genehmigen";
 
+/* Message for reset silences confirmation dialog */
+"Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Möchten Sie wirklich alle Benachrichtigungsstummschaltungen zurücksetzen? Sie werden wieder Benachrichtigungen für zuvor stummgeschaltete Ereignisse erhalten.";
+
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "den temporären Monitor-Modus genehmigen";
 
@@ -30,6 +33,9 @@
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Bundle-Hash";
+
+/* Cancel button title */
+"Cancel" = "Abbrechen";
 
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
@@ -114,6 +120,12 @@
 
 /* Notification message shown when an unknown app has been unblocked */
 "Requested application can now be run" = "Angefordert kann jetzt ausgeführt werden";
+
+/* Reset button title */
+"Reset" = "Zurücksetzen";
+
+/* Title for reset silences confirmation dialog */
+"Reset Silences" = "Stummschaltungen zurücksetzen";
 
 /* No comment provided by engineer. */
 "Rule Name" = "Regelname";

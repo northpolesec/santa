@@ -40,7 +40,12 @@
 @property(atomic, strong) NSDate *temporaryMonitorModeExpiration;
 @property NSMenuItem *temporaryMonitorModeMenuItem;
 @property NSMenuItem *temporaryMonitorModeRefreshItem;
+
+// Reset silences item
+@property NSMenuItem *resetSilencesMenuItem;
 @end
+
+static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 
 @implementation SNTStatusItemManager
 
@@ -133,6 +138,11 @@
   [menu addItem:[self menuItemWithTitle:santaVersionString andAction:nil]];
   [menu addItem:[self menuItemWithTitle:@"About Santa" andAction:@selector(aboutMenuItemClicked:)]];
 
+  // Add reset silences item
+  self.resetSilencesMenuItem = [self menuItemWithTitle:@"Reset Silences"
+                                             andAction:@selector(resetSilencesMenuItemClicked:)];
+  [menu addItem:self.resetSilencesMenuItem];
+
   // Add separator
   [menu addItem:[NSMenuItem separatorItem]];
 
@@ -185,6 +195,7 @@
     [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];
     self.statusItem = nil;
     self.syncMenuItem = nil;
+    self.resetSilencesMenuItem = nil;
     self.temporaryMonitorModeMenuItem = nil;
     self.temporaryMonitorModeRefreshItem = nil;
   }
@@ -289,6 +300,23 @@
                                                  }];
   }
   [daemonConn invalidate];
+}
+
+- (void)resetSilencesMenuItemClicked:(id)sender {
+  NSAlert *alert = [[NSAlert alloc] init];
+  alert.messageText =
+      NSLocalizedString(@"Reset Silences", @"Title for reset silences confirmation dialog");
+  alert.informativeText =
+      NSLocalizedString(@"Are you sure you want to reset all notification silences? "
+                        @"You will start receiving notifications for previously silenced events.",
+                        @"Message for reset silences confirmation dialog");
+  [alert addButtonWithTitle:NSLocalizedString(@"Reset", @"Reset button title")];
+  [alert addButtonWithTitle:NSLocalizedString(@"Cancel", @"Cancel button title")];
+
+  if ([alert runModal] == NSAlertFirstButtonReturn) {
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    [ud removeObjectForKey:kNotificationSilencesKey];
+  }
 }
 
 - (void)syncMenuItemClicked:(id)sender {
@@ -419,6 +447,15 @@
   NSMenuItem *i = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
   i.target = self;
   return i;
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
+  if (menuItem == self.resetSilencesMenuItem) {
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    NSDictionary *silences = [ud objectForKey:kNotificationSilencesKey];
+    return silences.count > 0;
+  }
+  return YES;
 }
 
 - (void)notificationWithIdentifier:(NSString *)identifier andBody:(NSString *)body {

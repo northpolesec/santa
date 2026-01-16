@@ -16,6 +16,9 @@
 /* Default text for Approve */
 "Approve" = "Approve";
 
+/* Message for reset silences confirmation dialog */
+"Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events.";
+
 /* Authorize execution of an application with Signing ID or Path */
 "authorize execution of %@" = "authorize execution of %@";
 
@@ -30,6 +33,9 @@
 
 /* No comment provided by engineer. */
 "Bundle Hash" = "Bundle Hash";
+
+/* Cancel button title */
+"Cancel" = "Cancel";
 
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
@@ -114,6 +120,12 @@
 
 /* Notification message shown when an unknown app has been unblocked */
 "Requested application can now be run" = "Requested application can now be run";
+
+/* Reset button title */
+"Reset" = "Reset";
+
+/* Title for reset silences confirmation dialog */
+"Reset Silences" = "Reset Silences";
 
 /* No comment provided by engineer. */
 "Rule Name" = "Rule Name";
