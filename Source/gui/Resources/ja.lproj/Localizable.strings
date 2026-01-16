@@ -16,6 +16,9 @@
 /* Default text for Approve */
 "Approve" = "許可する";
 
+/* Authorize execution fallback */
+"authorize execution" = "実行を許可する";
+
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "一時的なモニターモードを許可する";
 

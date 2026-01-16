@@ -16,6 +16,7 @@ def base_localization(write_out=False):
       if f.name not in ['SNTTestGUI.swift']
   ]
   files_to_localize.append('Source/common/SNTBlockMessage.mm')
+  files_to_localize.append('Source/gui/SNTAuthorizationHelper.mm')
   files_to_localize.append('Source/gui/SNTNotificationManager.mm')
   files_to_localize.append('Source/gui/SNTStatusItemManager.mm')
 

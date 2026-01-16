@@ -18,12 +18,27 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+objc_library(
+    name = "SNTAuthorizationHelper",
+    srcs = ["SNTAuthorizationHelper.mm"],
+    hdrs = ["SNTAuthorizationHelper.h"],
+    module_name = "santa_gui_SNTAuthorizationHelper",
+    sdk_frameworks = ["LocalAuthentication"],
+    deps = [
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTStoredExecutionEvent",
+    ],
+)
+
 swift_library(
     name = "SNTMessageView",
     srcs = ["SNTMessageView.swift"],
     generates_header = 1,
     module_name = "santa_gui_SNTMessageView",
-    deps = ["//Source/common:SNTConfigurator"],
+    deps = [
+        ":SNTAuthorizationHelper",
+        "//Source/common:SNTConfigurator",
+    ],
 )
 
 swift_library(
@@ -58,6 +73,7 @@ swift_library(
     srcs = ["SNTBinaryMessageWindowView.swift"],
     generates_header = 1,
     deps = [
+        ":SNTAuthorizationHelper",
         ":SNTMessageView",
         "//Source/common:CertificateHelpers",
         "//Source/common:SNTBlockMessage_SantaGUI",
@@ -142,6 +158,7 @@ objc_library(
     ],
     deps = [
         ":SNTAboutWindowView",
+        ":SNTAuthorizationHelper",
         ":SNTBinaryMessageWindowView",
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",

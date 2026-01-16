@@ -1,7 +1,7 @@
 import SwiftUI
-import LocalAuthentication
 
 import santa_common_SNTConfigurator
+import santa_gui_SNTAuthorizationHelper
 
 public let MAX_OUTER_VIEW_WIDTH = 560.0
 public let MAX_OUTER_VIEW_HEIGHT = 340.0
@@ -284,44 +284,13 @@ public struct CopyDetailsButton: View {
   }
 }
 
-@objc public class SNTAuthorizationHelper: NSObject {
-  @objc public static func authorizeTemporaryMonitorMode(replyBlock: @escaping (Bool) -> Void) {
-    let format = NSLocalizedString(
-      "authorize temporary Monitor Mode",
-      comment: "Authorize temporary Monitor Mode exception"
-    )
-
-    AuthorizeViaTouchID(reason: format, replyBlock: replyBlock)
-  }
-}
-
-public func AuthorizeViaTouchID(reason: String, replyBlock: @escaping (Bool) -> Void) {
-  let policy: LAPolicy =
-    SNTConfigurator.configurator().enableStandalonePasswordFallback
-    ? .deviceOwnerAuthentication : .deviceOwnerAuthenticationWithBiometrics
-
-  LAContext().evaluatePolicy(policy, localizedReason: reason) { success, error in
-    if error != nil {
-      replyBlock(false)
-    } else {
-      replyBlock(success)
-    }
-  }
-}
-
 // CanAuthorizeWithTouchID checks if TouchID is available on the current device
 // and returns an error if it is not.
 public func CanAuthorizeWithTouchID() -> (Bool, NSError?) {
-  let context = LAContext()
-  var error: NSError?
-
-  let policy: LAPolicy =
-    SNTConfigurator.configurator().enableStandalonePasswordFallback
-    ? .deviceOwnerAuthentication : .deviceOwnerAuthenticationWithBiometrics
-
-  if context.canEvaluatePolicy(policy, error: &error) {
+  do {
+    try SNTAuthorizationHelper.canAuthorizeWithTouchID()
     return (true, nil)
-  } else {
+  } catch let error as NSError {
     return (false, error)
   }
 }

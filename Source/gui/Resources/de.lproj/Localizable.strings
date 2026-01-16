@@ -16,6 +16,9 @@
 /* Default text for Approve */
 "Approve" = "Genehmigen";
 
+/* Authorize execution fallback */
+"authorize execution" = "Ausführung genehmigen";
+
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "den temporären Monitor-Modus genehmigen";
 

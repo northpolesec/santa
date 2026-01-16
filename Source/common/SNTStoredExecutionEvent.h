@@ -92,6 +92,9 @@
 /// The decision depends on the user approving execution.
 @property BOOL holdAndAsk;
 
+/// Skip showing the block dialog and go directly to TouchID authorization.
+@property BOOL silentTouchID;
+
 /// NSArray of logged in users when the decision was made.
 @property(nullable) NSArray *loggedInUsers;
 

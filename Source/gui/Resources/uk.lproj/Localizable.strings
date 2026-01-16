@@ -16,6 +16,9 @@
 /* Default text for Approve */
 "Approve" = "Затвердити";
 
+/* Authorize execution fallback */
+"authorize execution" = "дозволити виконання";
+
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "дозволити тимчасовий режим монітора";
 
