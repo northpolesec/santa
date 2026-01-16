@@ -125,7 +125,7 @@
 "Reset" = "リセット";
 
 /* Title for reset silences confirmation dialog */
-"Reset Silences" = "通知停止をリセット";
+"Reset Silenced Notifications" = "サイレント通知をリセット";
 
 /* No comment provided by engineer. */
 "Rule Name" = "ルール名";

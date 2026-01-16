@@ -125,7 +125,7 @@
 "Reset" = "Reset";
 
 /* Title for reset silences confirmation dialog */
-"Reset Silences" = "Reset Silences";
+"Reset Silenced Notifications" = "Reset Silenced Notifications";
 
 /* No comment provided by engineer. */
 "Rule Name" = "Rule Name";

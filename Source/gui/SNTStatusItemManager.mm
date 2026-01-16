@@ -139,7 +139,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   [menu addItem:[self menuItemWithTitle:@"About Santa" andAction:@selector(aboutMenuItemClicked:)]];
 
   // Add reset silences item
-  self.resetSilencesMenuItem = [self menuItemWithTitle:@"Reset Silences"
+  self.resetSilencesMenuItem = [self menuItemWithTitle:@"Reset Silenced Notifications"
                                              andAction:@selector(resetSilencesMenuItemClicked:)];
   [menu addItem:self.resetSilencesMenuItem];
 
@@ -304,8 +304,8 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 
 - (void)resetSilencesMenuItemClicked:(id)sender {
   NSAlert *alert = [[NSAlert alloc] init];
-  alert.messageText =
-      NSLocalizedString(@"Reset Silences", @"Title for reset silences confirmation dialog");
+  alert.messageText = NSLocalizedString(@"Reset Silenced Notifications",
+                                        @"Title for reset silences confirmation dialog");
   alert.informativeText =
       NSLocalizedString(@"Are you sure you want to reset all notification silences? "
                         @"You will start receiving notifications for previously silenced events.",

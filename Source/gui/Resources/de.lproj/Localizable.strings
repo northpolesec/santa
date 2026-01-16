@@ -125,7 +125,7 @@
 "Reset" = "Zurücksetzen";
 
 /* Title for reset silences confirmation dialog */
-"Reset Silences" = "Stummschaltungen zurücksetzen";
+"Reset Silenced Notifications" = "Stummgeschaltete Benachrichtigungen zurücksetzen";
 
 /* No comment provided by engineer. */
 "Rule Name" = "Regelname";

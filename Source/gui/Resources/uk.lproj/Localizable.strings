@@ -125,7 +125,7 @@
 "Reset" = "Скинути";
 
 /* Title for reset silences confirmation dialog */
-"Reset Silences" = "Скинути вимкнення сповіщень";
+"Reset Silenced Notifications" = "Скинути заглушені сповіщення";
 
 /* No comment provided by engineer. */
 "Rule Name" = "Назва правила";
