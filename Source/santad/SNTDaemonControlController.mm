@@ -42,6 +42,7 @@
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/String.h"
 #include "Source/common/faa/WatchItems.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/KillingMachine.h"
@@ -425,6 +426,10 @@ double watchdogRAMPeak = 0;
   [result modeTransition:^(SNTModeTransition *val) {
     // The _temporaryMonitorMode object is responsible for updating configurator as appropriate
     _temporaryMonitorMode->NewModeTransitionReceived(val);
+  }];
+
+  [result networkExtensionSettings:^(SNTNetworkExtensionSettings *val) {
+    [configurator setSyncServerNetworkExtensionSettings:val];
   }];
 
   [result eventDetailURL:^(NSString *val) {
