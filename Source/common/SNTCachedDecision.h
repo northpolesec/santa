@@ -56,5 +56,6 @@
 
 @property BOOL cacheable;
 @property BOOL holdAndAsk;
+@property BOOL silentTouchID;
 
 @end

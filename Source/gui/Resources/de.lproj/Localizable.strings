@@ -19,6 +19,9 @@
 /* Message for reset silences confirmation dialog */
 "Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Möchten Sie wirklich alle Benachrichtigungsstummschaltungen zurücksetzen? Sie werden wieder Benachrichtigungen für zuvor stummgeschaltete Ereignisse erhalten.";
 
+/* Authorize execution fallback */
+"authorize execution" = "Ausführung genehmigen";
+
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "den temporären Monitor-Modus genehmigen";
 

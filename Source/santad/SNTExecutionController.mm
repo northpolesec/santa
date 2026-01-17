@@ -313,6 +313,7 @@ static NSString *const kPrinterProxyPostMonterey =
     se.filePath = binInfo.path;
     se.decision = cd.decision;
     se.holdAndAsk = cd.holdAndAsk;
+    se.silentTouchID = cd.silentTouchID;
 
     se.signingChain = cd.certChain;
     se.teamID = cd.teamID;

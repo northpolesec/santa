@@ -14,10 +14,10 @@
 ///    limitations under the License.
 
 #import "Source/gui/SNTBinaryMessageWindowController.h"
+#import "Source/gui/SNTAuthorizationHelper.h"
 #import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 
 #include <AppKit/AppKit.h>
-#import <LocalAuthentication/LocalAuthentication.h>
 #import <SecurityInterface/SFCertificatePanel.h>
 #include <dispatch/dispatch.h>
 
@@ -78,6 +78,12 @@
 }
 
 - (void)showWindow:(id)sender {
+  // If silentTouchID is set, skip showing the window and directly trigger TouchID.
+  if (self.event.silentTouchID && self.replyBlock) {
+    [self performSilentTouchIDAuthorization];
+    return;
+  }
+
   if (self.window) [self.window orderOut:sender];
 
   self.window = [SNTMessageWindowController defaultWindow];
@@ -101,6 +107,19 @@
 
 - (NSString *)messageHash {
   return self.event.fileSHA256;
+}
+
+- (void)performSilentTouchIDAuthorization {
+  [SNTAuthorizationHelper authorizeExecutionForEvent:self.event
+                                          replyBlock:^(BOOL success) {
+                                            self.replyBlock(success);
+                                            // Notify the delegate to clean up the notification
+                                            // queue. This must be done on the main thread.
+                                            dispatch_async(dispatch_get_main_queue(), ^{
+                                              [self.delegate windowDidCloseSilenceHash:nil
+                                                                          withInterval:0];
+                                            });
+                                          }];
 }
 
 #pragma mark Generated properties

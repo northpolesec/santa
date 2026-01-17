@@ -25,6 +25,9 @@
 /* Authorize execution of an application with name */
 "authorize execution of the application %@" = "authorize execution of the application %@";
 
+/* Authorize execution fallback */
+"authorize execution" = "authorize execution";
+
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "authorize temporary Monitor Mode";
 

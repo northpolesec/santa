@@ -19,6 +19,7 @@ import santa_common_SNTCommonEnums
 import santa_common_SNTConfigState
 import santa_common_SNTConfigurator
 import santa_common_SNTStoredExecutionEvent
+import santa_gui_SNTAuthorizationHelper
 import santa_gui_SNTMessageView
 
 // A small class that will ferry bundle hashing state from SNTBinaryMessageWindowController
@@ -362,32 +363,6 @@ struct SNTBinaryMessageWindowView: View {
       return
     }
 
-    let bundleName = e.fileBundleName ?? ""
-    let filePath = e.filePath ?? ""
-    let signingID = e.signingID ?? ""
-
-    var msg = "authorize execution"
-
-    if !bundleName.isEmpty {
-      let format = NSLocalizedString(
-        "authorize execution of the application %@",
-        comment: "Authorize execution of an application with name"
-      )
-      msg = String.localizedStringWithFormat(format, bundleName)
-    } else if !signingID.isEmpty {
-      let format = NSLocalizedString(
-        "authorize execution of %@",
-        comment: "Authorize execution of an application with Signing ID or Path"
-      )
-      msg = String.localizedStringWithFormat(format, signingID)
-    } else if !filePath.isEmpty {
-      let format = NSLocalizedString(
-        "authorize execution of %@",
-        comment: "Authorize execution of an application with Signing ID or Path"
-      )
-      msg = String.localizedStringWithFormat(format, (filePath as NSString).lastPathComponent)
-    }
-
     // Force unwrap the callback because it should always be set and is a
     // programming error if it isn't.
     //
@@ -395,15 +370,12 @@ struct SNTBinaryMessageWindowView: View {
     // crash the GUI process meaning policy decisions will still be enforced.
     let callback = self.replyCallback!;
 
-    AuthorizeViaTouchID(
-      reason: msg,
-      replyBlock: { success in
-        callback(success)
-        DispatchQueue.main.sync {
-          window?.close()
-        }
+    SNTAuthorizationHelper.authorizeExecution(for: e) { success in
+      callback(success)
+      DispatchQueue.main.sync {
+        window?.close()
       }
-    )
+    }
   }
 
   func dismissButton() {
