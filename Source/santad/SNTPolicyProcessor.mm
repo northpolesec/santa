@@ -162,8 +162,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
           cd.cacheable = NO;
           state = SNTRuleStateBlock;
           break;
-        case ReturnValue::REQUIRE_TOUCHID_SILENT:
-          // REQUIRE_TOUCHID_SILENT responses are not cacheable.
+        case ReturnValue::REQUIRE_TOUCHID_ONLY:
+          // REQUIRE_TOUCHID_ONLY responses are not cacheable.
           // Like REQUIRE_TOUCHID, but skips showing the block dialog.
           cd.holdAndAsk = YES;
           cd.silentTouchID = YES;
