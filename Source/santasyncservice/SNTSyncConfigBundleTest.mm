@@ -20,6 +20,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTModeTransition.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
 @interface SNTConfigBundle (ConfigBundleCreator)
@@ -43,6 +44,7 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property SNTNetworkExtensionSettings *networkExtensionSettings;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -95,6 +97,11 @@
   XCTAssertEqualObjects(bundle.bannedNetworkMountBlockMessage,
                         syncState.bannedNetworkMountBlockMessage);
   XCTAssertEqualObjects(bundle.allowedNetworkMountHosts, syncState.allowedNetworkMountHosts);
+
+  syncState.networkExtensionSettings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertNotNil(bundle.networkExtensionSettings);
+  XCTAssertTrue(bundle.networkExtensionSettings.enable);
 }
 
 - (void)testRuleSyncConfigBundle {
@@ -122,6 +129,7 @@
   XCTAssertNil(bundle.modeTransition);
   XCTAssertNil(bundle.eventDetailURL);
   XCTAssertNil(bundle.eventDetailText);
+  XCTAssertNil(bundle.networkExtensionSettings);
 }
 
 - (void)testSyncTypeConfigBundle {
@@ -155,6 +163,7 @@
   XCTAssertNil(bundle.modeTransition);
   XCTAssertNil(bundle.eventDetailURL);
   XCTAssertNil(bundle.eventDetailText);
+  XCTAssertNil(bundle.networkExtensionSettings);
 }
 
 @end

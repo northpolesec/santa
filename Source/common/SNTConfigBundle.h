@@ -18,6 +18,7 @@
 
 @class SNTExportConfiguration;
 @class SNTModeTransition;
+@class SNTNetworkExtensionSettings;
 
 @interface SNTConfigBundle : NSObject <NSSecureCoding>
 
@@ -43,5 +44,6 @@
 - (void)eventDetailURL:(void (^)(NSString *))block;
 - (void)eventDetailText:(void (^)(NSString *))block;
 - (void)enableNotificationSilences:(void (^)(BOOL))block;
+- (void)networkExtensionSettings:(void (^)(SNTNetworkExtensionSettings *))block;
 
 @end

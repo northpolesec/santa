@@ -20,6 +20,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
 @interface SNTConfigBundle (Testing)
 @property NSNumber *clientMode;
@@ -43,6 +44,7 @@
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
 @property NSNumber *enableNotificationSilences;
+@property SNTNetworkExtensionSettings *networkExtensionSettings;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -52,7 +54,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 21;
+  exp.expectedFulfillmentCount = 22;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -79,6 +81,7 @@
   bundle.eventDetailURL = @"https://example.com/details";
   bundle.eventDetailText = @"View Details";
   bundle.enableNotificationSilences = @(YES);
+  bundle.networkExtensionSettings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -189,6 +192,12 @@
     [exp fulfill];
   }];
 
+  [bundle networkExtensionSettings:^(SNTNetworkExtensionSettings *val) {
+    XCTAssertNotNil(val);
+    XCTAssertTrue(val.enable);
+    [exp fulfill];
+  }];
+
   // Low timeout because code above is synchronous
   [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
@@ -277,6 +286,10 @@
   }];
 
   [bundle enableNotificationSilences:^(BOOL val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle networkExtensionSettings:^(SNTNetworkExtensionSettings *val) {
     XCTFail(@"This shouldn't be called");
   }];
 }

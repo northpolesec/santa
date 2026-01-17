@@ -19,6 +19,7 @@
 
 @class SNTExportConfiguration;
 @class SNTModeTransition;
+@class SNTNetworkExtensionSettings;
 @class SNTRule;
 
 ///
@@ -382,6 +383,17 @@
 /// Defaults to NO.
 ///
 @property(readonly, nonatomic) BOOL enableMachineIDDecoration;
+
+///
+///  Currently defined settings for Santa's network extension. Its value is set by a sync server.
+///
+@property(nullable, readonly) SNTNetworkExtensionSettings *networkExtensionSettings;
+
+///
+///  Set the mode network extension settings as received from a sync server.
+///
+- (void)setSyncServerNetworkExtensionSettings:
+    (nonnull SNTNetworkExtensionSettings *)networkExtensionSettings;
 
 #pragma mark - GUI Settings
 

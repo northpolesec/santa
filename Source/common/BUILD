@@ -465,6 +465,7 @@ objc_library(
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
+        "//Source/common/ne:SNTNetworkExtensionSettings",
     ],
 )
 
@@ -478,6 +479,7 @@ objc_library(
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
         ":SNTModeTransition",
+        "//Source/common/ne:SNTNetworkExtensionSettings",
     ],
 )
 
@@ -489,6 +491,7 @@ santa_unit_test(
         ":SNTConfigBundle",
         ":SNTExportConfiguration",
         ":SNTModeTransition",
+        "//Source/common/ne:SNTNetworkExtensionSettings",
     ],
 )
 
@@ -1039,6 +1042,7 @@ test_suite(
         ":TelemetryEventMapTest",
         "//Source/common/cel:CELTest",
         "//Source/common/faa:unit_tests",
+        "//Source/common/ne:unit_tests",
     ],
     visibility = ["//:santa_package_group"],
 )
