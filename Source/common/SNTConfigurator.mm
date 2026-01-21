@@ -26,6 +26,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
 // Ensures the given object is an NSArray and only contains NSString value types
 static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
@@ -226,6 +227,7 @@ static NSString *const kSyncCleanRequiredDeprecated = @"SyncCleanRequired";
 static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 static NSString *const kExportConfigurationKey = @"ExportConfiguration";
 static NSString *const kModeTransitionKey = @"ModeTransition";
+static NSString *const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings";
 
 - (instancetype)init {
   return [self initWithSyncStateFile:kSyncStateFilePath
@@ -277,6 +279,7 @@ static NSString *const kModeTransitionKey = @"ModeTransition";
       kEnableBundlesKey : number,
       kExportConfigurationKey : data,
       kModeTransitionKey : data,
+      kNetworkExtensionSettingsKey : data,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
       kFullSyncInterval : number,
@@ -822,6 +825,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self syncStateSet];
 }
 
++ (NSSet *)keyPathsForValuesAffectingNetworkExtensionSettings {
+  return [self syncStateSet];
+}
+
 #pragma mark Public Interface
 
 - (SNTClientMode)clientMode {
@@ -926,6 +933,16 @@ static SNTConfigurator *sharedConfigurator = nil;
   } else {
     [self updateSyncStateForKey:kModeTransitionKey value:[modeTransition serialize]];
   }
+}
+
+- (SNTNetworkExtensionSettings *)networkExtensionSettings {
+  return [SNTNetworkExtensionSettings deserialize:self.syncState[kNetworkExtensionSettingsKey]];
+}
+
+- (void)setSyncServerNetworkExtensionSettings:
+    (SNTNetworkExtensionSettings *)networkExtensionSettings {
+  [self updateSyncStateForKey:kNetworkExtensionSettingsKey
+                        value:[networkExtensionSettings serialize]];
 }
 
 - (NSRegularExpression *)allowedPathRegex {
