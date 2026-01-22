@@ -14,7 +14,7 @@
 
 #import "Source/gui/SNTSystemExtensionDelegate.h"
 
-#import <NetworkExtension/NetworkExtension.h>
+#import "src/santanetd/SNDFilterConfigurationHelper.h"
 
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -63,7 +63,7 @@
 
 - (void)submit {
   if (self.isNetworkExtension && !self.isActivation) {
-    [self disableFilterConfiguration];
+    [SNDFilterConfigurationHelper disableFilterConfiguration];
   }
   [[OSSystemExtensionManager sharedManager] submitRequest:self.request];
 }
@@ -101,72 +101,9 @@
   //     [self disableFilterConfiguration];
   //   }
   if (self.isNetworkExtension && self.isActivation) {
-    [self enableFilterConfiguration];
+    [SNDFilterConfigurationHelper enableFilterConfiguration];
   } else {
     exit(0);
-  }
-}
-
-- (void)enableFilterConfiguration {
-  LOGI(@"Configuring content filter for network extension");
-
-  NEFilterManager *manager = [NEFilterManager sharedManager];
-  [manager loadFromPreferencesWithCompletionHandler:^(NSError *error) {
-    if (error) {
-      LOGE(@"Failed to load filter preferences: %@", error);
-      exit(1);
-      return;
-    }
-
-    NEFilterProviderConfiguration *providerConfig = [[NEFilterProviderConfiguration alloc] init];
-    providerConfig.filterSockets = YES;
-    providerConfig.filterPackets = NO;
-    providerConfig.organization = @"North Pole Security";
-    providerConfig.filterDataProviderBundleIdentifier = @"com.northpolesec.santa.netd";
-
-    manager.providerConfiguration = providerConfig;
-    manager.localizedDescription = @"Santa Network Extension";
-    manager.enabled = YES;
-
-    [manager saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
-      if (saveError) {
-        LOGE(@"Failed to save filter configuration: %@", saveError);
-        exit(1);
-      } else {
-        LOGI(@"Filter configuration saved and enabled - network extension will launch "
-             @"automatically");
-        exit(0);
-      }
-    }];
-  }];
-}
-
-- (void)disableFilterConfiguration {
-  LOGI(@"Removing content filter configuration");
-
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-
-  NEFilterManager *manager = [NEFilterManager sharedManager];
-  [manager loadFromPreferencesWithCompletionHandler:^(NSError *error) {
-    if (error) {
-      LOGE(@"Unable to load save preferences while trying to deactivate the extension: %@", error);
-      dispatch_semaphore_signal(sema);
-      return;
-    }
-
-    [manager removeFromPreferencesWithCompletionHandler:^(NSError *removeError) {
-      if (removeError) {
-        LOGE(@"Failed to remove filter configuration: %@", removeError);
-      } else {
-        LOGI(@"Filter configuration removed successfully");
-      }
-
-      dispatch_semaphore_signal(sema);
-    }];
-  }];
-
-  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC))) {
-    LOGW(@"Unable to remove filter configuration profile.");
   }
 }
 

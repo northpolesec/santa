@@ -685,7 +685,16 @@ double watchdogRAMPeak = 0;
                                               reply:(void (^)(NSDictionary *settings,
                                                               NSString *santaProtocolVersion,
                                                               NSError *error))reply {
-  NSError *error = nil;
+  NSError *error;
+
+  if (![[SNTConfigurator configurator] isSyncV2Enabled]) {
+    [SNTError populateError:&error
+                   withCode:SNTErrorCodeNetworkExtensionNotAuthorized
+                     format:@"Network extension registration is not authorized."];
+    reply(nil, @"0.0", error);
+    return;
+  }
+
   NSDictionary *settings = [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion
                                                                              error:&error];
   reply(settings, kSantaNetworkExtensionProtocolVersion, error);

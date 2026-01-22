@@ -131,12 +131,12 @@ objc_library(
     srcs = ["SNTSystemExtensionDelegate.mm"],
     hdrs = ["SNTSystemExtensionDelegate.h"],
     sdk_frameworks = [
-        "NetworkExtension",
         "SystemExtensions",
     ],
     deps = [
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
+        "@santanetd//src/santanetd:SNDFilterConfigurationHelper",
     ],
 )
 
@@ -166,7 +166,6 @@ objc_library(
     sdk_frameworks = [
         "LocalAuthentication",
         "IOKit",
-        "NetworkExtension",
         "SecurityInterface",
         "SystemExtensions",
         "UserNotifications",
@@ -295,7 +294,6 @@ santa_unit_test(
         "SNTSystemExtensionDelegateTest.mm",
     ],
     sdk_frameworks = [
-        "NetworkExtension",
         "SystemExtensions",
     ],
     deps = [

@@ -56,9 +56,10 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeTMMAuthFailed = 613,
 
   // Network Extension errors
-  SNTErrorCodeNetworkExtensionProtocolVersionInvalid = 710,
-  SNTErrorCodeNetworkExtensionProtocolVersionBad = 711,
-  SNTErrorCodeNetworkExtensionAlreadyConnected = 712,
+  SNTErrorCodeNetworkExtensionNotAuthorized = 710,
+  SNTErrorCodeNetworkExtensionProtocolVersionInvalid = 711,
+  SNTErrorCodeNetworkExtensionProtocolVersionBad = 712,
+  SNTErrorCodeNetworkExtensionAlreadyConnected = 713,
 };
 
 @interface SNTError : NSObject

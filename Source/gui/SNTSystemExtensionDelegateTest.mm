@@ -13,18 +13,12 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <NetworkExtension/NetworkExtension.h>
 #import <OCMock/OCMock.h>
 #import <SystemExtensions/SystemExtensions.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/gui/SNTSystemExtensionDelegate.h"
-
-@interface SNTSystemExtensionDelegate (Testing)
-- (void)enableFilterConfiguration;
-- (void)disableFilterConfiguration;
-@end
 
 @interface SNTSystemExtensionDelegateTest : XCTestCase
 @end
@@ -98,58 +92,6 @@
 
   [delegate submit];
 
-  OCMVerifyAll(managerMock);
-
-  [managerMock stopMocking];
-}
-
-- (void)testEnableFilterConfiguration {
-  SNTSystemExtensionDelegate *delegate =
-      [SNTSystemExtensionDelegate delegateForSantanetdActivation];
-
-  id managerMock = OCMClassMock([NEFilterManager class]);
-
-  OCMStub([managerMock sharedManager]).andReturn(managerMock);
-
-  // Stub loadFromPreferencesWithCompletionHandler to immediately call completion with no error
-  OCMStub([managerMock
-      loadFromPreferencesWithCompletionHandler:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
-  OCMExpect([managerMock setProviderConfiguration:[OCMArg checkWithBlock:^BOOL(id obj) {
-                           NEFilterProviderConfiguration *config = obj;
-                           XCTAssertNotNil(config);
-                           XCTAssertTrue(config.filterSockets);
-                           XCTAssertFalse(config.filterPackets);
-                           XCTAssertEqualObjects(config.organization, @"North Pole Security");
-                           XCTAssertFalse(config.filterBrowsers);
-                           XCTAssertEqualObjects(config.filterDataProviderBundleIdentifier,
-                                                 @"com.northpolesec.santa.netd");
-                           return YES;
-                         }]]);
-  OCMExpect([managerMock setLocalizedDescription:@"Santa Network Extension"]);
-  OCMExpect([managerMock setEnabled:YES]);
-  OCMExpect([managerMock saveToPreferencesWithCompletionHandler:[OCMArg any]]);
-
-  [delegate enableFilterConfiguration];
-
-  OCMVerifyAll(managerMock);
-
-  [managerMock stopMocking];
-}
-
-- (void)testDisableFilterConfiguration {
-  SNTSystemExtensionDelegate *delegate =
-      [SNTSystemExtensionDelegate delegateForSantanetdDeactivation];
-
-  id managerMock = OCMClassMock([NEFilterManager class]);
-  OCMStub([managerMock sharedManager]).andReturn(managerMock);
-
-  OCMStub([managerMock
-      loadFromPreferencesWithCompletionHandler:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
-  OCMExpect([managerMock removeFromPreferencesWithCompletionHandler:[OCMArg any]]);
-
-  [delegate disableFilterConfiguration];
-
-  // Verify removeFromPreferencesWithCompletionHandler was called
   OCMVerifyAll(managerMock);
 
   [managerMock stopMocking];

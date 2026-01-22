@@ -99,7 +99,6 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   WEAKIFY(self);
 
   MOLXPCConnection *conn = [SNTXPCNetworkExtensionInterface configuredConnection];
-  LOGE(@"~~~~~~~~~~ Connect BACK with service id: %@, conn: %@", [SNTXPCNetworkExtensionInterface serviceID], conn);
   conn.invalidationHandler = ^{
     STRONGIFY(self);
     LOGI(@"Network extension connection invalidated, clearing state");
@@ -108,10 +107,6 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   [conn resume];
 
   self.netExtConnection = conn;
-
-  [[self.netExtConnection synchronousRemoteObjectProxy] applySettings:@{@"hey": @"there"} reply:^(BOOL val) {
-    NSLog(@"Yep, did apply settings...: %d", val);
-  }];
 }
 
 - (void)clearNetworkExtensionConnection {
