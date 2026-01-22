@@ -17,6 +17,7 @@
 #include <memory>
 
 #import "Source/common/SNTXPCControlInterface.h"
+#include "Source/common/SantaVnode.h"
 #include "Source/common/faa/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/Logs/EndpointSecurity/Logger.h"
@@ -29,10 +30,25 @@
 ///
 @interface SNTDaemonControlController : NSObject <SNTDaemonControlXPC>
 
-- (instancetype)initWithAuthResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
-                      notificationQueue:(SNTNotificationQueue *)notQueue
-                             syncdQueue:(SNTSyncdQueue *)syncdQueue
-                                 logger:(std::shared_ptr<santa::Logger>)logger
-                             watchItems:(std::shared_ptr<santa::WatchItems>)watchItems;
+- (instancetype)initWithNotificationQueue:(SNTNotificationQueue *)notQueue
+                               syncdQueue:(SNTSyncdQueue *)syncdQueue
+                                   logger:(std::shared_ptr<santa::Logger>)logger
+                               watchItems:(std::shared_ptr<santa::WatchItems>)watchItems;
+
+///
+///  Called when caches should be flushed (rules changed, explicit flush command, etc.).
+///  Flushes both the auth result cache and TouchID approval cache.
+///
+@property(copy) void (^flushCacheBlock)(santa::FlushCacheMode, santa::FlushCacheReason);
+
+///
+///  Called to get cache counts (root cache count, non-root cache count).
+///
+@property(copy) NSArray<NSNumber *> * (^cacheCountsBlock)(void);
+
+///
+///  Called to check the cache for a given vnode ID.
+///
+@property(copy) SNTAction (^checkCacheBlock)(SantaVnode);
 
 @end

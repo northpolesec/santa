@@ -30,6 +30,8 @@
 #include "parser/parser.h"
 
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/TouchIDFunction.h"
+#include "Source/common/cel/result.pb.h"
 
 namespace cel_runtime = ::google::api::expr::runtime;
 
@@ -58,10 +60,22 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
     return result;
   }
 
+  // Add TouchID cooldown functions for CELv2 only
+  if constexpr (IsV2) {
+    if (auto result = santa::cel::AddTouchIDCooldownCompilerLibrary(*builder); !result.ok()) {
+      return result;
+    }
+  }
+
   // Link the reflection for needed messages so that the CEL compiler can
   // recognize them.
   using ExecutionContextT = typename CELProtoTraits<IsV2>::ExecutionContextT;
   google::protobuf::LinkMessageReflection<ExecutionContextT>();
+
+  // Link Result message reflection for V2
+  if constexpr (IsV2) {
+    google::protobuf::LinkMessageReflection<::santa::cel::Result>();
+  }
 
   // Add all the possible variables to the type checker.
   ::cel::TypeCheckerBuilder &checker_builder = builder->GetCheckerBuilder();
@@ -131,6 +145,14 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
     return result;
   }
 
+  // Register TouchID cooldown functions for CELv2 only
+  if constexpr (IsV2) {
+    if (auto result = santa::cel::RegisterTouchIDCooldownFunctions(builder->GetRegistry(), options);
+        !result.ok()) {
+      return result;
+    }
+  }
+
   // Create an expression plan with the checked expression.
   absl::StatusOr<std::unique_ptr<cel_runtime::CelExpression>> expression_plan =
       builder->CreateExpression(&cel_expr);
@@ -139,31 +161,54 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
 };
 
 template <bool IsV2>
-absl::StatusOr<std::pair<typename Evaluator<IsV2>::ReturnValue, bool>> Evaluator<IsV2>::Evaluate(
+absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
     const ::cel_runtime::CelExpression *expression_plan, const ActivationT &activation) {
   // Evaluate the parsed expression.
   absl::StatusOr<cel_runtime::CelValue> result =
       expression_plan->Evaluate(activation, arena_.get());
+
   if (!result.ok()) {
     return result.status();
   }
 
   // Check the result type.
-  // A bool value will return ALLOWLIST for true and BLOCKLIST for false.
-  // A Policy value will be returned as-is
-  // Everything else is an error.
+  // For V1: A bool value will return ALLOWLIST for true and BLOCKLIST for false.
+  //         A ReturnValue enum (int64) will be returned as-is.
+  // For V2: A Result message is expected (constants and custom return functions
+  //         both return this type). Bool is also supported for convenience.
   if (bool value; result->GetValue(&value)) {
     if (value) {
-      return {{Traits::ALLOWLIST, activation.IsResultCacheable()}};
+      return EvaluationResultT(Traits::ALLOWLIST, activation.IsResultCacheable());
     }
-    return {{Traits::BLOCKLIST, activation.IsResultCacheable()}};
-  } else if (int64_t value; result->GetValue(&value)) {
-    // Check if the value is a valid ReturnValue enum
-    auto descriptor = Traits::ReturnValue_descriptor();
-    if (descriptor->FindValueByNumber((int)value) != nullptr) {
-      return {{static_cast<ReturnValue>(value), activation.IsResultCacheable()}};
+    return EvaluationResultT(Traits::BLOCKLIST, activation.IsResultCacheable());
+  } else if constexpr (IsV2) {
+    // V2: Handle Result message
+    if (result->IsMessage()) {
+      const auto *msg = result->MessageOrDie();
+      if (msg->GetDescriptor()->full_name() == "santa.cel.Result") {
+        const auto *cel_result = dynamic_cast<const ::santa::cel::Result *>(msg);
+        if (cel_result) {
+          auto rv = static_cast<ReturnValue>(cel_result->value());
+          // Check if cooldown was explicitly set (distinguishes constants from functions)
+          std::optional<uint64_t> cooldownOpt;
+          if (cel_result->has_cooldown_minutes()) {
+            cooldownOpt = cel_result->cooldown_minutes();
+          }
+          return EvaluationResultT(rv, activation.IsResultCacheable(), cooldownOpt);
+        }
+      }
     }
-  } else if (const cel_runtime::CelError * value; result->GetValue(&value)) {
+  } else {
+    // V1: Handle int64 ReturnValue enum
+    if (int64_t value; result->GetValue(&value)) {
+      auto descriptor = Traits::ReturnValue_descriptor();
+      if (descriptor->FindValueByNumber((int)value) != nullptr) {
+        return EvaluationResultT(static_cast<ReturnValue>(value), activation.IsResultCacheable());
+      }
+    }
+  }
+
+  if (const cel_runtime::CelError * value; result->GetValue(&value)) {
     return absl::InvalidArgumentError(value->message());
   }
 
@@ -172,8 +217,8 @@ absl::StatusOr<std::pair<typename Evaluator<IsV2>::ReturnValue, bool>> Evaluator
 }
 
 template <bool IsV2>
-absl::StatusOr<std::pair<typename Evaluator<IsV2>::ReturnValue, bool>>
-Evaluator<IsV2>::CompileAndEvaluate(absl::string_view cel_expr, const ActivationT &activation) {
+absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::CompileAndEvaluate(
+    absl::string_view cel_expr, const ActivationT &activation) {
   absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> expr = Compile(cel_expr);
   if (!expr.ok()) {
     return expr.status();

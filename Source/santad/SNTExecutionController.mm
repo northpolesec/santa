@@ -45,6 +45,7 @@
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/String.h"
+#include "Source/common/SystemResources.h"
 #include "Source/common/Unit.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -93,6 +94,10 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   LogExecutionBlock _logger;
   std::shared_ptr<TTYWriter> _ttyWriter;
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
+  // Cache of TouchID approvals: SHA-256 (as std::string) -> timestamp (nanoseconds since boot)
+  // Note: We use std::string instead of NSString* because SantaCache uses == for key comparison,
+  // which would compare pointer addresses for NSString*, not string contents.
+  std::unique_ptr<SantaCache<std::string, uint64_t>> _touchIDApprovalCache;
 }
 
 static NSString *const kPrinterProxyPreMonterey =
@@ -123,6 +128,7 @@ static NSString *const kPrinterProxyPostMonterey =
     _ttyWriter = std::move(ttyWriter);
     _policyProcessor = policyProcessor;
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
+    _touchIDApprovalCache = std::make_unique<SantaCache<std::string, uint64_t>>(100);
     _processControlBlock = processControlBlock;
 
     _eventQueue =
@@ -284,6 +290,27 @@ static NSString *const kPrinterProxyPostMonterey =
   BOOL stoppedProc = false;
   std::pair<pid_t, int> pidAndVersion =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
+
+  // Check TouchID approval cache before prompting - only if cooldown was specified
+  if (cd.holdAndAsk && cd.sha256 && cd.touchIDCooldownMinutes != nil) {
+    uint64_t cooldownMinutes = [cd.touchIDCooldownMinutes unsignedLongLongValue];
+    if (cooldownMinutes > 0) {
+      uint64_t cachedTimestamp = _touchIDApprovalCache->get(santa::NSStringToUTF8String(cd.sha256));
+      if (cachedTimestamp > 0) {
+        uint64_t expiryTime = cachedTimestamp + (cooldownMinutes * 60 * NSEC_PER_SEC);
+        if (GetCurrentUptime() < expiryTime) {
+          // Cache hit - skip TouchID prompt
+          cd.holdAndAsk = NO;
+          cd.decisionExtra = @"TouchID Cached";
+          cd.decision = BlockToAllowDecision(cd.decision);
+          action = (cd.cacheable ? SNTActionRespondAllow : SNTActionRespondAllowNoCache);
+          // Update the cached decision with the new state
+          [[SNTDecisionCache sharedCache] cacheDecision:cd];
+        }
+      }
+    }
+  }
+
   // Only allow a user in standalone mode to override a block if an
   // explicit block rule is not set when using a sync service.
   if (cd.holdAndAsk) {
@@ -431,6 +458,14 @@ static NSString *const kPrinterProxyPostMonterey =
               // preserving the rule type (e.g., BlockSigningID -> AllowSigningID)
               cd.decision = BlockToAllowDecision(cd.decision);
               cd.decisionExtra = @"TouchID Approved";
+
+              // Cache the TouchID approval so subsequent executions within the cooldown period
+              // don't require re-authorization - only if cooldown was specified and > 0
+              if (cd.sha256 && cd.touchIDCooldownMinutes != nil &&
+                  [cd.touchIDCooldownMinutes unsignedLongLongValue] > 0) {
+                std::string sha256Key = santa::NSStringToUTF8String(cd.sha256);
+                self->_touchIDApprovalCache->set(sha256Key, GetCurrentUptime());
+              }
 
               if (stoppedProc) {
                 _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
@@ -661,6 +696,10 @@ static NSString *const kPrinterProxyPostMonterey =
       return makeActivation.operator()<false>();
     }
   };
+}
+
+- (void)flushTouchIDApprovalCache {
+  _touchIDApprovalCache->clear();
 }
 
 @end

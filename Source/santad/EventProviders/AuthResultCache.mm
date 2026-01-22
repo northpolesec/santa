@@ -16,9 +16,9 @@
 #include "Source/santad/EventProviders/AuthResultCache.h"
 
 #include <mach/clock_types.h>
-#include <time.h>
 
 #import "Source/common/SNTLogging.h"
+#include "Source/common/SystemResources.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Client.h"
 
 using santa::Client;
@@ -37,12 +37,9 @@ static NSString *const kFlushCacheReasonEntitlementsTeamIDFilterChanged =
 
 namespace santa {
 
-static inline uint64_t GetCurrentUptime() {
-  return clock_gettime_nsec_np(CLOCK_MONOTONIC);
-}
-
 // Decision is stored in upper 8 bits, timestamp in remaining 56.
-static inline uint64_t CacheableAction(SNTAction action, uint64_t timestamp = GetCurrentUptime()) {
+static inline uint64_t CacheableAction(SNTAction action,
+                                       uint64_t timestamp = ::GetCurrentUptime()) {
   return ((uint64_t)action << 56) | (timestamp & 0xFFFFFFFFFFFFFF);
 }
 
