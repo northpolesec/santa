@@ -523,7 +523,7 @@ static NSString *const kPrinterProxy =
   Returns an SNTFileInfo for the system PrinterProxy path on this system.
 */
 - (SNTFileInfo *)printerProxyFileInfo {
-  SNTFileInfo *proxyInfo = [[SNTFileInfo alloc] initWithPath:kPrinterProxyPostMonterey];
+  SNTFileInfo *proxyInfo = [[SNTFileInfo alloc] initWithPath:kPrinterProxy];
   return proxyInfo;
 }
 
