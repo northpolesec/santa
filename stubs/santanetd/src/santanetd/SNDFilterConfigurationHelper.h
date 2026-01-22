@@ -18,7 +18,7 @@
 // access to the Network Extension repo.
 @interface SNDFilterConfigurationHelper : NSObject
 
-+ (void)enableFilterConfiguration;
++ (BOOL)enableFilterConfiguration;
 + (void)disableFilterConfiguration;
 
 @end

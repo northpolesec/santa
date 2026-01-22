@@ -14,10 +14,11 @@
 
 #import "Source/gui/SNTSystemExtensionDelegate.h"
 
-#import "src/santanetd/SNDFilterConfigurationHelper.h"
+#include <stdlib.h>
 
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "src/santanetd/SNDFilterConfigurationHelper.h"
 
 @implementation SNTSystemExtensionDelegate
 
@@ -81,30 +82,24 @@
   LOGI(@"SystemExtension \"%@\" request needs user approval", request.identifier);
 
   // If the sysx is not authorized, don't wait around. macOS will start the sysx once authorized.
-  exit(1);
+  exit(EXIT_FAILURE);
 }
 
 - (void)request:(OSSystemExtensionRequest *)request didFailWithError:(NSError *)error {
   LOGE(@"SystemExtension \"%@\" request did fail: %@", request.identifier, error);
-  exit((int)error.code);
+  exit(EXIT_FAILURE);
 }
 
 - (void)request:(OSSystemExtensionRequest *)request
     didFinishWithResult:(OSSystemExtensionRequestResult)result {
   LOGI(@"SystemExtension \"%@\" request did finish: %ld", request.identifier, (long)result);
 
-  // If this is a network extension, we need to configure the content filter
-  // if (self.isNetworkExtension) {
-  //   if (self.isActivation) {
-  //     [self enableFilterConfiguration];
-  //   } else {
-  //     [self disableFilterConfiguration];
-  //   }
+  BOOL success = YES;
   if (self.isNetworkExtension && self.isActivation) {
-    [SNDFilterConfigurationHelper enableFilterConfiguration];
-  } else {
-    exit(0);
+    success = [SNDFilterConfigurationHelper enableFilterConfiguration];
   }
+
+  exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 @end

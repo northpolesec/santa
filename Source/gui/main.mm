@@ -40,11 +40,15 @@ int main(int argc, const char *argv[]) {
     }
 
     if (delegate) {
-      // Submit the system extension request. This process will exit either after the request
-      // finishes (either successfully or unsuccessfully), or after a timeout.
-      [delegate submit];
+      // Submit the system extension request on a background queue to avoid blocking
+      // the main queue. This process will exit either after the request finishes
+      // (either successfully or unsuccessfully), or after a timeout.
+      dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        [delegate submit];
+      });
+
       dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 60),
-                     dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+                     dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
                        LOGW(@"Timed out waiting for Santa system extension operation");
                        exit(1);
                      });
