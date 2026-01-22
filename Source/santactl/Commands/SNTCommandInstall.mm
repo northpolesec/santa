@@ -40,10 +40,15 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 + (NSString *)longHelpText {
-  return @"Instruct the daemon to install Santa.app.\n"
-         @"Options:\n"
-         @"  --network-extension:  Install and activate the santanetd content filter instead.\n"
-         @"                        WARNING: All network connections will reset.\n";
+  NSString *helpText = @"Instruct the daemon to install Santa.app.\n";
+#ifdef DEBUG
+  helpText = [helpText
+      stringByAppendingString:
+          @"Options:\n"
+          @"  --network-extension:  Install and activate the santanetd content filter instead.\n"
+          @"                        WARNING: All network connections will reset.\n"];
+#endif
+  return helpText;
 }
 
 + (BOOL)isHidden {
@@ -53,12 +58,14 @@ REGISTER_COMMAND_NAME(@"install")
 - (void)runWithArguments:(NSArray *)arguments {
   BOOL installNetworkExtension = NO;
 
+#ifdef DEBUG
   for (NSString *arg in arguments) {
     if ([arg caseInsensitiveCompare:@"--network-extension"] == NSOrderedSame) {
       installNetworkExtension = YES;
       break;
     }
   }
+#endif
 
   if (installNetworkExtension) {
     [self installNetworkExtension];

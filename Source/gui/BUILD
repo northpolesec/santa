@@ -127,6 +127,20 @@ swift_library(
 )
 
 objc_library(
+    name = "SNTSystemExtensionDelegate",
+    srcs = ["SNTSystemExtensionDelegate.mm"],
+    hdrs = ["SNTSystemExtensionDelegate.h"],
+    sdk_frameworks = [
+        "NetworkExtension",
+        "SystemExtensions",
+    ],
+    deps = [
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
     name = "SantaGUI_lib",
     srcs = [
         "SNTAboutWindowController.h",
@@ -152,6 +166,7 @@ objc_library(
     sdk_frameworks = [
         "LocalAuthentication",
         "IOKit",
+        "NetworkExtension",
         "SecurityInterface",
         "SystemExtensions",
         "UserNotifications",
@@ -164,6 +179,7 @@ objc_library(
         ":SNTFileAccessMessageWindowView",
         ":SNTFileInfoView",
         ":SNTNetworkMountMessageWindowView",
+        ":SNTSystemExtensionDelegate",
         "//Source/common:CertificateHelpers",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
@@ -273,10 +289,27 @@ santa_unit_test(
     ],
 )
 
+santa_unit_test(
+    name = "SNTSystemExtensionDelegateTest",
+    srcs = [
+        "SNTSystemExtensionDelegateTest.mm",
+    ],
+    sdk_frameworks = [
+        "NetworkExtension",
+        "SystemExtensions",
+    ],
+    deps = [
+        ":SNTSystemExtensionDelegate",
+        "//Source/common:SNTXPCControlInterface",
+        "@OCMock",
+    ],
+)
+
 test_suite(
     name = "unit_tests",
     tests = [
         ":SNTNotificationManagerTest",
+        ":SNTSystemExtensionDelegateTest",
     ],
     visibility = ["//:santa_package_group"],
 )

@@ -8,6 +8,22 @@ package(
 licenses(["notice"])
 
 objc_library(
+    name = "SNDXPCNetworkExtensionInterface",
+    hdrs = ["SNDXPCNetworkExtensionInterface.h"],
+)
+
+objc_library(
+    name = "SNTXPCNetworkExtensionInterface",
+    srcs = ["SNTXPCNetworkExtensionInterface.mm"],
+    hdrs = ["SNTXPCNetworkExtensionInterface.h"],
+    deps = [
+        ":SNDXPCNetworkExtensionInterface",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
+    ],
+)
+
+objc_library(
     name = "SNTNetworkExtensionSettings",
     srcs = ["SNTNetworkExtensionSettings.mm"],
     hdrs = ["SNTNetworkExtensionSettings.h"],

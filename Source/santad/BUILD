@@ -212,6 +212,23 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "SNTNetworkExtensionQueue",
+    srcs = ["SNTNetworkExtensionQueue.mm"],
+    hdrs = ["SNTNetworkExtensionQueue.h"],
+    deps = [
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTDeepCopy",
+        "//Source/common:SNTError",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStrengthify",
+        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTXPCNetworkExtensionInterface",
+    ],
+)
+
+
+objc_library(
     name = "SNTPolicyProcessor",
     srcs = ["SNTPolicyProcessor.mm"],
     hdrs = ["SNTPolicyProcessor.h"],
@@ -933,6 +950,7 @@ objc_library(
         ":KillingMachine",
         ":SNTDatabaseController",
         ":SNTEventTable",
+        ":SNTNetworkExtensionQueue",
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
@@ -1001,6 +1019,7 @@ objc_library(
         ":SNTEndpointSecurityTamperResistance",
         ":SNTEventTable",
         ":SNTExecutionController",
+        ":SNTNetworkExtensionQueue",
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
@@ -1040,6 +1059,7 @@ objc_library(
         ":SNTDecisionCache",
         ":SNTEventTable",
         ":SNTExecutionController",
+        ":SNTNetworkExtensionQueue",
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
