@@ -227,7 +227,6 @@ objc_library(
     ],
 )
 
-
 objc_library(
     name = "SNTPolicyProcessor",
     srcs = ["SNTPolicyProcessor.mm"],

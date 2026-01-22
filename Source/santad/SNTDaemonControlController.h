@@ -33,7 +33,7 @@
 - (instancetype)initWithAuthResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                       notificationQueue:(SNTNotificationQueue *)notQueue
                              syncdQueue:(SNTSyncdQueue *)syncdQueue
-                        netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
+                      netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
                                  logger:(std::shared_ptr<santa::Logger>)logger
                              watchItems:(std::shared_ptr<santa::WatchItems>)watchItems;
 

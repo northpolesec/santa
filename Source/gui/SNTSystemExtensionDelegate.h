@@ -52,6 +52,6 @@
 /// Submit the system extension request to the system.
 /// This should not be called from the main queue.
 ///
-- (void)submit;
+- (void)submitAndExitAsync;
 
 @end

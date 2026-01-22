@@ -62,11 +62,16 @@
   return [[self alloc] initForNetworkExtension:YES activation:NO];
 }
 
-- (void)submit {
-  if (self.isNetworkExtension && !self.isActivation) {
-    [SNDFilterConfigurationHelper disableFilterConfiguration];
-  }
-  [[OSSystemExtensionManager sharedManager] submitRequest:self.request];
+- (void)submitAndExitAsync {
+  // Submit the system extension request on a background queue to avoid blocking
+  // the main queue. This process will exit either after the request finishes
+  // (either successfully or unsuccessfully).
+  dispatch_async(self.q, ^{
+    if (self.isNetworkExtension && !self.isActivation) {
+      [SNDFilterConfigurationHelper disableFilterConfiguration];
+    }
+    [[OSSystemExtensionManager sharedManager] submitRequest:self.request];
+  });
 }
 
 #pragma mark OSSystemExtensionRequestDelegate

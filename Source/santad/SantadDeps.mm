@@ -36,9 +36,9 @@
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTDatabaseController.h"
 #include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTNetworkExtensionQueue.h"
 #include "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/TTYWriter.h"
-#import "Source/santad/SNTNetworkExtensionQueue.h"
 
 using santa::AuthResultCache;
 using santa::Enricher;
@@ -251,8 +251,8 @@ SantadDeps::SantadDeps(
     std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection *control_connection,
     SNTCompilerController *compiler_controller, SNTNotificationQueue *notifier_queue,
     SNTSyncdQueue *syncd_queue, SNTNetworkExtensionQueue *netext_queue,
-    SNTExecutionController *exec_controller,
-    std::shared_ptr<::PrefixTree<Unit>> prefix_tree, std::shared_ptr<::TTYWriter> tty_writer,
+    SNTExecutionController *exec_controller, std::shared_ptr<::PrefixTree<Unit>> prefix_tree,
+    std::shared_ptr<::TTYWriter> tty_writer,
     std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
     std::shared_ptr<santa::EntitlementsFilter> entitlements_filter)
     : esapi_(std::move(esapi)),

@@ -28,9 +28,9 @@
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
+#import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
-#import "Source/santad/SNTNetworkExtensionQueue.h"
 #include "Source/santad/TTYWriter.h"
 
 void SantadMain(
