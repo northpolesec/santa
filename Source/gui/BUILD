@@ -299,6 +299,7 @@ santa_unit_test(
     deps = [
         ":SNTSystemExtensionDelegate",
         "//Source/common:SNTXPCControlInterface",
+        "//Source/common:TestUtils",
         "@OCMock",
     ],
 )

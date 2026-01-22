@@ -691,7 +691,7 @@ double watchdogRAMPeak = 0;
     [SNTError populateError:&error
                    withCode:SNTErrorCodeNetworkExtensionNotAuthorized
                      format:@"Network extension registration is not authorized."];
-    reply(nil, @"0.0", error);
+    reply(nil, nil, error);
     return;
   }
 

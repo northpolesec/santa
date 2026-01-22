@@ -1,4 +1,3 @@
-/// Copyright 2015 Google Inc. All rights reserved.
 /// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +17,7 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/common/TestUtils.h"
 #import "Source/gui/SNTSystemExtensionDelegate.h"
 
 @interface SNTSystemExtensionDelegateTest : XCTestCase
@@ -82,17 +82,21 @@
   XCTAssertEqualObjects(delegate.request.delegate, delegate);
 }
 
-- (void)testSubmit {
+- (void)testSubmitAndExitAsync {
   SNTSystemExtensionDelegate *delegate = [SNTSystemExtensionDelegate delegateForSantadActivation];
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   id managerMock = OCMClassMock([OSSystemExtensionManager class]);
 
   OCMStub([managerMock sharedManager]).andReturn(managerMock);
-  OCMExpect([managerMock submitRequest:delegate.request]);
+  OCMStub([managerMock submitRequest:delegate.request]).andDo(^(NSInvocation *invocation) {
+    dispatch_semaphore_signal(sema);
+  });
 
-  [delegate submit];
+  [delegate submitAndExitAsync];
 
-  OCMVerifyAll(managerMock);
+  XCTAssertSemaTrue(sema, 5, @"submitRequest should be called within 5 seconds");
 
   [managerMock stopMocking];
 }

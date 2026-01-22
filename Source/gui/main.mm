@@ -21,7 +21,7 @@
 
 int main(int argc, const char *argv[]) {
   @autoreleasepool {
-    SNTSystemExtensionDelegate *delegate = nil;
+    SNTSystemExtensionDelegate *delegate;
     NSArray *args = [NSProcessInfo processInfo].arguments;
 
     if ([args containsObject:@"--load-system-extension"]) {
@@ -30,7 +30,9 @@ int main(int argc, const char *argv[]) {
     } else if ([args containsObject:@"--unload-system-extension"]) {
       LOGI(@"Requesting Santa System Extension deactivation");
       delegate = [SNTSystemExtensionDelegate delegateForSantadDeactivation];
-    } else if ([args containsObject:@"--load-network-extension"]) {
+    }
+#ifdef DEBUG
+    else if ([args containsObject:@"--load-network-extension"]) {
       LOGI(@"Requesting Santa Network Extension (Content Filter) activation");
       LOGW(@"WARNING: All network connections will reset when filter activates");
       delegate = [SNTSystemExtensionDelegate delegateForSantanetdActivation];
@@ -38,6 +40,7 @@ int main(int argc, const char *argv[]) {
       LOGI(@"Requesting Santa Network Extension (Content Filter) deactivation");
       delegate = [SNTSystemExtensionDelegate delegateForSantanetdDeactivation];
     }
+#endif
 
     if (delegate) {
       [delegate submitAndExitAsync];
