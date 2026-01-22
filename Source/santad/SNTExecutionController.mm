@@ -95,11 +95,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
 }
 
-static NSString *const kPrinterProxyPreMonterey =
-    (@"/System/Library/Frameworks/Carbon.framework/Versions/Current/"
-     @"Frameworks/Print.framework/Versions/Current/Plugins/PrinterProxy.app/"
-     @"Contents/MacOS/PrinterProxy");
-static NSString *const kPrinterProxyPostMonterey =
+static NSString *const kPrinterProxy =
     (@"/System/Library/PrivateFrameworks/PrintingPrivate.framework/"
      @"Versions/Current/Plugins/PrinterProxy.app/Contents/MacOS/PrinterProxy");
 
@@ -528,7 +524,6 @@ static NSString *const kPrinterProxyPostMonterey =
 */
 - (SNTFileInfo *)printerProxyFileInfo {
   SNTFileInfo *proxyInfo = [[SNTFileInfo alloc] initWithPath:kPrinterProxyPostMonterey];
-  if (!proxyInfo) proxyInfo = [[SNTFileInfo alloc] initWithPath:kPrinterProxyPreMonterey];
   return proxyInfo;
 }
 
