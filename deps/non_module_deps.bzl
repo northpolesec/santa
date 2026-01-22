@@ -2,7 +2,7 @@
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
-def _non_module_deps_impl(module_ctx):
+def _non_module_deps_impl():
     # FMDB is used to access SQLite from Objective-C(++) code.
     git_repository(
         name = "FMDB",
