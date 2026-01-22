@@ -20,7 +20,7 @@
 #import "Source/common/SNTXPCControlInterface.h"
 #import "src/santanetd/SNDFilterConfigurationHelper.h"
 
-@interface SNTSystemExtensionDelegate()
+@interface SNTSystemExtensionDelegate ()
 @property dispatch_queue_t q;
 @end
 
