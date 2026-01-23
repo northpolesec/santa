@@ -433,7 +433,7 @@ double watchdogRAMPeak = 0;
   }];
 
   [result networkExtensionSettings:^(SNTSyncNetworkExtensionSettings *val) {
-    [configurator setSyncServerNetworkExtensionSettings:val];
+    [configurator setSyncServerSyncNetworkExtensionSettings:val];
   }];
 
   [result eventDetailURL:^(NSString *val) {

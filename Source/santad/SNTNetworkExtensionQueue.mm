@@ -129,7 +129,7 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   NSMutableDictionary *settings = [NSMutableDictionary dictionary];
   auto [majorVersion, _] = [self protocolVersionComponents:self.connectedProtocolVersion];
   SNTSyncNetworkExtensionSettings *netExtSettings =
-      [[SNTConfigurator configurator] networkExtensionSettings];
+      [[SNTConfigurator configurator] syncNetworkExtensionSettings];
 
   if (majorVersion >= 1) {
     settings[@"enable"] = @(netExtSettings.enable);

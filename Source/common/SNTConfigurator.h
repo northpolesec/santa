@@ -387,13 +387,13 @@
 ///
 ///  Currently defined settings for Santa's network extension. Its value is set by a sync server.
 ///
-@property(nullable, readonly) SNTSyncNetworkExtensionSettings *networkExtensionSettings;
+@property(nullable, readonly) SNTSyncNetworkExtensionSettings *syncNetworkExtensionSettings;
 
 ///
 ///  Set the mode network extension settings as received from a sync server.
 ///
-- (void)setSyncServerNetworkExtensionSettings:
-    (nonnull SNTSyncNetworkExtensionSettings *)networkExtensionSettings;
+- (void)setSyncServerSyncNetworkExtensionSettings:
+    (nonnull SNTSyncNetworkExtensionSettings *)syncNetworkExtensionSettings;
 
 #pragma mark - GUI Settings
 

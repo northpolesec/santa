@@ -825,7 +825,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self syncStateSet];
 }
 
-+ (NSSet *)keyPathsForValuesAffectingNetworkExtensionSettings {
++ (NSSet *)keyPathsForValuesAffectingSyncNetworkExtensionSettings {
   return [self syncStateSet];
 }
 
@@ -935,14 +935,14 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 }
 
-- (SNTSyncNetworkExtensionSettings *)networkExtensionSettings {
+- (SNTSyncNetworkExtensionSettings *)syncNetworkExtensionSettings {
   return [SNTSyncNetworkExtensionSettings deserialize:self.syncState[kNetworkExtensionSettingsKey]];
 }
 
-- (void)setSyncServerNetworkExtensionSettings:
-    (SNTSyncNetworkExtensionSettings *)networkExtensionSettings {
+- (void)setSyncServerSyncNetworkExtensionSettings:
+    (SNTSyncNetworkExtensionSettings *)syncNetworkExtensionSettings {
   [self updateSyncStateForKey:kNetworkExtensionSettingsKey
-                        value:[networkExtensionSettings serialize]];
+                        value:[syncNetworkExtensionSettings serialize]];
 }
 
 - (NSRegularExpression *)allowedPathRegex {
