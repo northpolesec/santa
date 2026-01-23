@@ -26,7 +26,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
-#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+#import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 // Ensures the given object is an NSArray and only contains NSString value types
 static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
@@ -935,12 +935,12 @@ static SNTConfigurator *sharedConfigurator = nil;
   }
 }
 
-- (SNTNetworkExtensionSettings *)networkExtensionSettings {
-  return [SNTNetworkExtensionSettings deserialize:self.syncState[kNetworkExtensionSettingsKey]];
+- (SNTSyncNetworkExtensionSettings *)networkExtensionSettings {
+  return [SNTSyncNetworkExtensionSettings deserialize:self.syncState[kNetworkExtensionSettingsKey]];
 }
 
 - (void)setSyncServerNetworkExtensionSettings:
-    (SNTNetworkExtensionSettings *)networkExtensionSettings {
+    (SNTSyncNetworkExtensionSettings *)networkExtensionSettings {
   [self updateSyncStateForKey:kNetworkExtensionSettingsKey
                         value:[networkExtensionSettings serialize]];
 }

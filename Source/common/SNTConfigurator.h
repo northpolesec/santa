@@ -19,7 +19,7 @@
 
 @class SNTExportConfiguration;
 @class SNTModeTransition;
-@class SNTNetworkExtensionSettings;
+@class SNTSyncNetworkExtensionSettings;
 @class SNTRule;
 
 ///
@@ -387,13 +387,13 @@
 ///
 ///  Currently defined settings for Santa's network extension. Its value is set by a sync server.
 ///
-@property(nullable, readonly) SNTNetworkExtensionSettings *networkExtensionSettings;
+@property(nullable, readonly) SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 
 ///
 ///  Set the mode network extension settings as received from a sync server.
 ///
 - (void)setSyncServerNetworkExtensionSettings:
-    (nonnull SNTNetworkExtensionSettings *)networkExtensionSettings;
+    (nonnull SNTSyncNetworkExtensionSettings *)networkExtensionSettings;
 
 #pragma mark - GUI Settings
 

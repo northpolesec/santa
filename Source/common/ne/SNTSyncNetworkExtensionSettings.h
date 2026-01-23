@@ -14,7 +14,7 @@
 
 #import <Foundation/Foundation.h>
 
-@interface SNTNetworkExtensionSettings : NSObject <NSSecureCoding>
+@interface SNTSyncNetworkExtensionSettings : NSObject <NSSecureCoding>
 
 @property(readonly) BOOL enable;
 

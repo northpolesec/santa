@@ -20,7 +20,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
-#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+#import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 @interface SNTConfigBundle (Testing)
 @property NSNumber *clientMode;
@@ -44,7 +44,7 @@
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
 @property NSNumber *enableNotificationSilences;
-@property SNTNetworkExtensionSettings *networkExtensionSettings;
+@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -81,7 +81,7 @@
   bundle.eventDetailURL = @"https://example.com/details";
   bundle.eventDetailText = @"View Details";
   bundle.enableNotificationSilences = @(YES);
-  bundle.networkExtensionSettings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  bundle.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -192,7 +192,7 @@
     [exp fulfill];
   }];
 
-  [bundle networkExtensionSettings:^(SNTNetworkExtensionSettings *val) {
+  [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings *val) {
     XCTAssertNotNil(val);
     XCTAssertTrue(val.enable);
     [exp fulfill];
@@ -289,7 +289,7 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle networkExtensionSettings:^(SNTNetworkExtensionSettings *val) {
+  [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings *val) {
     XCTFail(@"This shouldn't be called");
   }];
 }

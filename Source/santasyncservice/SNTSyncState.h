@@ -18,7 +18,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
-#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+#import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 @class SNTSyncManager;
 @class MOLXPCConnection;
@@ -87,7 +87,7 @@
 @property NSString *overrideFileAccessAction;
 @property SNTExportConfiguration *exportConfig;
 @property SNTModeTransition *modeTransition;
-@property SNTNetworkExtensionSettings *networkExtensionSettings;
+@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
 
