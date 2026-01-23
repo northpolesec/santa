@@ -17,7 +17,7 @@
 #import "Source/common/CoderMacros.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
-#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+#import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 @interface SNTConfigBundle ()
 @property NSNumber *clientMode;
@@ -41,7 +41,7 @@
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
 @property NSNumber *enableNotificationSilences;
-@property SNTNetworkExtensionSettings *networkExtensionSettings;
+@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @end
 
 @implementation SNTConfigBundle
@@ -99,7 +99,7 @@
     DECODE(decoder, eventDetailURL, NSString);
     DECODE(decoder, eventDetailText, NSString);
     DECODE(decoder, enableNotificationSilences, NSNumber);
-    DECODE(decoder, networkExtensionSettings, SNTNetworkExtensionSettings);
+    DECODE(decoder, networkExtensionSettings, SNTSyncNetworkExtensionSettings);
   }
   return self;
 }
@@ -229,7 +229,7 @@
   }
 }
 
-- (void)networkExtensionSettings:(void (^)(SNTNetworkExtensionSettings *))block {
+- (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block {
   if (self.networkExtensionSettings) {
     block(self.networkExtensionSettings);
   }

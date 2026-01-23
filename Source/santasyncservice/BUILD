@@ -63,7 +63,7 @@ objc_library(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTModeTransition",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )
 
@@ -76,7 +76,7 @@ objc_library(
         "//Source/common:SNTConfigBundle",
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTModeTransition",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )
 
@@ -89,7 +89,7 @@ santa_unit_test(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigBundle",
         "//Source/common:SNTModeTransition",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )
 
@@ -246,7 +246,7 @@ objc_library(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:String",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "@northpolesec_protos//syncv2:v2_cc_proto",
         "@protobuf//src/google/protobuf/json",
     ],
@@ -310,7 +310,7 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:String",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "@OCMock",
         "@northpolesec_protos//sync:v1_cc_proto",
         "@northpolesec_protos//syncv2:v2_cc_proto",
@@ -382,7 +382,7 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:String",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "@OCMock",
         "@northpolesec_protos//sync:v1_cc_proto",
         "@northpolesec_protos//syncv2:v2_cc_proto",

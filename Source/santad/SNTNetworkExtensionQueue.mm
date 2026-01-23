@@ -25,7 +25,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
-#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+#import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
 
 NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
@@ -128,8 +128,8 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
   NSMutableDictionary *settings = [NSMutableDictionary dictionary];
   auto [majorVersion, _] = [self protocolVersionComponents:self.connectedProtocolVersion];
-  SNTNetworkExtensionSettings *netExtSettings =
-      [[SNTConfigurator configurator] networkExtensionSettings];
+  SNTSyncNetworkExtensionSettings *netExtSettings =
+      [[SNTConfigurator configurator] syncNetworkExtensionSettings];
 
   if (majorVersion >= 1) {
     settings[@"enable"] = @(netExtSettings.enable);

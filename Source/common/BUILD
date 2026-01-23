@@ -465,7 +465,7 @@ objc_library(
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )
 
@@ -479,7 +479,7 @@ objc_library(
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
         ":SNTModeTransition",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )
 
@@ -491,7 +491,7 @@ santa_unit_test(
         ":SNTConfigBundle",
         ":SNTExportConfiguration",
         ":SNTModeTransition",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )
 
