@@ -38,6 +38,7 @@ int main(int argc, const char *argv[]) {
       delegate = [SNTSystemExtensionDelegate delegateForSantanetdActivation];
     } else if ([args containsObject:@"--unload-network-extension"]) {
       LOGI(@"Requesting Santa Network Extension (Content Filter) deactivation");
+      LOGW(@"WARNING: All network connections will reset when filter activates");
       delegate = [SNTSystemExtensionDelegate delegateForSantanetdDeactivation];
     }
 #endif
