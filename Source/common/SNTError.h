@@ -49,11 +49,17 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeInsertOrReplaceRuleFailed = 511,
   SNTErrorCodeRemoveRuleFailed = 512,
 
-  // TMM Errors
+  // TMM errors
   SNTErrorCodeTMMNoPolicy = 610,
   SNTErrorCodeTMMNotInLockdown = 611,
   SNTErrorCodeTMMInvalidSyncServer = 612,
   SNTErrorCodeTMMAuthFailed = 613,
+
+  // Network Extension errors
+  SNTErrorCodeNetworkExtensionNotAuthorized = 710,
+  SNTErrorCodeNetworkExtensionProtocolVersionInvalid = 711,
+  SNTErrorCodeNetworkExtensionProtocolVersionBad = 712,
+  SNTErrorCodeNetworkExtensionAlreadyConnected = 713,
 };
 
 @interface SNTError : NSObject

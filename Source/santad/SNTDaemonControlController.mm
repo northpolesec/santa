@@ -47,6 +47,7 @@
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/KillingMachine.h"
 #import "Source/santad/SNTDatabaseController.h"
+#import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TemporaryMonitorMode.h"
@@ -67,6 +68,7 @@ double watchdogRAMPeak = 0;
 @interface SNTDaemonControlController ()
 @property SNTNotificationQueue *notQueue;
 @property SNTSyncdQueue *syncdQueue;
+@property SNTNetworkExtensionQueue *netExtQueue;
 @property dispatch_queue_t commandQ;
 @end
 
@@ -80,6 +82,7 @@ double watchdogRAMPeak = 0;
 - (instancetype)initWithAuthResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                       notificationQueue:(SNTNotificationQueue *)notQueue
                              syncdQueue:(SNTSyncdQueue *)syncdQueue
+                      netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
                                  logger:(std::shared_ptr<Logger>)logger
                              watchItems:(std::shared_ptr<WatchItems>)watchItems {
   self = [super init];
@@ -89,6 +92,7 @@ double watchdogRAMPeak = 0;
     _watchItems = std::move(watchItems);
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
+    _netExtQueue = netExtQueue;
 
     _commandQ = dispatch_queue_create("com.northpolesec.santa.cmdq", DISPATCH_QUEUE_SERIAL);
     dispatch_set_target_queue(_commandQ, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
@@ -675,6 +679,25 @@ double watchdogRAMPeak = 0;
   reply(YES);
 
   [self reloadNetworkExtension];
+}
+
+- (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion
+                                              reply:(void (^)(NSDictionary *settings,
+                                                              NSString *santaProtocolVersion,
+                                                              NSError *error))reply {
+  NSError *error;
+
+  if (![[SNTConfigurator configurator] isSyncV2Enabled]) {
+    [SNTError populateError:&error
+                   withCode:SNTErrorCodeNetworkExtensionNotAuthorized
+                     format:@"Network extension registration is not authorized."];
+    reply(nil, nil, error);
+    return;
+  }
+
+  NSDictionary *settings = [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion
+                                                                             error:&error];
+  reply(settings, kSantaNetworkExtensionProtocolVersion, error);
 }
 
 - (void)exportTelemetryWithReply:(void (^)(BOOL))reply {

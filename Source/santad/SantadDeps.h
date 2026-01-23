@@ -36,6 +36,7 @@
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
+#import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TTYWriter.h"
@@ -57,6 +58,7 @@ class SantadDeps {
       MOLXPCConnection *control_connection,
       SNTCompilerController *compiler_controller,
       SNTNotificationQueue *notifier_queue, SNTSyncdQueue *syncd_queue,
+      SNTNetworkExtensionQueue *netext_queue,
       SNTExecutionController *exec_controller,
       std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
       std::shared_ptr<santa::TTYWriter> tty_writer,
@@ -73,6 +75,7 @@ class SantadDeps {
   SNTCompilerController *CompilerController();
   SNTNotificationQueue *NotifierQueue();
   SNTSyncdQueue *SyncdQueue();
+  SNTNetworkExtensionQueue *NetworkExtensionQueue();
   SNTExecutionController *ExecController();
   std::shared_ptr<santa::PrefixTree<santa::Unit>> PrefixTree();
   std::shared_ptr<santa::TTYWriter> TTYWriter();
@@ -90,6 +93,7 @@ class SantadDeps {
   SNTCompilerController *compiler_controller_;
   SNTNotificationQueue *notifier_queue_;
   SNTSyncdQueue *syncd_queue_;
+  SNTNetworkExtensionQueue *netext_queue_;
   SNTExecutionController *exec_controller_;
   std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree_;
   std::shared_ptr<santa::TTYWriter> tty_writer_;
