@@ -35,22 +35,10 @@
                                syncdQueue:(SNTSyncdQueue *)syncdQueue
                       netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
                                    logger:(std::shared_ptr<santa::Logger>)logger
-                               watchItems:(std::shared_ptr<santa::WatchItems>)watchItems;
-
-///
-///  Called when caches should be flushed (rules changed, explicit flush command, etc.).
-///  Flushes both the auth result cache and TouchID approval cache.
-///
-@property(copy) void (^flushCacheBlock)(santa::FlushCacheMode, santa::FlushCacheReason);
-
-///
-///  Called to get cache counts (root cache count, non-root cache count).
-///
-@property(copy) NSArray<NSNumber *> * (^cacheCountsBlock)(void);
-
-///
-///  Called to check the cache for a given vnode ID.
-///
-@property(copy) SNTAction (^checkCacheBlock)(SantaVnode);
+                               watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
+                          flushCacheBlock:(void (^)(santa::FlushCacheMode,
+                                                    santa::FlushCacheReason))flushCacheBlock
+                          cacheCountBlock:(NSArray<NSNumber *> * (^)(void))cacheCountBlock
+                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock;
 
 @end
