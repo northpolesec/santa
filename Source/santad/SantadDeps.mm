@@ -38,6 +38,7 @@
 #include "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #include "Source/santad/SNTPolicyProcessor.h"
+#include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;
@@ -45,6 +46,7 @@ using santa::Enricher;
 using santa::Logger;
 using santa::Metrics;
 using santa::PrefixTree;
+using santa::SleighLauncher;
 using santa::TTYWriter;
 using santa::WatchItems;
 
@@ -136,8 +138,11 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
   uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
 
+  std::shared_ptr<::SleighLauncher> sleigh_launcher = SleighLauncher::Create(
+      @(SleighLauncher::kDefaultSleighPath), [configurator telemetryExportTimeoutSec]);
+
   std::shared_ptr<::Logger> logger = Logger::Create(
-      esapi, syncd_queue,
+      esapi, sleigh_launcher,
       ^SNTExportConfiguration *() {
         return [configurator exportConfig];
       },

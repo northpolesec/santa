@@ -35,10 +35,11 @@
 // Forward declarations
 @class SNTExportConfiguration;
 @class SNTStoredExecutionEvent;
-@class SNTSyncdQueue;
+
 namespace santa {
 class LoggerPeer;
-}
+class SleighLauncher;
+}  // namespace santa
 
 namespace santa {
 
@@ -48,13 +49,12 @@ class Logger : public Timer<Logger> {
  public:
   enum class ExportLogType {
     kUnknown = 0,
-    kUncompressedStream,
-    kGzipStream,
     kZstdStream,
   };
 
   static std::unique_ptr<Logger> Create(
-      std::shared_ptr<santa::EndpointSecurityAPI> esapi, SNTSyncdQueue *syncd_queue,
+      std::shared_ptr<santa::EndpointSecurityAPI> esapi,
+      std::shared_ptr<santa::SleighLauncher> sleigh_launcher,
       GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
       SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
       NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
@@ -62,8 +62,9 @@ class Logger : public Timer<Logger> {
       uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
       uint32_t telemetry_export_max_files_per_batch);
 
-  Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock getExportConfigBlock,
-         TelemetryEvent telemetry_mask, uint32_t telemetry_export_timeout_seconds,
+  Logger(std::shared_ptr<santa::SleighLauncher> sleigh_launcher,
+         GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
+         uint32_t telemetry_export_timeout_seconds,
          uint32_t telemetry_export_batch_threshold_size_mb,
          uint32_t telemetry_export_max_files_per_batch,
          std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer);
@@ -106,9 +107,6 @@ class Logger : public Timer<Logger> {
   void SetBatchThresholdSizeMB(uint32_t val);
   void SetMaxFilesPerBatch(uint32_t val);
   void SetTelmetryExportTimeoutSecs(uint32_t val);
-
-  static ExportLogType GetLogType(NSFileHandle *handle, NSString *path);
-  static std::pair<NSString *, NSString *> GetContentTypeAndExtension(ExportLogType log_type);
 
   friend class santa::LoggerPeer;
 
@@ -161,7 +159,7 @@ class Logger : public Timer<Logger> {
 
   void ExportTelemetrySerialized();
 
-  SNTSyncdQueue *syncd_queue_;
+  std::shared_ptr<santa::SleighLauncher> sleigh_launcher_;
   GetExportConfigBlock get_export_config_block_;
   TelemetryEvent telemetry_mask_;
   std::shared_ptr<santa::Serializer> serializer_;

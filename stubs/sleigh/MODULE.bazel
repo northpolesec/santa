@@ -1,0 +1,8 @@
+# Stub module for sleigh
+
+module(
+    name = "sleigh",
+    version = "1.0.0",
+)
+
+bazel_dep(name = "rules_cc", version = "0.2.14")

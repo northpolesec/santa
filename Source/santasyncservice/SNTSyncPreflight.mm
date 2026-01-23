@@ -240,24 +240,6 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     }
   }
 
-  if (resp.has_export_configuration()) {
-    auto exportConfig = resp.export_configuration().signed_post();
-    if (!exportConfig.url().empty() && !exportConfig.form_values().empty()) {
-      NSMutableDictionary *formValues =
-          [NSMutableDictionary dictionaryWithCapacity:exportConfig.form_values().size()];
-      for (const auto &pair : exportConfig.form_values()) {
-        formValues[StringToNSString(pair.first)] = StringToNSString(pair.second);
-      }
-      NSURL *url = [NSURL URLWithString:StringToNSString(exportConfig.url())];
-      if (url) {
-        self.syncState.exportConfig = [[SNTExportConfiguration alloc] initWithURL:url
-                                                                       formValues:formValues];
-      } else {
-        SLOGE(@"Invalid export configuration URL: %@", StringToNSString(exportConfig.url()));
-      }
-    }
-  }
-
   if (resp.has_event_detail_url()) {
     self.syncState.eventDetailURL = StringToNSString(resp.event_detail_url());
   }
@@ -325,10 +307,10 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
 
 void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *syncState) {
   // Extract NATS push notification configuration
-  LOGD(@"Preflight: Processing push notification configuration");
+  SLOGD(@"Preflight: Processing push notification configuration");
   if (!resp.push_server().empty()) {
     syncState.pushServer = StringToNSString(resp.push_server());
-    LOGD(@"Preflight: Push server: %@", syncState.pushServer);
+    SLOGD(@"Preflight: Push server: %@", syncState.pushServer);
   }
 
   if (!resp.push_key().empty()) {
@@ -341,9 +323,9 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
 
   if (!resp.push_deviceid().empty()) {
     syncState.pushDeviceID = StringToNSString(resp.push_deviceid());
-    LOGI(@"Preflight: Received push device ID: %@", syncState.pushDeviceID);
+    SLOGI(@"Preflight: Received push device ID: %@", syncState.pushDeviceID);
   } else {
-    LOGW(@"Preflight: No push device ID received from server");
+    SLOGW(@"Preflight: No push device ID received from server");
   }
 
   if (resp.push_tags_size() > 0) {
@@ -357,7 +339,7 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
   if (!resp.push_hmac_key().empty()) {
     syncState.pushHMACKey = [NSData dataWithBytes:resp.push_hmac_key().data()
                                            length:resp.push_hmac_key().size()];
-    LOGD(@"Preflight: Received push HMAC key (%zu bytes)", resp.push_hmac_key().size());
+    SLOGD(@"Preflight: Received push HMAC key (%zu bytes)", resp.push_hmac_key().size());
   }
 
   if (resp.has_mode_transition()) {
@@ -404,6 +386,24 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
   if (resp.has_network_extension()) {
     syncState.networkExtensionSettings =
         [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:resp.network_extension().enable()];
+  }
+
+  if (resp.has_export_configuration()) {
+    auto exportConfig = resp.export_configuration().signed_post();
+    if (!exportConfig.url().empty() && !exportConfig.form_values().empty()) {
+      NSMutableDictionary *formValues =
+          [NSMutableDictionary dictionaryWithCapacity:exportConfig.form_values().size()];
+      for (const auto &pair : exportConfig.form_values()) {
+        formValues[StringToNSString(pair.first)] = StringToNSString(pair.second);
+      }
+      NSURL *url = [NSURL URLWithString:StringToNSString(exportConfig.url())];
+      if (url) {
+        syncState.exportConfig = [[SNTExportConfiguration alloc] initWithURL:url
+                                                                  formValues:formValues];
+      } else {
+        SLOGE(@"Invalid export configuration URL: %@", StringToNSString(exportConfig.url()));
+      }
+    }
   }
 }
 

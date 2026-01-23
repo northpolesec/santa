@@ -44,7 +44,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Syslog.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
-#import "Source/santad/SNTSyncdQueue.h"
+#include "Source/santad/SleighLauncher.h"
 
 using santa::BasicString;
 using santa::Empty;
@@ -126,10 +126,19 @@ class MockWriter : public santa::Writer {
               (override));
 };
 
-@interface LoggerTest : XCTestCase
+class MockSleighLauncher : public santa::SleighLauncher {
+ public:
+  MockSleighLauncher() : santa::SleighLauncher(@"/fake/sleigh", 60) {}
+
+  MOCK_METHOD(santa::SleighResult, Launch, (const std::vector<std::string> &input_files),
+              (override));
+};
+
+@interface LoggerTest : XCTestCase {
+  std::shared_ptr<MockSleighLauncher> _mockSleighLauncher;
+}
 @property NSFileManager *fileMgr;
 @property NSString *testDir;
-@property id mockSyncdQueue;
 @property SNTExportConfiguration * (^exportConfigBlock)(void);
 @end
 
@@ -145,9 +154,10 @@ class MockWriter : public santa::Writer {
                                          attributes:nil
                                               error:nil]);
 
-  self.mockSyncdQueue = OCMClassMock([SNTSyncdQueue class]);
+  _mockSleighLauncher = std::make_shared<MockSleighLauncher>();
   self.exportConfigBlock = ^{
-    return [[SNTExportConfiguration alloc] init];
+    return [[SNTExportConfiguration alloc] initWithURL:[NSURL URLWithString:@"http://test.example"]
+                                            formValues:@{@"key" : @"value"}];
   };
 }
 
@@ -158,7 +168,7 @@ class MockWriter : public santa::Writer {
     XCTFail(@"Test dir cleanup failed: %@", err);
   }
 
-  [self.mockSyncdQueue stopMocking];
+  _mockSleighLauncher.reset();
 }
 
 - (NSString *)createTestFile:(NSString *)name
@@ -168,10 +178,8 @@ class MockWriter : public santa::Writer {
   XCTAssertGreaterThanOrEqual(contentSize, sizeof(magic));
   switch (fileType) {
     case ExportLogType::kUnknown: magic = 0x0a; break;
-    case ExportLogType::kUncompressedStream: magic = ::fsspool::kStreamBatcherMagic; break;
-    case ExportLogType::kGzipStream: magic = 0x8b1f; break;
     case ExportLogType::kZstdStream: magic = 0xfd2fb528; break;
-    default: XCTFail("Creating unsupported file type: %d", fileType); break;
+    default: XCTFail("Creating unsupported file type: %d", (int)fileType); break;
   }
 
   NSMutableData *d = [[NSMutableData alloc] initWithBytes:&magic length:sizeof(magic)];
@@ -419,27 +427,26 @@ class MockWriter : public santa::Writer {
   XCTAssertEqual(map.at("qaz"), true);
 }
 
-- (void)setExportExpectationSize:(NSUInteger)totalSize success:(BOOL)success {
-  OCMExpect([self.mockSyncdQueue
-      exportTelemetryFiles:OCMOCK_ANY
-                  fileName:OCMOCK_ANY
-                 totalSize:totalSize
-               contentType:OCMOCK_ANY
-                    config:OCMOCK_ANY
-                     reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(success), nil])]);
+- (void)setExportExpectationSuccess:(BOOL)success {
+  santa::SleighResult result{
+      .success = (bool)success,
+      .exit_code = success ? 0 : 1,
+      .error_message = success ? "" : "mock failure",
+  };
+  EXPECT_CALL(*_mockSleighLauncher, Launch).WillOnce(Return(result));
 }
 
 - (void)testExportSuccessWithSupportedTypeAndUnknownFile {
   auto mockWriter = std::make_shared<MockWriter>();
 
-  [self setExportExpectationSize:25 success:YES];
+  [self setExportExpectationSuccess:YES];
 
   // Only f2 and f3 will be exported (total 25 bytes)
   NSString *f1 = [self createTestFile:@"f1" contentSize:5];
   NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
   NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
 
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
+  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -457,20 +464,19 @@ class MockWriter : public santa::Writer {
   l.ExportTelemetrySerialized();
 
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
-  XCTAssertTrue(OCMVerifyAll(self.mockSyncdQueue));
+  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
 }
 
-- (void)testExportFailWithSupportedTypeAndUnknownFile {
+- (void)testExportFail {
   auto mockWriter = std::make_shared<MockWriter>();
 
-  // Only f2 and f3 will be exported (total 25 bytes)
-  NSString *f1 = [self createTestFile:@"f1" contentSize:5];
+  NSString *f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
   NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
   NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
 
-  [self setExportExpectationSize:25 success:NO];
+  [self setExportExpectationSuccess:NO];
 
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
+  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -479,59 +485,15 @@ class MockWriter : public santa::Writer {
       .WillOnce(Return(f3.UTF8String))
       .WillOnce(Return(std::nullopt));
 
-  // The one unknown file will be marked true so it gets removed, but the two files that
-  // failed to send will be marked false.
-  // exported and the unknown file will be cleaned up.
-  EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f1.UTF8String, true),
+  // All files fail to export and are marked false.
+  EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f1.UTF8String, false),
                                                               Pair(f2.UTF8String, false),
                                                               Pair(f3.UTF8String, false))));
 
   l.ExportTelemetrySerialized();
 
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
-  XCTAssertTrue(OCMVerifyAll(self.mockSyncdQueue));
-}
-
-- (void)testExportWithMultipleSupportedTypes {
-  auto mockWriter = std::make_shared<MockWriter>();
-
-  // Only f1 and f2 will be exported in the first batch (total 25 bytes).
-  // Files f3 and f4 will be "visited" during the first batch scan, but not
-  // uploaded until the second batch.
-  NSString *f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
-  NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
-  NSString *f3 = [self createTestFile:@"f3" contentSize:30 type:ExportLogType::kGzipStream];
-  NSString *f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kGzipStream];
-
-  [self setExportExpectationSize:15 success:YES];
-  [self setExportExpectationSize:70 success:YES];
-
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
-               nullptr, mockWriter);
-
-  EXPECT_CALL(*mockWriter, NextFileToExport)
-      .WillOnce(Return(f1.UTF8String))
-      .WillOnce(Return(f2.UTF8String))
-      .WillOnce(Return(f3.UTF8String))
-      .WillOnce(Return(f4.UTF8String))
-      .WillOnce(Return(std::nullopt))
-      .WillOnce(Return(f3.UTF8String))
-      .WillOnce(Return(f4.UTF8String))
-      .WillOnce(Return(std::nullopt));
-
-  // Ensure only 2/4 files are sent the first time, and only the 2 remaining files
-  // are sent the second time.
-  EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f3.UTF8String, true),
-                                                              Pair(f4.UTF8String, true))))
-      .After(
-          EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(
-                                       Pair(f1.UTF8String, true), Pair(f2.UTF8String, true),
-                                       Pair(f3.UTF8String, false), Pair(f4.UTF8String, false)))));
-
-  l.ExportTelemetrySerialized();
-
-  XCTAssertTrue(OCMVerifyAll(self.mockSyncdQueue));
-  XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
+  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
 }
 
 - (void)testExportMaxOpenedFiles {
@@ -545,11 +507,13 @@ class MockWriter : public santa::Writer {
   NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
   NSString *f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
 
-  [self setExportExpectationSize:30 success:YES];
-  [self setExportExpectationSize:40 success:YES];
+  santa::SleighResult successResult{.success = true, .exit_code = 0, .error_message = ""};
+  EXPECT_CALL(*_mockSleighLauncher, Launch)
+      .WillOnce(Return(successResult))
+      .WillOnce(Return(successResult));
 
-  // Limit to 3 opened files
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
+  // Limit to 3 files per batch
+  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -559,7 +523,7 @@ class MockWriter : public santa::Writer {
       .WillOnce(Return(f4.UTF8String))
       .WillOnce(Return(std::nullopt));
 
-  // Ensure only 3/4 files are sent the first time because of the open file limit
+  // Ensure only 3/4 files are sent the first time because of the file limit
   // are sent the second time.
   EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f4.UTF8String, true))))
       .After(EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(
@@ -568,34 +532,26 @@ class MockWriter : public santa::Writer {
 
   l.ExportTelemetrySerialized();
 
-  XCTAssertTrue(OCMVerifyAll(self.mockSyncdQueue));
+  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
-- (void)testExportFilesExportedCalledIfNoneUploaded {
-  // This test ensures that FilesExported is always called even when there were no files to export.
-  // This makes sure cases such as a spool full of unsupported files can be cleared to make room for
-  // handled types.
+- (void)testExportFilesExportedCalledWhenEmpty {
+  // This test ensures that FilesExported is called even when there are no files to export.
   auto mockWriter = std::make_shared<MockWriter>();
 
-  // Both f1 and f2 are unsupported file types.
-  NSString *f1 = [self createTestFile:@"f1" contentSize:5];
-  NSString *f2 = [self createTestFile:@"f2" contentSize:10];
+  // No Launch call expected since there are no files
 
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
+  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
                nullptr, mockWriter);
 
-  EXPECT_CALL(*mockWriter, NextFileToExport)
-      .WillOnce(Return(f1.UTF8String))
-      .WillOnce(Return(f2.UTF8String))
-      .WillOnce(Return(std::nullopt));
+  EXPECT_CALL(*mockWriter, NextFileToExport).WillOnce(Return(std::nullopt));
 
-  EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f1.UTF8String, true),
-                                                              Pair(f2.UTF8String, true))));
+  EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre()));
 
   l.ExportTelemetrySerialized();
 
-  XCTAssertTrue(OCMVerifyAll(self.mockSyncdQueue));
+  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
@@ -614,12 +570,13 @@ class MockWriter : public santa::Writer {
   NSString *f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
   NSString *f5 = [self createTestFile:@"f5" contentSize:oneMB type:ExportLogType::kZstdStream];
 
-  [self setExportExpectationSize:((oneMB - 1) + 10) success:YES];
-  [self setExportExpectationSize:oneMB success:YES];
-  [self setExportExpectationSize:(40 + oneMB) success:YES];
+  santa::SleighResult successResult{.success = true, .exit_code = 0, .error_message = ""};
+  EXPECT_CALL(*_mockSleighLauncher, Launch)
+      .WillOnce(Return(successResult))
+      .WillOnce(Return(successResult))
+      .WillOnce(Return(successResult));
 
-  // Limit to 3 opened files
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
+  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -642,22 +599,22 @@ class MockWriter : public santa::Writer {
 
   l.ExportTelemetrySerialized();
 
-  XCTAssertTrue(OCMVerifyAll(self.mockSyncdQueue));
+  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
 - (void)testExportNoMoreBatchesAfterFailedExport {
   auto mockWriter = std::make_shared<MockWriter>();
 
-  // Only f1 and f2 will be sent in the first batch due to opened file limitations.
+  // Only f1 and f2 will be sent in the first batch due to file limitations.
   NSString *f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
   NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
 
-  // Simulate failed export in the reply block
-  [self setExportExpectationSize:15 success:NO];
+  // Simulate failed export
+  [self setExportExpectationSuccess:NO];
 
-  // Limit to 2 opened files
-  LoggerPeer l(self.mockSyncdQueue, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 2,
+  // Limit to 2 files per batch
+  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 2,
                nullptr, mockWriter);
 
   // Note: std::nullopt is never returned as the export loops don't continue
@@ -665,33 +622,14 @@ class MockWriter : public santa::Writer {
       .WillOnce(Return(f1.UTF8String))
       .WillOnce(Return(f2.UTF8String));
 
-  // Ensure only 3/4 files are sent the first time because of the open file limit
-  // are sent the second time.
+  // Both files should be marked false because the export failed.
   EXPECT_CALL(*mockWriter, FilesExported(UnorderedElementsAre(Pair(f1.UTF8String, false),
                                                               Pair(f2.UTF8String, false))));
 
   l.ExportTelemetrySerialized();
 
-  XCTAssertTrue(OCMVerifyAll(self.mockSyncdQueue));
+  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
-}
-
-- (void)testGetContentTypeAndExtension {
-  auto typeAndExt = Logger::GetContentTypeAndExtension(ExportLogType::kUnknown);
-  XCTAssertNil(typeAndExt.first);
-  XCTAssertNil(typeAndExt.second);
-
-  typeAndExt = Logger::GetContentTypeAndExtension(ExportLogType::kUncompressedStream);
-  XCTAssertEqualObjects(typeAndExt.first, @"application/octet-stream");
-  XCTAssertEqualObjects(typeAndExt.second, @"stream");
-
-  typeAndExt = Logger::GetContentTypeAndExtension(ExportLogType::kGzipStream);
-  XCTAssertEqualObjects(typeAndExt.first, @"application/gzip");
-  XCTAssertEqualObjects(typeAndExt.second, @"gz");
-
-  typeAndExt = Logger::GetContentTypeAndExtension(ExportLogType::kZstdStream);
-  XCTAssertEqualObjects(typeAndExt.first, @"application/zstd");
-  XCTAssertEqualObjects(typeAndExt.second, @"zst");
 }
 
 - (void)testExportSettingsClamp {

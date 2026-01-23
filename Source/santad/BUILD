@@ -840,6 +840,20 @@ objc_library(
 )
 
 objc_library(
+    name = "SleighLauncher",
+    srcs = ["SleighLauncher.mm"],
+    hdrs = ["SleighLauncher.h"],
+    deps = [
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTExportConfiguration",
+        "//Source/common:SNTLogging",
+        "@abseil-cpp//absl/status:statusor",
+        "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
+    ],
+)
+
+objc_library(
     name = "EndpointSecurityLogger",
     srcs = ["Logs/EndpointSecurity/Logger.mm"],
     hdrs = ["Logs/EndpointSecurity/Logger.h"],
@@ -857,8 +871,9 @@ objc_library(
         ":EndpointSecurityWriterSpool",
         ":EndpointSecurityWriterSyslog",
         ":SNTDecisionCache",
-        ":SNTSyncdQueue",
+        ":SleighLauncher",
         "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
@@ -1065,6 +1080,7 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":SleighLauncher",
         ":TTYWriter",
         "//Source/common:MOLXPCConnection",
         "//Source/common:PrefixTree",
@@ -1480,13 +1496,12 @@ santa_unit_test(
         ":EndpointSecurityWriterSpool",
         ":EndpointSecurityWriterSyslog",
         ":MockEndpointSecurityAPI",
-        ":SNTSyncdQueue",
+        ":SleighLauncher",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTExportConfiguration",
         "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
-        "@OCMock",
         "@googletest//:gtest",
     ],
 )
