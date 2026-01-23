@@ -222,7 +222,7 @@ objc_library(
         "//Source/common:SNTError",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStrengthify",
-        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "//Source/common/ne:SNTXPCNetworkExtensionInterface",
     ],
 )

@@ -24,9 +24,9 @@ objc_library(
 )
 
 objc_library(
-    name = "SNTNetworkExtensionSettings",
-    srcs = ["SNTNetworkExtensionSettings.mm"],
-    hdrs = ["SNTNetworkExtensionSettings.h"],
+    name = "SNTSyncNetworkExtensionSettings",
+    srcs = ["SNTSyncNetworkExtensionSettings.mm"],
+    hdrs = ["SNTSyncNetworkExtensionSettings.h"],
     deps = [
         "//Source/common:CoderMacros",
         "//Source/common:SNTLogging",
@@ -34,16 +34,16 @@ objc_library(
 )
 
 santa_unit_test(
-    name = "SNTNetworkExtensionSettingsTest",
-    srcs = ["SNTNetworkExtensionSettingsTest.mm"],
+    name = "SNTSyncNetworkExtensionSettingsTest",
+    srcs = ["SNTSyncNetworkExtensionSettingsTest.mm"],
     deps = [
-        ":SNTNetworkExtensionSettings",
+        ":SNTSyncNetworkExtensionSettings",
     ],
 )
 
 test_suite(
     name = "unit_tests",
     tests = [
-        ":SNTNetworkExtensionSettingsTest",
+        ":SNTSyncNetworkExtensionSettingsTest",
     ],
 )

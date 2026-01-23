@@ -16,7 +16,7 @@
 
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
-#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+#import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 
 // Expose necessary setters for SNTConfigBundle properties related to Postflight
@@ -41,7 +41,7 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
-@property SNTNetworkExtensionSettings *networkExtensionSettings;
+@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @end
 
 SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
