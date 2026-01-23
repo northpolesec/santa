@@ -13,4 +13,3 @@ objc_library(
     pch = "Source/OCMock/OCMock-Prefix.pch",
     visibility = ["//visibility:public"],
 )
-

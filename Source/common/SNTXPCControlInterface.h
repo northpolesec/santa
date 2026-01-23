@@ -79,6 +79,11 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 ///
 - (void)installNetworkExtension:(void (^)(BOOL))reply;
 
+- (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion
+                                              reply:(void (^)(NSDictionary *settings,
+                                                              NSString *santaProtocolVersion,
+                                                              NSError *error))reply;
+
 @end
 
 @interface SNTXPCControlInterface : NSObject
