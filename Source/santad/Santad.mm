@@ -84,12 +84,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   SNTConfigurator *configurator = [SNTConfigurator configurator];
 
   SNTDaemonControlController *dc =
-      [[SNTDaemonControlController alloc] initWithAuthResultCache:auth_result_cache
-                                                notificationQueue:notifier_queue
-                                                       syncdQueue:syncd_queue
-                                                netExtensionQueue:netext_queue
-                                                           logger:logger
-                                                       watchItems:watch_items];
+      [[SNTDaemonControlController alloc] initWithNotificationQueue:notifier_queue
+          syncdQueue:syncd_queue
+          netExtensionQueue:netext_queue
+          logger:logger
+          watchItems:watch_items
+          flushCacheBlock:^(FlushCacheMode mode, FlushCacheReason reason) {
+            auth_result_cache->FlushCache(mode, reason);
+            [exec_controller flushTouchIDApprovalCache];
+          }
+          cacheCountBlock:^NSArray<NSNumber *> *() {
+            return auth_result_cache->CacheCounts();
+          }
+          checkCacheBlock:^SNTAction(SantaVnode vnode) {
+            return auth_result_cache->CheckCache(vnode);
+          }];
 
   control_connection.exportedObject = dc;
   [control_connection resume];

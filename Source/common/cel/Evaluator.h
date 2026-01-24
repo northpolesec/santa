@@ -15,7 +15,9 @@
 #ifndef SANTA__COMMON__CEL__EVALUATOR_H
 #define SANTA__COMMON__CEL__EVALUATOR_H
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 
 #include "Source/common/cel/Activation.h"
 #include "Source/common/cel/CELProtoTraits.h"
@@ -35,12 +37,29 @@
 namespace santa {
 namespace cel {
 
+// Result of evaluating a CEL expression
+template <bool IsV2>
+struct EvaluationResult {
+  using Traits = CELProtoTraits<IsV2>;
+  using ReturnValue = typename Traits::ReturnValue;
+
+  ReturnValue value;
+  bool cacheable;
+  std::optional<uint64_t>
+      touchIDCooldownMinutes;  // nullopt = no caching (prompt every time)
+
+  EvaluationResult(ReturnValue v, bool c,
+                   std::optional<uint64_t> cooldown = std::nullopt)
+      : value(v), cacheable(c), touchIDCooldownMinutes(cooldown) {}
+};
+
 template <bool IsV2>
 class Evaluator {
  public:
   using Traits = CELProtoTraits<IsV2>;
   using ReturnValue = typename Traits::ReturnValue;
   using ActivationT = Activation<IsV2>;
+  using EvaluationResultT = EvaluationResult<IsV2>;
 
   static absl::StatusOr<std::unique_ptr<Evaluator>> Create();
 
@@ -64,13 +83,13 @@ class Evaluator {
   Compile(absl::string_view cel_expr);
 
   // Evaluate an expression plan with a SantaActivation object.
-  absl::StatusOr<std::pair<ReturnValue, bool>> Evaluate(
+  absl::StatusOr<EvaluationResultT> Evaluate(
       ::google::api::expr::runtime::CelExpression const *expression_plan,
       const ActivationT &activation);
 
   // Convenience method that combines Compile() and Evaluate() into a single
   // call.
-  absl::StatusOr<std::pair<ReturnValue, bool>> CompileAndEvaluate(
+  absl::StatusOr<EvaluationResultT> CompileAndEvaluate(
       absl::string_view cel_expr, const ActivationT &activation);
 
  private:

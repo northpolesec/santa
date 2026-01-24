@@ -52,7 +52,6 @@
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TemporaryMonitorMode.h"
 
-using santa::AuthResultCache;
 using santa::FlushCacheMode;
 using santa::FlushCacheReason;
 using santa::Logger;
@@ -70,29 +69,50 @@ double watchdogRAMPeak = 0;
 @property SNTSyncdQueue *syncdQueue;
 @property SNTNetworkExtensionQueue *netExtQueue;
 @property dispatch_queue_t commandQ;
+
+///
+///  Called when caches should be flushed (rules changed, explicit flush command, etc.).
+///  Flushes both the auth result cache and TouchID approval cache.
+///
+@property(copy) void (^flushCacheBlock)(santa::FlushCacheMode, santa::FlushCacheReason);
+
+///
+///  Called to get cache counts (root cache count, non-root cache count).
+///
+@property(copy) NSArray<NSNumber *> * (^cacheCountsBlock)(void);
+
+///
+///  Called to check the cache for a given vnode ID.
+///
+@property(copy) SNTAction (^checkCacheBlock)(SantaVnode);
+
 @end
 
 @implementation SNTDaemonControlController {
-  std::shared_ptr<AuthResultCache> _authResultCache;
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<santa::TemporaryMonitorMode> _temporaryMonitorMode;
 }
 
-- (instancetype)initWithAuthResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
-                      notificationQueue:(SNTNotificationQueue *)notQueue
-                             syncdQueue:(SNTSyncdQueue *)syncdQueue
-                      netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
-                                 logger:(std::shared_ptr<Logger>)logger
-                             watchItems:(std::shared_ptr<WatchItems>)watchItems {
+- (instancetype)initWithNotificationQueue:(SNTNotificationQueue *)notQueue
+                               syncdQueue:(SNTSyncdQueue *)syncdQueue
+                        netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
+                                   logger:(std::shared_ptr<santa::Logger>)logger
+                               watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
+                          flushCacheBlock:(void (^)(santa::FlushCacheMode,
+                                                    santa::FlushCacheReason))flushCacheBlock
+                          cacheCountBlock:(NSArray<NSNumber *> * (^)(void))cacheCountBlock
+                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock {
   self = [super init];
   if (self) {
     _logger = logger;
-    _authResultCache = authResultCache;
     _watchItems = std::move(watchItems);
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
     _netExtQueue = netExtQueue;
+    _flushCacheBlock = flushCacheBlock;
+    _cacheCountsBlock = cacheCountBlock;
+    _checkCacheBlock = checkCacheBlock;
 
     _commandQ = dispatch_queue_create("com.northpolesec.santa.cmdq", DISPATCH_QUEUE_SERIAL);
     dispatch_set_target_queue(_commandQ, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
@@ -110,18 +130,16 @@ double watchdogRAMPeak = 0;
 #pragma mark Cache ops
 
 - (void)cacheCounts:(void (^)(uint64_t, uint64_t))reply {
-  NSArray<NSNumber *> *counts = self->_authResultCache->CacheCounts();
+  NSArray<NSNumber *> *counts = self.cacheCountsBlock();
   reply([counts[0] unsignedLongLongValue], [counts[1] unsignedLongLongValue]);
 }
 
 - (void)flushCache:(void (^)(BOOL))reply {
-  self->_authResultCache->FlushCache(FlushCacheMode::kAllCaches,
-                                     FlushCacheReason::kExplicitCommand);
-  reply(YES);
+  self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kExplicitCommand);
 }
 
 - (void)checkCacheForVnodeID:(SantaVnode)vnodeID withReply:(void (^)(SNTAction))reply {
-  reply(self->_authResultCache->CheckCache(vnodeID));
+  reply(self.checkCacheBlock(vnodeID));
 }
 
 #pragma mark Database ops
@@ -199,7 +217,9 @@ double watchdogRAMPeak = 0;
   // The actual cache flushing happens after the new rules have been added to the database.
   if (flushCache) {
     LOGI(@"Flushing caches");
-    self->_authResultCache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
+    if (self.flushCacheBlock) {
+      self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
+    }
   }
 
   reply(success, errors);

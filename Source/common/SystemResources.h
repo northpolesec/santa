@@ -20,6 +20,7 @@
 #include <mach/mach_time.h>
 #include <sys/cdefs.h>
 #include <sys/proc_info.h>
+#include <time.h>
 
 #include <optional>
 #include <vector>
@@ -39,6 +40,11 @@ uint64_t NanosToMachTime(uint64_t nanos);
 
 // Add some number of nanoseconds to a given mach time and return the new result
 uint64_t AddNanosecondsToMachTime(uint64_t ns, uint64_t machTime);
+
+// Get the current system uptime in nanoseconds (monotonic clock)
+static inline uint64_t GetCurrentUptime() {
+  return clock_gettime_nsec_np(CLOCK_MONOTONIC);
+}
 
 // Get the result of proc_pidinfo with the PROC_PIDTASKINFO flavor
 std::optional<SantaTaskInfo> GetTaskInfo();

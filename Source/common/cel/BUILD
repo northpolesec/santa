@@ -1,3 +1,5 @@
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -7,25 +9,44 @@ package(
 
 licenses(["notice"])
 
+proto_library(
+    name = "result_proto",
+    srcs = ["result.proto"],
+    deps = [
+        "@northpolesec_protos//celv2:v2_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "result_cc_proto",
+    deps = [":result_proto"],
+)
+
 objc_library(
     name = "CEL",
     srcs = [
         "Activation.mm",
         "Evaluator.mm",
+        "TouchIDFunction.mm",
     ],
     hdrs = [
         "Activation.h",
         "CELProtoTraits.h",
         "Evaluator.h",
+        "TouchIDFunction.h",
     ],
     deps = [
+        ":result_cc_proto",
         "//Source/common:Memoizer",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@cel-cpp//checker:validation_result",
         "@cel-cpp//common:ast_proto",
+        "@cel-cpp//common:decl",
         "@cel-cpp//common:function_descriptor",
+        "@cel-cpp//common:type",
+        "@cel-cpp//common:value",
         "@cel-cpp//compiler",
         "@cel-cpp//compiler:compiler_factory",
         "@cel-cpp//compiler:standard_library",
@@ -46,6 +67,7 @@ objc_library(
         "@cel-cpp//extensions:strings",
         "@cel-cpp//internal:status_macros",
         "@cel-cpp//parser",
+        "@cel-cpp//runtime:function_adapter",
         "@northpolesec_protos//cel:v1_cc_proto",
         "@northpolesec_protos//celv2:v2_cc_proto",
     ],
@@ -56,6 +78,7 @@ santa_unit_test(
     srcs = ["Test.mm"],
     deps = [
         ":CEL",
+        ":result_cc_proto",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@northpolesec_protos//celv2:v2_cc_proto",

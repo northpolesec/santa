@@ -68,8 +68,8 @@
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().second, true);
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, true);
     }
   }
   {
@@ -79,8 +79,8 @@
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().second, true);
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, true);
     }
   }
   {
@@ -94,8 +94,8 @@
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().second, true);
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, true);
     }
 
     auto f2 = std::make_unique<ExecutableFileT>();
@@ -119,8 +119,8 @@
     if (!result2.ok()) {
       XCTFail("Failed to evaluate: %s", result2.status().message().data());
     } else {
-      XCTAssertEqual(result2.value().first, ReturnValue::BLOCKLIST);
-      XCTAssertEqual(result2.value().second, true);
+      XCTAssertEqual(result2.value().value, ReturnValue::BLOCKLIST);
+      XCTAssertEqual(result2.value().cacheable, true);
     }
   }
   {
@@ -129,8 +129,8 @@
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().second, false);
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
     }
   }
   {
@@ -140,8 +140,8 @@
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, ReturnValue::BLOCKLIST);
-      XCTAssertEqual(result.value().second, false);
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+      XCTAssertEqual(result.value().cacheable, false);
     }
   }
   {
@@ -168,8 +168,8 @@
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().second, false);
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
     }
     XCTAssertEqual(argsCallCount, 1);
   }
@@ -179,8 +179,8 @@
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().second, false);
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
     }
   }
 }
@@ -228,10 +228,135 @@
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
-      XCTAssertEqual(result.value().first, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertEqual(result.value().second, false);
+      XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
+      XCTAssertEqual(result.value().cacheable, false);
     }
   }
+}
+
+- (void)testTouchIDCooldownFunctions {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+
+  auto f = std::make_unique<ExecutableFileT>();
+  f->mutable_signing_time()->set_seconds(1748436989);
+  santa::cel::Activation<true> activation(
+      std::move(f),
+      ^std::vector<std::string>() {
+        return {"hello", "world"};
+      },
+      ^std::map<std::string, std::string>() {
+        return {};
+      },
+      ^uid_t() {
+        return 0;
+      },
+      ^std::string() {
+        return "/";
+      });
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  {
+    // Test require_touchid_with_cooldown_minutes returns REQUIRE_TOUCHID
+    auto result =
+        sut.value()->CompileAndEvaluate("require_touchid_with_cooldown_minutes(10)", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
+      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 10ULL);
+    }
+  }
+  {
+    // Test require_touchid_only_with_cooldown_minutes returns REQUIRE_TOUCHID_ONLY
+    auto result = sut.value()->CompileAndEvaluate("require_touchid_only_with_cooldown_minutes(5)",
+                                                  activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID_ONLY);
+      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 5ULL);
+    }
+  }
+  {
+    // Test conditional usage with cooldown function
+    auto result = sut.value()->CompileAndEvaluate(
+        "euid == 0 ? require_touchid_with_cooldown_minutes(15) : ALLOWLIST", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
+      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 15ULL);
+    }
+  }
+  {
+    // Test standard REQUIRE_TOUCHID constant (no cooldown function) - should have no cooldown
+    auto result = sut.value()->CompileAndEvaluate("REQUIRE_TOUCHID", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
+      XCTAssertFalse(result.value().touchIDCooldownMinutes.has_value());
+    }
+  }
+  {
+    // Test negative value is treated as 0
+    auto result =
+        sut.value()->CompileAndEvaluate("require_touchid_with_cooldown_minutes(-5)", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
+      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 0ULL);
+    }
+  }
+  {
+    // Test zero cooldown
+    auto result =
+        sut.value()->CompileAndEvaluate("require_touchid_with_cooldown_minutes(0)", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
+      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 0ULL);
+    }
+  }
+}
+
+- (void)testTouchIDCooldownNotAvailableInV1 {
+  using ExecutableFileT = santa::cel::CELProtoTraits<false>::ExecutableFileT;
+
+  auto f = std::make_unique<ExecutableFileT>();
+  f->mutable_signing_time()->set_seconds(1748436989);
+  santa::cel::Activation<false> activation(
+      std::move(f),
+      ^std::vector<std::string>() {
+        return {};
+      },
+      ^std::map<std::string, std::string>() {
+        return {};
+      },
+      ^uid_t() {
+        return 0;
+      },
+      ^std::string() {
+        return "/";
+      });
+
+  auto sut = santa::cel::Evaluator<false>::Create();
+  XCTAssertTrue(sut.ok());
+
+  // V1 should not support TouchID cooldown functions
+  auto result =
+      sut.value()->CompileAndEvaluate("require_touchid_with_cooldown_minutes(10)", activation);
+  XCTAssertFalse(result.ok());
 }
 
 @end
