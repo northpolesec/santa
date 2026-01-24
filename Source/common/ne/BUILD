@@ -8,9 +8,25 @@ package(
 licenses(["notice"])
 
 objc_library(
-    name = "SNTNetworkExtensionSettings",
-    srcs = ["SNTNetworkExtensionSettings.mm"],
-    hdrs = ["SNTNetworkExtensionSettings.h"],
+    name = "SNDXPCNetworkExtensionInterface",
+    hdrs = ["SNDXPCNetworkExtensionInterface.h"],
+)
+
+objc_library(
+    name = "SNTXPCNetworkExtensionInterface",
+    srcs = ["SNTXPCNetworkExtensionInterface.mm"],
+    hdrs = ["SNTXPCNetworkExtensionInterface.h"],
+    deps = [
+        ":SNDXPCNetworkExtensionInterface",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
+    ],
+)
+
+objc_library(
+    name = "SNTSyncNetworkExtensionSettings",
+    srcs = ["SNTSyncNetworkExtensionSettings.mm"],
+    hdrs = ["SNTSyncNetworkExtensionSettings.h"],
     deps = [
         "//Source/common:CoderMacros",
         "//Source/common:SNTLogging",
@@ -18,16 +34,16 @@ objc_library(
 )
 
 santa_unit_test(
-    name = "SNTNetworkExtensionSettingsTest",
-    srcs = ["SNTNetworkExtensionSettingsTest.mm"],
+    name = "SNTSyncNetworkExtensionSettingsTest",
+    srcs = ["SNTSyncNetworkExtensionSettingsTest.mm"],
     deps = [
-        ":SNTNetworkExtensionSettings",
+        ":SNTSyncNetworkExtensionSettings",
     ],
 )
 
 test_suite(
     name = "unit_tests",
     tests = [
-        ":SNTNetworkExtensionSettingsTest",
+        ":SNTSyncNetworkExtensionSettingsTest",
     ],
 )

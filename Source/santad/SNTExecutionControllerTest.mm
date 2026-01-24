@@ -847,4 +847,160 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                        expectedControl:santa::ProcessControl::Kill];
 }
 
+// Test that successful TouchID auth populates the cache, and subsequent executions
+// of the same binary skip the TouchID prompt (cache hit scenario)
+- (void)testTouchIDCacheHitSkipsPrompt {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cachedsha256");
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+
+  // Create mock notifier queue that captures the reply block
+  id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  __block NotificationReplyBlock capturedReplyBlock = nil;
+  OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
+                    withCustomMessage:OCMOCK_ANY
+                            customURL:OCMOCK_ANY
+                          configState:OCMOCK_ANY
+                             andReply:OCMOCK_ANY])
+      .andDo(^(NSInvocation *invocation) {
+        __unsafe_unretained NotificationReplyBlock block;
+        [invocation getArgument:&block atIndex:6];
+        capturedReplyBlock = [block copy];
+      });
+
+  LogExecutionBlock loggerBlock = ^(Message esMsg) {
+  };
+
+  santa::ProcessControlBlock processControl = ^bool(pid_t pid, santa::ProcessControl control) {
+    return true;
+  };
+
+  // Create mock policy processor that returns a new decision each time
+  id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
+  __block SNTCachedDecision *currentDecision = nil;
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
+                                     targetProcess:&procExec
+                                       configState:OCMOCK_ANY
+                                activationCallback:OCMOCK_ANY])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation *invocation) {
+        [invocation setReturnValue:&currentDecision];
+      });
+
+  SNTExecutionController *controller =
+      [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
+                                             eventTable:self.mockEventDatabase
+                                          notifierQueue:mockNotifierQueue
+                                             syncdQueue:nil
+                                                 logger:loggerBlock
+                                              ttyWriter:santa::TTYWriter::Create(true)
+                                        policyProcessor:mockPolicyProcessor
+                                    processControlBlock:processControl];
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  // Track all actions received to verify the flow
+  __block NSMutableArray<NSNumber *> *receivedActions = [NSMutableArray array];
+
+  // First execution: should prompt for TouchID (cache is empty)
+  currentDecision = [[SNTCachedDecision alloc] init];
+  currentDecision.decision = SNTEventStateBlockUnknown;
+  currentDecision.holdAndAsk = YES;
+  currentDecision.decisionClientMode = SNTClientModeLockdown;
+  currentDecision.sha256 = @"cachedsha256";
+  currentDecision.touchIDCooldownMinutes = @(5);  // 5 minute cooldown for caching
+
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                       postAction:^bool(SNTAction action) {
+                         [receivedActions addObject:@(action)];
+                         return true;
+                       }];
+  }
+
+  // First action should be SNTActionRespondHold (process held for TouchID)
+  XCTAssertGreaterThanOrEqual(receivedActions.count, 1UL);
+  XCTAssertEqual([receivedActions[0] integerValue], SNTActionRespondHold,
+                 @"First execution should hold for TouchID");
+
+  XCTAssertNotNil(capturedReplyBlock, @"Reply block should have been captured");
+  // Simulate successful TouchID auth
+  capturedReplyBlock(YES);
+
+  XCTAssertEqual(currentDecision.decision, SNTEventStateAllowUnknown);
+  XCTAssertEqualObjects(currentDecision.decisionExtra, @"TouchID Approved");
+
+  // Now test that a second execution with the same SHA256 uses the cache
+  // and skips the TouchID prompt
+  capturedReplyBlock = nil;
+  [receivedActions removeAllObjects];
+
+  // Create a new holdAndAsk decision for the second execution (same SHA256)
+  SNTCachedDecision *secondDecision = [[SNTCachedDecision alloc] init];
+  secondDecision.decision = SNTEventStateBlockUnknown;
+  secondDecision.holdAndAsk = YES;
+  secondDecision.decisionClientMode = SNTClientModeLockdown;
+  secondDecision.sha256 = @"cachedsha256";       // Same SHA256 - should hit cache
+  secondDecision.touchIDCooldownMinutes = @(5);  // Same cooldown
+  currentDecision = secondDecision;
+
+  // Second execution with same controller (cache persists)
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                       postAction:^bool(SNTAction action) {
+                         [receivedActions addObject:@(action)];
+                         return true;
+                       }];
+  }
+
+  // Second execution should NOT hold - cache hit should allow immediately
+  XCTAssertGreaterThanOrEqual(receivedActions.count, 1UL);
+  // Should be SNTActionRespondAllow or SNTActionRespondAllowNoCache (not SNTActionRespondHold)
+  SNTAction secondAction = (SNTAction)[receivedActions[0] integerValue];
+  XCTAssertTrue(
+      secondAction == SNTActionRespondAllow || secondAction == SNTActionRespondAllowNoCache,
+      @"Second execution should skip TouchID and allow (got %ld)", (long)secondAction);
+
+  // Verify the decision was updated to show it was cached
+  XCTAssertFalse(secondDecision.holdAndAsk, @"holdAndAsk should be cleared by cache hit");
+  XCTAssertEqualObjects(secondDecision.decisionExtra, @"TouchID Cached");
+
+  // The notification queue should NOT have been called for the second execution
+  XCTAssertNil(capturedReplyBlock, @"No reply block should be captured for cached execution");
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockNotifierQueue stopMocking];
+  [mockPolicyProcessor stopMocking];
+}
+
+// Test that flushTouchIDApprovalCache clears the cache
+- (void)testFlushTouchIDApprovalCache {
+  SNTExecutionController *controller =
+      [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
+                                             eventTable:self.mockEventDatabase
+                                          notifierQueue:nil
+                                             syncdQueue:nil
+                                                 logger:nullptr
+                                              ttyWriter:santa::TTYWriter::Create(true)
+                                        policyProcessor:nil
+                                    processControlBlock:santa::ProdSuspendResumeBlock()];
+
+  // Just verify that flush doesn't crash - the cache internals are private
+  XCTAssertNoThrow([controller flushTouchIDApprovalCache]);
+}
+
 @end

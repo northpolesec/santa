@@ -12,16 +12,16 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+#import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 #import "Source/common/CoderMacros.h"
 #import "Source/common/SNTLogging.h"
 
-@interface SNTNetworkExtensionSettings ()
+@interface SNTSyncNetworkExtensionSettings ()
 @property(readwrite) BOOL enable;
 @end
 
-@implementation SNTNetworkExtensionSettings
+@implementation SNTSyncNetworkExtensionSettings
 
 - (instancetype)initWithEnable:(BOOL)enable {
   self = [super init];
@@ -53,7 +53,7 @@
                                        requiringSecureCoding:YES
                                                        error:&error];
   if (error) {
-    LOGE(@"SNTNetworkExtensionSettings serialization failed: %@", error.localizedDescription);
+    LOGE(@"SNTSyncNetworkExtensionSettings serialization failed: %@", error.localizedDescription);
     return nil;
   }
 
@@ -66,11 +66,11 @@
   }
 
   NSError *error;
-  id object = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTNetworkExtensionSettings class]
+  id object = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTSyncNetworkExtensionSettings class]
                                                 fromData:data
                                                    error:&error];
   if (error) {
-    LOGE(@"SNTNetworkExtensionSettings deserialization failed: %@", error.localizedDescription);
+    LOGE(@"SNTSyncNetworkExtensionSettings deserialization failed: %@", error.localizedDescription);
     return nil;
   }
 

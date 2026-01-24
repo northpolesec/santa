@@ -17,22 +17,28 @@
 #include <memory>
 
 #import "Source/common/SNTXPCControlInterface.h"
+#include "Source/common/SantaVnode.h"
 #include "Source/common/faa/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 @class SNTNotificationQueue;
 @class SNTSyncdQueue;
+@class SNTNetworkExtensionQueue;
 
 ///
 ///  SNTDaemonControlController handles all of the RPCs from santactl
 ///
 @interface SNTDaemonControlController : NSObject <SNTDaemonControlXPC>
 
-- (instancetype)initWithAuthResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
-                      notificationQueue:(SNTNotificationQueue *)notQueue
-                             syncdQueue:(SNTSyncdQueue *)syncdQueue
-                                 logger:(std::shared_ptr<santa::Logger>)logger
-                             watchItems:(std::shared_ptr<santa::WatchItems>)watchItems;
+- (instancetype)initWithNotificationQueue:(SNTNotificationQueue *)notQueue
+                               syncdQueue:(SNTSyncdQueue *)syncdQueue
+                        netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
+                                   logger:(std::shared_ptr<santa::Logger>)logger
+                               watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
+                          flushCacheBlock:(void (^)(santa::FlushCacheMode,
+                                                    santa::FlushCacheReason))flushCacheBlock
+                          cacheCountBlock:(NSArray<NSNumber *> * (^)(void))cacheCountBlock
+                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock;
 
 @end

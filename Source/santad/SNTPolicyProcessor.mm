@@ -43,6 +43,12 @@ enum class PlatformBinaryState {
   kStaticCheck,
 };
 
+struct CELEvaluationResult {
+  bool succeeded;            // Whether CEL evaluation succeeded
+  bool decisionMade;         // If !succeeded, whether a decision was made (fail-closed)
+  SNTRuleState resultState;  // If succeeded, the resulting state
+};
+
 struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   SNTRuleIdentifiers *ri =
       [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:{
@@ -102,6 +108,104 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   return self;
 }
 
+- (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule *)rule
+                                     cachedDecision:(SNTCachedDecision *)cd
+                                 activationCallback:(ActivationCallbackBlock)activationCallback {
+  bool useV2 = (rule.state == SNTRuleStateCELv2);
+  auto activation = activationCallback(useV2);
+
+  // Evaluate the CEL expression and extract results
+  int returnValue = 0;
+  bool cacheable = true;
+  std::optional<uint64_t> touchIDCooldownMinutes;
+
+  if (useV2) {
+    auto *v2Activation = static_cast<santa::cel::Activation<true> *>(activation.get());
+    // In debug builds, ensure the returned type matches expectations, but no
+    // need to pay the RTTI cost in release builds since the number of returned
+    // types is small and should rarely change.
+    assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
+    auto evalResult = self->celEvaluatorV2_->CompileAndEvaluate(
+        santa::NSStringToUTF8StringView(rule.celExpr), *v2Activation);
+
+    if (!evalResult.ok()) {
+      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
+           std::string(evalResult.status().message()).c_str());
+      if ([SNTConfigurator configurator].failClosed) {
+        cd.decision = SNTEventStateBlockUnknown;
+        return {.succeeded = false, .decisionMade = true, .resultState = {}};
+      }
+      return {.succeeded = false, .decisionMade = false, .resultState = {}};
+    }
+
+    returnValue = static_cast<int>(evalResult->value);
+    cacheable = evalResult->cacheable;
+    touchIDCooldownMinutes = evalResult->touchIDCooldownMinutes;
+  } else {
+    auto *v1Activation = static_cast<santa::cel::Activation<false> *>(activation.get());
+    assert(dynamic_cast<santa::cel::Activation<false> *>(activation.get()) != nullptr);
+    auto evalResult = self->celEvaluatorV1_->CompileAndEvaluate(
+        santa::NSStringToUTF8StringView(rule.celExpr), *v1Activation);
+
+    if (!evalResult.ok()) {
+      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
+           std::string(evalResult.status().message()).c_str());
+      if ([SNTConfigurator configurator].failClosed) {
+        cd.decision = SNTEventStateBlockUnknown;
+        return {.succeeded = false, .decisionMade = true, .resultState = {}};
+      }
+      return {.succeeded = false, .decisionMade = false, .resultState = {}};
+    }
+
+    returnValue = static_cast<int>(evalResult->value);
+    cacheable = evalResult->cacheable;
+    // V1 doesn't support TouchID, so cooldown is always nullopt
+  }
+
+  LOGD(@"Ran CEL program and received result: %d (cacheable %d)", returnValue, cacheable);
+
+  SNTRuleState resultState;
+  if (useV2) {
+    using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+    switch (static_cast<ReturnValue>(returnValue)) {
+      case ReturnValue::ALLOWLIST: resultState = SNTRuleStateAllow; break;
+      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowTransitive; break;
+      case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
+      case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
+      case ReturnValue::REQUIRE_TOUCHID_ONLY:
+        // REQUIRE_TOUCHID_ONLY is like REQUIRE_TOUCHID but it skips the Santa dialog
+        cd.silentTouchID = YES;
+        [[fallthrough]];
+      case ReturnValue::REQUIRE_TOUCHID:
+        // REQUIRE_TOUCHID responses are not cacheable.
+        cd.holdAndAsk = YES;
+        cd.cacheable = NO;
+        resultState = SNTRuleStateBlock;
+        // Extract cooldown if specified via require_touchid_with_cooldown_minutes()
+        if (touchIDCooldownMinutes.has_value()) {
+          cd.touchIDCooldownMinutes = @(touchIDCooldownMinutes.value());
+        }
+        break;
+      default: resultState = rule.state; break;
+    }
+  } else {
+    using ReturnValue = santa::cel::CELProtoTraits<false>::ReturnValue;
+    switch (static_cast<ReturnValue>(returnValue)) {
+      case ReturnValue::ALLOWLIST: resultState = SNTRuleStateAllow; break;
+      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowTransitive; break;
+      case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
+      case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
+      default: resultState = rule.state; break;
+    }
+  }
+
+  if (!cacheable) {
+    cd.cacheable = NO;
+  }
+
+  return {.succeeded = true, .decisionMade = false, .resultState = resultState};
+}
+
 // This method applies the rules to the cached decision object.
 //
 // It returns YES if the decision was made, NO if the decision was not made.
@@ -113,79 +217,13 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   SNTRuleType type = rule.type;
 
   if ((state == SNTRuleStateCEL || state == SNTRuleStateCELv2) && activationCallback) {
-    bool useV2 = (state == SNTRuleStateCELv2);
-    auto activation = activationCallback(useV2);
-
-    absl::StatusOr<std::pair<int, bool>> evalResult;
-
-    if (useV2) {
-      auto *v2Activation = static_cast<santa::cel::Activation<true> *>(activation.get());
-      // In debug builds, ensure the returned type matches expectations, but no
-      // need to pay the RTTI cost in release builds since the number of returned
-      // types is small and should rarely change.
-      assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
-      evalResult = self->celEvaluatorV2_->CompileAndEvaluate(
-          santa::NSStringToUTF8StringView(rule.celExpr), *v2Activation);
-    } else {
-      auto *v1Activation = static_cast<santa::cel::Activation<false> *>(activation.get());
-      assert(dynamic_cast<santa::cel::Activation<false> *>(activation.get()) != nullptr);
-      evalResult = self->celEvaluatorV1_->CompileAndEvaluate(
-          santa::NSStringToUTF8StringView(rule.celExpr), *v1Activation);
+    CELEvaluationResult celResult = [self evaluateCELExpressionForRule:rule
+                                                        cachedDecision:cd
+                                                    activationCallback:activationCallback];
+    if (!celResult.succeeded) {
+      return celResult.decisionMade;
     }
-
-    if (!evalResult.ok()) {
-      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
-           std::string(evalResult.status().message()).c_str());
-
-      // If the CEL program failed to execute and the failClosed key is set
-      // to true, then we should block.
-      if ([SNTConfigurator configurator].failClosed) {
-        cd.decision = SNTEventStateBlockUnknown;
-        return YES;
-      }
-      return NO;
-    }
-
-    LOGD(@"Ran CEL program and received result: %d (cacheable %d)",
-         static_cast<int>(evalResult->first), evalResult->second);
-
-    if (useV2) {
-      using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
-      switch (static_cast<ReturnValue>(evalResult->first)) {
-        case ReturnValue::ALLOWLIST: state = SNTRuleStateAllow; break;
-        case ReturnValue::ALLOWLIST_COMPILER: state = SNTRuleStateAllowTransitive; break;
-        case ReturnValue::BLOCKLIST: state = SNTRuleStateBlock; break;
-        case ReturnValue::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
-        case ReturnValue::REQUIRE_TOUCHID:
-          // REQUIRE_TOUCHID responses are not cacheable.
-          cd.holdAndAsk = YES;
-          cd.cacheable = NO;
-          state = SNTRuleStateBlock;
-          break;
-        case ReturnValue::REQUIRE_TOUCHID_ONLY:
-          // REQUIRE_TOUCHID_ONLY responses are not cacheable.
-          // Like REQUIRE_TOUCHID, but skips showing the block dialog.
-          cd.holdAndAsk = YES;
-          cd.silentTouchID = YES;
-          cd.cacheable = NO;
-          state = SNTRuleStateBlock;
-          break;
-        default: break;
-      }
-    } else {
-      using ReturnValue = santa::cel::CELProtoTraits<false>::ReturnValue;
-      switch (static_cast<ReturnValue>(evalResult->first)) {
-        case ReturnValue::ALLOWLIST: state = SNTRuleStateAllow; break;
-        case ReturnValue::ALLOWLIST_COMPILER: state = SNTRuleStateAllowTransitive; break;
-        case ReturnValue::BLOCKLIST: state = SNTRuleStateBlock; break;
-        case ReturnValue::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
-        default: break;
-      }
-    }
-
-    if (!evalResult->second) {
-      cd.cacheable = NO;
-    }
+    state = celResult.resultState;
   }
 
   static const auto decisions =

@@ -36,6 +36,7 @@
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTDatabaseController.h"
 #include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTNetworkExtensionQueue.h"
 #include "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -93,6 +94,12 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   SNTSyncdQueue *syncd_queue = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
   if (!syncd_queue) {
     LOGE(@"Failed to initialize syncd queue.");
+    exit(EXIT_FAILURE);
+  }
+
+  SNTNetworkExtensionQueue *netext_queue = [[SNTNetworkExtensionQueue alloc] init];
+  if (!netext_queue) {
+    LOGE(@"Failed to initialize network extension queue.");
     exit(EXIT_FAILURE);
   }
 
@@ -233,8 +240,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
 
   return std::make_unique<SantadDeps>(
       esapi, logger, std::move(metrics), std::move(watch_items), std::move(auth_result_cache),
-      control_connection, compiler_controller, notifier_queue, syncd_queue, exec_controller,
-      prefix_tree, std::move(tty_writer), std::move(process_tree), std::move(entitlements_filter));
+      control_connection, compiler_controller, notifier_queue, syncd_queue, netext_queue,
+      exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree),
+      std::move(entitlements_filter));
 }
 
 SantadDeps::SantadDeps(
@@ -242,8 +250,9 @@ SantadDeps::SantadDeps(
     std::shared_ptr<::Metrics> metrics, std::shared_ptr<::WatchItems> watch_items,
     std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection *control_connection,
     SNTCompilerController *compiler_controller, SNTNotificationQueue *notifier_queue,
-    SNTSyncdQueue *syncd_queue, SNTExecutionController *exec_controller,
-    std::shared_ptr<::PrefixTree<Unit>> prefix_tree, std::shared_ptr<::TTYWriter> tty_writer,
+    SNTSyncdQueue *syncd_queue, SNTNetworkExtensionQueue *netext_queue,
+    SNTExecutionController *exec_controller, std::shared_ptr<::PrefixTree<Unit>> prefix_tree,
+    std::shared_ptr<::TTYWriter> tty_writer,
     std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
     std::shared_ptr<santa::EntitlementsFilter> entitlements_filter)
     : esapi_(std::move(esapi)),
@@ -256,6 +265,7 @@ SantadDeps::SantadDeps(
       compiler_controller_(compiler_controller),
       notifier_queue_(notifier_queue),
       syncd_queue_(syncd_queue),
+      netext_queue_(netext_queue),
       exec_controller_(exec_controller),
       prefix_tree_(prefix_tree),
       tty_writer_(std::move(tty_writer)),
@@ -299,6 +309,10 @@ SNTNotificationQueue *SantadDeps::NotifierQueue() {
 
 SNTSyncdQueue *SantadDeps::SyncdQueue() {
   return syncd_queue_;
+}
+
+SNTNetworkExtensionQueue *SantadDeps::NetworkExtensionQueue() {
+  return netext_queue_;
 }
 
 SNTExecutionController *SantadDeps::ExecController() {

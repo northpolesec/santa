@@ -28,7 +28,7 @@
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
-#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+#import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #include "Source/santasyncservice/ProtoTraits.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
@@ -403,7 +403,7 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
 
   if (resp.has_network_extension()) {
     syncState.networkExtensionSettings =
-        [[SNTNetworkExtensionSettings alloc] initWithEnable:resp.network_extension().enable()];
+        [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:resp.network_extension().enable()];
   }
 }
 

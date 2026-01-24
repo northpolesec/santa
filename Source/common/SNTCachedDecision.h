@@ -57,5 +57,6 @@
 @property BOOL cacheable;
 @property BOOL holdAndAsk;
 @property BOOL silentTouchID;
+@property NSNumber *touchIDCooldownMinutes;  // nil = no caching (prompt every time)
 
 @end

@@ -1,0 +1,33 @@
+// Copyright 2026 North Pole Security, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package santa.cel;
+
+import "celv2/v2.proto";
+
+// Result is the /internal/ return type for CELv2 policy expressions.
+// It contains the decision value and optional fields that can be populated by custom functions.
+message Result {
+  // The return value (ALLOWLIST, BLOCKLIST, REQUIRE_TOUCHID, etc.)
+  santa.cel.v2.ReturnValue value = 1;
+
+  // The cooldown period in minutes for TouchID caching.
+  // Only meaningful for REQUIRE_TOUCHID and REQUIRE_TOUCHID_ONLY values.
+  // If not set (has_cooldown_minutes() == false), no caching is performed.
+  // If set to 0, no caching is performed (prompt every time).
+  // If set to > 0, cache the approval for that many minutes.
+  optional uint64 cooldown_minutes = 2;
+}

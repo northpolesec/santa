@@ -14,6 +14,7 @@
 
 #include "Source/common/cel/Activation.h"
 
+#include "Source/common/cel/result.pb.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -22,6 +23,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#include "common/type.h"
 #include "eval/public/containers/container_backed_list_impl.h"
 #include "eval/public/containers/container_backed_map_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
@@ -124,7 +126,15 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
   auto retDescriptor = Traits::ReturnValue_descriptor();
   auto retValue = retDescriptor->FindValueByName(name);
   if (retValue != nullptr) {
-    return CELValue(retValue->number(), arena);
+    if constexpr (IsV2) {
+      // For V2, return a Result message so that these values can
+      // be mixed with composite returns from functions.
+      auto *result = google::protobuf::Arena::Create<::santa::cel::Result>(arena);
+      result->set_value(static_cast<::santa::cel::v2::ReturnValue>(retValue->number()));
+      return cel_runtime::CelProtoWrapper::CreateMessage(result, arena);
+    } else {
+      return CELValue(retValue->number(), arena);
+    }
   }
 
   // Handle the fields from the CELContext message.
@@ -154,7 +164,13 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
   auto retDescriptor = Traits::ReturnValue_descriptor();
   for (int i = 1; i < retDescriptor->value_count(); i++) {
     auto value = retDescriptor->value(i);
-    v.push_back({value->name(), ::cel::IntType()});
+    if constexpr (IsV2) {
+      // For V2, register as a Result message type so they can be mixed with
+      // functions in ternary expressions.
+      v.push_back({value->name(), ::cel::MessageType(::santa::cel::Result::descriptor())});
+    } else {
+      v.push_back({value->name(), ::cel::IntType()});
+    }
   }
 
   // Now add all the fields from the CELContext message.

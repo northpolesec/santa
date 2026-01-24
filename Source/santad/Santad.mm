@@ -76,7 +76,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 std::shared_ptr<AuthResultCache> auth_result_cache,
                 MOLXPCConnection *control_connection, SNTCompilerController *compiler_controller,
                 SNTNotificationQueue *notifier_queue, SNTSyncdQueue *syncd_queue,
-                SNTExecutionController *exec_controller,
+                SNTNetworkExtensionQueue *netext_queue, SNTExecutionController *exec_controller,
                 std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
                 std::shared_ptr<TTYWriter> tty_writer,
                 std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
@@ -84,11 +84,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   SNTConfigurator *configurator = [SNTConfigurator configurator];
 
   SNTDaemonControlController *dc =
-      [[SNTDaemonControlController alloc] initWithAuthResultCache:auth_result_cache
-                                                notificationQueue:notifier_queue
-                                                       syncdQueue:syncd_queue
-                                                           logger:logger
-                                                       watchItems:watch_items];
+      [[SNTDaemonControlController alloc] initWithNotificationQueue:notifier_queue
+          syncdQueue:syncd_queue
+          netExtensionQueue:netext_queue
+          logger:logger
+          watchItems:watch_items
+          flushCacheBlock:^(FlushCacheMode mode, FlushCacheReason reason) {
+            auth_result_cache->FlushCache(mode, reason);
+            [exec_controller flushTouchIDApprovalCache];
+          }
+          cacheCountBlock:^NSArray<NSNumber *> *() {
+            return auth_result_cache->CacheCounts();
+          }
+          checkCacheBlock:^SNTAction(SantaVnode vnode) {
+            return auth_result_cache->CheckCache(vnode);
+          }];
 
   control_connection.exportedObject = dc;
   [control_connection resume];

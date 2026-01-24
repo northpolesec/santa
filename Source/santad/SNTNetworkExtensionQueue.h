@@ -14,13 +14,13 @@
 
 #import <Foundation/Foundation.h>
 
-@interface SNTNetworkExtensionSettings : NSObject <NSSecureCoding>
+extern NSString *const kSantaNetworkExtensionProtocolVersion;
 
-@property(readonly) BOOL enable;
+@interface SNTNetworkExtensionQueue : NSObject
 
-- (instancetype)initWithEnable:(BOOL)enable;
+@property(readonly) NSString *connectedProtocolVersion;
 
-- (NSData *)serialize;
-+ (instancetype)deserialize:(NSData *)data;
+- (NSDictionary *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
+                                                  error:(NSError **)error;
 
 @end
