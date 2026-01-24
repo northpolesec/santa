@@ -685,6 +685,24 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   });
 }
 
+// Helper function to safely get the last error from a NATS connection as an NSString.
+// This copies the error text to avoid lifetime issues with the internal NATS buffer,
+// which may be overwritten by subsequent NATS operations.
+static NSString *GetNATSLastError(natsConnection *nc) {
+  if (!nc) {
+    return nil;
+  }
+
+  const char *lastError = NULL;
+  natsConnection_GetLastError(nc, &lastError);
+
+  // Copy to NSString to avoid lifetime issues.
+  if (lastError && *lastError != '\0') {
+    return @(lastError);
+  }
+  return nil;
+}
+
 // NATS error handler callback
 static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus err, void *closure) {
   if (!closure) return;
@@ -693,28 +711,31 @@ static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus e
   const char *statusText = natsStatus_GetText(err);
   const char *subSubject = sub ? natsSubscription_GetSubject(sub) : "unknown";
 
-  // Also get the detailed last error from the connection if available
-  const char *connLastError = NULL;
-  if (nc) {
-    natsConnection_GetLastError(nc, &connLastError);
-  }
+  // Get the detailed last error from the connection (safely copied to NSString)
+  NSString *connLastError = GetNATSLastError(nc);
 
   // Log with server context and both error sources
   NSString *errorDetail =
-      connLastError && strlen(connLastError) > 0 &&
-              (!statusText || strcmp(statusText, connLastError) != 0)
-          ? [NSString stringWithFormat:@"%s - %s", statusText ?: "unknown", connLastError]
+      connLastError.length > 0 && (!statusText || ![connLastError isEqualToString:@(statusText)])
+          ? [NSString stringWithFormat:@"%s - %@", statusText ?: "unknown", connLastError]
           : [NSString stringWithFormat:@"%s", statusText ?: "unknown"];
 
   LOGE(@"NATS Error on %@: %@ (status: %d) on subscription: %s", self.pushServer ?: @"server",
        errorDetail, err, subSubject);
 
-  // Check for specific error types
-  // NATS doesn't expose specific permission violation status, but we can check the error text
+  // Check for permission/subscription violations.
+  // NATS doesn't expose a specific permission violation status code, so we check the error text.
+  //
+  // We only schedule a manual reconnection if the connection has been closed by the server.
+  // This is because:
+  // 1. A "closed" connection is a terminal state - the NATS library will NOT automatically
+  //    reconnect from this state, so we must handle it ourselves.
+  // 2. A "disconnected" connection is transient - NATS handles reconnection automatically.
+  // 3. Subscription errors on an open connection are non-fatal - the connection remains
+  //    usable for other subscriptions, so no reconnection is needed.
   if (err == NATS_ERR || (statusText && strstr(statusText, "violation")) ||
       (statusText && strstr(statusText, "Permitted")) ||
-      (connLastError && strstr(connLastError, "violation")) ||
-      (connLastError && strstr(connLastError, "Permitted"))) {
+      [connLastError containsString:@"violation"] || [connLastError containsString:@"Permitted"]) {
     LOGE(@"NATS: Permission/Subscription violation on %@ subject: %s", self.pushServer ?: @"server",
          subSubject);
 
@@ -748,19 +769,16 @@ static void disconnectedCallback(natsConnection *nc, void *closure) {
   if (!closure) return;
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
 
-  // Get last error from NATS for better diagnostics
-  const char *lastError = NULL;
-  if (nc) {
-    natsConnection_GetLastError(nc, &lastError);
-  }
+  // Get last error from NATS (safely copied to NSString for use in async block)
+  NSString *lastError = GetNATSLastError(nc);
 
   NSString *errorInfo =
-      (lastError && strlen(lastError) > 0) ? [NSString stringWithFormat:@" - %s", lastError] : @"";
+      lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
   LOGW(@"NATS: Disconnected from %@%@", self.pushServer ?: @"server", errorInfo);
 
   dispatch_async(self.connectionQueue, ^{
-    if (lastError && strlen(lastError) > 0) {
-      self.lastConnectionError = @(lastError);
+    if (lastError.length > 0) {
+      self.lastConnectionError = lastError;
     }
     self.isConnected = NO;
   });
@@ -799,18 +817,16 @@ static void closedCallback(natsConnection *nc, void *closure) {
   if (!closure) return;
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
 
-  // Get last error from NATS for diagnostics
-  const char *lastError = NULL;
-  if (nc) {
-    natsConnection_GetLastError(nc, &lastError);
-  }
+  // Get last error from NATS (safely copied to NSString for use in async block)
+  NSString *lastError = GetNATSLastError(nc);
+
   NSString *errorInfo =
-      (lastError && strlen(lastError) > 0) ? [NSString stringWithFormat:@" - %s", lastError] : @"";
+      lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
   LOGI(@"NATS: Connection to %@ closed%@", self.pushServer ?: @"server", errorInfo);
 
   dispatch_async(self.connectionQueue, ^{
-    if (lastError && strlen(lastError) > 0) {
-      self.lastConnectionError = @(lastError);
+    if (lastError.length > 0) {
+      self.lastConnectionError = lastError;
     }
     self.isConnected = NO;
 
