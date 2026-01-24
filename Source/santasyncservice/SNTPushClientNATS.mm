@@ -94,6 +94,8 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
 @property(atomic) NSInteger retryAttempt;
 @property(atomic) BOOL isRetrying;
+// Track the last error for better retry diagnostics
+@property(nonatomic, copy) NSString *lastConnectionError;
 @end
 
 @implementation SNTPushClientNATS
@@ -374,7 +376,29 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     natsOptions_Destroy(opts);
 
     if (status != NATS_OK) {
-      LOGE(@"NATS: Failed to connect: %s", natsStatus_GetText(status));
+      // Capture detailed error information for diagnostics
+      const char *statusText = natsStatus_GetText(status);
+      NSString *errorDetail =
+          [NSString stringWithFormat:@"%s (code: %d)", statusText ?: "unknown", status];
+
+      // Categorize the error for better diagnostics
+      NSString *errorCategory;
+      switch (status) {
+        case NATS_TIMEOUT: errorCategory = @"TIMEOUT"; break;
+        case NATS_NO_SERVER: errorCategory = @"NO_SERVER"; break;
+        case NATS_IO_ERROR: errorCategory = @"IO_ERROR"; break;
+        case NATS_SECURE_CONNECTION_WANTED:
+        case NATS_SECURE_CONNECTION_REQUIRED:
+        case NATS_SSL_ERROR: errorCategory = @"TLS_ERROR"; break;
+        case NATS_CONNECTION_AUTH_FAILED:
+        case NATS_NOT_PERMITTED: errorCategory = @"AUTH_ERROR"; break;
+        case NATS_NO_RESPONDERS: errorCategory = @"NO_RESPONDERS"; break;
+        default: errorCategory = @"OTHER"; break;
+      }
+
+      self.lastConnectionError = [NSString stringWithFormat:@"[%@] %@", errorCategory, errorDetail];
+      LOGE(@"NATS: Failed to connect to %@ - %@ (category: %@)", serverURL, errorDetail,
+           errorCategory);
       [self scheduleConnectionRetry];
       return;
     }
@@ -382,6 +406,7 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     LOGI(@"NATS: Connected to %@", serverURL);
     self.conn = conn;
     self.isConnected = YES;
+    self.lastConnectionError = nil;
 
     // Reset retry state on successful connection
     self.retryAttempt = 0;
@@ -660,22 +685,59 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   });
 }
 
+// Helper function to safely get the last error from a NATS connection as an NSString.
+// This copies the error text to avoid lifetime issues with the internal NATS buffer,
+// which may be overwritten by subsequent NATS operations.
+static NSString *GetNATSLastError(natsConnection *nc) {
+  if (!nc) {
+    return nil;
+  }
+
+  const char *lastError = NULL;
+  natsConnection_GetLastError(nc, &lastError);
+
+  // Copy to NSString to avoid lifetime issues.
+  if (lastError && *lastError != '\0') {
+    return @(lastError);
+  }
+  return nil;
+}
+
 // NATS error handler callback
 static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus err, void *closure) {
   if (!closure) return;
 
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  const char *lastError = natsStatus_GetText(err);
+  const char *statusText = natsStatus_GetText(err);
   const char *subSubject = sub ? natsSubscription_GetSubject(sub) : "unknown";
 
-  LOGE(@"NATS Error: %s (status: %d) on subscription: %s", lastError ? lastError : "unknown error",
-       err, subSubject);
+  // Get the detailed last error from the connection (safely copied to NSString)
+  NSString *connLastError = GetNATSLastError(nc);
 
-  // Check for specific error types
-  // NATS doesn't expose specific permission violation status, but we can check the error text
-  if (err == NATS_ERR || (lastError && strstr(lastError, "violation")) ||
-      (lastError && strstr(lastError, "Permitted"))) {
-    LOGE(@"NATS: Permission/Subscription violation on subject: %s", subSubject);
+  // Log with server context and both error sources
+  NSString *errorDetail =
+      connLastError.length > 0 && (!statusText || ![connLastError isEqualToString:@(statusText)])
+          ? [NSString stringWithFormat:@"%s - %@", statusText ?: "unknown", connLastError]
+          : [NSString stringWithFormat:@"%s", statusText ?: "unknown"];
+
+  LOGE(@"NATS Error on %@: %@ (status: %d) on subscription: %s", self.pushServer ?: @"server",
+       errorDetail, err, subSubject);
+
+  // Check for permission/subscription violations.
+  // NATS doesn't expose a specific permission violation status code, so we check the error text.
+  //
+  // We only schedule a manual reconnection if the connection has been closed by the server.
+  // This is because:
+  // 1. A "closed" connection is a terminal state - the NATS library will NOT automatically
+  //    reconnect from this state, so we must handle it ourselves.
+  // 2. A "disconnected" connection is transient - NATS handles reconnection automatically.
+  // 3. Subscription errors on an open connection are non-fatal - the connection remains
+  //    usable for other subscriptions, so no reconnection is needed.
+  if (err == NATS_ERR || (statusText && strstr(statusText, "violation")) ||
+      (statusText && strstr(statusText, "Permitted")) ||
+      [connLastError containsString:@"violation"] || [connLastError containsString:@"Permitted"]) {
+    LOGE(@"NATS: Permission/Subscription violation on %@ subject: %s", self.pushServer ?: @"server",
+         subSubject);
 
     // Permission errors on subscriptions don't necessarily mean the connection is dead.
     // The connection may still be alive and other subscriptions may work.
@@ -686,15 +748,17 @@ static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus e
     // Verify if the connection is actually closed despite the permission error
     dispatch_async(self.connectionQueue, ^{
       if (self.conn && natsConnection_IsClosed(self.conn)) {
-        LOGE(@"NATS: Connection was closed by server due to permissions error, cleaning up and "
-             @"scheduling reconnect");
+        self.lastConnectionError = @"Permission violation - connection closed by server";
+        LOGE(@"NATS: Connection to %@ was closed by server due to permissions error, "
+             @"cleaning up and scheduling reconnect",
+             self.pushServer ?: @"server");
         self.isConnected = NO;
         natsConnection_Destroy(self.conn);
         self.conn = NULL;
         [self scheduleConnectionRetry];
       } else {
-        LOGD(@"NATS: Connection still alive despite subscription error on %s, continuing",
-             subSubject);
+        LOGD(@"NATS: Connection to %@ still alive despite subscription error on %s, continuing",
+             self.pushServer ?: @"server", subSubject);
       }
     });
   }
@@ -704,8 +768,18 @@ static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus e
 static void disconnectedCallback(natsConnection *nc, void *closure) {
   if (!closure) return;
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  LOGW(@"NATS: Disconnected from server");
+
+  // Get last error from NATS (safely copied to NSString for use in async block)
+  NSString *lastError = GetNATSLastError(nc);
+
+  NSString *errorInfo =
+      lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
+  LOGW(@"NATS: Disconnected from %@%@", self.pushServer ?: @"server", errorInfo);
+
   dispatch_async(self.connectionQueue, ^{
+    if (lastError.length > 0) {
+      self.lastConnectionError = lastError;
+    }
     self.isConnected = NO;
   });
 }
@@ -714,9 +788,10 @@ static void disconnectedCallback(natsConnection *nc, void *closure) {
 static void reconnectedCallback(natsConnection *nc, void *closure) {
   if (!closure) return;
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  LOGI(@"NATS: Reconnected to server");
+  LOGI(@"NATS: Reconnected to %@", self.pushServer ?: @"server");
   dispatch_async(self.connectionQueue, ^{
     self.isConnected = YES;
+    self.lastConnectionError = nil;
 
     // Trigger sync with jitter to avoid thundering herd
     // We might have missed push notifications while disconnected
@@ -741,15 +816,26 @@ static void reconnectedCallback(natsConnection *nc, void *closure) {
 static void closedCallback(natsConnection *nc, void *closure) {
   if (!closure) return;
   SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  LOGI(@"NATS: Connection closed");
+
+  // Get last error from NATS (safely copied to NSString for use in async block)
+  NSString *lastError = GetNATSLastError(nc);
+
+  NSString *errorInfo =
+      lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
+  LOGI(@"NATS: Connection to %@ closed%@", self.pushServer ?: @"server", errorInfo);
+
   dispatch_async(self.connectionQueue, ^{
+    if (lastError.length > 0) {
+      self.lastConnectionError = lastError;
+    }
     self.isConnected = NO;
 
     // If we're not shutting down, schedule a reconnection attempt
     // The closed callback is called when the connection is permanently closed
     // and NATS won't automatically reconnect, so we need to do it ourselves
     if (!self.isShuttingDown && self.conn) {
-      LOGI(@"NATS: Connection closed unexpectedly, cleaning up and scheduling reconnect");
+      LOGI(@"NATS: Connection to %@ closed unexpectedly, cleaning up and scheduling reconnect",
+           self.pushServer ?: @"server");
 
       // Clean up the closed connection
       natsConnection_Destroy(self.conn);
@@ -781,8 +867,11 @@ static void closedCallback(natsConnection *nc, void *closure) {
     currentRetryDelay = 300.0 + arc4random_uniform(301);  // 5-10 minutes
   }
 
-  LOGW(@"NATS: Connection failed, will retry in %.1f seconds (attempt %ld)", currentRetryDelay,
-       (long)self.retryAttempt);
+  LOGW(@"NATS: Connection to %@ failed%@, will retry in %.1f seconds (attempt %ld)",
+       self.pushServer ?: @"server",
+       self.lastConnectionError ? [NSString stringWithFormat:@" (%@)", self.lastConnectionError]
+                                : @"",
+       currentRetryDelay, (long)self.retryAttempt);
 
   // Cancel any existing retry timer
   if (self.connectionRetryTimer) {
