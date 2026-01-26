@@ -106,7 +106,10 @@ objc_library(
         ],
     }),
     sdk_dylibs = ["libz"],
-    sdk_frameworks = ["IOKit"],
+    sdk_frameworks = [
+        "IOKit",
+        "SystemConfiguration",
+    ],
     deps = [
         ":SNTCommandCommand",
         ":SNTCommandInstall",
