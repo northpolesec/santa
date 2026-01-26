@@ -16,33 +16,6 @@
 
 #import <Foundation/Foundation.h>
 
-/// Result of a security assessment (equivalent to `spctl --assess`).
-@interface SNTAssessmentResult : NSObject
-
-/// Whether the assessment was skipped (e.g., not an app bundle).
-@property(nonatomic, readonly) BOOL skipped;
-
-/// Whether the binary was accepted by the security assessment.
-@property(nonatomic, readonly) BOOL accepted;
-
-/// The source of the assessment (e.g., "Apple System", "Developer ID", "Notarized Developer ID").
-@property(nonatomic, readonly) NSString *source;
-
-/// The signer/originator of the binary.
-@property(nonatomic, readonly) NSString *originator;
-
-/// The reason for rejection, failure, or skipping.
-@property(nonatomic, readonly) NSString *reason;
-
-- (instancetype)initWithAccepted:(BOOL)accepted
-                          source:(NSString *)source
-                      originator:(NSString *)originator
-                          reason:(NSString *)reason;
-- (instancetype)initRejectedWithReason:(NSString *)reason;
-- (instancetype)initSkippedWithReason:(NSString *)reason;
-
-@end
-
 /**
   `MOLCodesignChecker` validates a binary (either on-disk or in memory) has been signed
   and if so allows for pulling out the certificates that were used to sign it.
@@ -83,14 +56,6 @@
           architecture is not found in the binary or this is not a universal binary.
 */
 - (NSString *)validationStatusForArchitecture:(NSString *)architecture;
-
-/**
-  Performs a security assessment (equivalent to `spctl --assess`) on the binary.
-
-  @return An SNTAssessmentResult containing the assessment results,
-          or nil if the assessment could not be performed.
-*/
-- (SNTAssessmentResult *)securityAssessment;
 
 /**
   An array of `MOLCertificate` objects representing the chain that signed this binary.

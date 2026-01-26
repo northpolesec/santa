@@ -16,7 +16,6 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #import <Security/Security.h>
-#include <sys/cdefs.h>
 
 #include <mach-o/arch.h>
 #include <mach-o/fat.h>
@@ -25,6 +24,10 @@
 #import "Source/common/MOLCertificate.h"
 #include "Source/common/ScopedCFTypeRef.h"
 #include "Source/common/String.h"
+
+using ScopedCFError = santa::ScopedCFTypeRef<CFErrorRef>;
+using ScopedCFString = santa::ScopedCFTypeRef<CFStringRef>;
+using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
 
 /**
   kStaticSigningFlags are the flags used when validating signatures on disk.
@@ -61,72 +64,6 @@ static const SecCSFlags kStaticSigningFlags =
 static const SecCSFlags kSigningFlags = kSecCSDefaultFlags;
 
 NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcodesignchecker";
-
-__BEGIN_DECLS
-
-// SecAssessment API declarations - these exist in Security.framework but lack public headers
-typedef const struct __SecAssessment *SecAssessmentRef;
-static const uint64_t kSecAssessmentDefaultFlags = 0;
-
-extern SecAssessmentRef SecAssessmentCreate(CFURLRef path, uint64_t flags, CFDictionaryRef context,
-                                            CFErrorRef *errors);
-extern CFDictionaryRef SecAssessmentCopyResult(SecAssessmentRef assessment, uint64_t flags,
-                                               CFErrorRef *errors);
-extern CFStringRef kSecAssessmentAssessmentVerdict;
-extern CFStringRef kSecAssessmentAssessmentAuthority;
-extern CFStringRef kSecAssessmentAssessmentSource;
-extern CFStringRef kSecAssessmentAssessmentOriginator;
-extern CFStringRef kSecAssessmentContextKeyOperation;
-extern CFStringRef kSecAssessmentOperationTypeExecute;
-
-__END_DECLS
-
-using ScopedCFError = santa::ScopedCFTypeRef<CFErrorRef>;
-using ScopedCFString = santa::ScopedCFTypeRef<CFStringRef>;
-using ScopedSecAssessment = santa::ScopedCFTypeRef<SecAssessmentRef>;
-using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
-
-@implementation SNTAssessmentResult
-
-- (instancetype)initWithAccepted:(BOOL)accepted
-                         skipped:(BOOL)skipped
-                          source:(NSString *)source
-                      originator:(NSString *)originator
-                          reason:(NSString *)reason {
-  self = [super init];
-  if (self) {
-    _accepted = accepted;
-    _source = [source copy];
-    _originator = [originator copy];
-    _reason = [reason copy];
-  }
-  return self;
-}
-
-- (instancetype)initWithAccepted:(BOOL)accepted
-                          source:(NSString *)source
-                      originator:(NSString *)originator
-                          reason:(NSString *)reason {
-  return [self initWithAccepted:accepted
-                        skipped:NO
-                         source:source
-                     originator:originator
-                         reason:reason];
-}
-
-- (instancetype)initRejectedWithReason:(NSString *)reason {
-  return [self initWithAccepted:NO source:nil originator:nil reason:reason];
-}
-
-- (instancetype)initSkippedWithReason:(NSString *)reason {
-  return [self initWithAccepted:NO
-                        skipped:YES
-                         source:nil
-                     originator:nil
-                         reason:reason];
-}
-
-@end
 
 @interface MOLCodesignChecker ()
 /// Cached designated requirement
@@ -391,63 +328,6 @@ using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
           errSecSuccess);
 }
 
-- (SNTAssessmentResult *)securityAssessment {
-  if (!self.binaryPath) return nil;
-
-  // Security assessment (spctl --assess) is only meaningful for app bundles
-  NSBundle *bundle = [NSBundle bundleWithPath:self.binaryPath];
-  if (!bundle || !bundle.bundleIdentifier) {
-    return [[SNTAssessmentResult alloc] initSkippedWithReason:@"not part of an app bundle"];
-  }
-
-  NSURL *url = [NSURL fileURLWithPath:self.binaryPath];
-
-  auto [assessmentRef, createError] = ScopedCFError::AssumeFrom([&](CFErrorRef *out) {
-    return ScopedSecAssessment::Assume(SecAssessmentCreate(
-        (__bridge CFURLRef)url, kSecAssessmentDefaultFlags, (__bridge CFDictionaryRef) @{}, out));
-  });
-  if (!assessmentRef) {
-    return [self rejectedAssessmentWithError:createError];
-  }
-
-  auto [result, resultError] = ScopedCFError::AssumeFrom(
-      [&](CFErrorRef *out) { return SecAssessmentCopyResult(assessmentRef.Unsafe(), 0, out); });
-  if (!result) {
-    return [self rejectedAssessmentWithError:resultError];
-  }
-
-  NSDictionary *resultDict = CFBridgingRelease(result);
-
-  BOOL accepted = [resultDict[(__bridge NSString *)kSecAssessmentAssessmentVerdict] boolValue];
-  NSString *source = nil;
-  NSString *originator = nil;
-  NSString *reason = nil;
-
-  NSDictionary *authority = resultDict[(__bridge NSString *)kSecAssessmentAssessmentAuthority];
-  if (authority) {
-    source = authority[(__bridge NSString *)kSecAssessmentAssessmentSource];
-    originator = authority[(__bridge NSString *)kSecAssessmentAssessmentOriginator];
-  }
-
-  // If rejected, try to get the reason from the CS error code
-  if (!accepted) {
-    NSNumber *csError = resultDict[@"assessment:cserror"];
-    if (csError) {
-      OSStatus csErrorCode = [csError intValue];
-      ScopedCFString errorMessage =
-          ScopedCFString::Assume(SecCopyErrorMessageString(csErrorCode, NULL));
-      if (errorMessage) {
-        reason = errorMessage.BridgeRelease<NSString *>();
-      }
-    }
-  }
-
-  return [[SNTAssessmentResult alloc] initWithAccepted:accepted
-                                                source:source
-                                            originator:originator
-                                                reason:reason];
-}
-
 - (NSString *)validationStatusForArchitecture:(NSString *)architecture {
   NSDictionary *offsets;
   if (_binaryFileDescriptor == -1) {
@@ -512,23 +392,6 @@ using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
 }
 
 #pragma mark Private
-
-- (SNTAssessmentResult *)rejectedAssessmentWithError:(const ScopedCFError &)scopedError {
-  NSString *reason;
-  if (scopedError) {
-    OSStatus errorCode = (OSStatus)CFErrorGetCode(scopedError.Unsafe());
-    ScopedCFString errorMessage =
-        ScopedCFString::Assume(SecCopyErrorMessageString(errorCode, NULL));
-    if (errorMessage) {
-      reason = [NSString stringWithFormat:@"%@ (%d)", errorMessage.Bridge<NSString *>(), errorCode];
-    } else {
-      reason = [NSString stringWithFormat:@"error %d", errorCode];
-    }
-  } else {
-    reason = @"Assessment failed";
-  }
-  return [[SNTAssessmentResult alloc] initRejectedWithReason:reason];
-}
 
 - (NSError *)errorWithCode:(OSStatus)code description:(NSString *)description {
   if (!description) {

@@ -46,7 +46,7 @@ static NSString *const kType = @"Type";
 static NSString *const kPageZero = @"Page Zero";
 static NSString *const kCodeSigned = @"Code-signed";
 static NSString *const kValidation = @"Validation";
-static NSString *const kAssessment = @"Assessment";
+static NSString *const kAssessment = @"Security Assessment";
 static NSString *const kRule = @"Rule";
 static NSString *const kSigningChain = @"Signing Chain";
 static NSString *const kUniversalSigningChain = @"Universal Signing Chain";
@@ -414,10 +414,49 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     // Assessment only applies to Mach-O binaries
     if (!fileInfo.isMachO) return nil;
 
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
-    if (!csc) return nil;
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/sbin/spctl"];
+    task.arguments = @[ @"--assess", @"-vv", fileInfo.path ];
 
-    return [csc securityAssessment];
+    NSPipe *stdoutPipe = [NSPipe pipe];
+    NSPipe *stderrPipe = [NSPipe pipe];
+    task.standardOutput = stdoutPipe;
+    task.standardError = stderrPipe;
+
+    NSError *error;
+    if (![task launchAndReturnError:&error]) {
+      return [NSString stringWithFormat:@"Failed to run spctl: %@", error.localizedDescription];
+    }
+
+    // Wait for the task to complete with a timeout
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      [task waitUntilExit];
+      dispatch_semaphore_signal(sema);
+    });
+
+    if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
+      [task terminate];
+      return @"spctl timed out";
+    }
+
+    NSData *stdoutData = [stdoutPipe.fileHandleForReading readDataToEndOfFile];
+    NSData *stderrData = [stderrPipe.fileHandleForReading readDataToEndOfFile];
+
+    NSMutableString *output = [NSMutableString string];
+    if (stdoutData.length > 0) {
+      [output appendString:[[NSString alloc] initWithData:stdoutData
+                                                 encoding:NSUTF8StringEncoding]];
+    }
+    if (stderrData.length > 0) {
+      if (output.length > 0) [output appendString:@"\n"];
+      [output appendString:[[NSString alloc] initWithData:stderrData
+                                                 encoding:NSUTF8StringEncoding]];
+    }
+
+    NSString *trimmed =
+        [output stringByTrimmingCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    return trimmed.length > 0 ? trimmed : nil;
   };
 }
 
@@ -870,7 +909,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       } else if ([key isEqual:kValidation]) {
         [output appendString:[self stringForValidation:outputDict[key]]];
       } else if ([key isEqual:kAssessment]) {
-        [output appendString:[self stringForAssessment:outputDict[key]]];
+        [output appendString:[self stringForAssessment:outputDict[key] filePath:fileInfo.path]];
       } else {
         if (singleKey) {
           [output appendFormat:@"%@\n", outputDict[key]];
@@ -1137,42 +1176,47 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 - (NSString *)stringForValidation:(NSArray *)validation {
   if (!validation.count) return @"";
   NSMutableString *result = [NSMutableString string];
-  [result appendString:@"    Validation:\n"];
+  [result appendFormat:@"%@:\n", kValidation];
   int i = 0;
   for (NSDictionary *archInfo in validation) {
     NSString *arch = archInfo[@"arch"];
     NSString *status = archInfo[@"status"];
     NSString *archLabel = [NSString stringWithFormat:@"%d. %@", ++i, arch];
-    [result appendFormat:@"        %-15s: %@\n", archLabel.UTF8String, status];
+    [result
+        appendFormat:@"    %-*s: %@\n", (int)self.maxKeyWidth - 4, archLabel.UTF8String, status];
   }
   return result.copy;
 }
 
-- (NSString *)stringForAssessment:(SNTAssessmentResult *)assessment {
-  if (!assessment) return @"";
+- (NSString *)stringForAssessment:(NSString *)assessment filePath:(NSString *)filePath {
+  if (!assessment.length) return @"";
+
+  NSArray<NSString *> *lines = [assessment componentsSeparatedByString:@"\n"];
+  NSMutableArray<NSString *> *processedLines = [NSMutableArray arrayWithCapacity:lines.count];
+
+  // Process lines, stripping the file path prefix if present
+  NSString *pathPrefix = [NSString stringWithFormat:@"%@: ", filePath];
+  for (NSString *line in lines) {
+    if ([line hasPrefix:pathPrefix]) {
+      [processedLines addObject:[line substringFromIndex:pathPrefix.length]];
+    } else {
+      [processedLines addObject:line];
+    }
+  }
+
   NSMutableString *result = [NSMutableString string];
-  [result appendString:@"    Assessment         : "];
 
-  if (assessment.skipped) {
-    [result appendFormat:@"Skipped (%@)\n", assessment.reason ?: @"unknown reason"];
-    return result.copy;
-  }
+  // First line with label
+  [result appendFormat:@"%-*s: %@\n", (int)self.maxKeyWidth, kAssessment.UTF8String,
+                       processedLines.firstObject];
 
-  if (assessment.accepted) {
-    [result appendString:@"Accepted"];
-    if (assessment.source) {
-      [result appendFormat:@" (%@)", assessment.source];
-    }
-  } else {
-    [result appendString:@"Rejected"];
-    // Prefer the human-readable reason over the source when rejected
-    if (assessment.reason) {
-      [result appendFormat:@" (%@)", assessment.reason];
-    } else if (assessment.source) {
-      [result appendFormat:@" (%@)", assessment.source];
-    }
+  // Subsequent lines indented to align after ": "
+  NSString *indent = [@"" stringByPaddingToLength:self.maxKeyWidth + 2
+                                       withString:@" "
+                                  startingAtIndex:0];
+  for (NSUInteger i = 1; i < processedLines.count; i++) {
+    [result appendFormat:@"%@%@\n", indent, processedLines[i]];
   }
-  [result appendString:@"\n"];
 
   return result.copy;
 }
