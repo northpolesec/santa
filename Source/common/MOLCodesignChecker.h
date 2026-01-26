@@ -49,6 +49,15 @@
 @property(readonly) NSArray *universalSigningInformation;
 
 /**
+  Validates the code signature for a specific architecture in a universal binary.
+
+  @param architecture The architecture name to validate (e.g., "arm64", "x86_64")
+  @return A human-readable status string describing the verification result, or nil if the
+          architecture is not found in the binary or this is not a universal binary.
+*/
+- (NSString *)validationStatusForArchitecture:(NSString *)architecture;
+
+/**
   An array of `MOLCertificate` objects representing the chain that signed this binary.
 
   @see [MOLCertificate](http://cocoadocs.org/docsets/MOLCertificate)

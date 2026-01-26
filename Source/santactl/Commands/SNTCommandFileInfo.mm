@@ -45,6 +45,8 @@ static NSString *const kDownloadAgent = @"Download Agent";
 static NSString *const kType = @"Type";
 static NSString *const kPageZero = @"Page Zero";
 static NSString *const kCodeSigned = @"Code-signed";
+static NSString *const kValidation = @"Validation";
+static NSString *const kAssessment = @"Security Assessment";
 static NSString *const kRule = @"Rule";
 static NSString *const kSigningChain = @"Signing Chain";
 static NSString *const kUniversalSigningChain = @"Universal Signing Chain";
@@ -93,6 +95,7 @@ NSString *formattedStringForKeyArray(NSArray<NSString *> *array) {
 @property(nonatomic) BOOL bundleInfo;
 @property(nonatomic) BOOL enableEntitlements;
 @property(nonatomic) BOOL filterInclusive;
+@property(nonatomic) BOOL enableVerify;
 @property(nonatomic) NSNumber *certIndex;
 @property(nonatomic, copy) NSArray<NSString *> *outputKeyList;
 @property(nonatomic, copy) NSDictionary<NSString *, NSRegularExpression *> *outputFilters;
@@ -138,6 +141,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 @property(readonly, copy, nonatomic) SNTAttributeBlock type;
 @property(readonly, copy, nonatomic) SNTAttributeBlock pageZero;
 @property(readonly, copy, nonatomic) SNTAttributeBlock codeSigned;
+@property(readonly, copy, nonatomic) SNTAttributeBlock validation;
+@property(readonly, copy, nonatomic) SNTAttributeBlock assessment;
 @property(readonly, copy, nonatomic) SNTAttributeBlock rule;
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock universalSigningChain;
@@ -206,6 +211,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           @"    --filter-inclusive: If multiple filters are specified, they must all match\n"
           @"                        for the file to be displayed.\n"
           @"    --entitlements: If the file has entitlements, will also display them\n"
+          @"    --verify: Perform code signature validation and security assessment. The\n"
+          @"              security assessment will be performed by /usr/bin/spctl.\n"
           @"    --bundleinfo: If the file is part of a bundle, will also display bundle\n"
           @"                  hash information and hashes of all bundle executables.\n"
           @"                  Incompatible with --recursive and --cert-index.\n"
@@ -241,6 +248,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     kType,
     kPageZero,
     kCodeSigned,
+    kAssessment,
+    kValidation,
     kSecureSigningTime,
     kSigningTime,
     kRule,
@@ -275,6 +284,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kType : self.type,
       kPageZero : self.pageZero,
       kCodeSigned : self.codeSigned,
+      kValidation : self.validation,
+      kAssessment : self.assessment,
       kRule : self.rule,
       kSigningChain : self.signingChain,
       kUniversalSigningChain : self.universalSigningChain,
@@ -377,6 +388,84 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 - (SNTAttributeBlock)codeSigned {
   return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
     return [fileInfo codesignStatus];
+  };
+}
+
+- (SNTAttributeBlock)validation {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    NSArray *archs = [fileInfo architectures];
+    if (archs.count == 0) return nil;
+
+    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+    if (!csc) return nil;
+
+    NSMutableArray *results = [NSMutableArray arrayWithCapacity:archs.count];
+    for (NSString *arch in archs) {
+      NSString *status = [csc validationStatusForArchitecture:arch];
+      if (status) {
+        [results addObject:@{@"arch" : arch, @"status" : status}];
+      }
+    }
+    return results.count ? results : nil;
+  };
+}
+
+- (SNTAttributeBlock)assessment {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    // Assessment only applies to Mach-O binaries
+    if (!fileInfo.isMachO) return nil;
+
+    // Verify spctl is the expected Apple platform binary before executing
+    static NSString *const spctlPath = @"/usr/sbin/spctl";
+    MOLCodesignChecker *spctlChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:spctlPath];
+    if (!spctlChecker.platformBinary ||
+        ![spctlChecker.signingID isEqualToString:@"com.apple.spctl"]) {
+      return @"Unable to locate suitable spctl binary";
+    }
+
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:spctlPath];
+    task.arguments = @[ @"--assess", @"-vv", fileInfo.path ];
+
+    NSPipe *stdoutPipe = [NSPipe pipe];
+    NSPipe *stderrPipe = [NSPipe pipe];
+    task.standardOutput = stdoutPipe;
+    task.standardError = stderrPipe;
+
+    NSError *error;
+    if (![task launchAndReturnError:&error]) {
+      return [NSString stringWithFormat:@"Failed to run spctl: %@", error.localizedDescription];
+    }
+
+    // Wait for the task to complete with a timeout
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      [task waitUntilExit];
+      dispatch_semaphore_signal(sema);
+    });
+
+    if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
+      [task terminate];
+      return @"spctl timed out";
+    }
+
+    NSData *stdoutData = [stdoutPipe.fileHandleForReading readDataToEndOfFile];
+    NSData *stderrData = [stderrPipe.fileHandleForReading readDataToEndOfFile];
+
+    NSMutableString *output = [NSMutableString string];
+    if (stdoutData.length > 0) {
+      [output appendString:[[NSString alloc] initWithData:stdoutData
+                                                 encoding:NSUTF8StringEncoding]];
+    }
+    if (stderrData.length > 0) {
+      if (output.length > 0) [output appendString:@"\n"];
+      [output appendString:[[NSString alloc] initWithData:stderrData
+                                                 encoding:NSUTF8StringEncoding]];
+    }
+
+    NSString *trimmed =
+        [output stringByTrimmingCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    return trimmed.length > 0 ? trimmed : nil;
   };
 }
 
@@ -802,6 +891,11 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     [outputDict removeObjectForKey:kEntitlements];
   }
 
+  if (!self.enableVerify) {
+    [outputDict removeObjectForKey:kAssessment];
+    [outputDict removeObjectForKey:kValidation];
+  }
+
   // If there's nothing in the outputDict, then don't need to print anything.
   if (!outputDict.count) return;
 
@@ -821,6 +915,10 @@ REGISTER_COMMAND_NAME(@"fileinfo")
         [output appendString:[self stringForSigningChain:outputDict[key] key:key]];
       } else if ([key isEqual:kEntitlements]) {
         [output appendString:[self stringForEntitlements:outputDict[key] key:key]];
+      } else if ([key isEqual:kValidation]) {
+        [output appendString:[self stringForValidation:outputDict[key]]];
+      } else if ([key isEqual:kAssessment]) {
+        [output appendString:[self stringForAssessment:outputDict[key] filePath:fileInfo.path]];
       } else {
         if (singleKey) {
           [output appendFormat:@"%@\n", outputDict[key]];
@@ -929,6 +1027,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       self.bundleInfo = YES;
     } else if ([arg caseInsensitiveCompare:@"--entitlements"] == NSOrderedSame) {
       self.enableEntitlements = YES;
+    } else if ([arg caseInsensitiveCompare:@"--verify"] == NSOrderedSame) {
+      self.enableVerify = YES;
     } else if ([arg caseInsensitiveCompare:@"--filter-inclusive"] == NSOrderedSame) {
       self.filterInclusive = YES;
     } else if ([arg caseInsensitiveCompare:@"--localtz"] == NSOrderedSame) {
@@ -967,6 +1067,10 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       // get no output even if there are entitlements.
       if ([key isEqualToString:kEntitlements]) {
         self.enableEntitlements = YES;
+      }
+      // If user specifically asked for validation or assessment, enable verification.
+      if ([key isEqualToString:kValidation] || [key isEqualToString:kAssessment]) {
+        self.enableVerify = YES;
       }
     }
     for (NSString *key in filters) {
@@ -1075,6 +1179,54 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     // This entitlement has a more complex value, so print it as-is.
     [result appendFormat:@"   %2d. %@: %@\n", ++i, key, obj];
   }];
+  return result.copy;
+}
+
+- (NSString *)stringForValidation:(NSArray *)validation {
+  if (!validation.count) return @"";
+  NSMutableString *result = [NSMutableString string];
+  [result appendFormat:@"%@:\n", kValidation];
+  int i = 0;
+  for (NSDictionary *archInfo in validation) {
+    NSString *arch = archInfo[@"arch"];
+    NSString *status = archInfo[@"status"];
+    NSString *archLabel = [NSString stringWithFormat:@"%d. %@", ++i, arch];
+    [result
+        appendFormat:@"    %-*s: %@\n", (int)self.maxKeyWidth - 4, archLabel.UTF8String, status];
+  }
+  return result.copy;
+}
+
+- (NSString *)stringForAssessment:(NSString *)assessment filePath:(NSString *)filePath {
+  if (!assessment.length) return @"";
+
+  NSArray<NSString *> *lines = [assessment componentsSeparatedByString:@"\n"];
+  NSMutableArray<NSString *> *processedLines = [NSMutableArray arrayWithCapacity:lines.count];
+
+  // Process lines, stripping the file path prefix if present
+  NSString *pathPrefix = [NSString stringWithFormat:@"%@: ", filePath];
+  for (NSString *line in lines) {
+    if ([line hasPrefix:pathPrefix]) {
+      [processedLines addObject:[line substringFromIndex:pathPrefix.length]];
+    } else {
+      [processedLines addObject:line];
+    }
+  }
+
+  NSMutableString *result = [NSMutableString string];
+
+  // First line with label
+  [result appendFormat:@"%-*s: %@\n", (int)self.maxKeyWidth, kAssessment.UTF8String,
+                       processedLines.firstObject];
+
+  // Subsequent lines indented to align after ": "
+  NSString *indent = [@"" stringByPaddingToLength:self.maxKeyWidth + 2
+                                       withString:@" "
+                                  startingAtIndex:0];
+  for (NSUInteger i = 1; i < processedLines.count; i++) {
+    [result appendFormat:@"%@%@\n", indent, processedLines[i]];
+  }
+
   return result.copy;
 }
 
