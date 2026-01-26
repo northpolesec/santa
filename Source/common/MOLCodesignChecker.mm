@@ -26,6 +26,8 @@
 #include "Source/common/String.h"
 
 using ScopedCFError = santa::ScopedCFTypeRef<CFErrorRef>;
+using ScopedCFString = santa::ScopedCFTypeRef<CFStringRef>;
+using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
 
 /**
   kStaticSigningFlags are the flags used when validating signatures on disk.
@@ -324,6 +326,69 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   if (!requirement) return NO;
   return (SecStaticCodeCheckValidity(self.codeRef, kStaticSigningFlags, requirement) ==
           errSecSuccess);
+}
+
+- (NSString *)validationStatusForArchitecture:(NSString *)architecture {
+  NSDictionary *offsets;
+  if (_binaryFileDescriptor == -1) {
+    offsets = [self architectureAndOffsetsForUniversalBinaryPath:self.binaryPath];
+  } else {
+    offsets = [self architectureAndOffsetsForFileDescriptor:_binaryFileDescriptor];
+  }
+
+  ScopedSecStaticCode scopedCodeRef;
+  SecStaticCodeRef codeRef = NULL;
+
+  if (offsets) {
+    NSNumber *offset = offsets[architecture];
+    if (!offset) return nil;
+
+    NSDictionary *attributes =
+        @{(__bridge NSString *)kSecCodeAttributeUniversalFileOffset : offset};
+    SecStaticCodeRef newCodeRef = NULL;
+    OSStatus createStatus = SecStaticCodeCreateWithPathAndAttributes(
+        (__bridge CFURLRef)[NSURL fileURLWithPath:self.binaryPath], kSecCSDefaultFlags,
+        (__bridge CFDictionaryRef)attributes, &newCodeRef);
+
+    if (createStatus != errSecSuccess || !newCodeRef) {
+      return @"Failed to create code reference";
+    }
+    scopedCodeRef = ScopedSecStaticCode::Assume(newCodeRef);
+    codeRef = scopedCodeRef.Unsafe();
+  } else {
+    // Single-architecture binary - use the existing code ref
+    codeRef = self.codeRef;
+  }
+
+  auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef *out) {
+    return SecStaticCodeCheckValidityWithErrors(codeRef, kStaticSigningFlags, NULL, out);
+  });
+
+  if (status == errSecSuccess) {
+    // Check if it's ad-hoc signed
+    CFDictionaryRef signingDict = NULL;
+    SecCodeCopySigningInformation(codeRef, kSecCSSigningInformation, &signingDict);
+    NSDictionary *info = CFBridgingRelease(signingDict);
+    int flags = [info[(__bridge id)kSecCodeInfoFlags] intValue];
+    if (flags & kSecCodeSignatureAdhoc) {
+      return @"Ad-hoc signed";
+    }
+    return @"Valid on disk";
+  }
+
+  if (status == errSecCSUnsigned) {
+    return @"Unsigned";
+  }
+
+  // Get a human-readable error message
+  if (scopedError) {
+    return [NSString
+        stringWithFormat:@"Invalid (%@)",
+                         scopedError.Bridge<NSError *>().localizedDescription ?: @"unknown"];
+  }
+  ScopedCFString errorMessage = ScopedCFString::Assume(SecCopyErrorMessageString(status, NULL));
+  return
+      [NSString stringWithFormat:@"Invalid (%@)", errorMessage.Bridge<NSString *>() ?: @"unknown"];
 }
 
 #pragma mark Private
