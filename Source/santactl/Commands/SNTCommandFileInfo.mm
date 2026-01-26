@@ -211,7 +211,8 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           @"    --filter-inclusive: If multiple filters are specified, they must all match\n"
           @"                        for the file to be displayed.\n"
           @"    --entitlements: If the file has entitlements, will also display them\n"
-          @"    --verify: Perform code signature validation and security assessment\n"
+          @"    --verify: Perform code signature validation and security assessment. The\n"
+          @"              security assessment will be performed by /usr/bin/spctl.\n"
           @"    --bundleinfo: If the file is part of a bundle, will also display bundle\n"
           @"                  hash information and hashes of all bundle executables.\n"
           @"                  Incompatible with --recursive and --cert-index.\n"
@@ -414,8 +415,16 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     // Assessment only applies to Mach-O binaries
     if (!fileInfo.isMachO) return nil;
 
+    // Verify spctl is the expected Apple platform binary before executing
+    static NSString *const spctlPath = @"/usr/sbin/spctl";
+    MOLCodesignChecker *spctlChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:spctlPath];
+    if (!spctlChecker.platformBinary ||
+        ![spctlChecker.signingID isEqualToString:@"com.apple.spctl"]) {
+      return @"Unable to locate suitable spctl binary";
+    }
+
     NSTask *task = [[NSTask alloc] init];
-    task.executableURL = [NSURL fileURLWithPath:@"/usr/sbin/spctl"];
+    task.executableURL = [NSURL fileURLWithPath:spctlPath];
     task.arguments = @[ @"--assess", @"-vv", fileInfo.path ];
 
     NSPipe *stdoutPipe = [NSPipe pipe];
