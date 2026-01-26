@@ -13,6 +13,7 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#import <SystemConfiguration/SystemConfiguration.h>
 
 #include <libproc.h>
 #include <unistd.h>
@@ -47,6 +48,15 @@ void print(NSString *format, ...) {
   }
   vfprintf(stdout, format.UTF8String, args);
   va_end(args);
+}
+
+// Returns YES if a user is logged in at the GUI console, NO otherwise.
+// When at the login screen (no user logged in), console user will be "loginwindow" with uid 0.
+BOOL IsConsoleUserLoggedIn() {
+  uid_t uid;
+  CFBridgingRelease(SCDynamicStoreCopyConsoleUser(NULL, &uid, NULL));
+  // uid 0 indicates no user is logged in (loginwindow or root)
+  return uid > 0;
 }
 
 @implementation SNTCommandDoctor
@@ -107,6 +117,7 @@ REGISTER_COMMAND_NAME(@"doctor")
     if ([nsName isEqualToString:@"santasyncservice"]) foundSantaSyncService = YES;
   }
 
+  foundSanta = foundSanta || !IsConsoleUserLoggedIn();
   if (!foundSanta) {
     print(@"[-] Santa GUI process doesn't seem to be running");
   }
@@ -155,6 +166,8 @@ REGISTER_COMMAND_NAME(@"doctor")
     return YES;
   }
   print(@"[+] Sync is enabled");
+  print(@"[+] Machine ID: %s", config.machineID.UTF8String ?: "(not set)");
+  print(@"[+] Machine Owner: %s", config.machineOwner.UTF8String ?: "(not set)");
 
   if (![syncBaseURL.scheme isEqualToString:@"https"]) {
     print(@"[-] Sync is not using HTTPS");
