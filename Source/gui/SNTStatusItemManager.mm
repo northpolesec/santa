@@ -340,7 +340,9 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   __block BOOL hasVisibleWindows = NO;
   [NSApp enumerateWindowsWithOptions:0
                           usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
-                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")]) return;
+                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")]) {
+                              return;
+                            }
                             *stop = hasVisibleWindows = window.visible;
                           }];
   return hasVisibleWindows;
