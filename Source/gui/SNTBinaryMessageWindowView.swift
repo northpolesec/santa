@@ -250,8 +250,17 @@ struct SNTBinaryMessageWindowView: View {
 
   @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
+  @State private var repliedToCallback = false
 
   let c = SNTConfigurator.configurator()
+
+  func callReplyCallback(_ response: Bool) {
+    guard !repliedToCallback else { return }
+    if let cb = replyCallback {
+      cb(false)
+    }
+    repliedToCallback = true
+  }
 
   func getDismissText() -> String? {
     if event?.needsBundleHash ?? false && !bundleProgress.isFinished {
@@ -290,13 +299,15 @@ struct SNTBinaryMessageWindowView: View {
       if event?.holdAndAsk ?? false {
         let (canAuthz, err) = CanAuthorizeWithTouchID()
         if !canAuthz {
-          if let errMsg = err {
-            Text(errMsg.localizedDescription).foregroundColor(.red)
+          Group {
+            if let errMsg = err {
+              Text(errMsg.localizedDescription).foregroundColor(.red)
+            }
+          }.task {
+            // If this is a holdAndAsk event but TouchID is not available,
+            // call the reply block immediately with false.
+            let _ = callReplyCallback(false)
           }
-
-          // If this is a holdAndAsk event but TouchID is not available,
-          // call the reply block immediately with false.
-          let _ = replyCallback?(false)
         }
       }
 
@@ -346,9 +357,7 @@ struct SNTBinaryMessageWindowView: View {
       }
     }
 
-    if let callback = replyCallback {
-      callback(false)
-    }
+    callReplyCallback(false)
 
     window?.close()
 
@@ -367,15 +376,8 @@ struct SNTBinaryMessageWindowView: View {
       return
     }
 
-    // Force unwrap the callback because it should always be set and is a
-    // programming error if it isn't.
-    //
-    // Note: this may prevent other replyBlocks from being run, but should only
-    // crash the GUI process meaning policy decisions will still be enforced.
-    let callback = self.replyCallback!;
-
     SNTAuthorizationHelper.authorizeExecution(for: e) { success in
-      callback(success)
+      callReplyCallback(success)
       DispatchQueue.main.sync {
         window?.close()
       }
@@ -392,9 +394,7 @@ struct SNTBinaryMessageWindowView: View {
     }
 
     // Close the window after responding to the block.
-    if let callback = replyCallback {
-      callback(false)
-    }
+    callReplyCallback(false)
     window?.close()
   }
 }
