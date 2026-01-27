@@ -1,0 +1,12 @@
+# Lefthook - Git hooks manager
+# https://github.com/evilmartians/lefthook
+#
+# OPTIONAL: Install with `brew install lefthook && lefthook install`
+# This runs checks locally before push, saving CI wait time.
+# Skip hooks with: git push --no-verify
+
+pre-push:
+  parallel: true
+  commands:
+    lint:
+      run: ./Testing/lint.sh
