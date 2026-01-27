@@ -303,6 +303,12 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 }
 
 - (void)resetSilencesMenuItemClicked:(id)sender {
+  // Check if we have any visible windows (excluding status bar windows).
+  // If not, ensure we stay in accessory mode to avoid a dock icon "blip".
+  if (![self hasVisibleWindows]) {
+    NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
+  }
+
   NSAlert *alert = [[NSAlert alloc] init];
   alert.messageText = NSLocalizedString(@"Reset Silenced Notifications",
                                         @"Title for reset silences confirmation dialog");
@@ -313,10 +319,31 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   [alert addButtonWithTitle:NSLocalizedString(@"Reset", @"Reset button title")];
   [alert addButtonWithTitle:NSLocalizedString(@"Cancel", @"Cancel button title")];
 
+  // Ensure the alert appears above other app windows (which use NSModalPanelWindowLevel).
+  [alert layout];
+  alert.window.level = NSPopUpMenuWindowLevel;
+
   if ([alert runModal] == NSAlertFirstButtonReturn) {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [ud removeObjectForKey:kNotificationSilencesKey];
   }
+
+  // Modal alerts don't trigger NSWindowWillCloseNotification, so manually restore
+  // accessory policy after the alert dismisses (if no other windows are visible).
+  // Re-check since windows may have opened/closed while the modal was displayed.
+  if (![self hasVisibleWindows]) {
+    NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
+  }
+}
+
+- (BOOL)hasVisibleWindows {
+  __block BOOL hasVisibleWindows = NO;
+  [NSApp enumerateWindowsWithOptions:0
+                          usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
+                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")]) return;
+                            *stop = hasVisibleWindows = window.visible;
+                          }];
+  return hasVisibleWindows;
 }
 
 - (void)syncMenuItemClicked:(id)sender {

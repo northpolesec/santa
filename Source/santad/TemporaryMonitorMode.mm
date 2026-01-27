@@ -158,7 +158,7 @@ void TemporaryMonitorMode::NewModeTransitionReceived(SNTModeTransition *mode_tra
 
   // Notify the GUI about policy availability
   [[notification_queue_.notifierConnection remoteObjectProxy]
-      temporaryMonitorModePolicyAvailable:(mode_transition.type == SNTModeTransitionTypeOnDemand)];
+      temporaryMonitorModePolicyAvailable:Available(nil)];
 }
 
 bool TemporaryMonitorMode::Available(NSError **err) {

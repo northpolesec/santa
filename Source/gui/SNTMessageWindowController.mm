@@ -39,7 +39,7 @@
 }
 
 - (IBAction)showWindow:(id)sender {
-  [self.window setLevel:NSPopUpMenuWindowLevel];
+  [self.window setLevel:NSModalPanelWindowLevel];
   [self.window setMovableByWindowBackground:YES];
   [self.window makeKeyAndOrderFront:sender];
   [self.window center];
