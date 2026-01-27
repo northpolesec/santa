@@ -256,10 +256,10 @@ struct SNTBinaryMessageWindowView: View {
 
   func callReplyCallback(_ response: Bool) {
     guard !repliedToCallback else { return }
+    repliedToCallback = true
     if let cb = replyCallback {
       cb(response)
     }
-    repliedToCallback = true
   }
 
   func getDismissText() -> String? {
@@ -371,14 +371,16 @@ struct SNTBinaryMessageWindowView: View {
   func standAloneButton() {
     guard let e = self.event else {
       if let cb = self.replyCallback {
-        cb(false)
+        DispatchQueue.main.async {
+          cb(false)
+        }
       }
       return
     }
 
     SNTAuthorizationHelper.authorizeExecution(for: e) { success in
-      callReplyCallback(success)
       DispatchQueue.main.sync {
+        callReplyCallback(success)
         window?.close()
       }
     }
