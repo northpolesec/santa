@@ -293,6 +293,10 @@ struct SNTBinaryMessageWindowView: View {
           if let errMsg = err {
             Text(errMsg.localizedDescription).foregroundColor(.red)
           }
+
+          // If this is a holdAndAsk event but TouchID is not available,
+          // call the reply block immediately with false.
+          let _ = replyCallback?(false)
         }
       }
 
