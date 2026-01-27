@@ -370,10 +370,8 @@ struct SNTBinaryMessageWindowView: View {
   // the "Open Event" button.
   func standAloneButton() {
     guard let e = self.event else {
-      if let cb = self.replyCallback {
-        DispatchQueue.main.async {
-          cb(false)
-        }
+      DispatchQueue.main.async {
+        callReplyCallback(false)
       }
       return
     }
