@@ -257,7 +257,7 @@ struct SNTBinaryMessageWindowView: View {
   func callReplyCallback(_ response: Bool) {
     guard !repliedToCallback else { return }
     if let cb = replyCallback {
-      cb(false)
+      cb(response)
     }
     repliedToCallback = true
   }
