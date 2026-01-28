@@ -38,6 +38,7 @@
 // Temporary monitor mode items
 @property(atomic, strong) NSTimer *temporaryMonitorModeTimer;
 @property(atomic, strong) NSDate *temporaryMonitorModeExpiration;
+@property(atomic, strong) NSTimer *iconTintTimer;
 @property NSMenuItem *temporaryMonitorModeMenuItem;
 @property NSMenuItem *temporaryMonitorModeRefreshItem;
 
@@ -88,27 +89,6 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
                                                object:nil];
   }
   return self;
-}
-
-- (void)setMenuItemImageWithTintColor:(NSColor *)tintColor {
-  NSImage *original = [NSImage imageNamed:@"MenuItem"];
-  if (!original) return;
-  [original setTemplate:YES];
-  original.size = NSMakeSize(24.0, 16.0);
-
-  if (!tintColor) {
-    self.statusItem.button.image = original;
-    return;
-  }
-
-  NSImage *tinted = [original copy];
-  [tinted lockFocus];
-  [tintColor set];
-  NSRectFillUsingOperation(NSMakeRect(0, 0, tinted.size.width, tinted.size.height),
-                           NSCompositingOperationSourceAtop);
-  [tinted unlockFocus];
-  [tinted setTemplate:NO];
-  self.statusItem.button.image = tinted;
 }
 
 - (void)setupStatusBarItem {
@@ -247,6 +227,9 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
         requestTemporaryMonitorModeWithDurationMinutes:0
                                                  reply:^(uint32 minutes, NSError *err) {
                                                    if (err) {
+                                                     [self temporarilyTintIconWithColor:
+                                                               [NSColor
+                                                                   colorNamed:@"SyncFailureColor"]];
                                                      NSString *failureDescription;
                                                      switch (err.code) {
                                                        case SNTErrorCodeTMMNoPolicy:
@@ -358,13 +341,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
     ss.invalidationHandler = ^(void) {
       dispatch_async(dispatch_get_main_queue(), ^{
         self.syncMenuItem.target = self;
-        // Tint the icon red to indicate failure
-        [self setMenuItemImageWithTintColor:[NSColor colorNamed:@"SyncFailureColor"]];
-        [NSTimer scheduledTimerWithTimeInterval:2.0
-                                        repeats:NO
-                                          block:^(NSTimer *_Nonnull timer) {
-                                            [self setMenuItemImageWithTintColor:nil];
-                                          }];
+        [self temporarilyTintIconWithColor:[NSColor colorNamed:@"SyncFailureColor"]];
         [self notificationWithIdentifier:@"sync_result_notification"
                                  andBody:NSLocalizedString(
                                              @"Sync failed",
@@ -380,33 +357,22 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
                           self.syncMenuItem.target = self;
 
                           if (status == SNTSyncStatusTypeSuccess) {
-                            // Tint the icon green to indicate success
-                            [self
-                                setMenuItemImageWithTintColor:[NSColor
-                                                                  colorNamed:@"SyncSuccessColor"]];
+                            [self temporarilyTintIconWithColor:[NSColor
+                                                                   colorNamed:@"SyncSuccessColor"]];
                             [self notificationWithIdentifier:@"sync_result_notification"
                                                      andBody:NSLocalizedString(
                                                                  @"Sync completed successfully",
                                                                  @"Notification message shown when "
                                                                  @"a sync completes successfully")];
                           } else {
-                            // Tint the icon red to indicate failure
-                            [self
-                                setMenuItemImageWithTintColor:[NSColor
-                                                                  colorNamed:@"SyncFailureColor"]];
+                            [self temporarilyTintIconWithColor:[NSColor
+                                                                   colorNamed:@"SyncFailureColor"]];
                             [self notificationWithIdentifier:@"sync_result_notification"
                                                      andBody:NSLocalizedString(
                                                                  @"Sync failed",
                                                                  @"Notification message shown when "
                                                                  @"a sync fails")];
                           }
-
-                          [NSTimer
-                              scheduledTimerWithTimeInterval:2.0
-                                                     repeats:NO
-                                                       block:^(NSTimer *_Nonnull timer) {
-                                                         [self setMenuItemImageWithTintColor:nil];
-                                                       }];
                         });
                         ss.invalidationHandler = nil;
                         [ss invalidate];
@@ -519,6 +485,45 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   } else {
     [self removeStatusBarItem];
   }
+}
+
+#pragma mark - Icon Tinting
+
+- (void)temporarilyTintIconWithColor:(NSColor *)color {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.iconTintTimer invalidate];
+    self.iconTintTimer = nil;
+
+    [self setMenuItemImageWithTintColor:color];
+    self.iconTintTimer =
+        [NSTimer scheduledTimerWithTimeInterval:2.0
+                                        repeats:NO
+                                          block:^(NSTimer *_Nonnull timer) {
+                                            [self setMenuItemImageWithTintColor:nil];
+                                            self.iconTintTimer = nil;
+                                          }];
+  });
+}
+
+- (void)setMenuItemImageWithTintColor:(NSColor *)tintColor {
+  NSImage *original = [NSImage imageNamed:@"MenuItem"];
+  if (!original) return;
+  [original setTemplate:YES];
+  original.size = NSMakeSize(24.0, 16.0);
+
+  if (!tintColor) {
+    self.statusItem.button.image = original;
+    return;
+  }
+
+  NSImage *tinted = [original copy];
+  [tinted lockFocus];
+  [tintColor set];
+  NSRectFillUsingOperation(NSMakeRect(0, 0, tinted.size.width, tinted.size.height),
+                           NSCompositingOperationSourceAtop);
+  [tinted unlockFocus];
+  [tinted setTemplate:NO];
+  self.statusItem.button.image = tinted;
 }
 
 @end
