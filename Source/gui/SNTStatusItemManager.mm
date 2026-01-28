@@ -38,6 +38,7 @@
 // Temporary monitor mode items
 @property(atomic, strong) NSTimer *temporaryMonitorModeTimer;
 @property(atomic, strong) NSDate *temporaryMonitorModeExpiration;
+@property(atomic, strong) NSTimer *iconTintTimer;
 @property NSMenuItem *temporaryMonitorModeMenuItem;
 @property NSMenuItem *temporaryMonitorModeRefreshItem;
 
@@ -489,12 +490,19 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 #pragma mark - Icon Tinting
 
 - (void)temporarilyTintIconWithColor:(NSColor *)color {
-  [self setMenuItemImageWithTintColor:color];
-  [NSTimer scheduledTimerWithTimeInterval:2.0
-                                  repeats:NO
-                                    block:^(NSTimer *_Nonnull timer) {
-                                      [self setMenuItemImageWithTintColor:nil];
-                                    }];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.iconTintTimer invalidate];
+    self.iconTintTimer = nil;
+
+    [self setMenuItemImageWithTintColor:color];
+    self.iconTintTimer =
+        [NSTimer scheduledTimerWithTimeInterval:2.0
+                                        repeats:NO
+                                          block:^(NSTimer *_Nonnull timer) {
+                                            [self setMenuItemImageWithTintColor:nil];
+                                            self.iconTintTimer = nil;
+                                          }];
+  });
 }
 
 - (void)setMenuItemImageWithTintColor:(NSColor *)tintColor {
