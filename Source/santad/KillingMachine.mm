@@ -199,7 +199,7 @@ SNTKilledProcess *KillProcess(SNTKillRequest *request, audit_token_t *token) {
 #ifndef DEBUG
   // Prevent killing NPS processes in non-debug builds
   static NSString *kNPSTeamID = @"ZMCG7MLDV9";
-  auto teamIDMatcher = BufferMatcher::TeamID(kSantaTeamID);
+  auto teamIDMatcher = BufferMatcher::TeamID(kNPSTeamID);
   if (teamIDMatcher->Matches(targetPid)) {
     LOGW(@"Rejecting request to kill NPS process (team ID: %@)", kNPSTeamID);
     return [[SNTKilledProcess alloc] initWithPid:targetPid
