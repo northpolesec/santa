@@ -127,6 +127,43 @@ extern bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_fun
       }));
 }
 
+- (void)testTeamIDMatcherNPSTeamID {
+  // This tests ensures processes with NPS team IDs are protected in non-debug builds.
+  // The actual protection (which prevents killing Santa processes) is compiled out
+  // in debug builds, but this verifies the underlying matcher works correctly.
+  NSString *npsTeamID = @"ZMCG7MLDV9";
+
+  XCTAssertTrue(santa::TestTeamIDMatcher(
+      12345, npsTeamID, ^(pid_t pid, unsigned int ops, void *useraddr, size_t usersize) {
+        if (ops == santa::kCsopTeamID) {
+          santa::csops_blob *blob = (santa::csops_blob *)useraddr;
+          blob->type = 0;
+          blob->len = htonl(sizeof(santa::csops_blob) + 1 + npsTeamID.length);
+          std::memcpy(blob->data, npsTeamID.UTF8String, npsTeamID.length);
+          return 0;
+        }
+        return -1;
+      }));
+}
+
+- (void)testTeamIDMatcherNonSantaTeamID {
+  // Verify that a non-NPS team ID does not match the Santa team ID.
+  NSString *npsTeamID = @"ZMCG7MLDV9";
+  NSString *otherTeamID = @"OTHER12345";
+
+  XCTAssertFalse(santa::TestTeamIDMatcher(
+      12345, npsTeamID, ^(pid_t pid, unsigned int ops, void *useraddr, size_t usersize) {
+        if (ops == santa::kCsopTeamID) {
+          santa::csops_blob *blob = (santa::csops_blob *)useraddr;
+          blob->type = 0;
+          blob->len = htonl(sizeof(santa::csops_blob) + 1 + otherTeamID.length);
+          std::memcpy(blob->data, otherTeamID.UTF8String, otherTeamID.length);
+          return 0;
+        }
+        return -1;
+      }));
+}
+
 - (void)testSigningIDMatcherSuccess {
   NSString *signingID = @"com.example.app";
 

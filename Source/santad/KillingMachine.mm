@@ -196,6 +196,18 @@ SNTKilledProcess *KillProcess(SNTKillRequest *request, audit_token_t *token) {
                                            error:SNTKilledProcessErrorInvalidTarget];
   }
 
+#ifndef DEBUG
+  // Prevent killing NPS processes in non-debug builds
+  static NSString *kNPSTeamID = @"ZMCG7MLDV9";
+  auto teamIDMatcher = BufferMatcher::TeamID(kSantaTeamID);
+  if (teamIDMatcher->Matches(targetPid)) {
+    LOGW(@"Rejecting request to kill NPS process (team ID: %@)", kNPSTeamID);
+    return [[SNTKilledProcess alloc] initWithPid:targetPid
+                                      pidversion:targetPidversion
+                                           error:SNTKilledProcessErrorInvalidTarget];
+  }
+#endif
+
   int error = proc_signal_with_audittoken(token, SIGKILL);
   if (error == 0) {
     LOGI(@"Killed process: %d (from kill command: %@)", targetPid, request.uuid);
