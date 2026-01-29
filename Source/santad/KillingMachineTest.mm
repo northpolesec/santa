@@ -129,7 +129,7 @@ extern bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_fun
 
 - (void)testTeamIDMatcherNPSTeamID {
   // This tests ensures processes with NPS team IDs are protected in non-debug builds.
-  // The actual protection (which prevents killing Santa processes) is compiled out
+  // The actual protection (which prevents killing NPS processes) is compiled out
   // in debug builds, but this verifies the underlying matcher works correctly.
   NSString *npsTeamID = @"ZMCG7MLDV9";
 
@@ -146,7 +146,7 @@ extern bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_fun
       }));
 }
 
-- (void)testTeamIDMatcherNonSantaTeamID {
+- (void)testTeamIDMatcherNonNPSTeamID {
   // Verify that a non-NPS team ID does not match the Santa team ID.
   NSString *npsTeamID = @"ZMCG7MLDV9";
   NSString *otherTeamID = @"OTHER12345";
