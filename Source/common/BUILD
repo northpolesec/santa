@@ -786,6 +786,18 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "SNTStoredUSBMountEvent",
+    srcs = ["SNTStoredUSBMountEvent.mm"],
+    hdrs = ["SNTStoredUSBMountEvent.h"],
+    module_name = "santa_common_SNTStoredUSBMountEvent",
+    deps = [
+        ":CoderMacros",
+        ":SNTProcessChain",
+        ":SNTStoredEvent",
+    ],
+)
+
+objc_library(
     name = "SNTConfigState",
     srcs = ["SNTConfigState.mm"],
     hdrs = ["SNTConfigState.h"],

@@ -270,6 +270,15 @@ NS_ASSUME_NONNULL_BEGIN
        @"isRemovable: %d isEjectable: %d",
        protocol, kind, isInternal, isRemovable, isEjectable);
 
+  NSString *model = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey];
+  NSString *vendor = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey];
+  NSString *devicePath = diskInfo[(__bridge NSString *)kDADiskDescriptionDevicePathKey];
+  NSString *mediaPath = diskInfo[(__bridge NSString *)kDADiskDescriptionMediaPathKey];
+  
+LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devicePath: %@ "
+     @"mediaPath: %@",
+    model, vendor, devicePath, mediaPath);
+
   // if the device is internal, or virtual *AND* is not an SD Card,
   // then allow the mount. This is to ensure we block SD cards inserted into
   // the internal reader of some Macs, whilst also ensuring we don't block
