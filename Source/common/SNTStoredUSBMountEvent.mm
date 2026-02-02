@@ -15,49 +15,48 @@
 #import "Source/common/SNTStoredUSBMountEvent.h"
 #include <Foundation/Foundation.h>
 
-
 #import "Source/common/CoderMacros.h"
 
 @implementation SNTStoredUSBMountEvent
 
 - (instancetype)init {
-    self = [super init];
-    if (self) {
-        _uuid = [[NSUUID UUID] UUIDString];
-    }
-    return self;
+  self = [super init];
+  if (self) {
+    _uuid = [[NSUUID UUID] UUIDString];
+  }
+  return self;
 }
 
 + (BOOL)supportsSecureCoding {
-    return YES;
+  return YES;
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder {
-    [super encodeWithCoder:coder];
-    ENCODE(coder, uuid);
-    ENCODE(coder, deviceModel);
-    ENCODE(coder, deviceModel);
-    ENCODE(coder, mountOnName);
+  [super encodeWithCoder:coder];
+  ENCODE(coder, uuid);
+  ENCODE(coder, deviceModel);
+  ENCODE(coder, deviceModel);
+  ENCODE(coder, mountOnName);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
-    self = [super initWithCoder:decoder];
-    if (self) {
-        DECODE(decoder, uuid, NSString);
-        DECODE(decoder, deviceModel, NSString);
-        DECODE(decoder, deviceVendor, NSString);
-        DECODE(decoder, mountOnName, NSString);
-    }
-    return self;
+  self = [super initWithCoder:decoder];
+  if (self) {
+    DECODE(decoder, uuid, NSString);
+    DECODE(decoder, deviceModel, NSString);
+    DECODE(decoder, deviceVendor, NSString);
+    DECODE(decoder, mountOnName, NSString);
+  }
+  return self;
 }
 
-
 - (NSString *)description {
-    return [NSString stringWithFormat:@"SNTStoredUSBMountEvent[%@]: %@, By: %@", self.idx, self.deviceModel, self.mountOnName];
+  return [NSString stringWithFormat:@"SNTStoredUSBMountEvent[%@]: %@, By: %@", self.idx,
+                                    self.deviceModel, self.mountOnName];
 }
 
 - (BOOL)unactionableEvent {
-    return YES;
+  return YES;
 }
 
 - (NSString *)uniqueID {

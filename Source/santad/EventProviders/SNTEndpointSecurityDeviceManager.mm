@@ -274,10 +274,10 @@ NS_ASSUME_NONNULL_BEGIN
   NSString *vendor = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey];
   NSString *devicePath = diskInfo[(__bridge NSString *)kDADiskDescriptionDevicePathKey];
   NSString *mediaPath = diskInfo[(__bridge NSString *)kDADiskDescriptionMediaPathKey];
-  
-LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devicePath: %@ "
-     @"mediaPath: %@",
-    model, vendor, devicePath, mediaPath);
+
+  LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devicePath: %@ "
+       @"mediaPath: %@",
+       model, vendor, devicePath, mediaPath);
 
   // if the device is internal, or virtual *AND* is not an SD Card,
   // then allow the mount. This is to ensure we block SD cards inserted into
@@ -534,10 +534,11 @@ LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devic
 
   NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
   if (!disk) {
-    storedUSBMountEvent.deviceModel = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey];
-    storedUSBMountEvent.deviceVendor = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]; 
+    storedUSBMountEvent.deviceModel =
+        diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey];
+    storedUSBMountEvent.deviceVendor =
+        diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey];
   }
-  
 
   if ([self haveRemountArgs]) {
     event.remountArgs = self.remountArgs;

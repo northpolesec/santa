@@ -57,7 +57,7 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
 ::pbv2::NetworkMountEvent *MessageForNetworkMountEvent(SNTStoredNetworkMountEvent *event,
                                                        google::protobuf::Arena *arena);
 ::pbv2::USBMountEvent *MessageForUSBMountEvent(SNTStoredUSBMountEvent *event,
-                                                       google::protobuf::Arena *arena);                                                       
+                                               google::protobuf::Arena *arena);
 
 template <bool IsV2>
 BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch) {
@@ -396,9 +396,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
 }
 
 ::pbv2::USBMountEvent *MessageForUSBMountEvent(SNTStoredUSBMountEvent *event,
-                                                       google::protobuf::Arena *arena) {
-  auto pbUSBMountEvent =
-      google::protobuf::Arena::Create<typename ::pbv2::USBMountEvent>(arena);
+                                               google::protobuf::Arena *arena) {
+  auto pbUSBMountEvent = google::protobuf::Arena::Create<typename ::pbv2::USBMountEvent>(arena);
 
   pbUSBMountEvent->set_uuid(NSStringToUTF8String(event.uuid));
   pbUSBMountEvent->set_device_model(NSStringToUTF8String(event.deviceModel));
