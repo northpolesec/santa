@@ -533,11 +533,13 @@ NS_ASSUME_NONNULL_BEGIN
   storedUSBMountEvent.mountOnName = @(eventStatFS->f_mntonname);
 
   NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
-  if (!disk) {
+  if (disk) {
     storedUSBMountEvent.deviceModel =
-        diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey];
+        [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey]
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
     storedUSBMountEvent.deviceVendor =
-        diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey];
+        [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   }
 
   if ([self haveRemountArgs]) {
