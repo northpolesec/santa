@@ -16,11 +16,19 @@
 
 #import "Source/common/SNTStoredEvent.h"
 
+/// Represents a USB Mount Event
 @interface SNTStoredUSBMountEvent : SNTStoredEvent <NSSecureCoding>
 
+/// The UUID of the event
 @property NSString *uuid;
+
+/// The Device Model string as reported by DiskArbitration framework
 @property NSString *deviceModel;
+
+/// The Device Vendor string as reported by DiskArbitration framework
 @property NSString *deviceVendor;
+
+/// The mount on path
 @property NSString *mountOnName;
 
 @end

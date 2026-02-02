@@ -60,7 +60,7 @@
 }
 
 - (NSString *)uniqueID {
-  // Dedupe on URL / mountFromName
+  // Dedupe on URL / mountOnName
   return [NSString stringWithFormat:@"%@", self.mountOnName];
 }
 

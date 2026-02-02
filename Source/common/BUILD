@@ -796,6 +796,16 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "SNTStoredUSBMountEventTest",
+    srcs = ["SNTStoredUSBMountEventTest.mm"],
+    deps = [
+        ":CoderMacros",
+        ":SNTStoredEvent",
+        ":SNTStoredUSBMountEvent",
+    ],
+)
+
 objc_library(
     name = "SNTConfigState",
     srcs = ["SNTConfigState.mm"],
@@ -1043,6 +1053,7 @@ test_suite(
         ":SNTStoredExecutionEventTest",
         ":SNTStoredNetworkMountEventTest",
         ":SNTStoredTemporaryMonitorModeAuditEventTest",
+        ":SNTStoredUSBMountEventTest",
         ":SNTTimerTest",
         ":SNTXxhashTest",
         ":SantaCacheTest",
