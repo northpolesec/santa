@@ -35,7 +35,7 @@
   [super encodeWithCoder:coder];
   ENCODE(coder, uuid);
   ENCODE(coder, deviceModel);
-  ENCODE(coder, deviceModel);
+  ENCODE(coder, deviceVendor);
   ENCODE(coder, mountOnName);
 }
 
