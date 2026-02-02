@@ -306,7 +306,7 @@ santa_unit_test(
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
-        "//Source/common:SNTStoredUSBkMountEvent",
+        "//Source/common:SNTStoredUSBMountEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
