@@ -25,6 +25,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
+#import "Source/common/SNTStoredUSBMountEvent.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
@@ -119,6 +120,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event) {
     [[notifier_queue.notifierConnection remoteObjectProxy] postUSBBlockNotification:event];
+  };
+
+  device_client.usbMountCallback = ^(SNTStoredUSBMountEvent *event) {
+    [syncd_queue addStoredEvent:event];
   };
 
   device_client.networkMountCallback = ^(SNTStoredNetworkMountEvent *event) {

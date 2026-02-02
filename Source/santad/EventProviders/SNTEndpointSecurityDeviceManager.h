@@ -18,6 +18,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTDeviceEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
+#import "Source/common/SNTStoredUSBMountEvent.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
@@ -30,6 +31,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent *event);
 typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
+typedef void (^SNTUSBMountCallback)(SNTStoredUSBMountEvent *event);
 
 /*
  * Manages DiskArbitration and EndpointSecurity to monitor/block/remount USB
@@ -42,6 +44,7 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
 @property(nonatomic, readwrite, nullable) NSArray<NSString *> *remountArgs;
 @property(nonatomic, nullable) SNTDeviceBlockCallback deviceBlockCallback;
 @property(nonatomic, nullable) SNTNetworkMountCallback networkMountCallback;
+@property(nonatomic, nullable) SNTUSBMountCallback usbMountCallback;
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::Metrics>)metrics

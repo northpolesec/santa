@@ -529,6 +529,16 @@ LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devic
       initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
             fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
 
+  SNTStoredUSBMountEvent *storedUSBMountEvent = [[SNTStoredUSBMountEvent alloc] init];
+  storedUSBMountEvent.mountOnName = @(eventStatFS->f_mntonname);
+
+  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
+  if (!disk) {
+    storedUSBMountEvent.deviceModel = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey];
+    storedUSBMountEvent.deviceVendor = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]; 
+  }
+  
+
   if ([self haveRemountArgs]) {
     event.remountArgs = self.remountArgs;
 
@@ -546,12 +556,15 @@ LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devic
   } else {
     // The mount is going to be blocked, log it
     NSMutableDictionary *props = [CFBridgingRelease(DADiskCopyDescription(disk)) mutableCopy];
-    props[santa::kMountFromNameKey] = event.mntfromname;
     [self logDiskAppeared:[props copy] allowed:false];
   }
 
   if (self.deviceBlockCallback) {
     self.deviceBlockCallback(event);
+  }
+
+  if (self.usbMountCallback) {
+    self.usbMountCallback(storedUSBMountEvent);
   }
 
   return ES_AUTH_RESULT_DENY;
