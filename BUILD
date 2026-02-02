@@ -28,7 +28,7 @@ apple_bundle_version(
         "release": "\\d{4}\\.\\d+",
         "build": "\\d+",
     },
-    fallback_build_label = "santa_9999.1.4",
+    fallback_build_label = "santa_9999.1.1",
     short_version_string = "{release}",
     visibility = ["//visibility:public"],
 )

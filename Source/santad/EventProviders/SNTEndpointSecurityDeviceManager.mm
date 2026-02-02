@@ -556,6 +556,7 @@ LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devic
   } else {
     // The mount is going to be blocked, log it
     NSMutableDictionary *props = [CFBridgingRelease(DADiskCopyDescription(disk)) mutableCopy];
+    props[santa::kMountFromNameKey] = event.mntfromname;
     [self logDiskAppeared:[props copy] allowed:false];
   }
 
