@@ -792,7 +792,6 @@ objc_library(
     module_name = "santa_common_SNTStoredUSBMountEvent",
     deps = [
         ":CoderMacros",
-        ":SNTProcessChain",
         ":SNTStoredEvent",
     ],
 )
