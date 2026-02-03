@@ -22,20 +22,88 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTError.h"
+#include "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
+#import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
+#import "Source/santad/SNTNotificationQueue.h"
+#import "Source/santad/SNTSyncdQueue.h"
 
 NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
 @interface SNTNetworkExtensionQueue ()
 @property MOLXPCConnection *netExtConnection;
 @property(readwrite) NSString *connectedProtocolVersion;
+@property NSArray<SNTKVOManager *> *kvoWatchers;
+@property(weak) SNTNotificationQueue *notifierQueue;
+@property(weak) SNTSyncdQueue *syncdQueue;
 @end
 
 @implementation SNTNetworkExtensionQueue
+
+- (instancetype)initWithNotifierQueue:(SNTNotificationQueue *)notifierQueue
+                           syncdQueue:(SNTSyncdQueue *)syncdQueue {
+  self = [super init];
+  if (self) {
+    _notifierQueue = notifierQueue;
+    _syncdQueue = syncdQueue;
+
+    WEAKIFY(self);
+
+    _kvoWatchers = @[
+      [[SNTKVOManager alloc]
+          initWithObject:[SNTConfigurator configurator]
+                selector:@selector(syncNetworkExtensionSettings)
+                    type:[SNTSyncNetworkExtensionSettings class]
+                callback:^(SNTSyncNetworkExtensionSettings *oldValue,
+                           SNTSyncNetworkExtensionSettings *newValue) {
+                  if ((!oldValue && !newValue) || [oldValue isEqual:newValue]) {
+                    return;
+                  }
+
+                  STRONGIFY(self);
+
+                  LOGI(@"SyncNetworkExtensionSettings changed: enable %d -> %d", oldValue.enable,
+                       newValue.enable);
+
+                  [self handleSettingsChanged:newValue];
+
+                  // Force push notification client to reconnect.
+                  // This resets the NATS connection state and triggers a sync
+                  // to get fresh credentials and reconnect immediately.
+                  LOGI(@"SNTNetworkExtensionQueue: Triggering push notification reconnect");
+                  [self.syncdQueue pushNotificationReconnect];
+                }],
+    ];
+  }
+  return self;
+}
+
+- (void)handleSettingsChanged:(SNTSyncNetworkExtensionSettings *)settings {
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  // Update the filter enabled state via the GUI process
+  [[self.notifierQueue.notifierConnection remoteObjectProxy]
+      setNetworkExtensionFilterEnabled:settings.enable
+                                 reply:^(BOOL success) {
+                                   if (success) {
+                                     LOGI(@"Successfully updated network extension filter enabled "
+                                          @"state");
+                                   } else {
+                                     LOGW(@"Failed to update network extension filter enabled "
+                                          @"state");
+                                   }
+
+                                   dispatch_semaphore_signal(sema);
+                                 }];
+
+  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
+    LOGW(@"Timeout when attempting to set filter enabled state (%d)", settings.enable);
+  }
+}
 
 - (NSDictionary *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
                                                   error:(NSError **)error {

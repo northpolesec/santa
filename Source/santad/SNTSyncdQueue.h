@@ -39,4 +39,10 @@
                  contentType:(NSString *)contentType
                       config:(SNTExportConfiguration *)config
                        reply:(void (^)(BOOL))reply;
+
+/// Force the push notification client to reconnect immediately.
+/// Use this when external conditions have changed (e.g., network interface reset by content filter)
+/// and you want to reconnect without waiting for the normal retry backoff.
+- (void)pushNotificationReconnect;
+
 @end

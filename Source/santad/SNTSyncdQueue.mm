@@ -244,4 +244,16 @@
   return NO;
 }
 
+- (void)pushNotificationReconnect {
+  [self dispatchBlockOnSyncdQueue:^{
+    if (!self.syncConnection.isConnected) {
+      LOGW(@"Cannot reconnect push notifications: sync service not connected");
+      return;
+    }
+
+    LOGD(@"SNTSyncdQueue: Forwarding pushNotificationReconnect to sync service");
+    [[self.syncConnection remoteObjectProxy] pushNotificationReconnect];
+  }];
+}
+
 @end

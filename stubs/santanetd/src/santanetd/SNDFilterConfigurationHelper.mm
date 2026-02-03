@@ -25,4 +25,9 @@
   // Stub implementation
 }
 
++ (BOOL)setFilterEnabled:(BOOL)enabled {
+  // Stub implementation
+  return NO;
+}
+
 @end

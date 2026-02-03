@@ -718,6 +718,14 @@ double watchdogRAMPeak = 0;
   NSDictionary *settings = [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion
                                                                              error:&error];
   reply(settings, kSantaNetworkExtensionProtocolVersion, error);
+
+  // When the network extension registers, it may have just been enabled which can
+  // reset network connections. Trigger a NATS reconnect to ensure push notifications
+  // are working immediately.
+  if (settings) {
+    LOGI(@"Network extension registered, triggering push notification reconnect");
+    [self.syncdQueue pushNotificationReconnect];
+  }
 }
 
 - (void)exportTelemetryWithReply:(void (^)(BOOL))reply {
@@ -747,6 +755,14 @@ double watchdogRAMPeak = 0;
 
 - (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply {
   reply(_temporaryMonitorMode->Available(nil));
+}
+
+#pragma mark Network Extension Ops
+
+- (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply {
+  SNTSyncNetworkExtensionSettings *settings =
+      [[SNTConfigurator configurator] syncNetworkExtensionSettings];
+  reply(settings ? settings.enable : NO);
 }
 
 @end

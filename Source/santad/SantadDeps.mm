@@ -97,7 +97,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  SNTNetworkExtensionQueue *netext_queue = [[SNTNetworkExtensionQueue alloc] init];
+  SNTNetworkExtensionQueue *netext_queue =
+      [[SNTNetworkExtensionQueue alloc] initWithNotifierQueue:notifier_queue
+                                                   syncdQueue:syncd_queue];
   if (!netext_queue) {
     LOGE(@"Failed to initialize network extension queue.");
     exit(EXIT_FAILURE);

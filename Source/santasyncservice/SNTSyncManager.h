@@ -73,5 +73,6 @@
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 - (void)pushNotificationServerAddress:(void (^)(NSString *))reply;
+- (void)pushNotificationReconnect;
 
 @end

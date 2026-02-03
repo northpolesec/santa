@@ -31,6 +31,30 @@
   return self;
 }
 
+- (BOOL)isEqual:(id)other {
+  if (other == nil) {
+    return NO;
+  }
+
+  if (self == other) {
+    return YES;
+  }
+
+  if (![other isKindOfClass:[SNTSyncNetworkExtensionSettings class]]) {
+    return NO;
+  }
+
+  SNTSyncNetworkExtensionSettings *otherSettings = (SNTSyncNetworkExtensionSettings *)other;
+  return self.enable == otherSettings.enable;
+}
+
+- (NSUInteger)hash {
+  NSUInteger prime = 31;
+  NSUInteger result = 1;
+  result = prime * result + self.enable;
+  return result;
+}
+
 + (BOOL)supportsSecureCoding {
   return YES;
 }
