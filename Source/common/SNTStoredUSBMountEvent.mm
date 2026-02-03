@@ -13,6 +13,7 @@
 /// limitations under the License.
 
 #import "Source/common/SNTStoredUSBMountEvent.h"
+
 #include <Foundation/Foundation.h>
 
 #import "Source/common/CoderMacros.h"
@@ -51,8 +52,8 @@
 }
 
 - (NSString *)description {
-  return [NSString stringWithFormat:@"SNTStoredUSBMountEvent[%@]: %@, By: %@", self.idx,
-                                    self.deviceModel, self.mountOnName];
+  return [NSString stringWithFormat:@"SNTStoredUSBMountEvent[%@]: %@ %@ on: %@", self.idx,
+                                    self.deviceVendor, self.deviceModel, self.mountOnName];
 }
 
 - (BOOL)unactionableEvent {
