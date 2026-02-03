@@ -16,7 +16,7 @@
 
 @implementation SNDFilterConfigurationHelper
 
-+ (BOOL)enableFilterConfiguration {
++ (BOOL)enableFilterConfigurationWithEnabled:(BOOL)enabled {
   // Stub implementation
   return NO;
 }

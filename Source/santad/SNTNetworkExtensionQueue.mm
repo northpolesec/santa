@@ -83,10 +83,16 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 }
 
 - (void)handleSettingsChanged:(SNTSyncNetworkExtensionSettings *)settings {
+  MOLXPCConnection *conn = self.notifierQueue.notifierConnection;
+  if (!conn) {
+    LOGW(@"Notifier connection unavailable; skipping filter enabled update (%d)", settings.enable);
+    return;
+  }
+
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   // Update the filter enabled state via the GUI process
-  [[self.notifierQueue.notifierConnection remoteObjectProxy]
+  [[conn remoteObjectProxy]
       setNetworkExtensionFilterEnabled:settings.enable
                                  reply:^(BOOL success) {
                                    if (success) {
