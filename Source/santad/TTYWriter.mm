@@ -15,10 +15,13 @@
 
 #include "Source/santad/TTYWriter.h"
 
+#include <signal.h>
 #include <string.h>
 #include <sys/errno.h>
+#include <sys/ioctl.h>
 #include <sys/param.h>
 
+#include "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
 
@@ -44,7 +47,8 @@ bool TTYWriter::CanWrite(const es_process_t *proc) {
   return proc && proc->tty && proc->tty->path.length > 0;
 }
 
-void TTYWriter::Write(const es_process_t *proc, NSString * (^messageCreator)(void)) {
+void TTYWriter::Write(const es_process_t *proc, bool send_signal,
+                      NSString * (^messageCreator)(void)) {
   if (silent_tty_mode_.load(std::memory_order_relaxed) || !CanWrite(proc)) {
     return;
   }
@@ -55,6 +59,11 @@ void TTYWriter::Write(const es_process_t *proc, NSString * (^messageCreator)(voi
   // Realize the message string before going async so as not to need to worry about
   // lifetimes of objects in the provided block.
   NSString *msg = messageCreator();
+  NSString *companyName = [[SNTConfigurator configurator] brandingCompanyName];
+  if (companyName) {
+    msg = [msg stringByAppendingFormat:@"\nManaged by: %@\n", companyName];
+  }
+  msg = [msg stringByAppendingFormat:@"\n"];
 
   dispatch_async(q_, ^{
     int fd = open(tty.UTF8String, O_WRONLY | O_NOCTTY);
@@ -66,12 +75,35 @@ void TTYWriter::Write(const es_process_t *proc, NSString * (^messageCreator)(voi
     std::string_view str = santa::NSStringToUTF8StringView(msg);
     write(fd, str.data(), str.length());
 
+    // Send SIGWINCH to the foreground process group to trigger a shell prompt redraw.
+    // Without this, the prompt gets "buried" above our message because the shell
+    // redraws its prompt when the blocked process exits, but our async write
+    // happens after that.
+    pid_t pgrp = 0;
+    if (send_signal) {
+      ioctl(fd, TIOCGPGRP, &pgrp);
+    }
+
     close(fd);
+
+    if (send_signal && pgrp > 1) {
+      kill(-pgrp, SIGWINCH);
+    }
   });
 }
 
+void TTYWriter::Write(const es_process_t *proc, NSString * (^messageCreator)(void)) {
+  Write(proc, true, messageCreator);
+}
+
 void TTYWriter::Write(const es_process_t *proc, NSString *msg) {
-  Write(proc, ^NSString * {
+  Write(proc, true, ^NSString * {
+    return msg;
+  });
+}
+
+void TTYWriter::WriteWithoutSignal(const es_process_t *proc, NSString *msg) {
+  Write(proc, false, ^NSString * {
     return msg;
   });
 }

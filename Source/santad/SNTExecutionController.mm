@@ -428,7 +428,7 @@ static NSString *const kPrinterProxy =
               [SNTBlockMessage eventDetailURLForEvent:se
                                             customURL:(cd.customURL ?: config.eventDetailURL)];
           if (detailURL) {
-            [msg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
+            [msg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
           }
           return msg;
         });

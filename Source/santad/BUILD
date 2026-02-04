@@ -311,6 +311,7 @@ objc_library(
         "EndpointSecurity",
     ],
     deps = [
+        "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:String",
     ],
