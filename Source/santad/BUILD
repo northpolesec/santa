@@ -627,6 +627,7 @@ objc_library(
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTProcessChain",
         "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:SNTStoredUSBMountEvent",
         "//Source/common:String",
     ],
 )
@@ -1032,6 +1033,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:SNTStoredUSBMountEvent",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:TelemetryEventMap",

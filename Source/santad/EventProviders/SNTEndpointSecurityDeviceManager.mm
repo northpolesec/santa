@@ -247,9 +247,7 @@ NS_ASSUME_NONNULL_BEGIN
   return mask;
 }
 
-- (BOOL)shouldOperateOnDisk:(DADiskRef)disk {
-  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
-
+- (BOOL)shouldOperateOnDiskWithProperties:(NSDictionary *)diskInfo {
   // Handle cases like time machine mounts where a disk info is not present.
   if (!diskInfo) {
     return false;
@@ -269,6 +267,15 @@ NS_ASSUME_NONNULL_BEGIN
   LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo Protocol: %@ Kind: %@ isInternal: %d "
        @"isRemovable: %d isEjectable: %d",
        protocol, kind, isInternal, isRemovable, isEjectable);
+
+  NSString *model = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey];
+  NSString *vendor = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey];
+  NSString *devicePath = diskInfo[(__bridge NSString *)kDADiskDescriptionDevicePathKey];
+  NSString *mediaPath = diskInfo[(__bridge NSString *)kDADiskDescriptionMediaPathKey];
+
+  LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devicePath: %@ "
+       @"mediaPath: %@",
+       model, vendor, devicePath, mediaPath);
 
   // if the device is internal, or virtual *AND* is not an SD Card,
   // then allow the mount. This is to ensure we block SD cards inserted into
@@ -348,8 +355,9 @@ NS_ASSUME_NONNULL_BEGIN
     }
 
     CFAutorelease(disk);
+    NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
 
-    if (![self shouldOperateOnDisk:disk]) {
+    if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
       [self incrementStartupMetricsOperation:kMetricStartupDiskOperationSkip];
       continue;
     }
@@ -512,13 +520,23 @@ NS_ASSUME_NONNULL_BEGIN
   DADiskRef disk = DADiskCreateFromBSDName(NULL, self.diskArbSession, eventStatFS->f_mntfromname);
   CFAutorelease(disk);
 
-  if (![self shouldOperateOnDisk:disk]) {
+  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
+  if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
     return ES_AUTH_RESULT_ALLOW;
   }
 
   SNTDeviceEvent *event = [[SNTDeviceEvent alloc]
       initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
             fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
+
+  NSString *model = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey]
+      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  NSString *vendor = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]
+      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  SNTStoredUSBMountEvent *storedUSBMountEvent =
+      [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:model
+                                             deviceVendor:vendor
+                                              mountOnName:@(eventStatFS->f_mntonname)];
 
   if ([self haveRemountArgs]) {
     event.remountArgs = self.remountArgs;
@@ -542,7 +560,7 @@ NS_ASSUME_NONNULL_BEGIN
   }
 
   if (self.deviceBlockCallback) {
-    self.deviceBlockCallback(event);
+    self.deviceBlockCallback(event, storedUSBMountEvent);
   }
 
   return ES_AUTH_RESULT_DENY;

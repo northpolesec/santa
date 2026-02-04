@@ -28,6 +28,7 @@
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
 #include "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
+#import "Source/common/SNTStoredUSBMountEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
@@ -55,6 +56,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
     SNTStoredTemporaryMonitorModeAuditEvent *event, google::protobuf::Arena *arena);
 ::pbv2::NetworkMountEvent *MessageForNetworkMountEvent(SNTStoredNetworkMountEvent *event,
                                                        google::protobuf::Arena *arena);
+::pbv2::USBMountEvent *MessageForUSBMountEvent(SNTStoredUSBMountEvent *event,
+                                               google::protobuf::Arena *arena);
 
 template <bool IsV2>
 BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch) {
@@ -102,8 +105,10 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
   google::protobuf::RepeatedPtrField<typename Traits::AuditEventT> *uploadAuditEvents =
       req->mutable_audit_events();
   google::protobuf::RepeatedPtrField<::pbv2::NetworkMountEvent> *uploadNetworkMountEvents;
+  google::protobuf::RepeatedPtrField<::pbv2::USBMountEvent> *uploadUSBMountEvents;
   if constexpr (IsV2) {
     uploadNetworkMountEvents = req->mutable_network_mount_events();
+    uploadUSBMountEvents = req->mutable_usb_mount_events();
   }
   __block BOOL success = YES;
   NSUInteger finalIdx = (events.count - 1);
@@ -134,6 +139,13 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
           uploadNetworkMountEvents->UnsafeArenaAddAllocated(e);
         }
       }
+    } else if ([event isKindOfClass:[SNTStoredUSBMountEvent class]]) {
+      if constexpr (IsV2) {
+        if (auto e = MessageForUSBMountEvent((SNTStoredUSBMountEvent *)event, pArena)) {
+          uploadUSBMountEvents->UnsafeArenaAddAllocated(e);
+        }
+      }
+
     } else {
       // This shouldn't be able to happen. But if it does, log a warning and continue. We still
       // want to continue on in case this is the last event being enumerated so that anything in
@@ -145,6 +157,7 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
         uploadEvents->size() + uploadFAAEvents->size() + uploadAuditEvents->size();
     if constexpr (IsV2) {
       totalEventCount += uploadNetworkMountEvents->size();
+      totalEventCount += uploadUSBMountEvents->size();
     }
 
     if (totalEventCount >= self.syncState.eventBatchSize || idx == finalIdx) {
@@ -163,6 +176,7 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
       uploadAuditEvents->Clear();
       if constexpr (IsV2) {
         uploadNetworkMountEvents->Clear();
+        uploadUSBMountEvents->Clear();
       }
     }
   }];
@@ -379,6 +393,22 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
   pbNetworkMountEvent->set_fs_type(NSStringToUTF8String(event.fsType));
 
   return pbNetworkMountEvent;
+}
+
+::pbv2::USBMountEvent *MessageForUSBMountEvent(SNTStoredUSBMountEvent *event,
+                                               google::protobuf::Arena *arena) {
+  auto pbUSBMountEvent = google::protobuf::Arena::Create<typename ::pbv2::USBMountEvent>(arena);
+
+  pbUSBMountEvent->set_uuid(NSStringToUTF8String(event.uuid));
+  if (event.deviceModel.length > 0) {
+    pbUSBMountEvent->set_device_model(NSStringToUTF8String(event.deviceModel));
+  }
+  if (event.deviceVendor.length > 0) {
+    pbUSBMountEvent->set_device_vendor(NSStringToUTF8String(event.deviceVendor));
+  }
+  pbUSBMountEvent->set_mount_on(NSStringToUTF8String(event.mountOnName));
+
+  return pbUSBMountEvent;
 }
 
 void MessageForTemporaryMonitorModeEnterAuditEvent(

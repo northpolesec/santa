@@ -786,6 +786,27 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "SNTStoredUSBMountEvent",
+    srcs = ["SNTStoredUSBMountEvent.mm"],
+    hdrs = ["SNTStoredUSBMountEvent.h"],
+    module_name = "santa_common_SNTStoredUSBMountEvent",
+    deps = [
+        ":CoderMacros",
+        ":SNTStoredEvent",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTStoredUSBMountEventTest",
+    srcs = ["SNTStoredUSBMountEventTest.mm"],
+    deps = [
+        ":CoderMacros",
+        ":SNTStoredEvent",
+        ":SNTStoredUSBMountEvent",
+    ],
+)
+
+objc_library(
     name = "SNTConfigState",
     srcs = ["SNTConfigState.mm"],
     hdrs = ["SNTConfigState.h"],
@@ -1032,6 +1053,7 @@ test_suite(
         ":SNTStoredExecutionEventTest",
         ":SNTStoredNetworkMountEventTest",
         ":SNTStoredTemporaryMonitorModeAuditEventTest",
+        ":SNTStoredUSBMountEventTest",
         ":SNTTimerTest",
         ":SNTXxhashTest",
         ":SantaCacheTest",

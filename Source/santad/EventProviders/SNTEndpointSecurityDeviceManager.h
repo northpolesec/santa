@@ -18,6 +18,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTDeviceEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
+#import "Source/common/SNTStoredUSBMountEvent.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
@@ -28,7 +29,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent *event);
+typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent);
 typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
 
 /*
