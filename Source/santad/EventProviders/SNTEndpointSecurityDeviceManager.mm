@@ -519,8 +519,12 @@ NS_ASSUME_NONNULL_BEGIN
                               eventStatFS:(const struct statfs *)eventStatFS {
   DADiskRef disk = DADiskCreateFromBSDName(NULL, self.diskArbSession, eventStatFS->f_mntfromname);
   CFAutorelease(disk);
-  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
 
+  if (!disk) {
+    return ES_AUTH_RESULT_ALLOW;
+  }
+
+  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
   if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
     return ES_AUTH_RESULT_ALLOW;
   }
@@ -529,18 +533,14 @@ NS_ASSUME_NONNULL_BEGIN
       initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
             fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
 
-  SNTStoredUSBMountEvent *storedUSBMountEvent;
-
-  if (disk) {
-    NSString *model = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey]
-        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    NSString *vendor = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]
-        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    storedUSBMountEvent =
-        [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:model
-                                               deviceVendor:vendor
-                                                mountOnName:@(eventStatFS->f_mntonname)];
-  }
+  NSString *model = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey]
+      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  NSString *vendor = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]
+      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  SNTStoredUSBMountEvent *storedUSBMountEvent =
+      [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:model
+                                             deviceVendor:vendor
+                                              mountOnName:@(eventStatFS->f_mntonname)];
 
   if ([self haveRemountArgs]) {
     event.remountArgs = self.remountArgs;
