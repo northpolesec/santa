@@ -29,9 +29,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent *event);
+typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent);
 typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
-typedef void (^SNTUSBMountCallback)(SNTStoredUSBMountEvent *event);
 
 /*
  * Manages DiskArbitration and EndpointSecurity to monitor/block/remount USB
@@ -44,7 +43,6 @@ typedef void (^SNTUSBMountCallback)(SNTStoredUSBMountEvent *event);
 @property(nonatomic, readwrite, nullable) NSArray<NSString *> *remountArgs;
 @property(nonatomic, nullable) SNTDeviceBlockCallback deviceBlockCallback;
 @property(nonatomic, nullable) SNTNetworkMountCallback networkMountCallback;
-@property(nonatomic, nullable) SNTUSBMountCallback usbMountCallback;
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::Metrics>)metrics

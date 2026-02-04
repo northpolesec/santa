@@ -118,13 +118,14 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                remountUSBMode:[configurator remountUSBMode]
                                            startupPreferences:[configurator onStartUSBOptions]];
 
-  device_client.deviceBlockCallback = ^(SNTDeviceEvent *event) {
+  device_client.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+    [syncd_queue addStoredEvent:usbEvent];
     [[notifier_queue.notifierConnection remoteObjectProxy] postUSBBlockNotification:event];
   };
 
-  device_client.usbMountCallback = ^(SNTStoredUSBMountEvent *event) {
-    [syncd_queue addStoredEvent:event];
-  };
+  // device_client.usbMountCallback = ^(SNTStoredUSBMountEvent *event) {
+  //   [syncd_queue addStoredEvent:event];
+  // };
 
   device_client.networkMountCallback = ^(SNTStoredNetworkMountEvent *event) {
     [syncd_queue addStoredEvent:event];

@@ -400,10 +400,10 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
   auto pbUSBMountEvent = google::protobuf::Arena::Create<typename ::pbv2::USBMountEvent>(arena);
 
   pbUSBMountEvent->set_uuid(NSStringToUTF8String(event.uuid));
-  if ([event.deviceModel length] != 0) {
+  if (event.deviceModel.length > 0) {
     pbUSBMountEvent->set_device_model(NSStringToUTF8String(event.deviceModel));
   }
-  if ([event.deviceVendor length] != 0) {
+  if (event.deviceVendor.length > 0) {
     pbUSBMountEvent->set_device_vendor(NSStringToUTF8String(event.deviceVendor));
   }
   pbUSBMountEvent->set_mount_on(NSStringToUTF8String(event.mountOnName));

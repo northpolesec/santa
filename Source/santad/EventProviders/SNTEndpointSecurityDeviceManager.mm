@@ -564,12 +564,12 @@ NS_ASSUME_NONNULL_BEGIN
   }
 
   if (self.deviceBlockCallback) {
-    self.deviceBlockCallback(event);
+    self.deviceBlockCallback(event, storedUSBMountEvent);
   }
 
-  if (self.usbMountCallback) {
-    self.usbMountCallback(storedUSBMountEvent);
-  }
+  // if (self.usbMountCallback) {
+  //   self.usbMountCallback(storedUSBMountEvent);
+  // }
 
   return ES_AUTH_RESULT_DENY;
 }
