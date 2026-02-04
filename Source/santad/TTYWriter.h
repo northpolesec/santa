@@ -44,10 +44,13 @@ class TTYWriter {
 
   void Write(const es_process_t *proc, NSString * (^messageCreator)(void));
   void Write(const es_process_t *proc, NSString *msg);
+  void WriteWithoutSignal(const es_process_t *proc, NSString *msg);
 
   void EnableSilentTTYMode(bool silent_tty_mode);
 
  private:
+  void Write(const es_process_t *proc, bool send_signal, NSString * (^messageCreator)(void));
+
   dispatch_queue_t q_;
   std::atomic<bool> silent_tty_mode_;
 };

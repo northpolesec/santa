@@ -426,10 +426,10 @@ void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent *event, URLTextPair lin
   NSURL *detailURL = [SNTBlockMessage eventDetailURLForFileAccessEvent:event
                                                              customURL:link_info.first];
   if (detailURL) {
-    [blockMsg appendFormat:@"More info:\n%@\n\n", detailURL.absoluteString];
+    [blockMsg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
   }
 
-  tty_writer_->Write(msg->process, blockMsg);
+  tty_writer_->WriteWithoutSignal(msg->process, blockMsg);
 }
 
 FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
