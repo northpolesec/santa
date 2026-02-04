@@ -520,10 +520,6 @@ NS_ASSUME_NONNULL_BEGIN
   DADiskRef disk = DADiskCreateFromBSDName(NULL, self.diskArbSession, eventStatFS->f_mntfromname);
   CFAutorelease(disk);
 
-  if (!disk) {
-    return ES_AUTH_RESULT_ALLOW;
-  }
-
   NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
   if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
     return ES_AUTH_RESULT_ALLOW;
