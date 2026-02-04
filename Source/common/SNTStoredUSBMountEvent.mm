@@ -20,10 +20,15 @@
 
 @implementation SNTStoredUSBMountEvent
 
-- (instancetype)init {
+- (instancetype)initWithDeviceModel:(NSString *)deviceModel
+                deviceVendor:(NSString *)deviceVendor
+                mountOnName:(NSString *)mountOnName {
   self = [super init];
   if (self) {
     _uuid = [[NSUUID UUID] UUIDString];
+    _deviceModel = deviceModel;
+    _deviceVendor = deviceVendor;
+    _mountOnName = mountOnName;
   }
   return self;
 }

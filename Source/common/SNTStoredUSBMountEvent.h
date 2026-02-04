@@ -20,15 +20,19 @@
 @interface SNTStoredUSBMountEvent : SNTStoredEvent <NSSecureCoding>
 
 /// The UUID of the event
-@property NSString *uuid;
+@property(readonly) NSString *uuid;
 
 /// The Device Model string as reported by DiskArbitration framework
-@property NSString *deviceModel;
+@property(readonly) NSString *deviceModel;
 
 /// The Device Vendor string as reported by DiskArbitration framework
-@property NSString *deviceVendor;
+@property(readonly) NSString *deviceVendor;
 
 /// The mount on path
-@property NSString *mountOnName;
+@property(readonly) NSString *mountOnName;
+
+- (instancetype)initWithDeviceModel:(NSString *)deviceModel
+                deviceVendor:(NSString *)deviceVendor
+                mountOnName:(NSString *)mountOnName;
 
 @end
