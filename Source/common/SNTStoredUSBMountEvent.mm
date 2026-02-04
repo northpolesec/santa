@@ -14,8 +14,6 @@
 
 #import "Source/common/SNTStoredUSBMountEvent.h"
 
-#include <Foundation/Foundation.h>
-
 #import "Source/common/CoderMacros.h"
 
 @implementation SNTStoredUSBMountEvent
