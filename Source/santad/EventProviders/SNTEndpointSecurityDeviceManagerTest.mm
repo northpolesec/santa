@@ -63,7 +63,7 @@ class MockAuthResultCache : public AuthResultCache {
 @interface SNTEndpointSecurityDeviceManager (Testing)
 - (instancetype)init;
 - (void)logDiskAppeared:(NSDictionary *)props allowed:(bool)allowed;
-- (BOOL)shouldOperateOnDisk:(DADiskRef)disk;
+- (BOOL)shouldOperateOnDiskWithProperties:(NSDictionary *)diskInfo;
 - (void)performStartupTasks:(SNTDeviceManagerStartupPreferences)startupPrefs;
 - (uint32_t)updatedMountFlags:(struct statfs *)sfs;
 @end
@@ -435,7 +435,9 @@ class MockAuthResultCache : public AuthResultCache {
   SNTEndpointSecurityDeviceManager *deviceManager = [[SNTEndpointSecurityDeviceManager alloc] init];
 
   id partialDeviceManager = OCMPartialMock(deviceManager);
-  OCMStub([partialDeviceManager shouldOperateOnDisk:nil]).ignoringNonObjectArgs().andReturn(YES);
+  OCMStub([partialDeviceManager shouldOperateOnDiskWithProperties:nil])
+      .ignoringNonObjectArgs()
+      .andReturn(YES);
 
   deviceManager.blockUSBMount = YES;
   deviceManager.remountArgs = @[ @"noexec", @"rdonly" ];

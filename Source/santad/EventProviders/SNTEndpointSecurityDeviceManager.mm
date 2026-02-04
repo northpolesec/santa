@@ -247,9 +247,7 @@ NS_ASSUME_NONNULL_BEGIN
   return mask;
 }
 
-- (BOOL)shouldOperateOnDisk:(DADiskRef)disk {
-  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
-
+- (BOOL)shouldOperateOnDiskWithProperties:(NSDictionary *)diskInfo {
   // Handle cases like time machine mounts where a disk info is not present.
   if (!diskInfo) {
     return false;
@@ -357,8 +355,9 @@ NS_ASSUME_NONNULL_BEGIN
     }
 
     CFAutorelease(disk);
+    NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
 
-    if (![self shouldOperateOnDisk:disk]) {
+    if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
       [self incrementStartupMetricsOperation:kMetricStartupDiskOperationSkip];
       continue;
     }
@@ -520,8 +519,9 @@ NS_ASSUME_NONNULL_BEGIN
                               eventStatFS:(const struct statfs *)eventStatFS {
   DADiskRef disk = DADiskCreateFromBSDName(NULL, self.diskArbSession, eventStatFS->f_mntfromname);
   CFAutorelease(disk);
+  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
 
-  if (![self shouldOperateOnDisk:disk]) {
+  if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
     return ES_AUTH_RESULT_ALLOW;
   }
 
@@ -530,7 +530,7 @@ NS_ASSUME_NONNULL_BEGIN
             fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
 
   SNTStoredUSBMountEvent *storedUSBMountEvent;
-  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
+
   if (disk) {
     NSString *model = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey]
         stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
