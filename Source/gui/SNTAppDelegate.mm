@@ -15,6 +15,8 @@
 
 #import "Source/gui/SNTAppDelegate.h"
 
+#import <UserNotifications/UserNotifications.h>
+
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
@@ -44,6 +46,7 @@
   self.notificationManager.statusItemManager = self.statusItemManager;
 
   [self setupMenu];
+  [self setupNativeNotifications];
 
   NSNotificationCenter *workspaceNotifications = [[NSWorkspace sharedWorkspace] notificationCenter];
 
@@ -184,6 +187,18 @@
   [editMenuItem setSubmenu:editMenu];
   [mainMenu addItem:editMenuItem];
   [NSApp setMainMenu:mainMenu];
+}
+
+#pragma mark Native Notifications
+
+- (void)setupNativeNotifications {
+  [[UNUserNotificationCenter currentNotificationCenter]
+      requestAuthorizationWithOptions:0
+                    completionHandler:^(BOOL granted, NSError *error) {
+                      if (error) {
+                        LOGE(@"Failed to request notification authorization: %@", error);
+                      }
+                    }];
 }
 
 @end
