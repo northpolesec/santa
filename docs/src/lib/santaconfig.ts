@@ -258,7 +258,8 @@ sequences will be replaced in the final URL:
     },
     {
       key: "BrandingCompanyName",
-      description: `The company name to display on Santa UIs. This setting is ignored if \`BrandingCompanyLogo\` is set.`,
+      description: `The company name to display on Santa GUIs as well as in messages written to the TTY. For GUI
+      windows, this setting is ignored if \`BrandingCompanyLogo\` is set.`,
       type: "string",
       versionAdded: "2026.1",
     },
