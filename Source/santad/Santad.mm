@@ -123,10 +123,6 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[notifier_queue.notifierConnection remoteObjectProxy] postUSBBlockNotification:event];
   };
 
-  // device_client.usbMountCallback = ^(SNTStoredUSBMountEvent *event) {
-  //   [syncd_queue addStoredEvent:event];
-  // };
-
   device_client.networkMountCallback = ^(SNTStoredNetworkMountEvent *event) {
     [syncd_queue addStoredEvent:event];
     [[notifier_queue.notifierConnection remoteObjectProxy]

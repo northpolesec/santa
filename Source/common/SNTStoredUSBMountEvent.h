@@ -32,7 +32,7 @@
 @property(readonly) NSString *mountOnName;
 
 - (instancetype)initWithDeviceModel:(NSString *)deviceModel
-                deviceVendor:(NSString *)deviceVendor
-                mountOnName:(NSString *)mountOnName;
+                       deviceVendor:(NSString *)deviceVendor
+                        mountOnName:(NSString *)mountOnName;
 
 @end

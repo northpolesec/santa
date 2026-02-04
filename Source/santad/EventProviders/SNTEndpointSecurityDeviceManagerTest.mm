@@ -235,12 +235,13 @@ class MockAuthResultCache : public AuthResultCache {
              dm.blockUSBMount = YES;
              dm.remountArgs = wantRemountArgs;
 
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event) {
-               gotRemountedArgs = event.remountArgs;
-               gotmntonname = event.mntonname;
-               gotmntfromname = event.mntfromname;
-               [expectation fulfill];
-             };
+             dm.deviceBlockCallback =
+                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbMountEvent) {
+                   gotRemountedArgs = event.remountArgs;
+                   gotmntonname = event.mntonname;
+                   gotmntfromname = event.mntfromname;
+                   [expectation fulfill];
+                 };
            }];
 
   XCTAssertEqual(self.mockDA.insertedDevices.count, 1);
@@ -267,12 +268,13 @@ class MockAuthResultCache : public AuthResultCache {
            deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
              dm.blockUSBMount = YES;
 
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event) {
-               gotRemountedArgs = event.remountArgs;
-               gotmntonname = event.mntonname;
-               gotmntfromname = event.mntfromname;
-               [expectation fulfill];
-             };
+             dm.deviceBlockCallback =
+                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbMountEvent) {
+                   gotRemountedArgs = event.remountArgs;
+                   gotmntonname = event.mntonname;
+                   gotmntfromname = event.mntfromname;
+                   [expectation fulfill];
+                 };
            }];
 
   [self waitForExpectations:@[ expectation ] timeout:60.0];
@@ -299,12 +301,13 @@ class MockAuthResultCache : public AuthResultCache {
              dm.blockUSBMount = YES;
              dm.remountArgs = wantRemountArgs;
 
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event) {
-               gotRemountedArgs = event.remountArgs;
-               gotmntonname = event.mntonname;
-               gotmntfromname = event.mntfromname;
-               [expectation fulfill];
-             };
+             dm.deviceBlockCallback =
+                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbMountEvent) {
+                   gotRemountedArgs = event.remountArgs;
+                   gotmntonname = event.mntonname;
+                   gotmntfromname = event.mntfromname;
+                   [expectation fulfill];
+                 };
            }];
 
   XCTAssertEqual(self.mockDA.insertedDevices.count, 1);
@@ -332,9 +335,10 @@ class MockAuthResultCache : public AuthResultCache {
              dm.blockUSBMount = YES;
              dm.remountArgs = wantRemountArgs;
 
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event) {
-               XCTFail(@"Should not be called");
-             };
+             dm.deviceBlockCallback =
+                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbMountEvent) {
+                   XCTFail(@"Should not be called");
+                 };
            }];
 
   XCTAssertEqual(self.mockDA.insertedDevices.count, 1);
@@ -370,12 +374,13 @@ class MockAuthResultCache : public AuthResultCache {
              dm.blockUSBMount = YES;
              dm.remountArgs = wantRemountArgs;
 
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event) {
-               gotRemountedArgs = event.remountArgs;
-               gotmntonname = event.mntonname;
-               gotmntfromname = event.mntfromname;
-               [expectation fulfill];
-             };
+             dm.deviceBlockCallback =
+                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbMountEvent) {
+                   gotRemountedArgs = event.remountArgs;
+                   gotmntonname = event.mntonname;
+                   gotmntfromname = event.mntfromname;
+                   [expectation fulfill];
+                 };
            }];
 
   XCTAssertEqual(self.mockDA.insertedDevices.count, 1);
