@@ -344,18 +344,18 @@ cwd != '/Library/LaunchDaemons'
 
 ### Rule Dictionary Format
 
-When defining rules in a plist (for static rules or import/export), each rule
+When defining rules in a plist (for StaticRules or import/export), each rule
 is represented as a dictionary with the following keys:
 
 #### Keys
 
 | Key | Type | Required | Description |
 | --- | ---- | -------- | ----------- |
-| `identifier` | String | Yes | The identifier for the rule. The format depends on the `rule_type` (see [Identifier Format](#identifier-format) below). The legacy key `sha256` is also accepted as a fallback. |
+| `identifier` | String | Yes | The identifier for the rule. The format depends on the `rule_type` (see [Identifier Format](#identifier-format) below). |
 | `policy` | String | Yes | The action to take when the rule matches. See [Supported Policies](#supported-policies). |
 | `rule_type` | String | Yes | The type of rule. See [Rule Types](#rule-types) for values. |
 | `custom_msg` | String | No | A custom message displayed in the block notification when this rule blocks execution. |
-| `custom_url` | String | No | A custom URL the user can visit for more information when blocked. |
+| `custom_url` | String | No | A custom URL the user can visit for more information when blocked. Supports the same placeholders as [`EventDetailURL`](/configuration/keys#EventDetailURL). |
 | `comment` | String | No | A comment or note about the rule (for documentation purposes). |
 | `cel_expr` | String | No | A CEL expression for the rule. **Required** if `policy` is `CEL`. |
 
@@ -389,7 +389,6 @@ use `platform` as the Team ID prefix (e.g., `platform:com.apple.curl`).
 | `ALLOWLIST_COMPILER` | Allow execution and enable transitive allowlisting (if configured) |
 | `BLOCKLIST` | Block execution |
 | `SILENT_BLOCKLIST` | Block execution without showing a notification |
-| `REMOVE` | Remove an existing rule. Not valid for static rules. |
 | `CEL` | Evaluate a CEL expression to determine the action |
 
 #### Example Rules
