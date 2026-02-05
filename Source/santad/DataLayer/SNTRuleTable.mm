@@ -137,6 +137,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       @"/Applications/Santa.app/Contents/MacOS/santabundleservice",
       @"/Applications/Santa.app/Contents/MacOS/santametricservice",
       @"/Applications/Santa.app/Contents/MacOS/santasyncservice",
+      @"/Applications/Santa.app/Contents/MacOS/sleigh",
     ]];
 
     // Combine the fallback default mute set and Santa-curated set

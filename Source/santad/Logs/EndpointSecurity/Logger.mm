@@ -24,6 +24,7 @@
 #include <utility>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTExportConfiguration.h"
 #include "Source/common/SNTLogging.h"
 #include "Source/common/SNTStoredExecutionEvent.h"
@@ -41,7 +42,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Syslog.h"
 #include "Source/santad/SNTDecisionCache.h"
-#import "Source/santad/SNTSyncdQueue.h"
+#include "Source/santad/SleighLauncher.h"
 #include "absl/container/flat_hash_map.h"
 
 namespace santa {
@@ -59,7 +60,8 @@ static constexpr uint32_t kMaxTelemetryExportIntervalSecs = 3600;
 
 // Translate configured log type to appropriate Serializer/Writer pairs
 std::unique_ptr<Logger> Logger::Create(
-    std::shared_ptr<EndpointSecurityAPI> esapi, SNTSyncdQueue *syncd_queue,
+    std::shared_ptr<EndpointSecurityAPI> esapi,
+    std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
     GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
     SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
     NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
@@ -122,24 +124,25 @@ std::unique_ptr<Logger> Logger::Create(
   }
 
   auto logger = std::make_unique<Logger>(
-      syncd_queue, getExportConfigBlock, telemetry_mask, telemetry_export_timeout_seconds,
-      telemetry_export_batch_threshold_size_mb, telemetry_export_max_files_per_batch,
-      std::move(serializer), std::move(writer));
+      std::move(sleigh_launcher), getExportConfigBlock, telemetry_mask,
+      telemetry_export_timeout_seconds, telemetry_export_batch_threshold_size_mb,
+      telemetry_export_max_files_per_batch, std::move(serializer), std::move(writer));
 
   logger->SetTimerInterval(telemetry_export_seconds);
 
   return logger;
 }
 
-Logger::Logger(SNTSyncdQueue *syncd_queue, GetExportConfigBlock get_export_config_block,
-               TelemetryEvent telemetry_mask, uint32_t telemetry_export_timeout_seconds,
+Logger::Logger(std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
+               GetExportConfigBlock get_export_config_block, TelemetryEvent telemetry_mask,
+               uint32_t telemetry_export_timeout_seconds,
                uint32_t telemetry_export_batch_threshold_size_mb,
                uint32_t telemetry_export_max_files_per_batch,
                std::shared_ptr<santa::Serializer> serializer, std::shared_ptr<santa::Writer> writer)
     : Timer<Logger>(kMinTelemetryExportIntervalSecs, kMaxTelemetryExportIntervalSecs,
                     Timer::OnStart::kFireImmediately, "TelemetryExportIntervalSec",
                     Logger::RescheduleMode::kTrailingEdge),
-      syncd_queue_(syncd_queue),
+      sleigh_launcher_(std::move(sleigh_launcher)),
       get_export_config_block_(get_export_config_block),
       telemetry_mask_(telemetry_mask),
       serializer_(std::move(serializer)),
@@ -212,38 +215,6 @@ void Logger::SetTelemetryMask(TelemetryEvent mask) {
   telemetry_mask_ = mask;
 }
 
-Logger::ExportLogType Logger::GetLogType(NSFileHandle *handle, NSString *path) {
-  static constexpr NSUInteger kMagicLength = sizeof(uint32_t);
-  NSError *err;
-  NSData *magic_bytes = [handle readDataUpToLength:kMagicLength error:&err];
-  [handle seekToFileOffset:0];
-  if (magic_bytes.length != kMagicLength) {
-    LOGW(@"Unable to determine log file type: %@", path);
-    return ExportLogType::kUnknown;
-  }
-
-  uint32_t magic = *(uint32_t *)(magic_bytes.bytes);
-  if (magic == ::fsspool::kStreamBatcherMagic) {
-    return ExportLogType::kUncompressedStream;
-  } else if (magic == 0xfd2fb528) {
-    return ExportLogType::kZstdStream;
-  } else if ((magic & 0xffff) == 0x8b1f) {
-    return ExportLogType::kGzipStream;
-  } else {
-    LOGW(@"Unsupported log file type: %@ (magic: 0x%08x)", path, magic);
-    return ExportLogType::kUnknown;
-  }
-}
-
-std::pair<NSString *, NSString *> Logger::GetContentTypeAndExtension(ExportLogType log_type) {
-  switch (log_type) {
-    case ExportLogType::kUncompressedStream: return {@"application/octet-stream", @"stream"};
-    case ExportLogType::kGzipStream: return {@"application/gzip", @"gz"};
-    case ExportLogType::kZstdStream: return {@"application/zstd", @"zst"};
-    default: return {nil, nil};
-  }
-}
-
 bool Logger::OnTimer() {
   ExportTelemetry();
   return true;
@@ -256,6 +227,12 @@ void Logger::ExportTelemetry() {
 }
 
 void Logger::ExportTelemetrySerialized() {
+  // Check if sleigh launcher is available
+  if (!sleigh_launcher_) {
+    LOGW(@"Telemetry export enabled, but no Sleigh launcher configured.");
+    return;
+  }
+
   // Get a copy of the current export config to be used for the entire export
   SNTExportConfiguration *export_config = get_export_config_block_();
   if (!export_config) {
@@ -263,32 +240,22 @@ void Logger::ExportTelemetrySerialized() {
     return;
   }
 
-  uint32_t max_opened_files = export_max_files_per_batch_->load(std::memory_order_relaxed);
-  uint64_t max_file_upload_size_bytes =
+  uint32_t max_files_per_batch = export_max_files_per_batch_->load(std::memory_order_relaxed);
+  uint64_t max_batch_size_bytes =
       export_batch_threshold_size_bytes_->load(std::memory_order_relaxed);
-  __block BOOL reply_block_success = YES;
-  BOOL process_another_batch = YES;
+  bool continue_processing = true;
 
-  while (reply_block_success && process_another_batch) {
-    uint64_t total_bytes_opened = 0;
-    ExportLogType cur_log_type = ExportLogType::kUnknown;
-    NSMutableDictionary<NSString *, NSFileHandle *> *pathsToHandles =
-        [[NSMutableDictionary alloc] initWithCapacity:max_opened_files];
+  while (continue_processing) {
+    uint64_t total_bytes = 0;
+    std::vector<std::string> files_to_export;
 
-    process_another_batch = NO;
+    continue_processing = false;
 
     while (std::optional<std::string> file_to_export = writer_->NextFileToExport()) {
       NSString *path = @((*file_to_export).c_str());
 
-      NSFileHandle *handle = [NSFileHandle fileHandleForReadingAtPath:path];
-      if (!handle) {
-        LOGW(@"Failed to get a file handle for telemetry file to export: %@", path);
-        tracker_.AckCompleted(*file_to_export);
-        continue;
-      }
-
       struct stat sb;
-      if (fstat(handle.fileDescriptor, &sb) != 0) {
+      if (stat(path.fileSystemRepresentation, &sb) != 0) {
         LOGW(@"Failed to stat telemetry file to export: %@", path);
         tracker_.AckCompleted(*file_to_export);
         continue;
@@ -300,90 +267,40 @@ void Logger::ExportTelemetrySerialized() {
         continue;
       }
 
-      ExportLogType log_type = GetLogType(handle, path);
-      if (log_type == ExportLogType::kUnknown) {
-        LOGI(@"Unsupported log type, removing: %@", path);
-        tracker_.AckCompleted(*file_to_export);
-        continue;
-      }
-
       // Track all files as initially unsuccessfully processed
       // in case the export times out.
       tracker_.Track(*file_to_export);
 
-      if (cur_log_type == ExportLogType::kUnknown || cur_log_type == log_type) {
-        cur_log_type = log_type;
-        total_bytes_opened += sb.st_size;
-        [pathsToHandles setObject:handle forKey:path];
-      } else {
-        // This is a different supported log type. It will be "tracked" in the tracker, until the
-        // next batch, but can be closed as no other operations will be performed on the file in
-        // this current batch.
-        [handle closeFile];
-        process_another_batch = YES;
-      }
+      files_to_export.push_back(*file_to_export);
+      total_bytes += sb.st_size;
 
-      if (pathsToHandles.count >= max_opened_files ||
-          total_bytes_opened >= max_file_upload_size_bytes) {
+      if (files_to_export.size() >= max_files_per_batch || total_bytes >= max_batch_size_bytes) {
         // Current batch is full
-        process_another_batch = YES;
+        continue_processing = true;
         break;
       }
     }
 
-    if (pathsToHandles.count == 0) {
+    if (files_to_export.empty()) {
       // Nothing left to process
       // Drain the tracker in case there were non-uploadable files encountered
       writer_->FilesExported(tracker_.Drain());
       break;
     }
 
-    auto [contentType, extension] = GetContentTypeAndExtension(cur_log_type);
-    // We should always have a valid content type and extension
-    assert(contentType != nil);
-    assert(extension != nil);
+    // Launch sleigh
+    absl::Status result = sleigh_launcher_->Launch(
+        files_to_export, export_timeout_secs_->load(std::memory_order_relaxed));
 
-    NSString *fileName = [NSString stringWithFormat:@"%@-%@.%@", [SNTSystemInfo bootSessionUUID],
-                                                    [[NSUUID UUID] UUIDString], extension];
-
-    dispatch_semaphore_t semaProcessingBlockCompleted = dispatch_semaphore_create(0);
-    dispatch_semaphore_t semaProcessingBlockExecuted = dispatch_semaphore_create(0);
-
-    dispatch_semaphore_signal(semaProcessingBlockExecuted);
-
-    void (^exportReplyBlock)(BOOL success) = ^void(BOOL success) {
-      if (dispatch_semaphore_wait(semaProcessingBlockExecuted, DISPATCH_TIME_NOW) != 0) {
-        // Block has already executed, nothing to do.
-        return;
+    if (result.ok()) {
+      LOGD(@"Successfully exported %zu telemetry files via sleigh", files_to_export.size());
+      for (const auto &file : files_to_export) {
+        tracker_.AckCompleted(file);
       }
-
-      reply_block_success = success;
-
-      [pathsToHandles
-          enumerateKeysAndObjectsUsingBlock:^(NSString *path, NSFileHandle *handle, BOOL *stop) {
-            [handle closeFile];
-
-            if (success) {
-              tracker_.AckCompleted(path.UTF8String);
-            }
-          }];
-
-      dispatch_semaphore_signal(semaProcessingBlockCompleted);
-    };
-
-    [syncd_queue_ exportTelemetryFiles:[pathsToHandles allValues]
-                              fileName:fileName
-                             totalSize:total_bytes_opened
-                           contentType:contentType
-                                config:export_config
-                                 reply:exportReplyBlock];
-
-    if (dispatch_semaphore_wait(
-            semaProcessingBlockCompleted,
-            dispatch_time(DISPATCH_TIME_NOW,
-                          export_timeout_secs_->load(std::memory_order_relaxed) * NSEC_PER_SEC))) {
-      LOGW(@"Timed out waiting for telemetry to export.");
-      exportReplyBlock(FALSE);
+    } else {
+      LOGE(@"Failed to export telemetry via sleigh: %s", std::string(result.message()).c_str());
+      // Don't continue processing after a failure
+      continue_processing = false;
     }
 
     writer_->FilesExported(tracker_.Drain());

@@ -12,9 +12,6 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-// This command currently only exists in debug builds
-#ifdef DEBUG
-
 #import "Source/santactl/SNTCommand.h"
 
 #import "Source/common/MOLXPCConnection.h"
@@ -46,6 +43,10 @@ REGISTER_COMMAND_NAME(@"telemetry")
           @"  One of:\n"
           @"    --export: Export current telemetry.\n"
           @"\n");
+}
+
++ (BOOL)isHidden {
+  return YES;
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
@@ -107,5 +108,3 @@ REGISTER_COMMAND_NAME(@"telemetry")
 }
 
 @end
-
-#endif  // DEBUG

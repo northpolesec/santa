@@ -26,11 +26,6 @@
       argumentIndex:0
             ofReply:NO];
 
-  [r setClasses:[NSSet setWithObjects:[NSArray class], [NSFileHandle class], nil]
-        forSelector:@selector(exportTelemetryFiles:fileName:totalSize:contentType:config:reply:)
-      argumentIndex:0
-            ofReply:NO];
-
   return r;
 }
 

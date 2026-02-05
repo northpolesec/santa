@@ -19,7 +19,6 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
@@ -210,27 +209,6 @@
   dispatch_async(self.syncdQueue, ^{
     block();
   });
-}
-
-- (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)telemetryFiles
-                    fileName:(NSString *)fileName
-                   totalSize:(NSUInteger)totalSize
-                 contentType:(NSString *)contentType
-                      config:(SNTExportConfiguration *)config
-                       reply:(void (^)(BOOL))reply {
-  [self dispatchBlockOnSyncdQueue:^{
-    if (self.syncConnection.isConnected) {
-      [self.syncConnection.remoteObjectProxy exportTelemetryFiles:telemetryFiles
-                                                         fileName:fileName
-                                                        totalSize:totalSize
-                                                      contentType:contentType
-                                                           config:config
-                                                            reply:reply];
-    } else {
-      // Unable to send to sync service, but still must call the completion handler
-      reply(NO);
-    }
-  }];
 }
 
 // The event upload is skipped if an event has been initiated for it in the last 10 minutes.

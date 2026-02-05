@@ -211,6 +211,7 @@ macos_application(
         "//Source/santabundleservice": "MacOS",
         "//Source/santametricservice": "MacOS",
         "//Source/santasyncservice": "MacOS",
+        "@sleigh//:sleigh": "MacOS",
         "//Source/santad:com.northpolesec.santa.daemon": "Library/SystemExtensions",
         ":network_extension_bundle": "Library/SystemExtensions",
         "Resources/Fonts/StarJedi.ttf": ".",

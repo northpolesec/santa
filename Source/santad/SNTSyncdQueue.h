@@ -18,7 +18,6 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 
-@class SNTExportConfiguration;
 @class MOLXPCConnection;
 
 @interface SNTSyncdQueue : NSObject
@@ -33,12 +32,6 @@
 - (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent *> *)events
          withBundleHash:(NSString *)bundleHash;
 - (void)addBundleEvent:(SNTStoredExecutionEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
-- (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)telemetryFiles
-                    fileName:(NSString *)fileName
-                   totalSize:(NSUInteger)totalSize
-                 contentType:(NSString *)contentType
-                      config:(SNTExportConfiguration *)config
-                       reply:(void (^)(BOOL))reply;
 
 /// Force the push notification client to reconnect immediately.
 /// Use this when external conditions have changed (e.g., network interface reset by content filter)

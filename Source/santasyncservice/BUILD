@@ -196,8 +196,6 @@ objc_library(
     srcs = [
         "SNTPushClientFCM.h",
         "SNTPushClientFCM.mm",
-        "SNTStreamingMultipartFormData.h",
-        "SNTStreamingMultipartFormData.mm",
         "SNTSyncEventUpload.h",
         "SNTSyncEventUpload.mm",
         "SNTSyncManager.mm",
@@ -317,18 +315,6 @@ santa_unit_test(
         "@northpolesec_protos//sync:v1_cc_proto",
         "@northpolesec_protos//syncv2:v2_cc_proto",
         "@protobuf//src/google/protobuf/json",
-    ],
-)
-
-santa_unit_test(
-    name = "SNTStreamingMultipartFormDataTest",
-    srcs = [
-        "SNTStreamingMultipartFormDataTest.mm",
-    ],
-    deps = [
-        ":sync_lib",
-        "//Source/common:SNTLogging",
-        "//Source/common:ScopedFile",
     ],
 )
 
@@ -522,7 +508,6 @@ test_suite(
         ":SNTPushClientNATSCommandTest",
         ":SNTPushClientNATSConnectionTest",
         ":SNTPushClientNATSTest",
-        ":SNTStreamingMultipartFormDataTest",
         ":SNTSyncConfigBundleTest",
         ":SNTSyncManagerNATSTest",
         ":SNTSyncManagerTest",
