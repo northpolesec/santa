@@ -17,6 +17,7 @@
 
 #import <Foundation/Foundation.h>
 
+#include <atomic>
 #include <map>
 #include <memory>
 #include <string>

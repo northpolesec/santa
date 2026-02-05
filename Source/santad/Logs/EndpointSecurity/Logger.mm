@@ -289,6 +289,7 @@ void Logger::ExportTelemetrySerialized() {
     }
 
     // Launch sleigh
+    sleigh_launcher_->SetTimeoutSeconds(export_timeout_secs_->load(std::memory_order_relaxed));
     SleighResult result = sleigh_launcher_->Launch(files_to_export);
 
     if (result.success) {

@@ -160,7 +160,9 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(
 
   // Convert export config to parameters for sleigh
   SNTExportConfiguration *exportConfig = [[SNTConfigurator configurator] exportConfig];
-  std::map<std::string, std::string> form_values;
+  if (!exportConfig) {
+    return absl::InvalidArgumentError("Export configuration is nil");
+  }
 
   auto *export_config = config.mutable_export_config();
   auto *signed_post = export_config->mutable_signed_post();
