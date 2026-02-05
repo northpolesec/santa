@@ -92,7 +92,7 @@ for ARTIFACT in "${INPUT_APP}"; do
   BN=$(/usr/bin/basename "${ARTIFACT}")
 
   echo "stapling ${BN}"
-  /usr/bin/xcrun stapler staple "${ARTIFACT}"
+  /usr/bin/xcrun stapler staple -v "${ARTIFACT}"
 done
 
 # Ensure _CodeSignature/CodeResources files have 0644 permissions so they can

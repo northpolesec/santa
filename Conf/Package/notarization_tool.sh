@@ -14,5 +14,5 @@ KEY_FILE_PATH=/tmp/notarization_key.p8
 
 echo "${NOTARIZATION_KEY_P8}" | base64 --decode > "${KEY_FILE_PATH}"
 
-/usr/bin/xcrun notarytool submit "${2}" --wait \
+/usr/bin/xcrun notarytool submit "${2}" --wait -v \
   --key "${KEY_FILE_PATH}" --key-id "${NOTARIZATION_KEY_ID}" --issuer "${NOTARIZATION_ISSUER_ID}"
