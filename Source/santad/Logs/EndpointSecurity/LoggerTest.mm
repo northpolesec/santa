@@ -128,15 +128,13 @@ class MockWriter : public santa::Writer {
 
 class MockSleighLauncher : public santa::SleighLauncher {
  public:
-  MockSleighLauncher() : santa::SleighLauncher(@"/fake/sleigh", 60) {}
+  MockSleighLauncher() : santa::SleighLauncher("/fake/sleigh") {}
 
-  MOCK_METHOD(santa::SleighResult, Launch, (const std::vector<std::string> &input_files),
-              (override));
+  MOCK_METHOD(absl::Status, Launch,
+              (const std::vector<std::string> &input_files, uint32_t timeout_seconds), (override));
 };
 
-@interface LoggerTest : XCTestCase {
-  std::shared_ptr<MockSleighLauncher> _mockSleighLauncher;
-}
+@interface LoggerTest : XCTestCase
 @property NSFileManager *fileMgr;
 @property NSString *testDir;
 @property SNTExportConfiguration * (^exportConfigBlock)(void);
@@ -154,7 +152,6 @@ class MockSleighLauncher : public santa::SleighLauncher {
                                          attributes:nil
                                               error:nil]);
 
-  _mockSleighLauncher = std::make_shared<MockSleighLauncher>();
   self.exportConfigBlock = ^{
     return [[SNTExportConfiguration alloc] initWithURL:[NSURL URLWithString:@"http://test.example"]
                                             formValues:@{@"key" : @"value"}];
@@ -167,8 +164,6 @@ class MockSleighLauncher : public santa::SleighLauncher {
   if (err) {
     XCTFail(@"Test dir cleanup failed: %@", err);
   }
-
-  _mockSleighLauncher.reset();
 }
 
 - (NSString *)createTestFile:(NSString *)name
@@ -427,26 +422,24 @@ class MockSleighLauncher : public santa::SleighLauncher {
   XCTAssertEqual(map.at("qaz"), true);
 }
 
-- (void)setExportExpectationSuccess:(BOOL)success {
-  santa::SleighResult result{
-      .success = (bool)success,
-      .exit_code = success ? 0 : 1,
-      .error_message = success ? "" : "mock failure",
-  };
-  EXPECT_CALL(*_mockSleighLauncher, Launch).WillOnce(Return(result));
+- (void)setExportExpectationSuccess:(BOOL)success mock:(MockSleighLauncher *)mock {
+  absl::Status result = success ? absl::OkStatus() : absl::InternalError("mock failure");
+  EXPECT_CALL(*mock, Launch).WillOnce(Return(result));
 }
 
 - (void)testExportSuccessWithSupportedTypeAndUnknownFile {
   auto mockWriter = std::make_shared<MockWriter>();
+  auto mockSleigh = std::make_unique<MockSleighLauncher>();
+  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
 
-  [self setExportExpectationSuccess:YES];
+  [self setExportExpectationSuccess:YES mock:mockSleighPtr];
 
   // Only f2 and f3 will be exported (total 25 bytes)
   NSString *f1 = [self createTestFile:@"f1" contentSize:5];
   NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
   NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
 
-  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
+  LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -464,19 +457,21 @@ class MockSleighLauncher : public santa::SleighLauncher {
   l.ExportTelemetrySerialized();
 
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
-  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockSleighPtr);
 }
 
 - (void)testExportFail {
   auto mockWriter = std::make_shared<MockWriter>();
+  auto mockSleigh = std::make_unique<MockSleighLauncher>();
+  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
 
   NSString *f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
   NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
   NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
 
-  [self setExportExpectationSuccess:NO];
+  [self setExportExpectationSuccess:NO mock:mockSleighPtr];
 
-  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
+  LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -493,11 +488,13 @@ class MockSleighLauncher : public santa::SleighLauncher {
   l.ExportTelemetrySerialized();
 
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
-  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockSleighPtr);
 }
 
 - (void)testExportMaxOpenedFiles {
   auto mockWriter = std::make_shared<MockWriter>();
+  auto mockSleigh = std::make_unique<MockSleighLauncher>();
+  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
 
   // Only f1, f2, and f3 will be exported in the first batch (total 30 bytes).
   // File f4 will not be visited because of the limit being reached, but will
@@ -507,13 +504,13 @@ class MockSleighLauncher : public santa::SleighLauncher {
   NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
   NSString *f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
 
-  santa::SleighResult successResult{.success = true, .exit_code = 0, .error_message = ""};
-  EXPECT_CALL(*_mockSleighLauncher, Launch)
+  absl::Status successResult = absl::OkStatus();
+  EXPECT_CALL(*mockSleighPtr, Launch)
       .WillOnce(Return(successResult))
       .WillOnce(Return(successResult));
 
   // Limit to 3 files per batch
-  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
+  LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -532,17 +529,19 @@ class MockSleighLauncher : public santa::SleighLauncher {
 
   l.ExportTelemetrySerialized();
 
-  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockSleighPtr);
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
 - (void)testExportFilesExportedCalledWhenEmpty {
   // This test ensures that FilesExported is called even when there are no files to export.
   auto mockWriter = std::make_shared<MockWriter>();
+  auto mockSleigh = std::make_unique<MockSleighLauncher>();
+  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
 
   // No Launch call expected since there are no files
 
-  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
+  LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport).WillOnce(Return(std::nullopt));
@@ -551,12 +550,14 @@ class MockSleighLauncher : public santa::SleighLauncher {
 
   l.ExportTelemetrySerialized();
 
-  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockSleighPtr);
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
 - (void)testExportMaxBatchSize {
   auto mockWriter = std::make_shared<MockWriter>();
+  auto mockSleigh = std::make_unique<MockSleighLauncher>();
+  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
 
   // Files f1 and f2 will be exported in the first batch.
   // File f3 will go alone in the second batch.
@@ -570,13 +571,13 @@ class MockSleighLauncher : public santa::SleighLauncher {
   NSString *f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
   NSString *f5 = [self createTestFile:@"f5" contentSize:oneMB type:ExportLogType::kZstdStream];
 
-  santa::SleighResult successResult{.success = true, .exit_code = 0, .error_message = ""};
-  EXPECT_CALL(*_mockSleighLauncher, Launch)
+  absl::Status successResult = absl::OkStatus();
+  EXPECT_CALL(*mockSleighPtr, Launch)
       .WillOnce(Return(successResult))
       .WillOnce(Return(successResult))
       .WillOnce(Return(successResult));
 
-  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
+  LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
                nullptr, mockWriter);
 
   EXPECT_CALL(*mockWriter, NextFileToExport)
@@ -599,22 +600,24 @@ class MockSleighLauncher : public santa::SleighLauncher {
 
   l.ExportTelemetrySerialized();
 
-  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockSleighPtr);
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
 - (void)testExportNoMoreBatchesAfterFailedExport {
   auto mockWriter = std::make_shared<MockWriter>();
+  auto mockSleigh = std::make_unique<MockSleighLauncher>();
+  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
 
   // Only f1 and f2 will be sent in the first batch due to file limitations.
   NSString *f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
   NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
 
   // Simulate failed export
-  [self setExportExpectationSuccess:NO];
+  [self setExportExpectationSuccess:NO mock:mockSleighPtr];
 
   // Limit to 2 files per batch
-  LoggerPeer l(_mockSleighLauncher, self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 2,
+  LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 2,
                nullptr, mockWriter);
 
   // Note: std::nullopt is never returned as the export loops don't continue
@@ -628,12 +631,12 @@ class MockSleighLauncher : public santa::SleighLauncher {
 
   l.ExportTelemetrySerialized();
 
-  XCTBubbleMockVerifyAndClearExpectations(_mockSleighLauncher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockSleighPtr);
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
 - (void)testExportSettingsClamp {
-  LoggerPeer l(nil, self.exportConfigBlock, TelemetryEvent::kNone, 5, 1, 2, nullptr, nullptr);
+  LoggerPeer l(nullptr, self.exportConfigBlock, TelemetryEvent::kNone, 5, 1, 2, nullptr, nullptr);
 
   // Export batch threshold size must be between 1 and 5120 MB
   constexpr uint64_t mb_multiplier = 1024 * 1024;
