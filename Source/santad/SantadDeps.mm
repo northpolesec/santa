@@ -140,11 +140,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
   uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
 
-  std::shared_ptr<::SleighLauncher> sleigh_launcher = SleighLauncher::Create(
-      @(SleighLauncher::kDefaultSleighPath), [configurator telemetryExportTimeoutSec]);
-
   std::shared_ptr<::Logger> logger = Logger::Create(
-      esapi, sleigh_launcher,
+      esapi, SleighLauncher::Create(std::string(SleighLauncher::kDefaultSleighPath)),
       ^SNTExportConfiguration *() {
         return [configurator exportConfig];
       },

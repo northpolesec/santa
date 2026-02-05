@@ -23,38 +23,29 @@
 #include <string>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
 namespace santa {
 
-struct SleighResult {
-  bool success;
-  int exit_code;
-  std::string error_message;
-};
-
 class SleighLauncher {
  public:
-  static constexpr const char *kDefaultSleighPath = "/Applications/Santa.app/Contents/MacOS/sleigh";
+  static constexpr std::string_view kDefaultSleighPath =
+      "/Applications/Santa.app/Contents/MacOS/sleigh";
 
-  static std::unique_ptr<SleighLauncher> Create(NSString *sleigh_path, uint32_t timeout_seconds);
-
-  SleighLauncher(NSString *sleigh_path, uint32_t timeout_seconds);
+  static std::unique_ptr<SleighLauncher> Create(std::string sleigh_path);
+  SleighLauncher(std::string sleigh_path);
 
   virtual ~SleighLauncher() = default;
 
-  SleighLauncher(SleighLauncher &&) = default;
-  SleighLauncher &operator=(SleighLauncher &&rhs) = default;
   SleighLauncher(SleighLauncher &) = delete;
   SleighLauncher &operator=(SleighLauncher &rhs) = delete;
 
-  virtual SleighResult Launch(const std::vector<std::string> &input_files);
-
-  void SetTimeoutSeconds(uint32_t timeout_seconds);
+  virtual absl::Status Launch(const std::vector<std::string> &input_files,
+                              uint32_t timeout_seconds);
 
  private:
   NSString *sleigh_path_;
-  std::unique_ptr<std::atomic_uint32_t> timeout_seconds_;
 
   absl::StatusOr<std::string> SerializeConfig(const std::vector<std::string> &input_files);
 };

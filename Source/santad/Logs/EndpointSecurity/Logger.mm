@@ -61,7 +61,7 @@ static constexpr uint32_t kMaxTelemetryExportIntervalSecs = 3600;
 // Translate configured log type to appropriate Serializer/Writer pairs
 std::unique_ptr<Logger> Logger::Create(
     std::shared_ptr<EndpointSecurityAPI> esapi,
-    std::shared_ptr<santa::SleighLauncher> sleigh_launcher,
+    std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
     GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
     SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
     NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
@@ -124,16 +124,16 @@ std::unique_ptr<Logger> Logger::Create(
   }
 
   auto logger = std::make_unique<Logger>(
-      sleigh_launcher, getExportConfigBlock, telemetry_mask, telemetry_export_timeout_seconds,
-      telemetry_export_batch_threshold_size_mb, telemetry_export_max_files_per_batch,
-      std::move(serializer), std::move(writer));
+      std::move(sleigh_launcher), getExportConfigBlock, telemetry_mask,
+      telemetry_export_timeout_seconds, telemetry_export_batch_threshold_size_mb,
+      telemetry_export_max_files_per_batch, std::move(serializer), std::move(writer));
 
   logger->SetTimerInterval(telemetry_export_seconds);
 
   return logger;
 }
 
-Logger::Logger(std::shared_ptr<santa::SleighLauncher> sleigh_launcher,
+Logger::Logger(std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
                GetExportConfigBlock get_export_config_block, TelemetryEvent telemetry_mask,
                uint32_t telemetry_export_timeout_seconds,
                uint32_t telemetry_export_batch_threshold_size_mb,
@@ -255,7 +255,7 @@ void Logger::ExportTelemetrySerialized() {
       NSString *path = @((*file_to_export).c_str());
 
       struct stat sb;
-      if (stat(path.UTF8String, &sb) != 0) {
+      if (stat(path.fileSystemRepresentation, &sb) != 0) {
         LOGW(@"Failed to stat telemetry file to export: %@", path);
         tracker_.AckCompleted(*file_to_export);
         continue;
@@ -289,16 +289,16 @@ void Logger::ExportTelemetrySerialized() {
     }
 
     // Launch sleigh
-    sleigh_launcher_->SetTimeoutSeconds(export_timeout_secs_->load(std::memory_order_relaxed));
-    SleighResult result = sleigh_launcher_->Launch(files_to_export);
+    absl::Status result = sleigh_launcher_->Launch(
+        files_to_export, export_timeout_secs_->load(std::memory_order_relaxed));
 
-    if (result.success) {
+    if (result.ok()) {
       LOGD(@"Successfully exported %zu telemetry files via sleigh", files_to_export.size());
       for (const auto &file : files_to_export) {
         tracker_.AckCompleted(file);
       }
     } else {
-      LOGE(@"Failed to export telemetry via sleigh: %s", result.error_message.c_str());
+      LOGE(@"Failed to export telemetry via sleigh: %s", std::string(result.message()).c_str());
       // Don't continue processing after a failure
       continue_processing = false;
     }

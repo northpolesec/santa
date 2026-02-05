@@ -22,50 +22,27 @@
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSystemInfo.h"
+#include "Source/common/String.h"
 #include "telemetry/sleighconfig.pb.h"
 
 namespace santa {
 
-std::unique_ptr<SleighLauncher> SleighLauncher::Create(NSString *sleigh_path,
-                                                       uint32_t timeout_seconds) {
-  if (!sleigh_path) {
-    sleigh_path = @(kDefaultSleighPath);
+std::unique_ptr<SleighLauncher> SleighLauncher::Create(std::string sleigh_path) {
+  if (sleigh_path.empty()) {
+    sleigh_path = kDefaultSleighPath;
   }
-
-  return std::make_unique<SleighLauncher>(sleigh_path, timeout_seconds);
+  return std::make_unique<SleighLauncher>(sleigh_path);
 }
 
-SleighLauncher::SleighLauncher(NSString *sleigh_path, uint32_t timeout_seconds)
-    : sleigh_path_(sleigh_path),
-      timeout_seconds_(std::make_unique<std::atomic_uint32_t>(timeout_seconds)) {}
+SleighLauncher::SleighLauncher(std::string sleigh_path)
+    : sleigh_path_(StringToNSString(sleigh_path)) {}
 
-void SleighLauncher::SetTimeoutSeconds(uint32_t timeout_seconds) {
-  timeout_seconds_->store(timeout_seconds, std::memory_order_relaxed);
-}
-
-SleighResult SleighLauncher::Launch(const std::vector<std::string> &input_files) {
-  // Check Sleigh binary exists and is correctly signed.
-  MOLCodesignChecker *csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleigh_path_];
-  if (!csc || ![csc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
-      csc.signatureFlags & kSecCodeSignatureAdhoc) {
-    LOGD(@"SleighLauncher::Launch(): Sleigh code signature is invalid");
-#ifndef DEBUG
-    return SleighResult{
-        .success = false,
-        .exit_code = -1,
-        .error_message = "Sleigh code signature is invalid",
-    };
-#endif
-  }
-
+absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
+                                    uint32_t timeout_secs) {
   absl::StatusOr<std::string> serialized = SerializeConfig(input_files);
   if (!serialized.ok()) {
     LOGD(@"SleighLauncher::Launch(): Failed to serialize SleighConfig");
-    return SleighResult{
-        .success = false,
-        .exit_code = -1,
-        .error_message = "Failed to serialize SleighConfig protobuf",
-    };
+    return absl::InternalError("Failed to serialize SleighConfig protobuf");
   }
   NSData *configData = [NSData dataWithBytes:serialized->data() length:serialized->size()];
 
@@ -77,16 +54,22 @@ SleighResult SleighLauncher::Launch(const std::vector<std::string> &input_files)
   NSPipe *stdinPipe = [NSPipe pipe];
   task.standardInput = stdinPipe;
 
+  // Check Sleigh binary exists and is correctly signed.
+  MOLCodesignChecker *csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleigh_path_];
+  if (!csc || ![csc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
+      csc.signatureFlags & kSecCodeSignatureAdhoc) {
+    LOGD(@"SleighLauncher::Launch(): Sleigh code signature is invalid");
+#ifndef DEBUG
+    return absl::FailedPreconditionError("Sleigh code signature is invalid");
+#endif
+  }
+
   // Start the process
   NSError *error;
   if (![task launchAndReturnError:&error]) {
     LOGD(@"SleighLauncher::Launch(): Failed to launch sleigh: %@", error);
-    return SleighResult{
-        .success = false,
-        .exit_code = -1,
-        .error_message =
-            "Failed to launch sleigh: " + std::string([error.localizedDescription UTF8String]),
-    };
+    return absl::AbortedError("Failed to launch Sleigh: " +
+                              std::string([error.localizedDescription UTF8String]));
   }
   // Write config to stdin and close
   NSFileHandle *stdinHandle = stdinPipe.fileHandleForWriting;
@@ -96,12 +79,8 @@ SleighResult SleighLauncher::Launch(const std::vector<std::string> &input_files)
   } @catch (NSException *e) {
     LOGD(@"SleighLauncher::Launch(): Failed to write config to Sleigh stdin: %@", e);
     [task terminate];
-    return SleighResult{
-        .success = false,
-        .exit_code = -1,
-        .error_message =
-            "Failed to write config to sleigh stdin: " + std::string([e.reason UTF8String]),
-    };
+    return absl::InternalError("Failed to write config to Sleigh: " +
+                               std::string([e.reason UTF8String]));
   }
 
   // Wait for completion with timeout
@@ -111,36 +90,22 @@ SleighResult SleighLauncher::Launch(const std::vector<std::string> &input_files)
     dispatch_semaphore_signal(sema);
   };
 
-  uint32_t timeout_secs = timeout_seconds_->load(std::memory_order_relaxed);
   if (dispatch_semaphore_wait(sema,
                               dispatch_time(DISPATCH_TIME_NOW, timeout_secs * NSEC_PER_SEC))) {
     // Timeout - kill the process
     [task terminate];
-    return SleighResult{
-        .success = false,
-        .exit_code = -1,
-        .error_message =
-            "Sleigh process timed out after " + std::to_string(timeout_secs) + " seconds",
-    };
+    return absl::DeadlineExceededError("Sleigh timed out after " + std::to_string(timeout_secs) +
+                                       " seconds");
   }
 
   // Check exit code
   int exitCode = task.terminationStatus;
   if (exitCode != 0) {
     std::string errorMsg = "Sleigh exited with code " + std::to_string(exitCode);
-
-    return SleighResult{
-        .success = false,
-        .exit_code = exitCode,
-        .error_message = errorMsg,
-    };
+    return absl::UnknownError("Sleigh exited with code " + std::to_string(exitCode));
   }
 
-  return SleighResult{
-      .success = true,
-      .exit_code = 0,
-      .error_message = "",
-  };
+  return absl::OkStatus();
 }
 
 absl::StatusOr<std::string> SleighLauncher::SerializeConfig(

@@ -31,6 +31,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/SleighLauncher.h"
 
 // Forward declarations
 @class SNTExportConfiguration;
@@ -38,7 +39,6 @@
 
 namespace santa {
 class LoggerPeer;
-class SleighLauncher;
 }  // namespace santa
 
 namespace santa {
@@ -54,7 +54,7 @@ class Logger : public Timer<Logger> {
 
   static std::unique_ptr<Logger> Create(
       std::shared_ptr<santa::EndpointSecurityAPI> esapi,
-      std::shared_ptr<santa::SleighLauncher> sleigh_launcher,
+      std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
       GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
       SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
       NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
@@ -62,7 +62,7 @@ class Logger : public Timer<Logger> {
       uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
       uint32_t telemetry_export_max_files_per_batch);
 
-  Logger(std::shared_ptr<santa::SleighLauncher> sleigh_launcher,
+  Logger(std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
          GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
          uint32_t telemetry_export_timeout_seconds,
          uint32_t telemetry_export_batch_threshold_size_mb,
@@ -159,7 +159,7 @@ class Logger : public Timer<Logger> {
 
   void ExportTelemetrySerialized();
 
-  std::shared_ptr<santa::SleighLauncher> sleigh_launcher_;
+  std::unique_ptr<santa::SleighLauncher> sleigh_launcher_;
   GetExportConfigBlock get_export_config_block_;
   TelemetryEvent telemetry_mask_;
   std::shared_ptr<santa::Serializer> serializer_;
