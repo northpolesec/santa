@@ -16,8 +16,10 @@
 
 #include <stdlib.h>
 
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 #import "src/santanetd/SNDFilterConfigurationHelper.h"
 
 @interface SNTSystemExtensionDelegate ()
@@ -105,7 +107,29 @@
 
   BOOL success = YES;
   if (self.isNetworkExtension && self.isActivation) {
-    success = [SNDFilterConfigurationHelper enableFilterConfiguration];
+    // Get the desired enabled state from santad (based on sync settings)
+    // Default to NO if santad is not reachable or no settings exist
+    __block BOOL enabled = NO;
+
+    MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+    daemonConn.unprivilegedInterface = [SNTXPCUnprivilegedControlInterface controlInterface];
+    [daemonConn resume];
+
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    [[daemonConn remoteObjectProxy] networkExtensionEnabled:^(BOOL enabledState) {
+      enabled = enabledState;
+      dispatch_semaphore_signal(sema);
+    }];
+
+    if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
+      LOGW(@"Timeout waiting for network extension enabled state, defaulting to disabled");
+      enabled = NO;
+    }
+
+    [daemonConn invalidate];
+
+    LOGI(@"Configuring network extension with enabled state: %@", enabled ? @"YES" : @"NO");
+    success = [SNDFilterConfigurationHelper enableFilterConfigurationWithEnabled:enabled];
   }
 
   exit(success ? EXIT_SUCCESS : EXIT_FAILURE);

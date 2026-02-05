@@ -117,6 +117,13 @@ struct RuleCounts {
 - (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply;
 - (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply;
 
+///
+/// Network Extension Ops
+///
+/// Returns the desired enabled state for the network extension content filter.
+/// Returns NO if no settings have been synced yet.
+- (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply;
+
 @end
 
 @interface SNTXPCUnprivilegedControlInterface : NSObject

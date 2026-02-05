@@ -16,13 +16,18 @@
 
 @implementation SNDFilterConfigurationHelper
 
-+ (BOOL)enableFilterConfiguration {
++ (BOOL)enableFilterConfigurationWithEnabled:(BOOL)enabled {
   // Stub implementation
   return NO;
 }
 
 + (void)disableFilterConfiguration {
   // Stub implementation
+}
+
++ (BOOL)setFilterEnabled:(BOOL)enabled {
+  // Stub implementation
+  return NO;
 }
 
 @end

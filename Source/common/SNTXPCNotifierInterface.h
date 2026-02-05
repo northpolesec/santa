@@ -46,6 +46,7 @@
 - (void)enterTemporaryMonitorMode:(NSDate *)expiration;
 - (void)leaveTemporaryMonitorMode;
 - (void)temporaryMonitorModePolicyAvailable:(BOOL)available;
+- (void)setNetworkExtensionFilterEnabled:(BOOL)enabled reply:(void (^)(BOOL success))reply;
 @end
 
 @interface SNTXPCNotifierInterface : NSObject

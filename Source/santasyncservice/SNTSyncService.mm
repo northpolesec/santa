@@ -120,6 +120,10 @@
   [self.syncManager pushNotificationServerAddress:reply];
 }
 
+- (void)pushNotificationReconnect {
+  [self.syncManager pushNotificationReconnect];
+}
+
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
                    syncType:(SNTSyncType)syncType
                       reply:(void (^)(SNTSyncStatusType))reply {

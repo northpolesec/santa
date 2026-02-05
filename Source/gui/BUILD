@@ -134,8 +134,10 @@ objc_library(
         "SystemExtensions",
     ],
     deps = [
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SNTXPCUnprivilegedControlInterface",
         "@santanetd//src/santanetd:SNDFilterConfigurationHelper",
     ],
 )

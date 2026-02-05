@@ -20,6 +20,6 @@
 ///
 @protocol SNDNetworkExtensionXPC
 
-- (void)applySettings:(NSDictionary *)settings reply:(void (^)(BOOL))reply;
+- (void)updateNetworkExtensionSettings:(NSDictionary *)settings reply:(void (^)(BOOL))reply;
 
 @end

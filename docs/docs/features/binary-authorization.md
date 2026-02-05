@@ -342,6 +342,121 @@ euid != 0
 cwd != '/Library/LaunchDaemons'
 ```
 
+### Rule Dictionary Format
+
+When defining rules in a plist (for StaticRules or import/export), each rule
+is represented as a dictionary with the following keys:
+
+#### Keys
+
+| Key | Type | Required | Description |
+| --- | ---- | -------- | ----------- |
+| `identifier` | String | Yes | The identifier for the rule. The format depends on the `rule_type` (see [Identifier Format](#identifier-format) below). |
+| `policy` | String | Yes | The action to take when the rule matches. See [Supported Policies](#supported-policies). |
+| `rule_type` | String | Yes | The type of rule. See [Rule Types](#rule-types) for values. |
+| `custom_msg` | String | No | A custom message displayed in the block notification when this rule blocks execution. |
+| `custom_url` | String | No | A custom URL the user can visit for more information when blocked. Supports the same placeholders as [`EventDetailURL`](/configuration/keys#EventDetailURL). |
+| `comment` | String | No | A comment or note about the rule (for documentation purposes). |
+| `cel_expr` | String | No | A CEL expression for the rule. **Required** if `policy` is `CEL`. |
+
+:::note
+
+Key names are case-insensitive. Values for `policy` and `rule_type` are also
+case-insensitive.
+
+:::
+
+#### Identifier Format
+
+The format of the `identifier` value depends on the `rule_type`:
+
+| Rule Type | Identifier Format | Example |
+| --------- | ----------------- | ------- |
+| `BINARY` | SHA-256 hash (64 hex characters) | `a1b2c3d4...` (64 chars) |
+| `CERTIFICATE` | SHA-256 hash (64 hex characters) | `a1b2c3d4...` (64 chars) |
+| `TEAMID` | 10-character alphanumeric Team ID | `EQHXZ8M8AV` |
+| `SIGNINGID` | `TeamID:SigningID` format | `EQHXZ8M8AV:com.google.Chrome` |
+| `CDHASH` | Code Directory Hash (40 hex characters) | `ea7c2330699c760b2d6c2c3e703fde01ca54e9b4` |
+
+For `SIGNINGID` rules targeting platform binaries (those shipped with macOS),
+use `platform` as the Team ID prefix (e.g., `platform:com.apple.curl`).
+
+#### Supported Policies
+
+| Value | Description |
+| ----- | ----------- |
+| `ALLOWLIST` | Allow execution |
+| `ALLOWLIST_COMPILER` | Allow execution and enable transitive allowlisting (if configured) |
+| `BLOCKLIST` | Block execution |
+| `SILENT_BLOCKLIST` | Block execution without showing a notification |
+| `CEL` | Evaluate a CEL expression to determine the action |
+
+#### Example Rules
+
+Rules are typically provided either as part of the
+[`StaticRules`](/configuration/keys#StaticRules) configuration key or from a
+sync server. Below are examples of individual rule dictionaries.
+
+**Block a specific binary by SHA-256 hash:**
+
+```xml
+<dict>
+    <key>identifier</key>
+    <string>a1b2c3d4e5f6...</string>
+    <key>rule_type</key>
+    <string>BINARY</string>
+    <key>policy</key>
+    <string>BLOCKLIST</string>
+    <key>custom_msg</key>
+    <string>This application is not permitted by company policy.</string>
+</dict>
+```
+
+**Allow all apps from a specific Team ID:**
+
+```xml
+<dict>
+    <key>identifier</key>
+    <string>EQHXZ8M8AV</string>
+    <key>rule_type</key>
+    <string>TEAMID</string>
+    <key>policy</key>
+    <string>ALLOWLIST</string>
+</dict>
+```
+
+**Allow a specific Signing ID:**
+
+```xml
+<dict>
+    <key>identifier</key>
+    <string>EQHXZ8M8AV:com.google.Chrome</string>
+    <key>rule_type</key>
+    <string>SIGNINGID</string>
+    <key>policy</key>
+    <string>ALLOWLIST</string>
+</dict>
+```
+
+**CEL rule to only allow recently signed versions:**
+
+```xml
+<dict>
+    <key>identifier</key>
+    <string>EQHXZ8M8AV:com.google.Chrome</string>
+    <key>rule_type</key>
+    <string>SIGNINGID</string>
+    <key>policy</key>
+    <string>CEL</string>
+    <key>cel_expr</key>
+    <string>target.signing_time >= timestamp('2025-01-01T00:00:00Z')</string>
+</dict>
+```
+
+When using `StaticRules`, these dictionaries are placed in an array under the
+`StaticRules` key in a configuration profile. When received from a sync server,
+the same structure is used but in JSON format.
+
 ## Rule Layering
 
 Since Santa is a first match system, there are some interesting ways you can
