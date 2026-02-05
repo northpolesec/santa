@@ -540,6 +540,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
   MockSleighLauncher *mockSleighPtr = mockSleigh.get();
 
   // No Launch call expected since there are no files
+  EXPECT_CALL(*mockSleighPtr, Launch(testing::_, testing::_)).Times(0);
 
   LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
                nullptr, mockWriter);
