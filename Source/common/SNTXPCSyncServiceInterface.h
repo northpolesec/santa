@@ -67,6 +67,11 @@
 // the syncservice needlessly when there is no configured sync server.
 - (void)spindown;
 
+// Force the push notification client to reconnect immediately.
+// Use this when external conditions have changed (e.g., network interface reset by content filter)
+// and you want to reconnect without waiting for the normal retry backoff.
+- (void)pushNotificationReconnect;
+
 @end
 
 @interface SNTXPCSyncServiceInterface : NSObject

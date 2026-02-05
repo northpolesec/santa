@@ -191,6 +191,25 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   reply(nil);
 }
 
+- (void)pushNotificationReconnect {
+  if (!self.pushNotifications) {
+    LOGD(@"Push notifications not configured, nothing to reconnect");
+    return;
+  }
+
+  LOGD(@"Force reconnecting push notification client");
+
+  // First, reset the push client's connection state (cancel retry timers, close connection)
+  // Then trigger a sync which will call handlePreflightSyncState with fresh credentials
+  // and reconnect the push client. Give a small amount of time before doing another sync
+  // since right now the force reconnect happens when enabling the network extension which
+  // can cause connections to reset and a flood of network activity.
+  if ([self.pushNotifications respondsToSelector:@selector(forceReconnect)]) {
+    [self.pushNotifications forceReconnect];
+  }
+  [self syncSecondsFromNow:2];
+}
+
 #pragma mark sync control / SNTPushNotificationsDelegate methods
 
 - (void)sync {

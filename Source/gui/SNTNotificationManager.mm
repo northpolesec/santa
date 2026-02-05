@@ -17,6 +17,7 @@
 
 #import <Foundation/Foundation.h>
 #import <UserNotifications/UserNotifications.h>
+#include <sys/qos.h>
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLXPCConnection.h"
@@ -41,6 +42,7 @@
 #import "Source/gui/SNTMessageWindowController.h"
 #import "Source/gui/SNTNetworkMountMessageWindowController.h"
 #import "Source/gui/SNTStatusItemManager.h"
+#import "src/santanetd/SNDFilterConfigurationHelper.h"
 
 @interface SNTNotificationManager ()
 
@@ -485,6 +487,13 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)temporaryMonitorModePolicyAvailable:(BOOL)available {
   [self.statusItemManager setTemporaryMonitorModePolicyAvailable:available];
+}
+
+- (void)setNetworkExtensionFilterEnabled:(BOOL)enabled reply:(void (^)(BOOL success))reply {
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    BOOL success = [SNDFilterConfigurationHelper setFilterEnabled:enabled];
+    reply(success);
+  });
 }
 
 #pragma mark SNTBundleServiceProgressXPC protocol methods

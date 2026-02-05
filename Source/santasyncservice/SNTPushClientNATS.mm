@@ -916,6 +916,38 @@ static void closedCallback(natsConnection *nc, void *closure) {
 }
 
 #pragma mark - SNTPushNotificationsClientDelegate
+
+- (void)forceReconnect {
+  dispatch_async(self.connectionQueue, ^{
+    if (self.isShuttingDown) return;
+
+    LOGI(@"NATS: Force reconnect requested - resetting connection state");
+
+    // Cancel any pending retry timer
+    if (self.connectionRetryTimer) {
+      dispatch_source_cancel(self.connectionRetryTimer);
+      self.connectionRetryTimer = nil;
+    }
+
+    // Unsubscribe and close existing connection
+    [self unsubscribeAll];
+
+    if (self.conn) {
+      natsConnection_Close(self.conn);
+      natsConnection_Destroy(self.conn);
+      self.conn = NULL;
+    }
+
+    self.isConnected = NO;
+    self.retryAttempt = 0;
+    self.isRetrying = NO;
+
+    // Note: We intentionally do NOT call [self connect] here.
+    // The caller should trigger a sync after this, which will call
+    // handlePreflightSyncState with fresh credentials and reconnect.
+  });
+}
+
 - (NSString *)token {
   // NATS doesn't use tokens like FCM
   return [[SNTConfigurator configurator] machineID];

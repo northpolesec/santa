@@ -122,6 +122,10 @@
   [self.syncManager pushNotificationServerAddress:reply];
 }
 
+- (void)pushNotificationReconnect {
+  [self.syncManager pushNotificationReconnect];
+}
+
 - (void)exportTelemetryFiles:(NSArray<NSFileHandle *> *)fds
                     fileName:(NSString *)fileName
                    totalSize:(NSUInteger)totalSize

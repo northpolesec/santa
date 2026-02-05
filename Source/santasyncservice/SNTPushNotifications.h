@@ -30,10 +30,19 @@
 @class SNTSyncState;
 
 @protocol SNTPushNotificationsClientDelegate <NSObject>
+
+@property(readonly) NSString *token;
+@property(readonly) NSUInteger fullSyncInterval;
+
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
 - (BOOL)isConnected;
 - (void)handlePreflightSyncState:(SNTSyncState *)syncState;
 
-@property(readonly) NSString *token;
-@property(readonly) NSUInteger fullSyncInterval;
+@optional
+
+/// Force an immediate reconnection attempt.
+/// Use this when external conditions have changed (e.g., network interface reset)
+/// and you want to reconnect without waiting for the normal retry backoff.
+- (void)forceReconnect;
+
 @end
