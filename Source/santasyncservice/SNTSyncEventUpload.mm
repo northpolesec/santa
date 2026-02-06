@@ -391,6 +391,7 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
       NSStringToUTF8String([event sanitizedMountFromRemovingCredentials]));
   pbNetworkMountEvent->set_mount_on(NSStringToUTF8String(event.mountOnName));
   pbNetworkMountEvent->set_fs_type(NSStringToUTF8String(event.fsType));
+  pbNetworkMountEvent->set_access_time([event.occurrenceDate timeIntervalSince1970]);
 
   return pbNetworkMountEvent;
 }
@@ -407,6 +408,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
     pbUSBMountEvent->set_device_vendor(NSStringToUTF8String(event.deviceVendor));
   }
   pbUSBMountEvent->set_mount_on(NSStringToUTF8String(event.mountOnName));
+  pbUSBMountEvent->set_access_time([event.occurrenceDate timeIntervalSince1970]);
+  
 
   return pbUSBMountEvent;
 }
