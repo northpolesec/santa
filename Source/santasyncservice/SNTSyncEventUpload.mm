@@ -409,7 +409,6 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
   }
   pbUSBMountEvent->set_mount_on(NSStringToUTF8String(event.mountOnName));
   pbUSBMountEvent->set_access_time([event.occurrenceDate timeIntervalSince1970]);
-  
 
   return pbUSBMountEvent;
 }
