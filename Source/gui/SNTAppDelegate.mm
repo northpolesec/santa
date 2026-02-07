@@ -81,8 +81,9 @@
   __block BOOL hasVisibleWindows = NO;
   [NSApp enumerateWindowsWithOptions:0
                           usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
-                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")])
+                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")]) {
                               return;
+                            }
                             *stop = hasVisibleWindows = window.visible;
                           }];
   if (hasVisibleWindows) {
