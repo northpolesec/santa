@@ -75,7 +75,20 @@
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
-  NSApp.activationPolicy = NSApplicationActivationPolicyRegular;
+  // Only show the dock icon if the app has visible windows (excluding status bar windows).
+  // Without this guard, events such as virtual desktop switches can reactivate the app and
+  // cause the dock icon to reappear when there are no windows to display.
+  __block BOOL hasVisibleWindows = NO;
+  [NSApp enumerateWindowsWithOptions:0
+                          usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
+                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")]) {
+                              return;
+                            }
+                            *stop = hasVisibleWindows = window.visible;
+                          }];
+  if (hasVisibleWindows) {
+    NSApp.activationPolicy = NSApplicationActivationPolicyRegular;
+  }
 }
 
 - (void)aWindowWillClose:(NSNotification *)notification {
@@ -100,6 +113,7 @@
     self.aboutWindowController = [[SNTAboutWindowController alloc] init];
   }
   [self.aboutWindowController showWindow:self];
+  NSApp.activationPolicy = NSApplicationActivationPolicyRegular;
   return NO;
 }
 

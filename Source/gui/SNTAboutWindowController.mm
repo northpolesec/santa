@@ -24,8 +24,6 @@
 @implementation SNTAboutWindowController
 
 - (void)showWindow:(id)sender {
-  [super showWindow:sender];
-
   if (self.window) [self.window orderOut:sender];
 
   self.window =
