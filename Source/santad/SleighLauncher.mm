@@ -64,6 +64,13 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
 #endif
   }
 
+  // Semaphore used to time bound sleigh execution
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  task.terminationHandler = ^(__unused NSTask *t) {
+    dispatch_semaphore_signal(sema);
+  };
+
   // Start the process
   NSError *error;
   if (![task launchAndReturnError:&error]) {
@@ -83,13 +90,6 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
                                std::string([e.reason UTF8String]));
   }
 
-  // Wait for completion with timeout
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-
-  task.terminationHandler = ^(__unused NSTask *t) {
-    dispatch_semaphore_signal(sema);
-  };
-
   if (dispatch_semaphore_wait(sema,
                               dispatch_time(DISPATCH_TIME_NOW, timeout_secs * NSEC_PER_SEC))) {
     // Timeout - kill the process
@@ -101,7 +101,6 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   // Check exit code
   int exitCode = task.terminationStatus;
   if (exitCode != 0) {
-    std::string errorMsg = "Sleigh exited with code " + std::to_string(exitCode);
     return absl::UnknownError("Sleigh exited with code " + std::to_string(exitCode));
   }
 
