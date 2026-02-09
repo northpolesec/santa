@@ -102,8 +102,8 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
         return NO;
       }
 
-      // Note: For RENAME events, we process the `source`. This is the one
-      // that we sould be creating transitive rules for, not the destination.
+      // Note: For RENAME events, we first attempt to process the `source`, but if that doesn't
+      // exist (e.g. the rename operation completed) we fall back to the `destination`.
       if (strncmp(kIgnoredCompilerProcessPathPrefix.data(), esMsg->event.rename.source->path.data,
                   kIgnoredCompilerProcessPathPrefix.length()) == 0) {
         return NO;
@@ -126,6 +126,30 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
                                esMsg->event.rename.destination.new_path.filename.data];
           targetFile = [[SNTFileInfo alloc] initWithPath:targetPath error:&error];
         }
+      }
+
+      break;
+    case ES_EVENT_TYPE_NOTIFY_CLONE:
+      if (![self isCompiler:esMsg->process->audit_token]) {
+        return NO;
+      }
+
+      // Note: For CLONE events, we first attempt to process the `source`. But if that doesn't exist
+      // exist (it normally will since clones are copies), we fall back to the `destination`.
+      if (strncmp(kIgnoredCompilerProcessPathPrefix.data(), esMsg->event.clone.source->path.data,
+                  kIgnoredCompilerProcessPathPrefix.length()) == 0) {
+        return NO;
+      }
+
+      targetFile = [[SNTFileInfo alloc] initWithEndpointSecurityFile:esMsg->event.clone.source
+                                                               error:&error];
+      if (!targetFile) {
+        LOGD(@"Unable to locate source file for clone event while creating transitive. Falling "
+             @"back to destination. Path: %s, Error: %@",
+             esMsg->event.clone.source->path.data, error);
+        targetPath = [NSString stringWithFormat:@"%s/%s", esMsg->event.clone.target_dir->path.data,
+                                                esMsg->event.clone.target_name.data];
+        targetFile = [[SNTFileInfo alloc] initWithPath:targetPath error:&error];
       }
 
       break;
@@ -164,7 +188,7 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
         [ruleTable executionRuleForIdentifiers:(struct RuleIdentifiers){
                                                    .binarySHA256 = targetFile.SHA256,
                                                }];
-    if (!prevRule || prevRule.state == SNTRuleStateAllowTransitive) {
+    if (!prevRule || prevRule.state != SNTRuleStateAllowTransitive) {
       // Construct a new transitive allowlist rule for the executable.
       SNTRule *rule = [[SNTRule alloc] initWithIdentifier:targetFile.SHA256
                                                     state:SNTRuleStateAllowTransitive
