@@ -191,6 +191,11 @@ static const pid_t PID_MAX = 99999;
     Message msg(mockESApi, &esMsg);
     XCTAssertFalse([cc handleEvent:msg withLogger:nullptr]);
   }
+  {
+    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLONE, &notCompilerProc);
+    Message msg(mockESApi, &esMsg);
+    XCTAssertFalse([cc handleEvent:msg withLogger:nullptr]);
+  }
 
   // Ensure compiler process events are only handled with non-ignored paths
   {
@@ -202,6 +207,12 @@ static const pid_t PID_MAX = 99999;
   {
     esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_RENAME, &compilerProc);
     esMsg.event.rename.source = &ignoredFile;
+    Message msg(mockESApi, &esMsg);
+    XCTAssertFalse([cc handleEvent:msg withLogger:nullptr]);
+  }
+  {
+    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLONE, &compilerProc);
+    esMsg.event.clone.source = &ignoredFile;
     Message msg(mockESApi, &esMsg);
     XCTAssertFalse([cc handleEvent:msg withLogger:nullptr]);
   }
@@ -329,6 +340,79 @@ static const pid_t PID_MAX = 99999;
     Message msg(mockESApi, &esMsg);
     NSString *expectedTarget =
         [NSString stringWithFormat:@"%s/%s", destDir.path.data, destFilename.data];
+
+    struct stat sbNewFile;
+    XCTAssertEqual(stat("/usr/bin/true", &sbNewFile), 0);
+    SantaVnode vnodeDest = SantaVnode::VnodeForFile(sbNewFile);
+
+    id mockCompilerController = OCMPartialMock(cc);
+    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+    OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
+    OCMStub([mockFileInfo vnode]).andReturn(vnodeDest);
+
+    // Return nil the first time when the source path is looked up
+    OCMExpect([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
+        .ignoringNonObjectArgs()
+        .andReturn(nil);
+    OCMExpect([mockFileInfo initWithPath:expectedTarget error:[OCMArg anyObjectRef]])
+        .ignoringNonObjectArgs()
+        .andReturn(mockFileInfo);
+
+    OCMExpect([mockCompilerController
+                  createTransitiveRule:msg
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                  return fi.vnode.fsid == sbNewFile.st_dev &&
+                                         fi.vnode.fileid == sbNewFile.st_ino;
+                                }]
+                                logger:nullptr])
+        .ignoringNonObjectArgs();
+
+    XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
+
+    XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
+    [mockCompilerController stopMocking];
+    [mockFileInfo stopMocking];
+  }
+  // Ensure transitive rules are created for CLONE events from the source path
+  {
+    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLONE, &compilerProc);
+    esMsg.event.clone.source = &normalFile;
+    Message msg(mockESApi, &esMsg);
+
+    id mockCompilerController = OCMPartialMock(cc);
+    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+    OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
+    OCMStub([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
+        .ignoringNonObjectArgs()
+        .andReturn(mockFileInfo);
+    OCMStub([mockFileInfo vnode]).andReturn(vnodeNormal);
+
+    OCMExpect([mockCompilerController
+                  createTransitiveRule:msg
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                  return fi.vnode.fsid == normalFile.stat.st_dev &&
+                                         fi.vnode.fileid == normalFile.stat.st_ino;
+                                }]
+                                logger:nullptr])
+        .ignoringNonObjectArgs();
+
+    XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
+
+    XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
+    [mockCompilerController stopMocking];
+    [mockFileInfo stopMocking];
+  }
+  // Ensure transitive rules are created for CLONE events from the target path as a fallback
+  {
+    es_file_t targetDir = MakeESFile("/usr/bin", MakeStat(1000));
+    es_string_token_t targetName = MakeESStringToken("true");
+    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLONE, &compilerProc);
+    esMsg.event.clone.source = &normalFile;
+    esMsg.event.clone.target_dir = &targetDir;
+    esMsg.event.clone.target_name = targetName;
+    Message msg(mockESApi, &esMsg);
+    NSString *expectedTarget =
+        [NSString stringWithFormat:@"%s/%s", targetDir.path.data, targetName.data];
 
     struct stat sbNewFile;
     XCTAssertEqual(stat("/usr/bin/true", &sbNewFile), 0);
