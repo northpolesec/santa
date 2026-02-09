@@ -188,6 +188,8 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
         [ruleTable executionRuleForIdentifiers:(struct RuleIdentifiers){
                                                    .binarySHA256 = targetFile.SHA256,
                                                }];
+    // Note: Don't overwrite existing rules, unless it was a transitive rule which is allowed
+    // in order to have timestamps updated.
     if (!prevRule || prevRule.state == SNTRuleStateAllowTransitive) {
       // Construct a new transitive allowlist rule for the executable.
       SNTRule *rule = [[SNTRule alloc] initWithIdentifier:targetFile.SHA256
