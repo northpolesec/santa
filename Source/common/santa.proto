@@ -1168,6 +1168,61 @@ message XProtect {
   }
 }
 
+// Per-process network activity collected during a single monitoring window
+message NetworkActivity {
+  // A single network socket flow observed during the monitoring window
+  message Flow {
+    // Remote endpoint address (IPv4 or IPv6 string representation)
+    optional string remote_address = 1;
+    optional uint32 remote_port = 2;
+
+    // Local endpoint address (IPv4 or IPv6 string representation)
+    optional string local_address = 3;
+    optional uint32 local_port = 4;
+
+    // IP protocol number (e.g. 6 for TCP, 17 for UDP)
+    optional int32 protocol = 5;
+
+    enum SocketFamily {
+      SOCKET_FAMILY_UNKNOWN = 0;
+      SOCKET_FAMILY_INET = 1;
+      SOCKET_FAMILY_INET6 = 2;
+    }
+    optional SocketFamily socket_family = 6;
+
+    enum Direction {
+      DIRECTION_UNKNOWN = 0;
+      DIRECTION_INBOUND = 1;
+      DIRECTION_OUTBOUND = 2;
+    }
+    optional Direction direction = 7;
+
+    // Cumulative byte counts for this flow
+    optional uint64 bytes_inbound = 8;
+    optional uint64 bytes_outbound = 9;
+
+    // When the flow was first observed
+    // Not present for flows that were re-tracked after idle eviction
+    optional google.protobuf.Timestamp start_time = 10;
+
+    // When the flow was closed
+    // Only present if the flow closed during this window
+    optional google.protobuf.Timestamp close_time = 11;
+  }
+
+  // Network activity for a single process
+  message Process {
+    // Information about the process performing network activity
+    optional ProcessInfo process = 1;
+
+    // Active flows for this process during the window
+    repeated Flow flows = 2;
+  }
+
+  // All processes with network activity during this window
+  repeated Process processes = 1;
+}
+
 // A message encapsulating a single event
 message SantaMessage {
   // Machine ID of the host emitting this log
@@ -1210,6 +1265,7 @@ message SantaMessage {
     LaunchItem launch_item = 31;
     TCCModification tcc_modification = 32;
     XProtect xprotect = 33;
+    NetworkActivity network_activity = 34;
   }
 }
 
