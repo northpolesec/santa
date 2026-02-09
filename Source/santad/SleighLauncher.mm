@@ -14,11 +14,18 @@
 
 #include "Source/santad/SleighLauncher.h"
 
-#include <atomic>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <memory>
+
+#include "absl/cleanup/cleanup.h"
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTDropRootPrivs.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -34,81 +41,143 @@ std::unique_ptr<SleighLauncher> SleighLauncher::Create(std::string sleigh_path) 
   return std::make_unique<SleighLauncher>(sleigh_path);
 }
 
-SleighLauncher::SleighLauncher(std::string sleigh_path)
-    : sleigh_path_(StringToNSString(sleigh_path)) {}
+SleighLauncher::SleighLauncher(std::string sleigh_path) : sleigh_path_(std::move(sleigh_path)) {}
 
 absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
                                     uint32_t timeout_secs) {
-  absl::StatusOr<std::string> serialized = SerializeConfig(input_files);
+  // Phase 1: Open all input files (as root) and collect FD numbers
+  std::vector<int> input_fds;
+  absl::Cleanup close_fds = [&input_fds]() {
+    for (int fd : input_fds) {
+      close(fd);
+    }
+  };
+
+  for (const auto &file : input_files) {
+    int fd = open(file.c_str(), O_RDONLY);
+    if (fd < 0) {
+      LOGD(@"SleighLauncher::Launch(): Failed to open input file: %s", file.c_str());
+      return absl::InternalError("Failed to open input file: " + file);
+    }
+    input_fds.push_back(fd);
+  }
+
+  // Phase 2: Serialize config with FD numbers
+  absl::StatusOr<std::string> serialized = SerializeConfig(input_fds);
   if (!serialized.ok()) {
     LOGD(@"SleighLauncher::Launch(): Failed to serialize SleighConfig");
     return absl::InternalError("Failed to serialize SleighConfig protobuf");
   }
-  NSData *configData = [NSData dataWithBytes:serialized->data() length:serialized->size()];
 
-  // Set up NSTask
-  NSTask *task = [[NSTask alloc] init];
-  task.executableURL = [NSURL fileURLWithPath:sleigh_path_];
+  // Phase 3: Create stdin pipe
+  int stdin_pipe[2];
+  if (pipe(stdin_pipe) != 0) {
+    LOGD(@"SleighLauncher::Launch(): Failed to create stdin pipe");
+    return absl::InternalError("Failed to create stdin pipe");
+  }
 
-  // Set up stdin pipe
-  NSPipe *stdinPipe = [NSPipe pipe];
-  task.standardInput = stdinPipe;
-
-  // Check Sleigh binary exists and is correctly signed.
-  MOLCodesignChecker *csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleigh_path_];
+  // Phase 4: Code signature check (ObjC, must happen before fork)
+  NSString *sleighNSPath = StringToNSString(sleigh_path_);
+  MOLCodesignChecker *csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleighNSPath];
   if (!csc || ![csc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
       csc.signatureFlags & kSecCodeSignatureAdhoc) {
     LOGD(@"SleighLauncher::Launch(): Sleigh code signature is invalid");
 #ifndef DEBUG
+    close(stdin_pipe[0]);
+    close(stdin_pipe[1]);
     return absl::FailedPreconditionError("Sleigh code signature is invalid");
 #endif
   }
 
-  // Semaphore used to time bound sleigh execution
+  // Phase 5: Prepare argv (before fork, no ObjC in child)
+  const char *sleigh_path_cstr = sleigh_path_.c_str();
+  const char *argv[] = {sleigh_path_cstr, nullptr};
+
+  // Phase 6: fork
+  pid_t pid = fork();
+  if (pid < 0) {
+    close(stdin_pipe[0]);
+    close(stdin_pipe[1]);
+    LOGD(@"SleighLauncher::Launch(): fork() failed");
+    return absl::InternalError("fork() failed");
+  }
+
+  if (pid == 0) {
+    // Child process - only async-signal-safe functions from here
+
+    // Redirect stdin to read end of pipe
+    dup2(stdin_pipe[0], STDIN_FILENO);
+    close(stdin_pipe[0]);
+    close(stdin_pipe[1]);
+
+    // Drop root privileges
+    if (!DropRootPrivileges()) {
+      _exit(126);
+    }
+
+    // exec sleigh
+    execv(sleigh_path_cstr, const_cast<char *const *>(argv));
+    _exit(127);
+  }
+
+  // Parent process
+  close(stdin_pipe[0]);           // Close read end
+  std::move(close_fds).Invoke();  // Close input FDs (child inherited copies)
+
+  // Write serialized config to stdin pipe
+  const char *data = serialized->data();
+  size_t remaining = serialized->size();
+  bool write_failed = false;
+  while (remaining > 0) {
+    ssize_t written = write(stdin_pipe[1], data, remaining);
+    if (written < 0) {
+      write_failed = true;
+      break;
+    }
+    data += written;
+    remaining -= written;
+  }
+  close(stdin_pipe[1]);
+
+  if (write_failed) {
+    kill(pid, SIGTERM);
+    waitpid(pid, nullptr, 0);
+    LOGD(@"SleighLauncher::Launch(): Failed to write config to Sleigh stdin");
+    return absl::InternalError("Failed to write config to Sleigh stdin");
+  }
+
+  // Async waitpid with timeout using dispatch semaphore
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block int child_status = 0;
 
-  task.terminationHandler = ^(__unused NSTask *t) {
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    waitpid(pid, &child_status, 0);
     dispatch_semaphore_signal(sema);
-  };
-
-  // Start the process
-  NSError *error;
-  if (![task launchAndReturnError:&error]) {
-    LOGD(@"SleighLauncher::Launch(): Failed to launch sleigh: %@", error);
-    return absl::AbortedError("Failed to launch Sleigh: " +
-                              std::string([error.localizedDescription UTF8String]));
-  }
-  // Write config to stdin and close
-  NSFileHandle *stdinHandle = stdinPipe.fileHandleForWriting;
-  @try {
-    [stdinHandle writeData:configData];
-    [stdinHandle closeFile];
-  } @catch (NSException *e) {
-    LOGD(@"SleighLauncher::Launch(): Failed to write config to Sleigh stdin: %@", e);
-    [task terminate];
-    return absl::InternalError("Failed to write config to Sleigh: " +
-                               std::string([e.reason UTF8String]));
-  }
+  });
 
   if (dispatch_semaphore_wait(sema,
                               dispatch_time(DISPATCH_TIME_NOW, timeout_secs * NSEC_PER_SEC))) {
-    // Timeout - kill the process
-    [task terminate];
+    // Timeout - kill the process and wait for async waitpid to complete
+    kill(pid, SIGTERM);
+    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
     return absl::DeadlineExceededError("Sleigh timed out after " + std::to_string(timeout_secs) +
                                        " seconds");
   }
 
   // Check exit code
-  int exitCode = task.terminationStatus;
-  if (exitCode != 0) {
-    return absl::UnknownError("Sleigh exited with code " + std::to_string(exitCode));
+  if (WIFEXITED(child_status)) {
+    int exit_code = WEXITSTATUS(child_status);
+    if (exit_code != 0) {
+      return absl::UnknownError("Sleigh exited with code " + std::to_string(exit_code));
+    }
+  } else {
+    return absl::UnknownError("Sleigh terminated abnormally");
   }
 
   return absl::OkStatus();
 }
 
-absl::StatusOr<std::string> SleighLauncher::SerializeConfig(
-    const std::vector<std::string> &input_files) {
+absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<int> &input_fds) {
   // Build the SleighConfig protobuf
   ::santa::telemetry::v1::SleighConfig config;
   NSString *machineID = [[SNTConfigurator configurator] machineID];
@@ -116,8 +185,8 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(
   std::string host_name = [[SNTSystemInfo longHostname] UTF8String];
   config.set_host_name(host_name);
 
-  for (const auto &file : input_files) {
-    config.add_input_files(file);
+  for (int fd : input_fds) {
+    config.add_input_fds(fd);
   }
 
   // filter_expressions left empty (reserved for future use)
