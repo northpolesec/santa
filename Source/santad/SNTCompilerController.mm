@@ -134,7 +134,7 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
         return NO;
       }
 
-      // Note: For CLONE events, we first attempt to process the `source`. But if that doesn't exist
+      // Note: For CLONE events, we first attempt to process the `source`. But if that doesn't
       // exist (it normally will since clones are copies), we fall back to the `destination`.
       if (strncmp(kIgnoredCompilerProcessPathPrefix.data(), esMsg->event.clone.source->path.data,
                   kIgnoredCompilerProcessPathPrefix.length()) == 0) {
