@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { useColorMode } from "@docusaurus/theme-common";
 import {
   registerCelLanguage,
@@ -54,7 +55,7 @@ export default function CELPlayground() {
 
   const editorTheme = colorMode === "dark" ? "vs-dark" : "light";
 
-  function handleCelEditorMount(_editor: any, monaco: Monaco) {
+  function handleCelEditorMount(_editor: editor.IStandaloneCodeEditor, monaco: Monaco) {
     completionDisposableRef.current?.dispose();
     completionDisposableRef.current = registerCelCompletionProvider(monaco);
   }

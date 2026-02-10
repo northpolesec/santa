@@ -1,12 +1,7 @@
 import type { Monaco } from "@monaco-editor/react";
+import { VARIABLES, FUNCTIONS } from "./constants";
 
 const CONSTANT_NAMES: string[] = [];
-const VARIABLES = ["target", "args", "envs", "euid", "cwd"];
-const FUNCTIONS = [
-  "timestamp",
-  "require_touchid_with_cooldown_minutes",
-  "require_touchid_only_with_cooldown_minutes",
-];
 
 export function setConstantNames(names: string[]) {
   CONSTANT_NAMES.length = 0;

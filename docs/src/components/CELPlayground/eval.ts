@@ -33,13 +33,7 @@ const V2_ONLY_CONSTANTS = new Set(
   ),
 );
 
-const V2_ONLY_FUNCTIONS = [
-  "require_touchid_with_cooldown_minutes",
-  "require_touchid_only_with_cooldown_minutes",
-];
-
-// Dynamic fields that make results non-cacheable
-const DYNAMIC_FIELDS = ["args", "envs", "euid", "cwd"];
+import { V2_ONLY_FUNCTIONS, DYNAMIC_FIELDS } from "./constants";
 
 export const DEFAULT_EXPRESSION = `target.signing_time >= timestamp('2025-05-31T00:00:00Z')`;
 
@@ -181,12 +175,7 @@ export function evaluate(expression: string, yamlInput: string): EvalResult {
 
     return { valid: true, value: displayValue, cacheable, isV2 };
   } catch (err) {
-    if (err instanceof ParseError || err instanceof EvaluationError) {
-      return { valid: false, error: err.message };
-    } else if (err instanceof Error) {
-      return { valid: false, error: err.message };
-    } else {
-      return { valid: false, error: String(err) };
-    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { valid: false, error: message };
   }
 }
