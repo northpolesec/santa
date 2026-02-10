@@ -1173,7 +1173,7 @@ message NetworkActivity {
   // A single network socket flow observed during the monitoring window
   message Flow {
     // Unique identifier for this flow
-    optional bytes id = 1;
+    optional string id = 1;
 
     // Remote endpoint address (IPv4 or IPv6 string representation)
     optional string remote_address = 2;
