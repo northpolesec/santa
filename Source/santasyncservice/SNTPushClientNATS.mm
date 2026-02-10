@@ -601,25 +601,20 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 - (void)handlePushNotificationForSubject:(NSString *)subject {
   dispatch_async(self.messageQueue, ^{
     if (!self.isShuttingDown) {
+      uint32_t jitterSeconds = 0;
       if ([subject hasPrefix:@"santa.tag."]) {
-        uint32_t jitterSeconds = arc4random_uniform(181);
+        jitterSeconds = arc4random_uniform(181);
         LOGI(@"NATS: Scheduling sync in %u seconds (jitter) due to tag message on %@",
              jitterSeconds, subject);
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-          if (!self.isShuttingDown) {
-            [self.syncDelegate syncSecondsFromNow:jitterSeconds];
-          }
-        });
       } else {
         LOGI(@"NATS: Triggering immediate sync due to message on %@", subject);
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-          if (!self.isShuttingDown) {
-            [self.syncDelegate sync];
-          }
-        });
       }
+
+      dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self.isShuttingDown) {
+          [self.syncDelegate syncSecondsFromNow:jitterSeconds];
+        }
+      });
     }
   });
 }
