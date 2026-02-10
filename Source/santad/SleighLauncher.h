@@ -15,10 +15,6 @@
 #ifndef SANTA__SANTAD__SLEIGHLAUNCHER_H
 #define SANTA__SANTAD__SLEIGHLAUNCHER_H
 
-#import <Foundation/Foundation.h>
-
-#include <atomic>
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -45,9 +41,10 @@ class SleighLauncher {
                               uint32_t timeout_seconds);
 
  private:
-  NSString *sleigh_path_;
+  std::string sleigh_path_;
 
-  absl::StatusOr<std::string> SerializeConfig(const std::vector<std::string> &input_files);
+  absl::StatusOr<std::string> SerializeConfig(
+      const std::vector<int> &input_fds);
 };
 
 }  // namespace santa
