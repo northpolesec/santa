@@ -122,6 +122,7 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
 
   // Parent process
   close(stdin_pipe[0]);           // Close read end
+  fcntl(stdin_pipe[1], F_SETNOSIGPIPE, 1);  // Prevent SIGPIPE if child exits
   std::move(close_fds).Invoke();  // Close input FDs (child inherited copies)
 
   // Write serialized config to stdin pipe
@@ -131,6 +132,10 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   while (remaining > 0) {
     ssize_t written = write(stdin_pipe[1], data, remaining);
     if (written < 0) {
+      if (errno == EINTR) {
+        // Retry
+        continue;
+      }
       write_failed = true;
       break;
     }
@@ -140,7 +145,7 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   close(stdin_pipe[1]);
 
   if (write_failed) {
-    kill(pid, SIGTERM);
+    kill(pid, SIGKILL);
     waitpid(pid, nullptr, 0);
     LOGD(@"SleighLauncher::Launch(): Failed to write config to Sleigh stdin");
     return absl::InternalError("Failed to write config to Sleigh stdin");
@@ -158,7 +163,7 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   if (dispatch_semaphore_wait(sema,
                               dispatch_time(DISPATCH_TIME_NOW, timeout_secs * NSEC_PER_SEC))) {
     // Timeout - kill the process and wait for async waitpid to complete
-    kill(pid, SIGTERM);
+    kill(pid, SIGKILL);
     dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
     return absl::DeadlineExceededError("Sleigh timed out after " + std::to_string(timeout_secs) +
                                        " seconds");
