@@ -42,6 +42,7 @@ extern "C" {
                             jwt:(NSString *)jwt
                    pushDeviceID:(NSString *)deviceID
                            tags:(NSArray<NSString *> *)tags;
+- (void)handlePushNotificationForSubject:(NSString *)subject;
 @end
 
 @interface SNTPushClientNATSTest : XCTestCase
@@ -561,6 +562,55 @@ extern "C" {
 
   // Then: Should log error about empty device ID after sanitization
   // (Would verify through logs in integration test)
+}
+
+#pragma mark - Push Notification Jitter Tests
+
+- (void)testTagMessageTriggersDelayedSync {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+
+  XCTestExpectation *expectation =
+      [self expectationWithDescription:@"syncSecondsFromNow called for tag message"];
+
+  OCMStub([self.mockSyncDelegate syncSecondsFromNow:0]).ignoringNonObjectArgs()
+      .andDo(^(NSInvocation *invocation) {
+        uint64_t seconds;
+        [invocation getArgument:&seconds atIndex:2];
+        XCTAssertLessThanOrEqual(seconds, 180u);
+        [expectation fulfill];
+      });
+
+  // Reject immediate sync - it should NOT be called for tag messages
+  OCMReject([self.mockSyncDelegate sync]);
+
+  // When: A tag push notification is received
+  [self.client handlePushNotificationForSubject:@"santa.tag.production"];
+
+  // Then: syncSecondsFromNow should be called with jitter in [0, 180]
+  [self waitForExpectations:@[expectation] timeout:2.0];
+}
+
+- (void)testHostMessageTriggersImmediateSync {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+
+  XCTestExpectation *expectation =
+      [self expectationWithDescription:@"sync called for host message"];
+
+  OCMStub([self.mockSyncDelegate sync])
+      .andDo(^(NSInvocation *invocation) {
+        [expectation fulfill];
+      });
+
+  // Reject delayed sync - it should NOT be called for host messages
+  OCMReject([self.mockSyncDelegate syncSecondsFromNow:0]).ignoringNonObjectArgs();
+
+  // When: A host push notification is received
+  [self.client handlePushNotificationForSubject:@"santa.host.ABC123"];
+
+  // Then: sync should be called immediately (no jitter)
+  [self waitForExpectations:@[expectation] timeout:2.0];
 }
 
 @end

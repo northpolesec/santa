@@ -594,6 +594,36 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   }
 }
 
+// Handle a push notification for the given subject by dispatching a sync.
+// Tag subjects (santa.tag.*) get a random jitter delay of 0-180 seconds to
+// avoid thundering herd when many hosts share the same tag. Host subjects
+// (santa.host.*) trigger an immediate sync.
+- (void)handlePushNotificationForSubject:(NSString *)subject {
+  dispatch_async(self.messageQueue, ^{
+    if (!self.isShuttingDown) {
+      if ([subject hasPrefix:@"santa.tag."]) {
+        uint32_t jitterSeconds = arc4random_uniform(181);
+        LOGI(@"NATS: Scheduling sync in %u seconds (jitter) due to tag message on %@",
+             jitterSeconds, subject);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+          if (!self.isShuttingDown) {
+            [self.syncDelegate syncSecondsFromNow:jitterSeconds];
+          }
+        });
+      } else {
+        LOGI(@"NATS: Triggering immediate sync due to message on %@", subject);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+          if (!self.isShuttingDown) {
+            [self.syncDelegate sync];
+          }
+        });
+      }
+    }
+  });
+}
+
 // NATS message handler
 static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure) {
   if (!closure || !msg) {
@@ -630,18 +660,7 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
   //
   // IMPORTANT: Do not touch the nats objects in this block they are owned by
   // the nats library and will be destroyed after this block.
-  dispatch_async(self.messageQueue, ^{
-    if (!self.isShuttingDown) {
-      LOGI(@"NATS: Triggering immediate sync due to message on %@", msgSubject);
-
-      // Queue sync to main thread
-      dispatch_async(dispatch_get_main_queue(), ^{
-        if (!self.isShuttingDown) {
-          [self.syncDelegate sync];
-        }
-      });
-    }
-  });
+  [self handlePushNotificationForSubject:msgSubject];
 
   natsMsg_Destroy(msg);
 }
