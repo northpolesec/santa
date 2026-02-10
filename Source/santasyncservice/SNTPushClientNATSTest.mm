@@ -573,7 +573,8 @@ extern "C" {
   XCTestExpectation *expectation =
       [self expectationWithDescription:@"syncSecondsFromNow called for tag message"];
 
-  OCMStub([self.mockSyncDelegate syncSecondsFromNow:0]).ignoringNonObjectArgs()
+  OCMStub([self.mockSyncDelegate syncSecondsFromNow:0])
+      .ignoringNonObjectArgs()
       .andDo(^(NSInvocation *invocation) {
         uint64_t seconds;
         [invocation getArgument:&seconds atIndex:2];
@@ -588,7 +589,7 @@ extern "C" {
   [self.client handlePushNotificationForSubject:@"santa.tag.production"];
 
   // Then: syncSecondsFromNow should be called with jitter in [0, 180]
-  [self waitForExpectations:@[expectation] timeout:2.0];
+  [self waitForExpectations:@[ expectation ] timeout:2.0];
 }
 
 - (void)testHostMessageTriggersImmediateSync {
@@ -598,10 +599,9 @@ extern "C" {
   XCTestExpectation *expectation =
       [self expectationWithDescription:@"sync called for host message"];
 
-  OCMStub([self.mockSyncDelegate sync])
-      .andDo(^(NSInvocation *invocation) {
-        [expectation fulfill];
-      });
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+    [expectation fulfill];
+  });
 
   // Reject delayed sync - it should NOT be called for host messages
   OCMReject([self.mockSyncDelegate syncSecondsFromNow:0]).ignoringNonObjectArgs();
@@ -610,7 +610,7 @@ extern "C" {
   [self.client handlePushNotificationForSubject:@"santa.host.ABC123"];
 
   // Then: sync should be called immediately (no jitter)
-  [self waitForExpectations:@[expectation] timeout:2.0];
+  [self waitForExpectations:@[ expectation ] timeout:2.0];
 }
 
 @end
