@@ -14,6 +14,7 @@
 
 #import "Source/santasyncservice/SNTPushNotificationsTracker.h"
 
+#import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSyncConstants.h"
 
@@ -91,7 +92,7 @@
 - (NSDictionary *)all {
   __block NSDictionary *d;
   dispatch_sync(self.notificationsQueue, ^() {
-    d = self.notifications;
+    d = [self.notifications sntDeepCopy];
   });
   return d;
 }
