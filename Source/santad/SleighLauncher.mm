@@ -121,9 +121,9 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   }
 
   // Parent process
-  close(stdin_pipe[0]);           // Close read end
+  close(stdin_pipe[0]);                     // Close read end
   fcntl(stdin_pipe[1], F_SETNOSIGPIPE, 1);  // Prevent SIGPIPE if child exits
-  std::move(close_fds).Invoke();  // Close input FDs (child inherited copies)
+  std::move(close_fds).Invoke();            // Close input FDs (child inherited copies)
 
   // Write serialized config to stdin pipe
   const char *data = serialized->data();
