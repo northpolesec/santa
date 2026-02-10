@@ -69,8 +69,8 @@ describe("evaluate", () => {
   it("does not false-positive on dynamic field names in strings", () => {
     // "args" appears as a string literal, not as the variable
     const result = evaluate(
-      'target.signing_time >= timestamp("2025-01-01T00:00:00Z")',
-      'target:\n  signing_time: "2025-06-01T00:00:00Z"',
+      'target.name == "args"',
+      'target:\n  name: "args"',
     );
     expect(result.valid).toBe(true);
     expect(result.cacheable).toBe(true);
