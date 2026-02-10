@@ -187,7 +187,8 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<in
   ::santa::telemetry::v1::SleighConfig config;
   NSString *machineID = [[SNTConfigurator configurator] machineID];
   config.set_host_id(machineID ? [machineID UTF8String] : "");
-  std::string host_name = [[SNTSystemInfo longHostname] UTF8String];
+  NSString *hostName = [SNTSystemInfo longHostname];
+  std::string host_name = hostName ? [hostName UTF8String] : "";
   config.set_host_name(host_name);
 
   for (int fd : input_fds) {
