@@ -1,14 +1,12 @@
 import type { Monaco } from "@monaco-editor/react";
-import { VARIABLES, FUNCTIONS } from "./constants";
-
-const CONSTANT_NAMES: string[] = [];
-
-export function setConstantNames(names: string[]) {
-  CONSTANT_NAMES.length = 0;
-  CONSTANT_NAMES.push(...names);
-}
+import { VARIABLES, FUNCTIONS, CONSTANT_NAMES } from "./constants";
 
 export function registerCelLanguage(monaco: Monaco) {
+  const alreadyRegistered = monaco.languages
+    .getLanguages()
+    .some((lang) => lang.id === "cel");
+  if (alreadyRegistered) return;
+
   monaco.languages.register({ id: "cel" });
   monaco.languages.setMonarchTokensProvider("cel", {
     constants: CONSTANT_NAMES,

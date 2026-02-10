@@ -100,7 +100,10 @@ export default function CELPlayground() {
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between min-h-8">
-            <label className="text-sm font-medium text-foreground">
+            <label
+              htmlFor={showImport ? "eslogger-json-input" : undefined}
+              className="text-sm font-medium text-foreground"
+            >
               {showImport
                 ? "Input Context (eslogger JSON)"
                 : "Input Context (YAML)"}
@@ -138,6 +141,7 @@ export default function CELPlayground() {
           {showImport ? (
             <>
               <textarea
+                id="eslogger-json-input"
                 value={esloggerJson}
                 onChange={(e) => {
                   setEsloggerJson(e.target.value);

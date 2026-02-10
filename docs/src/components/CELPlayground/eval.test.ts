@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { evaluate, DEFAULT_EXPRESSION, DEFAULT_YAML } from "./eval";
+import { Environment } from "@marcbachmann/cel-js";
+import { evaluate, analyzeAST, DEFAULT_EXPRESSION, DEFAULT_YAML } from "./eval";
 
 describe("evaluate", () => {
   it("evaluates the default expression and YAML successfully", () => {
@@ -122,5 +123,29 @@ describe("evaluate", () => {
     );
     expect(result.valid).toBe(true);
     expect(result.value).toBe("ALLOWLIST");
+  });
+});
+
+describe("analyzeAST", () => {
+  it("extracts identifiers and calls from a cel-js AST", () => {
+    // Parse with the real cel-js parser so this test breaks if the
+    // library changes its AST shape in a way analyzeAST doesn't handle.
+    const env = new Environment({ unlistedVariablesAreDyn: true });
+
+    // "foo.bar(baz)" is a receiver-call in CEL:
+    //   { op: "rcall", args: ["bar", {op:"id",args:"foo"}, [{op:"id",args:"baz"}]] }
+    const ast = env.parse("foo.bar(baz)").ast;
+    const result = analyzeAST(ast);
+
+    expect(result.identifiers).toContain("foo");
+    expect(result.identifiers).toContain("baz");
+
+    // "somefunc(x)" is a plain call:
+    //   { op: "call", args: ["somefunc", [{op:"id",args:"x"}]] }
+    const ast2 = env.parse("somefunc(x)").ast;
+    const result2 = analyzeAST(ast2);
+
+    expect(result2.identifiers).toContain("x");
+    expect(result2.calls).toContain("somefunc");
   });
 });

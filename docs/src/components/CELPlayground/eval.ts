@@ -1,39 +1,12 @@
-import { Environment, ParseError, EvaluationError } from "@marcbachmann/cel-js";
+import { Environment } from "@marcbachmann/cel-js";
 import { parse as parseYAML } from "yaml";
-import { setConstantNames } from "./autocompletion";
-
 import {
-  ReturnValue as V1ReturnValue,
-  ReturnValueSchema as V1ReturnValueSchema,
-} from "@buf/northpolesec_protos.bufbuild_es/cel/v1_pb.js";
-import {
-  ReturnValue as V2ReturnValue,
-  ReturnValueSchema as V2ReturnValueSchema,
-} from "@buf/northpolesec_protos.bufbuild_es/celv2/v2_pb.js";
+  V2_ONLY_FUNCTIONS,
+  DYNAMIC_FIELDS,
+  V2_ONLY_CONSTANTS,
+  v2Entries,
+} from "./constants";
 
-// Build enum name→value and value→name maps from proto descriptors
-function enumEntries(schema: { values: readonly { name: string; number: number }[] }) {
-  const nameToValue: Record<string, bigint> = {};
-  const valueToName: Record<string, string> = {};
-  for (const v of schema.values) {
-    if (v.name === "UNSPECIFIED") continue;
-    nameToValue[v.name] = BigInt(v.number);
-    valueToName[String(BigInt(v.number))] = v.name;
-  }
-  return { nameToValue, valueToName };
-}
-
-const v1Entries = enumEntries(V1ReturnValueSchema);
-const v2Entries = enumEntries(V2ReturnValueSchema);
-
-// V2-only constant names (not in V1)
-const V2_ONLY_CONSTANTS = new Set(
-  Object.keys(v2Entries.nameToValue).filter(
-    (name) => !(name in v1Entries.nameToValue),
-  ),
-);
-
-import { V2_ONLY_FUNCTIONS, DYNAMIC_FIELDS } from "./constants";
 
 export const DEFAULT_EXPRESSION = `target.signing_time >= timestamp('2025-05-31T00:00:00Z')`;
 
@@ -62,6 +35,8 @@ function buildEnvironment(): Environment {
   }
 
   // Register V2 custom functions
+  // Note: These return fixed values; the minutes parameter is ignored
+  // since actual TouchID behavior cannot be simulated in a playground.
   env.registerFunction(
     "require_touchid_with_cooldown_minutes(int): int",
     (_minutes: bigint) => v2Entries.nameToValue["REQUIRE_TOUCHID"],
@@ -105,7 +80,7 @@ function mapResultToName(value: any): string {
   return String(value);
 }
 
-function analyzeAST(node: any): {
+export function analyzeAST(node: any): {
   identifiers: Set<string>;
   calls: Set<string>;
 } {
@@ -155,8 +130,6 @@ export interface EvalResult {
 }
 
 const celEnv = buildEnvironment();
-
-setConstantNames(Object.keys(v2Entries.nameToValue));
 
 export function evaluate(expression: string, yamlInput: string): EvalResult {
   try {
