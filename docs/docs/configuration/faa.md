@@ -26,6 +26,17 @@ individual watch rules.
 - `EventDetailText` (optional): Button label text for the notification dialog, maximum 48 characters. Defaults to 'Open'.
 - `WatchItems` (optional): Dictionary containing the individual monitoring rules
 
+:::tip
+
+If you want a default URL and button text for all file access events without
+configuring them in every FAA policy, you can set the global
+[FileAccessEventDetailURL](/configuration/keys#FileAccessEventDetailURL) and
+[FileAccessEventDetailText](/configuration/keys#FileAccessEventDetailText)
+configuration keys. Per-policy `EventDetailURL` and `EventDetailText` values
+(and per-rule overrides) will take precedence over these global defaults.
+
+:::
+
 ### Watch Item Structure
 
 Each entry in the `WatchItems` dictionary represents a single rule. The key for
