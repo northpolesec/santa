@@ -191,6 +191,7 @@ static NSString *const kEnableNATS =
 
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
+static NSString *const kTelemetryFilterExpressionsKey = @"TelemetryFilterExpressions";
 
 static NSString *const kOnStartUSBOptions = @"OnStartUSBOptions";
 
@@ -379,6 +380,7 @@ static NSString *const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings
       kEntitlementsPrefixFilterKey : array,
       kEntitlementsTeamIDFilterKey : array,
       kEnabledProcessAnnotations : array,
+      kTelemetryFilterExpressionsKey : array,
       kTelemetryKey : array,
       kBrandingCompanyName : string,
       kBrandingCompanyLogo : string,
@@ -786,6 +788,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEntitlementsTeamIDFilter {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingTelemetryFilterExpressions {
   return [self configStateSet];
 }
 
@@ -1765,6 +1771,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSArray *)entitlementsTeamIDFilter {
   return EnsureArrayOfStrings(self.configState[kEntitlementsTeamIDFilterKey]);
+}
+
+- (NSArray *)telemetryFilterExpressions {
+  return EnsureArrayOfStrings(self.configState[kTelemetryFilterExpressionsKey]);
 }
 
 - (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {

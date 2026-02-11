@@ -317,6 +317,13 @@
 @property(readonly) uint32_t telemetryExportMaxFilesPerBatch;
 
 ///
+///  CEL expressions used to filter telemetry events during export.
+///
+///  @note: This property is KVO compliant.
+///
+@property(nullable, readonly, nonatomic) NSArray<NSString *> *telemetryFilterExpressions;
+
+///
 ///  If set, contains the filesystem access policy configuration.
 ///
 ///  @note: The property fileAccessPolicyPlist will be ignored if
