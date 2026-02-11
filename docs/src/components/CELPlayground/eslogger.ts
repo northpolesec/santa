@@ -54,5 +54,9 @@ export function convertEsloggerEvent(input: string): string {
     context.cwd = exec.cwd.path;
   }
 
+  // Make up signing times
+  context.target.signing_time = "2025-06-01T00:00:00Z";
+  context.target.secure_signing_time = "2025-06-01T00:00:00Z";
+
   return stringifyYAML(context);
 }

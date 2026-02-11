@@ -1,11 +1,43 @@
-import {
-  ReturnValueSchema as V1ReturnValueSchema,
-} from "@buf/northpolesec_protos.bufbuild_es/cel/v1_pb.js";
-import {
-  ReturnValueSchema as V2ReturnValueSchema,
-} from "@buf/northpolesec_protos.bufbuild_es/celv2/v2_pb.js";
+import { ReturnValueSchema as V1ReturnValueSchema } from "@buf/northpolesec_protos.bufbuild_es/cel/v1_pb.js";
+import { ReturnValueSchema as V2ReturnValueSchema } from "@buf/northpolesec_protos.bufbuild_es/celv2/v2_pb.js";
+import { CELVariable } from "./autocompletion";
 
-export const VARIABLES = ["target", "args", "envs", "euid", "cwd"] as const;
+export const VARIABLES: CELVariable[] = [
+  { name: "envs", type: "map", documentation: "Environment variables" },
+  { name: "args", type: "list", documentation: "Command line arguments" },
+  {
+    name: "target.signing_time",
+    type: "timestamp",
+    documentation: "Code signing timestamp",
+  },
+  {
+    name: "target.secure_signing_time",
+    type: "timestamp",
+    documentation: "Secure code signing timestamp",
+  },
+  { name: "ALLOWLIST", type: "string", documentation: "Allow policy constant" },
+  { name: "BLOCKLIST", type: "string", documentation: "Block policy constant" },
+  {
+    name: "ALLOWLIST_COMPILER",
+    type: "string",
+    documentation: "Allow compiler policy constant",
+  },
+  {
+    name: "SILENT_BLOCKLIST",
+    type: "string",
+    documentation: "Silent block policy constant",
+  },
+  {
+    name: "REQUIRE_TOUCHID",
+    type: "string",
+    documentation: "Require Touch ID policy constant",
+  },
+  {
+    name: "REQUIRE_TOUCHID_ONLY",
+    type: "string",
+    documentation: "Require Touch ID only policy constant",
+  },
+];
 
 export const DYNAMIC_FIELDS = ["args", "envs", "euid", "cwd"] as const;
 
@@ -17,7 +49,9 @@ export const V2_ONLY_FUNCTIONS = [
 export const FUNCTIONS = ["timestamp", ...V2_ONLY_FUNCTIONS] as const;
 
 // Build enum name→value and value→name maps from proto descriptors
-function enumEntries(schema: { values: readonly { name: string; number: number }[] }) {
+function enumEntries(schema: {
+  values: readonly { name: string; number: number }[];
+}) {
   const nameToValue: Record<string, bigint> = {};
   const valueToName: Record<string, string> = {};
   for (const v of schema.values) {

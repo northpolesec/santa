@@ -2,10 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useColorMode } from "@docusaurus/theme-common";
-import {
-  registerCelLanguage,
-  registerCelCompletionProvider,
-} from "./autocompletion";
+import { registerCELLanguage } from "./autocompletion";
+import { VARIABLES } from "./constants";
 import { convertEsloggerEvent } from "./eslogger";
 import {
   evaluate,
@@ -28,6 +26,7 @@ const celEditorOptions = {
   lineNumbersMinChars: 3,
   folding: false,
   glyphMargin: false,
+  wordBasedSuggestions: "off" as const,
 };
 
 const dataEditorOptions = {
@@ -55,11 +54,6 @@ export default function CELPlayground() {
 
   const editorTheme = colorMode === "dark" ? "vs-dark" : "light";
 
-  function handleCelEditorMount(_editor: editor.IStandaloneCodeEditor, monaco: Monaco) {
-    completionDisposableRef.current?.dispose();
-    completionDisposableRef.current = registerCelCompletionProvider(monaco);
-  }
-
   function handleImport() {
     try {
       const yaml = convertEsloggerEvent(esloggerJson);
@@ -77,7 +71,7 @@ export default function CELPlayground() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 mb-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="flex flex-col gap-2">
           <div className="flex items-center min-h-8">
@@ -92,8 +86,9 @@ export default function CELPlayground() {
               theme={editorTheme}
               value={expression}
               onChange={(value) => setExpression(value ?? "")}
-              beforeMount={registerCelLanguage}
-              onMount={handleCelEditorMount}
+              beforeMount={(monaco) =>
+                registerCELLanguage(monaco, { variables: VARIABLES })
+              }
               options={celEditorOptions}
             />
           </div>
@@ -147,7 +142,9 @@ export default function CELPlayground() {
                   setEsloggerJson(e.target.value);
                   setImportError(null);
                 }}
-                placeholder={'Paste output from "eslogger exec" here. Only the first event will be used.'}
+                placeholder={
+                  'Paste output from "eslogger exec" here. Only the first event will be used.'
+                }
                 className="w-full min-h-[280px] p-3 rounded-md border border-border bg-card text-card-foreground font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                 spellCheck={false}
               />
@@ -210,8 +207,8 @@ export default function CELPlayground() {
               </div>
               {result.isV2 && (
                 <div className="mt-1 rounded-md border border-border bg-accent p-3 text-sm text-accent-foreground">
-                  This expression uses CELv2 features which are only available to
-                  Workshop customers.
+                  This expression uses CELv2 features which are only available
+                  to Workshop customers.
                 </div>
               )}
             </div>
