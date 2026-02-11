@@ -561,7 +561,7 @@ export const celLanguageDefinition = {
   digits: /\d+(_+\d+)*/,
   octaldigits: /[0-7]+(_+[0-7]+)*/,
   binarydigits: /[0-1]+(_+[0-1]+)*/,
-  hexdigits: /[[0-9a-fA-F]+(_+[0-9a-fA-F]+)*/,
+  hexdigits: /[0-9a-fA-F]+(_+[0-9a-fA-F]+)*/,
 
   // Tokenizer
   tokenizer: {
@@ -766,7 +766,9 @@ export function registerCELLanguage(
 
   // Build a map of variable names to types for quick lookup
   const variableTypes = new Map<string, CELVariableType>();
-  variables.forEach((v) => variableTypes.set(v.name, v.type));
+  for (const v of variables) {
+    variableTypes.set(v.name, v.type);
+  }
 
   // Build general completion items (not after a dot)
   const generalCompletions: any[] = [];

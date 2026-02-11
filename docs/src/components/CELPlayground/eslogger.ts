@@ -13,8 +13,12 @@ function parseExecEvent(input: string): Record<string, any> {
   }
 
   // Try parsing the whole input as a single JSON object
-  const event = JSON.parse(input);
-  if (event?.event?.exec) return event;
+  try {
+    const event = JSON.parse(input);
+    if (event?.event?.exec) return event;
+  } catch {
+    // fall through to consistent error
+  }
   throw new Error("No exec event found in eslogger output");
 }
 
@@ -54,9 +58,10 @@ export function convertEsloggerEvent(input: string): string {
     context.cwd = exec.cwd.path;
   }
 
-  // Make up signing times
+  // Make up signing times (eslogger doesn't include these)
   context.target.signing_time = "2025-06-01T00:00:00Z";
   context.target.secure_signing_time = "2025-06-01T00:00:00Z";
 
-  return stringifyYAML(context);
+  const yaml = stringifyYAML(context);
+  return "# Note: signing times are fake — eslogger events don't include them\n" + yaml;
 }

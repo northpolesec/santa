@@ -143,7 +143,7 @@ export default function CELPlayground() {
                   setImportError(null);
                 }}
                 placeholder={
-                  'Paste output from "eslogger exec" here. Only the first event will be used.'
+                  'Paste output from "eslogger exec" here. Only the first event will be used.\n\nNote: eslogger events don\'t include signing times, so fake timestamps will be added.'
                 }
                 className="w-full min-h-[280px] p-3 rounded-md border border-border bg-card text-card-foreground font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                 spellCheck={false}

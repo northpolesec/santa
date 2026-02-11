@@ -5,6 +5,8 @@ import { CELVariable } from "./autocompletion";
 export const VARIABLES: CELVariable[] = [
   { name: "envs", type: "map", documentation: "Environment variables" },
   { name: "args", type: "list", documentation: "Command line arguments" },
+  { name: "euid", type: "int", documentation: "Effective user ID" },
+  { name: "cwd", type: "string", documentation: "Current working directory" },
   {
     name: "target.signing_time",
     type: "timestamp",
