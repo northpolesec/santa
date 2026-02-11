@@ -38,9 +38,12 @@ describe("convertEsloggerEvent", () => {
     expect(result.cwd).toBe("/Users/test");
   });
 
-  it("always includes an empty target map", () => {
+  it("always includes a target map with signing times", () => {
     const result = toObject(convertEsloggerEvent(MINIMAL_EXEC_EVENT));
-    expect(result.target).toEqual({});
+    expect(result.target).toEqual({
+      signing_time: "2025-06-01T00:00:00Z",
+      secure_signing_time: "2025-06-01T00:00:00Z",
+    });
   });
 
   it("handles env values containing '='", () => {
@@ -58,7 +61,10 @@ describe("convertEsloggerEvent", () => {
   it("handles missing optional fields", () => {
     const event = JSON.stringify({ event: { exec: {} } });
     const result = toObject(convertEsloggerEvent(event));
-    expect(result.target).toEqual({});
+    expect(result.target).toEqual({
+      signing_time: "2025-06-01T00:00:00Z",
+      secure_signing_time: "2025-06-01T00:00:00Z",
+    });
     expect(result.args).toBeUndefined();
     expect(result.envs).toBeUndefined();
     expect(result.euid).toBeUndefined();
