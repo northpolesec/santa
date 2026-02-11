@@ -44,6 +44,8 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSString *fileAccessEventDetailURL;
+@property NSString *fileAccessEventDetailText;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @end
 
@@ -89,6 +91,14 @@
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.eventDetailText, syncState.eventDetailText);
 
+  syncState.fileAccessEventDetailURL = @"my://faa-url";
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.fileAccessEventDetailURL, syncState.fileAccessEventDetailURL);
+
+  syncState.fileAccessEventDetailText = @"View FAA Details";
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.fileAccessEventDetailText, syncState.fileAccessEventDetailText);
+
   syncState.blockNetworkMount = @(YES);
   syncState.bannedNetworkMountBlockMessage = @"banban";
   syncState.allowedNetworkMountHosts = @[ @"0.0.0.0", @"localhost" ];
@@ -129,6 +139,8 @@
   XCTAssertNil(bundle.modeTransition);
   XCTAssertNil(bundle.eventDetailURL);
   XCTAssertNil(bundle.eventDetailText);
+  XCTAssertNil(bundle.fileAccessEventDetailURL);
+  XCTAssertNil(bundle.fileAccessEventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
 }
 
@@ -163,6 +175,8 @@
   XCTAssertNil(bundle.modeTransition);
   XCTAssertNil(bundle.eventDetailURL);
   XCTAssertNil(bundle.eventDetailText);
+  XCTAssertNil(bundle.fileAccessEventDetailURL);
+  XCTAssertNil(bundle.fileAccessEventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
 }
 

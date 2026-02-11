@@ -112,6 +112,30 @@
   XCTAssertNil([SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:@"null"]);
 }
 
+- (void)testEventDetailURLForFileAccessEventFallback {
+  SNTStoredFileAccessEvent *fae = [[SNTStoredFileAccessEvent alloc] init];
+
+  fae.ruleVersion = @"my_rv";
+  fae.ruleName = @"my_rn";
+  fae.accessedPath = @"my_ap";
+  fae.process.executingUser = @"my_un";
+
+  NSString *configURL = @"http://localhost?rv=%rule_version%&rn=%rule_name%&ap=%accessed_path%";
+  NSString *wantUrl = @"http://localhost?rv=my_rv&rn=my_rn&ap=my_ap";
+
+  OCMStub([self.mockConfigurator fileAccessEventDetailURL]).andReturn(configURL);
+
+  // When customURL is nil, should fall back to fileAccessEventDetailURL
+  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:nil];
+  XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
+
+  // When customURL is provided, it should be used instead
+  NSString *customURL = @"http://custom?rv=%rule_version%";
+  NSString *wantCustomUrl = @"http://custom?rv=my_rv";
+  gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:customURL];
+  XCTAssertEqualObjects(gotUrl.absoluteString, wantCustomUrl);
+}
+
 - (void)testEventDetailURLMissingDetails {
   SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
 

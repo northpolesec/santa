@@ -388,6 +388,14 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
         [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:resp.network_extension().enable()];
   }
 
+  if (resp.has_file_access_event_detail_url()) {
+    syncState.fileAccessEventDetailURL = StringToNSString(resp.file_access_event_detail_url());
+  }
+
+  if (resp.has_file_access_event_detail_text()) {
+    syncState.fileAccessEventDetailText = StringToNSString(resp.file_access_event_detail_text());
+  }
+
   if (resp.has_export_configuration()) {
     auto exportConfig = resp.export_configuration().signed_post();
     if (!exportConfig.url().empty() && !exportConfig.form_values().empty()) {

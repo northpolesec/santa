@@ -25,6 +25,8 @@
 @property(readonly) SNTClientMode clientMode;
 @property(readonly) BOOL enableNotificationSilences;
 @property(readonly) NSString *eventDetailText;
+@property(readonly) NSString *fileAccessEventDetailURL;
+@property(readonly) NSString *fileAccessEventDetailText;
 
 - (instancetype)initWithConfig:(SNTConfigurator *)config;
 
