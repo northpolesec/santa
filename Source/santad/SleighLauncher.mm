@@ -195,7 +195,11 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<in
     config.add_input_fds(fd);
   }
 
-  // filter_expressions left empty (reserved for future use)
+  NSArray<NSString *> *filterExpressions =
+      [[SNTConfigurator configurator] telemetryFilterExpressions];
+  for (NSString *expr in filterExpressions) {
+    config.add_filter_expressions([expr UTF8String]);
+  }
 
   // Convert export config to parameters for sleigh
   SNTExportConfiguration *exportConfig = [[SNTConfigurator configurator] exportConfig];
