@@ -442,6 +442,13 @@ changes in the release notes of any future release that changes them.`,
       type: "string",
       repeated: true,
     },
+    {
+      key: "TelemetryFilterExpressions",
+      description: `A list of CEL expressions for filtering/redacting rows before upload. Only useful for Workshop customers.`,
+      type: "string",
+      repeated: true,
+      versionAdded: "2026.2",
+    },
   ],
   faa: [
     {

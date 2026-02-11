@@ -267,7 +267,7 @@ SNTFileAccessRule *FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add 
   details[kWatchItemConfigKeyOptions] = optionsDict;
 
   NSArray *processes = ProcessesFromProtoFAARuleProcesses(pbAddRule.processes());
-  if (!paths) {
+  if (!processes) {
     return nil;
   }
   details[kWatchItemConfigKeyProcesses] = processes;
@@ -389,7 +389,7 @@ void ProcessDeprecatedBundleNotificationsForRule(
         decrementPendingRulesForHash:primaryHash
                       totalRuleCount:@(protoRule->file_bundle_binary_count())];
   }
-#pragma clang diagnostic push
+#pragma clang diagnostic pop
 }
 
 @implementation SNTSyncRuleDownload

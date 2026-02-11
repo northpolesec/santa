@@ -103,9 +103,6 @@ void InstallServices() {
 
 int main(int argc, char *argv[]) {
   @autoreleasepool {
-    // Do not wait on child processes
-    signal(SIGCHLD, SIG_IGN);
-
     NSString *product_version = [SNTSystemInfo santaProductVersion];
     NSString *build_version = [SNTSystemInfo santaBuildVersion];
 
