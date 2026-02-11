@@ -582,9 +582,6 @@ extern "C" {
         [expectation fulfill];
       });
 
-  // Reject immediate sync - it should NOT be called for tag messages
-  OCMReject([self.mockSyncDelegate sync]);
-
   // When: A tag push notification is received
   [self.client handlePushNotificationForSubject:@"santa.tag.production"];
 
@@ -597,19 +594,21 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   XCTestExpectation *expectation =
-      [self expectationWithDescription:@"sync called for host message"];
+      [self expectationWithDescription:@"syncSecondsFromNow called with 0 for host message"];
 
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
-    [expectation fulfill];
-  });
-
-  // Reject delayed sync - it should NOT be called for host messages
-  OCMReject([self.mockSyncDelegate syncSecondsFromNow:0]).ignoringNonObjectArgs();
+  OCMStub([self.mockSyncDelegate syncSecondsFromNow:0])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation *invocation) {
+        uint64_t seconds;
+        [invocation getArgument:&seconds atIndex:2];
+        XCTAssertEqual(seconds, 0u);
+        [expectation fulfill];
+      });
 
   // When: A host push notification is received
   [self.client handlePushNotificationForSubject:@"santa.host.ABC123"];
 
-  // Then: sync should be called immediately (no jitter)
+  // Then: syncSecondsFromNow should be called with 0 (no jitter)
   [self waitForExpectations:@[ expectation ] timeout:2.0];
 }
 
