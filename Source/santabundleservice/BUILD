@@ -12,6 +12,7 @@ objc_library(
         "main.mm",
     ],
     deps = [
+        "//Source/common:Glob",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTFileInfo",

@@ -37,6 +37,9 @@ using santa::StringToNSString;
 // Semi-arbitrary number of seconds to wait for santad to finish killing processes
 static constexpr int64_t kKillResponseTimeoutSeconds = 90;
 
+// Bundle hashing + event upload can take a while for large bundles
+static constexpr int64_t kEventUploadResponseTimeoutSeconds = 300;
+
 // Maximum age in seconds for command timestamps (5 minutes)
 static constexpr int64_t kMaxCommandAgeSeconds = 300;
 
@@ -165,6 +168,10 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 - (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
                             withCommandUUID:(NSString *)uuid
                                     onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::EventUploadResponse *)handleEventUploadRequest:
+                                     (const ::pbv1::EventUploadRequest &)eventUploadRequest
+                                          withCommandUUID:(NSString *)uuid
+                                                  onArena:(google::protobuf::Arena *)arena;
 - (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
                                       (const ::pbv1::SantaCommandRequest &)command
                                                         onArena:(google::protobuf::Arena *)arena;
@@ -291,6 +298,46 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   return pbKillResponse;
 }
 
+// Handle EventUploadRequest command
+- (::pbv1::EventUploadResponse *)handleEventUploadRequest:
+                                     (const ::pbv1::EventUploadRequest &)eventUploadRequest
+                                          withCommandUUID:(NSString *)uuid
+                                                  onArena:(google::protobuf::Arena *)arena {
+  NSString *path = StringToNSString(eventUploadRequest.path());
+  if (path.length == 0) {
+    LOGE(@"NATS: EventUploadRequest has empty path");
+    return nil;
+  }
+
+  id<SNTPushNotificationsSyncDelegate> strongSyncDelegate = self.syncDelegate;
+  if (!strongSyncDelegate) {
+    LOGE(@"NATS: EventUploadRequest failed - no sync delegate");
+    return nil;
+  }
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block NSError *uploadError;
+  [strongSyncDelegate eventUploadForPath:path
+                                   reply:^(NSError *error) {
+                                     uploadError = error;
+                                     dispatch_semaphore_signal(sema);
+                                   }];
+
+  if (dispatch_semaphore_wait(
+          sema, dispatch_time(DISPATCH_TIME_NOW,
+                              kEventUploadResponseTimeoutSeconds * NSEC_PER_SEC)) != 0) {
+    LOGE(@"NATS: EventUploadRequest timed out for path: %@", path);
+    return nil;
+  }
+
+  if (uploadError) {
+    LOGE(@"NATS: EventUploadRequest failed for path %@: %@", path, uploadError);
+    return nil;
+  }
+
+  return google::protobuf::Arena::Create<::pbv1::EventUploadResponse>(arena);
+}
+
 // Dispatch Santa command to appropriate handler based on command type
 - (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
                                       (const ::pbv1::SantaCommandRequest &)command
@@ -340,6 +387,19 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                                    withCommandUUID:uuid
                                            onArena:arena];
       response->unsafe_arena_set_allocated_kill(killResponse);
+      break;
+    }
+
+    case ::pbv1::SantaCommandRequest::kEventUpload: {
+      LOGI(@"NATS: Dispatching EventUploadRequest command");
+      auto *eventUploadResponse = [self handleEventUploadRequest:command.event_upload()
+                                                 withCommandUUID:uuid
+                                                         onArena:arena];
+      if (eventUploadResponse) {
+        response->unsafe_arena_set_allocated_event_upload(eventUploadResponse);
+      } else {
+        response->set_error(::pbv1::SantaCommandResponse::ERROR_UNSPECIFIED);
+      }
       break;
     }
 

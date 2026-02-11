@@ -26,6 +26,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
+#import "Source/common/SNTXPCBundleServiceInterface.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
@@ -309,6 +310,69 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 - (MOLXPCConnection *)daemonConnection {
   return self.daemonConn;
+}
+
+- (void)eventUploadForPath:(NSString *)path reply:(void (^)(NSError *error))reply {
+  if (path.length == 0) {
+    reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
+                              code:1
+                          userInfo:@{NSLocalizedDescriptionKey : @"Empty path"}]);
+    return;
+  }
+
+  // Check enableBundles via daemon XPC
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block BOOL enableBundles = NO;
+  [[self.daemonConn remoteObjectProxy] enableBundles:^(BOOL response) {
+    enableBundles = response;
+    dispatch_semaphore_signal(sema);
+  }];
+  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
+    LOGE(@"EventUpload: Timeout checking enableBundles, proceeding without bundles");
+  }
+
+  // Connect to bundle service
+  MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
+  [bs resume];
+
+  dispatch_semaphore_t eventSema = dispatch_semaphore_create(0);
+  __block NSArray<SNTStoredExecutionEvent *> *resultEvents;
+  [[bs remoteObjectProxy] generateEventsFromPath:path
+                                   enableBundles:enableBundles
+                                           reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
+                                             resultEvents = events;
+                                             dispatch_semaphore_signal(eventSema);
+                                           }];
+
+  if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_SEC)) !=
+      0) {
+    reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
+                              code:2
+                          userInfo:@{NSLocalizedDescriptionKey : @"Timeout generating events"}]);
+    return;
+  }
+
+  if (!resultEvents.count) {
+    reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
+                              code:3
+                          userInfo:@{NSLocalizedDescriptionKey : @"No events generated"}]);
+    return;
+  }
+
+  // Upload events to sync server
+  [self postEventsToSyncServer:resultEvents
+                         reply:^(BOOL success) {
+                           if (success) {
+                             reply(nil);
+                           } else {
+                             reply([NSError
+                                 errorWithDomain:@"com.northpolesec.santa.syncservice"
+                                            code:4
+                                        userInfo:@{
+                                          NSLocalizedDescriptionKey : @"Failed to upload events"
+                                        }]);
+                           }
+                         }];
 }
 
 #pragma mark syncing chain

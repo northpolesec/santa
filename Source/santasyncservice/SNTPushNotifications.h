@@ -25,6 +25,7 @@
 - (void)preflightSync;
 - (void)pushNotificationSyncSecondsFromNow:(uint64_t)seconds;
 - (MOLXPCConnection *)daemonConnection;
+- (void)eventUploadForPath:(NSString *)path reply:(void (^)(NSError *error))reply;
 @end
 
 @class SNTSyncState;
