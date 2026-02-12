@@ -223,6 +223,30 @@ REGISTER_COMMAND_NAME(@"doctor")
   NSMutableURLRequest *req = [[NSMutableURLRequest alloc]
       initWithURL:[syncBaseURL URLByAppendingPathComponent:@"preflight/santactl-doctor-test"]];
   req.HTTPMethod = @"POST";
+
+  // Add extra headers from config (e.g. token auth headers).
+  NSDictionary *extraHeaders = [config syncExtraHeaders];
+  [extraHeaders enumerateKeysAndObjectsWithOptions:0
+                                        usingBlock:^(id key, id object, BOOL *stop) {
+                                          if (![key isKindOfClass:[NSString class]] ||
+                                              ![object isKindOfClass:[NSString class]])
+                                            return;
+                                          NSString *k = (NSString *)key;
+                                          NSString *v = (NSString *)object;
+
+                                          if ([k isEqualToString:@"Content-Encoding"] ||
+                                              [k isEqualToString:@"Content-Length"] ||
+                                              [k isEqualToString:@"Content-Type"] ||
+                                              [k isEqualToString:@"Connection"] ||
+                                              [k isEqualToString:@"Host"] ||
+                                              [k isEqualToString:@"Proxy-Authenticate"] ||
+                                              [k isEqualToString:@"Proxy-Authorization"] ||
+                                              [k isEqualToString:@"WWW-Authenticate"])
+                                            return;
+
+                                          [req setValue:v forHTTPHeaderField:k];
+                                        }];
+
   NSURLSessionDataTask *task = [[authURLSession session]
       dataTaskWithRequest:req
         completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
