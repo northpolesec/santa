@@ -519,8 +519,14 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
   // Apply extra headers at the session level so all requests (including doctor checks) get them.
   NSSet<NSString *> *restrictedHeaders = [NSSet setWithArray:@[
-    @"content-encoding", @"content-length", @"content-type", @"connection",
-    @"host", @"proxy-authenticate", @"proxy-authorization", @"www-authenticate",
+    @"content-encoding",
+    @"content-length",
+    @"content-type",
+    @"connection",
+    @"host",
+    @"proxy-authenticate",
+    @"proxy-authorization",
+    @"www-authenticate",
   ]];
   NSDictionary *extraHeaders = [config syncExtraHeaders];
   if (extraHeaders.count) {
