@@ -36,6 +36,34 @@ const dataEditorOptions = {
   tabSize: 2,
 };
 
+function encodePlaygroundState(expr: string, yaml: string): string {
+  const bytes = new TextEncoder().encode(JSON.stringify({ e: expr, c: yaml }));
+  let binary = "";
+  for (const b of bytes) {
+    binary += String.fromCharCode(b);
+  }
+  return btoa(binary);
+}
+
+function decodePlaygroundState(
+  hash: string,
+): { expression: string; context: string } | null {
+  try {
+    const binary = atob(hash);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const data = JSON.parse(new TextDecoder().decode(bytes));
+    if (typeof data.e === "string" && typeof data.c === "string") {
+      return { expression: data.e, context: data.c };
+    }
+  } catch {
+    // ignore malformed hash
+  }
+  return null;
+}
+
 export default function CELPlayground() {
   const { colorMode } = useColorMode();
   const [expression, setExpression] = useState(DEFAULT_EXPRESSION);
@@ -44,9 +72,19 @@ export default function CELPlayground() {
   const [showImport, setShowImport] = useState(false);
   const [esloggerJson, setEsloggerJson] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const completionDisposableRef = useRef<{ dispose(): void } | null>(null);
 
   useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      const state = decodePlaygroundState(hash);
+      if (state) {
+        setExpression(state.expression);
+        setYamlInput(state.context);
+      }
+    }
     return () => {
       completionDisposableRef.current?.dispose();
     };
@@ -70,6 +108,22 @@ export default function CELPlayground() {
     setResult(evaluate(expression, yamlInput));
   }
 
+  function handleCopyLink() {
+    const hash = encodePlaygroundState(expression, yamlInput);
+    const url = `${window.location.origin}${window.location.pathname}#${hash}`;
+    navigator.clipboard.writeText(url).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      (err) => {
+        console.error("Failed to copy link to clipboard:", err);
+        setCopyFailed(true);
+        setTimeout(() => setCopyFailed(false), 2000);
+      },
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 mb-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -79,7 +133,8 @@ export default function CELPlayground() {
               CEL Expression
             </label>
           </div>
-          <div className="rounded-md border border-border overflow-hidden">
+          {/* Stop key events from reaching Docusaurus search shortcut handler */}
+          <div className="rounded-md border border-border overflow-hidden" onKeyDown={(e) => e.stopPropagation()}>
             <Editor
               height="280px"
               language="cel"
@@ -155,7 +210,7 @@ export default function CELPlayground() {
               )}
             </>
           ) : (
-            <div className="rounded-md border border-border overflow-hidden">
+            <div className="rounded-md border border-border overflow-hidden" onKeyDown={(e) => e.stopPropagation()}>
               <Editor
                 height="280px"
                 language="yaml"
@@ -169,12 +224,18 @@ export default function CELPlayground() {
         </div>
       </div>
 
-      <div>
+      <div className="flex items-center gap-2">
         <button
           onClick={handleEvaluate}
           className="px-4 py-2 rounded-md bg-primary text-primary-foreground font-medium text-sm hover:bg-primary-hover transition-colors cursor-pointer"
         >
           Evaluate
+        </button>
+        <button
+          onClick={handleCopyLink}
+          className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground font-medium text-sm hover:bg-[hsl(var(--secondary-hover))] transition-colors cursor-pointer"
+        >
+          {copyFailed ? "Failed to copy" : copied ? "Copied!" : "Copy Link"}
         </button>
       </div>
 
