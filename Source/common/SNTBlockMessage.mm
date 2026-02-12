@@ -283,9 +283,9 @@ static id ValueOrNull(id value) {
 
 + (NSURL *)eventDetailURLForFileAccessEvent:(SNTStoredFileAccessEvent *)event
                                   customURL:(NSString *)url {
-  return [self
-      eventDetailURLForEvent:event
-                   customURL:(url ?: [[SNTConfigurator configurator] fileAccessEventDetailURL])
+  return
+      [self eventDetailURLForEvent:event
+                         customURL:url ?: [[SNTConfigurator configurator] fileAccessEventDetailURL]
                    templateMapping:[self fileAccessEventDetailTemplateMappingForEvent:event]];
 }
 
