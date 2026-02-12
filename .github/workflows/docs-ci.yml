@@ -31,6 +31,10 @@ jobs:
         working-directory: docs
         run: pnpm install --frozen-lockfile
 
+      - name: Test
+        working-directory: docs
+        run: pnpm test
+
       - name: Build
         working-directory: docs
         run: pnpm build

@@ -1,3 +1,7 @@
+---
+sidebar_position: 1
+---
+
 # Common Expression Language (CEL)
 
 import AddedBadge from "@site/src/components/AddedBadge/AddedBadge";
@@ -114,5 +118,5 @@ ID rule `platform:com.apple.mount_apfs` with the following CEL program
 
 ```clike
 ('-s' in args &&
-  args.exists(arg, arg.contains("com.apple.TimeMachine.")) ? BLOCKLIST : ALLOWLIST
+  args.exists(arg, arg.contains("com.apple.TimeMachine."))) ? BLOCKLIST : ALLOWLIST
 ```
