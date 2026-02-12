@@ -90,6 +90,8 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSString *fileAccessEventDetailURL;
+@property NSString *fileAccessEventDetailText;
 
 /// Clean sync flag, if True, all existing rules should be deleted before inserting any new rules.
 @property SNTSyncType syncType;
