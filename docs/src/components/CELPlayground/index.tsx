@@ -37,14 +37,24 @@ const dataEditorOptions = {
 };
 
 function encodePlaygroundState(expr: string, yaml: string): string {
-  return btoa(JSON.stringify({ e: expr, c: yaml }));
+  const bytes = new TextEncoder().encode(JSON.stringify({ e: expr, c: yaml }));
+  let binary = "";
+  for (const b of bytes) {
+    binary += String.fromCharCode(b);
+  }
+  return btoa(binary);
 }
 
 function decodePlaygroundState(
   hash: string,
 ): { expression: string; context: string } | null {
   try {
-    const data = JSON.parse(atob(hash));
+    const binary = atob(hash);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const data = JSON.parse(new TextDecoder().decode(bytes));
     if (typeof data.e === "string" && typeof data.c === "string") {
       return { expression: data.e, context: data.c };
     }
@@ -63,6 +73,7 @@ export default function CELPlayground() {
   const [esloggerJson, setEsloggerJson] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const completionDisposableRef = useRef<{ dispose(): void } | null>(null);
 
   useEffect(() => {
@@ -100,10 +111,17 @@ export default function CELPlayground() {
   function handleCopyLink() {
     const hash = encodePlaygroundState(expression, yamlInput);
     const url = `${window.location.origin}${window.location.pathname}#${hash}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(url).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      (err) => {
+        console.error("Failed to copy link to clipboard:", err);
+        setCopyFailed(true);
+        setTimeout(() => setCopyFailed(false), 2000);
+      },
+    );
   }
 
   return (
@@ -217,7 +235,7 @@ export default function CELPlayground() {
           onClick={handleCopyLink}
           className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground font-medium text-sm hover:bg-[hsl(var(--secondary-hover))] transition-colors cursor-pointer"
         >
-          {copied ? "Copied!" : "Copy Link"}
+          {copyFailed ? "Failed to copy" : copied ? "Copied!" : "Copy Link"}
         </button>
       </div>
 
