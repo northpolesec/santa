@@ -131,32 +131,9 @@ using santa::NSStringToUTF8String;
     [req setValue:contentEncodingHeader forHTTPHeaderField:@"Content-Encoding"];
   }
 
-  [self addExtraRequestHeaders:req];
-
   [req setHTTPBody:requestBody];
 
   return req;
-}
-
-- (void)addExtraRequestHeaders:(NSMutableURLRequest *)req {
-  // This is likely unnecessary as the docs for NSURLSession list most of these as being
-  // ignored but explicitly setting them here is an extra layer of protection.
-  NSSet<NSString *> *restrictedHeaders = [NSSet setWithArray:@[
-    @"content-encoding", @"content-length", @"content-type", @"connection",
-    @"host", @"proxy-authenticate", @"proxy-authorization", @"www-authenticate",
-  ]];
-
-  NSDictionary *extra = [[SNTConfigurator configurator] syncExtraHeaders];
-  [extra enumerateKeysAndObjectsWithOptions:0 usingBlock:^(id key, id object, BOOL *stop) {
-    if (![key isKindOfClass:[NSString class]] || ![object isKindOfClass:[NSString class]]) {
-      return;
-    }
-    NSString *k = (NSString *)key;
-    if ([restrictedHeaders containsObject:k.lowercaseString]) {
-      return;
-    }
-    [req setValue:(NSString *)object forHTTPHeaderField:k];
-  }];
 }
 
 - (NSData *)dataFromRequest:(NSURLRequest *)request

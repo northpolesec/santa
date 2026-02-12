@@ -21,16 +21,14 @@
 #include <optional>
 #include <vector>
 
-#include "absl/cleanup/cleanup.h"
-
-#import "Source/common/MOLAuthenticatingURLSession.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTXPCSyncServiceInterface.h"
 #import "Source/common/SystemResources.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
-@interface SNTCommandDoctor : SNTCommand <SNTCommandProtocol>
+@interface SNTCommandDoctor : SNTCommand <SNTCommandProtocol, SNTSyncServiceLogReceiverXPC>
 @end
 
 void print(NSString *format, ...) {
@@ -153,6 +151,10 @@ REGISTER_COMMAND_NAME(@"doctor")
   return YES;
 }
 
+- (void)didReceiveLog:(NSString *)log withType:(os_log_type_t)logType {
+  print(@"    %s", log.UTF8String);
+}
+
 - (BOOL)validateSync {
   print(@"=> Validating sync...");
 
@@ -175,111 +177,52 @@ REGISTER_COMMAND_NAME(@"doctor")
     print(@"[+] Sync is using HTTPS");
   }
 
-  NSURLSessionConfiguration *sessConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
-  sessConfig.connectionProxyDictionary = [[SNTConfigurator configurator] syncProxyConfig];
+  MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
+  [conn resume];
 
-  MOLAuthenticatingURLSession *authURLSession =
-      [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:sessConfig];
-  authURLSession.userAgent = @"santactl-sync/";
-  NSString *santactlVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
-  if (santactlVersion) {
-    authURLSession.userAgent = [authURLSession.userAgent stringByAppendingString:santactlVersion];
-  }
-  authURLSession.refusesRedirects = YES;
-  authURLSession.serverHostname = syncBaseURL.host;
-  authURLSession.loggingBlock = ^(NSString *line) {
-    print(@"%s", [line UTF8String]);
-  };
-
-  // Configure server auth
-  if ([config syncServerAuthRootsFile]) {
-    authURLSession.serverRootsPemFile = [config syncServerAuthRootsFile];
-  } else if ([config syncServerAuthRootsData]) {
-    authURLSession.serverRootsPemData = [config syncServerAuthRootsData];
-  }
-
-  // Configure client auth
-  if ([config syncClientAuthCertificateFile]) {
-    NSString *certFile = [config syncClientAuthCertificateFile];
-    authURLSession.clientCertFile = certFile;
-    authURLSession.clientCertPassword = [config syncClientAuthCertificatePassword];
-  } else if ([config syncClientAuthCertificateCn]) {
-    authURLSession.clientCertCommonName = [config syncClientAuthCertificateCn];
-  } else if ([config syncClientAuthCertificateIssuer]) {
-    authURLSession.clientCertIssuerCn = [config syncClientAuthCertificateIssuer];
-  }
+  NSXPCListener *logListener = [NSXPCListener anonymousListener];
+  MOLXPCConnection *lr = [[MOLXPCConnection alloc] initServerWithListener:logListener];
+  lr.exportedObject = self;
+  lr.unprivilegedInterface =
+      [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
+  [lr resume];
 
   dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+  __block BOOL err = NO;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  // Disable user-interaction for Keychain APIs in this process.
-  // If the settings on the identity's private key are not set to provide access to this process
-  // the user will be prompted for their password, which we don't want because santasyncservice
-  // would *not* do this and would instead fail the attempt.
-  SecKeychainSetUserInteractionAllowed(false);
-#pragma clang diagnostic pop
+  id<SNTSyncServiceXPC> proxy = conn.remoteObjectProxy;
+  if (!proxy) {
+    print(@"[-] Failed to connect to sync service");
+    print(@"");
+    return YES;
+  }
 
-  NSMutableURLRequest *req = [[NSMutableURLRequest alloc]
-      initWithURL:[syncBaseURL URLByAppendingPathComponent:@"preflight/santactl-doctor-test"]];
-  req.HTTPMethod = @"POST";
-
-  // Add extra headers from config (e.g. token auth headers).
-  NSDictionary *extraHeaders = [config syncExtraHeaders];
-  [extraHeaders enumerateKeysAndObjectsWithOptions:0
-                                        usingBlock:^(id key, id object, BOOL *stop) {
-                                          if (![key isKindOfClass:[NSString class]] ||
-                                              ![object isKindOfClass:[NSString class]])
-                                            return;
-                                          NSString *k = (NSString *)key;
-                                          NSString *v = (NSString *)object;
-
-                                          if ([k isEqualToString:@"Content-Encoding"] ||
-                                              [k isEqualToString:@"Content-Length"] ||
-                                              [k isEqualToString:@"Content-Type"] ||
-                                              [k isEqualToString:@"Connection"] ||
-                                              [k isEqualToString:@"Host"] ||
-                                              [k isEqualToString:@"Proxy-Authenticate"] ||
-                                              [k isEqualToString:@"Proxy-Authorization"] ||
-                                              [k isEqualToString:@"WWW-Authenticate"])
-                                            return;
-
-                                          [req setValue:v forHTTPHeaderField:k];
-                                        }];
-
-  NSURLSessionDataTask *task = [[authURLSession session]
-      dataTaskWithRequest:req
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-          absl::Cleanup cleanup = ^{
-            dispatch_semaphore_signal(semaphore);
-          };
-
-          if (error) {
-            print(@"[-] Failed to retrieve preflight data");
-            return;
-          }
-
-          NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
-          switch (httpResponse.statusCode) {
-            case 301: {
-              NSString *location = [httpResponse valueForHTTPHeaderField:@"Location"];
-              print(@"[?] HTTP 301, new location: %s", location.UTF8String);
-              break;
-            }
-            case 200:
-            case 400:  // Treat a 400 as OK: we didn't populate any data or set an appropriate
-                       // Content-Type.
-              print(@"[+] Preflight request succeeded");
-              break;
-            default: print(@"[-] HTTP response code: %d", httpResponse.statusCode);
-          }
-        }];
-  [task resume];
+  [proxy checkSyncServerStatus:logListener.endpoint
+                         reply:^(NSInteger statusCode, NSString *description) {
+                           if (statusCode == 0) {
+                             print(@"[-] Failed to retrieve preflight data: %s",
+                                   description.UTF8String);
+                             err = YES;
+                           } else if (statusCode == 301) {
+                             print(@"[?] %s", description.UTF8String);
+                           } else if (statusCode == 200 || statusCode == 400) {
+                             // Treat a 400 as OK: we didn't populate any data or set an
+                             // appropriate Content-Type.
+                             print(@"[+] Preflight request succeeded");
+                           } else {
+                             print(@"[-] HTTP response code: %ld %s", (long)statusCode,
+                                   description.UTF8String);
+                             err = YES;
+                           }
+                           dispatch_semaphore_signal(semaphore);
+                         }];
   dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+
+  [conn invalidate];
 
   print(@"");
 
-  return NO;
+  return err;
 }
 
 @end
