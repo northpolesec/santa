@@ -139,30 +139,24 @@ using santa::NSStringToUTF8String;
 }
 
 - (void)addExtraRequestHeaders:(NSMutableURLRequest *)req {
+  // This is likely unnecessary as the docs for NSURLSession list most of these as being
+  // ignored but explicitly setting them here is an extra layer of protection.
+  NSSet<NSString *> *restrictedHeaders = [NSSet setWithArray:@[
+    @"content-encoding", @"content-length", @"content-type", @"connection",
+    @"host", @"proxy-authenticate", @"proxy-authorization", @"www-authenticate",
+  ]];
+
   NSDictionary *extra = [[SNTConfigurator configurator] syncExtraHeaders];
-  [extra enumerateKeysAndObjectsWithOptions:0
-                                 usingBlock:^(id key, id object, BOOL *stop) {
-                                   if (![key isKindOfClass:[NSString class]] ||
-                                       ![object isKindOfClass:[NSString class]])
-                                     return;
-                                   NSString *k = (NSString *)key;
-                                   NSString *v = (NSString *)object;
-
-                                   // This is likely unnecessary as the docs for NSURLSession list
-                                   // most of these as being ignored but explicitly setting them
-                                   // here is an extra layer of protection.
-                                   if ([k isEqualToString:@"Content-Encoding"] ||
-                                       [k isEqualToString:@"Content-Length"] ||
-                                       [k isEqualToString:@"Content-Type"] ||
-                                       [k isEqualToString:@"Connection"] ||
-                                       [k isEqualToString:@"Host"] ||
-                                       [k isEqualToString:@"Proxy-Authenticate"] ||
-                                       [k isEqualToString:@"Proxy-Authorization"] ||
-                                       [k isEqualToString:@"WWW-Authenticate"])
-                                     return;
-
-                                   [req setValue:v forHTTPHeaderField:k];
-                                 }];
+  [extra enumerateKeysAndObjectsWithOptions:0 usingBlock:^(id key, id object, BOOL *stop) {
+    if (![key isKindOfClass:[NSString class]] || ![object isKindOfClass:[NSString class]]) {
+      return;
+    }
+    NSString *k = (NSString *)key;
+    if ([restrictedHeaders containsObject:k.lowercaseString]) {
+      return;
+    }
+    [req setValue:(NSString *)object forHTTPHeaderField:k];
+  }];
 }
 
 - (NSData *)dataFromRequest:(NSURLRequest *)request
