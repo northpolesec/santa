@@ -33,7 +33,6 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-
 #include "absl/container/flat_hash_map.h"
 #include "cel/v1.pb.h"
 
@@ -67,6 +66,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   std::unique_ptr<santa::cel::Evaluator<false>> celEvaluatorV1_;
   std::unique_ptr<santa::cel::Evaluator<true>> celEvaluatorV2_;
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter_;
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree_;
 }
 @property SNTRuleTable *ruleTable;
 @property SNTConfigurator *configurator;
@@ -99,11 +99,14 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 }
 
 - (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable
-               entitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter {
+               entitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter
+                      processTree:
+                          (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
   self = [self init];
   if (self) {
     _ruleTable = ruleTable;
     entitlementsFilter_ = std::move(entitlementsFilter);
+    processTree_ = std::move(processTree);
   }
   return self;
 }

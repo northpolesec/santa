@@ -32,6 +32,7 @@ struct CELProtoTraits<false> {
   // Message types
   using ExecutionContextT = ::santa::cel::v1::ExecutionContext;
   using ExecutableFileT = ::santa::cel::v1::ExecutableFile;
+  using AncestorT = std::nullptr_t;
 
   // Enum aliases
   using ReturnValue = ::santa::cel::v1::ReturnValue;
@@ -59,6 +60,7 @@ struct CELProtoTraits<true> {
   // Message types
   using ExecutionContextT = ::santa::cel::v2::ExecutionContext;
   using ExecutableFileT = ::santa::cel::v2::ExecutableFile;
+  using AncestorT = ::santa::cel::v2::Ancestor;
 
   // Enum aliases
   using ReturnValue = ::santa::cel::v2::ReturnValue;

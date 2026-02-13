@@ -14,6 +14,7 @@
 #include "Source/santad/ProcessTree/process_tree.h"
 
 #import <Foundation/Foundation.h>
+#include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
 #include <libproc.h>
 #include <mach/message.h>
@@ -21,17 +22,73 @@
 #include <sys/sysctl.h>
 
 #include <memory>
+#include <optional>
 #include <vector>
 
+#include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
 #include "Source/santad/ProcessTree/process.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
+__BEGIN_DECLS
+int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
+__END_DECLS
+
 namespace santa::santad::process_tree {
 
 namespace {
+
+// csops operations (from XNU bsd/sys/codesign.h)
+static constexpr unsigned int kCsopStatus = 0;
+static constexpr unsigned int kCsopCDHash = 5;
+static constexpr unsigned int kCsopIdentity = 11;
+static constexpr unsigned int kCsopTeamID = 14;
+
+static constexpr size_t kCDHashSize = 20;
+
+struct csops_blob {
+  uint32_t type;
+  uint32_t len;
+  char data[];
+};
+
+std::optional<CodeSigningInfo> LoadCodeSigningInfoForPID(pid_t pid) {
+  uint32_t flags = 0;
+  if (csops(pid, kCsopStatus, &flags, sizeof(flags)) != 0) {
+    return std::nullopt;
+  }
+  if (!(flags & CS_VALID)) {
+    return std::nullopt;
+  }
+
+  CodeSigningInfo info;
+  info.is_platform_binary = (flags & CS_PLATFORM_BINARY) != 0;
+
+  // Get CDHash (raw 20-byte buffer, no blob wrapper)
+  uint8_t cdhash[kCDHashSize] = {};
+  if (csops(pid, kCsopCDHash, cdhash, sizeof(cdhash)) == 0) {
+    info.cdhash = santa::BufToHexString(cdhash, sizeof(cdhash));
+  }
+
+  // Get signing identity (blob-wrapped, null-terminated string)
+  std::vector<uint8_t> id_buf(1024);
+  if (csops(pid, kCsopIdentity, id_buf.data(), id_buf.size()) == 0) {
+    auto *blob = reinterpret_cast<csops_blob *>(id_buf.data());
+    info.signing_id = std::string(blob->data);
+  }
+
+  // Get team ID (blob-wrapped, null-terminated string)
+  std::vector<uint8_t> team_buf(256);
+  if (csops(pid, kCsopTeamID, team_buf.data(), team_buf.size()) == 0) {
+    auto *blob = reinterpret_cast<csops_blob *>(team_buf.data());
+    info.team_id = std::string(blob->data);
+  }
+
+  return info;
+}
+
 // Modified from
 // https://chromium.googlesource.com/crashpad/crashpad/+/360e441c53ab4191a6fd2472cc57c3343a2f6944/util/posix/process_util_mac.cc
 // TODO: https://github.com/apple-oss-distributions/adv_cmds/blob/main/ps/ps.c
@@ -134,6 +191,7 @@ absl::StatusOr<Process> LoadPID(pid_t pid) {
                  std::make_shared<struct Program>((struct Program){
                      .executable = path,
                      .arguments = args,
+                     .code_signing = LoadCodeSigningInfoForPID(pid),
                  }),
                  nullptr);
 }

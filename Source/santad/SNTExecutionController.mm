@@ -50,6 +50,7 @@
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/santad/ProcessTree/process_tree_macos.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
@@ -94,10 +95,13 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   LogExecutionBlock _logger;
   std::shared_ptr<TTYWriter> _ttyWriter;
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
+
   // Cache of TouchID approvals: SHA-256 (as std::string) -> timestamp (nanoseconds since boot)
   // Note: We use std::string instead of NSString* because SantaCache uses == for key comparison,
   // which would compare pointer addresses for NSString*, not string contents.
   std::unique_ptr<SantaCache<std::string, uint64_t>> _touchIDApprovalCache;
+
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> _processTree;
 }
 
 static NSString *const kPrinterProxy =
@@ -113,7 +117,9 @@ static NSString *const kPrinterProxy =
                            logger:(LogExecutionBlock)logger
                         ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
                   policyProcessor:(SNTPolicyProcessor *)policyProcessor
-              processControlBlock:(santa::ProcessControlBlock)processControlBlock {
+              processControlBlock:(santa::ProcessControlBlock)processControlBlock
+                      processTree:
+                          (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
   self = [super init];
   if (self) {
     _ruleTable = ruleTable;
@@ -126,6 +132,7 @@ static NSString *const kPrinterProxy =
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _touchIDApprovalCache = std::make_unique<SantaCache<std::string, uint64_t>>(100);
     _processControlBlock = processControlBlock;
+    _processTree = std::move(processTree);
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -651,12 +658,14 @@ static NSString *const kPrinterProxy =
 - (ActivationCallbackBlock)createActivationBlockForMessage:(const santa::Message &)esMsg
                                                  andCSInfo:(nullable MOLCodesignChecker *)csInfo {
   std::shared_ptr<santa::EndpointSecurityAPI> esApi = esMsg.ESAPI();
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree = _processTree;
 
   return ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
     auto makeActivation =
         [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
       using Traits = santa::cel::CELProtoTraits<IsV2>;
       using ExecutableFileT = typename Traits::ExecutableFileT;
+      using AncestorT = typename Traits::AncestorT;
 
       auto f = std::make_unique<ExecutableFileT>();
 
@@ -682,6 +691,9 @@ static NSString *const kPrinterProxy =
           ^std::string() {
             es_file_t *f = esMsg->event.exec.cwd;
             return std::string(f->path.data, f->path.length);
+          },
+          ^std::vector<AncestorT>() {
+            return Ancestors<IsV2>(processTree, esMsg);
           });
     };
 
@@ -695,6 +707,58 @@ static NSString *const kPrinterProxy =
 
 - (void)flushTouchIDApprovalCache {
   _touchIDApprovalCache->clear();
+}
+
+template <bool IsV2>
+std::vector<typename santa::cel::CELProtoTraits<IsV2>::AncestorT> Ancestors(
+    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
+    const santa::Message &esMsg);
+
+template <>
+std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
+    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
+    const santa::Message &esMsg) {
+  if (!processTree) return {};
+
+  using Traits = santa::cel::CELProtoTraits<true>;
+  using AncestorT = typename Traits::AncestorT;
+
+  auto pid = santa::santad::process_tree::PidFromAuditToken(esMsg->process->parent_audit_token);
+  auto proc = processTree->Get(pid);
+  if (!proc) {
+    return {};
+  }
+
+  std::vector<santa::cel::CELProtoTraits<true>::AncestorT> ancestors;
+  for (const auto &p : processTree->RootSlice(*proc)) {
+    if (!p->program_) {
+      continue;
+    }
+
+    AncestorT ancestor;
+    ancestor.set_path(p->program_->executable);
+
+    if (p->program_->code_signing) {
+      const auto &cs = *p->program_->code_signing;
+      if (cs.is_platform_binary) {
+        ancestor.set_signing_id("platform:" + cs.signing_id);
+      } else {
+        ancestor.set_signing_id(cs.team_id + ":" + cs.signing_id);
+      }
+      ancestor.set_team_id(cs.team_id);
+      ancestor.set_cdhash(cs.cdhash);
+    }
+
+    ancestors.push_back(std::move(ancestor));
+  }
+  return ancestors;
+}
+
+template <>
+std::vector<santa::cel::CELProtoTraits<false>::AncestorT> Ancestors<false>(
+    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
+    const santa::Message &esMsg) {
+  return {};
 }
 
 @end

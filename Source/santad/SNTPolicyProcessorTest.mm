@@ -664,9 +664,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     auto makeActivation =
         [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
       using ExecutableFileT = typename santa::cel::CELProtoTraits<IsV2>::ExecutableFileT;
+      using AncestorT = typename santa::cel::CELProtoTraits<IsV2>::AncestorT;
       auto ef = std::make_unique<ExecutableFileT>();
       ef->mutable_signing_time()->set_seconds(1717987200);
       ef->mutable_secure_signing_time()->set_seconds(1717987200);
+
       return std::make_unique<santa::cel::Activation<IsV2>>(
           std::move(ef),
           ^std::vector<std::string>() {
@@ -681,6 +683,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
           },
           ^std::string() {
             return "/";
+          },
+          ^std::vector<AncestorT>() {
+            return {};
           });
     };
 
@@ -798,6 +803,182 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertTrue(cd.holdAndAsk);
     XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
+  }
+}
+
+- (void)testCELAncestors {
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+
+  ActivationCallbackBlock activation =
+      ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
+    auto makeActivation =
+        [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
+      using ExecutableFileT = typename santa::cel::CELProtoTraits<IsV2>::ExecutableFileT;
+      using ActivationAncestorT = typename santa::cel::CELProtoTraits<IsV2>::AncestorT;
+      auto ef = std::make_unique<ExecutableFileT>();
+
+      return std::make_unique<santa::cel::Activation<IsV2>>(
+          std::move(ef),
+          ^std::vector<std::string>() {
+            return std::vector<std::string>{"./malware", "--stealth"};
+          },
+          ^std::map<std::string, std::string>() {
+            return std::map<std::string, std::string>{};
+          },
+          ^uid_t() {
+            return 501;
+          },
+          ^std::string() {
+            return "/Users/admin";
+          },
+          ^std::vector<ActivationAncestorT>() {
+            if constexpr (IsV2) {
+              AncestorT launchd;
+              launchd.set_path("/sbin/launchd");
+              launchd.set_signing_id("platform:com.apple.xpc.launchd");
+              launchd.set_team_id("");
+              launchd.set_cdhash("abcd1234abcd1234abcd1234abcd1234abcd1234");
+
+              AncestorT terminal;
+              terminal.set_path("/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal");
+              terminal.set_signing_id("platform:com.apple.Terminal");
+              terminal.set_team_id("");
+              terminal.set_cdhash("ef012345ef012345ef012345ef012345ef012345");
+
+              AncestorT zsh;
+              zsh.set_path("/bin/zsh");
+              zsh.set_signing_id("platform:com.apple.zsh");
+              zsh.set_team_id("");
+              zsh.set_cdhash("56789abc56789abc56789abc56789abc56789abc");
+
+              AncestorT curl;
+              curl.set_path("/usr/bin/curl");
+              curl.set_signing_id("platform:com.apple.curl");
+              curl.set_team_id("");
+              curl.set_cdhash("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
+
+              return std::vector<AncestorT>{curl, zsh, terminal, launchd};
+            } else {
+              return {};
+            }
+          });
+    };
+
+    if (useV2) {
+      return makeActivation.operator()<true>();
+    } else {
+      return makeActivation.operator()<false>();
+    }
+  };
+
+  SNTRule * (^createCELRule)(NSString *, BOOL) = ^SNTRule *(NSString *celExpr, BOOL v2) {
+    return [[SNTRule alloc]
+        initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                     state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
+                      type:SNTRuleTypeBinary
+                 customMsg:nil
+                 customURL:nil
+                 timestamp:0
+                   comment:nil
+                   celExpr:celExpr
+                     error:NULL];
+  };
+
+  // Test: Check that an ancestor with a specific path exists
+  {
+    SNTRule *r = createCELRule(@"ancestors.exists(a, a.path == '/bin/zsh')", true);
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertFalse(cd.cacheable);
+  }
+
+  // Test: Check that no ancestor matches a non-existent path
+  {
+    SNTRule *r = createCELRule(@"ancestors.exists(a, a.path == '/usr/bin/python3')", true);
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertFalse(cd.cacheable);
+  }
+
+  // Test: Block if any ancestor has a specific signing_id
+  {
+    SNTRule *r = createCELRule(@"ancestors.exists(a, a.signing_id == 'platform:com.apple.curl') "
+                                "? BLOCKLIST : ALLOWLIST",
+                               true);
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
+  }
+
+  // Test: Verify all ancestors are platform binaries (signing_id starts with "platform:")
+  {
+    SNTRule *r = createCELRule(@"ancestors.all(a, a.signing_id.startsWith('platform:'))", true);
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertFalse(cd.cacheable);
+  }
+
+  // Test: Check ancestor list size
+  {
+    SNTRule *r = createCELRule(@"size(ancestors) == 4", true);
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertFalse(cd.cacheable);
+  }
+
+  // Test: Block if launched from Terminal (checking ancestor path with endsWith)
+  {
+    SNTRule *r = createCELRule(
+        @"ancestors.exists(a, a.path.endsWith('/Terminal')) ? BLOCKLIST : ALLOWLIST", true);
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.cacheable);
+  }
+
+  // Test: Match ancestor by cdhash
+  {
+    SNTRule *r = createCELRule(
+        @"ancestors.exists(a, a.cdhash == 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef')", true);
+    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.cacheable);
   }
 }

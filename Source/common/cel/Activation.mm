@@ -96,6 +96,7 @@ cel_runtime::CelValue CreateCELValue(const std::map<K, V> &v, google::protobuf::
   }
   return cel_runtime::CelValue::CreateMap(builder);
 }
+
 }  // namespace
 
 // Template methods that delegate to the helper functions
@@ -149,6 +150,22 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
   } else if (name == "cwd") {
     return CELValue(cwd_(), arena);
   }
+
+  // Handle the V2 specific fields
+  if constexpr (IsV2) {
+    if (name == "ancestors") {
+      // Convert ancestors to CEL list of proto messages
+      std::vector<cel_runtime::CelValue> ancestorValues;
+      for (const auto &ancestor : ancestors_()) {
+        // Create a copy of the proto on the arena and wrap it
+        auto *proto = arena->Create<AncestorT>(arena);
+        proto->CopyFrom(ancestor);
+        ancestorValues.push_back(cel_runtime::CelProtoWrapper::CreateMessage(proto, arena));
+      }
+      return cel_runtime::CelValue::CreateList(
+          arena->Create<cel_runtime::ContainerBackedListImpl>(arena, ancestorValues));
+    }
+  }
   return {};
 }
 
@@ -199,7 +216,15 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
 
 template <bool IsV2>
 bool Activation<IsV2>::IsResultCacheable() const {
-  return !args_.HasValue() && !envs_.HasValue() && !euid_.HasValue() && !cwd_.HasValue();
+  if (args_.HasValue() || envs_.HasValue() || euid_.HasValue() || cwd_.HasValue()) {
+    return false;
+  }
+
+  if constexpr (IsV2) {
+    return !ancestors_.HasValue();
+  }
+
+  return true;
 }
 
 template <bool IsV2>
