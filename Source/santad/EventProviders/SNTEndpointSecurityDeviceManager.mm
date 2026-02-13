@@ -533,10 +533,13 @@ NS_ASSUME_NONNULL_BEGIN
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   NSString *vendor = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  NSString *protocol = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceProtocolKey]
+      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   SNTStoredUSBMountEvent *storedUSBMountEvent =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:model
                                              deviceVendor:vendor
-                                              mountOnName:@(eventStatFS->f_mntonname)];
+                                              mountOnName:@(eventStatFS->f_mntonname)
+                                                 protocol:protocol];
 
   if ([self haveRemountArgs]) {
     event.remountArgs = self.remountArgs;
@@ -547,16 +550,18 @@ NS_ASSUME_NONNULL_BEGIN
            eventStatFS->f_mntfromname, eventStatFS->f_mntonname);
       return ES_AUTH_RESULT_ALLOW;
     }
-
     uint32_t newMode = [self updatedMountFlags:eventStatFS];
     LOGI(@"SNTEndpointSecurityDeviceManager: remounting device '%s'->'%s', flags (%u) -> (%u)",
          eventStatFS->f_mntfromname, eventStatFS->f_mntonname, eventStatFS->f_flags, newMode);
     [self remount:disk mountMode:newMode semaphore:nil];
+    [storedUSBMountEvent setRemountArgs:event.remountArgs];
+    [storedUSBMountEvent setDecision:(SNTStoredUSBMountEventDecisionAllowedWithRemount)];
   } else {
     // The mount is going to be blocked, log it
     NSMutableDictionary *props = [CFBridgingRelease(DADiskCopyDescription(disk)) mutableCopy];
     props[santa::kMountFromNameKey] = event.mntfromname;
     [self logDiskAppeared:[props copy] allowed:false];
+    [storedUSBMountEvent setDecision:(SNTStoredUSBMountEventDecisionBlocked)];
   }
 
   if (self.deviceBlockCallback) {

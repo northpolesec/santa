@@ -25,7 +25,8 @@
   SNTStoredUSBMountEvent *event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
-                                              mountOnName:@"/Volumes/USB_DRIVE"];
+                                              mountOnName:@"/Volumes/USB_DRIVE"
+                                                 protocol:@"USB"];
 
   XCTAssertNotNil(event.uuid);
   XCTAssertGreaterThan(event.uuid.length, 0);
@@ -33,7 +34,8 @@
   SNTStoredUSBMountEvent *event2 =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
-                                              mountOnName:@"/Volumes/USB_DRIVE"];
+                                              mountOnName:@"/Volumes/USB_DRIVE"
+                                                 protocol:@"USB"];
 
   XCTAssertNotEqualObjects(event.uuid, event2.uuid);
 }
@@ -42,7 +44,8 @@
   SNTStoredUSBMountEvent *event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
-                                              mountOnName:@"/Volumes/USB_DRIVE"];
+                                              mountOnName:@"/Volumes/USB_DRIVE"
+                                                 protocol:@"USB"];
 
   XCTAssertEqualObjects([event uniqueID], @"/Volumes/USB_DRIVE");
 }
@@ -57,8 +60,13 @@
   SNTStoredUSBMountEvent *event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:@"USB Flash Drive"
                                              deviceVendor:@"SanDisk"
-                                              mountOnName:@"/Volumes/USB_DRIVE"];
+                                              mountOnName:@"/Volumes/USB_DRIVE"
+                                                 protocol:@"USB"];
   NSString *originalUUID = event.uuid;
+  SNTStoredUSBMountEventDecision decision =
+      SNTStoredUSBMountEventDecision::SNTStoredUSBMountEventDecisionAllowedWithRemount;
+  [event setDecision:decision];
+  [event setRemountArgs:@[ @"noexec", @"rdonly" ]];
 
   // Archive the event
   NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
@@ -83,13 +91,17 @@
   XCTAssertEqualObjects(decodedEvent.mountOnName, @"/Volumes/USB_DRIVE");
   XCTAssertEqualObjects(decodedEvent.deviceModel, @"USB Flash Drive");
   XCTAssertEqualObjects(decodedEvent.deviceVendor, @"SanDisk");
+  XCTAssertEqualObjects(decodedEvent.protocol, @"USB");
+  XCTAssertEqual(decodedEvent.decision, SNTStoredUSBMountEventDecisionAllowedWithRemount);
+  XCTAssertEqualObjects(decodedEvent.remountArgs, (@[ @"noexec", @"rdonly" ]));
 }
 
 - (void)testEncodeDecodeWithNilValues {
   SNTStoredUSBMountEvent *event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
-                                              mountOnName:@"/Volumes/USB_DRIVE"];
+                                              mountOnName:@"/Volumes/USB_DRIVE"
+                                                 protocol:@"USB"];
 
   NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
                                                 requiringSecureCoding:YES
@@ -110,13 +122,15 @@
   XCTAssertEqualObjects(decodedEvent.mountOnName, @"/Volumes/USB_DRIVE");
   XCTAssertNil(decodedEvent.deviceModel);
   XCTAssertNil(decodedEvent.deviceVendor);
+  XCTAssertNil(decodedEvent.remountArgs);
 }
 
 - (void)testDescription {
   SNTStoredUSBMountEvent *event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:@"USB Flash Drive"
                                              deviceVendor:@"SanDisk"
-                                              mountOnName:@"/Volumes/USB_DRIVE"];
+                                              mountOnName:@"/Volumes/USB_DRIVE"
+                                                 protocol:@"USB"];
 
   NSString *description = [event description];
 

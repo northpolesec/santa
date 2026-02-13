@@ -16,6 +16,12 @@
 
 #import "Source/common/SNTStoredEvent.h"
 
+// The decision matrix for USB mount events
+typedef NS_ENUM(NSInteger, SNTStoredUSBMountEventDecision) {
+  SNTStoredUSBMountEventDecisionBlocked,
+  SNTStoredUSBMountEventDecisionAllowedWithRemount,
+};
+
 /// Represents a USB Mount Event
 @interface SNTStoredUSBMountEvent : SNTStoredEvent <NSSecureCoding>
 
@@ -31,8 +37,22 @@
 /// The mount on path
 @property(readonly) NSString *mountOnName;
 
+/// The protocol string as reported by DiskArbitration framework
+@property(readonly) NSString *protocol;
+
+/// The remount flags
+@property(readonly) NSArray<NSString *> *remountArgs;
+
+/// The decision on whether the mount was blocked, or allowed with remount
+@property(readonly) SNTStoredUSBMountEventDecision decision;
+
 - (instancetype)initWithDeviceModel:(NSString *)deviceModel
                        deviceVendor:(NSString *)deviceVendor
-                        mountOnName:(NSString *)mountOnName;
+                        mountOnName:(NSString *)mountOnName
+                           protocol:(NSString *)protocol;
+
+- (void)setRemountArgs:(NSArray<NSString *> *)remountArgs;
+
+- (void)setDecision:(SNTStoredUSBMountEventDecision)decision;
 
 @end
