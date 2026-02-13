@@ -44,7 +44,7 @@ process.
 					<key>PlatformBinary</key>
 					<true/>
 				</dict>
-                                <!-- On macOS 26.3 the mds processs will also read cookies -->
+                                <!-- On macOS 26.3 the mds process will also read cookies -->
 				<dict>
 					<key>SigningID</key>
 					<string>com.apple.mds</string>
