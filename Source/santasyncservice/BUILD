@@ -139,6 +139,7 @@ objc_library(
     srcs = ["SNTPushNotificationsTracker.mm"],
     hdrs = ["SNTPushNotificationsTracker.h"],
     deps = [
+        "//Source/common:SNTDeepCopy",
         "//Source/common:SNTLogging",
         "//Source/common:SNTSyncConstants",
     ],

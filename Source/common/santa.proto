@@ -1168,6 +1168,66 @@ message XProtect {
   }
 }
 
+// Per-process network activity collected during a single monitoring window
+message NetworkActivity {
+  // A single network socket flow observed during the monitoring window
+  message Flow {
+    // Unique identifier for this flow
+    optional string id = 1;
+
+    // Remote endpoint address (IPv4 or IPv6 string representation)
+    optional string remote_address = 2;
+    optional uint32 remote_port = 3;
+
+    // Local endpoint address (IPv4 or IPv6 string representation)
+    optional string local_address = 4;
+    optional uint32 local_port = 5;
+
+    // IP protocol number (e.g. 6 for TCP, 17 for UDP)
+    optional int32 protocol = 6;
+
+    enum SocketFamily {
+      SOCKET_FAMILY_UNKNOWN = 0;
+      SOCKET_FAMILY_INET = 1;
+      SOCKET_FAMILY_INET6 = 2;
+    }
+    optional SocketFamily socket_family = 7;
+
+    enum Direction {
+      DIRECTION_UNKNOWN = 0;
+      DIRECTION_INBOUND = 1;
+      DIRECTION_OUTBOUND = 2;
+    }
+    optional Direction direction = 8;
+
+    // Cumulative byte counts for this flow
+    optional uint64 bytes_inbound = 9;
+    optional uint64 bytes_outbound = 10;
+
+    // When the flow was first observed
+    // Only present if the flow started during this window
+    // If a flow began before Santa began monitoring then this field will never
+    // be set for the flow id
+    optional google.protobuf.Timestamp start_time = 11;
+
+    // When the flow was closed
+    // Only present if the flow closed during this window
+    optional google.protobuf.Timestamp close_time = 12;
+  }
+
+  // Network activity for a single process
+  message Process {
+    // Information about the process performing network activity
+    optional ProcessInfo process = 1;
+
+    // Active flows for this process during the window
+    repeated Flow flows = 2;
+  }
+
+  // All processes with network activity during this window
+  repeated Process processes = 1;
+}
+
 // A message encapsulating a single event
 message SantaMessage {
   // Machine ID of the host emitting this log
@@ -1210,6 +1270,7 @@ message SantaMessage {
     LaunchItem launch_item = 31;
     TCCModification tcc_modification = 32;
     XProtect xprotect = 33;
+    NetworkActivity network_activity = 34;
   }
 }
 

@@ -850,8 +850,12 @@ objc_library(
     deps = [
         "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:String",
+        "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/status:statusor",
         "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
     ],

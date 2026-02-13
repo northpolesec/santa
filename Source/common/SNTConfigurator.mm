@@ -191,6 +191,7 @@ static NSString *const kEnableNATS =
 
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
+static NSString *const kTelemetryFilterExpressionsKey = @"TelemetryFilterExpressions";
 
 static NSString *const kOnStartUSBOptions = @"OnStartUSBOptions";
 
@@ -219,6 +220,8 @@ static NSString *const kOverrideFileAccessActionKey = @"OverrideFileAccessAction
 static NSString *const kEnableBundlesKey = @"EnableBundles";
 static NSString *const kEventDetailURLKey = @"EventDetailURL";
 static NSString *const kEventDetailTextKey = @"EventDetailText";
+static NSString *const kFileAccessEventDetailURLKey = @"FileAccessEventDetailURL";
+static NSString *const kFileAccessEventDetailTextKey = @"FileAccessEventDetailText";
 
 // The keys managed by a sync server.
 static NSString *const kFullSyncLastSuccess = @"FullSyncLastSuccess";
@@ -282,6 +285,8 @@ static NSString *const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings
       kNetworkExtensionSettingsKey : data,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
+      kFileAccessEventDetailURLKey : string,
+      kFileAccessEventDetailTextKey : string,
       kFullSyncInterval : number,
       kFCMFullSyncInterval : number,
     };
@@ -309,6 +314,8 @@ static NSString *const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings
       kMoreInfoURLKey : string,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
+      kFileAccessEventDetailURLKey : string,
+      kFileAccessEventDetailTextKey : string,
       kDismissTextKey : string,
       kUnknownBlockMessage : string,
       kBannedBlockMessage : string,
@@ -379,6 +386,7 @@ static NSString *const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings
       kEntitlementsPrefixFilterKey : array,
       kEntitlementsTeamIDFilterKey : array,
       kEnabledProcessAnnotations : array,
+      kTelemetryFilterExpressionsKey : array,
       kTelemetryKey : array,
       kBrandingCompanyName : string,
       kBrandingCompanyLogo : string,
@@ -546,6 +554,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEventDetailText {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingFileAccessEventDetailURL {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingFileAccessEventDetailText {
   return [self syncAndConfigStateSet];
 }
 
@@ -786,6 +802,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEntitlementsTeamIDFilter {
+  return [self configStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingTelemetryFilterExpressions {
   return [self configStateSet];
 }
 
@@ -1108,6 +1128,24 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)setSyncServerEventDetailText:(NSString *)eventDetailText {
   [self updateSyncStateForKey:kEventDetailTextKey value:eventDetailText];
+}
+
+- (NSString *)fileAccessEventDetailURL {
+  return self.syncState[kFileAccessEventDetailURLKey]
+             ?: self.configState[kFileAccessEventDetailURLKey];
+}
+
+- (void)setSyncServerFileAccessEventDetailURL:(NSString *)fileAccessEventDetailURL {
+  [self updateSyncStateForKey:kFileAccessEventDetailURLKey value:fileAccessEventDetailURL];
+}
+
+- (NSString *)fileAccessEventDetailText {
+  return self.syncState[kFileAccessEventDetailTextKey]
+             ?: self.configState[kFileAccessEventDetailTextKey];
+}
+
+- (void)setSyncServerFileAccessEventDetailText:(NSString *)fileAccessEventDetailText {
+  [self updateSyncStateForKey:kFileAccessEventDetailTextKey value:fileAccessEventDetailText];
 }
 
 - (NSString *)dismissText {
@@ -1765,6 +1803,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSArray *)entitlementsTeamIDFilter {
   return EnsureArrayOfStrings(self.configState[kEntitlementsTeamIDFilterKey]);
+}
+
+- (NSArray *)telemetryFilterExpressions {
+  return EnsureArrayOfStrings(self.configState[kTelemetryFilterExpressionsKey]);
 }
 
 - (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {

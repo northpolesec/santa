@@ -1,0 +1,24 @@
+---
+sidebar_position: 2
+title: CEL Playground
+---
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+# CEL Playground
+
+Test and validate your [CEL expressions](/features/binary-authorization#cel) before deploying them. Enter a CEL expression and provide sample execution context as YAML, then evaluate to see the result and whether it would be cacheable.
+
+See the [CEL expressions cookbook](/cookbook/cel/) for example expressions.
+
+<BrowserOnly fallback={<div>Loading...</div>}>
+  {() => {
+    const CELPlayground = require('@site/src/components/CELPlayground').default;
+    return <CELPlayground />;
+  }}
+</BrowserOnly>
+
+:::info
+The evaluation is all done inside your browser; the data you input never leaves
+your machine.
+:::

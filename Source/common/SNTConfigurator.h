@@ -317,6 +317,13 @@
 @property(readonly) uint32_t telemetryExportMaxFilesPerBatch;
 
 ///
+///  CEL expressions used to filter telemetry events during export.
+///
+///  @note: This property is KVO compliant.
+///
+@property(nullable, readonly, nonatomic) NSArray<NSString *> *telemetryFilterExpressions;
+
+///
 ///  If set, contains the filesystem access policy configuration.
 ///
 ///  @note: The property fileAccessPolicyPlist will be ignored if
@@ -447,12 +454,18 @@
 ///  This property contains a kind of format string to be turned into the URL to send them to.
 ///  The following sequences will be replaced in the final URL:
 ///
-///  %file_sha%    -- SHA-256 of the file that was blocked.
-///  %machine_id%  -- ID of the machine.
-///  %username%    -- executing user.
-///  %serial%      -- System's serial number.
-///  %uuid%        -- System's UUID.
-///  %hostname%    -- System's full hostname.
+///  %file_identifier%            -- SHA-256 of the binary.
+///  %bundle_or_file_identifier%  -- Bundle hash if available, otherwise binary SHA-256.
+///  %file_sha%                   -- Deprecated, acts like bundle_or_file_identifier
+///  %file_bundle_id%             -- Bundle ID of the binary.
+///  %team_id%                    -- Team ID from the signature.
+///  %signing_id%                 -- Signing ID from the signature.
+///  %cdhash%                     -- CDHash of the binary.
+///  %username%                   -- Executing user.
+///  %machine_id%                 -- ID of the machine.
+///  %hostname%                   -- System's full hostname.
+///  %uuid%                       -- System's UUID.
+///  %serial%                     -- System's serial number.
 ///
 ///  @note: This is not an NSURL because the format-string parsing is done elsewhere.
 ///
@@ -474,6 +487,48 @@
 ///  Set the EventDetailText as received from a sync server.
 ///
 - (void)setSyncServerEventDetailText:(nullable NSString *)eventDetailText;
+
+///
+///  When the user gets a file access block notification, a button can be displayed which will
+///  take them to a web page with more information about that event.
+///
+///  This property contains a kind of format string to be turned into the URL to send them to.
+///  The following sequences will be replaced in the final URL:
+///
+///  %rule_version%    -- Version of the rule that was violated.
+///  %rule_name%       -- Name of the rule that was violated.
+///  %accessed_path%   -- Path accessed by the binary.
+///  %file_identifier% -- SHA-256 of the binary that performed the access.
+///  %username%        -- Executing user.
+///  %team_id%         -- Team ID from the signature.
+///  %signing_id%      -- Signing ID from the signature.
+///  %cdhash%          -- CDHash of the binary.
+///  %machine_id%      -- ID of the machine.
+///  %hostname%        -- System's full hostname.
+///  %uuid%            -- System's UUID.
+///  %serial%          -- System's serial number.
+///
+///  @note: This is not an NSURL because the format-string parsing is done elsewhere.
+///
+///  If this item isn't set, the Open Event button will not be displayed for file access events.
+///
+@property(nullable, readonly, nonatomic) NSString *fileAccessEventDetailURL;
+
+///
+///  Set the FileAccessEventDetailURL as received from a sync server.
+///
+- (void)setSyncServerFileAccessEventDetailURL:(nullable NSString *)fileAccessEventDetailURL;
+
+///
+///  Related to FileAccessEventDetailURL, this string represents the text to show on the
+///  button for file access events.
+///
+@property(nullable, readonly, nonatomic) NSString *fileAccessEventDetailText;
+
+///
+///  Set the FileAccessEventDetailText as received from a sync server.
+///
+- (void)setSyncServerFileAccessEventDetailText:(nullable NSString *)fileAccessEventDetailText;
 
 ///
 ///  This string represents the text to show on the "Dismiss" button in the UI instead of "Dismiss".

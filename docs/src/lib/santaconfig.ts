@@ -202,6 +202,40 @@ sequences will be replaced in the final URL:
       type: "string",
     },
     {
+      key: "FileAccessEventDetailURL",
+      description: `When the user gets a file access block notification, a button can be displayed which will take them
+      to a web page with more information about that event. This URL will be used for all file access rules unless
+      overridden by a rule-specific option.
+
+This property supports several placeholders in the string that will be replaced before the URL is constructed.
+The following sequences will be replaced in the final URL:
+
+| Placeholder        | Description                                              |
+| ------------------ | -------------------------------------------------------- |
+| %rule_version%     | Version of the rule that was violated                    |
+| %rule_name%        | Name of the rule that was violated                       |
+| %accessed_path%    | The path accessed by the binary                          |
+| %file_identifier%  | SHA-256 of the binary that performed the access          |
+| %username%         | The executing user                                       |
+| %team_id%          | The Team ID that signed the binary, if any               |
+| %signing_id%       | The Signing ID of the binary, if any                     |
+| %cdhash%           | The binary's CDHash, if any                              |
+| %machine_id%       | ID of the machine                                        |
+| %hostname%         | System's full hostname                                   |
+| %uuid%             | System's UUID                                            |
+| %serial%           | System's serial number                                   |
+
+**Example**: \`https://sync-server-hostname/%machine_id%/%rule_name%/%rule_version%\`
+`,
+      type: "string",
+    },
+    {
+      key: "FileAccessEventDetailText",
+      description: `Related to the \`FileAccessEventDetailURL\` key, this string represents the text to show on the button for file
+      access events`,
+      type: "string",
+    },
+    {
       key: "DismissText",
       description: `The text to display on the button that dismisses the binary block dialog. The default text is
         "Dismiss"`,
@@ -441,6 +475,13 @@ changes in the release notes of any future release that changes them.`,
         will not be logged. Use the value \`platform\` to filter entitlements from platform binaries.`,
       type: "string",
       repeated: true,
+    },
+    {
+      key: "TelemetryFilterExpressions",
+      description: `A list of CEL expressions for filtering/redacting rows before upload. Only useful for Workshop customers.`,
+      type: "string",
+      repeated: true,
+      versionAdded: "2026.2",
     },
   ],
   faa: [
