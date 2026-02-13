@@ -21,7 +21,9 @@
 - (instancetype)initWithDeviceModel:(NSString *)deviceModel
                        deviceVendor:(NSString *)deviceVendor
                         mountOnName:(NSString *)mountOnName
-                           protocol:(NSString *)protocol {
+                           protocol:(NSString *)protocol
+                           decision:(SNTStoredUSBMountEventDecision)decision
+                        remountArgs:(NSArray<NSString *> *)remountArgs {
   self = [super init];
   if (self) {
     _uuid = [[NSUUID UUID] UUIDString];
@@ -29,16 +31,10 @@
     _deviceVendor = deviceVendor;
     _mountOnName = mountOnName;
     _protocol = protocol;
+    _decision = decision;
+    _remountArgs = remountArgs;
   }
   return self;
-}
-
-- (void)setRemountArgs:(NSArray<NSString *> *)remountArgs {
-  _remountArgs = remountArgs;
-}
-
-- (void)setDecision:(SNTStoredUSBMountEventDecision)decision {
-  _decision = decision;
 }
 
 + (BOOL)supportsSecureCoding {

@@ -26,7 +26,9 @@
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
                                               mountOnName:@"/Volumes/USB_DRIVE"
-                                                 protocol:@"USB"];
+                                                 protocol:@"USB"
+                                                 decision:SNTStoredUSBMountEventDecisionBlocked
+                                              remountArgs:nil];
 
   XCTAssertNotNil(event.uuid);
   XCTAssertGreaterThan(event.uuid.length, 0);
@@ -35,7 +37,9 @@
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
                                               mountOnName:@"/Volumes/USB_DRIVE"
-                                                 protocol:@"USB"];
+                                                 protocol:@"USB"
+                                                 decision:SNTStoredUSBMountEventDecisionBlocked
+                                              remountArgs:nil];
 
   XCTAssertNotEqualObjects(event.uuid, event2.uuid);
 }
@@ -45,7 +49,9 @@
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
                                               mountOnName:@"/Volumes/USB_DRIVE"
-                                                 protocol:@"USB"];
+                                                 protocol:@"USB"
+                                                 decision:SNTStoredUSBMountEventDecisionBlocked
+                                              remountArgs:nil];
 
   XCTAssertEqualObjects([event uniqueID], @"/Volumes/USB_DRIVE");
 }
@@ -57,16 +63,14 @@
 }
 
 - (void)testEncodeDecode {
-  SNTStoredUSBMountEvent *event =
-      [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:@"USB Flash Drive"
-                                             deviceVendor:@"SanDisk"
-                                              mountOnName:@"/Volumes/USB_DRIVE"
-                                                 protocol:@"USB"];
+  SNTStoredUSBMountEvent *event = [[SNTStoredUSBMountEvent alloc]
+      initWithDeviceModel:@"USB Flash Drive"
+             deviceVendor:@"SanDisk"
+              mountOnName:@"/Volumes/USB_DRIVE"
+                 protocol:@"USB"
+                 decision:SNTStoredUSBMountEventDecisionAllowedWithRemount
+              remountArgs:@[ @"noexec", @"rdonly" ]];
   NSString *originalUUID = event.uuid;
-  SNTStoredUSBMountEventDecision decision =
-      SNTStoredUSBMountEventDecision::SNTStoredUSBMountEventDecisionAllowedWithRemount;
-  [event setDecision:decision];
-  [event setRemountArgs:@[ @"noexec", @"rdonly" ]];
 
   // Archive the event
   NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
@@ -101,7 +105,9 @@
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
                                               mountOnName:@"/Volumes/USB_DRIVE"
-                                                 protocol:@"USB"];
+                                                 protocol:@"USB"
+                                                 decision:SNTStoredUSBMountEventDecisionBlocked
+                                              remountArgs:nil];
 
   NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
                                                 requiringSecureCoding:YES
@@ -130,7 +136,9 @@
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:@"USB Flash Drive"
                                              deviceVendor:@"SanDisk"
                                               mountOnName:@"/Volumes/USB_DRIVE"
-                                                 protocol:@"USB"];
+                                                 protocol:@"USB"
+                                                 decision:SNTStoredUSBMountEventDecisionBlocked
+                                              remountArgs:nil];
 
   NSString *description = [event description];
 

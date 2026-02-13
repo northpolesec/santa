@@ -49,10 +49,8 @@ typedef NS_ENUM(NSInteger, SNTStoredUSBMountEventDecision) {
 - (instancetype)initWithDeviceModel:(NSString *)deviceModel
                        deviceVendor:(NSString *)deviceVendor
                         mountOnName:(NSString *)mountOnName
-                           protocol:(NSString *)protocol;
-
-- (void)setRemountArgs:(NSArray<NSString *> *)remountArgs;
-
-- (void)setDecision:(SNTStoredUSBMountEventDecision)decision;
+                           protocol:(NSString *)protocol
+                           decision:(SNTStoredUSBMountEventDecision)decision
+                        remountArgs:(NSArray<NSString *> *)remountArgs;
 
 @end
