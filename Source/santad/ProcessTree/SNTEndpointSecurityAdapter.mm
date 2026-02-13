@@ -54,15 +54,15 @@ void InformFromESEvent(ProcessTree &tree, const Message &msg) {
 
       // Extract code signing info from the target process
       CodeSigningInfo cs_info{
-          .signing_id = std::string(target->signing_id.data, target->signing_id.length),
-          .team_id = std::string(target->team_id.data, target->team_id.length),
+          .signing_id = std::string(santa::StringTokenToStringView(target->signing_id)),
+          .team_id = std::string(santa::StringTokenToStringView(target->team_id)),
           .cdhash = santa::BufToHexString(target->cdhash, sizeof(target->cdhash)),
           .is_platform_binary = target->is_platform_binary,
       };
 
       tree.HandleExec(
           msg->mach_time, **proc, PidFromAuditToken(target->audit_token),
-          (struct Program){.executable = std::string(executable.data, executable.length),
+          (struct Program){.executable = std::string(santa::StringTokenToStringView(executable)),
                            .arguments = args,
                            .code_signing = cs_info},
           (struct Cred){

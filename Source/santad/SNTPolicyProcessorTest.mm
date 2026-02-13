@@ -858,7 +858,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
               curl.set_team_id("");
               curl.set_cdhash("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
 
-              return std::vector<AncestorT>{launchd, terminal, zsh, curl};
+              return std::vector<AncestorT>{curl, zsh, terminal, launchd};
             } else {
               return {};
             }
