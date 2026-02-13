@@ -21,7 +21,7 @@ export default function PlaygroundLink({
 }) {
   const hash = encodePlaygroundState(dedent(expression), dedent(context));
   return (
-    <div className="flex justify-end">
+    <div className="flex justify-end mb-3">
       <a
         href={`/cookbook/cel-playground#${hash}`}
         className="inline-block px-2 py-0.5 rounded border border-border text-xs font-medium no-underline hover:bg-secondary transition-colors"
