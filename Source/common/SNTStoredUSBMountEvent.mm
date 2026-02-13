@@ -20,13 +20,19 @@
 
 - (instancetype)initWithDeviceModel:(NSString *)deviceModel
                        deviceVendor:(NSString *)deviceVendor
-                        mountOnName:(NSString *)mountOnName {
+                        mountOnName:(NSString *)mountOnName
+                           protocol:(NSString *)protocol
+                           decision:(SNTStoredUSBMountEventDecision)decision
+                        remountArgs:(NSArray<NSString *> *)remountArgs {
   self = [super init];
   if (self) {
     _uuid = [[NSUUID UUID] UUIDString];
     _deviceModel = deviceModel;
     _deviceVendor = deviceVendor;
     _mountOnName = mountOnName;
+    _protocol = protocol;
+    _decision = decision;
+    _remountArgs = remountArgs;
   }
   return self;
 }
@@ -41,6 +47,9 @@
   ENCODE(coder, deviceModel);
   ENCODE(coder, deviceVendor);
   ENCODE(coder, mountOnName);
+  ENCODE(coder, protocol);
+  ENCODE(coder, remountArgs);
+  ENCODE_BOXABLE(coder, decision);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -50,6 +59,9 @@
     DECODE(decoder, deviceModel, NSString);
     DECODE(decoder, deviceVendor, NSString);
     DECODE(decoder, mountOnName, NSString);
+    DECODE(decoder, protocol, NSString);
+    DECODE_ARRAY(decoder, remountArgs, NSString);
+    DECODE_SELECTOR(decoder, decision, NSNumber, integerValue);
   }
   return self;
 }
