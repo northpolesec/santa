@@ -16,4 +16,4 @@ would be useful to others.
   a hard control. It operates at the mount level. It cannot block:
    - Directly writing to an unmounted, but attached device
 
-- Metrics reported by Santa are not currently in a format that is friendly to open source solutions
+- Metrics reported by Santa are not _currently_ in a format that is friendly to open-source solutions
