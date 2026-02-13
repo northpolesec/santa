@@ -132,6 +132,7 @@
         if (!se) continue;
         se.decision = SNTEventStateBundleBinary;
 
+        BOOL includePrimaryEvent = YES;
         if (enableBundles && fi.bundle) {
           se.fileBundlePath = fi.bundlePath;
 
@@ -159,16 +160,26 @@
                                                                     progress:nil];
             NSNumber *ms = [NSNumber numberWithDouble:[startTime timeIntervalSinceNow] * -1000.0];
 
+            NSNumber *bundleCount = @(relatedEvents.count);
             for (SNTStoredExecutionEvent *e in relatedEvents.allValues) {
               e.fileBundleHash = bundleHash;
               e.fileBundleHashMilliseconds = ms;
-              e.fileBundleBinaryCount = @(relatedEvents.count);
+              e.fileBundleBinaryCount = bundleCount;
+            }
+            if (relatedEvents[se.fileSHA256]) {
+              includePrimaryEvent = NO;
+            } else {
+              se.fileBundleHash = bundleHash;
+              se.fileBundleHashMilliseconds = ms;
+              se.fileBundleBinaryCount = bundleCount;
             }
             [allEvents addObjectsFromArray:relatedEvents.allValues];
           }
         }
 
-        [allEvents addObject:se];
+        if (includePrimaryEvent) {
+          [allEvents addObject:se];
+        }
       }
     }
 

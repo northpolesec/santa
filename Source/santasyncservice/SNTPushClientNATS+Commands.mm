@@ -38,7 +38,7 @@ using santa::StringToNSString;
 static constexpr int64_t kKillResponseTimeoutSeconds = 90;
 
 // Bundle hashing + event upload can take a while for large bundles
-static constexpr int64_t kEventUploadResponseTimeoutSeconds = 300;
+static constexpr int64_t kEventUploadResponseTimeoutSeconds = 600;
 
 // Maximum age in seconds for command timestamps (5 minutes)
 static constexpr int64_t kMaxCommandAgeSeconds = 300;

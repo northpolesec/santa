@@ -110,6 +110,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     LOGE(@"Events upload failed to create sync state: %ld", status);
+    if (reply) reply(NO);
     return;
   }
   syncState.eventBatchSize = self.eventBatchSize;
@@ -344,8 +345,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
                                              dispatch_semaphore_signal(eventSema);
                                            }];
 
-  if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_SEC)) !=
+  if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) !=
       0) {
+    [bs invalidate];
     reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
                               code:2
                           userInfo:@{NSLocalizedDescriptionKey : @"Timeout generating events"}]);
@@ -353,6 +355,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   }
 
   if (!resultEvents.count) {
+    [bs invalidate];
     reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
                               code:3
                           userInfo:@{NSLocalizedDescriptionKey : @"No events generated"}]);
@@ -372,6 +375,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
                                           NSLocalizedDescriptionKey : @"Failed to upload events"
                                         }]);
                            }
+                           [bs invalidate];
                          }];
 }
 
