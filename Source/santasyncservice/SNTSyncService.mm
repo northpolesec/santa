@@ -124,6 +124,23 @@
   [self.syncManager pushNotificationReconnect];
 }
 
+- (void)checkSyncServerStatus:(NSXPCListenerEndpoint *)logListener
+                        reply:(void (^)(NSInteger statusCode, NSString *description))reply {
+  MOLXPCConnection *ll;
+  if (logListener) {
+    ll = [[MOLXPCConnection alloc] initClientWithListener:logListener];
+    ll.remoteInterface =
+        [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
+    [ll resume];
+    [[SNTSyncBroadcaster broadcaster] addLogListener:ll];
+  }
+  [self.syncManager checkSyncServerStatus:^(NSInteger statusCode, NSString *description) {
+    [[SNTSyncBroadcaster broadcaster] barrier];
+    if (ll) [[SNTSyncBroadcaster broadcaster] removeLogListener:ll];
+    reply(statusCode, description);
+  }];
+}
+
 - (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
                    syncType:(SNTSyncType)syncType
                       reply:(void (^)(SNTSyncStatusType))reply {

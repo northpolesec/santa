@@ -61,6 +61,12 @@
 // and you want to reconnect without waiting for the normal retry backoff.
 - (void)pushNotificationReconnect;
 
+// Check sync server connectivity by making a preflight test request using the syncservice's
+// existing session configuration (auth, certs, headers, proxy). Returns the HTTP status code
+// and a human-readable description. Status 0 indicates a connection error.
+- (void)checkSyncServerStatus:(NSXPCListenerEndpoint *)logListener
+                        reply:(void (^)(NSInteger statusCode, NSString *description))reply;
+
 @end
 
 @interface SNTXPCSyncServiceInterface : NSObject

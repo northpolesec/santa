@@ -74,5 +74,6 @@
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
 - (void)pushNotificationServerAddress:(void (^)(NSString *))reply;
 - (void)pushNotificationReconnect;
+- (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString *description))reply;
 
 @end
