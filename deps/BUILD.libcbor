@@ -1,0 +1,50 @@
+genrule(
+    name = "cbor_configuration_h",
+    srcs = ["src/cbor/configuration.h.in"],
+    outs = ["src/cbor/configuration.h"],
+    cmd = """
+        sed -e 's/$${CBOR_VERSION_MAJOR}/0/g' \
+            -e 's/$${CBOR_VERSION_MINOR}/11/g' \
+            -e 's/$${CBOR_VERSION_PATCH}/0/g' \
+            -e 's/$${CBOR_BUFFER_GROWTH}/2/g' \
+            -e 's/$${CBOR_MAX_STACK_SIZE}/2048/g' \
+            -e 's/#cmakedefine01 CBOR_PRETTY_PRINTER/#define CBOR_PRETTY_PRINTER 1/g' \
+            -e 's/$${CBOR_RESTRICT_SPECIFIER}/restrict/g' \
+            -e 's/$${CBOR_INLINE_SPECIFIER}/inline/g' \
+            $< > $@
+    """,
+)
+
+genrule(
+    name = "cbor_export_h",
+    outs = ["src/cbor/cbor_export.h"],
+    cmd = """
+        cat > $@ << 'EOF'
+#ifndef CBOR_EXPORT_H
+#define CBOR_EXPORT_H
+
+#define CBOR_EXPORT __attribute__((visibility("default")))
+#define CBOR_NO_EXPORT __attribute__((visibility("hidden")))
+
+#endif /* CBOR_EXPORT_H */
+EOF
+    """,
+)
+
+cc_library(
+    name = "cbor",
+    srcs = ["src/cbor.c", "src/allocators.c"] + glob([
+        "src/cbor/*.c",
+        "src/cbor/internal/*.c",
+    ]),
+    hdrs = ["src/cbor.h"] + glob([
+        "src/cbor/*.h",
+        "src/cbor/internal/*.h",
+    ]),
+    includes = ["src"],
+    textual_hdrs = [
+        ":cbor_configuration_h",
+        ":cbor_export_h",
+    ],
+    visibility = ["//visibility:public"],
+)

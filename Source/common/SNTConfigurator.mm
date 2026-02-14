@@ -149,6 +149,9 @@ static NSString* const kMachineIDPlistFileKey = @"MachineIDPlist";
 static NSString* const kMachineIDPlistKeyKey = @"MachineIDKey";
 
 static NSString* const kEnableStandalonePasswordFallbackKey = @"EnableStandalonePasswordFallback";
+static NSString* const kEnableFido2AuthorizationKey = @"EnableFido2Authorization";
+static NSString* const kFido2RelyingPartyIDKey = @"Fido2RelyingPartyID";
+static NSString* const kFido2CredentialsKey = @"Fido2Credentials";
 static NSString* const kEnableSilentModeKey = @"EnableSilentMode";
 static NSString* const kEnableSilentTTYModeKey = @"EnableSilentTTYMode";
 static NSString* const kAboutTextKey = @"AboutText";
@@ -356,6 +359,9 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kEnableAntiTamperProcessSuspendResumeKey : number,
       kAntiSuspendSigningIDsKey : array,
       kEnableStandalonePasswordFallbackKey : number,
+      kEnableFido2AuthorizationKey : number,
+      kFido2RelyingPartyIDKey : string,
+      kFido2CredentialsKey : array,
       kEnableSilentModeKey : number,
       kEnableSilentTTYModeKey : number,
       kAboutTextKey : string,
@@ -583,6 +589,18 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingEnableStandalonePasswordFallback {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingEnableFido2Authorization {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingFido2RelyingPartyID {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingFido2Credentials {
   return [self configStateSet];
 }
 
@@ -1162,6 +1180,19 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (BOOL)enableStandalonePasswordFallback {
   NSNumber* number = self.configState[kEnableStandalonePasswordFallbackKey];
   return number ? [number boolValue] : YES;
+}
+
+- (BOOL)enableFido2Authorization {
+  NSNumber* number = self.configState[kEnableFido2AuthorizationKey];
+  return number ? [number boolValue] : NO;
+}
+
+- (NSString*)fido2RelyingPartyID {
+  return self.configState[kFido2RelyingPartyIDKey];
+}
+
+- (NSArray<NSDictionary*>*)fido2Credentials {
+  return self.configState[kFido2CredentialsKey];
 }
 
 - (BOOL)enableSilentMode {

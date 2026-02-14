@@ -22,6 +22,48 @@ import santa_common_SNTStoredExecutionEvent
 import santa_gui_SNTAuthorizationHelper
 import santa_gui_SNTMessageView
 
+// CanAuthorizeWithTouchID checks if TouchID is available on the current device
+// and returns an error if it is not.
+func CanAuthorizeWithTouchID() -> (Bool, NSError?) {
+  do {
+    try SNTAuthorizationHelper.canAuthorizeWithTouchID()
+    return (true, nil)
+  } catch let error as NSError {
+    return (false, error)
+  }
+}
+
+// CanAuthorize checks if any authorization method (TouchID or FIDO2) is available.
+func CanAuthorize() -> (Bool, NSError?) {
+  do {
+    try SNTAuthorizationHelper.canAuthorize()
+    return (true, nil)
+  } catch let error as NSError {
+    return (false, error)
+  }
+}
+
+// StandaloneButton is only used in Standalone mode. It's a replacement for the
+// Open event button.
+func StandaloneButton(action: @escaping () -> Void, isAuthenticating: Bool = false) -> some View {
+  Button(
+    action: action,
+    label: {
+      if isAuthenticating {
+        HStack(spacing: 6) {
+          ProgressView().controlSize(.small)
+          Text(NSLocalizedString("Touch Security Key\u{2026}", comment: "Waiting for FIDO2 key touch"))
+        }.frame(maxWidth: 200.0)
+      } else {
+        Text(NSLocalizedString("Approve", comment: "Default text for Approve")).frame(maxWidth: 200.0)
+      }
+    }
+  )
+  .disabled(isAuthenticating)
+  .keyboardShortcut(.return, modifiers: .command)
+  .help("⌘ Return")
+}
+
 // A small class that will ferry bundle hashing state from SNTBinaryMessageWindowController
 // to SwiftUI.
 @objc public class SNTBundleProgress: NSObject, ObservableObject {
@@ -259,6 +301,7 @@ struct SNTBinaryMessageWindowView: View {
   @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
   @State private var repliedToCallback = false
+  @State private var isAuthenticating = false
 
   let c = SNTConfigurator.configurator()
 
@@ -303,17 +346,17 @@ struct SNTBinaryMessageWindowView: View {
         .animation(.spring(duration: 0.4), value: bundleProgress.isFinished)
       }
 
-      // Display the standalone error message to the user if one is provided.
+      // Display an error and auto-deny if no authorization method is available.
       if event?.holdAndAsk ?? false {
-        let (canAuthz, err) = CanAuthorizeWithTouchID()
+        let (canAuthz, err) = CanAuthorize()
         if !canAuthz {
           Group {
             if let errMsg = err {
               Text(errMsg.localizedDescription).foregroundColor(.red)
             }
           }.task {
-            // If this is a holdAndAsk event but TouchID is not available,
-            // call the reply block immediately with false.
+            // If this is a holdAndAsk event but no auth method (TouchID or
+            // FIDO2) is available, call the reply block immediately with false.
             let _ = callReplyCallback(false)
           }
         }
@@ -321,7 +364,7 @@ struct SNTBinaryMessageWindowView: View {
 
       HStack(spacing: 15.0) {
         if shouldAddStandaloneButton(event) {
-          StandaloneButton(action: standAloneButton)
+          StandaloneButton(action: standAloneButton, isAuthenticating: isAuthenticating)
         } else if shouldAddOpenButton() {
           OpenEventButton(
             customText: configState.eventDetailText,
@@ -344,7 +387,7 @@ struct SNTBinaryMessageWindowView: View {
       return false
     }
 
-    let (canAuthz, _) = CanAuthorizeWithTouchID()
+    let (canAuthz, _) = CanAuthorize()
     if !canAuthz {
       return false
     }
@@ -385,8 +428,10 @@ struct SNTBinaryMessageWindowView: View {
       return
     }
 
+    isAuthenticating = true
     SNTAuthorizationHelper.authorizeExecution(for: e) { success in
       DispatchQueue.main.sync {
+        self.isAuthenticating = false
         callReplyCallback(success)
         window?.close()
       }

@@ -16,13 +16,13 @@
 
 @class SNTStoredExecutionEvent;
 
-/// Helper class for TouchID/LocalAuthentication authorization.
+/// Helper class for TouchID/LocalAuthentication and FIDO2 authorization.
 @interface SNTAuthorizationHelper : NSObject
 
-/// Authorize temporary monitor mode via TouchID.
+/// Authorize temporary monitor mode via TouchID or FIDO2 security key.
 + (void)authorizeTemporaryMonitorModeWithReplyBlock:(void (^)(BOOL success))replyBlock;
 
-/// Authorize execution of a binary via TouchID.
+/// Authorize execution of a binary via TouchID or FIDO2 security key.
 + (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent*)event
                         replyBlock:(void (^)(BOOL success))replyBlock;
 
@@ -31,5 +31,11 @@
 
 /// Check if TouchID authorization is available on this device.
 + (BOOL)canAuthorizeWithTouchID:(NSError**)error;
+
+/// Check if a FIDO2 security key is available for authorization.
++ (BOOL)canAuthorizeWithFido2;
+
+/// Check if any authorization method (TouchID or FIDO2) is available.
++ (BOOL)canAuthorize:(NSError**)error;
 
 @end

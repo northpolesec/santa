@@ -454,6 +454,29 @@
 @property(readonly, nonatomic) BOOL enableStandalonePasswordFallback;
 
 ///
+///  Enable FIDO2 security key authorization as an alternative to TouchID.
+///  When enabled, users can authenticate with a FIDO2-compatible hardware security key
+///  wherever TouchID authorization is normally required.
+///
+///  Defaults to NO.
+///
+@property(readonly, nonatomic) BOOL enableFido2Authorization;
+
+///
+///  The FIDO2 Relying Party ID used during assertion verification.
+///  This should match the RP ID the credentials were registered with.
+///
+@property(readonly, nonatomic, nullable) NSString* fido2RelyingPartyID;
+
+///
+///  Array of FIDO2 credential dictionaries. Each dictionary should contain:
+///    - "credential_id": base64-encoded credential ID (NSString)
+///    - "public_key": base64-encoded public key in COSE format (NSString)
+///    - "type": algorithm type, e.g. "es256" (NSString)
+///
+@property(readonly, nonatomic, nullable) NSArray<NSDictionary*>* fido2Credentials;
+
+///
 ///  When silent mode is enabled, Santa will never show notifications for
 ///  blocked processes.
 ///

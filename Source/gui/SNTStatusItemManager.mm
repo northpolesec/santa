@@ -210,15 +210,15 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 - (void)tmmRefreshItemClicked:(id)sender {
   MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
-  [[daemonConn synchronousRemoteObjectProxy]
+  [[daemonConn remoteObjectProxy]
       requestTemporaryMonitorModeWithDurationMinutes:0
                                                reply:^(uint32 minutes, NSError* err) {
                                                  if (err) {
                                                    // TODO: Handle this properly
                                                    NSLog(@"Failed to refresh TMM");
                                                  }
+                                                 [daemonConn invalidate];
                                                }];
-  [daemonConn invalidate];
 }
 
 - (void)tmmMenuItemClicked:(id)sender {
@@ -226,14 +226,15 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   [daemonConn resume];
 
   if (self.temporaryMonitorModeExpiration) {
-    [[daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError* err) {
+    [[daemonConn remoteObjectProxy] cancelTemporaryMonitorMode:^(NSError* err) {
       if (err) {
         [self notificationWithIdentifier:@"tmm_cancel_failed_notification"
                                  andBody:err.localizedDescription];
       }
+      [daemonConn invalidate];
     }];
   } else {
-    [[daemonConn synchronousRemoteObjectProxy]
+    [[daemonConn remoteObjectProxy]
         requestTemporaryMonitorModeWithDurationMinutes:0
                                                  reply:^(uint32 minutes, NSError* err) {
                                                    if (err) {
@@ -290,9 +291,9 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
                                                                             andBody:
                                                                                 failureDescription];
                                                    }
+                                                   [daemonConn invalidate];
                                                  }];
   }
-  [daemonConn invalidate];
 }
 
 - (void)resetSilencesMenuItemClicked:(id)sender {

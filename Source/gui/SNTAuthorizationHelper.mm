@@ -18,6 +18,7 @@
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/gui/SNTFido2Helper.h"
 
 @implementation SNTAuthorizationHelper
 
@@ -27,13 +28,39 @@
              : LAPolicyDeviceOwnerAuthenticationWithBiometrics;
 }
 
-+ (void)authorizeWithReason:(NSString*)reason replyBlock:(void (^)(BOOL success))replyBlock {
++ (void)authorizeWithTouchIDReason:(NSString*)reason replyBlock:(void (^)(BOOL success))replyBlock {
   LAContext* context = [[LAContext alloc] init];
   [context evaluatePolicy:[self authorizationPolicy]
           localizedReason:reason
                     reply:^(BOOL success, NSError* _Nullable error) {
                       replyBlock(success);
                     }];
+}
+
++ (void)authorizeWithReason:(NSString*)reason replyBlock:(void (^)(BOOL success))replyBlock {
+  // Try FIDO2 first. The device check happens on a background thread inside
+  // SNTFido2Helper. If FIDO2 succeeds, we're done. If it fails (no device
+  // connected, or auth error), fall back to TouchID.
+  [SNTFido2Helper authorizeWithReason:reason
+                           replyBlock:^(BOOL success, BOOL deviceWasFound) {
+                             if (success) {
+                               replyBlock(YES);
+                               return;
+                             }
+                             if (deviceWasFound) {
+                               // A device was found but auth failed (cancel, timeout, etc.)
+                               // — don't fall back to TouchID.
+                               replyBlock(NO);
+                               return;
+                             }
+                             // No FIDO2 device found — try TouchID as fallback.
+                             NSError* err;
+                             if ([self canAuthorizeWithTouchID:&err]) {
+                               [self authorizeWithTouchIDReason:reason replyBlock:replyBlock];
+                             } else {
+                               replyBlock(NO);
+                             }
+                           }];
 }
 
 + (void)authorizeTemporaryMonitorModeWithReplyBlock:(void (^)(BOOL success))replyBlock {
@@ -72,6 +99,17 @@
 + (BOOL)canAuthorizeWithTouchID:(NSError**)error {
   LAContext* context = [[LAContext alloc] init];
   return [context canEvaluatePolicy:[self authorizationPolicy] error:error];
+}
+
++ (BOOL)canAuthorizeWithFido2 {
+  return [SNTFido2Helper isFido2DeviceAvailable];
+}
+
++ (BOOL)canAuthorize:(NSError**)error {
+  if ([self canAuthorizeWithFido2]) {
+    return YES;
+  }
+  return [self canAuthorizeWithTouchID:error];
 }
 
 @end

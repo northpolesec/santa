@@ -39,6 +39,7 @@
 }
 
 - (IBAction)showWindow:(id)sender {
+  [self.window setContentSize:self.window.contentViewController.view.fittingSize];
   [self.window setLevel:NSModalPanelWindowLevel];
   [self.window setMovableByWindowBackground:YES];
 

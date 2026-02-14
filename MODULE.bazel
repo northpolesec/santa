@@ -51,6 +51,8 @@ non_module_deps = use_extension("//deps:non_module_deps.bzl", "non_module_deps")
 use_repo(non_module_deps, "FMDB")
 use_repo(non_module_deps, "OCMock")
 use_repo(non_module_deps, "nats_c")
+use_repo(non_module_deps, "libcbor")
+use_repo(non_module_deps, "libfido2")
 
 # Hedron's Compile Commands Extractor
 # Note: Moved to a fork because the original project's maintenance status is in limbo.

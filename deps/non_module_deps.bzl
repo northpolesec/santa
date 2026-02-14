@@ -28,4 +28,20 @@ def _non_module_deps_impl(_module_ctx):
         build_file = Label("//deps:BUILD.nats"),
     )
 
+    # libcbor is a dependency of libfido2.
+    git_repository(
+        name = "libcbor",
+        remote = "https://github.com/PJK/libcbor.git",
+        tag = "v0.11.0",
+        build_file = Label("//deps:BUILD.libcbor"),
+    )
+
+    # libfido2 provides FIDO2/WebAuthn security key support.
+    git_repository(
+        name = "libfido2",
+        remote = "https://github.com/Yubico/libfido2.git",
+        tag = "1.14.0",
+        build_file = Label("//deps:BUILD.libfido2"),
+    )
+
 non_module_deps = module_extension(implementation = _non_module_deps_impl)

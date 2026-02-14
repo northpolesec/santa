@@ -15,7 +15,6 @@
 import SwiftUI
 
 import santa_common_SNTConfigurator
-import santa_gui_SNTAuthorizationHelper
 
 public let MAX_OUTER_VIEW_WIDTH = 560.0
 public let MAX_OUTER_VIEW_HEIGHT = 340.0
@@ -296,33 +295,6 @@ public struct CopyDetailsButton: View {
     .keyboardShortcut("c", modifiers: [.command, .shift])
     .help("⇧ ⌘  c")
   }
-}
-
-// CanAuthorizeWithTouchID checks if TouchID is available on the current device
-// and returns an error if it is not.
-public func CanAuthorizeWithTouchID() -> (Bool, NSError?) {
-  do {
-    try SNTAuthorizationHelper.canAuthorizeWithTouchID()
-    return (true, nil)
-  } catch let error as NSError {
-    return (false, error)
-  }
-}
-
-// StandaloneButton is only used in Standalone mode. It's a replacement for the
-// Open event button.
-//
-// It is intended to be used for all approvals in the future if in standalone
-// mode.
-public func StandaloneButton(action: @escaping () -> Void) -> some View {
-  Button(
-    action: action,
-    label: {
-      Text(NSLocalizedString("Approve", comment: "Default text for Approve")).frame(maxWidth: 200.0)
-    }
-  )
-  .keyboardShortcut(.return, modifiers: .command)
-  .help("⌘ Return")
 }
 
 public func DismissButton(

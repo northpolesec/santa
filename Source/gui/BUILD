@@ -19,12 +19,39 @@ filegroup(
 )
 
 objc_library(
+    name = "SNTMessageWindowController",
+    srcs = ["SNTMessageWindowController.mm"],
+    hdrs = ["SNTMessageWindowController.h"],
+    sdk_frameworks = ["Cocoa"],
+)
+
+objc_library(
+    name = "SNTFido2Helper",
+    srcs = ["SNTFido2Helper.mm"],
+    hdrs = ["SNTFido2Helper.h"],
+    module_name = "santa_gui_SNTFido2Helper",
+    sdk_frameworks = [
+        "AppKit",
+        "CoreFoundation",
+        "IOKit",
+    ],
+    deps = [
+        ":SNTMessageView",
+        ":SNTMessageWindowController",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
+        "@libfido2//:fido2",
+    ],
+)
+
+objc_library(
     name = "SNTAuthorizationHelper",
     srcs = ["SNTAuthorizationHelper.mm"],
     hdrs = ["SNTAuthorizationHelper.h"],
     module_name = "santa_gui_SNTAuthorizationHelper",
     sdk_frameworks = ["LocalAuthentication"],
     deps = [
+        ":SNTFido2Helper",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredExecutionEvent",
     ],
@@ -32,11 +59,13 @@ objc_library(
 
 swift_library(
     name = "SNTMessageView",
-    srcs = ["SNTMessageView.swift"],
+    srcs = [
+        "SNTFido2PromptView.swift",
+        "SNTMessageView.swift",
+    ],
     generates_header = 1,
     module_name = "santa_gui_SNTMessageView",
     deps = [
-        ":SNTAuthorizationHelper",
         "//Source/common:SNTConfigurator",
     ],
 )
@@ -156,8 +185,6 @@ objc_library(
         "SNTDeviceMessageWindowController.mm",
         "SNTFileAccessMessageWindowController.h",
         "SNTFileAccessMessageWindowController.mm",
-        "SNTMessageWindowController.h",
-        "SNTMessageWindowController.mm",
         "SNTNetworkMountMessageWindowController.h",
         "SNTNetworkMountMessageWindowController.mm",
         "SNTNotificationManager.h",
@@ -180,6 +207,7 @@ objc_library(
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         ":SNTFileInfoView",
+        ":SNTMessageWindowController",
         ":SNTNetworkMountMessageWindowView",
         ":SNTSystemExtensionDelegate",
         "//Source/common:CertificateHelpers",

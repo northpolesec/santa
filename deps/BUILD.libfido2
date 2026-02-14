@@ -1,0 +1,110 @@
+cc_library(
+    name = "openbsd_compat",
+    srcs = [
+        "openbsd-compat/explicit_bzero.c",
+        "openbsd-compat/freezero.c",
+        "openbsd-compat/recallocarray.c",
+    ],
+    hdrs = glob(["openbsd-compat/*.h"]),
+    copts = [
+        "-DHAVE_CLOCK_GETTIME",
+        "-DHAVE_MEMSET_S",
+    ],
+    defines = [
+        "HAVE_ARC4RANDOM_BUF",
+        "HAVE_ASPRINTF",
+        "HAVE_ERR_H",
+        "HAVE_GETLINE",
+        "HAVE_GETOPT",
+        "HAVE_GETPAGESIZE",
+        "HAVE_POSIX_IOCTL",
+        "HAVE_READPASSPHRASE",
+        "HAVE_SIGNAL_H",
+        "HAVE_STRLCAT",
+        "HAVE_STRLCPY",
+        "HAVE_STRSEP",
+        "HAVE_TIMINGSAFE_BCMP",
+        "HAVE_UNISTD_H",
+    ],
+    # Do NOT add includes = ["openbsd-compat"] here. The openbsd-compat
+    # directory contains shim headers (e.g. time.h, err.h) that shadow system
+    # headers and cause infinite include recursion. libfido2 sources already
+    # reference the compat header via a relative path:
+    #   #include "../openbsd-compat/openbsd-compat.h"
+    deps = ["@boringssl//:crypto"],
+)
+
+cc_library(
+    name = "fido2",
+    srcs = glob(
+        ["src/*.c"],
+        exclude = [
+            "src/hid_linux.c",
+            "src/hid_win.c",
+            "src/hid_freebsd.c",
+            "src/hid_netbsd.c",
+            "src/hid_openbsd.c",
+            "src/hid_hidapi.c",
+            "src/hid_unix.c",
+            "src/winhello.c",
+            "src/netlink.c",
+            "src/nfc.c",
+            "src/nfc_linux.c",
+            "src/pcsc.c",
+        ],
+    ),
+    hdrs = glob([
+        "src/*.h",
+        "src/fido/*.h",
+    ]),
+    copts = [
+        "-D_FIDO_INTERNAL",
+        "-DHAVE_CLOCK_GETTIME",
+        "-DHAVE_MEMSET_S",
+        # BoringSSL has the same direct HKDF API as LibreSSL, not
+        # the OpenSSL EVP_MD_meth_dup/EVP_PKEY_HKDF path. Pretend to be
+        # a recent LibreSSL so all the modern code paths are taken and the
+        # old-version compat branches (memcpy of EVP_MD structs) are skipped.
+        "-DLIBRESSL_VERSION_NUMBER=0x4000000fL",
+        # BoringSSL lacks EVP_MD_meth_dup/free (OpenSSL 1.1 API) and
+        # EVP_MD_fetch/free (OpenSSL 3.x API). In BoringSSL, EVP_MD
+        # objects are static constants that don't need dup/free.
+        "-DEVP_MD_meth_dup(x)=(EVP_MD*)(x)",
+        "-DEVP_MD_meth_free(x)",
+        "-DEVP_MD_fetch(ctx,name,props)=EVP_get_digestbyname(name)",
+        "-DEVP_MD_free(x)",
+    ],
+    defines = [
+        "HAVE_ARC4RANDOM_BUF",
+        "HAVE_ASPRINTF",
+        "HAVE_ERR_H",
+        "HAVE_GETLINE",
+        "HAVE_GETOPT",
+        "HAVE_GETPAGESIZE",
+        "HAVE_POSIX_IOCTL",
+        "HAVE_READPASSPHRASE",
+        "HAVE_SIGNAL_H",
+        "HAVE_STRLCAT",
+        "HAVE_STRLCPY",
+        "HAVE_STRSEP",
+        "HAVE_TIMINGSAFE_BCMP",
+        "HAVE_UNISTD_H",
+        "TLS=__thread",
+        "_FIDO_MAJOR=1",
+        "_FIDO_MINOR=14",
+        "_FIDO_PATCH=0",
+    ],
+    includes = [
+        "src",
+    ],
+    linkopts = [
+        "-framework IOKit",
+        "-framework CoreFoundation",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":openbsd_compat",
+        "@boringssl//:crypto",
+        "@libcbor//:cbor",
+    ],
+)
