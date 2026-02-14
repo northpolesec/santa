@@ -151,6 +151,11 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedTCCModification &) {
 
 #endif  // HAVE_MACOS_15_4
 
+std::vector<uint8_t> Empty::SerializeNetworkFlow(SNDProcessInfo *, SNDFlowInfo *,
+                                                 SNTCachedDecision *) {
+  return {};
+}
+
 std::vector<uint8_t> Empty::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
     const EnrichedProcess &enriched_process, size_t target_index,

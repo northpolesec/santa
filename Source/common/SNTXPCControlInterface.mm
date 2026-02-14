@@ -22,6 +22,9 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "src/santanetd/SNDFlowInfo.h"
+#import "src/santanetd/SNDProcessFlows.h"
+#import "src/santanetd/SNDProcessInfo.h"
 
 static NSString *const kSantaExtensionBundleID = @"com.northpolesec.santa.daemon";
 static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.netd";
@@ -82,6 +85,12 @@ static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
         forSelector:@selector(killProcesses:reply:)
       argumentIndex:0
             ofReply:YES];
+
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNDProcessFlows class],
+                                      [SNDProcessInfo class], [SNDFlowInfo class], nil]
+        forSelector:@selector(reportNetworkFlows:reply:)
+      argumentIndex:0
+            ofReply:NO];
 }
 
 + (NSXPCInterface *)controlInterface {

@@ -31,10 +31,15 @@
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#import "src/santanetd/SNDFlowInfo.h"
+#import "src/santanetd/SNDProcessFlows.h"
+#import "src/santanetd/SNDProcessInfo.h"
 
 NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
-@interface SNTNetworkExtensionQueue ()
+@interface SNTNetworkExtensionQueue () {
+  std::shared_ptr<santa::Logger> _logger;
+}
 @property MOLXPCConnection *netExtConnection;
 @property(readwrite) NSString *connectedProtocolVersion;
 @property NSArray<SNTKVOManager *> *kvoWatchers;
@@ -45,11 +50,13 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 @implementation SNTNetworkExtensionQueue
 
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue *)notifierQueue
-                           syncdQueue:(SNTSyncdQueue *)syncdQueue {
+                           syncdQueue:(SNTSyncdQueue *)syncdQueue
+                               logger:(std::shared_ptr<santa::Logger>)logger {
   self = [super init];
   if (self) {
     _notifierQueue = notifierQueue;
     _syncdQueue = syncdQueue;
+    _logger = std::move(logger);
 
     WEAKIFY(self);
 
@@ -108,6 +115,19 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
     LOGW(@"Timeout when attempting to set filter enabled state (%d)", settings.enable);
+  }
+}
+
+- (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows {
+  if (!processFlows.count) {
+    return;
+  }
+
+  for (SNDProcessFlows *pf in processFlows) {
+    SNDProcessInfo *info = pf.processInfo;
+    [pf enumerateFlowsUsingBlock:^(SNDFlowInfo *flow) {
+      _logger->LogNetworkFlow(info, flow);
+    }];
   }
 }
 

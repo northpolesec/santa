@@ -895,6 +895,9 @@ objc_library(
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTXPCUnprivilegedControlInterface",
+        "@santanetd//src/santanetd:SNDFlowInfo",
+        "@santanetd//src/santanetd:SNDProcessFlows",
+        "@santanetd//src/santanetd:SNDProcessInfo",
     ],
 )
 

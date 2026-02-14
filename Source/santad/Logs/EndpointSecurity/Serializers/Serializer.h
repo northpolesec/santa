@@ -31,6 +31,8 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #import "Source/santad/SNTDecisionCache.h"
 
+@class SNDFlowInfo;
+@class SNDProcessInfo;
 @class SNTStoredExecutionEvent;
 
 namespace santa {
@@ -103,6 +105,10 @@ class Serializer {
                                                   const std::string_view) = 0;
 
   virtual std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) = 0;
+
+  virtual std::vector<uint8_t> SerializeNetworkFlow(SNDProcessInfo *processInfo, SNDFlowInfo *flow,
+                                                    SNTCachedDecision *cd) = 0;
+  std::vector<uint8_t> SerializeNetworkFlow(SNDProcessInfo *processInfo, SNDFlowInfo *flow);
 
   virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *, bool) = 0;
   virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) = 0;

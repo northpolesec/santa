@@ -216,6 +216,7 @@ objc_library(
     srcs = ["SNTNetworkExtensionQueue.mm"],
     hdrs = ["SNTNetworkExtensionQueue.h"],
     deps = [
+        ":EndpointSecurityLogger",
         ":SNTNotificationQueue",
         ":SNTSyncdQueue",
         "//Source/common:MOLXPCConnection",
@@ -228,6 +229,9 @@ objc_library(
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "//Source/common/ne:SNTXPCNetworkExtensionInterface",
+        "@santanetd//src/santanetd:SNDFlowInfo",
+        "@santanetd//src/santanetd:SNDProcessFlows",
+        "@santanetd//src/santanetd:SNDProcessInfo",
     ],
 )
 
@@ -706,6 +710,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXxhash",
         "//Source/common:String",
+        "@santanetd//src/santanetd:SNDProcessInfo",
     ],
 )
 
@@ -765,6 +770,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:String",
+        "@santanetd//src/santanetd:SNDNetworkFlowsSerializer",
     ],
 )
 
@@ -789,6 +795,7 @@ objc_library(
         "//Source/common:santa_cc_proto_library_wrapper",
         "@abseil-cpp//absl/status",
         "@protobuf//src/google/protobuf/json",
+        "@santanetd//src/santanetd:SNDNetworkFlowsSerializer",
     ],
 )
 
@@ -1000,6 +1007,7 @@ objc_library(
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common/faa:WatchItems",
         "@FMDB",
+        "@santanetd//src/santanetd:SNDProcessFlows",
     ],
 )
 

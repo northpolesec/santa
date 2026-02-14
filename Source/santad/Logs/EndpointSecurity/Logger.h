@@ -34,6 +34,8 @@
 #include "Source/santad/SleighLauncher.h"
 
 // Forward declarations
+@class SNDFlowInfo;
+@class SNDProcessInfo;
 @class SNTExportConfiguration;
 @class SNTStoredExecutionEvent;
 
@@ -84,6 +86,8 @@ class Logger : public Timer<Logger> {
 
   void LogDiskAppeared(NSDictionary *props, bool allowed);
   void LogDiskDisappeared(NSDictionary *props);
+
+  void LogNetworkFlow(SNDProcessInfo *processInfo, SNDFlowInfo *flow);
 
   virtual void LogFileAccess(const std::string &policy_version, const std::string &policy_name,
                              const santa::Message &msg,
