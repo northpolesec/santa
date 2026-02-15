@@ -88,7 +88,7 @@ static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNDProcessFlows class],
                                       [SNDProcessInfo class], [SNDFlowInfo class], nil]
-        forSelector:@selector(reportNetworkFlows:reply:)
+        forSelector:@selector(reportNetworkFlows:windowStart:windowEnd:reply:)
       argumentIndex:0
             ofReply:NO];
 }

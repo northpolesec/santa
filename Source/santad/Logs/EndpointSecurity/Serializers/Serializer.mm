@@ -110,10 +110,12 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(
                              std::move(enriched_event_target), decision, state.HexDigest());
 }
 
-std::vector<uint8_t> Serializer::SerializeNetworkFlow(SNDProcessInfo *processInfo,
-                                                      SNDFlowInfo *flow) {
-  return SerializeNetworkFlow(processInfo, flow,
-                              [decision_cache_ cachedDecisionForVnode:[processInfo vnode]]);
+std::vector<uint8_t> Serializer::SerializeNetworkFlow(SNDProcessInfo *process_info,
+                                                      SNDFlowInfo *flow,
+                                                      struct timespec window_start,
+                                                      struct timespec window_end) {
+  return SerializeNetworkFlow(process_info, flow, window_start, window_end,
+                              [decision_cache_ cachedDecisionForVnode:[process_info vnode]]);
 }
 
 };  // namespace santa

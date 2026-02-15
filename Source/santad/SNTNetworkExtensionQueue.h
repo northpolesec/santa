@@ -38,6 +38,8 @@ extern NSString *const kSantaNetworkExtensionProtocolVersion;
 - (NSDictionary *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
                                                   error:(NSError **)error;
 
-- (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows;
+- (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
+               windowStart:(NSDate *)windowStart
+                 windowEnd:(NSDate *)windowEnd;
 
 @end

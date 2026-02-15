@@ -774,9 +774,12 @@ double watchdogRAMPeak = 0;
 
 #pragma mark Network Extension Ops
 
-- (void)reportNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows reply:(void (^)(void))reply {
+- (void)reportNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
+               windowStart:(NSDate *)windowStart
+                 windowEnd:(NSDate *)windowEnd
+                     reply:(void (^)(void))reply {
   dispatch_async(self.netFlowQ, ^{
-    [self.netExtQueue handleNetworkFlows:processFlows];
+    [self.netExtQueue handleNetworkFlows:processFlows windowStart:windowStart windowEnd:windowEnd];
   });
   reply();
 }

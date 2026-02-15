@@ -118,15 +118,28 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 }
 
-- (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows {
+- (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
+               windowStart:(NSDate *)windowStart
+                 windowEnd:(NSDate *)windowEnd {
   if (!processFlows.count) {
     return;
   }
 
+  NSTimeInterval startSecs = windowStart.timeIntervalSince1970;
+  NSTimeInterval endSecs = windowEnd.timeIntervalSince1970;
+  struct timespec windowStartTS = {
+      .tv_sec = static_cast<time_t>(startSecs),
+      .tv_nsec = static_cast<long>((startSecs - static_cast<time_t>(startSecs)) * NSEC_PER_SEC),
+  };
+  struct timespec windowEndTS = {
+      .tv_sec = static_cast<time_t>(endSecs),
+      .tv_nsec = static_cast<long>((endSecs - static_cast<time_t>(endSecs)) * NSEC_PER_SEC),
+  };
+
   for (SNDProcessFlows *pf in processFlows) {
     SNDProcessInfo *info = pf.processInfo;
     [pf enumerateFlowsUsingBlock:^(SNDFlowInfo *flow) {
-      _logger->LogNetworkFlow(info, flow);
+      _logger->LogNetworkFlow(info, flow, windowStartTS, windowEndTS);
     }];
   }
 }

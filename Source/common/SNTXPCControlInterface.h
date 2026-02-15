@@ -85,7 +85,10 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                                                               NSString *santaProtocolVersion,
                                                               NSError *error))reply;
 
-- (void)reportNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows reply:(void (^)(void))reply;
+- (void)reportNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
+               windowStart:(NSDate *)windowStart
+                 windowEnd:(NSDate *)windowEnd
+                     reply:(void (^)(void))reply;
 
 @end
 

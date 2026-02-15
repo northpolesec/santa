@@ -151,8 +151,8 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedTCCModification &) {
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> Empty::SerializeNetworkFlow(SNDProcessInfo *, SNDFlowInfo *,
-                                                 SNTCachedDecision *) {
+std::vector<uint8_t> Empty::SerializeNetworkFlow(SNDProcessInfo *, SNDFlowInfo *, struct timespec,
+                                                 struct timespec, SNTCachedDecision *) {
   return {};
 }
 
