@@ -465,14 +465,21 @@ changes in the release notes of any future release that changes them.`,
     },
     {
       key: "EntitlementsPrefixFilter",
-      description: `Entitlement prefixes that should not be logged (for example: \`com.apple.private\`).`,
+      description: `Filters entitlements from execution telemetry based on prefix. Entitlements
+        matching a prefix in this list will be omitted from the logged event. This does not
+        prevent the execution event itself from being logged - it only controls which
+        entitlements are included in the event (for example: \`com.apple.private\`).`,
       type: "string",
       repeated: true,
     },
     {
       key: "EntitlementsTeamIDFilter",
-      description: `Entitlements from processes with a matching TeamID in the code signature
-        will not be logged. Use the value \`platform\` to filter entitlements from platform binaries.`,
+      description: `Filters entitlements from execution telemetry based on the process's
+        TeamID. When a process's code signature has a TeamID matching an entry in this list,
+        its entitlements will be omitted from the logged event. This does not prevent the
+        execution event itself from being logged - it only controls which entitlements are
+        included in the event. Use the value \`platform\` to filter entitlements from
+        platform binaries.`,
       type: "string",
       repeated: true,
     },
