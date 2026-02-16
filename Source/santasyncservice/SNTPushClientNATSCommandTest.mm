@@ -822,8 +822,11 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
                                                                 withCommandUUID:@"uuid"
                                                                         onArena:self.arena];
 
-  // Then: Should return nil for empty path
-  XCTAssertEqual(response, nullptr, @"Empty path should return nil response");
+  // Then: Should return response with ERROR_INVALID_PATH
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertTrue(response->has_error(), @"Should have error set");
+  XCTAssertEqual(response->error(), ::pbv1::EventUploadResponse::ERROR_INVALID_PATH,
+                 @"Empty path should return ERROR_INVALID_PATH");
 }
 
 - (void)testHandleEventUploadRequestNilSyncDelegate {
@@ -839,8 +842,11 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
                                       withCommandUUID:@"uuid"
                                               onArena:self.arena];
 
-  // Then: Should return nil when no delegate
-  XCTAssertEqual(response, nullptr, @"Nil sync delegate should return nil response");
+  // Then: Should return response with ERROR_INTERNAL
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertTrue(response->has_error(), @"Should have error set");
+  XCTAssertEqual(response->error(), ::pbv1::EventUploadResponse::ERROR_INTERNAL,
+                 @"Nil sync delegate should return ERROR_INTERNAL");
 }
 
 - (void)testHandleEventUploadRequestSuccess {
@@ -848,44 +854,38 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   ::pbv1::EventUploadRequest eventUploadRequest;
   eventUploadRequest.set_path("/Applications/Safari.app");
 
-  // Mock delegate to call reply with nil error (success)
-  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app" reply:[OCMArg any]])
-      .andDo(^(NSInvocation *invocation) {
-        __unsafe_unretained void (^reply)(NSError *);
-        [invocation getArgument:&reply atIndex:3];
-        reply(nil);
-      });
+  // Mock delegate - handler fires and forgets, so we just need the stub
+  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
+                                              reply:[OCMArg any]]);
 
   // When: Handling the event upload request
   ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
                                                                 withCommandUUID:@"uuid"
                                                                         onArena:self.arena];
 
-  // Then: Should return a successful response
-  XCTAssertNotEqual(response, nullptr, @"Successful upload should return non-nil response");
+  // Then: Should return a successful response with no error
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertFalse(response->has_error(), @"Successful request should not have error");
 }
 
-- (void)testHandleEventUploadRequestFailure {
+- (void)testHandleEventUploadRequestFiresDelegate {
   // Given: An EventUploadRequest with a valid path
   ::pbv1::EventUploadRequest eventUploadRequest;
   eventUploadRequest.set_path("/Applications/Safari.app");
 
-  // Mock delegate to call reply with an error
-  NSError *mockError = [NSError errorWithDomain:@"test" code:1 userInfo:nil];
-  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app" reply:[OCMArg any]])
-      .andDo(^(NSInvocation *invocation) {
-        __unsafe_unretained void (^reply)(NSError *);
-        [invocation getArgument:&reply atIndex:3];
-        reply(mockError);
-      });
+  // Mock delegate to verify it gets called (fire-and-forget)
+  OCMExpect([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
+                                                reply:[OCMArg any]]);
 
   // When: Handling the event upload request
   ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
                                                                 withCommandUUID:@"uuid"
                                                                         onArena:self.arena];
 
-  // Then: Should return nil on failure
-  XCTAssertEqual(response, nullptr, @"Failed upload should return nil response");
+  // Then: Should return immediately with no error and delegate method should be called
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertFalse(response->has_error(), @"Should not have error");
+  OCMVerifyAll(self.mockSyncDelegate);
 }
 
 - (void)testDispatchSantaCommandToHandlerEventUpload {
@@ -896,13 +896,9 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
   [self signCommandRequest:&command];
 
-  // Mock delegate to call reply with nil error (success)
-  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app" reply:[OCMArg any]])
-      .andDo(^(NSInvocation *invocation) {
-        __unsafe_unretained void (^reply)(NSError *);
-        [invocation getArgument:&reply atIndex:3];
-        reply(nil);
-      });
+  // Mock delegate - handler fires and forgets
+  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
+                                              reply:[OCMArg any]]);
 
   // When: Dispatching the command
   ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
@@ -926,10 +922,13 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
-  // Then: Should return an ERROR_INTERNAL response
-  XCTAssertTrue(response->has_error());
-  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_UNSPECIFIED,
-                 @"Failed event upload should return ERROR_UNSPECIFIED");
+  // Then: Should return EventUploadResponse with ERROR_INVALID_PATH (not top-level error)
+  XCTAssertFalse(response->has_error(), @"Should not have top-level error");
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kEventUpload,
+                 @"Should have event_upload response set");
+  XCTAssertTrue(response->event_upload().has_error(), @"EventUploadResponse should have error");
+  XCTAssertEqual(response->event_upload().error(), ::pbv1::EventUploadResponse::ERROR_INVALID_PATH,
+                 @"Should return ERROR_INVALID_PATH on empty path");
 }
 
 @end

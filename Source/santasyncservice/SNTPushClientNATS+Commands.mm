@@ -37,9 +37,6 @@ using santa::StringToNSString;
 // Semi-arbitrary number of seconds to wait for santad to finish killing processes
 static constexpr int64_t kKillResponseTimeoutSeconds = 90;
 
-// Bundle hashing + event upload can take a while for large bundles
-static constexpr int64_t kEventUploadResponseTimeoutSeconds = 600;
-
 // Maximum age in seconds for command timestamps (5 minutes)
 static constexpr int64_t kMaxCommandAgeSeconds = 300;
 
@@ -303,39 +300,34 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                                      (const ::pbv1::EventUploadRequest &)eventUploadRequest
                                           withCommandUUID:(NSString *)uuid
                                                   onArena:(google::protobuf::Arena *)arena {
+  auto pbResponse = google::protobuf::Arena::Create<::pbv1::EventUploadResponse>(arena);
+
   NSString *path = StringToNSString(eventUploadRequest.path());
   if (path.length == 0) {
     LOGE(@"NATS: EventUploadRequest has empty path");
-    return nil;
+    pbResponse->set_error(::pbv1::EventUploadResponse::ERROR_INVALID_PATH);
+    return pbResponse;
   }
 
   id<SNTPushNotificationsSyncDelegate> strongSyncDelegate = self.syncDelegate;
   if (!strongSyncDelegate) {
     LOGE(@"NATS: EventUploadRequest failed - no sync delegate");
-    return nil;
+    pbResponse->set_error(::pbv1::EventUploadResponse::ERROR_INTERNAL);
+    return pbResponse;
   }
 
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  __block NSError *uploadError;
+  // Fire off the event upload asynchronously - don't wait for completion
   [strongSyncDelegate eventUploadForPath:path
                                    reply:^(NSError *error) {
-                                     uploadError = error;
-                                     dispatch_semaphore_signal(sema);
+                                     if (error) {
+                                       LOGE(@"NATS: EventUploadRequest failed for path %@: %@",
+                                            path, error);
+                                     } else {
+                                       LOGI(@"NATS: EventUploadRequest completed for path %@", path);
+                                     }
                                    }];
 
-  if (dispatch_semaphore_wait(
-          sema, dispatch_time(DISPATCH_TIME_NOW,
-                              kEventUploadResponseTimeoutSeconds * NSEC_PER_SEC)) != 0) {
-    LOGE(@"NATS: EventUploadRequest timed out for path: %@", path);
-    return nil;
-  }
-
-  if (uploadError) {
-    LOGE(@"NATS: EventUploadRequest failed for path %@: %@", path, uploadError);
-    return nil;
-  }
-
-  return google::protobuf::Arena::Create<::pbv1::EventUploadResponse>(arena);
+  return pbResponse;
 }
 
 // Dispatch Santa command to appropriate handler based on command type
@@ -395,11 +387,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
       auto *eventUploadResponse = [self handleEventUploadRequest:command.event_upload()
                                                  withCommandUUID:uuid
                                                          onArena:arena];
-      if (eventUploadResponse) {
-        response->unsafe_arena_set_allocated_event_upload(eventUploadResponse);
-      } else {
-        response->set_error(::pbv1::SantaCommandResponse::ERROR_UNSPECIFIED);
-      }
+      response->unsafe_arena_set_allocated_event_upload(eventUploadResponse);
       break;
     }
 

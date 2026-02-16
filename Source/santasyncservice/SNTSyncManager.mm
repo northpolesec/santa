@@ -356,9 +356,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
   if (!resultEvents.count) {
     [bs invalidate];
-    reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                              code:3
-                          userInfo:@{NSLocalizedDescriptionKey : @"No events generated"}]);
+    reply(nil);
     return;
   }
 
