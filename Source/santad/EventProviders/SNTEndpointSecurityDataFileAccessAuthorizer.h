@@ -29,7 +29,9 @@
 #include "Source/santad/TTYWriter.h"
 
 @interface SNTEndpointSecurityDataFileAccessAuthorizer
-    : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler, SNTDataFileAccessAuthorizer>
+    : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler,
+                                 SNTDataFileAccessAuthorizer,
+                                 SNTEndpointSecurityProbe>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                         metrics:(std::shared_ptr<santa::Metrics>)metrics

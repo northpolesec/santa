@@ -35,7 +35,7 @@ using santa::Message;
 @interface SNTEndpointSecurityAuthorizer ()
 @property SNTCompilerController *compilerController;
 @property SNTExecutionController *execController;
-@property id<SNTEndpointSecurityProbe> procWatcherProbe;
+@property NSMutableArray<id<SNTEndpointSecurityProbe>> *probes;
 @end
 
 @implementation SNTEndpointSecurityAuthorizer {
@@ -77,8 +77,8 @@ using santa::Message;
   // DENY results. The caller may also prevent caching if it has reason to so.
   bool cacheable = (result == ES_AUTH_RESULT_ALLOW) && !forcePreventCache;
 
-  if (self.procWatcherProbe) {
-    santa::ProbeInterest interest = [self.procWatcherProbe probeInterest:msg];
+  for (id<SNTEndpointSecurityProbe> probe in self.probes) {
+    santa::ProbeInterest interest = [probe probeInterest:msg];
 
     // Prevent caching if a probe is interested in the process. But don't re-enable
     // caching if it was already previously disabled.
@@ -245,8 +245,11 @@ using santa::Message;
   }];
 }
 
-- (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher {
-  self.procWatcherProbe = watcher;
+- (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)probe {
+  if (!self.probes) {
+    self.probes = [NSMutableArray array];
+  }
+  [self.probes addObject:probe];
 }
 
 @end
