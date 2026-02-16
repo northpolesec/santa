@@ -388,10 +388,12 @@ Applies when using the `protobuf` or `json` log types.
 - `EnableMachineIDDecoration`: Adds machine ID to filelog entries
 - `EntitlementsPrefixFilter`: Entitlement prefixes to exclude from execution telemetry.
   Matching entitlements will be omitted from the logged event, but the execution event
-  itself is still logged.
+  itself is still logged. Entitlements are only logged when `EventLogType` is set to
+  `protobuf` or `json`.
 - `EntitlementsTeamIDFilter`: Team IDs whose process entitlements should be excluded from
   execution telemetry. Matching entitlements will be omitted from the logged event, but the
-  execution event itself is still logged.
+  execution event itself is still logged. Entitlements are only logged when `EventLogType`
+  is set to `protobuf` or `json`.
 
 ## Example Configuration
 
