@@ -95,6 +95,9 @@
 /// Skip showing the block dialog and go directly to TouchID authorization.
 @property BOOL silentTouchID;
 
+/// Indicates whether the decision was made by a static rule.
+@property BOOL staticRule;
+
 /// NSArray of logged in users when the decision was made.
 @property(nullable) NSArray *loggedInUsers;
 

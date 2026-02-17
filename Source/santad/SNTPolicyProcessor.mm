@@ -298,6 +298,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // We know we have a match so apply the custom messages
   cd.customMsg = rule.customMsg;
   cd.customURL = rule.customURL;
+  cd.staticRule = rule.staticRule;
 
   return YES;
 }

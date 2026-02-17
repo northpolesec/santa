@@ -344,6 +344,7 @@ static NSString *const kPrinterProxy =
     se.decision = cd.decision;
     se.holdAndAsk = cd.holdAndAsk;
     se.silentTouchID = cd.silentTouchID;
+    se.staticRule = cd.staticRule;
 
     se.signingChain = cd.certChain;
     se.teamID = cd.teamID;
