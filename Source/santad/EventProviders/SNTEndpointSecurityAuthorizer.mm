@@ -36,6 +36,7 @@ using santa::Message;
 @property SNTCompilerController *compilerController;
 @property SNTExecutionController *execController;
 @property NSMutableArray<id<SNTEndpointSecurityProbe>> *probes;
+@property BOOL enabled;
 @end
 
 @implementation SNTEndpointSecurityAuthorizer {
@@ -57,6 +58,8 @@ using santa::Message;
     _compilerController = compilerController;
     _authResultCache = authResultCache;
     _ttyWriter = std::move(ttyWriter);
+
+    _probes = [NSMutableArray array];
 
     [self establishClientOrDie];
   }
@@ -239,6 +242,7 @@ using santa::Message;
 }
 
 - (void)enable {
+  self.enabled = YES;
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_EXEC,
                                     ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
@@ -246,10 +250,15 @@ using santa::Message;
 }
 
 - (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)probe {
-  if (!self.probes) {
-    self.probes = [NSMutableArray array];
+  if (self.enabled) {
+    // This is a programming error. Bail.
+    [NSException raise:@"Probe registration error"
+                format:@"Cannot register probes after authorizer is enabled"];
   }
-  [self.probes addObject:probe];
+
+  @synchronized(self) {
+    [self.probes addObject:probe];
+  }
 }
 
 @end
