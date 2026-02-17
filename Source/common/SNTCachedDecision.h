@@ -54,6 +54,8 @@
 @property NSString *customURL;
 @property BOOL silentBlock;
 
+@property BOOL staticRule;
+
 @property BOOL cacheable;
 @property BOOL holdAndAsk;
 @property BOOL silentTouchID;
