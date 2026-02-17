@@ -413,6 +413,21 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
   }
   pbUSBMountEvent->set_mount_on(NSStringToUTF8String(event.mountOnName));
   pbUSBMountEvent->set_access_time([event.occurrenceDate timeIntervalSince1970]);
+  pbUSBMountEvent->set_protocol(NSStringToUTF8String(event.protocol));
+
+  for (NSString *mountFlag in event.remountArgs) {
+    pbUSBMountEvent->add_remount_flags(NSStringToUTF8String(mountFlag));
+  }
+
+  switch (event.decision) {
+    case SNTStoredUSBMountEventDecisionAllowedWithRemount:
+      pbUSBMountEvent->set_decision(::pbv2::USBMountEvent::USB_MOUNT_DECISION_ALLOWED_WITH_REMOUNT);
+      break;
+    case SNTStoredUSBMountEventDecisionBlocked:
+      pbUSBMountEvent->set_decision(::pbv2::USBMountEvent::USB_MOUNT_DECISION_BLOCKED);
+      break;
+    default: pbUSBMountEvent->set_decision(::pbv2::USBMountEvent::USB_MOUNT_DECISION_UNSPECIFIED);
+  }
 
   return pbUSBMountEvent;
 }

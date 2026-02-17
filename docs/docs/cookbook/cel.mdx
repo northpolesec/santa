@@ -5,6 +5,7 @@ sidebar_position: 1
 # Common Expression Language (CEL)
 
 import AddedBadge from "@site/src/components/AddedBadge/AddedBadge";
+import PlaygroundLink from "@site/src/components/CELPlayground/PlaygroundLink";
 
 This page lists well-known and/or community-contributed CEL expressions.
 
@@ -23,6 +24,20 @@ before the provided date. This is particularly useful when attached to a
 target.signing_time >= timestamp('2025-05-31T00:00:00Z')
 ```
 
+<PlaygroundLink
+  expression={`target.signing_time >= timestamp('2025-05-31T00:00:00Z')`}
+  context={`
+    target:
+      signing_time: "2025-06-01T00:00:00Z"
+    args:
+      - "--version"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
 ## Prevent users from disabling gatekeeper
 
 Create a signing ID rule for `platform:com.apple.spctl` and attach the following CEL program
@@ -36,6 +51,26 @@ Create a signing ID rule for `platform:com.apple.spctl` and attach the following
     '--remove'
 ].exists(flag, flag in args) ? BLOCKLIST : ALLOWLIST
 ```
+
+<PlaygroundLink
+  expression={`
+    [
+        '--global-disable',
+        '--master-disable',
+        '--disable',
+        '--add',
+        '--remove'
+    ].exists(flag, flag in args) ? BLOCKLIST : ALLOWLIST
+  `}
+  context={`
+    args:
+      - "--master-disable"
+    envs:
+      HOME: "/Users/admin"
+    euid: 0
+    cwd: "/Users/admin"
+  `}
+/>
 
 ## Prevent Timestomping of LaunchAgents and LaunchDaemons <AddedBadge added={"Santa 2025.8"} />
 
@@ -53,6 +88,24 @@ args.exists(arg, arg in [
   '-a', '-m', '-r', '-A', '-t'
 ]) && args.join(" ").contains("Library/Launch") ? BLOCKLIST : ALLOWLIST
 ```
+
+<PlaygroundLink
+  expression={`
+    args.exists(arg, arg in [
+      '-a', '-m', '-r', '-A', '-t'
+    ]) && args.join(" ").contains("Library/Launch") ? BLOCKLIST : ALLOWLIST
+  `}
+  context={`
+    args:
+      - "-t"
+      - "202301010000"
+      - "/Users/admin/Library/LaunchAgents/com.malware.plist"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Users/admin"
+  `}
+/>
 
 Note this will not stop using the system calls directly or otherwise
 programmatically modifying the timestamps. Also this won't cover modifications
@@ -77,6 +130,26 @@ Program
         ".*\\W+display\\W+dialog.*")  ? BLOCKLIST : ALLOWLIST
 ```
 
+<PlaygroundLink
+  expression={`
+    (
+        args.join(" ").lowerAscii().matches(".*\\\\W+with\\\\W+hidden\\\\W+answer.*") ||
+        args.join(" ").lowerAscii().contains("password")
+    ) &&
+        args.join(" ").lowerAscii().matches(
+            ".*\\\\W+display\\\\W+dialog.*")  ? BLOCKLIST : ALLOWLIST
+  `}
+  context={`
+    args:
+      - "-e"
+      - 'display dialog "Enter your password" with hidden answer default answer ""'
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Users/admin"
+  `}
+/>
+
 Note: This will not stop obfuscated osascript that's evaluated at runtime or
 any other malicious behavior triggered through osascript. For better security
 block osascript all together if you can.  Be aware software like the Google
@@ -99,6 +172,22 @@ args.join(" ").contains("-setremotelogin on") ||
 args.join(" ").contains("-setremoteappleevents on") ? BLOCKLIST : ALLOWLIST
 ```
 
+<PlaygroundLink
+  expression={`
+    args.join(" ").contains("-setremotelogin on") ||
+    args.join(" ").contains("-setremoteappleevents on") ? BLOCKLIST : ALLOWLIST
+  `}
+  context={`
+    args:
+      - "-setremotelogin"
+      - "on"
+    envs:
+      HOME: "/Users/admin"
+    euid: 0
+    cwd: "/Users/admin"
+  `}
+/>
+
 ## Prevent Users from Taking and Mounting Time Machine Snapshots
 
 As was presented at [Kawaiicon 2025](https://kawaiicon.org/) by [Calum Hall](https://www.youtube.com/watch?v=hIeNuqq12sk&t=1390s), Time Machine snapshots can be used to bypass [File Access Authorization rules](https://www.youtube.com/watch?v=hIeNuqq12sk&t=1390s).
@@ -110,6 +199,18 @@ You can stop the taking of local snapshots by creating a signing ID for
 'localsnapshot' in args ? BLOCKLIST : ALLOWLIST
 ```
 
+<PlaygroundLink
+  expression={`'localsnapshot' in args ? BLOCKLIST : ALLOWLIST`}
+  context={`
+    args:
+      - "localsnapshot"
+    envs:
+      HOME: "/Users/admin"
+    euid: 0
+    cwd: "/Users/admin"
+  `}
+/>
+
 This will break taking local snapshots via the command line. Alternatively if
 you need to still be able to take time machine snapshots but don't want users
 to mount them locally you can stop the mount of local snapshots with a signing
@@ -120,3 +221,21 @@ ID rule `platform:com.apple.mount_apfs` with the following CEL program
 ('-s' in args &&
   args.exists(arg, arg.contains("com.apple.TimeMachine."))) ? BLOCKLIST : ALLOWLIST
 ```
+
+<PlaygroundLink
+  expression={`
+    ('-s' in args &&
+      args.exists(arg, arg.contains("com.apple.TimeMachine."))) ? BLOCKLIST : ALLOWLIST
+  `}
+  context={`
+    args:
+      - "-s"
+      - "com.apple.TimeMachine.2025-06-01-120000.local"
+      - "/"
+      - "/tmp/snapshot"
+    envs:
+      HOME: "/Users/admin"
+    euid: 0
+    cwd: "/Users/admin"
+  `}
+/>

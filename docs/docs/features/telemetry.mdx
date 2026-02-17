@@ -386,8 +386,14 @@ Applies when using the `protobuf` or `json` log types.
 ### Additional Options
 
 - `EnableMachineIDDecoration`: Adds machine ID to filelog entries
-- `EntitlementsPrefixFilter`: Entitlement prefixes to exclude from logging
-- `EntitlementsTeamIDFilter`: Team IDs whose entitlements should not be logged
+- `EntitlementsPrefixFilter`: Entitlement prefixes to exclude from execution telemetry.
+  Matching entitlements will be omitted from the logged event, but the execution event
+  itself is still logged. Entitlements are only logged when `EventLogType` is set to
+  `protobuf` or `json`.
+- `EntitlementsTeamIDFilter`: Team IDs whose process entitlements should be excluded from
+  execution telemetry. Matching entitlements will be omitted from the logged event, but the
+  execution event itself is still logged. Entitlements are only logged when `EventLogType`
+  is set to `protobuf` or `json`.
 
 ## Example Configuration
 
@@ -429,4 +435,4 @@ This configuration:
 - Monitors shell script changes in user directories
 - Excludes temporary directory changes
 - Adds machine ID to log entries
-- Filters out private Apple entitlements and platform binary entitlements
+- Omits private Apple entitlements and platform binary entitlements from execution events
