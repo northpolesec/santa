@@ -33,7 +33,6 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-
 #include "absl/container/flat_hash_map.h"
 #include "cel/v1.pb.h"
 
