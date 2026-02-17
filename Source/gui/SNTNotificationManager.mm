@@ -42,6 +42,7 @@
 #import "Source/gui/SNTMessageWindowController.h"
 #import "Source/gui/SNTNetworkMountMessageWindowController.h"
 #import "Source/gui/SNTStatusItemManager.h"
+#import "src/santanetd/SNDDNSProxyConfigurationHelper.h"
 #import "src/santanetd/SNDFilterConfigurationHelper.h"
 
 @interface SNTNotificationManager ()
@@ -492,6 +493,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 - (void)setNetworkExtensionFilterEnabled:(BOOL)enabled reply:(void (^)(BOOL success))reply {
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
     BOOL success = [SNDFilterConfigurationHelper setFilterEnabled:enabled];
+    [SNDDNSProxyConfigurationHelper setDNSProxyEnabled:enabled];
     reply(success);
   });
 }

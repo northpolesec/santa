@@ -11,6 +11,12 @@ objc_library(
 )
 
 objc_library(
+    name = "SNDDNSProxyConfigurationHelper",
+    srcs = ["SNDDNSProxyConfigurationHelper.mm"],
+    hdrs = ["SNDDNSProxyConfigurationHelper.h"],
+)
+
+objc_library(
     name = "SNDFlowInfo",
     srcs = ["SNDFlowInfo.mm"],
     hdrs = ["SNDFlowInfo.h"],

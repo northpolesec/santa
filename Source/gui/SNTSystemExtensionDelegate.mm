@@ -20,6 +20,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
+#import "src/santanetd/SNDDNSProxyConfigurationHelper.h"
 #import "src/santanetd/SNDFilterConfigurationHelper.h"
 
 @interface SNTSystemExtensionDelegate ()
@@ -75,6 +76,7 @@
   dispatch_async(self.q, ^{
     if (self.isNetworkExtension && !self.isActivation) {
       [SNDFilterConfigurationHelper disableFilterConfiguration];
+      [SNDDNSProxyConfigurationHelper disableDNSProxyConfiguration];
     }
     [[OSSystemExtensionManager sharedManager] submitRequest:self.request];
   });
@@ -130,6 +132,10 @@
 
     LOGI(@"Configuring network extension with enabled state: %@", enabled ? @"YES" : @"NO");
     success = [SNDFilterConfigurationHelper enableFilterConfigurationWithEnabled:enabled];
+
+    if (![SNDDNSProxyConfigurationHelper enableDNSProxyConfigurationWithEnabled:enabled]) {
+      LOGW(@"Failed to configure DNS proxy, continuing with filter only");
+    }
   }
 
   exit(success ? EXIT_SUCCESS : EXIT_FAILURE);

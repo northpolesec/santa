@@ -138,6 +138,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCUnprivilegedControlInterface",
+        "@santanetd//src/santanetd:SNDDNSProxyConfigurationHelper",
         "@santanetd//src/santanetd:SNDFilterConfigurationHelper",
     ],
 )
