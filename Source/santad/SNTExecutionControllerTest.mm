@@ -109,8 +109,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
       santa::EntitlementsFilter::Create(@[], @[]);
   SNTPolicyProcessor *policyProcessor =
       [[SNTPolicyProcessor alloc] initWithRuleTable:self.mockRuleDatabase
-                                 entitlementsFilter:entitlementsFilter
-                                        processTree:nullptr];
+                                 entitlementsFilter:entitlementsFilter];
 
   self.sut = [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                                     eventTable:self.mockEventDatabase

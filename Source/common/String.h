@@ -59,6 +59,10 @@ static inline std::string_view StringTokenToStringView(es_string_token_t es_str)
   return std::string_view(es_str.data, es_str.length);
 }
 
+static inline std::string StringTokenToString(es_string_token_t es_str) {
+  return std::string(es_str.data, es_str.length);
+}
+
 static inline NSString *StringTokenToNSString(es_string_token_t es_str) {
   return StringToNSString(es_str.data);
 }

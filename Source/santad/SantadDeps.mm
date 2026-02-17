@@ -137,8 +137,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
 
   SNTPolicyProcessor *policy_processor =
       [[SNTPolicyProcessor alloc] initWithRuleTable:rule_table
-                                 entitlementsFilter:entitlements_filter
-                                        processTree:process_tree];
+                                 entitlementsFilter:entitlements_filter];
 
   std::shared_ptr<::PrefixTree<Unit>> prefix_tree = std::make_shared<::PrefixTree<Unit>>();
 

@@ -46,7 +46,7 @@ static constexpr unsigned int kCsopCDHash = 5;
 static constexpr unsigned int kCsopIdentity = 11;
 static constexpr unsigned int kCsopTeamID = 14;
 
-static constexpr size_t kCDHashSize = 20;
+static constexpr size_t kCDHashSize = CS_CDHASH_LEN;
 
 struct csops_blob {
   uint32_t type;
@@ -59,7 +59,7 @@ std::optional<CodeSigningInfo> LoadCodeSigningInfoForPID(pid_t pid) {
   if (csops(pid, kCsopStatus, &flags, sizeof(flags)) != 0) {
     return std::nullopt;
   }
-  if (!(flags & CS_VALID)) {
+  if (!(flags & CS_VALID) || !(flags & CS_SIGNED)) {
     return std::nullopt;
   }
 
@@ -70,6 +70,11 @@ std::optional<CodeSigningInfo> LoadCodeSigningInfoForPID(pid_t pid) {
   uint8_t cdhash[kCDHashSize] = {};
   if (csops(pid, kCsopCDHash, cdhash, sizeof(cdhash)) == 0) {
     info.cdhash = santa::BufToHexString(cdhash, sizeof(cdhash));
+  }
+
+  // Don't fetch SigningID or TeamID for adhoc signed binaries
+  if (flags & CS_ADHOC) {
+    return info;
   }
 
   // Get signing identity (blob-wrapped, null-terminated string)
