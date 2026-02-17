@@ -60,9 +60,6 @@ static inline std::string_view StringTokenToStringView(es_string_token_t es_str)
 }
 
 static inline std::string StringTokenToString(es_string_token_t es_str) {
-  if (es_str.data == nullptr || es_str.length == 0) {
-    return {};
-  }
   return std::string(es_str.data, es_str.length);
 }
 
