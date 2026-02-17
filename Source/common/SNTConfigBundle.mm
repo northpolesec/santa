@@ -42,6 +42,7 @@
 @property NSString *eventDetailText;
 @property NSNumber *enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
+@property NSArray<NSString *> *pushTokenChain;
 @end
 
 @implementation SNTConfigBundle
@@ -73,6 +74,7 @@
   ENCODE(coder, eventDetailText);
   ENCODE(coder, enableNotificationSilences);
   ENCODE(coder, networkExtensionSettings);
+  ENCODE(coder, pushTokenChain);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -100,6 +102,7 @@
     DECODE(decoder, eventDetailText, NSString);
     DECODE(decoder, enableNotificationSilences, NSNumber);
     DECODE(decoder, networkExtensionSettings, SNTSyncNetworkExtensionSettings);
+    DECODE_ARRAY(decoder, pushTokenChain, NSString);
   }
   return self;
 }
@@ -232,6 +235,12 @@
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block {
   if (self.networkExtensionSettings) {
     block(self.networkExtensionSettings);
+  }
+}
+
+- (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block {
+  if (self.pushTokenChain) {
+    block(self.pushTokenChain);
   }
 }
 

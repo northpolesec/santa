@@ -82,6 +82,11 @@ uint64_t MakeDeadline(uint64_t want) {
     kStateTempMonitorModeSessionUUIDKey : testSessionUUID,
   };
 
+  __block BOOL syncV2Enabled = YES;
+  OCMStub([self.mockConfigurator isSyncV2Enabled]).andDo(^(NSInvocation *inv) {
+    [inv setReturnValue:&syncV2Enabled];
+  });
+
   NSMutableDictionary *testState = [goodTestState copy];
   XCTAssertGreaterThan(
       tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
@@ -121,7 +126,8 @@ uint64_t MakeDeadline(uint64_t want) {
   testState = [goodTestState mutableCopy];
   XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, @"xyz", pinnedURL), 0);
 
-  // Unpinned sync URL
+  // Sync V2 not enabled
+  syncV2Enabled = NO;
   testState = [goodTestState mutableCopy];
   testState[kStateTempMonitorModeSavedSyncURLKey] = unpinnedURL.host;
   OCMExpect([self.mockConfigurator

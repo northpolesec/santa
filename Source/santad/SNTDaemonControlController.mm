@@ -456,6 +456,10 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerSyncNetworkExtensionSettings:val];
   }];
 
+  [result pushTokenChain:^(NSArray<NSString *> *val) {
+    [configurator setSyncServerPushTokenChain:val];
+  }];
+
   [result eventDetailURL:^(NSString *val) {
     [configurator setSyncServerEventDetailURL:val];
   }];

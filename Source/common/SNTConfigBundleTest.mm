@@ -45,6 +45,7 @@
 @property NSString *eventDetailText;
 @property NSNumber *enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
+@property NSArray<NSString *> *pushTokenChain;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -54,7 +55,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 22;
+  exp.expectedFulfillmentCount = 23;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -82,6 +83,7 @@
   bundle.eventDetailText = @"View Details";
   bundle.enableNotificationSilences = @(YES);
   bundle.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
+  bundle.pushTokenChain = @[ @"issuerJWT", @"userJWT" ];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -198,6 +200,11 @@
     [exp fulfill];
   }];
 
+  [bundle pushTokenChain:^(NSArray<NSString *> *val) {
+    XCTAssertEqualObjects(val, (@[ @"issuerJWT", @"userJWT" ]));
+    [exp fulfill];
+  }];
+
   // Low timeout because code above is synchronous
   [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
@@ -290,6 +297,10 @@
   }];
 
   [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings *val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle pushTokenChain:^(NSArray<NSString *> *val) {
     XCTFail(@"This shouldn't be called");
   }];
 }

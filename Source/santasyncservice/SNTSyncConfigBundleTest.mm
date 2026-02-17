@@ -45,12 +45,44 @@
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
+@property NSArray<NSString *> *pushTokenChain;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
 @end
 
 @implementation SNTSyncConfigBundleTest
+
+- (void)testPreflightConfigBundle {
+  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  syncState.pushIssuerJWT = @"issuerToken";
+  syncState.pushJWT = @"userToken";
+
+  SNTConfigBundle *bundle = PreflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.pushTokenChain, (@[ @"issuerToken", @"userToken" ]));
+
+  XCTAssertNil(bundle.clientMode);
+  XCTAssertNil(bundle.syncType);
+  XCTAssertNil(bundle.allowlistRegex);
+  XCTAssertNil(bundle.blocklistRegex);
+  XCTAssertNil(bundle.blockUSBMount);
+  XCTAssertNil(bundle.remountUSBMode);
+  XCTAssertNil(bundle.blockNetworkMount);
+  XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
+  XCTAssertNil(bundle.allowedNetworkMountHosts);
+  XCTAssertNil(bundle.enableBundles);
+  XCTAssertNil(bundle.enableTransitiveRules);
+  XCTAssertNil(bundle.enableAllEventUpload);
+  XCTAssertNil(bundle.disableUnknownEventUpload);
+  XCTAssertNil(bundle.overrideFileAccessAction);
+  XCTAssertNil(bundle.exportConfiguration);
+  XCTAssertNil(bundle.fullSyncLastSuccess);
+  XCTAssertNil(bundle.ruleSyncLastSuccess);
+  XCTAssertNil(bundle.modeTransition);
+  XCTAssertNil(bundle.eventDetailURL);
+  XCTAssertNil(bundle.eventDetailText);
+  XCTAssertNil(bundle.networkExtensionSettings);
+}
 
 - (void)testPostflightConfigBundle {
   SNTConfigBundle *bundle;
@@ -130,6 +162,7 @@
   XCTAssertNil(bundle.eventDetailURL);
   XCTAssertNil(bundle.eventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
+  XCTAssertNil(bundle.pushTokenChain);
 }
 
 - (void)testSyncTypeConfigBundle {
@@ -164,6 +197,7 @@
   XCTAssertNil(bundle.eventDetailURL);
   XCTAssertNil(bundle.eventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
+  XCTAssertNil(bundle.pushTokenChain);
 }
 
 @end

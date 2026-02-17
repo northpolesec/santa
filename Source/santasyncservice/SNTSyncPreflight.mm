@@ -30,6 +30,7 @@
 #import "Source/common/String.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #include "Source/santasyncservice/ProtoTraits.h"
+#import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 #include "google/protobuf/arena.h"
@@ -298,10 +299,38 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     self.syncState.syncType = SNTSyncTypeNormal;
   }
 
+  // When running as sync v1, check if we have a push token chain. If so, save
+  // the chain in the configurator, and check if we now should enable sync v2.
+  // If so, do the preflight again as v2.
+  if (!resp.push_issuer_token().empty() && !resp.push_token().empty()) {
+    self.syncState.pushIssuerJWT = StringToNSString(resp.push_issuer_token());
+    self.syncState.pushJWT = StringToNSString(resp.push_token());
+    SLOGD(@"Preflight V%d: Received push token chain", IsV2 ? 2 : 1);
+  }
+
   if constexpr (IsV2) {
     HandleV2Responses(resp, self.syncState);
   }
 
+  // Update the daemon with the push token chain.
+  [rop updateSyncSettings:PreflightConfigBundle(self.syncState)
+                    reply:^{
+                      SLOGD(@"Preflight V%d: Updated sync settings", IsV2 ? 2 : 1);
+                    }];
+
+  // Check if we need to upgrade to sync v2.
+  if constexpr (!IsV2) {
+    if (self.syncState.pushIssuerJWT.length && self.syncState.pushJWT.length) {
+      __block BOOL isSyncV2 = NO;
+      [rop isSyncV2Enabled:^(BOOL reply) {
+        isSyncV2 = reply;
+      }];
+      if (isSyncV2) {
+        SLOGI(@"Preflight V1: Received a valid push token chain, updating to sync v2");
+        return Preflight<true>(self, arena, requestSyncType);
+      }
+    }
+  }
   return YES;
 }
 

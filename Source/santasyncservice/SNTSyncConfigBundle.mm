@@ -42,7 +42,18 @@
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
+@property NSArray<NSString *> *pushTokenChain;
 @end
+
+SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState) {
+  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+
+  if (syncState.pushIssuerJWT.length && syncState.pushJWT.length) {
+    bundle.pushTokenChain = @[ syncState.pushIssuerJWT, syncState.pushJWT ];
+  }
+
+  return bundle;
+}
 
 SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
