@@ -343,6 +343,9 @@ message Execution {
 
   // Entitlement information about the target executbale
   optional EntitlementInfo entitlement_info = 16;
+
+  // Indicates whether the decision was made by a static rule or not
+  optional bool static_rule = 17;
 }
 
 // Information about a fork event

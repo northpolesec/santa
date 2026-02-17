@@ -307,6 +307,10 @@ typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
   // TODO: Add support the for Standalone Approval field so that a sync service
   // can be notified that a user self approved a binary.
 
+  if (event.staticRule) {
+    e->set_static_rule(true);
+  }
+
   return e;
 }
 
