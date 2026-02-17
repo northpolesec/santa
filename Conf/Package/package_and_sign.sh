@@ -82,12 +82,12 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
   )
 
   if [[ "${BN}" == "sleigh" ]]; then
-    defaults write "${PWD}/parent-launch-constraints.plist" team-identifier "${SIGNING_TEAMID}"
-    CODESIGN_OPTS+=(--launch-constraint-parent "${PWD}/parent-launch-constraints.plist")
+    defaults write "${SCRATCH}/parent-launch-constraints.plist" team-identifier "${SIGNING_TEAMID}"
+    CODESIGN_OPTS+=(--launch-constraint-parent "${SCRATCH}/parent-launch-constraints.plist")
   fi
 
   echo "codesigning ${BN}"
-  /usr/bin/codesign ${CODESIGN_OPTS[@]} "${ARTIFACT}"
+  /usr/bin/codesign "${CODESIGN_OPTS[@]}" "${ARTIFACT}"
 done
 
 # Notarize all the bundles
