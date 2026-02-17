@@ -933,6 +933,15 @@ objc_library(
 )
 
 objc_library(
+    name = "CSOpsHelper",
+    srcs = ["CSOpsHelper.mm"],
+    hdrs = ["CSOpsHelper.h"],
+    deps = [
+        "//Source/common:String",
+    ],
+)
+
+objc_library(
     name = "KillingMachine",
     srcs = ["KillingMachine.mm"],
     hdrs = ["KillingMachine.h"],
@@ -940,6 +949,7 @@ objc_library(
         "bsm",
     ],
     deps = [
+        ":CSOpsHelper",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",
         "//Source/common:SNTLogging",
@@ -956,6 +966,7 @@ santa_unit_test(
         "KillingMachineTest.mm",
     ],
     deps = [
+        ":CSOpsHelper",
         ":KillingMachine",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",

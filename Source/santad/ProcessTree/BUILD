@@ -33,8 +33,8 @@ objc_library(
     ],
     deps = [
         ":process",
-        "//Source/common:String",
         "//Source/common:SystemResources",
+        "//Source/santad:CSOpsHelper",
         "//Source/santad/ProcessTree:process_tree_cc_proto",
         "//Source/santad/ProcessTree/annotations:annotator",
         "@abseil-cpp//absl/container:flat_hash_map",

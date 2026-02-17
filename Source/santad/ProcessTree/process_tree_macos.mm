@@ -14,7 +14,6 @@
 #include "Source/santad/ProcessTree/process_tree.h"
 
 #import <Foundation/Foundation.h>
-#include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
 #include <libproc.h>
 #include <mach/message.h>
@@ -25,70 +24,47 @@
 #include <optional>
 #include <vector>
 
-#include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
+#include "Source/santad/CSOpsHelper.h"
 #include "Source/santad/ProcessTree/process.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
-__BEGIN_DECLS
-int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
-__END_DECLS
-
 namespace santa::santad::process_tree {
 
 namespace {
 
-// csops operations (from XNU bsd/sys/codesign.h)
-static constexpr unsigned int kCsopStatus = 0;
-static constexpr unsigned int kCsopCDHash = 5;
-static constexpr unsigned int kCsopIdentity = 11;
-static constexpr unsigned int kCsopTeamID = 14;
-
-static constexpr size_t kCDHashSize = CS_CDHASH_LEN;
-
-struct csops_blob {
-  uint32_t type;
-  uint32_t len;
-  char data[];
-};
-
 std::optional<CodeSigningInfo> LoadCodeSigningInfoForPID(pid_t pid) {
-  uint32_t flags = 0;
-  if (csops(pid, kCsopStatus, &flags, sizeof(flags)) != 0) {
+  auto flags = santa::CSOpsStatusFlags(pid);
+  if (!flags) {
     return std::nullopt;
   }
-  if (!(flags & CS_VALID) || !(flags & CS_SIGNED)) {
+  if (!(*flags & CS_VALID) || !(*flags & CS_SIGNED)) {
     return std::nullopt;
   }
 
   CodeSigningInfo info;
-  info.is_platform_binary = (flags & CS_PLATFORM_BINARY) != 0;
+  info.is_platform_binary = (*flags & CS_PLATFORM_BINARY) != 0;
 
-  // Get CDHash (raw 20-byte buffer, no blob wrapper)
-  uint8_t cdhash[kCDHashSize] = {};
-  if (csops(pid, kCsopCDHash, cdhash, sizeof(cdhash)) == 0) {
-    info.cdhash = santa::BufToHexString(cdhash, sizeof(cdhash));
+  auto cdhash = santa::CSOpsGetCDHash(pid);
+  if (cdhash) {
+    info.cdhash = *cdhash;
   }
 
   // Don't fetch SigningID or TeamID for adhoc signed binaries
-  if (flags & CS_ADHOC) {
+  if (*flags & CS_ADHOC) {
     return info;
   }
 
-  // Get signing identity (blob-wrapped, null-terminated string)
-  std::vector<uint8_t> id_buf(1024);
-  if (csops(pid, kCsopIdentity, id_buf.data(), id_buf.size()) == 0) {
-    auto *blob = reinterpret_cast<csops_blob *>(id_buf.data());
-    info.signing_id = std::string(blob->data);
+  auto team_id = santa::CSOpsGetTeamID(pid);
+  if (team_id) {
+    info.team_id = *team_id;
   }
 
-  // Get team ID (blob-wrapped, null-terminated string)
-  std::vector<uint8_t> team_buf(256);
-  if (csops(pid, kCsopTeamID, team_buf.data(), team_buf.size()) == 0) {
-    auto *blob = reinterpret_cast<csops_blob *>(team_buf.data());
-    info.team_id = std::string(blob->data);
+  auto signing_id = santa::CSOpsGetSigningID(pid);
+  if (signing_id) {
+    info.signing_id = *signing_id;
   }
 
   return info;
