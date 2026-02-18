@@ -120,9 +120,10 @@ ActivationCallbackBlock CreateCELActivationBlock(
           },
           ^uid_t() {
             return audit_token_to_euid(esMsg->event.exec.target->audit_token);
-          },
           ^std::string() {
-            return santa::StringTokenToString(esMsg->event.exec.cwd->path);
+            es_file_t *f = esMsg->event.exec.cwd;
+            if (!f) return std::string();
+            return std::string(f->path.data, f->path.length);
           },
           ^std::vector<AncestorT>() {
             return Ancestors<IsV2>(processTree, esMsg);
