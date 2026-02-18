@@ -125,7 +125,7 @@ uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialStateLocked(
   }
 
   if (![tmm[kStateTempMonitorModeSavedSyncURLKey] isEqualToString:syncURL.host] ||
-      ![SNTConfigurator configurator].isSyncV2Enabled) {
+      !configurator_.isSyncV2Enabled) {
     // SyncBaseURL changed or is not pinned, do not attempt to re-enter Monitor Mode automatically.
     // Revoke the mode transition authorization as well so the machine is no longer eligible.
     RevokeLocked(SNTTemporaryMonitorModeLeaveReasonSyncServerChanged);
@@ -182,7 +182,7 @@ bool TemporaryMonitorMode::Available(NSError **err) {
     return false;
   }
 
-  if (![SNTConfigurator configurator].isSyncV2Enabled) {
+  if (!configurator_.isSyncV2Enabled) {
     [SNTError populateError:err
                    withCode:SNTErrorCodeTMMInvalidSyncServer
                      format:@"This machine is not configured with a sync "

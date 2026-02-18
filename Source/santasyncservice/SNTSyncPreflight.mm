@@ -327,7 +327,10 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
       }];
       if (isSyncV2) {
         SLOGI(@"Preflight V1: Received a valid push token chain, updating to sync v2");
-        return Preflight<true>(self, arena, requestSyncType);
+        // Force a clean sync to ensure any previously skipped v2 rules are
+        // processed.
+        self.syncState.isSyncV2 = YES;
+        return Preflight<true>(self, arena, SNTSyncTypeClean);
       }
     }
   }
