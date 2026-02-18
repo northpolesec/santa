@@ -1,5 +1,5 @@
 package(
-    default_visibility = ["//:santa_package_group"],
+    default_visibility = ["//visibility:public"],
 )
 
 licenses(["notice"])

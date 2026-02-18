@@ -24,7 +24,7 @@ macos_command_line_application(
     minimum_os_version = "14.0",
     provisioning_profile = select({
         ":adhoc_build": None,
-        "//conditions:default": "Santa_Dev.provisionprofile",
+        "//conditions:default": "@profiles//:santa_dev",
     }),
     visibility = ["//visibility:public"],
     deps = [":sleigh_lib"],
