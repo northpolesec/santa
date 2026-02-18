@@ -1,4 +1,4 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,17 +12,20 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include <sys/cdefs.h>
+#include "src/santanetd/SNDNetworkFlowsSerializer.h"
 
-#import "Source/common/SNTCommonEnums.h"
-#import "Source/common/SNTConfigBundle.h"
-#import "Source/santasyncservice/SNTSyncState.h"
+@class SNDFlowInfo;
+@class SNDProcessInfo;
+@class SNTCachedDecision;
 
-__BEGIN_DECLS
+namespace santanetd {
 
-SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState);
-SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState);
-SNTConfigBundle *RuleSyncConfigBundle();
-SNTConfigBundle *SyncTypeConfigBundle(SNTSyncType syncType);
+void PopulateNetworkActivityFlow(google::protobuf::Arena *,
+                                 ::santa::pb::v1::NetworkActivity_Process *, SNDProcessInfo *,
+                                 SNDFlowInfo *, SNTCachedDecision *) {}
 
-__END_DECLS
+std::string FormatNetworkFlowBasicString(SNDProcessInfo *, SNDFlowInfo *, SNTCachedDecision *) {
+  return {};
+}
+
+}  // namespace santanetd

@@ -402,6 +402,18 @@
 - (void)setSyncServerSyncNetworkExtensionSettings:
     (nonnull SNTSyncNetworkExtensionSettings *)syncNetworkExtensionSettings;
 
+///
+///  The push token chain as received from a sync server. This is used to
+///  validate sync v2 feature access. This will always be an array of two
+///  strings. The first is the account JWT and the second is the user JWT.
+///
+@property(nullable, readonly) NSArray<NSString *> *pushTokenChain;
+
+///
+///  Set the push token chain as received from a sync server.
+///
+- (void)setSyncServerPushTokenChain:(nonnull NSArray<NSString *> *)pushTokenChain;
+
 #pragma mark - GUI Settings
 
 ///
@@ -657,7 +669,9 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 #pragma mark - Sync Settings
 
 ///
-/// Returns whether or not Santa is able to use private Sync V2 features
+/// Returns whether or not Santa is able to use private Sync V2 features. This
+/// can only be called from the daemon. All other Santa components need to ask
+/// the daemon for this value.
 ///
 - (BOOL)isSyncV2Enabled;
 

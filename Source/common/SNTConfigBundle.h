@@ -47,5 +47,6 @@
 - (void)fileAccessEventDetailText:(void (^)(NSString *))block;
 - (void)enableNotificationSilences:(void (^)(BOOL))block;
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block;
+- (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block;
 
 @end

@@ -42,6 +42,7 @@
 #import "Source/santad/SNTDecisionCache.h"
 #include "absl/status/status.h"
 #include "google/protobuf/timestamp.pb.h"
+#include "src/santanetd/SNDNetworkFlowsSerializer.h"
 
 using google::protobuf::Arena;
 using google::protobuf::Timestamp;
@@ -1358,6 +1359,18 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification &m
 }
 
 #endif  // HAVE_MACOS_15_4
+
+std::vector<uint8_t> Protobuf::SerializeNetworkFlow(SNDProcessInfo *pi, SNDFlowInfo *flow,
+                                                    struct timespec window_start,
+                                                    struct timespec window_end,
+                                                    SNTCachedDecision *cd) {
+  Arena arena;
+  ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, window_start, window_end);
+  auto *na = santa_msg->mutable_network_activity();
+  auto *process = na->add_processes();
+  santanetd::PopulateNetworkActivityFlow(&arena, process, pi, flow, cd);
+  return FinalizeProto(santa_msg);
+}
 
 std::vector<uint8_t> Protobuf::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
