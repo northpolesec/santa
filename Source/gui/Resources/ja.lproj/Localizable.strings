@@ -202,10 +202,10 @@
 /* The default message to show the user when a program requires TouchID/password */
 "The following application requires authorization before it can be used" = "以下のアプリケーションは、使用前に認証が必要です";
 
-/* The default message to show the user when a Mountable Removable Media (e.g. USB device) is blocked from mounting */
+/* The default message to show the user when a Removable Media (e.g. USB device) is blocked from mounting */
 "The following device has been blocked from mounting" = "次のデバイスのマウントがブロックされました";
 
-/* The default message to show the user when a Mountable Removable Media (e.g. USB device) is remounted with reduced permissions */
+/* The default message to show the user when a Removable Media (e.g. USB device) is remounted with reduced permissions */
 "The following device has been remounted with reduced permissions" = "次のデバイスは権限を制限して再マウントされました";
 
 /* The default message to show the user when a network share mount is blocked */

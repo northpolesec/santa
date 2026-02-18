@@ -267,12 +267,12 @@ The following sequences will be replaced in the final URL:
     },
     {
       key: "BannedUSBBlockMessage",
-      description: `Message to display when a Mountable Removable Media (e.g. USB device) is prevented from being mounted`,
+      description: `Message to display when a Removable Media (e.g. USB device) is prevented from being mounted`,
       type: "string",
     },
     {
       key: "RemountUSBBlockMessage",
-      description: `Message to display when a Mountable Removable Media (e.g. USB device) is allowed to be mounted with a subset of the requested flags
+      description: `Message to display when a Removable Media (e.g. USB device) is allowed to be mounted with a subset of the requested flags
         as defined by \`RemountUSBMode\``,
       type: "string",
     },
@@ -750,7 +750,7 @@ changes in the release notes of any future release that changes them.`,
   usb: [
     {
       key: "BlockUSBMount",
-      description: "If true, blocking Mountable Removable Media (e.g. USB Mass storage) feature is enabled.",
+      description: "If true, blocking Removable Media (e.g. USB Mass storage) feature is enabled.",
       type: "bool",
       syncConfigurable: true,
       defaultValue: false,
@@ -775,7 +775,7 @@ changes in the release notes of any future release that changes them.`,
     },
     {
       key: "OnStartUSBOptions",
-      description: `If set, defines the action that should be taken on existing Mountable Removable Media (e.g. USB device) mounts when Santa starts up.
+      description: `If set, defines the action that should be taken on existing Removable Media (e.g. USB device) mounts when Santa starts up.
 
 **Note**: “remounts” are implemented by first unmounting and then mounting the device again). Existing mounts with
 mount flags that are a superset of \`RemountUSBMode\` are unaffected and left as-is.`,

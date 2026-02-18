@@ -160,9 +160,9 @@ SantaGUI        | 2025.3 (build 97, commit 10bdfcc2)
   Mode                                            | Monitor
   Log Type                                        | file
   File Logging                                    | No
-  Mountable Removable Media Blocking              | Yes
-  Mountable Removable Media Remounting Mode       | rdonly, nosuid, noowners
-  On Start Mountable Removable Media Options      | None
+  Removable Media Blocking                        | Yes
+  Removable Media Remounting Mode                 | rdonly, nosuid, noowners
+  On Start Removable Media Options                | None
   Watchdog CPU Events                             | 0  (Peak: 3.31%)
   Watchdog RAM Events                             | 0  (Peak: 15.19MB)
 >>> Cache Info
