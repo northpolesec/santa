@@ -16,10 +16,8 @@
 
 #include <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
-#include <arpa/inet.h>
 #include <bsm/libbsm.h>
 #include <libproc.h>
-#include <sys/cdefs.h>
 #include <sys/signal.h>
 
 #include <cerrno>
@@ -33,33 +31,12 @@
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
+#include "Source/santad/CSOpsHelper.h"
 #include "absl/cleanup/cleanup.h"
-
-__BEGIN_DECLS
-
-int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
-
-__END_DECLS
 
 namespace santa {
 
-// csops operations defined in XNU: bsd/sys/codesign.h
-static constexpr unsigned int kCsopStatus = 0;
-static constexpr unsigned int kCsopCDHash = 5;
-static constexpr unsigned int kCsopIdentity = 11;
-static constexpr unsigned int kCsopTeamID = 14;
-
 namespace {
-
-// Some csops operations return data wrapped in this small structure.
-struct csops_blob {
-  uint32_t type;
-  uint32_t len;
-  char data[];
-};
-
-// csops function signature for making csops injectable in order to test matchers
-using CSOpsFunc = std::function<int(pid_t, unsigned int, void *, size_t)>;
 
 // Base class for process matchers
 class ProcessMatcher {
@@ -68,90 +45,60 @@ class ProcessMatcher {
   virtual bool Matches(pid_t pid) const = 0;
 };
 
-// BufferMatcher compares buffer data populated by csops
-class BufferMatcher : public ProcessMatcher {
+// StringMatcher compares a string value retrieved via a CSOps getter function
+class StringMatcher : public ProcessMatcher {
  public:
-  static std::unique_ptr<ProcessMatcher> CDHash(NSString *cdhash, CSOpsFunc csops_func = csops) {
-    auto desired = HexStringToBuf(cdhash);
-    return std::make_unique<BufferMatcher>(kCsopCDHash, std::move(desired), false,
-                                           std::move(csops_func));
-  }
+  using GetterFunc = std::function<std::optional<std::string>(pid_t, CSOpsFunc)>;
 
-  static std::unique_ptr<ProcessMatcher> TeamID(NSString *teamID, CSOpsFunc csops_func = csops) {
-    std::string_view view = NSStringToUTF8StringView(teamID);
-    std::vector<uint8_t> desired(view.begin(), view.end());
-    return std::make_unique<BufferMatcher>(kCsopTeamID, std::move(desired), true,
-                                           std::move(csops_func));
-  }
-
-  static std::unique_ptr<ProcessMatcher> SigningID(NSString *signingID,
-                                                   CSOpsFunc csops_func = csops) {
-    std::string_view view = NSStringToUTF8StringView(signingID);
-    std::vector<uint8_t> desired(view.begin(), view.end());
-    return std::make_unique<BufferMatcher>(kCsopIdentity, std::move(desired), true,
-                                           std::move(csops_func));
-  }
-
-  BufferMatcher(unsigned int operation, std::vector<uint8_t> desiredValue, bool has_blob_wrapper,
-                CSOpsFunc csops_func)
-      : op_(operation),
-        desired_(std::move(desiredValue)),
-        has_blob_wrapper_(has_blob_wrapper),
+  StringMatcher(NSString *desired, GetterFunc getter, CSOpsFunc csops_func)
+      : desired_(NSStringToUTF8StringView(desired)),
+        getter_(std::move(getter)),
         csops_func_(std::move(csops_func)) {}
 
   bool Matches(pid_t pid) const override {
-    std::vector<uint8_t> buffer(has_blob_wrapper_ ? (desired_.size() + wrapper_length_overhead_)
-                                                  : desired_.size());
-    int err = csops_func_(pid, op_, buffer.data(), buffer.size());
-    if (err != 0) {
-      return false;
-    }
-
-    if (has_blob_wrapper_) {
-      csops_blob *blob = (struct csops_blob *)buffer.data();
-      if (ntohl(blob->len) - wrapper_length_overhead_ == desired_.size()) {
-        return std::memcmp(blob->data, desired_.data(), desired_.size()) == 0;
-      } else {
-        return false;
-      }
-    } else {
-      return std::memcmp(buffer.data(), desired_.data(), desired_.size()) == 0;
-    }
+    auto actual = getter_(pid, csops_func_);
+    return actual && *actual == desired_;
   }
 
  private:
-  unsigned int op_;
-  std::vector<uint8_t> desired_;
-  bool has_blob_wrapper_;
+  std::string desired_;
+  GetterFunc getter_;
   CSOpsFunc csops_func_;
-  static constexpr uint32_t wrapper_length_overhead_ = sizeof(struct csops_blob) + 1;
 };
 
 // FlagsMatcher compares status flags against a defined mask
 class FlagsMatcher : public ProcessMatcher {
  public:
-  static std::unique_ptr<ProcessMatcher> StatusFlags(uint32_t mask, CSOpsFunc csops_func = csops) {
-    return std::make_unique<FlagsMatcher>(kCsopStatus, mask, std::move(csops_func));
-  }
-
-  FlagsMatcher(unsigned int operation, uint32_t mask, CSOpsFunc csops_func)
-      : op_(operation), mask_(mask), csops_func_(std::move(csops_func)) {}
+  FlagsMatcher(uint32_t mask, CSOpsFunc csops_func)
+      : mask_(mask), csops_func_(std::move(csops_func)) {}
 
   bool Matches(pid_t pid) const override {
-    uint32_t status_flags = 0;
-    int err = csops_func_(pid, op_, &status_flags, sizeof(status_flags));
-    if (err == 0) {
-      return (status_flags & mask_) != 0;
-    } else {
-      return false;
-    }
+    auto flags = CSOpsStatusFlags(pid, csops_func_);
+    return flags && (*flags & mask_) != 0;
   }
 
  private:
-  unsigned int op_;
   uint32_t mask_;
   CSOpsFunc csops_func_;
 };
+
+std::unique_ptr<ProcessMatcher> MakeCDHashMatcher(NSString *cdhash, CSOpsFunc csops_func = csops) {
+  return std::make_unique<StringMatcher>(cdhash, CSOpsGetCDHash, std::move(csops_func));
+}
+
+std::unique_ptr<ProcessMatcher> MakeTeamIDMatcher(NSString *teamID, CSOpsFunc csops_func = csops) {
+  return std::make_unique<StringMatcher>(teamID, CSOpsGetTeamID, std::move(csops_func));
+}
+
+std::unique_ptr<ProcessMatcher> MakeSigningIDMatcher(NSString *signingID,
+                                                     CSOpsFunc csops_func = csops) {
+  return std::make_unique<StringMatcher>(signingID, CSOpsGetSigningID, std::move(csops_func));
+}
+
+std::unique_ptr<ProcessMatcher> MakeStatusFlagsMatcher(uint32_t mask,
+                                                       CSOpsFunc csops_func = csops) {
+  return std::make_unique<FlagsMatcher>(mask, std::move(csops_func));
+}
 
 bool AuditTokenForPid(pid_t pid, audit_token_t *token) {
   task_name_t task;
@@ -274,22 +221,22 @@ SNTKilledProcess *KillByMatchers(SNTKillRequest *request, pid_t pid,
 // These test-only functions expose hooks for testing matcher functionality
 // without having to expose the internal types.
 bool TestCDHashMatcher(pid_t pid, NSString *cdhash, CSOpsFunc csops_func) {
-  auto matcher = BufferMatcher::CDHash(cdhash, csops_func);
+  auto matcher = MakeCDHashMatcher(cdhash, csops_func);
   return matcher->Matches(pid);
 }
 
 bool TestTeamIDMatcher(pid_t pid, NSString *teamID, CSOpsFunc csops_func) {
-  auto matcher = BufferMatcher::TeamID(teamID, csops_func);
+  auto matcher = MakeTeamIDMatcher(teamID, csops_func);
   return matcher->Matches(pid);
 }
 
 bool TestSigningIDMatcher(pid_t pid, NSString *signingID, CSOpsFunc csops_func) {
-  auto matcher = BufferMatcher::SigningID(signingID, csops_func);
+  auto matcher = MakeSigningIDMatcher(signingID, csops_func);
   return matcher->Matches(pid);
 }
 
 bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_func) {
-  auto matcher = FlagsMatcher::StatusFlags(mask, csops_func);
+  auto matcher = MakeStatusFlagsMatcher(mask, csops_func);
   return matcher->Matches(pid);
 }
 #endif
@@ -313,15 +260,15 @@ SNTKillResponse *KillingMachine(SNTKillRequest *request) {
 
     // Populate the appropriate matchers for the request
     if ([request isKindOfClass:[SNTKillRequestCDHash class]]) {
-      matchers.push_back(BufferMatcher::CDHash(((SNTKillRequestCDHash *)request).cdhash));
+      matchers.push_back(MakeCDHashMatcher(((SNTKillRequestCDHash *)request).cdhash));
     } else if ([request isKindOfClass:[SNTKillRequestSigningID class]]) {
       SNTKillRequestSigningID *signingIDRequest = (SNTKillRequestSigningID *)request;
       if ([signingIDRequest.teamID isEqualToString:kPlatformTeamID]) {
-        matchers.push_back(FlagsMatcher::StatusFlags(CS_PLATFORM_BINARY));
+        matchers.push_back(MakeStatusFlagsMatcher(CS_PLATFORM_BINARY));
       } else {
-        matchers.push_back(BufferMatcher::TeamID(signingIDRequest.teamID));
+        matchers.push_back(MakeTeamIDMatcher(signingIDRequest.teamID));
       }
-      matchers.push_back(BufferMatcher::SigningID(signingIDRequest.signingID));
+      matchers.push_back(MakeSigningIDMatcher(signingIDRequest.signingID));
     } else if ([request isKindOfClass:[SNTKillRequestTeamID class]]) {
       // Don't allow `platform` here as killing all platform binaries is a bad
       // idea and isn't supported.
@@ -329,7 +276,7 @@ SNTKillResponse *KillingMachine(SNTKillRequest *request) {
       if ([teamIDRequest.teamID isEqualToString:kPlatformTeamID]) {
         return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest];
       }
-      matchers.push_back(BufferMatcher::TeamID(((SNTKillRequestTeamID *)request).teamID));
+      matchers.push_back(MakeTeamIDMatcher(((SNTKillRequestTeamID *)request).teamID));
     } else {
       LOGE(@"Unexpected request type: %@", [request class]);
       return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest];

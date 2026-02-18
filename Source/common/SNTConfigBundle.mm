@@ -40,6 +40,8 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSString *fileAccessEventDetailURL;
+@property NSString *fileAccessEventDetailText;
 @property NSNumber *enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
@@ -72,6 +74,8 @@
   ENCODE(coder, modeTransition);
   ENCODE(coder, eventDetailURL);
   ENCODE(coder, eventDetailText);
+  ENCODE(coder, fileAccessEventDetailURL);
+  ENCODE(coder, fileAccessEventDetailText);
   ENCODE(coder, enableNotificationSilences);
   ENCODE(coder, networkExtensionSettings);
   ENCODE(coder, pushTokenChain);
@@ -100,6 +104,8 @@
     DECODE(decoder, modeTransition, SNTModeTransition);
     DECODE(decoder, eventDetailURL, NSString);
     DECODE(decoder, eventDetailText, NSString);
+    DECODE(decoder, fileAccessEventDetailURL, NSString);
+    DECODE(decoder, fileAccessEventDetailText, NSString);
     DECODE(decoder, enableNotificationSilences, NSNumber);
     DECODE(decoder, networkExtensionSettings, SNTSyncNetworkExtensionSettings);
     DECODE_ARRAY(decoder, pushTokenChain, NSString);
@@ -223,6 +229,18 @@
 - (void)eventDetailText:(void (^)(NSString *))block {
   if (self.eventDetailText) {
     block(self.eventDetailText);
+  }
+}
+
+- (void)fileAccessEventDetailURL:(void (^)(NSString *))block {
+  if (self.fileAccessEventDetailURL) {
+    block(self.fileAccessEventDetailURL);
+  }
+}
+
+- (void)fileAccessEventDetailText:(void (^)(NSString *))block {
+  if (self.fileAccessEventDetailText) {
+    block(self.fileAccessEventDetailText);
   }
 }
 

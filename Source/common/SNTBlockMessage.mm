@@ -195,6 +195,7 @@ static id ValueOrNull(id value) {
 //   %hostname%                  - The machine's FQDN.
 //   %uuid%                      - The machine's UUID.
 //   %serial%                    - The machine's serial number.
+//   %file_sha%                  - Deprecated. Acts like %bundle_or_file_identifier%.
 //
 + (NSDictionary *)eventDetailTemplateMappingForEvent:(SNTStoredExecutionEvent *)event {
   SNTConfigurator *config = [SNTConfigurator configurator];
@@ -282,10 +283,10 @@ static id ValueOrNull(id value) {
 
 + (NSURL *)eventDetailURLForFileAccessEvent:(SNTStoredFileAccessEvent *)event
                                   customURL:(NSString *)url {
-  return [self
-      eventDetailURLForEvent:event
-                   customURL:(url ?: [[SNTConfigurator configurator] eventDetailURL])templateMapping
-                            :[self fileAccessEventDetailTemplateMappingForEvent:event]];
+  return
+      [self eventDetailURLForEvent:event
+                         customURL:url ?: [[SNTConfigurator configurator] fileAccessEventDetailURL]
+                   templateMapping:[self fileAccessEventDetailTemplateMappingForEvent:event]];
 }
 
 @end

@@ -33,7 +33,6 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-
 #include "absl/container/flat_hash_map.h"
 #include "cel/v1.pb.h"
 
@@ -299,6 +298,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // We know we have a match so apply the custom messages
   cd.customMsg = rule.customMsg;
   cd.customURL = rule.customURL;
+  cd.staticRule = rule.staticRule;
 
   return YES;
 }

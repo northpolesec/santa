@@ -43,6 +43,8 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSString *fileAccessEventDetailURL;
+@property NSString *fileAccessEventDetailText;
 @property NSNumber *enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
@@ -55,7 +57,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 23;
+  exp.expectedFulfillmentCount = 25;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -81,6 +83,8 @@
   bundle.modeTransition = [[SNTModeTransition alloc] initOnDemandMinutes:4 defaultDuration:2];
   bundle.eventDetailURL = @"https://example.com/details";
   bundle.eventDetailText = @"View Details";
+  bundle.fileAccessEventDetailURL = @"https://example.com/faa-details";
+  bundle.fileAccessEventDetailText = @"View FAA Details";
   bundle.enableNotificationSilences = @(YES);
   bundle.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
   bundle.pushTokenChain = @[ @"issuerJWT", @"userJWT" ];
@@ -189,6 +193,16 @@
     [exp fulfill];
   }];
 
+  [bundle fileAccessEventDetailURL:^(NSString *val) {
+    XCTAssertEqualObjects(val, @"https://example.com/faa-details");
+    [exp fulfill];
+  }];
+
+  [bundle fileAccessEventDetailText:^(NSString *val) {
+    XCTAssertEqualObjects(val, @"View FAA Details");
+    [exp fulfill];
+  }];
+
   [bundle enableNotificationSilences:^(BOOL val) {
     XCTAssertTrue(val);
     [exp fulfill];
@@ -289,6 +303,14 @@
   }];
 
   [bundle eventDetailText:^(NSString *val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle fileAccessEventDetailURL:^(NSString *val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle fileAccessEventDetailText:^(NSString *val) {
     XCTFail(@"This shouldn't be called");
   }];
 

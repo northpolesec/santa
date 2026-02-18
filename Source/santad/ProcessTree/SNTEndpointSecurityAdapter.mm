@@ -15,8 +15,10 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
+#include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
 
+#include "Source/common/String.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessTree/process_tree.h"
@@ -45,18 +47,32 @@ void InformFromESEvent(ProcessTree &tree, const Message &msg) {
       args.reserve(esapi->ExecArgCount(&msg->event.exec));
       for (int i = 0; i < esapi->ExecArgCount(&msg->event.exec); i++) {
         es_string_token_t arg = esapi->ExecArg(&msg->event.exec, i);
-        args.push_back(std::string(arg.data, arg.length));
+        args.push_back(StringTokenToString(arg));
       }
 
-      es_string_token_t executable = msg->event.exec.target->executable->path;
-      tree.HandleExec(
-          msg->mach_time, **proc, PidFromAuditToken(msg->event.exec.target->audit_token),
-          (struct Program){.executable = std::string(executable.data, executable.length),
-                           .arguments = args},
-          (struct Cred){
-              .uid = audit_token_to_euid(msg->event.exec.target->audit_token),
-              .gid = audit_token_to_egid(msg->event.exec.target->audit_token),
-          });
+      const es_process_t *target = msg->event.exec.target;
+      es_string_token_t executable = target->executable->path;
+
+      // Extract code signing info from the target process
+      CodeSigningInfo cs_info{
+          .cdhash = santa::BufToHexString(target->cdhash, sizeof(target->cdhash)),
+          .is_platform_binary = target->is_platform_binary,
+      };
+
+      // Only add TeamID and SigningID if production-signed.
+      if ((target->codesigning_flags & CS_ADHOC) == 0) {
+        cs_info.team_id = StringTokenToString(target->team_id);
+        cs_info.signing_id = StringTokenToString(target->signing_id);
+      }
+
+      tree.HandleExec(msg->mach_time, **proc, PidFromAuditToken(target->audit_token),
+                      (struct Program){.executable = StringTokenToString(executable),
+                                       .arguments = args,
+                                       .code_signing = cs_info},
+                      (struct Cred){
+                          .uid = audit_token_to_euid(target->audit_token),
+                          .gid = audit_token_to_egid(target->audit_token),
+                      });
 
       break;
     }

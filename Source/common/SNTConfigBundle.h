@@ -43,6 +43,8 @@
 - (void)modeTransition:(void (^)(SNTModeTransition *))block;
 - (void)eventDetailURL:(void (^)(NSString *))block;
 - (void)eventDetailText:(void (^)(NSString *))block;
+- (void)fileAccessEventDetailURL:(void (^)(NSString *))block;
+- (void)fileAccessEventDetailText:(void (^)(NSString *))block;
 - (void)enableNotificationSilences:(void (^)(BOOL))block;
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block;
 - (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block;

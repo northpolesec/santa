@@ -585,6 +585,10 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg, SNTCach
 
   EncodeEntitlements(pb_exec, cd);
 
+  if (cd.staticRule) {
+    pb_exec->set_static_rule(true);
+  }
+
   return FinalizeProto(santa_msg);
 }
 
