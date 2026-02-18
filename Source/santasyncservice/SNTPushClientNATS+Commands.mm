@@ -317,15 +317,15 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   }
 
   // Fire off the event upload asynchronously - don't wait for completion
-  [strongSyncDelegate eventUploadForPath:path
-                                   reply:^(NSError *error) {
-                                     if (error) {
-                                       LOGE(@"NATS: EventUploadRequest failed for path %@: %@",
-                                            path, error);
-                                     } else {
-                                       LOGI(@"NATS: EventUploadRequest completed for path %@", path);
-                                     }
-                                   }];
+  [strongSyncDelegate
+      eventUploadForPath:path
+                   reply:^(NSError *error) {
+                     if (error) {
+                       LOGE(@"NATS: EventUploadRequest failed for path %@: %@", path, error);
+                     } else {
+                       LOGI(@"NATS: EventUploadRequest completed for path %@", path);
+                     }
+                   }];
 
   return pbResponse;
 }

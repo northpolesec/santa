@@ -321,60 +321,62 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     return;
   }
 
-  // Check enableBundles via daemon XPC
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  __block BOOL enableBundles = NO;
-  [[self.daemonConn remoteObjectProxy] enableBundles:^(BOOL response) {
-    enableBundles = response;
-    dispatch_semaphore_signal(sema);
-  }];
-  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
-    LOGE(@"EventUpload: Timeout checking enableBundles, proceeding without bundles");
-  }
+  dispatch_async(self.syncQueue, ^{
+    // Check enableBundles via daemon XPC
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    __block BOOL enableBundles = NO;
+    [[self.daemonConn remoteObjectProxy] enableBundles:^(BOOL response) {
+      enableBundles = response;
+      dispatch_semaphore_signal(sema);
+    }];
+    if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
+      LOGE(@"EventUpload: Timeout checking enableBundles, proceeding without bundles");
+    }
 
-  // Connect to bundle service
-  MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
-  [bs resume];
+    // Connect to bundle service
+    MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
+    [bs resume];
 
-  dispatch_semaphore_t eventSema = dispatch_semaphore_create(0);
-  __block NSArray<SNTStoredExecutionEvent *> *resultEvents;
-  [[bs remoteObjectProxy] generateEventsFromPath:path
-                                   enableBundles:enableBundles
-                                           reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
-                                             resultEvents = events;
-                                             dispatch_semaphore_signal(eventSema);
-                                           }];
+    dispatch_semaphore_t eventSema = dispatch_semaphore_create(0);
+    __block NSArray<SNTStoredExecutionEvent *> *resultEvents;
+    [[bs remoteObjectProxy] generateEventsFromPath:path
+                                     enableBundles:enableBundles
+                                             reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
+                                               resultEvents = events;
+                                               dispatch_semaphore_signal(eventSema);
+                                             }];
 
-  if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) !=
-      0) {
-    [bs invalidate];
-    reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                              code:2
-                          userInfo:@{NSLocalizedDescriptionKey : @"Timeout generating events"}]);
-    return;
-  }
+    if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) !=
+        0) {
+      [bs invalidate];
+      reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
+                                code:2
+                            userInfo:@{NSLocalizedDescriptionKey : @"Timeout generating events"}]);
+      return;
+    }
 
-  if (!resultEvents.count) {
-    [bs invalidate];
-    reply(nil);
-    return;
-  }
+    if (!resultEvents.count) {
+      [bs invalidate];
+      reply(nil);
+      return;
+    }
 
-  // Upload events to sync server
-  [self postEventsToSyncServer:resultEvents
-                         reply:^(BOOL success) {
-                           if (success) {
-                             reply(nil);
-                           } else {
-                             reply([NSError
-                                 errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                            code:4
-                                        userInfo:@{
-                                          NSLocalizedDescriptionKey : @"Failed to upload events"
-                                        }]);
-                           }
-                           [bs invalidate];
-                         }];
+    // Upload events to sync server
+    [self postEventsToSyncServer:resultEvents
+                           reply:^(BOOL success) {
+                             if (success) {
+                               reply(nil);
+                             } else {
+                               reply([NSError
+                                   errorWithDomain:@"com.northpolesec.santa.syncservice"
+                                              code:4
+                                          userInfo:@{
+                                            NSLocalizedDescriptionKey : @"Failed to upload events"
+                                          }]);
+                             }
+                             [bs invalidate];
+                           }];
+  });
 }
 
 #pragma mark syncing chain
