@@ -51,6 +51,7 @@
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TemporaryMonitorMode.h"
+#import "src/santanetd/SNDProcessFlows.h"
 
 using santa::FlushCacheMode;
 using santa::FlushCacheReason;
@@ -69,6 +70,7 @@ double watchdogRAMPeak = 0;
 @property SNTSyncdQueue *syncdQueue;
 @property SNTNetworkExtensionQueue *netExtQueue;
 @property dispatch_queue_t commandQ;
+@property dispatch_queue_t netFlowQ;
 
 ///
 ///  Called when caches should be flushed (rules changed, explicit flush command, etc.).
@@ -114,8 +116,13 @@ double watchdogRAMPeak = 0;
     _cacheCountsBlock = cacheCountBlock;
     _checkCacheBlock = checkCacheBlock;
 
-    _commandQ = dispatch_queue_create("com.northpolesec.santa.cmdq", DISPATCH_QUEUE_SERIAL);
-    dispatch_set_target_queue(_commandQ, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
+    _commandQ = dispatch_queue_create_with_target(
+        "com.northpolesec.santa.cmdq", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+        dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
+
+    _netFlowQ = dispatch_queue_create_with_target("com.northpolesec.santa.daemon.networkflow",
+                                                  DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+                                                  dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
 
     _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
         [SNTConfigurator configurator], _notQueue,
@@ -770,6 +777,16 @@ double watchdogRAMPeak = 0;
 }
 
 #pragma mark Network Extension Ops
+
+- (void)reportNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
+               windowStart:(NSDate *)windowStart
+                 windowEnd:(NSDate *)windowEnd
+                     reply:(void (^)(void))reply {
+  dispatch_async(self.netFlowQ, ^{
+    [self.netExtQueue handleNetworkFlows:processFlows windowStart:windowStart windowEnd:windowEnd];
+  });
+  reply();
+}
 
 - (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply {
   SNTSyncNetworkExtensionSettings *settings =
