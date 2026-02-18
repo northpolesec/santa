@@ -45,6 +45,7 @@ using ActivationCallbackBlock =
 
 ///
 ///  @param ruleTable The rule table to be used for every decision
+///  @param entitlementsFilter The entitlements filter to be used for filtering entitlements
 ///
 - (nullable instancetype)initWithRuleTable:(nonnull SNTRuleTable *)ruleTable
                         entitlementsFilter:

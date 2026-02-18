@@ -258,6 +258,7 @@ objc_library(
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
+        "//Source/santad/ProcessTree:process_tree",
         "@FMDB",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@northpolesec_protos//cel:v1_cc_proto",
@@ -405,6 +406,8 @@ objc_library(
         "//Source/common:SantaVnode",
         "//Source/common:String",
         "//Source/common:Unit",
+        "//Source/santad/ProcessTree:process",
+        "//Source/santad/ProcessTree:process_tree",
         "@abseil-cpp//absl/synchronization",
     ],
 )
@@ -937,6 +940,15 @@ objc_library(
 )
 
 objc_library(
+    name = "CSOpsHelper",
+    srcs = ["CSOpsHelper.mm"],
+    hdrs = ["CSOpsHelper.h"],
+    deps = [
+        "//Source/common:String",
+    ],
+)
+
+objc_library(
     name = "KillingMachine",
     srcs = ["KillingMachine.mm"],
     hdrs = ["KillingMachine.h"],
@@ -944,6 +956,7 @@ objc_library(
         "bsm",
     ],
     deps = [
+        ":CSOpsHelper",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",
         "//Source/common:SNTLogging",
@@ -960,6 +973,7 @@ santa_unit_test(
         "KillingMachineTest.mm",
     ],
     deps = [
+        ":CSOpsHelper",
         ":KillingMachine",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",

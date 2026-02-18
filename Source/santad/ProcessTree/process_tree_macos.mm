@@ -21,9 +21,11 @@
 #include <sys/sysctl.h>
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "Source/common/SystemResources.h"
+#include "Source/santad/CSOpsHelper.h"
 #include "Source/santad/ProcessTree/process.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
@@ -32,6 +34,42 @@
 namespace santa::santad::process_tree {
 
 namespace {
+
+std::optional<CodeSigningInfo> LoadCodeSigningInfoForPID(pid_t pid) {
+  auto flags = santa::CSOpsStatusFlags(pid);
+  if (!flags) {
+    return std::nullopt;
+  }
+  if (!(*flags & CS_VALID) || !(*flags & CS_SIGNED)) {
+    return std::nullopt;
+  }
+
+  CodeSigningInfo info;
+  info.is_platform_binary = (*flags & CS_PLATFORM_BINARY) != 0;
+
+  auto cdhash = santa::CSOpsGetCDHash(pid);
+  if (cdhash) {
+    info.cdhash = *cdhash;
+  }
+
+  // Don't fetch SigningID or TeamID for adhoc signed binaries
+  if (*flags & CS_ADHOC) {
+    return info;
+  }
+
+  auto team_id = santa::CSOpsGetTeamID(pid);
+  if (team_id) {
+    info.team_id = *team_id;
+  }
+
+  auto signing_id = santa::CSOpsGetSigningID(pid);
+  if (signing_id) {
+    info.signing_id = *signing_id;
+  }
+
+  return info;
+}
+
 // Modified from
 // https://chromium.googlesource.com/crashpad/crashpad/+/360e441c53ab4191a6fd2472cc57c3343a2f6944/util/posix/process_util_mac.cc
 // TODO: https://github.com/apple-oss-distributions/adv_cmds/blob/main/ps/ps.c
@@ -134,6 +172,7 @@ absl::StatusOr<Process> LoadPID(pid_t pid) {
                  std::make_shared<struct Program>((struct Program){
                      .executable = path,
                      .arguments = args,
+                     .code_signing = LoadCodeSigningInfoForPID(pid),
                  }),
                  nullptr);
 }

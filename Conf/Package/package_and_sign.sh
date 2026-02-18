@@ -56,6 +56,7 @@ readonly INPUT_SANTACTL="${INPUT_APP}/Contents/MacOS/santactl"
 readonly INPUT_SANTABS="${INPUT_APP}/Contents/MacOS/santabundleservice"
 readonly INPUT_SANTAMS="${INPUT_APP}/Contents/MacOS/santametricservice"
 readonly INPUT_SANTASS="${INPUT_APP}/Contents/MacOS/santasyncservice"
+readonly INPUT_SLEIGH="${INPUT_APP}/Contents/MacOS/sleigh"
 
 readonly RELEASE_VERSION="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${INPUT_APP}/Contents/Info.plist")"
 readonly RELEASE_NAME="santa-${RELEASE_VERSION}"
@@ -67,12 +68,26 @@ readonly DMG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.dmg"
 readonly TAR_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.tar.gz"
 
 # Sign all of binaries/bundles. Maintain inside-out ordering where necessary
-for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INPUT_SANTASS}" "${INPUT_SYSX}" "${INPUT_APP}"; do
+for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INPUT_SANTASS}" "${INPUT_SLEIGH}" "${INPUT_SYSX}" "${INPUT_APP}"; do
   BN=$(/usr/bin/basename "${ARTIFACT}")
+
+  CODESIGN_OPTS=(
+    --sign "${SIGNING_IDENTITY}"
+    --keychain "${SIGNING_KEYCHAIN}"
+    --preserve-metadata=entitlements
+    --timestamp
+    --force
+    --generate-entitlement-der
+    --options library,kill,runtime
+  )
+
+  if [[ "${BN}" == "sleigh" ]]; then
+    defaults write "${SCRATCH}/parent-launch-constraints.plist" team-identifier "${SIGNING_TEAMID}"
+    CODESIGN_OPTS+=(--launch-constraint-parent "${SCRATCH}/parent-launch-constraints.plist")
+  fi
+
   echo "codesigning ${BN}"
-  /usr/bin/codesign --sign "${SIGNING_IDENTITY}" --keychain "${SIGNING_KEYCHAIN}" \
-        --preserve-metadata=entitlements --timestamp --force --generate-entitlement-der \
-        --options library,kill,runtime "${ARTIFACT}"
+  /usr/bin/codesign "${CODESIGN_OPTS[@]}" "${ARTIFACT}"
 done
 
 # Notarize all the bundles

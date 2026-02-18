@@ -108,6 +108,25 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   std::shared_ptr<santa::EntitlementsFilter> entitlements_filter = EntitlementsFilter::Create(
       configurator.entitlementsTeamIDFilter, configurator.entitlementsPrefixFilter);
 
+  // Create ProcessTree early so it can be passed to policy processor and exec controller
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
+  std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>> annotators;
+
+  for (NSString *annotation in [configurator enabledProcessAnnotations]) {
+    if ([[annotation lowercaseString] isEqualToString:@"originator"]) {
+      annotators.emplace_back(std::make_unique<santa::santad::process_tree::OriginatorAnnotator>());
+    } else {
+      LOGW(@"Unrecognized process annotation %@", annotation);
+    }
+  }
+
+  auto tree_status = santa::santad::process_tree::CreateTree(std::move(annotators));
+  if (!tree_status.ok()) {
+    LOGE(@"Failed to create process tree: %@", @(tree_status.status().ToString().c_str()));
+    exit(EXIT_FAILURE);
+  }
+  process_tree = *tree_status;
+
   SNTPolicyProcessor *policy_processor =
       [[SNTPolicyProcessor alloc] initWithRuleTable:rule_table
                                  entitlementsFilter:entitlements_filter];
@@ -157,27 +176,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  // Create process tree and enricher early so they can be used by Logger
-  std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
-  std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>> annotators;
-
-  for (NSString *annotation in [configurator enabledProcessAnnotations]) {
-    if ([[annotation lowercaseString] isEqualToString:@"originator"]) {
-      annotators.emplace_back(std::make_unique<santa::santad::process_tree::OriginatorAnnotator>());
-    } else {
-      LOGW(@"Unrecognized process annotation %@", annotation);
-    }
-  }
-
-  auto tree_status = santa::santad::process_tree::CreateTree(std::move(annotators));
-  if (!tree_status.ok()) {
-    LOGE(@"Failed to create process tree: %@", @(tree_status.status().ToString().c_str()));
-    exit(EXIT_FAILURE);
-  }
-  process_tree = *tree_status;
-
   std::shared_ptr<::Enricher> enricher = std::make_shared<::Enricher>(process_tree);
-
   LogExecutionBlock logBlock = ^(santa::Message esMsg) {
     std::unique_ptr<santa::EnrichedMessage> enrichedMsg = enricher->Enrich(std::move(esMsg));
     logger->Log(std::move(enrichedMsg));
@@ -191,7 +190,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
                                                  logger:logBlock
                                               ttyWriter:tty_writer
                                         policyProcessor:policy_processor
-                                    processControlBlock:processControlBlock];
+                                    processControlBlock:processControlBlock
+                                            processTree:process_tree];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);

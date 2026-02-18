@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <typeindex>
 #include <vector>
@@ -56,15 +57,28 @@ struct Cred {
   }
 };
 
+struct CodeSigningInfo {
+  std::string signing_id;
+  std::string team_id;
+  std::string cdhash;  // hex string
+  bool is_platform_binary;
+
+  friend bool operator==(const struct CodeSigningInfo &lhs,
+                         const struct CodeSigningInfo &rhs) {
+    return lhs.signing_id == rhs.signing_id && lhs.team_id == rhs.team_id &&
+           lhs.cdhash == rhs.cdhash &&
+           lhs.is_platform_binary == rhs.is_platform_binary;
+  }
+};
+
 struct Program {
   std::string executable;
   std::vector<std::string> arguments;
+  std::optional<CodeSigningInfo> code_signing;
 
   friend bool operator==(const struct Program &lhs, const struct Program &rhs) {
-    return lhs.executable == rhs.executable && lhs.arguments == rhs.arguments;
-  }
-  friend bool operator!=(const struct Program &lhs, const struct Program &rhs) {
-    return !(lhs == rhs);
+    return lhs.executable == rhs.executable && lhs.arguments == rhs.arguments &&
+           lhs.code_signing == rhs.code_signing;
   }
 };
 

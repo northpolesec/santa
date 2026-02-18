@@ -18,6 +18,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessControl.h"
+#include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -71,7 +72,9 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
                            logger:(LogExecutionBlock)logger
                         ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
                   policyProcessor:(SNTPolicyProcessor *)policyProcessor
-              processControlBlock:(santa::ProcessControlBlock)processControlBlock;
+              processControlBlock:(santa::ProcessControlBlock)processControlBlock
+                      processTree:
+                          (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
 
 ///
 ///  Handles the logic of deciding whether to allow the binary to run or not, sends the response to

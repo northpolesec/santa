@@ -34,6 +34,7 @@ objc_library(
     deps = [
         ":process",
         "//Source/common:SystemResources",
+        "//Source/santad:CSOpsHelper",
         "//Source/santad/ProcessTree:process_tree_cc_proto",
         "//Source/santad/ProcessTree/annotations:annotator",
         "@abseil-cpp//absl/container:flat_hash_map",
@@ -63,6 +64,7 @@ objc_library(
     ],
     deps = [
         ":process_tree",
+        "//Source/common:String",
         "//Source/santad:EndpointSecurityAPI",
         "//Source/santad:EndpointSecurityMessage",
         "@abseil-cpp//absl/status:statusor",

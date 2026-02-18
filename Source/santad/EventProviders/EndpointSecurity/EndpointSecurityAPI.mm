@@ -134,7 +134,7 @@ es_string_token_t EndpointSecurityAPI::ExecArg(const es_event_exec_t *event, uin
 std::vector<std::string> EndpointSecurityAPI::ExecArgs(const es_event_exec_t *event) {
   std::vector<std::string> args;
   for (uint32_t i = 0; i < es_exec_arg_count(event); i++) {
-    args.push_back(std::string(santa::StringTokenToStringView(es_exec_arg(event, i))));
+    args.push_back(StringTokenToString(es_exec_arg(event, i)));
   }
   return args;
 }
@@ -150,12 +150,12 @@ es_string_token_t EndpointSecurityAPI::ExecEnv(const es_event_exec_t *event, uin
 std::map<std::string, std::string> EndpointSecurityAPI::ExecEnvs(const es_event_exec_t *event) {
   std::map<std::string, std::string> envs;
   for (uint32_t i = 0; i < es_exec_env_count(event); i++) {
-    auto s = santa::StringTokenToStringView(es_exec_env(event, i));
+    auto s = santa::StringTokenToString(es_exec_env(event, i));
     auto npos = s.find("=");
     if (npos == ::std::string::npos) {
-      envs[std::string(s)] = "SANTA_ENV_VAL_MISSING_PLACEHOLDER";
+      envs[s] = "SANTA_ENV_VAL_MISSING_PLACEHOLDER";
     } else {
-      envs[std::string(s.substr(0, npos))] = std::string(s.substr(npos + 1));
+      envs[s.substr(0, npos)] = s.substr(npos + 1);
     }
   }
   return envs;
