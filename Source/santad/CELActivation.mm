@@ -120,6 +120,7 @@ ActivationCallbackBlock CreateCELActivationBlock(
           },
           ^uid_t() {
             return audit_token_to_euid(esMsg->event.exec.target->audit_token);
+          },
           ^std::string() {
             es_file_t *f = esMsg->event.exec.cwd;
             if (!f) return std::string();
