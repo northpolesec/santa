@@ -328,7 +328,7 @@ The following fields are available on the `target` object:
 | `target.signing_time` | `timestamp` | Code signing timestamp (developer-provided) |
 | `target.secure_signing_time` | `timestamp` | Secure code signing timestamp (from a timestamp authority) |
 
-Some examples of valid CEL expresssions:
+Some examples of valid CEL expressions:
 
 ```clike
 // Only allow executing versions of an app signed on or after May 31st 2025.
