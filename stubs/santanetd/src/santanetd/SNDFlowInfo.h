@@ -1,4 +1,4 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,17 +12,9 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include <sys/cdefs.h>
+#import <Foundation/Foundation.h>
 
-#import "Source/common/SNTCommonEnums.h"
-#import "Source/common/SNTConfigBundle.h"
-#import "Source/santasyncservice/SNTSyncState.h"
-
-__BEGIN_DECLS
-
-SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState);
-SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState);
-SNTConfigBundle *RuleSyncConfigBundle();
-SNTConfigBundle *SyncTypeConfigBundle(SNTSyncType syncType);
-
-__END_DECLS
+// Stub implementation to allow Santa to build independently without
+// access to the Network Extension repo.
+@interface SNDFlowInfo : NSObject <NSSecureCoding>
+@end

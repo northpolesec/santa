@@ -1172,6 +1172,9 @@ message XProtect {
 }
 
 // Per-process network activity collected during a single monitoring window
+// Note: The SantaMessage fields 'event_time' and 'processed_time' are set
+// to the start and end times of the window within which the NetworkActivity
+// was collected.
 message NetworkActivity {
   // A single network socket flow observed during the monitoring window
   message Flow {

@@ -1,4 +1,4 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,17 +12,29 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include <sys/cdefs.h>
+#import "src/santanetd/SNDProcessFlows.h"
 
-#import "Source/common/SNTCommonEnums.h"
-#import "Source/common/SNTConfigBundle.h"
-#import "Source/santasyncservice/SNTSyncState.h"
+@implementation SNDProcessFlows
 
-__BEGIN_DECLS
+- (instancetype)initWithProcessInfo:(SNDProcessInfo *)processInfo {
+  return [self init];
+}
 
-SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState);
-SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState);
-SNTConfigBundle *RuleSyncConfigBundle();
-SNTConfigBundle *SyncTypeConfigBundle(SNTSyncType syncType);
+- (void)addFlow:(SNDFlowInfo *)flow {
+}
 
-__END_DECLS
+- (void)enumerateFlowsUsingBlock:(void(NS_NOESCAPE ^)(SNDFlowInfo *flow))block {
+}
+
++ (BOOL)supportsSecureCoding {
+  return YES;
+}
+
+- (void)encodeWithCoder:(NSCoder *)coder {
+}
+
+- (instancetype)initWithCoder:(NSCoder *)coder {
+  return [self init];
+}
+
+@end

@@ -99,14 +99,6 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  SNTNetworkExtensionQueue *netext_queue =
-      [[SNTNetworkExtensionQueue alloc] initWithNotifierQueue:notifier_queue
-                                                   syncdQueue:syncd_queue];
-  if (!netext_queue) {
-    LOGE(@"Failed to initialize network extension queue.");
-    exit(EXIT_FAILURE);
-  }
-
   std::shared_ptr<::TTYWriter> tty_writer = TTYWriter::Create(configurator.enableSilentTTYMode);
   if (!tty_writer) {
     LOGE(@"Failed to initialize TTY writer");
@@ -172,6 +164,15 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
       [configurator telemetryExportMaxFilesPerBatch]);
   if (!logger) {
     LOGE(@"Failed to create logger.");
+    exit(EXIT_FAILURE);
+  }
+
+  SNTNetworkExtensionQueue *netext_queue =
+      [[SNTNetworkExtensionQueue alloc] initWithNotifierQueue:notifier_queue
+                                                   syncdQueue:syncd_queue
+                                                       logger:logger];
+  if (!netext_queue) {
+    LOGE(@"Failed to initialize network extension queue.");
     exit(EXIT_FAILURE);
   }
 

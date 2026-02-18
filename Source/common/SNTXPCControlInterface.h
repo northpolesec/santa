@@ -20,6 +20,7 @@
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 
+@class SNDProcessFlows;
 @class SNTStoredEvent;
 
 ///
@@ -83,6 +84,11 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                                               reply:(void (^)(NSDictionary *settings,
                                                               NSString *santaProtocolVersion,
                                                               NSError *error))reply;
+
+- (void)reportNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
+               windowStart:(NSDate *)windowStart
+                 windowEnd:(NSDate *)windowEnd
+                     reply:(void (^)(void))reply;
 
 @end
 
