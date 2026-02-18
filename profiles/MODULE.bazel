@@ -1,0 +1,6 @@
+# Profiles module
+
+module(
+    name = "profiles",
+    version = "1.0.0",
+)
