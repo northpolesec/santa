@@ -372,10 +372,28 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "CELActivation",
+    srcs = ["CELActivation.mm"],
+    hdrs = ["CELActivation.h"],
+    deps = [
+        ":EndpointSecurityAPI",
+        ":EndpointSecurityMessage",
+        ":SNTPolicyProcessor",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SigningIDHelpers",
+        "//Source/common:String",
+        "//Source/common/cel:CEL",
+        "//Source/santad/ProcessTree:process",
+        "//Source/santad/ProcessTree:process_tree",
+    ],
+)
+
+objc_library(
     name = "SNTExecutionController",
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
     deps = [
+        ":CELActivation",
         ":EndpointSecurityAPI",
         ":EndpointSecurityMessage",
         ":ProcessControl",

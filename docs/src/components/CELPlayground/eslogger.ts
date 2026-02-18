@@ -58,6 +58,16 @@ export function convertEsloggerEvent(input: string): string {
     context.cwd = exec.cwd.path;
   }
 
+  // signing_id: format as "teamID:signingID" or "platform:signingID"
+  const target = exec.target;
+  if (target?.signing_id) {
+    if (target.is_platform_binary && !target.team_id) {
+      context.target.signing_id = "platform:" + target.signing_id;
+    } else if (target.team_id) {
+      context.target.signing_id = target.team_id + ":" + target.signing_id;
+    }
+  }
+
   // Make up signing times (eslogger doesn't include these)
   context.target.signing_time = "2025-06-01T00:00:00Z";
   context.target.secure_signing_time = "2025-06-01T00:00:00Z";

@@ -11,6 +11,7 @@ import {
 export const DEFAULT_EXPRESSION = `target.signing_time >= timestamp('2025-05-31T00:00:00Z')`;
 
 export const DEFAULT_YAML = `target:
+  signing_id: "EQHXZ8M8AV:com.google.Chrome"
   signing_time: "2025-06-01T00:00:00Z"
 args:
   - "--flag"
