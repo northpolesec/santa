@@ -177,7 +177,7 @@ SantaGUI        | 2025.3 (build 97, commit 10bdfcc2)
   Compiler Rules                                  | 2
   Transitive Rules                                | 0
   Events Pending Upload                           | 117
->>> Static Rules                      
+>>> Static Rules
   Rules                                           | 1
 >>> Watch Items
   Enabled                                         | Yes
