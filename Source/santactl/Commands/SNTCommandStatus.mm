@@ -396,18 +396,18 @@ REGISTER_COMMAND_NAME(@"status")
     printf("%s\n", [statsStr UTF8String]);
   } else {
     printf(">>> Daemon Info\n");
-    printf("  %-25s | %s\n", "Mode", [clientMode UTF8String]);
-    printf("  %-25s | %s\n", "Log Type", [eventLogType UTF8String]);
-    printf("  %-25s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
-    printf("  %-25s | %s\n", "Mountable Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
+    printf("  %-45s | %s\n", "Mode", [clientMode UTF8String]);
+    printf("  %-45s | %s\n", "Log Type", [eventLogType UTF8String]);
+    printf("  %-45s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
+    printf("  %-45s | %s\n", "Mountable Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
     if (blockUSBMount && remountUSBMode.count > 0) {
-      printf("  %-25s | %s\n", "Mountable Removable Media Remounting Mode",
+      printf("  %-45s | %s\n", "Mountable Removable Media Remounting Mode",
              [[remountUSBMode componentsJoinedByString:@", "] UTF8String]);
     }
-    printf("  %-25s | %s\n", "On Start Mountable Removable Media Options",
+    printf("  %-45s | %s\n", "On Start Mountable Removable Media Options",
            StartupOptionToString(configurator.onStartUSBOptions).UTF8String);
     if (isSyncV2Enabled) {
-      printf("  %-25s | %s", "Network Mount Blocking", (networkMountExceptions ? "Yes" : "No"));
+      printf("  %-45s | %s", "Network Mount Blocking", (networkMountExceptions ? "Yes" : "No"));
       if (networkMountExceptions) {
         printf(" (%d host exception%s)\n", [networkMountExceptions intValue],
                [networkMountExceptions intValue] == 1 ? "" : "s");
@@ -415,48 +415,48 @@ REGISTER_COMMAND_NAME(@"status")
         printf("\n");
       }
     }
-    printf("  %-25s | %lld\n", "Static Rules", staticRuleCount);
-    printf("  %-25s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
-    printf("  %-25s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
+    printf("  %-45s | %lld\n", "Static Rules", staticRuleCount);
+    printf("  %-45s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
+    printf("  %-45s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
 
     printf(">>> Cache Info\n");
-    printf("  %-25s | %lld\n", "Root cache count", rootCacheCount);
-    printf("  %-25s | %lld\n", "Non-root cache count", nonRootCacheCount);
+    printf("  %-45s | %lld\n", "Root cache count", rootCacheCount);
+    printf("  %-45s | %lld\n", "Non-root cache count", nonRootCacheCount);
 
     printf(">>> Transitive Allowlisting\n");
-    printf("  %-25s | %s\n", "Enabled", (enableTransitiveRules ? "Yes" : "No"));
-    printf("  %-25s | %lld\n", "Compiler Rules", ruleCounts.compiler);
-    printf("  %-25s | %lld\n", "Transitive Rules", ruleCounts.transitive);
+    printf("  %-45s | %s\n", "Enabled", (enableTransitiveRules ? "Yes" : "No"));
+    printf("  %-45s | %lld\n", "Compiler Rules", ruleCounts.compiler);
+    printf("  %-45s | %lld\n", "Transitive Rules", ruleCounts.transitive);
 
     printf(">>> Rule Types\n");
-    printf("  %-25s | %lld\n", "Binary Rules", ruleCounts.binary);
-    printf("  %-25s | %lld\n", "Certificate Rules", ruleCounts.certificate);
-    printf("  %-25s | %lld\n", "TeamID Rules", ruleCounts.teamID);
-    printf("  %-25s | %lld\n", "SigningID Rules", ruleCounts.signingID);
-    printf("  %-25s | %lld\n", "CDHash Rules", ruleCounts.cdhash);
+    printf("  %-45s | %lld\n", "Binary Rules", ruleCounts.binary);
+    printf("  %-45s | %lld\n", "Certificate Rules", ruleCounts.certificate);
+    printf("  %-45s | %lld\n", "TeamID Rules", ruleCounts.teamID);
+    printf("  %-45s | %lld\n", "SigningID Rules", ruleCounts.signingID);
+    printf("  %-45s | %lld\n", "CDHash Rules", ruleCounts.cdhash);
 
     printf(">>> Watch Items\n");
-    printf("  %-25s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
+    printf("  %-45s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
     if (watchItemsEnabled) {
-      printf("  %-25s | %s\n", "Data Source",
+      printf("  %-45s | %s\n", "Data Source",
              santa::WatchItems::DataSourceName(watchItemsDataSource).UTF8String);
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDetachedConfig) {
-        printf("  %-25s | %s\n", "Config Path", (watchItemsConfigPath ?: @"null").UTF8String);
+        printf("  %-45s | %s\n", "Config Path", (watchItemsConfigPath ?: @"null").UTF8String);
       }
       if (watchItemsPolicyVersion.length > 0) {
-        printf("  %-25s | %s\n", "Policy Version", watchItemsPolicyVersion.UTF8String);
+        printf("  %-45s | %s\n", "Policy Version", watchItemsPolicyVersion.UTF8String);
       }
-      printf("  %-25s | %llu\n", "Rule Count", watchItemsRuleCount);
-      printf("  %-25s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
+      printf("  %-45s | %llu\n", "Rule Count", watchItemsRuleCount);
+      printf("  %-45s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
     }
 
     printf(">>> Sync\n");
-    printf("  %-25s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");
+    printf("  %-45s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");
     if (syncURLStr.length) {
-      printf("  %-25s | %s\n", "Sync Server", [syncURLStr UTF8String]);
-      printf("  %-25s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
-      printf("  %-25s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
-      printf("  %-25s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
+      printf("  %-45s | %s\n", "Sync Server", [syncURLStr UTF8String]);
+      printf("  %-45s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
+      printf("  %-45s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
+      printf("  %-45s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
 
       // If push notifications are enabled, show the push notifications full
       // sync interval since it's the active configuration.
@@ -466,7 +466,7 @@ REGISTER_COMMAND_NAME(@"status")
             [NSString stringWithFormat:@"%@ (with Push Notifications)",
                                        FormatInterval(pushNotificationsFullSyncInterval)];
       }
-      printf("  %-25s | %s\n", "Full Sync Interval", [fullSyncIntervalStr UTF8String]);
+      printf("  %-45s | %s\n", "Full Sync Interval", [fullSyncIntervalStr UTF8String]);
 
       // Format push notifications output
       NSString *pushNotificationsOutput = pushNotifications;
@@ -474,22 +474,22 @@ REGISTER_COMMAND_NAME(@"status")
         pushNotificationsOutput =
             [NSString stringWithFormat:@"NPS Push Service (%@)", pushServerAddress];
       }
-      printf("  %-25s | %s\n", "Push Notifications", [pushNotificationsOutput UTF8String]);
+      printf("  %-45s | %s\n", "Push Notifications", [pushNotificationsOutput UTF8String]);
 
-      printf("  %-25s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
-      printf("  %-25s | %lld\n", "Events Pending Upload", eventCount);
-      printf("  %-25s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
+      printf("  %-45s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
+      printf("  %-45s | %lld\n", "Events Pending Upload", eventCount);
+      printf("  %-45s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
-        printf("  %-25s | %s\n", "File Access Rules Hash",
+        printf("  %-45s | %s\n", "File Access Rules Hash",
                [(fileAccessRulesHash ?: @"null") UTF8String]);
       }
     }
 
     printf(">>> Metrics\n");
-    printf("  %-25s | %s\n", "Enabled", exportMetrics ? "Yes" : "No");
+    printf("  %-45s | %s\n", "Enabled", exportMetrics ? "Yes" : "No");
     if (exportMetrics) {
-      printf("  %-25s | %s\n", "Metrics Server", [[metricsURLStr absoluteString] UTF8String]);
-      printf("  %-25s | %lu\n", "Export Interval (seconds)", metricExportInterval);
+      printf("  %-45s | %s\n", "Metrics Server", [[metricsURLStr absoluteString] UTF8String]);
+      printf("  %-45s | %lu\n", "Export Interval (seconds)", metricExportInterval);
     }
   }
 
