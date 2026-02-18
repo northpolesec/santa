@@ -102,11 +102,13 @@ static id ValueOrNull(id value) {
 + (NSAttributedString *)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent *)event {
   NSString *defaultRemountMessage =
       NSLocalizedString(@"The following device has been remounted with reduced permissions",
-                        @"The default message to show the user when a USB device is remounted with "
+                        @"The default message to show the user when a Mountable Removable Media "
+                        @"(e.g. USB device) is remounted with "
                         @"reduced permissions");
-  NSString *defaultBannedMessage = NSLocalizedString(
-      @"The following device has been blocked from mounting",
-      @"The default message to show the user when a USB device is blocked from mounting");
+  NSString *defaultBannedMessage =
+      NSLocalizedString(@"The following device has been blocked from mounting",
+                        @"The default message to show the user when a Mountable Removable Media "
+                        @"(e.g. USB device) is blocked from mounting");
 
   if ([[SNTConfigurator configurator] remountUSBMode]) {
     return [SNTBlockMessage formatMessage:[[SNTConfigurator configurator] remountUSBBlockMessage]

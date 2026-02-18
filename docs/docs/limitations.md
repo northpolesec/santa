@@ -11,7 +11,7 @@ applications make use of temporary scripts, and blocking these could cause
 problems. We’re happy to revisit this (or at least make it an option) if it
 would be useful to others.
 
-- **USB Mass Storage / Removable Media Blocking:** Santa’s removable media
+- **Mountable Removable Media (e.g. USB Mass Storage) Blocking:** Santa’s removable media
   blocking feature only stops incidental data exfiltration, it is not meant as
   a hard control. It operates at the mount level. It cannot block:
    - Directly writing to an unmounted, but attached device

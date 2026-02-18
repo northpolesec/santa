@@ -157,39 +157,39 @@ SantaGUI        | 2025.3 (build 97, commit 10bdfcc2)
 
 ```shell title="santactl status"
 >>> Daemon Info
-  Mode                      | Monitor
-  Log Type                  | file
-  File Logging              | No
-  USB Blocking              | Yes
-  USB Remounting Mode       | rdonly, nosuid, noowners
-  On Start USB Options      | None
-  Watchdog CPU Events       | 0  (Peak: 3.31%)
-  Watchdog RAM Events       | 0  (Peak: 15.19MB)
+  Mode                                            | Monitor
+  Log Type                                        | file
+  File Logging                                    | No
+  Mountable Removable Media Blocking              | Yes
+  Mountable Removable Media Remounting Mode       | rdonly, nosuid, noowners
+  On Start Mountable Removable Media Options      | None
+  Watchdog CPU Events                             | 0  (Peak: 3.31%)
+  Watchdog RAM Events                             | 0  (Peak: 15.19MB)
 >>> Cache Info
-  Root cache count          | 133
-  Non-root cache count      | 3
+  Root cache count                                | 133
+  Non-root cache count                            | 3
 >>> Database Info
-  Binary Rules              | 1
-  Certificate Rules         | 0
-  TeamID Rules              | 8
-  SigningID Rules           | 4
-  CDHash Rules              | 2
-  Compiler Rules            | 2
-  Transitive Rules          | 0
-  Events Pending Upload     | 117
->>> Static Rules
-  Rules                     | 1
+  Binary Rules                                    | 1
+  Certificate Rules                               | 0
+  TeamID Rules                                    | 8
+  SigningID Rules                                 | 4
+  CDHash Rules                                    | 2
+  Compiler Rules                                  | 2
+  Transitive Rules                                | 0
+  Events Pending Upload                           | 117
+>>> Static Rules                      
+  Rules                                           | 1
 >>> Watch Items
-  Enabled                   | Yes
-  Policy Version            | v1.1
-  Rule Count                | 1
-  Config Path               | /var/db/santa/faa.plist
-  Last Policy Update        | 2025/04/17 12:55:46 -0400
+  Enabled                                         | Yes
+  Policy Version                                  | v1.1
+  Rule Count                                      | 1
+  Config Path                                     | /var/db/santa/faa.plist
+  Last Policy Update                              | 2025/04/17 12:55:46 -0400
 >>> Sync Info
-  Sync Server               | https://my-sync-server/santa/
-  Clean Sync Required       | No
-  Last Successful Full Sync | 2025/04/17 12:56:01 -0400
-  Last Successful Rule Sync | 2025/04/17 12:56:01 -0400
-  Push Notifications        | Connected
-  Bundle Scanning           | Yes
+  Sync Server                                     | https://my-sync-server/santa/
+  Clean Sync Required                             | No
+  Last Successful Full Sync                       | 2025/04/17 12:56:01 -0400
+  Last Successful Rule Sync                       | 2025/04/17 12:56:01 -0400
+  Push Notifications                              | Connected
+  Bundle Scanning                                 | Yes
 ```

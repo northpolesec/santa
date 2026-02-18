@@ -67,7 +67,7 @@ server.
 
 The server can respond with many configuration settings for the client to apply,
 including the client mode, the event batch size, whether to enable transitive
-rules, USB blocking configuration, etc.
+rules, Mountable Removable Media (e.g. USB device) blocking configuration, etc.
 
 The full
 [request](https://buf.build/northpolesec/protos/docs/main:santa.sync.v1#santa.sync.v1.PreflightRequest)
