@@ -77,9 +77,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (config.fcmEnabled) {
       LOGD(@"Using FCM push notifications");
       _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
-    } else if (config.enablePushNotifications && santa::IsDomainPinned(config.syncBaseURL)) {
+    } else if (config.enablePushNotifications) {
+      // Unless explicitly disabled, initialize the NATS push client. The client
+      // will wait for configuration during a valid V2 preflight.
       LOGD(@"Using NATS push notifications");
-      // Use NATS this will only work for V2 sync clients.
       _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
     }
 
@@ -394,6 +395,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       // These are no longer needed and should not be accessible to other sync stages
       syncState.pushNKey = nil;
       syncState.pushJWT = nil;
+      syncState.pushIssuerJWT = nil;
       syncState.pushHMACKey = nil;
 
       // If push interval changed, mark log the difference.
@@ -554,12 +556,19 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     SLOGD(@"%@", line);
   };
 
+  // Ask the daemon to determine if sync v2 is enabled. Sync v2 will be enabled
+  // if a pinned domain is configured or if a valid push token chain is present.
+  // The push token chain is stored in the sync state which is not accessible
+  // from the syncservice process.
+  [[self.daemonConn synchronousRemoteObjectProxy] isSyncV2Enabled:^(BOOL reply) {
+    syncState.isSyncV2 = reply;
+  }];
+
   // Configure server auth
   if (santa::IsDomainPinned(syncState.syncBaseURL)) {
 #ifndef DEBUG
     authURLSession.serverRootsPemString = santa::PinnedCertPEMs();
 #endif
-    syncState.isSyncV2 = YES;
   } else if ([config syncServerAuthRootsFile]) {
     authURLSession.serverRootsPemFile = [config syncServerAuthRootsFile];
   } else if ([config syncServerAuthRootsData]) {

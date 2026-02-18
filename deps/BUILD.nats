@@ -39,4 +39,3 @@ cc_library(
         "-lpthread",
     ],
 )
-

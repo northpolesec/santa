@@ -52,6 +52,27 @@ objc_library(
 )
 
 objc_library(
+    name = "NKeyTokenValidator",
+    srcs = ["NKeyTokenValidator.mm"],
+    hdrs = ["NKeyTokenValidator.h"],
+    deps = [
+        ":SNTLogging",
+        ":String",
+        "@boringssl//:crypto",
+        "@nats_c//:nats",
+    ],
+)
+
+santa_unit_test(
+    name = "NKeyTokenValidatorTest",
+    srcs = ["NKeyTokenValidatorTest.mm"],
+    deps = [
+        ":NKeyTokenValidator",
+        "@boringssl//:crypto",
+    ],
+)
+
+objc_library(
     name = "NSData+Zlib",
     srcs = ["NSData+Zlib.mm"],
     hdrs = ["NSData+Zlib.h"],
@@ -457,6 +478,7 @@ objc_library(
         "Foundation",
     ],
     deps = [
+        ":NKeyTokenValidator",
         ":Pinning",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
@@ -1034,6 +1056,7 @@ test_suite(
         ":MOLCertificateTest",
         ":MOLCodesignCheckerTest",
         ":MOLXPCConnectionTest",
+        ":NKeyTokenValidatorTest",
         ":NSDataZlibTest",
         ":PrefixTreeTest",
         ":RingBufferTest",
