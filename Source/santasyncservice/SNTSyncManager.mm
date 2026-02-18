@@ -346,6 +346,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       // These are no longer needed and should not be accessible to other sync stages
       syncState.pushNKey = nil;
       syncState.pushJWT = nil;
+      syncState.pushIssuerJWT = nil;
       syncState.pushHMACKey = nil;
 
       // If push interval changed, mark log the difference.
