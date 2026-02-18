@@ -297,8 +297,8 @@ REGISTER_COMMAND_NAME(@"status")
         @"watchdog_ram_events" : @(ramEvents),
         @"watchdog_cpu_peak" : @(cpuPeak),
         @"watchdog_ram_peak" : @(ramPeak),
-        @"block_usb" : @(blockUSBMount),
-        @"remount_usb_mode" : (blockUSBMount && remountUSBMode.count ? remountUSBMode : @""),
+        @"block_mountable_removable_media" : @(blockUSBMount),
+        @"remount_removable_media_mode" : (blockUSBMount && remountUSBMode.count ? remountUSBMode : @""),
         @"on_start_usb_options" : StartupOptionToString(configurator.onStartUSBOptions),
         @"static_rules" : @(staticRuleCount),
       },
@@ -399,12 +399,12 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-25s | %s\n", "Mode", [clientMode UTF8String]);
     printf("  %-25s | %s\n", "Log Type", [eventLogType UTF8String]);
     printf("  %-25s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
-    printf("  %-25s | %s\n", "USB Blocking", (blockUSBMount ? "Yes" : "No"));
+    printf("  %-25s | %s\n", "Mountable Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
     if (blockUSBMount && remountUSBMode.count > 0) {
-      printf("  %-25s | %s\n", "USB Remounting Mode",
+      printf("  %-25s | %s\n", "Mountable Removable Media Remounting Mode",
              [[remountUSBMode componentsJoinedByString:@", "] UTF8String]);
     }
-    printf("  %-25s | %s\n", "On Start USB Options",
+    printf("  %-25s | %s\n", "On Start Mountable Removable Media Options",
            StartupOptionToString(configurator.onStartUSBOptions).UTF8String);
     if (isSyncV2Enabled) {
       printf("  %-25s | %s", "Network Mount Blocking", (networkMountExceptions ? "Yes" : "No"));
