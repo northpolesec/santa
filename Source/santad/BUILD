@@ -1169,7 +1169,7 @@ macos_bundle(
     minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,
-        "//conditions:default": "//profiles:daemon_dev",
+        "//conditions:default": "@profiles//:daemon_dev",
     }),
     resources = [
         "//:Conf/com.northpolesec.santa.bundleservice.plist",
