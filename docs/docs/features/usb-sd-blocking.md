@@ -2,9 +2,9 @@
 sidebar_position: 4
 ---
 
-# USB/SD Blocking
+# Removable Media (e.g. USB/SD device) Blocking
 
-USB/SD blocking allows blocking removable USB/SD Card storage from mounting, or
+Removable Media blocking allows blocking removable media such as USB Mass Storage/SD Card storage from mounting, or
 forcing devices to be remounted as read-only. This is intended to prevent
 data exfiltration.
 
