@@ -372,6 +372,13 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   }
 
   dispatch_async(self.syncQueue, ^{
+    __block BOOL replied = NO;
+    void (^guardedReply)(NSError *) = ^(NSError *e) {
+      if (replied) return;
+      replied = YES;
+      if (reply) reply(e);
+    };
+
     // Check enableBundles via daemon XPC
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     __block BOOL enableBundles = NO;
@@ -396,38 +403,26 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
                                                dispatch_semaphore_signal(eventSema);
                                              }];
 
-    if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) !=
-        0) {
-      [bs invalidate];
-      if (reply) {
-        reply([NSError
-            errorWithDomain:@"com.northpolesec.santa.syncservice"
-                       code:2
-                   userInfo:@{NSLocalizedDescriptionKey : @"Timeout generating events"}]);
-      }
-      return;
-    }
+    dispatch_semaphore_wait(eventSema, DISPATCH_TIME_FOREVER);
 
     if (!resultEvents.count) {
       [bs invalidate];
-      if (reply) reply(nil);
+      guardedReply(nil);
       return;
     }
 
     // Upload events to sync server
     [self postEventsToSyncServer:resultEvents
                            reply:^(BOOL success) {
-                             if (reply) {
-                               if (success) {
-                                 reply(nil);
-                               } else {
-                                 reply([NSError
-                                     errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                                code:4
-                                            userInfo:@{
-                                              NSLocalizedDescriptionKey : @"Failed to upload events"
-                                            }]);
-                               }
+                             if (success) {
+                               guardedReply(nil);
+                             } else {
+                               guardedReply([NSError
+                                   errorWithDomain:@"com.northpolesec.santa.syncservice"
+                                              code:4
+                                          userInfo:@{
+                                            NSLocalizedDescriptionKey : @"Failed to upload events"
+                                          }]);
                              }
                              [bs invalidate];
                            }];
