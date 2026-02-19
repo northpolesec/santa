@@ -1183,7 +1183,7 @@ message NetworkActivity {
     // Use `id + hash` as a unique identifier.
     optional string id = 1;
 
-    // A Santa-computed identiifer to help distinguish duplicate flow ids.
+    // A Santa-computed identifier to help distinguish duplicate flow ids.
     optional string hash = 2;
 
     // Remote endpoint address (IPv4 or IPv6 string representation)
