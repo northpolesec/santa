@@ -128,7 +128,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   }
   self.xsrfToken = syncState.xsrfToken;
   self.xsrfTokenHeader = syncState.xsrfTokenHeader;
-  reply(success);
+  if (reply) reply(success);
 }
 
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
@@ -399,30 +399,35 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) !=
         0) {
       [bs invalidate];
-      reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                code:2
-                            userInfo:@{NSLocalizedDescriptionKey : @"Timeout generating events"}]);
+      if (reply) {
+        reply([NSError
+            errorWithDomain:@"com.northpolesec.santa.syncservice"
+                       code:2
+                   userInfo:@{NSLocalizedDescriptionKey : @"Timeout generating events"}]);
+      }
       return;
     }
 
     if (!resultEvents.count) {
       [bs invalidate];
-      reply(nil);
+      if (reply) reply(nil);
       return;
     }
 
     // Upload events to sync server
     [self postEventsToSyncServer:resultEvents
                            reply:^(BOOL success) {
-                             if (success) {
-                               reply(nil);
-                             } else {
-                               reply([NSError
-                                   errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                              code:4
-                                          userInfo:@{
-                                            NSLocalizedDescriptionKey : @"Failed to upload events"
-                                          }]);
+                             if (reply) {
+                               if (success) {
+                                 reply(nil);
+                               } else {
+                                 reply([NSError
+                                     errorWithDomain:@"com.northpolesec.santa.syncservice"
+                                                code:4
+                                            userInfo:@{
+                                              NSLocalizedDescriptionKey : @"Failed to upload events"
+                                            }]);
+                               }
                              }
                              [bs invalidate];
                            }];
