@@ -29,6 +29,8 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/ProcessTree/process_tree_macos.h"
 
+namespace {
+
 template <bool IsV2>
 std::vector<typename santa::cel::CELProtoTraits<IsV2>::AncestorT> Ancestors(
     const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
@@ -80,6 +82,8 @@ std::vector<santa::cel::CELProtoTraits<false>::AncestorT> Ancestors<false>(
     const santa::Message &esMsg) {
   return {};
 }
+
+}  // namespace
 
 namespace santa {
 
