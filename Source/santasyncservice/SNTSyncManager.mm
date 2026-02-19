@@ -396,12 +396,23 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     dispatch_semaphore_t eventSema = dispatch_semaphore_create(0);
     __block NSArray<SNTStoredExecutionEvent *> *resultEvents;
-    [[bs remoteObjectProxy] generateEventsFromPath:path
-                                     enableBundles:enableBundles
-                                             reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
-                                               resultEvents = events;
-                                               dispatch_semaphore_signal(eventSema);
-                                             }];
+    id proxy = [bs remoteObjectProxy];
+    if (!proxy) {
+      LOGE(@"EventUpload: Failed to connect to bundle service");
+      [bs invalidate];
+      guardedReply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
+                                       code:2
+                                   userInfo:@{NSLocalizedDescriptionKey :
+                                                  @"Failed to connect to bundle service"}]);
+      return;
+    }
+
+    [proxy generateEventsFromPath:path
+                    enableBundles:enableBundles
+                            reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
+                              resultEvents = events;
+                              dispatch_semaphore_signal(eventSema);
+                            }];
 
     dispatch_semaphore_wait(eventSema, DISPATCH_TIME_FOREVER);
 
