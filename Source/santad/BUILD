@@ -216,6 +216,7 @@ objc_library(
     srcs = ["SNTNetworkExtensionQueue.mm"],
     hdrs = ["SNTNetworkExtensionQueue.h"],
     deps = [
+        ":EndpointSecurityLogger",
         ":SNTNotificationQueue",
         ":SNTSyncdQueue",
         "//Source/common:MOLXPCConnection",
@@ -228,6 +229,9 @@ objc_library(
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "//Source/common/ne:SNTXPCNetworkExtensionInterface",
+        "@santanetd//src/santanetd:SNDFlowInfo",
+        "@santanetd//src/santanetd:SNDProcessFlows",
+        "@santanetd//src/santanetd:SNDProcessInfo",
     ],
 )
 
@@ -254,6 +258,7 @@ objc_library(
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
+        "//Source/santad/ProcessTree:process_tree",
         "@FMDB",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@northpolesec_protos//cel:v1_cc_proto",
@@ -401,6 +406,8 @@ objc_library(
         "//Source/common:SantaVnode",
         "//Source/common:String",
         "//Source/common:Unit",
+        "//Source/santad/ProcessTree:process",
+        "//Source/santad/ProcessTree:process_tree",
         "@abseil-cpp//absl/synchronization",
     ],
 )
@@ -706,6 +713,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXxhash",
         "//Source/common:String",
+        "@santanetd//src/santanetd:SNDProcessInfo",
     ],
 )
 
@@ -765,6 +773,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:String",
+        "@santanetd//src/santanetd:SNDNetworkFlowsSerializer",
     ],
 )
 
@@ -789,6 +798,7 @@ objc_library(
         "//Source/common:santa_cc_proto_library_wrapper",
         "@abseil-cpp//absl/status",
         "@protobuf//src/google/protobuf/json",
+        "@santanetd//src/santanetd:SNDNetworkFlowsSerializer",
     ],
 )
 
@@ -930,6 +940,15 @@ objc_library(
 )
 
 objc_library(
+    name = "CSOpsHelper",
+    srcs = ["CSOpsHelper.mm"],
+    hdrs = ["CSOpsHelper.h"],
+    deps = [
+        "//Source/common:String",
+    ],
+)
+
+objc_library(
     name = "KillingMachine",
     srcs = ["KillingMachine.mm"],
     hdrs = ["KillingMachine.h"],
@@ -937,6 +956,7 @@ objc_library(
         "bsm",
     ],
     deps = [
+        ":CSOpsHelper",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",
         "//Source/common:SNTLogging",
@@ -953,6 +973,7 @@ santa_unit_test(
         "KillingMachineTest.mm",
     ],
     deps = [
+        ":CSOpsHelper",
         ":KillingMachine",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",
@@ -1000,6 +1021,7 @@ objc_library(
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common/faa:WatchItems",
         "@FMDB",
+        "@santanetd//src/santanetd:SNDProcessFlows",
     ],
 )
 
@@ -1155,7 +1177,7 @@ macos_bundle(
     minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,
-        "//conditions:default": "//profiles:daemon_dev",
+        "//conditions:default": "@profiles//:daemon_dev",
     }),
     resources = [
         "//:Conf/com.northpolesec.santa.bundleservice.plist",

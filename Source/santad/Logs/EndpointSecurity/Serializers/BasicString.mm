@@ -40,6 +40,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "src/santanetd/SNDNetworkFlowsSerializer.h"
 
 namespace santa {
 
@@ -1067,6 +1068,15 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification
 }
 
 #endif  // HAVE_MACOS_15_4
+
+std::vector<uint8_t> BasicString::SerializeNetworkFlow(SNDProcessInfo *pi, SNDFlowInfo *flow,
+                                                       struct timespec window_start,
+                                                       struct timespec window_end,
+                                                       SNTCachedDecision *cd) {
+  std::string line = CreateDefaultString();
+  line += santanetd::FormatNetworkFlowBasicString(pi, flow, cd);
+  return FinalizeString(line);
+}
 
 std::vector<uint8_t> BasicString::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,

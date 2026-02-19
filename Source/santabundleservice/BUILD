@@ -40,7 +40,7 @@ macos_command_line_application(
     minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,
-        "//conditions:default": "//profiles:santa_dev",
+        "//conditions:default": "@profiles//:santa_dev",
     }),
     version = "//:version",
     visibility = ["//:santa_package_group"],

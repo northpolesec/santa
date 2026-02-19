@@ -232,11 +232,19 @@ struct SNTFileAccessMessageWindowView: View {
   @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
+  var effectiveURL: NSString? {
+    customURL ?? configState.fileAccessEventDetailURL as NSString?
+  }
+
+  var effectiveText: String? {
+    customText ?? configState.fileAccessEventDetailText
+  }
+
   var body: some View {
     SNTMessageView(
       SNTBlockMessage.attributedBlockMessage(for: event, customMessage: customMessage as String?)
     ) {
-      Event(e: event, customURL: customURL, window: window)
+      Event(e: event, customURL: effectiveURL, window: window)
 
       VStack(spacing: 15.0) {
         if configState.enableNotificationSilences {
@@ -244,8 +252,8 @@ struct SNTFileAccessMessageWindowView: View {
         }
 
         HStack(spacing: 15.0) {
-          if customURL != nil {
-            OpenEventButton(customText: customText, action: openButton)
+          if effectiveURL != nil {
+            OpenEventButton(customText: effectiveText, action: openButton)
           }
           DismissButton(silence: preventFutureNotifications, action: dismissButton)
         }
@@ -256,7 +264,7 @@ struct SNTFileAccessMessageWindowView: View {
   }
 
   func openButton() {
-    let url = SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String?)
+    let url = SNTBlockMessage.eventDetailURL(for: event, customURL: effectiveURL as String?)
     window?.close()
     if let url = url {
       openURL(url)

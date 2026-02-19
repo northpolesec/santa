@@ -78,9 +78,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (config.fcmEnabled) {
       LOGD(@"Using FCM push notifications");
       _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
-    } else if (config.enablePushNotifications && santa::IsDomainPinned(config.syncBaseURL)) {
+    } else if (config.enablePushNotifications) {
+      // Unless explicitly disabled, initialize the NATS push client. The client
+      // will wait for configuration during a valid V2 preflight.
       LOGD(@"Using NATS push notifications");
-      // Use NATS this will only work for V2 sync clients.
       _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
     }
 
@@ -210,6 +211,55 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     [self.pushNotifications forceReconnect];
   }
   [self syncSecondsFromNow:2];
+}
+
+- (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString *description))reply {
+  SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
+  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  if (!syncState) {
+    SLOGE(@"Failed to create sync state: %ld", (long)status);
+    reply(0, [NSString stringWithFormat:@"Failed to create sync state: %ld", (long)status]);
+    return;
+  }
+
+  NSURL *url = [NSURL URLWithString:@"preflight/santactl-doctor-test"
+                      relativeToURL:syncState.syncBaseURL];
+  NSMutableURLRequest *req = [[NSMutableURLRequest alloc] initWithURL:url];
+  req.HTTPMethod = @"POST";
+
+  SLOGD(@"Sending preflight request to %@", url.absoluteString);
+
+  __block BOOL timedOut = NO;
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  NSURLSessionDataTask *task = [syncState.session
+      dataTaskWithRequest:req
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+          if (timedOut) return;
+          if (error) {
+            SLOGE(@"Request error: %@", error.localizedDescription);
+            reply(0, error.localizedDescription);
+            dispatch_semaphore_signal(sema);
+            return;
+          }
+          NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+          NSInteger code = httpResponse.statusCode;
+          NSString *desc;
+          if (code == 301) {
+            NSString *location = [httpResponse valueForHTTPHeaderField:@"Location"];
+            desc = [NSString stringWithFormat:@"HTTP 301, new location: %@", location];
+          } else {
+            desc = [NSHTTPURLResponse localizedStringForStatusCode:code];
+          }
+          reply(code, desc);
+          dispatch_semaphore_signal(sema);
+        }];
+  [task resume];
+  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC))) {
+    timedOut = YES;
+    [task cancel];
+    SLOGE(@"Request timed out after 30s");
+    reply(0, @"Request timed out");
+  }
 }
 
 #pragma mark sync control / SNTPushNotificationsDelegate methods
@@ -413,6 +463,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       // These are no longer needed and should not be accessible to other sync stages
       syncState.pushNKey = nil;
       syncState.pushJWT = nil;
+      syncState.pushIssuerJWT = nil;
       syncState.pushHMACKey = nil;
 
       // If push interval changed, mark log the difference.
@@ -536,6 +587,30 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   NSURLSessionConfiguration *sessConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
   sessConfig.connectionProxyDictionary = [[SNTConfigurator configurator] syncProxyConfig];
 
+  // Apply extra headers at the session level so all requests (including doctor checks) get them.
+  NSSet<NSString *> *restrictedHeaders = [NSSet setWithArray:@[
+    @"content-encoding",
+    @"content-length",
+    @"content-type",
+    @"connection",
+    @"host",
+    @"proxy-authenticate",
+    @"proxy-authorization",
+    @"www-authenticate",
+  ]];
+  NSDictionary *extraHeaders = [config syncExtraHeaders];
+  if (extraHeaders.count) {
+    NSMutableDictionary *filtered = [NSMutableDictionary dictionary];
+    [extraHeaders enumerateKeysAndObjectsUsingBlock:^(id key, id object, BOOL *stop) {
+      if (![key isKindOfClass:[NSString class]] || ![object isKindOfClass:[NSString class]]) return;
+      if ([restrictedHeaders containsObject:((NSString *)key).lowercaseString]) return;
+      filtered[key] = object;
+    }];
+    if (filtered.count) {
+      sessConfig.HTTPAdditionalHeaders = filtered;
+    }
+  }
+
   MOLAuthenticatingURLSession *authURLSession =
       [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:sessConfig];
   authURLSession.userAgent = @"santactl-sync/";
@@ -549,12 +624,19 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     SLOGD(@"%@", line);
   };
 
+  // Ask the daemon to determine if sync v2 is enabled. Sync v2 will be enabled
+  // if a pinned domain is configured or if a valid push token chain is present.
+  // The push token chain is stored in the sync state which is not accessible
+  // from the syncservice process.
+  [[self.daemonConn synchronousRemoteObjectProxy] isSyncV2Enabled:^(BOOL reply) {
+    syncState.isSyncV2 = reply;
+  }];
+
   // Configure server auth
   if (santa::IsDomainPinned(syncState.syncBaseURL)) {
 #ifndef DEBUG
     authURLSession.serverRootsPemString = santa::PinnedCertPEMs();
 #endif
-    syncState.isSyncV2 = YES;
   } else if ([config syncServerAuthRootsFile]) {
     authURLSession.serverRootsPemFile = [config syncServerAuthRootsFile];
   } else if ([config syncServerAuthRootsData]) {

@@ -32,8 +32,10 @@ realclean:
 
 compile_commands:
 	# Build all targets under source so any generated code will be emitted and
-	# available for compile command construction.
-	bazel build //Source/...
+	# available for compile command construction. The --keep_going flag ensures
+	# cc_proto_library targets are built and visible to the
+	# refresh_compile_commands rule.
+	bazel build --keep_going //Source/...
 	bazel run :refresh_compile_commands
 
 .PHONY: fmt build test devrelease reload clean realclean compile_commands

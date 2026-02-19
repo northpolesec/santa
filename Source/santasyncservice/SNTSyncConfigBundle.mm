@@ -41,8 +41,21 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSString *fileAccessEventDetailURL;
+@property NSString *fileAccessEventDetailText;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
+@property NSArray<NSString *> *pushTokenChain;
 @end
+
+SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState) {
+  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+
+  if (syncState.pushIssuerJWT.length && syncState.pushJWT.length) {
+    bundle.pushTokenChain = @[ syncState.pushIssuerJWT, syncState.pushJWT ];
+  }
+
+  return bundle;
+}
 
 SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -65,6 +78,8 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.modeTransition = syncState.modeTransition;
   bundle.eventDetailURL = syncState.eventDetailURL;
   bundle.eventDetailText = syncState.eventDetailText;
+  bundle.fileAccessEventDetailURL = syncState.fileAccessEventDetailURL;
+  bundle.fileAccessEventDetailText = syncState.fileAccessEventDetailText;
   bundle.networkExtensionSettings = syncState.networkExtensionSettings;
 
   bundle.fullSyncLastSuccess = [NSDate now];

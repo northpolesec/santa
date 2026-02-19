@@ -40,8 +40,11 @@
 @property SNTModeTransition *modeTransition;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSString *fileAccessEventDetailURL;
+@property NSString *fileAccessEventDetailText;
 @property NSNumber *enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
+@property NSArray<NSString *> *pushTokenChain;
 @end
 
 @implementation SNTConfigBundle
@@ -71,8 +74,11 @@
   ENCODE(coder, modeTransition);
   ENCODE(coder, eventDetailURL);
   ENCODE(coder, eventDetailText);
+  ENCODE(coder, fileAccessEventDetailURL);
+  ENCODE(coder, fileAccessEventDetailText);
   ENCODE(coder, enableNotificationSilences);
   ENCODE(coder, networkExtensionSettings);
+  ENCODE(coder, pushTokenChain);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -98,8 +104,11 @@
     DECODE(decoder, modeTransition, SNTModeTransition);
     DECODE(decoder, eventDetailURL, NSString);
     DECODE(decoder, eventDetailText, NSString);
+    DECODE(decoder, fileAccessEventDetailURL, NSString);
+    DECODE(decoder, fileAccessEventDetailText, NSString);
     DECODE(decoder, enableNotificationSilences, NSNumber);
     DECODE(decoder, networkExtensionSettings, SNTSyncNetworkExtensionSettings);
+    DECODE_ARRAY(decoder, pushTokenChain, NSString);
   }
   return self;
 }
@@ -223,6 +232,18 @@
   }
 }
 
+- (void)fileAccessEventDetailURL:(void (^)(NSString *))block {
+  if (self.fileAccessEventDetailURL) {
+    block(self.fileAccessEventDetailURL);
+  }
+}
+
+- (void)fileAccessEventDetailText:(void (^)(NSString *))block {
+  if (self.fileAccessEventDetailText) {
+    block(self.fileAccessEventDetailText);
+  }
+}
+
 - (void)enableNotificationSilences:(void (^)(BOOL))block {
   if (self.enableNotificationSilences) {
     block([self.enableNotificationSilences boolValue]);
@@ -232,6 +253,12 @@
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block {
   if (self.networkExtensionSettings) {
     block(self.networkExtensionSettings);
+  }
+}
+
+- (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block {
+  if (self.pushTokenChain) {
+    block(self.pushTokenChain);
   }
 }
 

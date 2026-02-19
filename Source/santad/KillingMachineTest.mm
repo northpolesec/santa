@@ -23,21 +23,10 @@
 #include <functional>
 #include <vector>
 
-// Forward declare the types and functions we need to test
+#include "Source/santad/CSOpsHelper.h"
+
+// Forward declare test-only functions exposed by KillingMachine.mm
 namespace santa {
-
-using CSOpsFunc = std::function<int(pid_t, unsigned int, void *, size_t)>;
-
-static constexpr unsigned int kCsopStatus = 0;
-static constexpr unsigned int kCsopCDHash = 5;
-static constexpr unsigned int kCsopIdentity = 11;
-static constexpr unsigned int kCsopTeamID = 14;
-
-struct csops_blob {
-  uint32_t type;
-  uint32_t len;
-  char data[];
-};
 
 extern bool TestCDHashMatcher(pid_t pid, NSString *cdhash, CSOpsFunc csops_func);
 extern bool TestTeamIDMatcher(pid_t pid, NSString *teamID, CSOpsFunc csops_func);

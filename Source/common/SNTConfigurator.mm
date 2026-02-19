@@ -16,9 +16,12 @@
 #import "Source/common/SNTConfigurator.h"
 
 #include <sys/stat.h>
+#include <set>
+#include <string>
 
 #include "Source/common/Pinning.h"
 
+#import "Source/common/NKeyTokenValidator.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTModeTransition.h"
@@ -27,6 +30,12 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
+
+// Trusted operators authorized to issue account JWTs for sync v2 features.
+static const std::set<std::string> kTrustedNKeys = {
+    "ODMPJXU2TN4ECFQMZZN4AQYXX3XPS5BQSGOZX2F3OGGKNRGGAV6HNOKF",
+    "OAETVI6QW7WZTFUWJFZKIN2YCAEVDMINFIG4S5Y5YOCGSJYSPTNZZJSW",
+};
 
 // Ensures the given object is an NSArray and only contains NSString value types
 static NSArray<NSString *> *EnsureArrayOfStrings(id obj) {
@@ -220,6 +229,8 @@ static NSString *const kOverrideFileAccessActionKey = @"OverrideFileAccessAction
 static NSString *const kEnableBundlesKey = @"EnableBundles";
 static NSString *const kEventDetailURLKey = @"EventDetailURL";
 static NSString *const kEventDetailTextKey = @"EventDetailText";
+static NSString *const kFileAccessEventDetailURLKey = @"FileAccessEventDetailURL";
+static NSString *const kFileAccessEventDetailTextKey = @"FileAccessEventDetailText";
 
 // The keys managed by a sync server.
 static NSString *const kFullSyncLastSuccess = @"FullSyncLastSuccess";
@@ -229,6 +240,7 @@ static NSString *const kSyncTypeRequired = @"SyncTypeRequired";
 static NSString *const kExportConfigurationKey = @"ExportConfiguration";
 static NSString *const kModeTransitionKey = @"ModeTransition";
 static NSString *const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings";
+static NSString *const kPushTokenChainKey = @"PushTokenChain";
 
 - (instancetype)init {
   return [self initWithSyncStateFile:kSyncStateFilePath
@@ -281,8 +293,11 @@ static NSString *const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings
       kExportConfigurationKey : data,
       kModeTransitionKey : data,
       kNetworkExtensionSettingsKey : data,
+      kPushTokenChainKey : array,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
+      kFileAccessEventDetailURLKey : string,
+      kFileAccessEventDetailTextKey : string,
       kFullSyncInterval : number,
       kFCMFullSyncInterval : number,
     };
@@ -310,6 +325,8 @@ static NSString *const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings
       kMoreInfoURLKey : string,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
+      kFileAccessEventDetailURLKey : string,
+      kFileAccessEventDetailTextKey : string,
       kDismissTextKey : string,
       kUnknownBlockMessage : string,
       kBannedBlockMessage : string,
@@ -548,6 +565,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingEventDetailText {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingFileAccessEventDetailURL {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingFileAccessEventDetailText {
   return [self syncAndConfigStateSet];
 }
 
@@ -835,6 +860,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self syncStateSet];
 }
 
++ (NSSet *)keyPathsForValuesAffectingPushTokenChain {
+  return [self syncStateSet];
+}
+
 #pragma mark Public Interface
 
 - (SNTClientMode)clientMode {
@@ -949,6 +978,14 @@ static SNTConfigurator *sharedConfigurator = nil;
     (SNTSyncNetworkExtensionSettings *)syncNetworkExtensionSettings {
   [self updateSyncStateForKey:kNetworkExtensionSettingsKey
                         value:[syncNetworkExtensionSettings serialize]];
+}
+
+- (NSArray<NSString *> *)pushTokenChain {
+  return EnsureArrayOfStrings(self.syncState[kPushTokenChainKey]);
+}
+
+- (void)setSyncServerPushTokenChain:(NSArray<NSString *> *)pushTokenChain {
+  [self updateSyncStateForKey:kPushTokenChainKey value:EnsureArrayOfStrings(pushTokenChain)];
 }
 
 - (NSRegularExpression *)allowedPathRegex {
@@ -1114,6 +1151,24 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (void)setSyncServerEventDetailText:(NSString *)eventDetailText {
   [self updateSyncStateForKey:kEventDetailTextKey value:eventDetailText];
+}
+
+- (NSString *)fileAccessEventDetailURL {
+  return self.syncState[kFileAccessEventDetailURLKey]
+             ?: self.configState[kFileAccessEventDetailURLKey];
+}
+
+- (void)setSyncServerFileAccessEventDetailURL:(NSString *)fileAccessEventDetailURL {
+  [self updateSyncStateForKey:kFileAccessEventDetailURLKey value:fileAccessEventDetailURL];
+}
+
+- (NSString *)fileAccessEventDetailText {
+  return self.syncState[kFileAccessEventDetailTextKey]
+             ?: self.configState[kFileAccessEventDetailTextKey];
+}
+
+- (void)setSyncServerFileAccessEventDetailText:(NSString *)fileAccessEventDetailText {
+  [self updateSyncStateForKey:kFileAccessEventDetailTextKey value:fileAccessEventDetailText];
 }
 
 - (NSString *)dismissText {
@@ -1517,8 +1572,36 @@ static SNTConfigurator *sharedConfigurator = nil;
   return (self.fcmProject.length && self.fcmEntity.length && self.fcmAPIKey.length);
 }
 
+- (BOOL)hasValidPushTokenChain {
+  if (!self.pushTokenChain) {
+    LOGW(@"Push token chain is not set");
+    return NO;
+  }
+  if (self.pushTokenChain.count != 2) {
+    LOGW(@"Push token chain has %ld tokens, expected 2", self.pushTokenChain.count);
+    return NO;
+  }
+  if (!self.pushTokenChain[0].length || !self.pushTokenChain[1].length) {
+    LOGW(@"Push token chain has empty tokens");
+    return NO;
+  }
+  return santa::NKeyTokenValidator(kTrustedNKeys, self.pushTokenChain[0], self.pushTokenChain[1])
+      .Validate();
+}
+
 - (BOOL)isSyncV2Enabled {
-  return santa::IsDomainPinned([self syncBaseURL]);
+  // Only the daemon can read / write to the sync state. Ensure there are no attempts to read this
+  // setting from non-daemon processes.
+  if (![[[NSProcessInfo processInfo] processName]
+          isEqualToString:@"com.northpolesec.santa.daemon"]) {
+    // This is a programming error
+    LOGE(@"Attempting to call isSyncV2Enabled from a non-daemon process");
+    [NSException
+         raise:@"Attempt to call isSyncV2Enabled from a non-daemon process"
+        format:@"isSyncV2Enabled called from: %@", [[NSProcessInfo processInfo] processName]];
+  }
+
+  return santa::IsDomainPinned([self syncBaseURL]) || [self hasValidPushTokenChain];
 }
 
 - (BOOL)enablePushNotifications {
@@ -1532,11 +1615,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (deprecatedValue != nil) {
     return [deprecatedValue boolValue];
   }
-  // Default to true when neither key is set, and SyncV2 is enabled.
-  if ([self isSyncV2Enabled]) {
-    return YES;
-  }
-  return NO;
+  return YES;
 }
 
 - (void)setSyncServerBlockUSBMount:(BOOL)enabled {
@@ -1680,13 +1759,23 @@ static SNTConfigurator *sharedConfigurator = nil;
 ///
 ///  Update the syncState. Triggers a KVO event for all dependents.
 ///
+///  This operation blocks to allow the caller to read the written values
+///  immediately after the call completes.
+///
 - (void)updateSyncStateForKey:(NSString *)key value:(id)value {
-  dispatch_async(dispatch_get_main_queue(), ^{
+  void (^block)(void) = ^{
     NSMutableDictionary *syncState = self.syncState.mutableCopy;
     syncState[key] = value;
     self.syncState = syncState;
     [self saveSyncStateToDisk];
-  });
+  };
+  // Avoid deadlocks by directly calling the block when already running on the
+  // main thread.
+  if ([NSThread isMainThread]) {
+    block();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), block);
+  }
 }
 
 ///

@@ -18,6 +18,7 @@
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
+#include <cstddef>
 
 #include <optional>
 
@@ -33,6 +34,7 @@
 - (void)testBasic {
   using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
 
   auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
@@ -49,6 +51,9 @@
       },
       ^std::string() {
         return "/";
+      },
+      ^std::vector<AncestorT>() {
+        return {};
       });
 
   auto sut = santa::cel::Evaluator<true>::Create();
@@ -113,6 +118,9 @@
         },
         ^std::string() {
           return "/Users/foo";
+        },
+        ^std::vector<santa::cel::v2::Ancestor>() {
+          return {};
         });
 
     auto result2 = sut.value()->Evaluate(expr.value().get(), activation2);
@@ -161,6 +169,9 @@
         },
         ^std::string {
           return "/";
+        },
+        ^std::vector<santa::cel::v2::Ancestor>() {
+          return {};
         });
 
     auto result = sut.value()->CompileAndEvaluate(
@@ -198,12 +209,19 @@
   auto cwdFn = ^std::string() {
     return "/";
   };
+  auto ancestorsV1Fn = ^std::vector<santa::cel::CELProtoTraits<false>::AncestorT>() {
+    return {};
+  };
+  auto ancestorsV2Fn = ^std::vector<santa::cel::CELProtoTraits<true>::AncestorT>() {
+    return {};
+  };
 
   {
     // V1
     auto f = std::make_unique<santa::cel::CELProtoTraits<false>::ExecutableFileT>();
     f->mutable_signing_time()->set_seconds(1748436989);
-    santa::cel::Activation<false> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn);
+    santa::cel::Activation<false> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn,
+                                             ancestorsV1Fn);
     auto sut = santa::cel::Evaluator<false>::Create();
     XCTAssertTrue(sut.ok());
 
@@ -218,7 +236,8 @@
     using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
     auto f = std::make_unique<santa::cel::CELProtoTraits<true>::ExecutableFileT>();
     f->mutable_signing_time()->set_seconds(1748436989);
-    santa::cel::Activation<true> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn);
+    santa::cel::Activation<true> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn,
+                                            ancestorsV2Fn);
     auto sut = santa::cel::Evaluator<true>::Create();
     XCTAssertTrue(sut.ok());
 
@@ -237,6 +256,7 @@
 - (void)testTouchIDCooldownFunctions {
   using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
 
   auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
@@ -253,6 +273,9 @@
       },
       ^std::string() {
         return "/";
+      },
+      ^std::vector<AncestorT>() {
+        return {};
       });
 
   auto sut = santa::cel::Evaluator<true>::Create();
@@ -332,6 +355,7 @@
 
 - (void)testTouchIDCooldownNotAvailableInV1 {
   using ExecutableFileT = santa::cel::CELProtoTraits<false>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<false>::AncestorT;
 
   auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
@@ -348,6 +372,9 @@
       },
       ^std::string() {
         return "/";
+      },
+      ^std::vector<AncestorT>() {
+        return {};
       });
 
   auto sut = santa::cel::Evaluator<false>::Create();

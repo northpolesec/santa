@@ -53,6 +53,7 @@
 @property(copy) NSString *pushServer;
 @property(copy) NSString *pushNKey;             // The nkey for authentication
 @property(copy) NSString *pushJWT;              // JWT for authentication
+@property(copy) NSString *pushIssuerJWT;        // Issuer JWT from chain validation
 @property(copy) NSString *pushDeviceID;         // Device ID for NATS subscription
 @property(copy) NSArray<NSString *> *pushTags;  // Tags to subscribe to
 @property(copy) NSData *pushHMACKey;            // HMAC key for validating push commands
@@ -90,6 +91,8 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSString *eventDetailURL;
 @property NSString *eventDetailText;
+@property NSString *fileAccessEventDetailURL;
+@property NSString *fileAccessEventDetailText;
 
 /// Clean sync flag, if True, all existing rules should be deleted before inserting any new rules.
 @property SNTSyncType syncType;

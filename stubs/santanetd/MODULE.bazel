@@ -5,4 +5,5 @@ module(
     version = "1.0.0",
 )
 
+bazel_dep(name = "protobuf", version = "33.1")
 bazel_dep(name = "rules_cc", version = "0.2.14")
