@@ -234,6 +234,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   };
 
   [authorizer_client registerAuthExecProbe:proc_faa_client];
+  [authorizer_client registerAuthExecProbe:data_faa_client];
 
   [syncd_queue reassessSyncServiceConnectionImmediately];
 

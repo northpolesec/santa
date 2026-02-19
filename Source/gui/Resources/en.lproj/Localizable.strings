@@ -187,10 +187,10 @@
 /* The default message to show the user when a program requires TouchID/password */
 "The following application requires authorization before it can be used" = "The following application requires authorization before it can be used";
 
-/* The default message to show the user when a USB device is blocked from mounting */
+/* The default message to show the user when a Removable Media (e.g. USB device) is blocked from mounting */
 "The following device has been blocked from mounting" = "The following device has been blocked from mounting";
 
-/* The default message to show the user when a USB device is remounted with reduced permissions */
+/* The default message to show the user when a Removable Media (e.g. USB device) is remounted with reduced permissions */
 "The following device has been remounted with reduced permissions" = "The following device has been remounted with reduced permissions";
 
 /* The default message to show the user when a network mount is blocked */
