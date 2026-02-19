@@ -18,6 +18,10 @@ build --per_file_copt=.*\.mm\$@-std=c++20
 build --cxxopt=-std=c++20
 build --host_cxxopt=-std=c++20
 
+# Use ThinLTO for faster link times with LTO benefits
+build --copt=-flto=thin
+build --linkopt=-flto=thin
+
 # Enable C++ interoperability in Swift
 build --@rules_swift//swift:copt=-cxx-interoperability-mode=default
 build --@rules_swift//swift:copt=-Xcc
