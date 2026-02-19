@@ -400,10 +400,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (!proxy) {
       LOGE(@"EventUpload: Failed to connect to bundle service");
       [bs invalidate];
-      guardedReply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                       code:2
-                                   userInfo:@{NSLocalizedDescriptionKey :
-                                                  @"Failed to connect to bundle service"}]);
+      guardedReply([NSError
+          errorWithDomain:@"com.northpolesec.santa.syncservice"
+                     code:2
+                 userInfo:@{NSLocalizedDescriptionKey : @"Failed to connect to bundle service"}]);
       return;
     }
 
