@@ -35,7 +35,8 @@ using santa::Message;
 @interface SNTEndpointSecurityAuthorizer ()
 @property SNTCompilerController *compilerController;
 @property SNTExecutionController *execController;
-@property id<SNTEndpointSecurityProbe> procWatcherProbe;
+@property NSMutableArray<id<SNTEndpointSecurityProbe>> *probes;
+@property BOOL enabled;
 @end
 
 @implementation SNTEndpointSecurityAuthorizer {
@@ -58,6 +59,8 @@ using santa::Message;
     _authResultCache = authResultCache;
     _ttyWriter = std::move(ttyWriter);
 
+    _probes = [NSMutableArray array];
+
     [self establishClientOrDie];
   }
   return self;
@@ -77,8 +80,8 @@ using santa::Message;
   // DENY results. The caller may also prevent caching if it has reason to so.
   bool cacheable = (result == ES_AUTH_RESULT_ALLOW) && !forcePreventCache;
 
-  if (self.procWatcherProbe) {
-    santa::ProbeInterest interest = [self.procWatcherProbe probeInterest:msg];
+  for (id<SNTEndpointSecurityProbe> probe in self.probes) {
+    santa::ProbeInterest interest = [probe probeInterest:msg];
 
     // Prevent caching if a probe is interested in the process. But don't re-enable
     // caching if it was already previously disabled.
@@ -239,14 +242,23 @@ using santa::Message;
 }
 
 - (void)enable {
+  self.enabled = YES;
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_EXEC,
                                     ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   }];
 }
 
-- (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher {
-  self.procWatcherProbe = watcher;
+- (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)probe {
+  if (self.enabled) {
+    // This is a programming error. Bail.
+    [NSException raise:@"Probe registration error"
+                format:@"Cannot register probes after authorizer is enabled"];
+  }
+
+  @synchronized(self) {
+    [self.probes addObject:probe];
+  }
 }
 
 @end
