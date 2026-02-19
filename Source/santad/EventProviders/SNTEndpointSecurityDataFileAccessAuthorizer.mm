@@ -158,6 +158,26 @@ using santa::Message;
                }];
 }
 
+- (santa::ProbeInterest)probeInterest:(const santa::Message &)esMsg {
+  if (!self.isSubscribed) {
+    return santa::ProbeInterest::kUninterested;
+  }
+
+  // Mute Santa's Bundle Service so that it doesn't run afoul of file access protections and
+  // can function as expected. Note: Other processes, especially santactl, are explicitly *NOT*
+  // allowlisted to prevent it from becoming an oracle.
+  const es_process_t *targetProc = esMsg->event.exec.target;
+  if ((targetProc->codesigning_flags & (CS_SIGNED | CS_VALID)) == (CS_SIGNED | CS_VALID) &&
+      targetProc->team_id.data && strcmp(targetProc->team_id.data, "ZMCG7MLDV9") == 0 &&
+      targetProc->signing_id.data &&
+      strcmp(targetProc->signing_id.data, "com.northpolesec.santa.bundleservice") == 0) {
+    [self muteProcess:&targetProc->audit_token];
+    return santa::ProbeInterest::kInterested;
+  }
+
+  return santa::ProbeInterest::kUninterested;
+}
+
 - (void)enable {
   std::set<es_event_type_t> events = {
       ES_EVENT_TYPE_AUTH_CLONE,        ES_EVENT_TYPE_AUTH_COPYFILE, ES_EVENT_TYPE_AUTH_CREATE,

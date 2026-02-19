@@ -202,10 +202,10 @@
 /* The default message to show the user when a program requires TouchID/password */
 "The following application requires authorization before it can be used" = "Die folgende Anwendung erfordert eine Autorisierung, bevor sie verwendet werden kann";
 
-/* The default message to show the user when a USB device is blocked from mounting */
+/* The default message to show the user when a Removable Media (e.g. USB device) is blocked from mounting */
 "The following device has been blocked from mounting" = "Das Mounten des folgenden Geräts wurde blockiert";
 
-/* The default message to show the user when a USB device is remounted with reduced permissions */
+/* The default message to show the user when a Removable Media (e.g. USB device) is remounted with reduced permissions */
 "The following device has been remounted with reduced permissions" = "Das folgende Gerät wurde mit reduzierten Berechtigungen gemountet";
 
 /* The default message to show the user when a network share mount is blocked */
