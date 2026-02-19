@@ -47,10 +47,10 @@
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
 #include "Source/common/Unit.h"
+#include "Source/santad/CELActivation.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/ProcessTree/process_tree_macos.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
@@ -263,10 +263,8 @@ static NSString *const kPrinterProxy =
       decisionForFileInfo:binInfo
             targetProcess:targetProc
               configState:configState
-       activationCallback:[self
-                              createActivationBlockForMessage:esMsg
-                                                    andCSInfo:[binInfo
-                                                                  codesignCheckerWithError:NULL]]];
+       activationCallback:santa::CreateCELActivationBlock(
+                              esMsg, [binInfo codesignCheckerWithError:NULL], _processTree)];
 
   cd.codesigningFlags = targetProc->codesigning_flags;
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
@@ -649,117 +647,8 @@ static NSString *const kPrinterProxy =
   // TODO: Notify the sync service of the new rule.
 }
 
-// Create a block that returns a santa::cel::Activation object for the given Message
-// and MOLCodesignChecker object. The block defines a bool parameter that determines
-// whether to create a v1 or v2 activation object.
-//
-// Note: The returned block captures a reference to the Message object and must
-// not use it after the Message object is destroyed. Care must be taken to not
-// use this in an asynchronous context outside of the evaluation of that execution.
-- (ActivationCallbackBlock)createActivationBlockForMessage:(const santa::Message &)esMsg
-                                                 andCSInfo:(nullable MOLCodesignChecker *)csInfo {
-  std::shared_ptr<santa::EndpointSecurityAPI> esApi = esMsg.ESAPI();
-  std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree = _processTree;
-
-  return ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
-    auto makeActivation =
-        [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
-      using Traits = santa::cel::CELProtoTraits<IsV2>;
-      using ExecutableFileT = typename Traits::ExecutableFileT;
-      using AncestorT = typename Traits::AncestorT;
-
-      auto f = std::make_unique<ExecutableFileT>();
-
-      if (csInfo.signingTime) {
-        f->mutable_signing_time()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
-      }
-      if (csInfo.secureSigningTime) {
-        f->mutable_secure_signing_time()->set_seconds(
-            csInfo.secureSigningTime.timeIntervalSince1970);
-      }
-
-      return std::make_unique<santa::cel::Activation<IsV2>>(
-          std::move(f),
-          ^std::vector<std::string>() {
-            return esApi->ExecArgs(&esMsg->event.exec);
-          },
-          ^std::map<std::string, std::string>() {
-            return esApi->ExecEnvs(&esMsg->event.exec);
-          },
-          ^uid_t() {
-            return audit_token_to_euid(esMsg->event.exec.target->audit_token);
-          },
-          ^std::string() {
-            es_file_t *f = esMsg->event.exec.cwd;
-            return std::string(f->path.data, f->path.length);
-          },
-          ^std::vector<AncestorT>() {
-            return Ancestors<IsV2>(processTree, esMsg);
-          });
-    };
-
-    if (useV2) {
-      return makeActivation.operator()<true>();
-    } else {
-      return makeActivation.operator()<false>();
-    }
-  };
-}
-
 - (void)flushTouchIDApprovalCache {
   _touchIDApprovalCache->clear();
-}
-
-template <bool IsV2>
-std::vector<typename santa::cel::CELProtoTraits<IsV2>::AncestorT> Ancestors(
-    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
-    const santa::Message &esMsg);
-
-template <>
-std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
-    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
-    const santa::Message &esMsg) {
-  if (!processTree) return {};
-
-  using Traits = santa::cel::CELProtoTraits<true>;
-  using AncestorT = typename Traits::AncestorT;
-
-  auto pid = santa::santad::process_tree::PidFromAuditToken(esMsg->process->parent_audit_token);
-  auto proc = processTree->Get(pid);
-  if (!proc) {
-    return {};
-  }
-
-  std::vector<santa::cel::CELProtoTraits<true>::AncestorT> ancestors;
-  for (const auto &p : processTree->RootSlice(*proc)) {
-    if (!p->program_) {
-      continue;
-    }
-
-    AncestorT ancestor;
-    ancestor.set_path(p->program_->executable);
-
-    if (p->program_->code_signing) {
-      const auto &cs = *p->program_->code_signing;
-      if (cs.is_platform_binary) {
-        ancestor.set_signing_id("platform:" + cs.signing_id);
-      } else {
-        ancestor.set_signing_id(cs.team_id + ":" + cs.signing_id);
-      }
-      ancestor.set_team_id(cs.team_id);
-      ancestor.set_cdhash(cs.cdhash);
-    }
-
-    ancestors.push_back(std::move(ancestor));
-  }
-  return ancestors;
-}
-
-template <>
-std::vector<santa::cel::CELProtoTraits<false>::AncestorT> Ancestors<false>(
-    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
-    const santa::Message &esMsg) {
-  return {};
 }
 
 @end
