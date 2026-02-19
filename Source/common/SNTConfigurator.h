@@ -414,6 +414,11 @@
 ///
 - (void)setSyncServerPushTokenChain:(nonnull NSArray<NSString *> *)pushTokenChain;
 
+///
+///  Set the telemetry filter expressions as received from a sync server.
+///
+- (void)setSyncServerTelemetryFilterExpressions:(nullable NSArray<NSString *> *)expressions;
+
 #pragma mark - GUI Settings
 
 ///

@@ -428,6 +428,16 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
     syncState.fileAccessEventDetailText = StringToNSString(resp.file_access_event_detail_text());
   }
 
+  // Always set telemetry filter expressions (even if empty) to allow the server to clear them.
+  {
+    NSMutableArray<NSString *> *expressions =
+        [NSMutableArray arrayWithCapacity:resp.telemetry_filter_expressions_size()];
+    for (const auto &expr : resp.telemetry_filter_expressions()) {
+      [expressions addObject:StringToNSString(expr)];
+    }
+    syncState.telemetryFilterExpressions = [expressions copy];
+  }
+
   if (resp.has_export_configuration()) {
     auto exportConfig = resp.export_configuration().signed_post();
     if (!exportConfig.url().empty() && !exportConfig.form_values().empty()) {

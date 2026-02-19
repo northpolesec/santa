@@ -467,6 +467,10 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerPushTokenChain:val];
   }];
 
+  [result telemetryFilterExpressions:^(NSArray<NSString *> *val) {
+    [configurator setSyncServerTelemetryFilterExpressions:val];
+  }];
+
   [result eventDetailURL:^(NSString *val) {
     [configurator setSyncServerEventDetailURL:val];
   }];

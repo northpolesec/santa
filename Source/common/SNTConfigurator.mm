@@ -294,6 +294,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kModeTransitionKey : data,
       kNetworkExtensionSettingsKey : data,
       kPushTokenChainKey : array,
+      kTelemetryFilterExpressionsKey : array,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
       kFileAccessEventDetailURLKey : string,
@@ -817,7 +818,7 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingTelemetryFilterExpressions {
-  return [self configStateSet];
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingTelemetry {
@@ -1863,7 +1864,18 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (NSArray *)telemetryFilterExpressions {
-  return EnsureArrayOfStrings(self.configState[kTelemetryFilterExpressionsKey]);
+  NSMutableArray *merged = [NSMutableArray array];
+  NSArray *syncExpressions = EnsureArrayOfStrings(self.syncState[kTelemetryFilterExpressionsKey]);
+  if (syncExpressions) [merged addObjectsFromArray:syncExpressions];
+  NSArray *configExpressions =
+      EnsureArrayOfStrings(self.configState[kTelemetryFilterExpressionsKey]);
+  if (configExpressions) [merged addObjectsFromArray:configExpressions];
+  return merged.count ? [merged copy] : nil;
+}
+
+- (void)setSyncServerTelemetryFilterExpressions:(NSArray<NSString *> *)expressions {
+  [self updateSyncStateForKey:kTelemetryFilterExpressionsKey
+                        value:EnsureArrayOfStrings(expressions)];
 }
 
 - (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {
