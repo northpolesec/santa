@@ -40,15 +40,10 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 + (NSString *)longHelpText {
-  NSString *helpText = @"Instruct the daemon to install Santa.app.\n";
-#ifdef DEBUG
-  helpText = [helpText
-      stringByAppendingString:
-          @"Options:\n"
-          @"  --network-extension:  Install and activate the santanetd content filter instead.\n"
-          @"                        WARNING: All network connections will reset.\n"];
-#endif
-  return helpText;
+  return @"Instruct the daemon to install Santa.app.\n"
+         @"Options:\n"
+         @"  --network-extension:  Install and activate the santanetd content filter instead.\n"
+         @"                        WARNING: All network connections will reset.\n";
 }
 
 + (BOOL)isHidden {
@@ -58,14 +53,12 @@ REGISTER_COMMAND_NAME(@"install")
 - (void)runWithArguments:(NSArray *)arguments {
   BOOL installNetworkExtension = NO;
 
-#ifdef DEBUG
   for (NSString *arg in arguments) {
     if ([arg caseInsensitiveCompare:@"--network-extension"] == NSOrderedSame) {
       installNetworkExtension = YES;
       break;
     }
   }
-#endif
 
   if (installNetworkExtension) {
     [self installNetworkExtension];
@@ -91,7 +84,8 @@ REGISTER_COMMAND_NAME(@"install")
       TEE_LOGI(@"Network extension installation was successful");
       success = YES;
     } else {
-      TEE_LOGW(@"Network extension installation unsuccessful. Please consult logs.");
+      TEE_LOGW(@"Network extension installation unsuccessful. Is this machine authorized? "
+               @"Please consult logs.");
     }
 
     dispatch_semaphore_signal(sema);

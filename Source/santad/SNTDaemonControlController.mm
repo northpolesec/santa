@@ -704,6 +704,12 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)installNetworkExtension:(void (^)(BOOL))reply {
+  if (![self.netExtQueue shouldInstallNetworkExtension]) {
+    LOGI(@"Network extension install not authorized");
+    reply(NO);
+    return;
+  }
+
   LOGI(@"Trigger santanetd (network extension) installation");
 
   // Verify the network extension bundle exists
@@ -719,9 +725,15 @@ double watchdogRAMPeak = 0;
     return;
   }
 
+  // Let the caller know the installation will be triggered.
+  // The actual installation happens asynchronously.
   reply(YES);
 
   [self reloadNetworkExtension];
+}
+
+- (void)shouldInstallNetworkExtension:(void (^)(BOOL))reply {
+  reply([self.netExtQueue shouldInstallNetworkExtension]);
 }
 
 - (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion

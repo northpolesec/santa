@@ -228,6 +228,11 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   return std::make_pair<int, int>([components[0] intValue], [components[1] intValue]);
 }
 
+- (BOOL)shouldInstallNetworkExtension {
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  return [configurator isSyncV2Enabled] && [configurator syncNetworkExtensionSettings].enable;
+}
+
 - (NSDictionary *)generateSettingsForProtocolVersion:(NSString *)protocolVersion {
   if (!protocolVersion) {
     return nil;

@@ -42,4 +42,8 @@ extern NSString *const kSantaNetworkExtensionProtocolVersion;
                windowStart:(NSDate *)windowStart
                  windowEnd:(NSDate *)windowEnd;
 
+/// Returns YES if the network extension should be installed.
+/// Checks that sync v2 is enabled and network extension settings have enable set to YES.
+- (BOOL)shouldInstallNetworkExtension;
+
 @end
