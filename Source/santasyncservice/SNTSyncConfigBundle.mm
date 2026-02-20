@@ -45,6 +45,7 @@
 @property NSString *fileAccessEventDetailText;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
+@property NSArray<NSString *> *telemetryFilterExpressions;
 @end
 
 SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState) {
@@ -81,6 +82,7 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.fileAccessEventDetailURL = syncState.fileAccessEventDetailURL;
   bundle.fileAccessEventDetailText = syncState.fileAccessEventDetailText;
   bundle.networkExtensionSettings = syncState.networkExtensionSettings;
+  bundle.telemetryFilterExpressions = syncState.telemetryFilterExpressions;
 
   bundle.fullSyncLastSuccess = [NSDate now];
 
