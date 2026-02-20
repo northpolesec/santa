@@ -79,10 +79,10 @@ REGISTER_COMMAND_NAME(@"install")
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   __block BOOL success = NO;
-  [[self.daemonConn remoteObjectProxy] installNetworkExtension:^(BOOL success) {
+  [[self.daemonConn remoteObjectProxy] installNetworkExtension:^(BOOL installTriggered) {
+    success = installTriggered;
     if (success) {
       TEE_LOGI(@"Network extension installation was successful");
-      success = YES;
     } else {
       TEE_LOGW(@"Network extension installation unsuccessful. Is this machine authorized? "
                @"Please consult logs.");
