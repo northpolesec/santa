@@ -48,5 +48,6 @@
 - (void)enableNotificationSilences:(void (^)(BOOL))block;
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block;
 - (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block;
+- (void)telemetryFilterExpressions:(void (^)(NSArray<NSString *> *))block;
 
 @end

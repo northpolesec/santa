@@ -45,6 +45,7 @@
 @property NSNumber *enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
+@property NSArray<NSString *> *telemetryFilterExpressions;
 @end
 
 @implementation SNTConfigBundle
@@ -79,6 +80,7 @@
   ENCODE(coder, enableNotificationSilences);
   ENCODE(coder, networkExtensionSettings);
   ENCODE(coder, pushTokenChain);
+  ENCODE(coder, telemetryFilterExpressions);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -109,6 +111,7 @@
     DECODE(decoder, enableNotificationSilences, NSNumber);
     DECODE(decoder, networkExtensionSettings, SNTSyncNetworkExtensionSettings);
     DECODE_ARRAY(decoder, pushTokenChain, NSString);
+    DECODE_ARRAY(decoder, telemetryFilterExpressions, NSString);
   }
   return self;
 }
@@ -259,6 +262,12 @@
 - (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block {
   if (self.pushTokenChain) {
     block(self.pushTokenChain);
+  }
+}
+
+- (void)telemetryFilterExpressions:(void (^)(NSArray<NSString *> *))block {
+  if (self.telemetryFilterExpressions) {
+    block(self.telemetryFilterExpressions);
   }
 }
 
