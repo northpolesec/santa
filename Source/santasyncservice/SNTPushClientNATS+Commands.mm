@@ -165,6 +165,10 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 - (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
                             withCommandUUID:(NSString *)uuid
                                     onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::EventUploadResponse *)handleEventUploadRequest:
+                                     (const ::pbv1::EventUploadRequest &)eventUploadRequest
+                                          withCommandUUID:(NSString *)uuid
+                                                  onArena:(google::protobuf::Arena *)arena;
 - (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
                                       (const ::pbv1::SantaCommandRequest &)command
                                                         onArena:(google::protobuf::Arena *)arena;
@@ -291,6 +295,41 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   return pbKillResponse;
 }
 
+// Handle EventUploadRequest command
+- (::pbv1::EventUploadResponse *)handleEventUploadRequest:
+                                     (const ::pbv1::EventUploadRequest &)eventUploadRequest
+                                          withCommandUUID:(NSString *)uuid
+                                                  onArena:(google::protobuf::Arena *)arena {
+  auto pbResponse = google::protobuf::Arena::Create<::pbv1::EventUploadResponse>(arena);
+
+  NSString *path = StringToNSString(eventUploadRequest.path());
+  if (path.length == 0) {
+    LOGE(@"NATS: EventUploadRequest has empty path");
+    pbResponse->set_error(::pbv1::EventUploadResponse::ERROR_INVALID_PATH);
+    return pbResponse;
+  }
+
+  id<SNTPushNotificationsSyncDelegate> strongSyncDelegate = self.syncDelegate;
+  if (!strongSyncDelegate) {
+    LOGE(@"NATS: EventUploadRequest failed - no sync delegate");
+    pbResponse->set_error(::pbv1::EventUploadResponse::ERROR_INTERNAL);
+    return pbResponse;
+  }
+
+  // Fire off the event upload asynchronously - don't wait for completion
+  [strongSyncDelegate
+      eventUploadForPath:path
+                   reply:^(NSError *error) {
+                     if (error) {
+                       LOGE(@"NATS: EventUploadRequest failed for path %@: %@", path, error);
+                     } else {
+                       LOGI(@"NATS: EventUploadRequest completed for path %@", path);
+                     }
+                   }];
+
+  return pbResponse;
+}
+
 // Dispatch Santa command to appropriate handler based on command type
 - (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
                                       (const ::pbv1::SantaCommandRequest &)command
@@ -340,6 +379,15 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                                    withCommandUUID:uuid
                                            onArena:arena];
       response->unsafe_arena_set_allocated_kill(killResponse);
+      break;
+    }
+
+    case ::pbv1::SantaCommandRequest::kEventUpload: {
+      LOGI(@"NATS: Dispatching EventUploadRequest command");
+      auto *eventUploadResponse = [self handleEventUploadRequest:command.event_upload()
+                                                 withCommandUUID:uuid
+                                                         onArena:arena];
+      response->unsafe_arena_set_allocated_event_upload(eventUploadResponse);
       break;
     }
 
