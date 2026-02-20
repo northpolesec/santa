@@ -392,29 +392,34 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     // Connect to bundle service
     MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
-    [bs resume];
 
     dispatch_semaphore_t eventSema = dispatch_semaphore_create(0);
+    bs.invalidationHandler = ^{
+      LOGE(@"EventUpload: Bundle service connection invalidated");
+      dispatch_semaphore_signal(eventSema);
+    };
+
+    [bs resume];
+
     __block NSArray<SNTStoredExecutionEvent *> *resultEvents;
-    id proxy = [bs remoteObjectProxy];
-    if (!proxy) {
-      LOGE(@"EventUpload: Failed to connect to bundle service");
+    [[bs remoteObjectProxy] generateEventsFromPath:path
+                                     enableBundles:enableBundles
+                                             reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
+                                               resultEvents = events;
+                                               dispatch_semaphore_signal(eventSema);
+                                             }];
+
+    dispatch_semaphore_wait(eventSema, DISPATCH_TIME_FOREVER);
+
+    if (!resultEvents) {
+      LOGE(@"EventUpload: Bundle service failed to generate events (connection lost)");
       [bs invalidate];
       guardedReply([NSError
           errorWithDomain:@"com.northpolesec.santa.syncservice"
                      code:2
-                 userInfo:@{NSLocalizedDescriptionKey : @"Failed to connect to bundle service"}]);
+                 userInfo:@{NSLocalizedDescriptionKey : @"Bundle service connection lost"}]);
       return;
     }
-
-    [proxy generateEventsFromPath:path
-                    enableBundles:enableBundles
-                            reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
-                              resultEvents = events;
-                              dispatch_semaphore_signal(eventSema);
-                            }];
-
-    dispatch_semaphore_wait(eventSema, DISPATCH_TIME_FOREVER);
 
     if (!resultEvents.count) {
       [bs invalidate];
