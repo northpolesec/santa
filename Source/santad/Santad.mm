@@ -803,5 +803,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                    });
   }
 
+  // Trigger network extension install/upgrade if this is the first launch after boot
+  if ([configurator isFirstLaunchAfterBoot]) {
+    LOGD(@"First launch after boot, triggering network extension install if authorized");
+    [dc installNetworkExtension:^(BOOL success) {
+      if (!success) {
+        LOGE(@"Failed to trigger network extension install at boot");
+      } else {
+        LOGD(@"Successfully triggered network extension install/upgrade.");
+      }
+    }];
+  }
+
   [[NSRunLoop mainRunLoop] run];
 }
