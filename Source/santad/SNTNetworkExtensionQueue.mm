@@ -237,7 +237,7 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 
   NSMutableDictionary *settings = [NSMutableDictionary dictionary];
-  auto [majorVersion, _] = [self protocolVersionComponents:self.connectedProtocolVersion];
+  auto [majorVersion, _] = [self protocolVersionComponents:protocolVersion];
   SNTSyncNetworkExtensionSettings *netExtSettings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
 
