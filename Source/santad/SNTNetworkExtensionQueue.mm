@@ -61,60 +61,58 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
     WEAKIFY(self);
 
     _kvoWatchers = @[
-      [[SNTKVOManager alloc]
-          initWithObject:[SNTConfigurator configurator]
-                selector:@selector(syncNetworkExtensionSettings)
-                    type:[SNTSyncNetworkExtensionSettings class]
-                callback:^(SNTSyncNetworkExtensionSettings *oldValue,
-                           SNTSyncNetworkExtensionSettings *newValue) {
-                  if ((!oldValue && !newValue) || [oldValue isEqual:newValue]) {
-                    return;
-                  }
+      [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
+                                   selector:@selector(syncNetworkExtensionSettings)
+                                       type:[SNTSyncNetworkExtensionSettings class]
+                                   callback:^(SNTSyncNetworkExtensionSettings *oldValue,
+                                              SNTSyncNetworkExtensionSettings *newValue) {
+                                     // Treat nil as equivalent to enable == NO (the default state).
+                                     if (oldValue.enable == newValue.enable) {
+                                       return;
+                                     }
 
-                  STRONGIFY(self);
+                                     STRONGIFY(self);
 
-                  LOGI(@"SyncNetworkExtensionSettings changed: enable %d -> %d", oldValue.enable,
-                       newValue.enable);
+                                     LOGI(@"SyncNetworkExtensionSettings changed: enable %d -> %d",
+                                          oldValue.enable, newValue.enable);
 
-                  [self handleSettingsChanged:newValue];
-
-                  // Force push notification client to reconnect.
-                  // This resets the NATS connection state and triggers a sync
-                  // to get fresh credentials and reconnect immediately.
-                  LOGI(@"SNTNetworkExtensionQueue: Triggering push notification reconnect");
-                  [self.syncdQueue pushNotificationReconnect];
-                }],
+                                     [self handleSettingsChanged:newValue];
+                                   }],
     ];
   }
   return self;
 }
 
 - (void)handleSettingsChanged:(SNTSyncNetworkExtensionSettings *)settings {
-  MOLXPCConnection *conn = self.notifierQueue.notifierConnection;
+  MOLXPCConnection *conn = self.netExtConnection;
   if (!conn) {
-    LOGW(@"Notifier connection unavailable; skipping filter enabled update (%d)", settings.enable);
+    LOGW(@"Network extension connection unavailable; skipping settings update");
+    return;
+  }
+
+  NSDictionary *settingsDict =
+      [self generateSettingsForProtocolVersion:self.connectedProtocolVersion];
+  if (!settingsDict) {
+    LOGW(@"Failed to generate settings for protocol version %@", self.connectedProtocolVersion);
     return;
   }
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  // Update the filter enabled state via the GUI process
   [[conn remoteObjectProxy]
-      setNetworkExtensionFilterEnabled:settings.enable
-                                 reply:^(BOOL success) {
-                                   if (success) {
-                                     LOGI(@"Successfully updated network extension filter enabled "
-                                          @"state");
-                                   } else {
-                                     LOGW(@"Failed to update network extension filter enabled "
-                                          @"state");
-                                   }
+      updateNetworkExtensionSettings:settingsDict
+                               reply:^(BOOL success) {
+                                 if (success) {
+                                   LOGI(@"Successfully updated network extension settings");
+                                 } else {
+                                   LOGW(@"Failed to update network extension settings");
+                                 }
 
-                                   dispatch_semaphore_signal(sema);
-                                 }];
+                                 dispatch_semaphore_signal(sema);
+                               }];
 
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
-    LOGW(@"Timeout when attempting to set filter enabled state (%d)", settings.enable);
+    LOGW(@"Timeout when attempting to update network extension settings");
   }
 }
 
