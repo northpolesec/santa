@@ -49,4 +49,7 @@ extern NSString *const kSantaNetworkExtensionProtocolVersion;
 /// Queries the connected network extension for its bundle version info.
 - (void)networkExtensionBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
 
+/// Returns YES if the network extension is currently connected.
+- (BOOL)isLoaded;
+
 @end

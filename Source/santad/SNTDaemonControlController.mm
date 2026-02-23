@@ -705,7 +705,7 @@ double watchdogRAMPeak = 0;
 
 - (void)installNetworkExtension:(void (^)(BOOL))reply {
   if (![self.netExtQueue shouldInstallNetworkExtension]) {
-    LOGI(@"Network extension install not authorized");
+    LOGI(@"Network extension installation/upgrade not authorized");
     reply(NO);
     return;
   }
@@ -812,6 +812,10 @@ double watchdogRAMPeak = 0;
   SNTSyncNetworkExtensionSettings *settings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
   reply(settings ? settings.enable : NO);
+}
+
+- (void)networkExtensionLoaded:(void (^)(BOOL loaded))reply {
+  reply([self.netExtQueue isLoaded]);
 }
 
 @end
