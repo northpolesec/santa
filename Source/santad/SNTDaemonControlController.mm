@@ -810,4 +810,8 @@ double watchdogRAMPeak = 0;
   reply(settings ? settings.enable : NO);
 }
 
+- (void)networkExtensionLoaded:(void (^)(BOOL loaded))reply {
+  reply([self.netExtQueue isLoaded]);
+}
+
 @end
