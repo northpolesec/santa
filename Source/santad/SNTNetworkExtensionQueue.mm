@@ -20,13 +20,13 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTError.h"
 #include "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
 #import "Source/santad/SNTNotificationQueue.h"
@@ -90,9 +90,9 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
     return;
   }
 
-  NSDictionary *settingsDict =
+  SNTNetworkExtensionSettings *netExtSettings =
       [self generateSettingsForProtocolVersion:self.connectedProtocolVersion];
-  if (!settingsDict) {
+  if (!netExtSettings) {
     LOGW(@"Failed to generate settings for protocol version %@", self.connectedProtocolVersion);
     return;
   }
@@ -100,7 +100,7 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   [[conn remoteObjectProxy]
-      updateNetworkExtensionSettings:settingsDict
+      updateNetworkExtensionSettings:netExtSettings
                                reply:^(BOOL success) {
                                  if (success) {
                                    LOGI(@"Successfully updated network extension settings");
@@ -142,8 +142,8 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 }
 
-- (NSDictionary *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
-                                                  error:(NSError **)error {
+- (SNTNetworkExtensionSettings *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
+                                                                 error:(NSError **)error {
   if (self.netExtConnection) {
     LOGW(@"Network extension attempting to register but already connected, clearing stale "
          @"connection");
@@ -246,21 +246,21 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   return self.netExtConnection != nil;
 }
 
-- (NSDictionary *)generateSettingsForProtocolVersion:(NSString *)protocolVersion {
+- (SNTNetworkExtensionSettings *)generateSettingsForProtocolVersion:(NSString *)protocolVersion {
   if (!protocolVersion) {
     return nil;
   }
 
-  NSMutableDictionary *settings = [NSMutableDictionary dictionary];
   auto [majorVersion, _] = [self protocolVersionComponents:protocolVersion];
-  SNTSyncNetworkExtensionSettings *netExtSettings =
+  SNTSyncNetworkExtensionSettings *syncSettings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
 
+  BOOL enable = NO;
   if (majorVersion >= 1) {
-    settings[@"enable"] = @(netExtSettings.enable);
+    enable = syncSettings.enable;
   }
 
-  return [settings sntDeepCopy];
+  return [[SNTNetworkExtensionSettings alloc] initWithEnable:enable];
 }
 
 @end

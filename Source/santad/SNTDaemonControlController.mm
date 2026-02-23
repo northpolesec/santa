@@ -737,7 +737,7 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion
-                                              reply:(void (^)(NSDictionary *settings,
+                                              reply:(void (^)(SNTNetworkExtensionSettings *settings,
                                                               NSString *santaProtocolVersion,
                                                               NSError *error))reply {
   NSError *error;
@@ -750,8 +750,8 @@ double watchdogRAMPeak = 0;
     return;
   }
 
-  NSDictionary *settings = [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion
-                                                                             error:&error];
+  SNTNetworkExtensionSettings *settings =
+      [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion error:&error];
   reply(settings, kSantaNetworkExtensionProtocolVersion, error);
 
   // When the network extension registers, it may have just been enabled which can
