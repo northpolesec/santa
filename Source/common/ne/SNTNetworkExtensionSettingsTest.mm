@@ -89,8 +89,7 @@
                                                        error:nil];
   XCTAssertNotNil(data);
 
-  NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data
-                                                                              error:nil];
+  NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data error:nil];
   unarchiver.requiresSecureCoding = YES;
   [unarchiver setClass:[SNTNetworkExtensionSettings class]
           forClassName:NSStringFromClass([SNTNetworkExtensionSettingsFuture class])];
