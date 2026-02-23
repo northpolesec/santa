@@ -27,7 +27,7 @@ using santa::PowerMonitor;
 @implementation PowerMonitorTest
 
 - (void)testCreateReturnsNonNull {
-  auto monitor = PowerMonitor::Create(^(PowerEvent event) {
+  auto monitor = PowerMonitor::Create(^(PowerEvent event){
   });
   XCTAssertTrue(monitor != nullptr);
 }
@@ -39,16 +39,16 @@ using santa::PowerMonitor;
 
 - (void)testConstructAndDestruct {
   // Verify that creating and immediately destroying a monitor doesn't crash.
-  auto monitor = PowerMonitor::Create(^(PowerEvent event) {
+  auto monitor = PowerMonitor::Create(^(PowerEvent event){
   });
   XCTAssertTrue(monitor != nullptr);
   monitor.reset();
 }
 
 - (void)testMultipleMonitorsCoexist {
-  auto monitor1 = PowerMonitor::Create(^(PowerEvent event) {
+  auto monitor1 = PowerMonitor::Create(^(PowerEvent event){
   });
-  auto monitor2 = PowerMonitor::Create(^(PowerEvent event) {
+  auto monitor2 = PowerMonitor::Create(^(PowerEvent event){
   });
   XCTAssertTrue(monitor1 != nullptr);
   XCTAssertTrue(monitor2 != nullptr);
