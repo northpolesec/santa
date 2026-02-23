@@ -19,6 +19,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 @class SNDProcessFlows;
+@class SNTNetworkExtensionSettings;
 @class SNTNotificationQueue;
 @class SNTSyncdQueue;
 
@@ -35,8 +36,8 @@ extern NSString *const kSantaNetworkExtensionProtocolVersion;
 
 - (instancetype)init NS_UNAVAILABLE;
 
-- (NSDictionary *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
-                                                  error:(NSError **)error;
+- (SNTNetworkExtensionSettings *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
+                                                                 error:(NSError **)error;
 
 - (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
                windowStart:(NSDate *)windowStart

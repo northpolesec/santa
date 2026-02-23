@@ -14,17 +14,16 @@
 
 #import <Foundation/Foundation.h>
 
-@class SNTNetworkExtensionSettings;
-
+/// Settings passed from the daemon (santa) to the network extension (santanetd) over XPC.
 ///
-///  Protocol implemented by the network extension (santanetd) and utilized by daemon
-///  for communication with the network extension.
-///
-@protocol SNDNetworkExtensionXPC
+/// This class conforms to NSSecureCoding, allowing it to be passed directly as a typed
+/// argument in XPC protocol methods. NSKeyedArchiver's keyed format provides inherent
+/// forward/backward compatibility: old receivers ignore unknown keys, new receivers get
+/// nil/0/NO for missing keys.
+@interface SNTNetworkExtensionSettings : NSObject <NSSecureCoding>
 
-- (void)updateNetworkExtensionSettings:(SNTNetworkExtensionSettings *)settings
-                                 reply:(void (^)(BOOL))reply;
+@property(readonly) BOOL enable;
 
-- (void)bundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
+- (instancetype)initWithEnable:(BOOL)enable;
 
 @end
