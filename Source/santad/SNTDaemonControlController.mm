@@ -705,7 +705,7 @@ double watchdogRAMPeak = 0;
 
 - (void)installNetworkExtension:(void (^)(BOOL))reply {
   if (![self.netExtQueue shouldInstallNetworkExtension]) {
-    LOGI(@"Network extension install not authorized");
+    LOGI(@"Network extension installation/upgrade not authorized");
     reply(NO);
     return;
   }
