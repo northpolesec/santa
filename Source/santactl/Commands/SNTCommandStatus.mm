@@ -261,9 +261,17 @@ REGISTER_COMMAND_NAME(@"status")
   }];
 
   __block NSNumber *networkMountExceptions;
+  __block BOOL networkExtensionEnabled = NO;
+  __block BOOL networkExtensionLoaded = NO;
   if (isSyncV2Enabled) {
     [rop blockNetworkMount:^(NSNumber *numExceptions) {
       networkMountExceptions = numExceptions;
+    }];
+    [rop networkExtensionEnabled:^(BOOL enabled) {
+      networkExtensionEnabled = enabled;
+    }];
+    [rop networkExtensionLoaded:^(BOOL loaded) {
+      networkExtensionLoaded = loaded;
     }];
   }
 
@@ -325,6 +333,11 @@ REGISTER_COMMAND_NAME(@"status")
       daemon[@"block_network_mounts"] = @(networkMountExceptions != nil);
       daemon[@"network_mount_host_exceptions"] = @([networkMountExceptions intValue]);
       stats[@"daemon"] = daemon;
+
+      stats[@"network_extension"] = @{
+        @"enabled" : @(networkExtensionEnabled),
+        @"loaded" : @(networkExtensionLoaded),
+      };
     }
 
     if (syncURLStr.length) {
@@ -427,6 +440,12 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-35s | %s\n", "Enabled", (enableTransitiveRules ? "Yes" : "No"));
     printf("  %-35s | %lld\n", "Compiler Rules", ruleCounts.compiler);
     printf("  %-35s | %lld\n", "Transitive Rules", ruleCounts.transitive);
+
+    if (isSyncV2Enabled) {
+      printf(">>> Network Extension\n");
+      printf("  %-35s | %s\n", "Enabled", (networkExtensionEnabled ? "Yes" : "No"));
+      printf("  %-35s | %s\n", "Loaded", (networkExtensionLoaded ? "Yes" : "No"));
+    }
 
     printf(">>> Rule Types\n");
     printf("  %-35s | %lld\n", "Binary Rules", ruleCounts.binary);

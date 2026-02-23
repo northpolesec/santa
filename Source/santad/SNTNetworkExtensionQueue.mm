@@ -233,6 +233,10 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   return [configurator isSyncV2Enabled] && [configurator syncNetworkExtensionSettings].enable;
 }
 
+- (BOOL)isLoaded {
+  return self.netExtConnection != nil;
+}
+
 - (NSDictionary *)generateSettingsForProtocolVersion:(NSString *)protocolVersion {
   if (!protocolVersion) {
     return nil;
