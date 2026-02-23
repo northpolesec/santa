@@ -92,8 +92,8 @@ REGISTER_COMMAND_NAME(@"version")
     if (loadedNetdVersion.length > 0) {
       if (bundledNetdVersion.length > 0 &&
           ![loadedNetdVersion isEqualToString:bundledNetdVersion]) {
-        printf("%-20s | %s (bundled: %s)\n", "santanetd (BETA)",
-               [loadedNetdVersion UTF8String], [bundledNetdVersion UTF8String]);
+        printf("%-20s | %s (bundled: %s)\n", "santanetd (BETA)", [loadedNetdVersion UTF8String],
+               [bundledNetdVersion UTF8String]);
       } else {
         printf("%-20s | %s\n", "santanetd (BETA)", [loadedNetdVersion UTF8String]);
       }
