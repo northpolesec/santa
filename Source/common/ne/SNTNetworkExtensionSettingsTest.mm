@@ -33,6 +33,17 @@
 }
 @end
 
+// Simulates a legacy version of SNTNetworkExtensionSettings that predates the 'enable'
+// property. Its encodeWithCoder: intentionally encodes nothing, producing an archive
+// that omits the 'enable' key entirely.
+@interface SNTNetworkExtensionSettingsLegacy : SNTNetworkExtensionSettings
+@end
+
+@implementation SNTNetworkExtensionSettingsLegacy
+- (void)encodeWithCoder:(NSCoder *)coder {
+}
+@end
+
 @interface SNTNetworkExtensionSettingsTest : XCTestCase
 @end
 
@@ -104,17 +115,28 @@
 }
 
 - (void)testBackwardCompatibility {
-  // Simulate an old sender that didn't encode the 'enable' key.
-  // New receiver should get default value (NO for BOOL).
-  SNTNetworkExtensionSettings *empty = [[SNTNetworkExtensionSettings alloc] init];
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:empty
+  // Simulate an old sender that predates the 'enable' property.
+  // New receiver should get default value (NO for BOOL) for the missing key.
+  //
+  // SNTNetworkExtensionSettingsLegacy encodes nothing, so the archive completely
+  // omits the 'enable' key. We remap the class name to SNTNetworkExtensionSettings
+  // during decode to simulate a new receiver processing data from a legacy sender.
+  SNTNetworkExtensionSettingsLegacy *legacy = [[SNTNetworkExtensionSettingsLegacy alloc] init];
+  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:legacy
                                        requiringSecureCoding:YES
                                                        error:nil];
+  XCTAssertNotNil(data);
+
+  NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data error:nil];
+  unarchiver.requiresSecureCoding = YES;
+  [unarchiver setClass:[SNTNetworkExtensionSettings class]
+          forClassName:NSStringFromClass([SNTNetworkExtensionSettingsLegacy class])];
 
   SNTNetworkExtensionSettings *deserialized =
-      [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTNetworkExtensionSettings class]
-                                        fromData:data
-                                           error:nil];
+      [unarchiver decodeObjectOfClass:[SNTNetworkExtensionSettings class]
+                               forKey:NSKeyedArchiveRootObjectKey];
+  [unarchiver finishDecoding];
+
   XCTAssertNotNil(deserialized);
   // Missing keys should result in default values (NO for BOOL).
   XCTAssertFalse(deserialized.enable);
