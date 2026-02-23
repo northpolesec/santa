@@ -231,6 +231,17 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   return [configurator isSyncV2Enabled] && [configurator syncNetworkExtensionSettings].enable;
 }
 
+- (void)networkExtensionBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply {
+  if (!self.netExtConnection) {
+    reply(nil);
+    return;
+  }
+
+  [[self.netExtConnection remoteObjectProxy] bundleVersionInfo:^(NSDictionary *bundleInfo) {
+    reply(bundleInfo);
+  }];
+}
+
 - (BOOL)isLoaded {
   return self.netExtConnection != nil;
 }
