@@ -37,6 +37,27 @@ cc_library(
 )
 
 objc_library(
+    name = "PowerMonitor",
+    srcs = ["PowerMonitor.mm"],
+    hdrs = ["PowerMonitor.h"],
+    sdk_frameworks = [
+        "IOKit",
+    ],
+    deps = [
+        ":PassKey",
+        ":SNTLogging",
+    ],
+)
+
+santa_unit_test(
+    name = "PowerMonitorTest",
+    srcs = ["PowerMonitorTest.mm"],
+    deps = [
+        ":PowerMonitor",
+    ],
+)
+
+objc_library(
     name = "SystemResources",
     srcs = ["SystemResources.mm"],
     hdrs = ["SystemResources.h"],
@@ -1062,6 +1083,7 @@ test_suite(
         ":MOLXPCConnectionTest",
         ":NKeyTokenValidatorTest",
         ":NSDataZlibTest",
+        ":PowerMonitorTest",
         ":PrefixTreeTest",
         ":RingBufferTest",
         ":SNTBlockMessageTest",
