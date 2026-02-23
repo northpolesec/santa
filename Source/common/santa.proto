@@ -380,20 +380,6 @@ message Exit {
   }
 }
 
-// Information about an open event
-message Open {
-  // The process that is opening the file
-  optional ProcessInfoLight instigator = 1;
-
-  // The file being opened
-  optional FileInfo target = 2;
-
-  // Bitmask of flags used to open the file
-  // Note: Represents the mask applied by the kernel, not the typical `open(2)`
-  // flags (e.g. FREAD, FWRITE instead of O_RDONLY, O_RDWR, etc...)
-  optional int32 flags = 3;
-}
-
 // Information about a close event
 message Close {
   // The process closing the file
