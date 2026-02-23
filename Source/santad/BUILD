@@ -221,12 +221,12 @@ objc_library(
         ":SNTSyncdQueue",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTDeepCopy",
         "//Source/common:SNTError",
         "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common/ne:SNTNetworkExtensionSettings",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "//Source/common/ne:SNTXPCNetworkExtensionInterface",
         "@santanetd//src/santanetd:SNDFlowInfo",
@@ -376,10 +376,28 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "CELActivation",
+    srcs = ["CELActivation.mm"],
+    hdrs = ["CELActivation.h"],
+    deps = [
+        ":EndpointSecurityAPI",
+        ":EndpointSecurityMessage",
+        ":SNTPolicyProcessor",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SigningIDHelpers",
+        "//Source/common:String",
+        "//Source/common/cel:CEL",
+        "//Source/santad/ProcessTree:process",
+        "//Source/santad/ProcessTree:process_tree",
+    ],
+)
+
+objc_library(
     name = "SNTExecutionController",
     srcs = ["SNTExecutionController.mm"],
     hdrs = ["SNTExecutionController.h"],
     deps = [
+        ":CELActivation",
         ":EndpointSecurityAPI",
         ":EndpointSecurityMessage",
         ":ProcessControl",

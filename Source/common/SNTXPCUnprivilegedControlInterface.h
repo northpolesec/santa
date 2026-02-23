@@ -120,9 +120,15 @@ struct RuleCounts {
 ///
 /// Network Extension Ops
 ///
+/// Returns whether the network extension should be installed.
+- (void)shouldInstallNetworkExtension:(void (^)(BOOL))reply;
 /// Returns the desired enabled state for the network extension content filter.
 /// Returns NO if no settings have been synced yet.
 - (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply;
+/// Returns bundle version info from the loaded network extension, or nil if not connected.
+- (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
+/// Returns whether the network extension is currently loaded and connected.
+- (void)networkExtensionLoaded:(void (^)(BOOL loaded))reply;
 
 @end
 

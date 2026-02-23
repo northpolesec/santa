@@ -48,6 +48,7 @@
 @property NSString *fileAccessEventDetailText;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
+@property NSArray<NSString *> *telemetryFilterExpressions;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -84,6 +85,7 @@
   XCTAssertNil(bundle.eventDetailURL);
   XCTAssertNil(bundle.eventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
+  XCTAssertNil(bundle.telemetryFilterExpressions);
 }
 
 - (void)testPostflightConfigBundle {
@@ -144,6 +146,10 @@
   bundle = PostflightConfigBundle(syncState);
   XCTAssertNotNil(bundle.networkExtensionSettings);
   XCTAssertTrue(bundle.networkExtensionSettings.enable);
+
+  syncState.telemetryFilterExpressions = @[ @"expr1", @"expr2" ];
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.telemetryFilterExpressions, syncState.telemetryFilterExpressions);
 }
 
 - (void)testRuleSyncConfigBundle {
@@ -175,6 +181,7 @@
   XCTAssertNil(bundle.fileAccessEventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
   XCTAssertNil(bundle.pushTokenChain);
+  XCTAssertNil(bundle.telemetryFilterExpressions);
 }
 
 - (void)testSyncTypeConfigBundle {
@@ -212,6 +219,7 @@
   XCTAssertNil(bundle.fileAccessEventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
   XCTAssertNil(bundle.pushTokenChain);
+  XCTAssertNil(bundle.telemetryFilterExpressions);
 }
 
 @end

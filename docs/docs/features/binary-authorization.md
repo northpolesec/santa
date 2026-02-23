@@ -320,12 +320,25 @@ of the expression can be cached. This is very important to be aware of, as
 overuse of CEL rules that prevent caching can have a negative impact on system
 performance, especially for binaries that are executed frequently.
 
-Some examples of valid CEL expresssions:
+The following fields are available on the `target` object:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `target.signing_id` | `string` | Signing ID of the target binary, prefixed with Team ID or `platform` (e.g. `EQHXZ8M8AV:com.google.Chrome` or `platform:com.apple.curl`) |
+| `target.signing_time` | `timestamp` | Code signing timestamp (developer-provided) |
+| `target.secure_signing_time` | `timestamp` | Secure code signing timestamp (from a timestamp authority) |
+
+Some examples of valid CEL expressions:
 
 ```clike
 // Only allow executing versions of an app signed on or after May 31st 2025.
 // This expression will be cacheable.
 target.signing_time >= timestamp('2025-05-31T00:00:00Z')
+
+// Only allow Chrome from this team, block other apps.
+// Useful when attached to a TEAMID rule to allow a specific app.
+// This expression will be cacheable.
+target.signing_id.contains('com.google.Chrome') ? ALLOWLIST : BLOCKLIST
 
 // Prevent using the --inspect flag.
 // This expression will NOT be cacheable.

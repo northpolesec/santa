@@ -8,6 +8,12 @@ export const VARIABLES: CELVariable[] = [
   { name: "euid", type: "int", documentation: "Effective user ID" },
   { name: "cwd", type: "string", documentation: "Current working directory" },
   {
+    name: "target.signing_id",
+    type: "string",
+    documentation:
+      "Signing ID of the target binary, prefixed with Team ID or 'platform' (e.g. 'EQHXZ8M8AV:com.google.Chrome' or 'platform:com.apple.curl')",
+  },
+  {
     name: "target.signing_time",
     type: "timestamp",
     documentation: "Code signing timestamp",

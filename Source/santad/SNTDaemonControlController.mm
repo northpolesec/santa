@@ -467,6 +467,10 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerPushTokenChain:val];
   }];
 
+  [result telemetryFilterExpressions:^(NSArray<NSString *> *val) {
+    [configurator setSyncServerTelemetryFilterExpressions:val];
+  }];
+
   [result eventDetailURL:^(NSString *val) {
     [configurator setSyncServerEventDetailURL:val];
   }];
@@ -700,6 +704,12 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)installNetworkExtension:(void (^)(BOOL))reply {
+  if (![self.netExtQueue shouldInstallNetworkExtension]) {
+    LOGI(@"Network extension installation/upgrade not authorized");
+    reply(NO);
+    return;
+  }
+
   LOGI(@"Trigger santanetd (network extension) installation");
 
   // Verify the network extension bundle exists
@@ -715,13 +725,19 @@ double watchdogRAMPeak = 0;
     return;
   }
 
+  // Let the caller know the installation will be triggered.
+  // The actual installation happens asynchronously.
   reply(YES);
 
   [self reloadNetworkExtension];
 }
 
+- (void)shouldInstallNetworkExtension:(void (^)(BOOL))reply {
+  reply([self.netExtQueue shouldInstallNetworkExtension]);
+}
+
 - (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion
-                                              reply:(void (^)(NSDictionary *settings,
+                                              reply:(void (^)(SNTNetworkExtensionSettings *settings,
                                                               NSString *santaProtocolVersion,
                                                               NSError *error))reply {
   NSError *error;
@@ -734,8 +750,8 @@ double watchdogRAMPeak = 0;
     return;
   }
 
-  NSDictionary *settings = [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion
-                                                                             error:&error];
+  SNTNetworkExtensionSettings *settings =
+      [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion error:&error];
   reply(settings, kSantaNetworkExtensionProtocolVersion, error);
 
   // When the network extension registers, it may have just been enabled which can
@@ -788,10 +804,18 @@ double watchdogRAMPeak = 0;
   reply();
 }
 
+- (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply {
+  [self.netExtQueue networkExtensionBundleVersionInfo:reply];
+}
+
 - (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply {
   SNTSyncNetworkExtensionSettings *settings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
   reply(settings ? settings.enable : NO);
+}
+
+- (void)networkExtensionLoaded:(void (^)(BOOL loaded))reply {
+  reply([self.netExtQueue isLoaded]);
 }
 
 @end

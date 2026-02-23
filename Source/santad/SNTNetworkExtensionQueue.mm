@@ -20,13 +20,13 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTError.h"
 #include "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
 #import "Source/santad/SNTNotificationQueue.h"
@@ -61,60 +61,58 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
     WEAKIFY(self);
 
     _kvoWatchers = @[
-      [[SNTKVOManager alloc]
-          initWithObject:[SNTConfigurator configurator]
-                selector:@selector(syncNetworkExtensionSettings)
-                    type:[SNTSyncNetworkExtensionSettings class]
-                callback:^(SNTSyncNetworkExtensionSettings *oldValue,
-                           SNTSyncNetworkExtensionSettings *newValue) {
-                  if ((!oldValue && !newValue) || [oldValue isEqual:newValue]) {
-                    return;
-                  }
+      [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
+                                   selector:@selector(syncNetworkExtensionSettings)
+                                       type:[SNTSyncNetworkExtensionSettings class]
+                                   callback:^(SNTSyncNetworkExtensionSettings *oldValue,
+                                              SNTSyncNetworkExtensionSettings *newValue) {
+                                     // Treat nil as equivalent to enable == NO (the default state).
+                                     if (oldValue.enable == newValue.enable) {
+                                       return;
+                                     }
 
-                  STRONGIFY(self);
+                                     STRONGIFY(self);
 
-                  LOGI(@"SyncNetworkExtensionSettings changed: enable %d -> %d", oldValue.enable,
-                       newValue.enable);
+                                     LOGI(@"SyncNetworkExtensionSettings changed: enable %d -> %d",
+                                          oldValue.enable, newValue.enable);
 
-                  [self handleSettingsChanged:newValue];
-
-                  // Force push notification client to reconnect.
-                  // This resets the NATS connection state and triggers a sync
-                  // to get fresh credentials and reconnect immediately.
-                  LOGI(@"SNTNetworkExtensionQueue: Triggering push notification reconnect");
-                  [self.syncdQueue pushNotificationReconnect];
-                }],
+                                     [self handleSettingsChanged:newValue];
+                                   }],
     ];
   }
   return self;
 }
 
 - (void)handleSettingsChanged:(SNTSyncNetworkExtensionSettings *)settings {
-  MOLXPCConnection *conn = self.notifierQueue.notifierConnection;
+  MOLXPCConnection *conn = self.netExtConnection;
   if (!conn) {
-    LOGW(@"Notifier connection unavailable; skipping filter enabled update (%d)", settings.enable);
+    LOGW(@"Network extension connection unavailable; skipping settings update");
+    return;
+  }
+
+  SNTNetworkExtensionSettings *netExtSettings =
+      [self generateSettingsForProtocolVersion:self.connectedProtocolVersion];
+  if (!netExtSettings) {
+    LOGW(@"Failed to generate settings for protocol version %@", self.connectedProtocolVersion);
     return;
   }
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  // Update the filter enabled state via the GUI process
   [[conn remoteObjectProxy]
-      setNetworkExtensionFilterEnabled:settings.enable
-                                 reply:^(BOOL success) {
-                                   if (success) {
-                                     LOGI(@"Successfully updated network extension filter enabled "
-                                          @"state");
-                                   } else {
-                                     LOGW(@"Failed to update network extension filter enabled "
-                                          @"state");
-                                   }
+      updateNetworkExtensionSettings:netExtSettings
+                               reply:^(BOOL success) {
+                                 if (success) {
+                                   LOGI(@"Successfully updated network extension settings");
+                                 } else {
+                                   LOGW(@"Failed to update network extension settings");
+                                 }
 
-                                   dispatch_semaphore_signal(sema);
-                                 }];
+                                 dispatch_semaphore_signal(sema);
+                               }];
 
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
-    LOGW(@"Timeout when attempting to set filter enabled state (%d)", settings.enable);
+    LOGW(@"Timeout when attempting to update network extension settings");
   }
 }
 
@@ -144,8 +142,8 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 }
 
-- (NSDictionary *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
-                                                  error:(NSError **)error {
+- (SNTNetworkExtensionSettings *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
+                                                                 error:(NSError **)error {
   if (self.netExtConnection) {
     LOGW(@"Network extension attempting to register but already connected, clearing stale "
          @"connection");
@@ -228,21 +226,41 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   return std::make_pair<int, int>([components[0] intValue], [components[1] intValue]);
 }
 
-- (NSDictionary *)generateSettingsForProtocolVersion:(NSString *)protocolVersion {
+- (BOOL)shouldInstallNetworkExtension {
+  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  return [configurator isSyncV2Enabled] && [configurator syncNetworkExtensionSettings].enable;
+}
+
+- (void)networkExtensionBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply {
+  if (!self.netExtConnection) {
+    reply(nil);
+    return;
+  }
+
+  [[self.netExtConnection remoteObjectProxy] bundleVersionInfo:^(NSDictionary *bundleInfo) {
+    reply(bundleInfo);
+  }];
+}
+
+- (BOOL)isLoaded {
+  return self.netExtConnection != nil;
+}
+
+- (SNTNetworkExtensionSettings *)generateSettingsForProtocolVersion:(NSString *)protocolVersion {
   if (!protocolVersion) {
     return nil;
   }
 
-  NSMutableDictionary *settings = [NSMutableDictionary dictionary];
-  auto [majorVersion, _] = [self protocolVersionComponents:self.connectedProtocolVersion];
-  SNTSyncNetworkExtensionSettings *netExtSettings =
+  auto [majorVersion, _] = [self protocolVersionComponents:protocolVersion];
+  SNTSyncNetworkExtensionSettings *syncSettings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
 
+  BOOL enable = NO;
   if (majorVersion >= 1) {
-    settings[@"enable"] = @(netExtSettings.enable);
+    enable = syncSettings.enable;
   }
 
-  return [settings sntDeepCopy];
+  return [[SNTNetworkExtensionSettings alloc] initWithEnable:enable];
 }
 
 @end
