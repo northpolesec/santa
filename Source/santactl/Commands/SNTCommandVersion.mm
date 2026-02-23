@@ -35,7 +35,7 @@ REGISTER_COMMAND_NAME(@"version")
 }
 
 + (BOOL)requiresDaemonConn {
-  return YES;
+  return NO;
 }
 
 + (NSString *)shortHelpText {
@@ -48,10 +48,17 @@ REGISTER_COMMAND_NAME(@"version")
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
-  // Query loaded santanetd info from the daemon (best-effort, with timeout), and main app bundle
-  NSDictionary *loadedNetdInfo = [self queryLoadedNetdBundleInfo];
+  // Best-effort connection to santad for querying santanetd info.
+  // Skip XPC queries if the connection fails to avoid unnecessary timeouts.
+  [self.daemonConn resume];
+
+  NSDictionary *loadedNetdInfo = nil;
+  BOOL netExtEnabled = NO;
+  if (self.daemonConn.isConnected) {
+    loadedNetdInfo = [self queryLoadedNetdBundleInfo];
+    netExtEnabled = [self queryNetworkExtensionEnabled];
+  }
   NSString *loadedNetdVersion = [self composeVersionsFromDict:loadedNetdInfo];
-  BOOL netExtEnabled = [self queryNetworkExtensionEnabled];
   NSString *bundledNetdVersion = [self santanetdBundledVersion];
 
   if ([arguments containsObject:@"--json"]) {
