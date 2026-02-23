@@ -72,10 +72,10 @@ REGISTER_COMMAND_NAME(@"version")
       versions[@"santanetd"] = loadedNetdVersion;
       if (bundledNetdVersion.length > 0 &&
           ![loadedNetdVersion isEqualToString:bundledNetdVersion]) {
-        versions[@"santanetd (bundled)"] = bundledNetdVersion;
+        versions[@"santanetd_bundled"] = bundledNetdVersion;
       }
     } else if (bundledNetdVersion.length > 0 && netExtEnabled) {
-      versions[@"santanetd (bundled)"] = bundledNetdVersion;
+      versions[@"santanetd"] = bundledNetdVersion;
     }
 
     NSData *versionsData = [NSJSONSerialization dataWithJSONObject:versions
@@ -90,13 +90,15 @@ REGISTER_COMMAND_NAME(@"version")
     printf("%-20s | %s\n", "SantaGUI", [[self santaAppVersion] UTF8String]);
 
     if (loadedNetdVersion.length > 0) {
-      printf("%-20s | %s\n", "santanetd", [loadedNetdVersion UTF8String]);
       if (bundledNetdVersion.length > 0 &&
           ![loadedNetdVersion isEqualToString:bundledNetdVersion]) {
-        printf("%-20s | %s\n", "santanetd (bundled)", [bundledNetdVersion UTF8String]);
+        printf("%-20s | %s (bundled: %s)\n", "santanetd (BETA)",
+               [loadedNetdVersion UTF8String], [bundledNetdVersion UTF8String]);
+      } else {
+        printf("%-20s | %s\n", "santanetd (BETA)", [loadedNetdVersion UTF8String]);
       }
     } else if (bundledNetdVersion.length > 0 && netExtEnabled) {
-      printf("%-20s | %s\n", "santanetd (bundled)", [bundledNetdVersion UTF8String]);
+      printf("%-20s | %s\n", "santanetd (BETA)", [bundledNetdVersion UTF8String]);
     }
   }
   exit(0);
