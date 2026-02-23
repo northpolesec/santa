@@ -21,6 +21,18 @@
 @property(readwrite) BOOL enable;
 @end
 
+// Simulates a future version of SNTNetworkExtensionSettings that encodes an additional
+// unknown key. Used in testForwardCompatibility to produce archive data with extra keys.
+@interface SNTNetworkExtensionSettingsFuture : SNTNetworkExtensionSettings
+@end
+
+@implementation SNTNetworkExtensionSettingsFuture
+- (void)encodeWithCoder:(NSCoder *)coder {
+  [super encodeWithCoder:coder];
+  [coder encodeObject:@"futureValue" forKey:@"futureProperty"];
+}
+@end
+
 @interface SNTNetworkExtensionSettingsTest : XCTestCase
 @end
 
@@ -64,19 +76,30 @@
 - (void)testForwardCompatibility {
   // Simulate a new sender encoding an archive with an unknown key.
   // Old receiver should decode successfully, ignoring the unknown key.
-  SNTNetworkExtensionSettings *settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  //
+  // SNTNetworkExtensionSettingsFuture is a stand-in for a hypothetical future version of
+  // SNTNetworkExtensionSettings that adds an extra property. We archive it, then remap the
+  // class name back to SNTNetworkExtensionSettings during decode to simulate an old receiver
+  // processing data produced by a new sender.
+  SNTNetworkExtensionSettingsFuture *future =
+      [[SNTNetworkExtensionSettingsFuture alloc] initWithEnable:YES];
 
-  NSKeyedArchiver *archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
-  [settings encodeWithCoder:archiver];
-  // Encode an extra key that the current class doesn't know about.
-  [archiver encodeObject:@"futureValue" forKey:@"futureProperty"];
-  [archiver finishEncoding];
-  NSData *data = archiver.encodedData;
+  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:future
+                                       requiringSecureCoding:YES
+                                                       error:nil];
+  XCTAssertNotNil(data);
+
+  NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data
+                                                                              error:nil];
+  unarchiver.requiresSecureCoding = YES;
+  [unarchiver setClass:[SNTNetworkExtensionSettings class]
+          forClassName:NSStringFromClass([SNTNetworkExtensionSettingsFuture class])];
 
   SNTNetworkExtensionSettings *deserialized =
-      [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTNetworkExtensionSettings class]
-                                        fromData:data
-                                           error:nil];
+      [unarchiver decodeObjectOfClass:[SNTNetworkExtensionSettings class]
+                               forKey:NSKeyedArchiveRootObjectKey];
+  [unarchiver finishDecoding];
+
   XCTAssertNotNil(deserialized);
   XCTAssertTrue(deserialized.enable);
 }
