@@ -22,4 +22,6 @@
 
 - (void)updateNetworkExtensionSettings:(NSDictionary *)settings reply:(void (^)(BOOL))reply;
 
+- (void)bundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
+
 @end

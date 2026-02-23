@@ -804,6 +804,10 @@ double watchdogRAMPeak = 0;
   reply();
 }
 
+- (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply {
+  [self.netExtQueue networkExtensionBundleVersionInfo:reply];
+}
+
 - (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply {
   SNTSyncNetworkExtensionSettings *settings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];

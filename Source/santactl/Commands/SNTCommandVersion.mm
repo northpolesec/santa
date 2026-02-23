@@ -19,6 +19,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
@@ -34,7 +35,7 @@ REGISTER_COMMAND_NAME(@"version")
 }
 
 + (BOOL)requiresDaemonConn {
-  return NO;
+  return YES;
 }
 
 + (NSString *)shortHelpText {
@@ -47,12 +48,29 @@ REGISTER_COMMAND_NAME(@"version")
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
+  // Query loaded santanetd info from the daemon (best-effort, with timeout), and main app bundle
+  NSDictionary *loadedNetdInfo = [self queryLoadedNetdBundleInfo];
+  NSString *loadedNetdVersion = [self composeVersionsFromDict:loadedNetdInfo];
+  BOOL netExtEnabled = [self queryNetworkExtensionEnabled];
+  NSString *bundledNetdVersion = [self santanetdBundledVersion];
+
   if ([arguments containsObject:@"--json"]) {
-    NSDictionary *versions = @{
+    NSMutableDictionary *versions = [@{
       @"santad" : [self santadVersion],
       @"santactl" : [self santactlVersion],
       @"SantaGUI" : [self santaAppVersion],
-    };
+    } mutableCopy];
+
+    if (loadedNetdVersion.length > 0) {
+      versions[@"santanetd"] = loadedNetdVersion;
+      if (bundledNetdVersion.length > 0 &&
+          ![loadedNetdVersion isEqualToString:bundledNetdVersion]) {
+        versions[@"santanetd (bundled)"] = bundledNetdVersion;
+      }
+    } else if (bundledNetdVersion.length > 0 && netExtEnabled) {
+      versions[@"santanetd (bundled)"] = bundledNetdVersion;
+    }
+
     NSData *versionsData = [NSJSONSerialization dataWithJSONObject:versions
                                                            options:NSJSONWritingPrettyPrinted
                                                              error:nil];
@@ -60,11 +78,54 @@ REGISTER_COMMAND_NAME(@"version")
                                                   encoding:NSUTF8StringEncoding];
     printf("%s\n", [versionsStr UTF8String]);
   } else {
-    printf("%-15s | %s\n", "santad", [[self santadVersion] UTF8String]);
-    printf("%-15s | %s\n", "santactl", [[self santactlVersion] UTF8String]);
-    printf("%-15s | %s\n", "SantaGUI", [[self santaAppVersion] UTF8String]);
+    printf("%-20s | %s\n", "santad", [[self santadVersion] UTF8String]);
+    printf("%-20s | %s\n", "santactl", [[self santactlVersion] UTF8String]);
+    printf("%-20s | %s\n", "SantaGUI", [[self santaAppVersion] UTF8String]);
+
+    if (loadedNetdVersion.length > 0) {
+      printf("%-20s | %s\n", "santanetd", [loadedNetdVersion UTF8String]);
+      if (bundledNetdVersion.length > 0 &&
+          ![loadedNetdVersion isEqualToString:bundledNetdVersion]) {
+        printf("%-20s | %s\n", "santanetd (bundled)", [bundledNetdVersion UTF8String]);
+      }
+    } else if (bundledNetdVersion.length > 0 && netExtEnabled) {
+      printf("%-20s | %s\n", "santanetd (bundled)", [bundledNetdVersion UTF8String]);
+    }
   }
   exit(0);
+}
+
+- (NSDictionary *)queryLoadedNetdBundleInfo {
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  self.daemonConn.invalidationHandler = ^{
+    dispatch_semaphore_signal(sema);
+  };
+
+  __block NSDictionary *result = nil;
+  [[self.daemonConn remoteObjectProxy]
+      networkExtensionLoadedBundleVersionInfo:^(NSDictionary *bundleInfo) {
+        result = bundleInfo;
+        dispatch_semaphore_signal(sema);
+      }];
+
+  dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC));
+  return result;
+}
+
+- (BOOL)queryNetworkExtensionEnabled {
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  self.daemonConn.invalidationHandler = ^{
+    dispatch_semaphore_signal(sema);
+  };
+
+  __block BOOL enabled = NO;
+  [[self.daemonConn remoteObjectProxy] networkExtensionEnabled:^(BOOL result) {
+    enabled = result;
+    dispatch_semaphore_signal(sema);
+  }];
+
+  dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC));
+  return enabled;
 }
 
 - (NSString *)composeVersionsFromDict:(NSDictionary *)dict {
@@ -93,6 +154,11 @@ REGISTER_COMMAND_NAME(@"version")
 
 - (NSString *)santactlVersion {
   return [self composeVersionsFromDict:[[NSBundle mainBundle] infoDictionary]];
+}
+
+- (NSString *)santanetdBundledVersion {
+  SNTFileInfo *netdInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)];
+  return [self composeVersionsFromDict:netdInfo.infoPlist];
 }
 
 @end
