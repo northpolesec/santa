@@ -42,7 +42,7 @@
                           checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock;
 
 /// Install the network extension, optionally checking whether an upgrade is needed first.
-/// When force is YES, delegates directly to installNetworkExtension:.
+/// When force is YES, delegates to installNetworkExtension: as long as installation is authorized.
 /// When force is NO, skips install if the loaded version already matches the on-disk version.
 - (void)installNetworkExtensionForce:(BOOL)force reply:(void (^)(BOOL))reply;
 
