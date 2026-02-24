@@ -53,4 +53,10 @@ extern NSString *const kSantaNetworkExtensionProtocolVersion;
 /// Returns YES if the network extension is currently connected.
 - (BOOL)isLoaded;
 
+/// Determines whether the network extension needs to be upgraded.
+/// Compares the loaded extension's CFBundleVersion against the on-disk version.
+/// Returns YES if the extension is not connected, versions differ, or loaded version is unknown.
+/// Returns NO if versions match, or if the on-disk bundle is unreadable.
+- (BOOL)networkExtensionNeedsUpgrade;
+
 @end
