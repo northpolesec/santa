@@ -1069,12 +1069,12 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> BasicString::SerializeNetworkFlow(SNDProcessInfo *pi, SNDFlowInfo *flow,
-                                                       struct timespec window_start,
-                                                       struct timespec window_end,
-                                                       SNTCachedDecision *cd) {
+std::vector<uint8_t> BasicString::SerializeNetworkFlows(SNDProcessFlows *processFlows,
+                                                        struct timespec window_start,
+                                                        struct timespec window_end,
+                                                        SNTCachedDecision *cd) {
   std::string line = CreateDefaultString();
-  line += santanetd::FormatNetworkFlowBasicString(pi, flow, cd);
+  line += santanetd::FormatNetworkFlowsBasicString(processFlows, cd);
   return FinalizeString(line);
 }
 

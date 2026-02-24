@@ -33,9 +33,7 @@
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
-#import "src/santanetd/SNDFlowInfo.h"
 #import "src/santanetd/SNDProcessFlows.h"
-#import "src/santanetd/SNDProcessInfo.h"
 
 NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
@@ -80,6 +78,24 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
                                      [self handleSettingsChanged:newValue];
                                    }],
+      [[SNTKVOManager alloc]
+          initWithObject:[SNTConfigurator configurator]
+                selector:@selector(syncBaseURL)
+                    type:[NSURL class]
+                callback:^(NSURL *oldValue, NSURL *newValue) {
+                  if ((!newValue && !oldValue) ||
+                      ([newValue.absoluteString isEqualToString:oldValue.absoluteString])) {
+                    return;
+                  }
+
+                  // Always clear settings, but only log a message if settings previously existed.
+                  if ([[SNTConfigurator configurator] syncNetworkExtensionSettings]) {
+                    LOGI(@"Network Extension settings revoked due to SyncBaseURL changing.");
+                  }
+
+                  [[SNTConfigurator configurator] setSyncServerSyncNetworkExtensionSettings:nil];
+                }],
+
     ];
   }
   return self;
@@ -121,7 +137,7 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 - (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
                windowStart:(NSDate *)windowStart
                  windowEnd:(NSDate *)windowEnd {
-  if (!processFlows.count) {
+  if (![self shouldInstallNetworkExtension] || !processFlows.count) {
     return;
   }
 
@@ -137,10 +153,7 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   };
 
   for (SNDProcessFlows *pf in processFlows) {
-    SNDProcessInfo *info = pf.processInfo;
-    [pf enumerateFlowsUsingBlock:^(SNDFlowInfo *flow) {
-      _logger->LogNetworkFlow(info, flow, windowStartTS, windowEndTS);
-    }];
+    _logger->LogNetworkFlows(pf, windowStartTS, windowEndTS);
   }
 }
 

@@ -14,17 +14,16 @@
 
 #include "src/santanetd/SNDNetworkFlowsSerializer.h"
 
-@class SNDFlowInfo;
-@class SNDProcessInfo;
+@class SNDProcessFlows;
 @class SNTCachedDecision;
 
 namespace santanetd {
 
-void PopulateNetworkActivityFlow(google::protobuf::Arena *,
-                                 ::santa::pb::v1::NetworkActivity_Process *, SNDProcessInfo *,
-                                 SNDFlowInfo *, SNTCachedDecision *) {}
+void PopulateNetworkActivityProcess(google::protobuf::Arena *,
+                                    ::santa::pb::v1::NetworkActivity_Process *, SNDProcessFlows *,
+                                    SNTCachedDecision *) {}
 
-std::string FormatNetworkFlowBasicString(SNDProcessInfo *, SNDFlowInfo *, SNTCachedDecision *) {
+std::string FormatNetworkFlowsBasicString(SNDProcessFlows *, SNTCachedDecision *) {
   return {};
 }
 
