@@ -1,0 +1,221 @@
+/* Notification message shown when a known app has been unblocked */
+"%@ can now be run" = "%@ ahora se puede ejecutar";
+
+/* The default message to show the user when access to a file is blocked */
+"Access to a file has been denied" = "El acceso a un archivo ha sido denegado";
+
+/* No comment provided by engineer. */
+"Accessed Path" = "Ruta accedida";
+
+/* No comment provided by engineer. */
+"An unknown error occurred. Please try again." = "Se produjo un error desconocido. Por favor, inténtelo de nuevo.";
+
+/* No comment provided by engineer. */
+"Application" = "Aplicación";
+
+/* Default text for Approve */
+"Approve" = "Aprobar";
+
+/* Message for reset silences confirmation dialog */
+"Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "¿Está seguro de que desea restablecer todas las notificaciones silenciadas? Comenzará a recibir notificaciones de eventos previamente silenciados.";
+
+/* Authorize execution of an application with Signing ID or Path */
+"authorize execution of %@" = "autorizar la ejecución de %@";
+
+/* Authorize execution of an application with name */
+"authorize execution of the application %@" = "autorizar la ejecución de la aplicación %@";
+
+/* Authorize execution fallback */
+"authorize execution" = "autorizar la ejecución";
+
+/* Authorize temporary Monitor Mode exception */
+"authorize temporary Monitor Mode" = "autorizar el modo Monitor temporal";
+
+/* No comment provided by engineer. */
+"Binary Path" = "Ruta del binario";
+
+/* No comment provided by engineer. */
+"Bundle Hash" = "Hash del bundle";
+
+/* Cancel button title */
+"Cancel" = "Cancelar";
+
+/* No comment provided by engineer. */
+"CDHash" = "CDHash";
+
+/* No comment provided by engineer. */
+"Clean Sync" = "Sincronización completa";
+
+/* Copy Details */
+"Copy Details" = "Copiar detalles";
+
+/* No comment provided by engineer. */
+"Destination" = "Destino";
+
+/* Dismiss button in more details dialog */
+"Dismiss" = "Descartar";
+
+/* No comment provided by engineer. */
+"Dismiss & Silence" = "Descartar y silenciar";
+
+/* No comment provided by engineer. */
+"Drop for application info" = "Soltar para información de la aplicación";
+
+/* No comment provided by engineer. */
+"Failed to connect to the sync service. Please try again later." = "Error al conectar con el servicio de sincronización. Por favor, inténtelo más tarde.";
+
+/* Error shown when user tries to enter TMM and an unknown error occurred. */
+"Failed to enter temporary monitor mode: an unknown error occurred" = "Error al entrar en modo monitor temporal: se produjo un error desconocido";
+
+/* Error message shown when user tries to enter TMM but authorization failed */
+"Failed to enter temporary monitor mode: authorization failed" = "Error al entrar en modo monitor temporal: la autorización falló";
+
+/* Error message shown when user tries to enter TMM while not in lockdown */
+"Failed to enter temporary monitor mode: not currently in lockdown" = "Error al entrar en modo monitor temporal: no se encuentra actualmente en modo bloqueo";
+
+/* Error message shown when user tries to enter TMM while not using Workshop */
+"Failed to enter temporary monitor mode: not using a supported sync server" = "Error al entrar en modo monitor temporal: no se está utilizando un servidor de sincronización compatible";
+
+/* Error message shown when user tries to enter TMM mode without a policy */
+"Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Error al entrar en modo monitor temporal: este equipo no tiene actualmente una política que permita el modo monitor temporal";
+
+/* No comment provided by engineer. */
+"Filename" = "Nombre del archivo";
+
+/* No comment provided by engineer. */
+"FS Type" = "Tipo FS";
+
+/* No comment provided by engineer. */
+"Label after time period picker" = "\U2800";
+
+/* No comment provided by engineer. */
+"Label before time period picker" = "Evitar notificaciones futuras para esta aplicación durante";
+
+/* Label shown before company branding */
+"Managed by:" = "Administrado por:";
+
+/* More Details button */
+"More Details" = "Más detalles";
+
+/* No comment provided by engineer. */
+"More Info..." = "Más información...";
+
+/* No comment provided by engineer. */
+"Network Share" = "Recurso compartido de red";
+
+/* Default text for Open button */
+"Open..." = "Abrir...";
+
+/* No comment provided by engineer. */
+"Parent" = "Proceso padre";
+
+/* No comment provided by engineer. */
+"Path" = "Ruta";
+
+/* No comment provided by engineer. */
+"Path Accessed" = "Ruta accedida";
+
+/* No comment provided by engineer. */
+"Publisher" = "Editor";
+
+/* No comment provided by engineer. */
+"Remount Mode" = "Modo de remontaje";
+
+/* Notification message shown when an unknown app has been unblocked */
+"Requested application can now be run" = "La aplicación solicitada ahora se puede ejecutar";
+
+/* Reset button title */
+"Reset" = "Restablecer";
+
+/* Title for reset silences confirmation dialog */
+"Reset Silenced Notifications" = "Restablecer notificaciones silenciadas";
+
+/* No comment provided by engineer. */
+"Rule Name" = "Nombre de la regla";
+
+/* No comment provided by engineer. */
+"Rule Version" = "Versión de la regla";
+
+/* Explanation in About view */
+"Santa is a security system providing application,\ndevice, and file-access controls." = "Santa es un sistema de seguridad que proporciona controles\nde aplicaciones, dispositivos y acceso a archivos.";
+
+/* No comment provided by engineer. */
+"Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santa está hecho con ❤️ por los elfos de [North Pole Security](https://northpole.security)\njunto con las contribuciones de nuestra maravillosa comunidad";
+
+/* No comment provided by engineer. */
+"SHA-256" = "SHA-256";
+
+/* No comment provided by engineer. */
+"Show menu bar icon" = "Mostrar icono en la barra de menús";
+
+/* No comment provided by engineer. */
+"Signed" = "Firmado";
+
+/* No comment provided by engineer. */
+"Signing ID" = "Signing ID";
+
+/* Client mode change: LOCKDOWN */
+"Switching into Lockdown mode" = "Cambiando a modo Bloqueo";
+
+/* Client mode change: MONITOR */
+"Switching into Monitor mode" = "Cambiando a modo Monitor";
+
+/* Client mode change: STANDALONE */
+"Switching into Standalone mode" = "Cambiando a modo Autónomo";
+
+/* No comment provided by engineer. */
+"Sync" = "Sincronizar";
+
+/* Notification message shown when a sync completes successfully */
+"Sync completed successfully" = "Sincronización completada con éxito";
+
+/* Notification message shown when a sync fails */
+"Sync failed" = "Error en la sincronización";
+
+/* No comment provided by engineer. */
+"Team ID" = "Team ID";
+
+/* No comment provided by engineer. */
+"The event upload failed. Please check your network connection and try again." = "Error al cargar el evento. Por favor, verifique su conexión de red e inténtelo de nuevo.";
+
+/* The default message to show the user when an unknown application is blocked */
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "La siguiente aplicación ha sido bloqueada<br />porque no se pudo determinar su nivel de confianza";
+
+/* The default message to show the user when a banned application is blocked */
+"The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "La siguiente aplicación ha sido bloqueada<br />porque se ha considerado maliciosa o contraria a la política";
+
+/* The default message to show the user when a program requires TouchID/password */
+"The following application requires authorization before it can be used" = "La siguiente aplicación requiere autorización antes de poder ser utilizada";
+
+/* The default message to show the user when a Removable Media (e.g. USB device) is blocked from mounting */
+"The following device has been blocked from mounting" = "Se ha bloqueado el montaje del siguiente dispositivo";
+
+/* The default message to show the user when a Removable Media (e.g. USB device) is remounted with reduced permissions */
+"The following device has been remounted with reduced permissions" = "El siguiente dispositivo ha sido remontado con permisos reducidos";
+
+/* The default message to show the user when a network mount is blocked */
+"The following network share has been blocked from mounting" = "Se ha bloqueado el montaje del siguiente recurso compartido de red";
+
+/* No comment provided by engineer. */
+"The postflight check failed. Please check your network connection and try again." = "La verificación posterior a la sincronización falló. Por favor, verifique su conexión de red e inténtelo de nuevo.";
+
+/* No comment provided by engineer. */
+"The preflight check failed. Please check your network connection and try again." = "La verificación previa a la sincronización falló. Por favor, verifique su conexión de red e inténtelo de nuevo.";
+
+/* No comment provided by engineer. */
+"The rule download failed. Please check your network connection and try again." = "La descarga de reglas falló. Por favor, verifique su conexión de red e inténtelo de nuevo.";
+
+/* No comment provided by engineer. */
+"The sync operation failed. Please try again." = "La operación de sincronización falló. Por favor, inténtelo de nuevo.";
+
+/* No comment provided by engineer. */
+"Too many syncs are in progress. Please try again later." = "Hay demasiadas sincronizaciones en curso. Por favor, inténtelo más tarde.";
+
+/* No comment provided by engineer. */
+"unknown" = "desconocido";
+
+/* No comment provided by engineer. */
+"User" = "Usuario";
+
+/* Version in About view */
+"Version **%@**" = "Versión **%@**";
