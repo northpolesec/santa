@@ -732,6 +732,21 @@ double watchdogRAMPeak = 0;
   [self reloadNetworkExtension];
 }
 
+- (void)installNetworkExtensionForce:(BOOL)force reply:(void (^)(BOOL))reply {
+  // Don't bother checking bundle version info if the network extension isn't authorized
+  if (![self.netExtQueue shouldInstallNetworkExtension]) {
+    reply(NO);
+    return;
+  }
+
+  if (!force && ![self.netExtQueue networkExtensionNeedsUpgrade]) {
+    reply(NO);
+    return;
+  }
+
+  [self installNetworkExtension:reply];
+}
+
 - (void)shouldInstallNetworkExtension:(void (^)(BOOL))reply {
   reply([self.netExtQueue shouldInstallNetworkExtension]);
 }

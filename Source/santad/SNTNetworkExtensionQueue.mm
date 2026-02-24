@@ -19,8 +19,10 @@
 #include <utility>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTError.h"
+#import "Source/common/SNTFileInfo.h"
 #include "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
@@ -244,6 +246,47 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
 - (BOOL)isLoaded {
   return self.netExtConnection != nil;
+}
+
+- (BOOL)networkExtensionNeedsUpgrade {
+  if (!self.netExtConnection) {
+    LOGD(@"Network extension not connected, needs install");
+    return YES;
+  }
+
+  // Read the on-disk version first. If unreadable, skip install (nothing to install).
+  SNTFileInfo *onDiskInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)];
+  NSString *onDiskVersion = [onDiskInfo bundleVersion];
+  if (!onDiskVersion) {
+    LOGD(@"Unable to read on-disk network extension version, skipping install");
+    return NO;
+  }
+
+  __block NSString *loadedVersion;
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  [self networkExtensionBundleVersionInfo:^(NSDictionary *bundleInfo) {
+    loadedVersion = bundleInfo[@"CFBundleVersion"];
+    dispatch_semaphore_signal(sema);
+  }];
+
+  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
+    LOGW(@"Timeout querying loaded network extension version, assuming upgrade needed");
+    return YES;
+  }
+
+  if (!loadedVersion) {
+    LOGD(@"Unable to determine loaded network extension version, needs upgrade");
+    return YES;
+  }
+
+  if ([loadedVersion isEqualToString:onDiskVersion]) {
+    LOGD(@"Network extension version matches (%@), skipping install", loadedVersion);
+    return NO;
+  }
+
+  LOGD(@"Network extension version mismatch (loaded: %@, on-disk: %@), needs upgrade",
+       loadedVersion, onDiskVersion);
+  return YES;
 }
 
 - (SNTNetworkExtensionSettings *)generateSettingsForProtocolVersion:(NSString *)protocolVersion {
