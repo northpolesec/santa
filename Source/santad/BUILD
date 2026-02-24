@@ -231,9 +231,7 @@ objc_library(
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "//Source/common/ne:SNTXPCNetworkExtensionInterface",
-        "@santanetd//src/santanetd:SNDFlowInfo",
         "@santanetd//src/santanetd:SNDProcessFlows",
-        "@santanetd//src/santanetd:SNDProcessInfo",
     ],
 )
 
@@ -733,7 +731,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXxhash",
         "//Source/common:String",
-        "@santanetd//src/santanetd:SNDProcessInfo",
+        "@santanetd//src/santanetd:SNDProcessFlows",
     ],
 )
 

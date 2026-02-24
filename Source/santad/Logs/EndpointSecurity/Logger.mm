@@ -339,9 +339,9 @@ void Logger::LogDiskDisappeared(NSDictionary *props) {
   }
 }
 
-void Logger::LogNetworkFlow(SNDProcessInfo *process_info, SNDFlowInfo *flow,
-                            struct timespec window_start, struct timespec window_end) {
-  writer_->Write(serializer_->SerializeNetworkFlow(process_info, flow, window_start, window_end));
+void Logger::LogNetworkFlows(SNDProcessFlows *processFlows, struct timespec window_start,
+                             struct timespec window_end) {
+  writer_->Write(serializer_->SerializeNetworkFlows(processFlows, window_start, window_end));
 }
 
 void Logger::LogFileAccess(const std::string &policy_version, const std::string &policy_name,
