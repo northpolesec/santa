@@ -432,7 +432,7 @@ static NSString *const kPrinterProxy =
                             se.filePath, se.fileSHA256, se.parentName, se.ppid];
           NSURL *detailURL =
               [SNTBlockMessage eventDetailURLForEvent:se
-                                            customURL:(cd.customURL ?: config.eventDetailURL)];
+                                       eventDetailURL:(cd.customURL ?: config.eventDetailURL)];
           if (detailURL) {
             [msg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
           }

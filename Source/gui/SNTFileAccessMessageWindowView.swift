@@ -233,7 +233,10 @@ struct SNTFileAccessMessageWindowView: View {
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
   var resolvedEventDetailURL: URL? {
-    SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String? ?? configState.fileAccessEventDetailURL)
+    SNTBlockMessage.eventDetailURL(
+      for: event,
+      eventDetailURL: customURL as String? ?? configState.fileAccessEventDetailURL
+    )
   }
 
   var effectiveText: String? {

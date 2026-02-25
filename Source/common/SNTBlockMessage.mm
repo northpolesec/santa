@@ -252,12 +252,12 @@ static id ValueOrNull(id value) {
   };
 }
 
-// Returns either the generated URL for the passed in event, or an NSURL from the passed in custom
-// URL string. If the custom URL string is the string "null", nil will be returned. If no custom
-// URL is passed and there is no configured EventDetailURL template, nil will be returned.
+// Returns an NSURL from the passed in event detail URL string after replacing format string
+// templates with values from the event. If the URL string is nil, empty, or the string "null",
+// nil will be returned.
 // The "format strings" in `templateMapping` will be replaced in the URL, if they are present.
 + (NSURL *)eventDetailURLForEvent:(SNTStoredEvent *)event
-                        customURL:(NSString *)url
+                   eventDetailURL:(NSString *)url
                   templateMapping:(NSDictionary *)templateMapping {
   NSString *formatStr = url;
   if (!formatStr.length) {
@@ -277,18 +277,17 @@ static id ValueOrNull(id value) {
   return u;
 }
 
-+ (NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event customURL:(NSString *)url {
++ (NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event eventDetailURL:(NSString *)url {
   return [self eventDetailURLForEvent:event
-                            customURL:url
+                       eventDetailURL:url
                       templateMapping:[self eventDetailTemplateMappingForEvent:event]];
 }
 
 + (NSURL *)eventDetailURLForFileAccessEvent:(SNTStoredFileAccessEvent *)event
-                                  customURL:(NSString *)url {
-  return
-      [self eventDetailURLForEvent:event
-                         customURL:url ?: [[SNTConfigurator configurator] fileAccessEventDetailURL]
-                   templateMapping:[self fileAccessEventDetailTemplateMappingForEvent:event]];
+                             eventDetailURL:(NSString *)url {
+  return [self eventDetailURLForEvent:event
+                       eventDetailURL:url
+                      templateMapping:[self fileAccessEventDetailTemplateMappingForEvent:event]];
 }
 
 @end

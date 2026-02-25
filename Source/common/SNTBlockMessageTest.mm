@@ -64,7 +64,7 @@
                       @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"
                       @"un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se eventDetailURL:url];
 
   // Set fileBundleHash and test again for newly expected values
   se.fileBundleHash = @"my_fbh";
@@ -74,12 +74,12 @@
             @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"
             @"un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
-  gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+  gotUrl = [SNTBlockMessage eventDetailURLForEvent:se eventDetailURL:url];
 
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 
-  XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:nil]);
-  XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:@"null"]);
+  XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se eventDetailURL:nil]);
+  XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se eventDetailURL:@"null"]);
 }
 
 - (void)testEventDetailURLForFileAccessEvent {
@@ -104,12 +104,12 @@
                       @"ti=SNT&si=SNT:s.n.t&ch=abc&"
                       @"ap=my_ap&un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:url];
+  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae eventDetailURL:url];
 
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 
-  XCTAssertNil([SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:nil]);
-  XCTAssertNil([SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:@"null"]);
+  XCTAssertNil([SNTBlockMessage eventDetailURLForFileAccessEvent:fae eventDetailURL:nil]);
+  XCTAssertNil([SNTBlockMessage eventDetailURLForFileAccessEvent:fae eventDetailURL:@"null"]);
 }
 
 - (void)testEventDetailURLForFileAccessEventFallback {
@@ -123,16 +123,19 @@
   NSString *configURL = @"http://localhost?rv=%rule_version%&rn=%rule_name%&ap=%accessed_path%";
   NSString *wantUrl = @"http://localhost?rv=my_rv&rn=my_rn&ap=my_ap";
 
-  OCMStub([self.mockConfigurator fileAccessEventDetailURL]).andReturn(configURL);
+  // When customURL is nil, the caller is responsible for providing the fallback URL.
+  // SNTBlockMessage no longer falls back to the configurator internally.
+  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae eventDetailURL:nil];
+  XCTAssertNil(gotUrl);
 
-  // When customURL is nil, should fall back to fileAccessEventDetailURL
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:nil];
+  // Caller provides the fallback explicitly
+  gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae eventDetailURL:configURL];
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 
   // When customURL is provided, it should be used instead
   NSString *customURL = @"http://custom?rv=%rule_version%";
   NSString *wantCustomUrl = @"http://custom?rv=my_rv";
-  gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:customURL];
+  gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae eventDetailURL:customURL];
   XCTAssertEqualObjects(gotUrl.absoluteString, wantCustomUrl);
 }
 
@@ -144,7 +147,7 @@
   NSString *url = @"http://localhost?fi=%file_identifier%";
   NSString *wantUrl = @"http://localhost?fi=my_fi";
 
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se eventDetailURL:url];
 
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 }

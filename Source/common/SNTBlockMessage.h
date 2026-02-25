@@ -57,9 +57,9 @@ NS_ASSUME_NONNULL_BEGIN
 ///  after replacing templates in the URL with values from the event.
 ///
 + (nullable NSURL *)eventDetailURLForEvent:(nullable SNTStoredExecutionEvent *)event
-                                 customURL:(nullable NSString *)url;
+                            eventDetailURL:(nullable NSString *)url;
 + (nullable NSURL *)eventDetailURLForFileAccessEvent:(nullable SNTStoredFileAccessEvent *)event
-                                           customURL:(nullable NSString *)url;
+                                      eventDetailURL:(nullable NSString *)url;
 
 ///
 ///  Strip HTML from a string, replacing <br /> with newline.

@@ -423,8 +423,11 @@ void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent *event, URLTextPair lin
                          event.process.filePath, event.process.fileSHA256,
                          StringToNSString(msg.ParentProcessName())];
 
-  NSURL *detailURL = [SNTBlockMessage eventDetailURLForFileAccessEvent:event
-                                                             customURL:link_info.first];
+  NSURL *detailURL =
+      [SNTBlockMessage eventDetailURLForFileAccessEvent:event
+                                         eventDetailURL:link_info.first
+                                                            ?: [[SNTConfigurator configurator]
+                                                                   fileAccessEventDetailURL]];
   if (detailURL) {
     [blockMsg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
   }

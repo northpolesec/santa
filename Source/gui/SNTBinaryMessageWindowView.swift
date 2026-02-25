@@ -256,7 +256,7 @@ struct SNTBinaryMessageWindowView: View {
   let c = SNTConfigurator.configurator()
 
   var resolvedEventDetailURL: URL? {
-    SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String? ?? configState.eventDetailURL)
+    SNTBlockMessage.eventDetailURL(for: event, eventDetailURL: customURL as String? ?? configState.eventDetailURL)
   }
 
   func callReplyCallback(_ response: Bool) {
