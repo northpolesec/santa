@@ -44,6 +44,9 @@
 
 // Reset silences item
 @property NSMenuItem *resetSilencesMenuItem;
+
+// Countdown formatter
+@property(nonatomic, strong) NSDateComponentsFormatter *countdownFormatter;
 @end
 
 static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
@@ -53,6 +56,11 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 - (instancetype)init {
   self = [super init];
   if (self) {
+    self.countdownFormatter = [[NSDateComponentsFormatter alloc] init];
+    self.countdownFormatter.allowedUnits =
+        NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute;
+    self.countdownFormatter.unitsStyle = NSDateComponentsFormatterUnitsStyleAbbreviated;
+
     [self setupStatusBarItem];
 
     // Watch for changes to the EnableMenuItem configuration key
@@ -390,10 +398,14 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   self.temporaryMonitorModeMenuItem.title = @"Leave Temporary Monitor Mode";
   self.temporaryMonitorModeRefreshItem.target = self;
 
-  // Create a timer that fires every second
+  // Create a timer that updates the countdown display. Using a 5 second interval is sufficient
+  // since the displayed units are days/hours/minutes which change infrequently.
   dispatch_async(dispatch_get_main_queue(), ^{
+    __block NSString *previousTitle = nil;
+
+    // Fire immediately to set the initial title, then repeat every 5 seconds.
     self.temporaryMonitorModeTimer = [NSTimer
-        scheduledTimerWithTimeInterval:1.0
+        scheduledTimerWithTimeInterval:5.0
                                repeats:YES
                                  block:^(NSTimer *timer) {
                                    if (!self.temporaryMonitorModeExpiration) {
@@ -410,16 +422,15 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
                                      return;
                                    }
 
-                                   NSDateComponentsFormatter *dcf =
-                                       [[NSDateComponentsFormatter alloc] init];
-                                   dcf.allowedUnits = NSCalendarUnitDay | NSCalendarUnitHour |
-                                                      NSCalendarUnitMinute;
-                                   dcf.unitsStyle = NSDateComponentsFormatterUnitsStyleAbbreviated;
-                                   NSString *title =
-                                       [dcf stringFromDate:[NSDate now]
-                                                    toDate:self.temporaryMonitorModeExpiration];
-                                   [self updateTitle:title];
+                                   NSString *title = [self.countdownFormatter
+                                       stringFromDate:[NSDate now]
+                                               toDate:self.temporaryMonitorModeExpiration];
+                                   if (![title isEqualToString:previousTitle]) {
+                                     previousTitle = title;
+                                     [self updateTitle:title];
+                                   }
                                  }];
+    [self.temporaryMonitorModeTimer fire];
   });
 }
 
