@@ -26,6 +26,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
+#import "Source/common/SNTXPCBundleServiceInterface.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
@@ -110,6 +111,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     LOGE(@"Events upload failed to create sync state: %ld", status);
+    if (reply) reply(NO);
     return;
   }
   syncState.eventBatchSize = self.eventBatchSize;
@@ -126,7 +128,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   }
   self.xsrfToken = syncState.xsrfToken;
   self.xsrfTokenHeader = syncState.xsrfTokenHeader;
-  reply(success);
+  if (reply) reply(success);
 }
 
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
@@ -359,6 +361,88 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 - (MOLXPCConnection *)daemonConnection {
   return self.daemonConn;
+}
+
+- (void)eventUploadForPath:(NSString *)path reply:(void (^)(NSError *error))reply {
+  if (path.length == 0) {
+    reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
+                              code:1
+                          userInfo:@{NSLocalizedDescriptionKey : @"Empty path"}]);
+    return;
+  }
+
+  dispatch_async(self.syncQueue, ^{
+    __block BOOL replied = NO;
+    void (^guardedReply)(NSError *) = ^(NSError *e) {
+      if (replied) return;
+      replied = YES;
+      if (reply) reply(e);
+    };
+
+    // Check enableBundles via daemon XPC
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    __block BOOL enableBundles = NO;
+    [[self.daemonConn remoteObjectProxy] enableBundles:^(BOOL response) {
+      enableBundles = response;
+      dispatch_semaphore_signal(sema);
+    }];
+    if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
+      LOGE(@"EventUpload: Timeout checking enableBundles, proceeding without bundles");
+    }
+
+    // Connect to bundle service
+    MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
+
+    dispatch_semaphore_t eventSema = dispatch_semaphore_create(0);
+    bs.invalidationHandler = ^{
+      LOGE(@"EventUpload: Bundle service connection invalidated");
+      dispatch_semaphore_signal(eventSema);
+    };
+
+    [bs resume];
+
+    __block NSArray<SNTStoredExecutionEvent *> *resultEvents;
+    [[bs remoteObjectProxy] generateEventsFromPath:path
+                                     enableBundles:enableBundles
+                                             reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
+                                               resultEvents = events;
+                                               dispatch_semaphore_signal(eventSema);
+                                             }];
+
+    dispatch_semaphore_wait(eventSema, DISPATCH_TIME_FOREVER);
+
+    if (!resultEvents) {
+      LOGE(@"EventUpload: Bundle service failed to generate events (connection lost)");
+      [bs invalidate];
+      guardedReply([NSError
+          errorWithDomain:@"com.northpolesec.santa.syncservice"
+                     code:2
+                 userInfo:@{NSLocalizedDescriptionKey : @"Bundle service connection lost"}]);
+      return;
+    }
+
+    if (!resultEvents.count) {
+      [bs invalidate];
+      guardedReply(nil);
+      return;
+    }
+
+    // Upload events to sync server
+    [self postEventsToSyncServer:resultEvents
+                           reply:^(BOOL success) {
+                             if (success) {
+                               guardedReply(nil);
+                             } else {
+                               guardedReply([NSError
+                                   errorWithDomain:@"com.northpolesec.santa.syncservice"
+                                              code:4
+                                          userInfo:@{
+                                            NSLocalizedDescriptionKey : @"Failed to upload events"
+                                          }]);
+                             }
+                             [bs invalidate];
+                           }];
+  });
 }
 
 #pragma mark syncing chain

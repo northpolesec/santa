@@ -22,6 +22,7 @@
 #import <memory>
 #import <vector>
 
+#include "Source/common/Glob.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTFileInfo.h"
@@ -111,6 +112,78 @@
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC))) {
       [progress cancel];
     }
+  });
+}
+
+- (void)generateEventsFromPath:(NSString *)path
+                 enableBundles:(BOOL)enableBundles
+                         reply:(void (^)(NSArray<SNTStoredExecutionEvent *> *events))reply {
+  dispatch_async(self.queue, ^{
+    NSMutableArray<SNTStoredExecutionEvent *> *allEvents = [NSMutableArray array];
+
+    std::vector<std::string> matches = santa::FindMatches(path);
+    for (const auto &match : matches) {
+      @autoreleasepool {
+        NSString *matchPath = @(match.c_str());
+        SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:matchPath];
+        if (!fi) continue;
+
+        SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
+        if (!se) continue;
+        se.decision = SNTEventStateBundleBinary;
+
+        BOOL includePrimaryEvent = YES;
+        if (enableBundles && fi.bundle) {
+          se.fileBundlePath = fi.bundlePath;
+
+          // Use the highest bundle we can find.
+          SNTFileInfo *b = [[SNTFileInfo alloc] initWithPath:se.fileBundlePath];
+          b.useAncestorBundle = YES;
+          se.fileBundlePath = b.bundlePath;
+
+          if (se.fileBundlePath) {
+            se.fileBundleID = b.bundleIdentifier;
+            se.fileBundleName = b.bundleName;
+            se.fileBundleVersion = b.bundleVersion;
+            se.fileBundleVersionString = b.bundleShortVersionString;
+
+            if (b.bundle.executablePath.length > b.bundlePath.length) {
+              se.fileBundleExecutableRelPath =
+                  [b.bundle.executablePath substringFromIndex:b.bundlePath.length + 1];
+            }
+
+            NSDate *startTime = [NSDate date];
+            NSDictionary *relatedEvents = [self findRelatedBinaries:se
+                                                           progress:nil
+                                                     clientListener:nil];
+            NSString *bundleHash = [self calculateBundleHashFromSHA256Hashes:relatedEvents.allKeys
+                                                                    progress:nil];
+            NSNumber *ms = [NSNumber numberWithDouble:[startTime timeIntervalSinceNow] * -1000.0];
+
+            NSNumber *bundleCount = @(relatedEvents.count);
+            for (SNTStoredExecutionEvent *e in relatedEvents.allValues) {
+              e.fileBundleHash = bundleHash;
+              e.fileBundleHashMilliseconds = ms;
+              e.fileBundleBinaryCount = bundleCount;
+            }
+            if (relatedEvents[se.fileSHA256]) {
+              includePrimaryEvent = NO;
+            } else {
+              se.fileBundleHash = bundleHash;
+              se.fileBundleHashMilliseconds = ms;
+              se.fileBundleBinaryCount = bundleCount;
+            }
+            [allEvents addObjectsFromArray:relatedEvents.allValues];
+          }
+        }
+
+        if (includePrimaryEvent) {
+          [allEvents addObject:se];
+        }
+      }
+    }
+
+    reply(allEvents);
   });
 }
 
