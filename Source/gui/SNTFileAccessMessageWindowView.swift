@@ -46,7 +46,7 @@ import santa_gui_SNTMessageView
   }
 }
 
-func copyDetailsToClipboard(e: SNTStoredFileAccessEvent?, customURL: String?) {
+func copyDetailsToClipboard(e: SNTStoredFileAccessEvent?, eventDetailURL: URL?) {
   var s =
     "Santa blocked access to \(e?.accessedPath ?? "<unknown>") by \((e?.process?.filePath as NSString?)?.lastPathComponent ?? "<unknown>")"
   s += "\nRule Name      : \(e?.ruleName ?? "<unknown>")"
@@ -62,8 +62,8 @@ func copyDetailsToClipboard(e: SNTStoredFileAccessEvent?, customURL: String?) {
   if let signingID = e?.process?.signingID {
     s += "\n  SigningID    : \(signingID)"
   }
-  if let url = SNTBlockMessage.eventDetailURL(for: e, customURL: customURL) {
-    s += "\nURL            : \(url.absoluteString)"
+  if let eventDetailURL = eventDetailURL {
+    s += "\nURL            : \(eventDetailURL.absoluteString)"
   }
   s += "\n"
 
@@ -74,7 +74,7 @@ func copyDetailsToClipboard(e: SNTStoredFileAccessEvent?, customURL: String?) {
 
 struct MoreDetailsView: View {
   let e: SNTStoredFileAccessEvent?
-  let customURL: NSString?
+  let eventDetailURL: URL?
 
   @Environment(\.presentationMode) var presentationMode
 
@@ -151,7 +151,7 @@ struct MoreDetailsView: View {
 
         HStack {
           CopyDetailsButton(action: {
-            copyDetailsToClipboard(e: e, customURL: customURL as String?)
+            copyDetailsToClipboard(e: e, eventDetailURL: eventDetailURL)
           })
 
           Button(action: { presentationMode.wrappedValue.dismiss() }) {
@@ -173,7 +173,7 @@ struct MoreDetailsView: View {
 
 struct Event: View {
   let e: SNTStoredFileAccessEvent?
-  let customURL: NSString?
+  let eventDetailURL: URL?
   let window: NSWindow?
 
   @State private var isShowingDetails = false
@@ -199,7 +199,7 @@ struct Event: View {
 
       }
     }.sheet(isPresented: $isShowingDetails) {
-      MoreDetailsView(e: e, customURL: customURL)
+      MoreDetailsView(e: e, eventDetailURL: eventDetailURL)
     }
 
     VStack(spacing: 2.0) {
@@ -209,7 +209,7 @@ struct Event: View {
         MoreDetailsButton($isShowingDetails)
 
         CopyDetailsButton(action: {
-          copyDetailsToClipboard(e: e, customURL: customURL as String?)
+          copyDetailsToClipboard(e: e, eventDetailURL: eventDetailURL)
         })
       }
 
@@ -232,11 +232,8 @@ struct SNTFileAccessMessageWindowView: View {
   @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
-  var effectiveURL: NSString? {
-    if let customURL = customURL {
-      return (customURL as String) == "null" ? nil : customURL
-    }
-    return configState.fileAccessEventDetailURL as NSString?
+  var resolvedEventDetailURL: URL? {
+    SNTBlockMessage.eventDetailURL(for: event, customURL: customURL as String?)
   }
 
   var effectiveText: String? {
@@ -247,7 +244,7 @@ struct SNTFileAccessMessageWindowView: View {
     SNTMessageView(
       SNTBlockMessage.attributedBlockMessage(for: event, customMessage: customMessage as String?)
     ) {
-      Event(e: event, customURL: effectiveURL, window: window)
+      Event(e: event, eventDetailURL: resolvedEventDetailURL, window: window)
 
       VStack(spacing: 15.0) {
         if configState.enableNotificationSilences {
@@ -255,7 +252,7 @@ struct SNTFileAccessMessageWindowView: View {
         }
 
         HStack(spacing: 15.0) {
-          if effectiveURL != nil {
+          if resolvedEventDetailURL != nil {
             OpenEventButton(customText: effectiveText, action: openButton)
           }
           DismissButton(silence: preventFutureNotifications, action: dismissButton)
@@ -267,9 +264,8 @@ struct SNTFileAccessMessageWindowView: View {
   }
 
   func openButton() {
-    let url = SNTBlockMessage.eventDetailURL(for: event, customURL: effectiveURL as String?)
     window?.close()
-    if let url = url {
+    if let url = resolvedEventDetailURL {
       openURL(url)
     }
   }

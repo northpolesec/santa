@@ -32,7 +32,7 @@
 ///  The custom message to display for this event
 @property(copy) NSString *customMessage;
 
-///  The custom URL to use for this event
+///  A custom URL for this event, overriding the configured EventDetailURL
 @property(copy) NSString *customURL;
 
 @end

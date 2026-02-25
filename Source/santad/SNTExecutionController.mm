@@ -502,7 +502,7 @@ static NSString *const kPrinterProxy =
         // Let the user know what happened in the GUI.
         [self.notifierQueue addEvent:se
                    withCustomMessage:cd.customMsg
-                           customURL:cd.customURL ?: config.eventDetailURL
+                           customURL:cd.customURL
                          configState:configState
                             andReply:replyBlock];
       }
