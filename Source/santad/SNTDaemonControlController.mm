@@ -143,6 +143,7 @@ double watchdogRAMPeak = 0;
 
 - (void)flushCache:(void (^)(BOOL))reply {
   self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kExplicitCommand);
+  reply(YES);
 }
 
 - (void)checkCacheForVnodeID:(SantaVnode)vnodeID withReply:(void (^)(SNTAction))reply {
