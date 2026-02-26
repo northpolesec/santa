@@ -60,7 +60,8 @@ func copyDetailsToClipboard(e: SNTStoredFileAccessEvent?, customURL: String?) {
     s += "\n  CDHash       : \(cdhash)"
   }
   if let signingID = e?.process?.signingID {
-    s += "\n  SigningID    : \(signingID)"
+    let formattedID = [e?.process?.teamID, signingID].compactMap { $0 }.joined(separator: ":")
+    s += "\n  SigningID    : \(formattedID)"
   }
   if let url = SNTBlockMessage.eventDetailURL(for: e, customURL: customURL) {
     s += "\nURL            : \(url.absoluteString)"
@@ -110,7 +111,9 @@ struct MoreDetailsView: View {
         if let signingID = e?.process?.signingID {
           addLabel {
             Text("Signing ID").bold().font(Font.system(size: 12.0))
-            Text(signingID).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
+            Text(
+              [e?.process?.teamID, signingID].compactMap { $0 }.joined(separator: ":")
+            ).font(Font.system(size: 12.0).monospaced()).textSelection(.enabled)
           }
           Divider()
         }
