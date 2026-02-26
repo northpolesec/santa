@@ -32,6 +32,7 @@
 #import "Source/common/SNTRule.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
+#import "Source/common/SigningIDHelpers.h"
 #include "Source/common/SystemResources.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
@@ -173,9 +174,16 @@
       cd.certChain = csc.certificates;
 
       cd.teamID = csc.teamID;
-      if (csc.teamID || csc.platformBinary) {
-        cd.signingID = csc.signingID;
+      cd.signingID = FormatSigningID(csc);
+
+      // Ensure that if no teamID exists but a signingID does exist, that the binary
+      // is a platform binary. If not, remove the signingID.
+      if (!cd.teamID && cd.signingID) {
+        if (!csc.platformBinary) {
+          cd.signingID = nil;
+        }
       }
+
       cd.cdhash = csc.cdhash;
 
       cd.entitlements = entitlementsFilter->Filter(
