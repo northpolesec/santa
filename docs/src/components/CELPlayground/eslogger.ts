@@ -68,10 +68,18 @@ export function convertEsloggerEvent(input: string): string {
     }
   }
 
-  // Make up signing times (eslogger doesn't include these)
+  // Make up signing times and ancestors (eslogger events don't include these)
   context.target.signing_time = "2025-06-01T00:00:00Z";
   context.target.secure_signing_time = "2025-06-01T00:00:00Z";
+  context.ancestors = [
+    {
+      signing_id: "platform:com.apple.Terminal",
+      team_id: "",
+      path: "/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal",
+      cdhash: "",
+    },
+  ];
 
   const yaml = stringifyYAML(context);
-  return "# Note: signing times are fake — eslogger events don't include them\n" + yaml;
+  return "# Note: signing times and ancestors are fake — eslogger events don't include them\n" + yaml;
 }
