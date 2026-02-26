@@ -30,9 +30,9 @@
 #include "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
-#import "Source/common/SigningIDHelpers.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
+#import "Source/common/SigningIDHelpers.h"
 #include "Source/common/SystemResources.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
@@ -175,7 +175,7 @@
 
       cd.teamID = csc.teamID;
       cd.signingID = FormatSigningID(csc);
-      
+
       // Ensure that if no teamID exists but a signingID does exist, that the binary
       // is a platform binary. If not, remove the signingID.
       if (!cd.teamID && cd.signingID) {
@@ -183,7 +183,7 @@
           cd.signingID = nil;
         }
       }
-      
+
       cd.cdhash = csc.cdhash;
 
       cd.entitlements = entitlementsFilter->Filter(
