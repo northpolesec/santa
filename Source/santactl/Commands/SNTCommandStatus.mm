@@ -250,6 +250,11 @@ REGISTER_COMMAND_NAME(@"status")
     blockUSBMount = response;
   }];
 
+  __block BOOL blockUnencryptedUSBMount = NO;
+  [rop blockUnencryptedUSBMount:^(BOOL response) {
+    blockUnencryptedUSBMount = response;
+  }];
+
   __block NSArray<NSString *> *remountUSBMode;
   [rop remountUSBMode:^(NSArray<NSString *> *response) {
     remountUSBMode = response;
@@ -306,6 +311,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"watchdog_cpu_peak" : @(cpuPeak),
         @"watchdog_ram_peak" : @(ramPeak),
         @"block_usb" : @(blockUSBMount),
+        @"block_unencrypted_usb" : @(blockUnencryptedUSBMount),
         @"remount_usb_mode" : (blockUSBMount && remountUSBMode.count ? remountUSBMode : @""),
         @"on_start_usb_options" : StartupOptionToString(configurator.onStartUSBOptions),
         @"static_rules" : @(staticRuleCount),
@@ -413,6 +419,8 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-35s | %s\n", "Log Type", [eventLogType UTF8String]);
     printf("  %-35s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
     printf("  %-35s | %s\n", "Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
+    printf("  %-35s | %s\n", "Unencrypted USB Blocking",
+           (blockUnencryptedUSBMount ? "Yes" : "No"));
     if (blockUSBMount && remountUSBMode.count > 0) {
       printf("  %-35s | %s\n", "Removable Media Remounting Mode",
              [[remountUSBMode componentsJoinedByString:@", "] UTF8String]);
