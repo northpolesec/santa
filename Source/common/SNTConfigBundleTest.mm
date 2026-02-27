@@ -28,6 +28,7 @@
 @property NSString *allowlistRegex;
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
+@property NSNumber *blockUnencryptedUSBMount;
 @property NSArray *remountUSBMode;
 @property NSNumber *blockNetworkMount;
 @property NSString *bannedNetworkMountBlockMessage;
@@ -57,7 +58,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 25;
+  exp.expectedFulfillmentCount = 26;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -66,6 +67,7 @@
   bundle.allowlistRegex = @"allow";
   bundle.blocklistRegex = @"block";
   bundle.blockUSBMount = @(YES);
+  bundle.blockUnencryptedUSBMount = @(YES);
   bundle.remountUSBMode = @[ @"foo" ];
   bundle.blockNetworkMount = @(YES);
   bundle.bannedNetworkMountBlockMessage = @"Network mount blocked";
@@ -110,6 +112,11 @@
   }];
 
   [bundle blockUSBMount:^(BOOL val) {
+    XCTAssertNotEqual(val, NO);
+    [exp fulfill];
+  }];
+
+  [bundle blockUnencryptedUSBMount:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
@@ -243,6 +250,10 @@
   }];
 
   [bundle blockUSBMount:^(BOOL val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle blockUnencryptedUSBMount:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
   }];
 

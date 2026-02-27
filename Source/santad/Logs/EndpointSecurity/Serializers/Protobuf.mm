@@ -15,6 +15,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 
+#include <DiskArbitration/DiskArbitration.h>
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
@@ -1483,6 +1484,11 @@ static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDict
     };
     EncodeTimestamp(pb_disk->mutable_appearance(), ts);
     Timestamp timestamp = pb_disk->appearance();
+  }
+
+  NSNumber *encrypted = props[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey];
+  if (encrypted != nil) {
+    pb_disk->set_encrypted([encrypted boolValue]);
   }
 }
 

@@ -30,6 +30,7 @@ NSString *const kBatchSize = @"batch_size";
 NSString *const kUploadLogsURL = @"upload_logs_url";
 NSString *const kClientMode = @"client_mode";
 NSString *const kBlockUSBMount = @"block_usb_mount";
+NSString *const kBlockUnencryptedUSBMount = @"block_unencrypted_usb_mount";
 NSString *const kRemountUSBMode = @"remount_usb_mode";
 NSString *const kClientModeMonitor = @"MONITOR";
 NSString *const kClientModeLockdown = @"LOCKDOWN";

@@ -484,6 +484,10 @@ message Disk {
 
   // Path mounted from
   optional string mount_from = 11;
+
+  // Whether the disk media is encrypted (from DiskArbitration kDADiskDescriptionMediaEncryptedKey).
+  // Absent if the encryption status was not yet determined by the system.
+  optional bool encrypted = 12;
 }
 
 // Information emitted when Santa captures bundle information
