@@ -403,8 +403,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      return;
                                    }
 
-                                   LOGI(@"BlockUnencryptedUSBMount changed: %d -> %d",
-                                        oldBool, newBool);
+                                   LOGI(@"BlockUnencryptedUSBMount changed: %d -> %d", oldBool,
+                                        newBool);
                                    device_client.blockUnencryptedUSBMount = newBool;
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator

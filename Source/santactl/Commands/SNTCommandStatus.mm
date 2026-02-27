@@ -419,8 +419,7 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-35s | %s\n", "Log Type", [eventLogType UTF8String]);
     printf("  %-35s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
     printf("  %-35s | %s\n", "Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
-    printf("  %-35s | %s\n", "Unencrypted USB Blocking",
-           (blockUnencryptedUSBMount ? "Yes" : "No"));
+    printf("  %-35s | %s\n", "Unencrypted USB Blocking", (blockUnencryptedUSBMount ? "Yes" : "No"));
     if (blockUSBMount && remountUSBMode.count > 0) {
       printf("  %-35s | %s\n", "Removable Media Remounting Mode",
              [[remountUSBMode componentsJoinedByString:@", "] UTF8String]);

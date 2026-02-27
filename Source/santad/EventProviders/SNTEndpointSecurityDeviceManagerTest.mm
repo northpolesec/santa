@@ -192,13 +192,14 @@ class MockAuthResultCache : public AuthResultCache {
         return true;
       }));
 
-  [deviceManager handleMessage:Message(mockESApi, &esMsg)
-            recordEventMetrics:^(EventDisposition d) {
-              XCTAssertEqual(d, (deviceManager.blockUSBMount || deviceManager.blockUnencryptedUSBMount)
-                                    ? EventDisposition::kProcessed
-                                    : EventDisposition::kDropped);
-              dispatch_semaphore_signal(semaMetrics);
-            }];
+  [deviceManager
+           handleMessage:Message(mockESApi, &esMsg)
+      recordEventMetrics:^(EventDisposition d) {
+        XCTAssertEqual(d, (deviceManager.blockUSBMount || deviceManager.blockUnencryptedUSBMount)
+                              ? EventDisposition::kProcessed
+                              : EventDisposition::kDropped);
+        dispatch_semaphore_signal(semaMetrics);
+      }];
 
   [self waitForExpectations:@[ mountExpectation ] timeout:60.0];
 
@@ -813,11 +814,9 @@ class MockAuthResultCache : public AuthResultCache {
            expectedAuthResult:ES_AUTH_RESULT_DENY
            deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
              dm.blockUnencryptedUSBMount = YES;
-             dm.deviceBlockCallback =
-                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
-                   XCTAssertEqual(usbEvent.decision,
-                                  SNTStoredUSBMountEventDecisionBlocked);
-                 };
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+             };
            }];
 }
 
@@ -829,11 +828,9 @@ class MockAuthResultCache : public AuthResultCache {
            expectedAuthResult:ES_AUTH_RESULT_DENY
            deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
              dm.blockUnencryptedUSBMount = YES;
-             dm.deviceBlockCallback =
-                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
-                   XCTAssertEqual(usbEvent.decision,
-                                  SNTStoredUSBMountEventDecisionBlocked);
-                 };
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+             };
            }];
 }
 
@@ -847,12 +844,10 @@ class MockAuthResultCache : public AuthResultCache {
            deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
              dm.blockUnencryptedUSBMount = YES;
              dm.remountArgs = wantRemountArgs;
-             dm.deviceBlockCallback =
-                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
-                   XCTAssertEqual(usbEvent.decision,
-                                  SNTStoredUSBMountEventDecisionAllowedWithRemount);
-                   XCTAssertEqualObjects(usbEvent.remountArgs, wantRemountArgs);
-                 };
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionAllowedWithRemount);
+               XCTAssertEqualObjects(usbEvent.remountArgs, wantRemountArgs);
+             };
            }];
 }
 
@@ -865,14 +860,12 @@ class MockAuthResultCache : public AuthResultCache {
            deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
              dm.blockUnencryptedUSBMount = YES;
              dm.remountArgs = @[ @"rdonly", @"noexec" ];
-             dm.deviceBlockCallback =
-                 ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
-                   // Must be blocked, NOT remounted — remounting would still
-                   // expose unencrypted data.
-                   XCTAssertEqual(usbEvent.decision,
-                                  SNTStoredUSBMountEventDecisionBlocked);
-                   XCTAssertNil(usbEvent.remountArgs);
-                 };
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+               // Must be blocked, NOT remounted — remounting would still
+               // expose unencrypted data.
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+               XCTAssertNil(usbEvent.remountArgs);
+             };
            }];
 }
 

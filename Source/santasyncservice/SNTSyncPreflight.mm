@@ -231,8 +231,7 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     }
   }
 
-  // TODO: Parse block_unencrypted_usb_mount from preflight response once the
-  // sync proto is updated with the corresponding field.
+  // TODO(sbs): Umm...handle block_unencrypted_usb_mount, need to update protos
 
   if (resp.has_override_file_access_action()) {
     switch (resp.override_file_access_action()) {
