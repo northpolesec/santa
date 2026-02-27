@@ -459,7 +459,7 @@ NS_ASSUME_NONNULL_BEGIN
 #endif  // HAVE_MACOS_15
 
   if ((isNetworkMount && !self.configurator.blockNetworkMount) ||
-      (!isNetworkMount && !self.blockUSBMount)) {
+      (!isNetworkMount && !self.blockUSBMount && !self.blockUnencryptedUSBMount)) {
     // TODO: We should also unsubscribe from events when these aren't set, but
     // this is generally a low-volume event type and handling dynamic subscriptions adds
     // a lot of code complexity.
@@ -525,6 +525,27 @@ NS_ASSUME_NONNULL_BEGIN
     return ES_AUTH_RESULT_ALLOW;
   }
 
+  // Read the encryption status from DiskArbitration. This key is populated
+  // asynchronously by diskarbitrationd via _FSGetMediaEncryptionStatusAtPath().
+  // A nil value means the key has not yet been populated — we treat this as
+  // "not encrypted" (deny-by-default) since this is a security-critical decision.
+  NSNumber *encryptedValue = diskInfo[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey];
+  BOOL isEncrypted = (encryptedValue != nil && [encryptedValue boolValue]);
+
+  // When only encryption enforcement is active (blockUSBMount is OFF),
+  // encrypted devices are allowed through (subject to remountArgs if configured).
+  // Unencrypted devices fall through to the block/remount logic below.
+  if (self.blockUnencryptedUSBMount && !self.blockUSBMount && isEncrypted) {
+    if (![self haveRemountArgs]) {
+      return ES_AUTH_RESULT_ALLOW;
+    }
+    // Encrypted device with remountArgs: fall through to remount logic.
+  }
+
+  // When blockUnencryptedUSBMount is ON and device is unencrypted, always block
+  // (never remount — remounting still exposes unencrypted data).
+  BOOL shouldBlockUnencrypted = self.blockUnencryptedUSBMount && !isEncrypted;
+
   SNTDeviceEvent *event = [[SNTDeviceEvent alloc]
       initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
             fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
@@ -537,7 +558,7 @@ NS_ASSUME_NONNULL_BEGIN
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   SNTStoredUSBMountEvent *storedUSBMountEvent;
 
-  if ([self haveRemountArgs]) {
+  if ([self haveRemountArgs] && !shouldBlockUnencrypted) {
     event.remountArgs = self.remountArgs;
 
     if ([self remountUSBModeContainsFlags:eventStatFS->f_flags] &&

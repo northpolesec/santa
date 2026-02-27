@@ -231,6 +231,8 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     }
   }
 
+  // TODO(sbs): Umm...handle block_unencrypted_usb_mount, need to update protos
+
   if (resp.has_override_file_access_action()) {
     switch (resp.override_file_access_action()) {
       case Traits::NONE: self.syncState.overrideFileAccessAction = @"NONE"; break;

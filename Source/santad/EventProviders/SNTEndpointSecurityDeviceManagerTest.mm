@@ -192,12 +192,14 @@ class MockAuthResultCache : public AuthResultCache {
         return true;
       }));
 
-  [deviceManager handleMessage:Message(mockESApi, &esMsg)
-            recordEventMetrics:^(EventDisposition d) {
-              XCTAssertEqual(d, deviceManager.blockUSBMount ? EventDisposition::kProcessed
-                                                            : EventDisposition::kDropped);
-              dispatch_semaphore_signal(semaMetrics);
-            }];
+  [deviceManager
+           handleMessage:Message(mockESApi, &esMsg)
+      recordEventMetrics:^(EventDisposition d) {
+        XCTAssertEqual(d, (deviceManager.blockUSBMount || deviceManager.blockUnencryptedUSBMount)
+                              ? EventDisposition::kProcessed
+                              : EventDisposition::kDropped);
+        dispatch_semaphore_signal(semaMetrics);
+      }];
 
   [self waitForExpectations:@[ mountExpectation ] timeout:60.0];
 
@@ -790,5 +792,93 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 #endif  // HAVE_MACOS_15
+
+#pragma mark - Block Unencrypted USB Mount Tests
+
+- (void)testBlockUnencryptedUSBMount_EncryptedDevice_Allowed {
+  [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+            diskInfoOverrides:@{
+              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @YES,
+            }
+           expectedAuthResult:ES_AUTH_RESULT_ALLOW
+           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+             dm.blockUnencryptedUSBMount = YES;
+           }];
+}
+
+- (void)testBlockUnencryptedUSBMount_UnencryptedDevice_Blocked {
+  [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+            diskInfoOverrides:@{
+              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
+            }
+           expectedAuthResult:ES_AUTH_RESULT_DENY
+           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+             dm.blockUnencryptedUSBMount = YES;
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+             };
+           }];
+}
+
+- (void)testBlockUnencryptedUSBMount_MissingKey_DeniedByDefault {
+  // No kDADiskDescriptionMediaEncryptedKey in diskInfo at all (nil).
+  // This simulates the async race where DA hasn't populated the key yet.
+  [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+            diskInfoOverrides:nil
+           expectedAuthResult:ES_AUTH_RESULT_DENY
+           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+             dm.blockUnencryptedUSBMount = YES;
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+             };
+           }];
+}
+
+- (void)testBlockUnencryptedUSBMount_EncryptedDevice_Remounted {
+  NSArray<NSString *> *wantRemountArgs = @[ @"rdonly", @"noexec" ];
+  [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+            diskInfoOverrides:@{
+              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @YES,
+            }
+           expectedAuthResult:ES_AUTH_RESULT_DENY
+           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+             dm.blockUnencryptedUSBMount = YES;
+             dm.remountArgs = wantRemountArgs;
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionAllowedWithRemount);
+               XCTAssertEqualObjects(usbEvent.remountArgs, wantRemountArgs);
+             };
+           }];
+}
+
+- (void)testBlockUnencryptedUSBMount_UnencryptedDevice_NoRemount {
+  [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+            diskInfoOverrides:@{
+              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
+            }
+           expectedAuthResult:ES_AUTH_RESULT_DENY
+           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+             dm.blockUnencryptedUSBMount = YES;
+             dm.remountArgs = @[ @"rdonly", @"noexec" ];
+             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+               // Must be blocked, NOT remounted — remounting would still
+               // expose unencrypted data.
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+               XCTAssertNil(usbEvent.remountArgs);
+             };
+           }];
+}
+
+- (void)testBlockUnencryptedUSBMount_Disabled_AllowsAll {
+  [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+            diskInfoOverrides:@{
+              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
+            }
+           expectedAuthResult:ES_AUTH_RESULT_ALLOW
+           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+             dm.blockUnencryptedUSBMount = NO;
+             // blockUSBMount also OFF (default from init)
+           }];
+}
 
 @end

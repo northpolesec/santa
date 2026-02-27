@@ -73,6 +73,7 @@ struct RuleCounts {
 - (void)enableBundles:(void (^)(BOOL))reply;
 - (void)enableTransitiveRules:(void (^)(BOOL))reply;
 - (void)blockUSBMount:(void (^)(BOOL))reply;
+- (void)blockUnencryptedUSBMount:(void (^)(BOOL))reply;
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply;
 - (void)blockNetworkMount:(void (^)(NSNumber *))reply;
 
