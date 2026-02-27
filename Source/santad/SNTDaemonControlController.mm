@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include <sys/qos.h>
 
 #import <Foundation/Foundation.h>
 
@@ -69,6 +70,7 @@ double watchdogRAMPeak = 0;
 @property SNTNotificationQueue *notQueue;
 @property SNTSyncdQueue *syncdQueue;
 @property SNTNetworkExtensionQueue *netExtQueue;
+@property dispatch_queue_t generalQ;
 @property dispatch_queue_t commandQ;
 @property dispatch_queue_t netFlowQ;
 
@@ -115,6 +117,10 @@ double watchdogRAMPeak = 0;
     _flushCacheBlock = flushCacheBlock;
     _cacheCountsBlock = cacheCountBlock;
     _checkCacheBlock = checkCacheBlock;
+
+    _generalQ = dispatch_queue_create_with_target(
+        "com.northpolesec.santa.generalXPCq", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+        dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
 
     _commandQ = dispatch_queue_create_with_target(
         "com.northpolesec.santa.cmdq", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
@@ -780,8 +786,11 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)exportTelemetryWithReply:(void (^)(BOOL))reply {
-  _logger->ExportTelemetry();
-  reply(YES);
+  // Perform work asynchronously to not hold up processing other XPC messages
+  dispatch_async(self.generalQ, ^{
+    _logger->ExportTelemetry();
+    reply(YES);
+  });
 }
 
 - (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber *)requestedDuration
