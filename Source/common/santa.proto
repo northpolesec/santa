@@ -558,6 +558,15 @@ message FileAccess {
   // This can happen, for example, when a single operation violates both Data
   // and Process File Access Authorization rules.
   optional string operation_id = 7;
+
+  // The access mode of the file in question
+  enum AccessMode {
+    ACCESS_MODE_UNKNOWN = 0;
+    ACCESS_MODE_READONLY = 1;
+    ACCESS_MODE_WRITEONLY = 2;
+    ACCESS_MODE_READWRITE = 3;
+  }
+  optional AccessMode access_mode = 8;
 }
 
 // Session identifier for a graphical session

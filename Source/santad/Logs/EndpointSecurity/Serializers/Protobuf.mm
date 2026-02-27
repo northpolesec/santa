@@ -1372,6 +1372,31 @@ std::vector<uint8_t> Protobuf::SerializeNetworkFlows(SNDProcessFlows *processFlo
   return FinalizeProto(santa_msg);
 }
 
+static ::pbv1::FileAccess::AccessMode GetAccessMode(const Message &msg) {
+  if (msg->event_type != ES_EVENT_TYPE_AUTH_OPEN) {
+    // treat rename/clone/truncate/etc as write mode since they are inherently mutate operations
+    return ::pbv1::FileAccess::ACCESS_MODE_WRITEONLY;
+  }
+
+  uint32_t fflag = msg->event.open.fflag;
+  bool has_read = fflag & FREAD;
+  bool has_write = fflag & (FWRITE | O_APPEND | O_TRUNC);
+
+  if (has_read && has_write) {
+    return ::pbv1::FileAccess::ACCESS_MODE_READWRITE;
+  }
+
+  if (has_write) {
+    return ::pbv1::FileAccess::ACCESS_MODE_WRITEONLY;
+  }
+
+  if (has_read) {
+    return ::pbv1::FileAccess::ACCESS_MODE_READONLY;
+  }
+
+  return ::pbv1::FileAccess::ACCESS_MODE_UNKNOWN;
+}
+
 std::vector<uint8_t> Protobuf::SerializeFileAccess(
     const std::string &policy_version, const std::string &policy_name, const Message &msg,
     const EnrichedProcess &enriched_process, size_t target_index,
@@ -1398,11 +1423,14 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
   EncodeString([file_access] { return file_access->mutable_policy_name(); }, policy_name);
 
   file_access->set_access_type(GetAccessType(msg->event_type));
+  file_access->set_access_mode(GetAccessMode(msg));
   file_access->set_policy_decision(GetPolicyDecision(decision));
   file_access->set_operation_id(operation_id);
 
   return FinalizeProto(santa_msg);
 }
+
+
 
 std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message &msg, const std::string_view hash) {
   Arena arena;
