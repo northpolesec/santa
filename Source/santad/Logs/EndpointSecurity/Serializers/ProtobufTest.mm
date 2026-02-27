@@ -1878,7 +1878,7 @@ void SerializeAndCheckNonESEvents(
         return false;
       },
       ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
-        return serializer->SerializeAllowlist(msg, "hash_value");
+        return serializer->SerializeAllowlist(msg, "hash_value", "close_file");
       });
 }
 

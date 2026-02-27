@@ -1111,7 +1111,8 @@ std::vector<uint8_t> BasicString::SerializeFileAccess(
 }
 
 std::vector<uint8_t> BasicString::SerializeAllowlist(const Message &msg,
-                                                     const std::string_view hash) {
+                                                     const std::string_view hash,
+                                                     const std::string_view target_path) {
   std::string str = CreateDefaultString();
 
   str.append("action=ALLOWLIST|pid=");
@@ -1119,7 +1120,7 @@ std::vector<uint8_t> BasicString::SerializeAllowlist(const Message &msg,
   str.append("|pidversion=");
   str.append(std::to_string(Pidversion(msg->process->audit_token)));
   str.append("|path=");
-  str.append(FilePath(santa::GetAllowListTargetFile(msg)).Sanitized());
+  str.append(SanitizableString(target_path.data(), target_path.size()).Sanitized());
   str.append("|sha256=");
   str.append(hash);
 

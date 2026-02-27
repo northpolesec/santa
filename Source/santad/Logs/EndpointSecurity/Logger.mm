@@ -313,9 +313,10 @@ void Logger::Log(std::unique_ptr<EnrichedMessage> msg) {
   }
 }
 
-void Logger::LogAllowlist(const Message &msg, const std::string_view hash) {
+void Logger::LogAllowlist(const Message &msg, const std::string_view hash,
+                          const std::string_view target_path) {
   if (ShouldLog(TelemetryEvent::kAllowlist)) {
-    writer_->Write(serializer_->SerializeAllowlist(msg, hash));
+    writer_->Write(serializer_->SerializeAllowlist(msg, hash, target_path));
   }
 }
 

@@ -79,7 +79,8 @@ class Logger : public Timer<Logger> {
 
   virtual void Log(std::unique_ptr<santa::EnrichedMessage> msg);
 
-  void LogAllowlist(const santa::Message &msg, const std::string_view hash);
+  void LogAllowlist(const santa::Message &msg, const std::string_view hash,
+                    const std::string_view target_path);
 
   void LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events);
 

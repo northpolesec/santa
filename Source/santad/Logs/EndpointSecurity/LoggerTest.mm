@@ -96,7 +96,8 @@ class MockSerializer : public Empty {
  public:
   MOCK_METHOD(std::vector<uint8_t>, SerializeMessage, (const EnrichedClose &msg));
 
-  MOCK_METHOD(std::vector<uint8_t>, SerializeAllowlist, (const Message &, const std::string_view));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeAllowlist,
+              (const Message &, const std::string_view, const std::string_view));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeBundleHashingEvent, (SNTStoredExecutionEvent *));
   MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary *, bool));
@@ -287,13 +288,14 @@ class MockSleighLauncher : public santa::SleighLauncher {
   auto mockWriter = std::make_shared<MockWriter>();
   es_message_t msg;
   std::string_view hash = "this_is_my_test_hash";
+  std::string_view target_path = "this_is_my_target_path";
 
   mockESApi->SetExpectationsRetainReleaseMessage();
-  EXPECT_CALL(*mockSerializer, SerializeAllowlist(testing::_, hash));
+  EXPECT_CALL(*mockSerializer, SerializeAllowlist(testing::_, hash, target_path));
   EXPECT_CALL(*mockWriter, Write);
 
   Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
-      .LogAllowlist(Message(mockESApi, &msg), hash);
+      .LogAllowlist(Message(mockESApi, &msg), hash, target_path);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());

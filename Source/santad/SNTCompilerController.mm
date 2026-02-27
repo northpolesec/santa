@@ -209,7 +209,7 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
             LOGE(@"Unable to add new transitive rule to database: %@", error.localizedDescription);
           }
         } else {
-          logger->LogAllowlist(esMsg, [targetFile.SHA256 UTF8String]);
+          logger->LogAllowlist(esMsg, [targetFile.SHA256 UTF8String], [targetFile.path UTF8String]);
         }
       }
     }
