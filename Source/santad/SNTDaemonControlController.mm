@@ -780,8 +780,11 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)exportTelemetryWithReply:(void (^)(BOOL))reply {
-  _logger->ExportTelemetry();
-  reply(YES);
+  // Perform work asynchronously to not hold up processing other XPC messages
+  dispatch_async(self.commandQ, ^{
+    _logger->ExportTelemetry();
+    reply(YES);
+  });
 }
 
 - (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber *)requestedDuration
