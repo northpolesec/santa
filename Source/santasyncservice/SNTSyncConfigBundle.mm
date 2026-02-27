@@ -27,6 +27,7 @@
 @property NSString *allowlistRegex;
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
+@property NSNumber *blockUnencryptedUSBMount;
 @property NSArray *remountUSBMode;
 @property NSNumber *blockNetworkMount;
 @property NSString *bannedNetworkMountBlockMessage;
@@ -70,6 +71,7 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.allowlistRegex = syncState.allowlistRegex;
   bundle.blocklistRegex = syncState.blocklistRegex;
   bundle.blockUSBMount = syncState.blockUSBMount;
+  bundle.blockUnencryptedUSBMount = syncState.blockUnencryptedUSBMount;
   bundle.remountUSBMode = syncState.remountUSBMode;
   bundle.blockNetworkMount = syncState.blockNetworkMount;
   bundle.bannedNetworkMountBlockMessage = syncState.bannedNetworkMountBlockMessage;

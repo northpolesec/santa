@@ -422,6 +422,10 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] blockUSBMount]);
 }
 
+- (void)blockUnencryptedUSBMount:(void (^)(BOOL))reply {
+  reply([[SNTConfigurator configurator] blockUnencryptedUSBMount]);
+}
+
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply {
   reply([[SNTConfigurator configurator] remountUSBMode]);
 }
@@ -484,6 +488,10 @@ double watchdogRAMPeak = 0;
 
   [result blockUSBMount:^(BOOL val) {
     [configurator setSyncServerBlockUSBMount:val];
+  }];
+
+  [result blockUnencryptedUSBMount:^(BOOL val) {
+    [configurator setSyncServerBlockUnencryptedUSBMount:val];
   }];
 
   [result remountUSBMode:^(NSArray *val) {
