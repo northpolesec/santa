@@ -100,7 +100,7 @@ class Serializer {
       const santa::EnrichedProcess &enriched_process, size_t target_index,
       std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision);
 
-  virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message &,
+  virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view,
                                                   const std::string_view) = 0;
 
   virtual std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) = 0;

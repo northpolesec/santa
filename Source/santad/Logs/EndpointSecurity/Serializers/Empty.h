@@ -76,7 +76,8 @@ class Empty : public Serializer {
       std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
       std::string_view operation_id) override;
 
-  std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view) override;
+  std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view,
+                                          const std::string_view) override;
 
   std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) override;
 

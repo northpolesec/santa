@@ -160,6 +160,7 @@ es_file_t *GetAllowListTargetFile(const Message &msg) {
   switch (msg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_CLOSE: return msg->event.close.target;
     case ES_EVENT_TYPE_NOTIFY_RENAME: return msg->event.rename.source;
+    case ES_EVENT_TYPE_NOTIFY_CLONE: return msg->event.clone.source;
     default:
       // This is a programming error
       [NSException raise:@"Unexpected type"

@@ -1404,7 +1404,8 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
   return FinalizeProto(santa_msg);
 }
 
-std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message &msg, const std::string_view hash) {
+std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message &msg, const std::string_view hash,
+                                                  const std::string_view target_path) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena);
 
@@ -1418,6 +1419,11 @@ std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message &msg, const std:
 
   EncodeFileInfo(pb_allowlist->mutable_target(), es_file, enriched_file,
                  [NSString stringWithFormat:@"%s", hash.data()]);
+
+  // The real path might not match the path that was used in `EncodeFileInfo`. This is because
+  // we know the stat information will be appropriate, but the path might've been built from
+  // components in the ES message.
+  *pb_allowlist->mutable_target()->mutable_path() = std::string(target_path);
 
   return FinalizeProto(santa_msg);
 }

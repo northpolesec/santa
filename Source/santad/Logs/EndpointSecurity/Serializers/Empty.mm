@@ -164,7 +164,8 @@ std::vector<uint8_t> Empty::SerializeFileAccess(
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeAllowlist(const Message &msg, const std::string_view hash) {
+std::vector<uint8_t> Empty::SerializeAllowlist(const Message &msg, const std::string_view hash,
+                                               const std::string_view target_path) {
   return {};
 }
 

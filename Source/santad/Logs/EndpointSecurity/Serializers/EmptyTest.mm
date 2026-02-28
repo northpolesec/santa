@@ -43,7 +43,7 @@ using santa::Empty;
   XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedUnlink *)&fake).size(), 0);
   XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedCSInvalidated *)&fake).size(), 0);
 
-  XCTAssertEqual(e->SerializeAllowlist(*(santa::Message *)&fake, "").size(), 0);
+  XCTAssertEqual(e->SerializeAllowlist(*(santa::Message *)&fake, "", "").size(), 0);
   XCTAssertEqual(e->SerializeBundleHashingEvent(nil).size(), 0);
   XCTAssertEqual(e->SerializeDiskAppeared(nil, true).size(), 0);
   XCTAssertEqual(e->SerializeDiskDisappeared(nil).size(), 0);

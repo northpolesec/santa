@@ -1295,14 +1295,15 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  std::vector<uint8_t> ret = BasicString::Create(mockESApi, nil, false)
-                                 ->SerializeAllowlist(Message(mockESApi, &esMsg), "test_hash");
+  std::vector<uint8_t> ret =
+      BasicString::Create(mockESApi, nil, false)
+          ->SerializeAllowlist(Message(mockESApi, &esMsg), "test_hash", "target_path");
 
   XCTAssertTrue(testing::Mock::VerifyAndClearExpectations(mockESApi.get()),
                 "Expected calls were not properly mocked");
 
   std::string got(ret.begin(), ret.end());
-  std::string want = "action=ALLOWLIST|pid=12|pidversion=34|path=foo"
+  std::string want = "action=ALLOWLIST|pid=12|pidversion=34|path=target_path"
                      "|sha256=test_hash|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
