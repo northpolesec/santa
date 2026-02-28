@@ -151,6 +151,7 @@ objc_library(
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
+        "//Source/common:String",
     ],
 )
 
