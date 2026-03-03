@@ -48,7 +48,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+                        metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
              faaPolicyProcessor:
                  (std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
     iterateProcessPoliciesBlock:(IterateProcessPoliciesBlock)iterateProcessPoliciesBlock {

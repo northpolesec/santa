@@ -33,18 +33,18 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SystemResources.h"
+#include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Client.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/Metrics.h"
 
 using santa::Client;
 using santa::EndpointSecurityAPI;
 using santa::EnrichedMessage;
+using santa::ESMetricsObserver;
 using santa::EventDisposition;
 using santa::Message;
-using santa::Metrics;
 using santa::Processor;
 
 @interface SNTEndpointSecurityClient ()
@@ -56,7 +56,7 @@ using santa::Processor;
 
 @implementation SNTEndpointSecurityClient {
   std::shared_ptr<EndpointSecurityAPI> _esApi;
-  std::shared_ptr<Metrics> _metrics;
+  std::shared_ptr<ESMetricsObserver> _metrics;
   Client _esClient;
   dispatch_queue_t _authQueue;
   dispatch_queue_t _notifyQueue;
@@ -64,7 +64,7 @@ using santa::Processor;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<Metrics>)metrics
+                      metrics:(std::shared_ptr<ESMetricsObserver>)metrics
                     processor:(Processor)processor {
   self = [super init];
   if (self) {
@@ -139,15 +139,17 @@ using santa::Processor;
 
   self->_esClient = self->_esApi->NewClient(^(es_client_t *c, Message esMsg) {
     int64_t processingStart = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+    es_event_type_t eventType = esMsg->event_type;
 
     // Update event stats BEFORE calling into the processor class to ensure
     // sequence numbers are processed in order.
-    self->_metrics->UpdateEventStats(self->_processor, esMsg.operator->());
+    self->_metrics->UpdateEventStats(self->_processor, eventType, esMsg->seq_num,
+                                     esMsg->global_seq_num);
 
     if ([self handleContextMessage:esMsg]) {
       int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
       self->_metrics->SetEventMetrics(self->_processor, EventDisposition::kProcessed,
-                                      processingEnd - processingStart, esMsg);
+                                      processingEnd - processingStart, eventType);
       return;
     }
 
@@ -156,12 +158,12 @@ using santa::Processor;
           recordEventMetrics:^(EventDisposition disposition) {
             int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
             self->_metrics->SetEventMetrics(self->_processor, disposition,
-                                            processingEnd - processingStart, esMsg);
+                                            processingEnd - processingStart, eventType);
           }];
     } else {
       int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
       self->_metrics->SetEventMetrics(self->_processor, EventDisposition::kDropped,
-                                      processingEnd - processingStart, esMsg);
+                                      processingEnd - processingStart, eventType);
     }
   });
 

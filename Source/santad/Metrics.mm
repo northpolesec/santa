@@ -419,17 +419,18 @@ void Metrics::StopPoll() {
   });
 }
 
-void Metrics::SetEventMetrics(Processor processor, EventDisposition event_disposition,
-                              int64_t nanos, const santa::Message &msg) {
+void Metrics::SetEventMetrics(Processor processor, EventDisposition disposition, int64_t nanos,
+                              es_event_type_t event_type) {
   dispatch_sync(events_q_, ^{
-    event_counts_cache_[EventCountTuple{processor, msg->event_type, event_disposition}]++;
-    event_times_cache_[EventTimesTuple{processor, msg->event_type}] = nanos;
+    event_counts_cache_[EventCountTuple{processor, event_type, disposition}]++;
+    event_times_cache_[EventTimesTuple{processor, event_type}] = nanos;
   });
 }
 
-void Metrics::UpdateEventStats(Processor processor, const es_message_t *msg) {
+void Metrics::UpdateEventStats(Processor processor, es_event_type_t event_type, uint64_t seq_num,
+                               uint64_t global_seq_num) {
   dispatch_sync(events_q_, ^{
-    EventStatsTuple event_stats_key{processor, msg->event_type};
+    EventStatsTuple event_stats_key{processor, event_type};
     // NB: Using the invalid event type ES_EVENT_TYPE_LAST to store drop counts
     // based on the global sequence number.
     EventStatsTuple global_stats_key{processor, ES_EVENT_TYPE_LAST};
@@ -440,26 +441,25 @@ void Metrics::UpdateEventStats(Processor processor, const es_message_t *msg) {
     // Sequence number should always increment by 1.
     // Drops detected if there is a difference between the current sequence
     // number and the expected sequence number
-    int64_t new_event_drops = msg->seq_num - old_event_stats.next_seq_num;
-    int64_t new_global_drops = msg->global_seq_num - old_global_stats.next_seq_num;
+    int64_t new_event_drops = seq_num - old_event_stats.next_seq_num;
+    int64_t new_global_drops = global_seq_num - old_global_stats.next_seq_num;
 
     // Only log one or the other, prefer the event specific log.
     // For higher volume event types, we'll normally see the event-specific log eventually
     // For lower volume event types, we may only see the global drop message
     if (new_event_drops > 0) {
       LOGD(@"Drops detected for client: %@, event: %@, drops: %llu", ProcessorToString(processor),
-           EventTypeToString(msg->event_type), new_event_drops);
+           EventTypeToString(event_type), new_event_drops);
     } else if (new_global_drops > 0) {
       LOGD(@"Drops detected globally for client: %@, drops: %llu", ProcessorToString(processor),
            new_global_drops);
     }
 
-    drop_cache_[event_stats_key] = SequenceStats{.next_seq_num = msg->seq_num + 1,
+    drop_cache_[event_stats_key] = SequenceStats{.next_seq_num = seq_num + 1,
                                                  .drops = old_event_stats.drops + new_event_drops};
 
-    drop_cache_[global_stats_key] =
-        SequenceStats{.next_seq_num = msg->global_seq_num + 1,
-                      .drops = old_global_stats.drops + new_global_drops};
+    drop_cache_[global_stats_key] = SequenceStats{
+        .next_seq_num = global_seq_num + 1, .drops = old_global_stats.drops + new_global_drops};
   });
 }
 

@@ -28,27 +28,12 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTMetricSet.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/ESMetricsObserver.h"
 
 namespace santa {
 
 // Test interface - forward declaration
 class MetricsPeer;
-
-enum class EventDisposition {
-  kProcessed = 0,
-  kDropped,
-};
-
-enum class Processor {
-  kUnknown = 0,
-  kAuthorizer,
-  kDeviceManager,
-  kRecorder,
-  kTamperResistance,
-  kDataFileAccessAuthorizer,
-  kProcessFileAccessAuthorizer,
-};
 
 enum class FileAccessMetricStatus {
   kOK = 0,
@@ -66,7 +51,7 @@ using FileAccessEventCountTuple =
 
 NSString *const EventTypeToString(es_event_type_t eventType);
 
-class Metrics : public std::enable_shared_from_this<Metrics> {
+class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Metrics> {
  public:
   static std::shared_ptr<Metrics> Create(SNTMetricSet *metric_set, uint64_t interval);
 
@@ -87,10 +72,11 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
   void Export();
 
   // Used for tracking event sequence numbers to determine if drops occured
-  void UpdateEventStats(Processor processor, const es_message_t *msg);
+  void UpdateEventStats(Processor processor, es_event_type_t event_type, uint64_t seq_num,
+                        uint64_t global_seq_num) override;
 
-  void SetEventMetrics(Processor processor, EventDisposition event_disposition, int64_t nanos,
-                       const santa::Message &msg);
+  void SetEventMetrics(Processor processor, EventDisposition disposition, int64_t nanos,
+                       es_event_type_t event_type) override;
 
   void AddRateLimitingMetrics(int64_t events_rate_limited_count);
 

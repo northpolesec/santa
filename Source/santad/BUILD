@@ -80,8 +80,8 @@ objc_library(
     hdrs = ["EventProviders/SNTEndpointSecurityEventHandler.h"],
     deps = [
         ":EndpointSecurityMessage",
-        ":Metrics",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common/es:ESMetricsObserver",
         "//Source/common/faa:WatchItemPolicy",
     ],
 )
@@ -439,7 +439,7 @@ objc_library(
         ":EndpointSecurityClient",
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",
-        ":Metrics",
+        "//Source/common/es:ESMetricsObserver",
         "//Source/common/faa:WatchItemPolicy",
     ],
 )
@@ -453,7 +453,6 @@ objc_library(
         ":EndpointSecurityClient",
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",
-        ":Metrics",
         ":SNTEndpointSecurityClientBase",
         "//Source/common:AuditUtilities",
         "//Source/common:BranchPrediction",
@@ -461,6 +460,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:SystemResources",
+        "//Source/common/es:ESMetricsObserver",
         "//Source/common/faa:WatchItemPolicy",
     ],
 )
@@ -472,8 +472,8 @@ objc_library(
     deps = [
         ":EndpointSecurityAPI",
         ":EndpointSecurityMessage",
-        ":Metrics",
         ":SNTEndpointSecurityClient",
+        "//Source/common/es:ESMetricsObserver",
         "//Source/santad/ProcessTree:SNTEndpointSecurityAdapter",
         "//Source/santad/ProcessTree:process_tree",
     ],
@@ -507,7 +507,6 @@ objc_library(
         ":EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
-        ":Metrics",
         ":SNTCompilerController",
         ":SNTEndpointSecurityEventHandler",
         ":SNTEndpointSecurityTreeAwareClient",
@@ -518,6 +517,7 @@ objc_library(
         "//Source/common:String",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
+        "//Source/common/es:ESMetricsObserver",
         "//Source/santad/ProcessTree:process_tree",
     ],
 )
@@ -530,10 +530,10 @@ objc_library(
         ":EndpointSecurityAPI",
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
-        ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         "//Source/common:SNTLogging",
+        "//Source/common/es:ESMetricsObserver",
         "//Source/common/faa:WatchItemPolicy",
     ],
 )
@@ -548,7 +548,6 @@ objc_library(
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityEnricher",
         ":EndpointSecurityMessage",
-        ":Metrics",
         ":SNTCompilerController",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
@@ -557,6 +556,7 @@ objc_library(
         "//Source/common:BranchPrediction",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
+        "//Source/common/es:ESMetricsObserver",
     ],
 )
 
@@ -602,13 +602,13 @@ objc_library(
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":FAAPolicyProcessor",
-        ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTStrengthify",
+        "//Source/common/es:ESMetricsObserver",
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
     ],
@@ -622,13 +622,13 @@ objc_library(
         ":EndpointSecurityAPI",
         ":EndpointSecurityMessage",
         ":FAAPolicyProcessor",
-        ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTLogging",
         "//Source/common:SantaCache",
         "//Source/common:SantaSetCache",
+        "//Source/common/es:ESMetricsObserver",
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
     ],
@@ -645,7 +645,6 @@ objc_library(
         ":EndpointSecurityLogger",
         ":EndpointSecurityMessage",
         ":EndpointSecuritySerializerUtilities",
-        ":Metrics",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         "//Source/common:AuditUtilities",
@@ -659,6 +658,7 @@ objc_library(
         "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStoredUSBMountEvent",
         "//Source/common:String",
+        "//Source/common/es:ESMetricsObserver",
     ],
 )
 
@@ -1049,7 +1049,6 @@ objc_library(
     srcs = ["Metrics.mm"],
     hdrs = ["Metrics.h"],
     deps = [
-        ":EndpointSecurityMessage",
         ":SNTApplicationCoreMetrics",
         "//Source/common:MOLXPCConnection",
         "//Source/common:Platform",
@@ -1057,6 +1056,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTXPCMetricServiceInterface",
+        "//Source/common/es:ESMetricsObserver",
     ],
 )
 
@@ -1599,9 +1599,7 @@ santa_unit_test(
     name = "MetricsTest",
     srcs = ["MetricsTest.mm"],
     deps = [
-        ":EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
         "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTMetricSet",

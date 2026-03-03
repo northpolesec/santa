@@ -17,17 +17,17 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 
+#include "Source/common/es/ESMetricsObserver.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/Metrics.h"
 #include "Source/santad/ProcessTree/SNTEndpointSecurityAdapter.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #include "Source/santad/ProcessTree/process_tree_macos.h"
 
 using santa::EndpointSecurityAPI;
+using santa::ESMetricsObserver;
 using santa::EventDisposition;
 using santa::Message;
-using santa::Metrics;
 using santa::Processor;
 
 @implementation SNTEndpointSecurityTreeAwareClient {
@@ -35,7 +35,7 @@ using santa::Processor;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<Metrics>)metrics
+                      metrics:(std::shared_ptr<ESMetricsObserver>)metrics
                     processor:(Processor)processor
                   processTree:
                       (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
