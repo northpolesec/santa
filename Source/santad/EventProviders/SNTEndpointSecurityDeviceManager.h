@@ -40,6 +40,7 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
     : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler>
 
 @property(nonatomic, readwrite) BOOL blockUSBMount;
+@property(nonatomic, readwrite) BOOL blockUnencryptedUSBMount;
 @property(nonatomic, readwrite, nullable) NSArray<NSString *> *remountArgs;
 @property(nonatomic, nullable) SNTDeviceBlockCallback deviceBlockCallback;
 @property(nonatomic, nullable) SNTNetworkMountCallback networkMountCallback;

@@ -28,6 +28,7 @@
 - (void)allowlistRegex:(void (^)(NSString *))block;
 - (void)blocklistRegex:(void (^)(NSString *))block;
 - (void)blockUSBMount:(void (^)(BOOL))block;
+- (void)blockUnencryptedUSBMount:(void (^)(BOOL))block;
 - (void)remountUSBMode:(void (^)(NSArray *))block;
 - (void)blockNetworkMount:(void (^)(BOOL))block;
 - (void)bannedNetworkMountBlockMessage:(void (^)(NSString *))block;
