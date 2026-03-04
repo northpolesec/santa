@@ -576,9 +576,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     }
 
     if (rule.state == SNTRuleStateCEL || rule.state == SNTRuleStateCELv2) {
-      absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> celExpr;
-
       google::protobuf::Arena arena;
+      absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> celExpr;
       if (rule.state == SNTRuleStateCEL && _celEvaluator != nullptr) {
         celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
       } else if (rule.state == SNTRuleStateCELv2 && _celV2Evaluator != nullptr) {
