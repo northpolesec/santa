@@ -1111,6 +1111,7 @@ test_suite(
         ":ScopedFileTest",
         ":ScopedIOObjectRefTest",
         ":TelemetryEventMapTest",
+        "//Source/common/cel:ArenaGrowthTest",
         "//Source/common/cel:CELTest",
         "//Source/common/faa:unit_tests",
         "//Source/common/ne:unit_tests",
