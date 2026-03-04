@@ -576,12 +576,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     }
 
     if (rule.state == SNTRuleStateCEL || rule.state == SNTRuleStateCELv2) {
+      google::protobuf::Arena arena;
       absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> celExpr;
-
       if (rule.state == SNTRuleStateCEL && _celEvaluator != nullptr) {
-        celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
+        celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
       } else if (rule.state == SNTRuleStateCELv2 && _celV2Evaluator != nullptr) {
-        celExpr = _celV2Evaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr));
+        celExpr = _celV2Evaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
       }
       if (!celExpr.ok()) {
         [errors addObject:
@@ -854,7 +854,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     if (!r) continue;
 
     if (r.state == SNTRuleStateCEL && _celEvaluator) {
-      auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(r.celExpr));
+      google::protobuf::Arena arena;
+      auto celExpr = _celEvaluator->Compile(santa::NSStringToUTF8StringView(r.celExpr), &arena);
       if (!celExpr.ok()) {
         LOGE(@"Failed to compile CEL expression for static rule %@: %s", r.identifier,
              std::string(celExpr.status().message()).c_str());
