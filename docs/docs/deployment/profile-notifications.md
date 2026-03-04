@@ -28,13 +28,19 @@ You will need the following information to configure this profile:
 
 - Notifications Enabled: True
 
-- Badges Enabled: True
-
-- Critical Alert Enabled: True
-
 - Show In Notification Center: True
 
 - Show In Lock Screen: False
+
+- Alert Type: Banner
+
+- Badges Enabled: True
+
+- Sounds Enabled: False
+
+- Critical Alert Enabled: True
+
+
 
 ## Example profile
 
