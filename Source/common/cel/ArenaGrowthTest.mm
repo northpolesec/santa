@@ -41,24 +41,25 @@ static size_t GetResidentMemoryBytes() {
 
 @implementation ArenaGrowthTest
 
-/// Demonstrates unbounded arena growth in CompileAndEvaluate.
+/// Regression test for unbounded arena growth in CompileAndEvaluate.
 ///
-/// This reproduces usage for a reported bug: the Evaluator holds a
-/// single protobuf Arena that is used for every compile+evaluate cycle. Since
-/// Arena is a monotonic bump allocator that never frees individual allocations,
-/// every evaluation leaks materialized variable values (args strings, env maps,
-/// etc.) and compilation temporaries.
+/// Previously, the Evaluator used a single protobuf Arena for every
+/// compile+evaluate cycle. Since Arena is a monotonic bump allocator that never
+/// frees individual allocations, every evaluation leaked materialized variable
+/// values (args strings, env maps, etc.) and compilation temporaries.
 ///
-/// The test mimics the real-world trigger: a TEAMID CEL rule with
-/// `args.exists(...)` evaluated on every matching exec event. With high-frequency
-/// processes like VS Code/yarn/node, this grows without bound.
+/// The fix uses a stack-local Arena in CompileAndEvaluate so temporaries are
+/// freed at end of scope. This test verifies memory stays bounded.
 - (void)testCompileAndEvaluateArenaGrowth {
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
 
-  // Create an evaluator (holds a single Arena for its lifetime).
   auto sut = santa::cel::Evaluator<true>::Create();
-  XCTAssertTrue(sut.ok(), @"Failed to create evaluator: %s", sut.status().message().data());
+  if (!sut.ok()) {
+    XCTFail(@"Failed to create evaluator: %.*s", (int)sut.status().message().size(),
+            sut.status().message().data());
+    return;
+  }
 
   // Build a large args list to amplify per-evaluation arena allocation.
   // This simulates a process like `node` or `yarn` with many arguments.
@@ -67,35 +68,40 @@ static size_t GetResidentMemoryBytes() {
   for (int i = 0; i < 200; i++) {
     largeArgs.push_back(std::string(256, 'a' + (i % 26)));
   }
+  const auto *argsPtr = &largeArgs;
 
   // Expression that forces materialization of the full args list onto the arena.
-  // This is the pattern from the bug report: args.exists(x, x == '...')
   absl::string_view expr = "args.exists(x, x == 'nonexistent_value')";
 
   // Warm up: run a few iterations to stabilize RSS and JIT/lazy allocations.
   for (int i = 0; i < 10; i++) {
-    auto f = std::make_unique<ExecutableFileT>();
-    f->mutable_signing_time()->set_seconds(1748436989);
-    auto argsCopy = largeArgs;
-    santa::cel::Activation<true> activation(
-        std::move(f),
-        ^std::vector<std::string>() {
-          return argsCopy;
-        },
-        ^std::map<std::string, std::string>() {
-          return {};
-        },
-        ^uid_t() {
-          return 501;
-        },
-        ^std::string() {
-          return "/usr/local/bin";
-        },
-        ^std::vector<AncestorT>() {
-          return {};
-        });
-    auto result = sut.value()->CompileAndEvaluate(expr, activation);
-    XCTAssertTrue(result.ok(), @"Warmup failed: %s", result.status().message().data());
+    @autoreleasepool {
+      auto f = std::make_unique<ExecutableFileT>();
+      f->mutable_signing_time()->set_seconds(1748436989);
+      santa::cel::Activation<true> activation(
+          std::move(f),
+          ^std::vector<std::string>() {
+            return *argsPtr;
+          },
+          ^std::map<std::string, std::string>() {
+            return {};
+          },
+          ^uid_t() {
+            return 501;
+          },
+          ^std::string() {
+            return "/usr/local/bin";
+          },
+          ^std::vector<AncestorT>() {
+            return {};
+          });
+      auto result = sut.value()->CompileAndEvaluate(expr, activation);
+      if (!result.ok()) {
+        XCTFail(@"Warmup failed: %.*s", (int)result.status().message().size(),
+                result.status().message().data());
+        return;
+      }
+    }
   }
 
   size_t rssBaseline = GetResidentMemoryBytes();
@@ -103,31 +109,36 @@ static size_t GetResidentMemoryBytes() {
 
   // Run many iterations of CompileAndEvaluate. Each iteration materializes
   // ~200 * 256 = ~50KB of arg strings onto the arena, plus compilation
-  // temporaries. Over 5000 iterations this should grow by ~250MB+ with the bug.
+  // temporaries. Before the fix this grew by ~600MB+ over 5000 iterations.
   const int iterations = 5000;
   for (int i = 0; i < iterations; i++) {
-    auto f = std::make_unique<ExecutableFileT>();
-    f->mutable_signing_time()->set_seconds(1748436989);
-    auto argsCopy = largeArgs;
-    santa::cel::Activation<true> activation(
-        std::move(f),
-        ^std::vector<std::string>() {
-          return argsCopy;
-        },
-        ^std::map<std::string, std::string>() {
-          return {{"PATH", "/usr/bin"}, {"HOME", "/Users/test"}};
-        },
-        ^uid_t() {
-          return 501;
-        },
-        ^std::string() {
-          return "/usr/local/bin";
-        },
-        ^std::vector<AncestorT>() {
-          return {};
-        });
-    auto result = sut.value()->CompileAndEvaluate(expr, activation);
-    XCTAssertTrue(result.ok(), @"Iteration %d failed: %s", i, result.status().message().data());
+    @autoreleasepool {
+      auto f = std::make_unique<ExecutableFileT>();
+      f->mutable_signing_time()->set_seconds(1748436989);
+      santa::cel::Activation<true> activation(
+          std::move(f),
+          ^std::vector<std::string>() {
+            return *argsPtr;
+          },
+          ^std::map<std::string, std::string>() {
+            return {{"PATH", "/usr/bin"}, {"HOME", "/Users/test"}};
+          },
+          ^uid_t() {
+            return 501;
+          },
+          ^std::string() {
+            return "/usr/local/bin";
+          },
+          ^std::vector<AncestorT>() {
+            return {};
+          });
+      auto result = sut.value()->CompileAndEvaluate(expr, activation);
+      if (!result.ok()) {
+        XCTFail(@"Iteration %d failed: %.*s", i, (int)result.status().message().size(),
+                result.status().message().data());
+        return;
+      }
+    }
   }
 
   size_t rssAfter = GetResidentMemoryBytes();
@@ -138,13 +149,8 @@ static size_t GetResidentMemoryBytes() {
         (double)rssBaseline / (1024.0 * 1024.0), (double)rssAfter / (1024.0 * 1024.0), growthMB,
         iterations);
 
-  // With the bug: each iteration leaks ~50KB+ onto the arena.
-  // 5000 iterations * ~50KB = ~250MB growth (conservative estimate).
-  // With the fix: the stack-local arena is destroyed each call, so growth
-  // should be negligible (a few MB for normal heap churn at most).
-  //
   // Threshold: 50MB is generous enough to avoid flakiness from normal heap
-  // activity, but will clearly catch the unbounded arena growth.
+  // activity, but will clearly catch unbounded arena growth (~600MB before fix).
   double thresholdMB = 50.0;
   XCTAssertLessThan(growthMB, thresholdMB,
                     @"CompileAndEvaluate leaked %.1fMB over %d iterations "
