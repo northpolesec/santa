@@ -1,4 +1,4 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ static size_t GetResidentMemoryBytes() {
 
 /// Demonstrates unbounded arena growth in CompileAndEvaluate.
 ///
-/// This reproduces the reported 32-52GB memory usage: the Evaluator holds a
+/// This reproduces usage for a reported bug: the Evaluator holds a
 /// single protobuf Arena that is used for every compile+evaluate cycle. Since
 /// Arena is a monotonic bump allocator that never frees individual allocations,
 /// every evaluation leaks materialized variable values (args strings, env maps,
