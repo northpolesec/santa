@@ -49,5 +49,6 @@
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block;
 - (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block;
 - (void)telemetryFilterExpressions:(void (^)(NSArray<NSString *> *))block;
+- (void)celFallbackExpressions:(void (^)(NSArray<NSString *> *))block;
 
 @end

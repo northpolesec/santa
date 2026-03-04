@@ -86,6 +86,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     case SNTEventStateBlockTeamID: return SNTEventStateAllowTeamID;
     case SNTEventStateBlockSigningID: return SNTEventStateAllowSigningID;
     case SNTEventStateBlockCDHash: return SNTEventStateAllowCDHash;
+    case SNTEventStateBlockCELFallback: return SNTEventStateAllowCELFallback;
     case SNTEventStateBlockLongPath: return SNTEventStateAllowUnknown;  // No direct equivalent
     default: return SNTEventStateAllowUnknown;
   }
@@ -173,6 +174,8 @@ static NSString *const kPrinterProxy =
     case SNTEventStateAllowCompilerSigningID: eventTypeStr = kAllowCompilerSigningID; break;
     case SNTEventStateAllowTransitive: eventTypeStr = kAllowTransitive; break;
     case SNTEventStateBlockLongPath: eventTypeStr = kBlockLongPath; break;
+    case SNTEventStateBlockCELFallback: eventTypeStr = kBlockCELFallback; break;
+    case SNTEventStateAllowCELFallback: eventTypeStr = kAllowCELFallback; break;
     default: eventTypeStr = kUnknownEventState; break;
   }
 
