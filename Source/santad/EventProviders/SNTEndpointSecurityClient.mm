@@ -142,26 +142,28 @@ using santa::Processor;
 
     // Update event stats BEFORE calling into the processor class to ensure
     // sequence numbers are processed in order.
-    self->_metrics->UpdateEventStats(self->_processor, esMsg.operator->());
+    self->_metrics->UpdateEventStats(self->_processor, esMsg->event_type, esMsg->seq_num,
+                                     esMsg->global_seq_num);
 
     if ([self handleContextMessage:esMsg]) {
       int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
       self->_metrics->SetEventMetrics(self->_processor, EventDisposition::kProcessed,
-                                      processingEnd - processingStart, esMsg);
+                                      processingEnd - processingStart, esMsg->event_type);
       return;
     }
 
+    es_event_type_t event_type = esMsg->event_type;
     if ([self shouldHandleMessage:esMsg]) {
       [self handleMessage:std::move(esMsg)
           recordEventMetrics:^(EventDisposition disposition) {
             int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
             self->_metrics->SetEventMetrics(self->_processor, disposition,
-                                            processingEnd - processingStart, esMsg);
+                                            processingEnd - processingStart, event_type);
           }];
     } else {
       int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
       self->_metrics->SetEventMetrics(self->_processor, EventDisposition::kDropped,
-                                      processingEnd - processingStart, esMsg);
+                                      processingEnd - processingStart, event_type);
     }
   });
 

@@ -29,8 +29,6 @@
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/SNTMetricSet.h"
 #include "Source/common/TestUtils.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 
 using santa::EventCountTuple;
 using santa::EventDisposition;
@@ -59,12 +57,19 @@ class MetricsPeer : public Metrics {
   using Metrics::drop_cache_;
   using Metrics::event_counts_cache_;
   using Metrics::event_times_cache_;
+  using Metrics::events_q_;
   using Metrics::faa_event_counts_cache_;
   using Metrics::interval_;
   using Metrics::rate_limit_counts_cache_;
   using Metrics::running_;
 
   using Metrics::SequenceStats;
+
+  // Drain the events queue to ensure all async blocks have completed
+  void DrainEventQueue() {
+    dispatch_sync(events_q_, ^{
+                  });
+  }
 };
 
 }  // namespace santa
@@ -74,7 +79,6 @@ using santa::EventTypeToString;
 using santa::FileAccessMetricStatus;
 using santa::FileAccessMetricStatusToString;
 using santa::FileAccessPolicyDecisionToString;
-using santa::Message;
 using santa::Metrics;
 using santa::MetricsPeer;
 using santa::ProcessorToString;
@@ -267,11 +271,6 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
 - (void)testSetEventMetrics {
   int64_t nanos = 1234;
-  es_message_t esExecMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, NULL);
-  es_message_t esOpenMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, NULL);
-
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  mockESApi->SetExpectationsRetainReleaseMessage();
 
   std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *){
                                                                 });
@@ -280,20 +279,21 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   XCTAssertEqual(metrics->event_counts_cache_.size(), 0);
   XCTAssertEqual(metrics->event_times_cache_.size(), 0);
 
-  {
-    Message execMsg(mockESApi, &esExecMsg);
-    Message openMsg(mockESApi, &esOpenMsg);
-    metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos, execMsg);
+  metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos,
+                           ES_EVENT_TYPE_AUTH_EXEC);
+  metrics->DrainEventQueue();
 
-    // Check sizes after setting metrics once
-    XCTAssertEqual(metrics->event_counts_cache_.size(), 1);
-    XCTAssertEqual(metrics->event_times_cache_.size(), 1);
+  // Check sizes after setting metrics once
+  XCTAssertEqual(metrics->event_counts_cache_.size(), 1);
+  XCTAssertEqual(metrics->event_times_cache_.size(), 1);
 
-    metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos, execMsg);
+  metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos,
+                           ES_EVENT_TYPE_AUTH_EXEC);
 
-    metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos * 2,
-                             openMsg);
-  }
+  metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos * 2,
+                           ES_EVENT_TYPE_AUTH_OPEN);
+
+  metrics->DrainEventQueue();
 
   // Re-check expected counts. One was an update, so should only be 2 items
   XCTAssertEqual(metrics->event_counts_cache_.size(), 2);
@@ -341,6 +341,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
   metrics->SetFileAccessEventMetrics("v1.0", "rule_abc", FileAccessMetricStatus::kOK,
                                      ES_EVENT_TYPE_AUTH_OPEN, FileAccessPolicyDecision::kDenied);
+  metrics->DrainEventQueue();
 
   // Check sizes after setting metrics once
   XCTAssertEqual(metrics->faa_event_counts_cache_.size(), 1);
@@ -352,6 +353,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   // Add a second metric
   metrics->SetFileAccessEventMetrics("v1.0", "rule_xyz", FileAccessMetricStatus::kOK,
                                      ES_EVENT_TYPE_AUTH_OPEN, FileAccessPolicyDecision::kDenied);
+  metrics->DrainEventQueue();
 
   // Re-check expected counts. One was an update, so should only be 2 items
   XCTAssertEqual(metrics->faa_event_counts_cache_.size(), 2);
@@ -366,10 +368,6 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testUpdateEventStats {
-  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, NULL);
-  esMsg.seq_num = 0;
-  esMsg.global_seq_num = 0;
-
   std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *){
                                                                 });
 
@@ -379,7 +377,8 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   // Map does not initially contain entries
   XCTAssertEqual(0, metrics->drop_cache_.size());
 
-  metrics->UpdateEventStats(Processor::kRecorder, &esMsg);
+  metrics->UpdateEventStats(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 0, 0);
+  metrics->DrainEventQueue();
 
   // After the first update, 2 entries exist, one for the event, and one for global
   XCTAssertEqual(2, metrics->drop_cache_.size());
@@ -389,10 +388,8 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   XCTAssertEqual(0, metrics->drop_cache_[globalStats].drops);
 
   // Increment sequence numbers by 1 and check that no drop was detected
-  esMsg.seq_num++;
-  esMsg.global_seq_num++;
-
-  metrics->UpdateEventStats(Processor::kRecorder, &esMsg);
+  metrics->UpdateEventStats(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 1, 1);
+  metrics->DrainEventQueue();
 
   XCTAssertEqual(2, metrics->drop_cache_.size());
   XCTAssertEqual(2, metrics->drop_cache_[eventStats].next_seq_num);
@@ -400,11 +397,9 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   XCTAssertEqual(2, metrics->drop_cache_[globalStats].next_seq_num);
   XCTAssertEqual(0, metrics->drop_cache_[globalStats].drops);
 
-  // Now incremenet sequence numbers by a large amount to trigger drop detection
-  esMsg.seq_num += 10;
-  esMsg.global_seq_num += 10;
-
-  metrics->UpdateEventStats(Processor::kRecorder, &esMsg);
+  // Now increment sequence numbers by a large amount to trigger drop detection
+  metrics->UpdateEventStats(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 11, 11);
+  metrics->DrainEventQueue();
 
   XCTAssertEqual(2, metrics->drop_cache_.size());
   XCTAssertEqual(12, metrics->drop_cache_[eventStats].next_seq_num);
@@ -417,16 +412,6 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   id mockEventProcessingTimes = OCMClassMock([SNTMetricInt64Gauge class]);
   id mockEventCounts = OCMClassMock([SNTMetricCounter class]);
   int64_t nanos = 1234;
-  es_message_t esExecMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, NULL);
-  es_message_t esOpenMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, NULL);
-
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  mockESApi->SetExpectationsRetainReleaseMessage();
-
-  // Initial update will have non-zero sequence numbers, triggering drop detection
-  es_message_t esMsgWithDrops = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, NULL);
-  esMsgWithDrops.seq_num = 123;
-  esMsgWithDrops.global_seq_num = 123;
 
   OCMStub([mockEventCounts incrementBy:0 forFieldValues:[OCMArg any]])
       .ignoringNonObjectArgs()
@@ -448,17 +433,15 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
                                         // This block intentionally left blank
                                     });
 
-  {
-    Message execMsg(mockESApi, &esExecMsg);
-    Message openMsg(mockESApi, &esOpenMsg);
-    metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos, execMsg);
-    metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos * 2,
-                             openMsg);
-  }
-  metrics->UpdateEventStats(Processor::kRecorder, &esMsgWithDrops);
+  metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos,
+                           ES_EVENT_TYPE_AUTH_EXEC);
+  metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos * 2,
+                           ES_EVENT_TYPE_AUTH_OPEN);
+  metrics->UpdateEventStats(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 123, 123);
   metrics->AddRateLimitingMetrics(123);
   metrics->SetFileAccessEventMetrics("v1.0", "rule_abc", FileAccessMetricStatus::kOK,
                                      ES_EVENT_TYPE_AUTH_OPEN, FileAccessPolicyDecision::kDenied);
+  metrics->DrainEventQueue();
 
   // First ensure we have the expected map sizes
   XCTAssertEqual(metrics->event_counts_cache_.size(), 2);
@@ -467,7 +450,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   XCTAssertEqual(metrics->faa_event_counts_cache_.size(), 1);
   XCTAssertEqual(metrics->drop_cache_.size(), 2);
 
-  EventStatsTuple eventStats{Processor::kRecorder, esMsgWithDrops.event_type};
+  EventStatsTuple eventStats{Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC};
   EventStatsTuple globalStats{Processor::kRecorder, ES_EVENT_TYPE_LAST};
   XCTAssertEqual(metrics->drop_cache_[eventStats].next_seq_num, 124);
   XCTAssertEqual(metrics->drop_cache_[eventStats].drops, 123);
