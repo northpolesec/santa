@@ -90,12 +90,14 @@
   }
   {
     // Re-use of a compiled expression.
-    auto expr = sut.value()->Compile("target.signing_time >= timestamp('2025-05-28T12:00:00Z')");
+    google::protobuf::Arena arena;
+    auto expr =
+        sut.value()->Compile("target.signing_time >= timestamp('2025-05-28T12:00:00Z')", &arena);
     if (!expr.ok()) {
       XCTFail("Failed to compile: %s", expr.status().message().data());
     }
 
-    auto result = sut.value()->Evaluate(expr.value().get(), activation);
+    auto result = sut.value()->Evaluate(expr.value().get(), activation, &arena);
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -123,7 +125,7 @@
           return {};
         });
 
-    auto result2 = sut.value()->Evaluate(expr.value().get(), activation2);
+    auto result2 = sut.value()->Evaluate(expr.value().get(), activation2, &arena);
     if (!result2.ok()) {
       XCTFail("Failed to evaluate: %s", result2.status().message().data());
     } else {
