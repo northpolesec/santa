@@ -60,7 +60,7 @@ std::shared_ptr<Protobuf> Protobuf::Create(std::shared_ptr<EndpointSecurityAPI> 
 Protobuf::Protobuf(std::shared_ptr<EndpointSecurityAPI> esapi, SNTDecisionCache *decision_cache,
                    bool json)
     : Serializer(std::move(decision_cache)),
-      esapi_(esapi),
+      esapi_(std::move(esapi)),
       json_(json),
       boot_session_uuid_(NSStringToUTF8String([SNTSystemInfo bootSessionUUID])) {}
 
