@@ -165,23 +165,23 @@ class ProcessToken {
  public:
   explicit ProcessToken(std::shared_ptr<ProcessTree> tree,
                         std::vector<struct Pid> pids);
-  ~ProcessToken();
-  ProcessToken(const ProcessToken &other)
-      : ProcessToken(other.tree_, other.pids_) {}
-  ProcessToken(ProcessToken &&other) noexcept
-      : tree_(std::move(other.tree_)), pids_(std::move(other.pids_)) {}
-  ProcessToken &operator=(const ProcessToken &other) {
-    return *this = ProcessToken(other.tree_, other.pids_);
-  }
-  ProcessToken &operator=(ProcessToken &&other) noexcept {
-    tree_ = std::move(other.tree_);
-    pids_ = std::move(other.pids_);
-    return *this;
-  }
+
+  // Default copy/move/destructor — shared_ptr<State> handles lifetime.
+  ProcessToken(const ProcessToken &) = default;
+  ProcessToken(ProcessToken &&) noexcept = default;
+  ProcessToken &operator=(const ProcessToken &) = default;
+  ProcessToken &operator=(ProcessToken &&) noexcept = default;
+  ~ProcessToken() = default;
 
  private:
-  std::shared_ptr<ProcessTree> tree_;
-  std::vector<struct Pid> pids_;
+  struct State {
+    std::shared_ptr<ProcessTree> tree;
+    std::vector<struct Pid> pids;
+    State(std::shared_ptr<ProcessTree> tree, std::vector<struct Pid> pids)
+        : tree(std::move(tree)), pids(std::move(pids)) {}
+    ~State();
+  };
+  std::shared_ptr<State> state_;
 };
 
 }  // namespace santa::santad::process_tree
