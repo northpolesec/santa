@@ -77,6 +77,7 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
     --preserve-metadata=entitlements
     --timestamp
     --force
+    --prefix com.northpolesec.santa.
     --generate-entitlement-der
     --options library,kill,runtime
   )

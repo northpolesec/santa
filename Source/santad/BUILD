@@ -151,6 +151,7 @@ objc_library(
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
+        "//Source/common:String",
     ],
 )
 
@@ -220,18 +221,18 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTSyncdQueue",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTDeepCopy",
         "//Source/common:SNTError",
+        "//Source/common:SNTFileInfo",
         "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common/ne:SNTNetworkExtensionSettings",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "//Source/common/ne:SNTXPCNetworkExtensionInterface",
-        "@santanetd//src/santanetd:SNDFlowInfo",
         "@santanetd//src/santanetd:SNDProcessFlows",
-        "@santanetd//src/santanetd:SNDProcessInfo",
     ],
 )
 
@@ -731,7 +732,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXxhash",
         "//Source/common:String",
-        "@santanetd//src/santanetd:SNDProcessInfo",
+        "@santanetd//src/santanetd:SNDProcessFlows",
     ],
 )
 
@@ -1048,7 +1049,6 @@ objc_library(
     srcs = ["Metrics.mm"],
     hdrs = ["Metrics.h"],
     deps = [
-        ":EndpointSecurityMessage",
         ":SNTApplicationCoreMetrics",
         "//Source/common:MOLXPCConnection",
         "//Source/common:Platform",
@@ -1056,6 +1056,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTXPCMetricServiceInterface",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 
@@ -1089,6 +1090,7 @@ objc_library(
         ":SNTSyncdQueue",
         ":TTYWriter",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:PowerMonitor",
         "//Source/common:PrefixTree",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -1597,9 +1599,7 @@ santa_unit_test(
     name = "MetricsTest",
     srcs = ["MetricsTest.mm"],
     deps = [
-        ":EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
         "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTMetricSet",
@@ -1897,6 +1897,7 @@ test_suite(
         ":SNTSyncdQueueTest",
         ":SantadTest",
         ":TemporaryMonitorModeTest",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:StreamBatchersTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
         "//Source/santad/ProcessTree:process_tree_test",
         "//Source/santad/ProcessTree/annotations:originator_test",

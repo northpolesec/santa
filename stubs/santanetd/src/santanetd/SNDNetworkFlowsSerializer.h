@@ -24,19 +24,16 @@ namespace santa::pb::v1 {
 class NetworkActivity_Process;
 }  // namespace santa::pb::v1
 
-@class SNDFlowInfo;
-@class SNDProcessInfo;
+@class SNDProcessFlows;
 @class SNTCachedDecision;
 
 namespace santanetd {
 
-void PopulateNetworkActivityFlow(google::protobuf::Arena *arena,
-                                 ::santa::pb::v1::NetworkActivity_Process *process,
-                                 SNDProcessInfo *processInfo, SNDFlowInfo *flow,
-                                 SNTCachedDecision *cd);
+void PopulateNetworkActivityProcess(google::protobuf::Arena *arena,
+                                    ::santa::pb::v1::NetworkActivity_Process *process,
+                                    SNDProcessFlows *processFlows, SNTCachedDecision *cd);
 
-std::string FormatNetworkFlowBasicString(SNDProcessInfo *processInfo, SNDFlowInfo *flow,
-                                         SNTCachedDecision *cd);
+std::string FormatNetworkFlowsBasicString(SNDProcessFlows *processFlows, SNTCachedDecision *cd);
 
 }  // namespace santanetd
 

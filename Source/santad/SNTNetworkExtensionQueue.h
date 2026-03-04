@@ -19,6 +19,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 @class SNDProcessFlows;
+@class SNTNetworkExtensionSettings;
 @class SNTNotificationQueue;
 @class SNTSyncdQueue;
 
@@ -35,11 +36,27 @@ extern NSString *const kSantaNetworkExtensionProtocolVersion;
 
 - (instancetype)init NS_UNAVAILABLE;
 
-- (NSDictionary *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
-                                                  error:(NSError **)error;
+- (SNTNetworkExtensionSettings *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
+                                                                 error:(NSError **)error;
 
 - (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
                windowStart:(NSDate *)windowStart
                  windowEnd:(NSDate *)windowEnd;
+
+/// Returns YES if the network extension should be installed.
+/// Checks that sync v2 is enabled and network extension settings have enable set to YES.
+- (BOOL)shouldInstallNetworkExtension;
+
+/// Queries the connected network extension for its bundle version info.
+- (void)networkExtensionBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
+
+/// Returns YES if the network extension is currently connected.
+- (BOOL)isLoaded;
+
+/// Determines whether the network extension needs to be upgraded.
+/// Compares the loaded extension's CFBundleVersion against the on-disk version.
+/// Returns YES if the extension is not connected, versions differ, or loaded version is unknown.
+/// Returns NO if versions match, or if the on-disk bundle is unreadable.
+- (BOOL)networkExtensionNeedsUpgrade;
 
 @end

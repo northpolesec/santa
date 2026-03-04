@@ -79,8 +79,8 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedTCCModification &) override;
 #endif  // HAVE_MACOS_15_4
 
-  std::vector<uint8_t> SerializeNetworkFlow(SNDProcessInfo *, SNDFlowInfo *, struct timespec,
-                                            struct timespec, SNTCachedDecision *) override;
+  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows *, struct timespec, struct timespec,
+                                             SNTCachedDecision *) override;
 
   std::vector<uint8_t> SerializeFileAccess(
       const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
@@ -88,7 +88,8 @@ class Protobuf : public Serializer {
       std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
       std::string_view operation_id) override;
 
-  std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view) override;
+  std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view,
+                                          const std::string_view) override;
 
   std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) override;
 
@@ -114,6 +115,8 @@ class Protobuf : public Serializer {
   // Toggle for transforming protobuf output to its JSON form.
   // See https://protobuf.dev/programming-guides/proto3/#json
   bool json_;
+  // Cached boot session UUID to avoid repeated ObjC dispatch on every event.
+  std::string boot_session_uuid_;
 };
 
 }  // namespace santa

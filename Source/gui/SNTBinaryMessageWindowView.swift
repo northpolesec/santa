@@ -345,7 +345,8 @@ struct SNTBinaryMessageWindowView: View {
   }
 
   func shouldAddOpenButton() -> Bool {
-    return customURL?.length ?? 0 > 0
+    guard let customURL = customURL else { return false }
+    return customURL.length > 0 && customURL as String != "null"
   }
 
   func openButton() {

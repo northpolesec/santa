@@ -12,19 +12,18 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "src/santanetd/SNDNetworkFlowsSerializer.h"
+#import <Foundation/Foundation.h>
 
-@class SNDProcessFlows;
-@class SNTCachedDecision;
+/// Settings passed from the daemon (santa) to the network extension (santanetd) over XPC.
+///
+/// This class conforms to NSSecureCoding, allowing it to be passed directly as a typed
+/// argument in XPC protocol methods. NSKeyedArchiver's keyed format provides inherent
+/// forward/backward compatibility: old receivers ignore unknown keys, new receivers get
+/// nil/0/NO for missing keys.
+@interface SNTNetworkExtensionSettings : NSObject <NSSecureCoding>
 
-namespace santanetd {
+@property(readonly) BOOL enable;
 
-void PopulateNetworkActivityProcess(google::protobuf::Arena *,
-                                    ::santa::pb::v1::NetworkActivity_Process *, SNDProcessFlows *,
-                                    SNTCachedDecision *) {}
+- (instancetype)initWithEnable:(BOOL)enable;
 
-std::string FormatNetworkFlowsBasicString(SNDProcessFlows *, SNTCachedDecision *) {
-  return {};
-}
-
-}  // namespace santanetd
+@end

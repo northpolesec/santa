@@ -10,6 +10,7 @@ export interface CELCompletionItem {
   documentation?: string;
   insertText?: string;
   insertTextRules?: "insertAsSnippet";
+  v2Only?: boolean;
 }
 
 // CEL Macros - expanded at parse time into comprehensions
@@ -359,6 +360,7 @@ export const celWorkshopFunctions: CELCompletionItem[] = [
       "Returns REQUIRE_TOUCHID. The cooldown parameter specifies the number of minutes before TouchID is required again.",
     insertText: "require_touchid_with_cooldown_minutes(${1:minutes})",
     insertTextRules: "insertAsSnippet",
+    v2Only: true,
   },
   {
     label: "require_touchid_only_with_cooldown_minutes",
@@ -369,6 +371,7 @@ export const celWorkshopFunctions: CELCompletionItem[] = [
       "Returns REQUIRE_TOUCHID_ONLY. The cooldown parameter specifies the number of minutes before TouchID is required again.",
     insertText: "require_touchid_only_with_cooldown_minutes(${1:minutes})",
     insertTextRules: "insertAsSnippet",
+    v2Only: true,
   },
 ];
 
@@ -697,6 +700,11 @@ export interface CELVariable {
   name: string;
   type: CELVariableType;
   documentation?: string;
+  dynamic?: boolean;
+  v2Only?: boolean;
+  // For list-type variables, describes the fields available on each element
+  // (used for completions inside comprehensions like ancestors.filter(a, a.))
+  itemFields?: CELVariable[];
 }
 
 // Track registration state to prevent duplicate registrations
@@ -766,8 +774,13 @@ export function registerCELLanguage(
 
   // Build a map of variable names to types for quick lookup
   const variableTypes = new Map<string, CELVariableType>();
+  // Build a map of list variable names to their item fields
+  const listItemFields = new Map<string, CELVariable[]>();
   for (const v of variables) {
     variableTypes.set(v.name, v.type);
+    if (v.type === "list" && v.itemFields) {
+      listItemFields.set(v.name, v.itemFields);
+    }
   }
 
   // Build general completion items (not after a dot)
@@ -920,17 +933,19 @@ export function registerCELLanguage(
           endColumn: position.column,
         });
 
-        // Check if we're typing after a dot (e.g., "args." or "target.signing_time.")
-        // Captures the full dotted path before the final dot
+        // Check if we're typing after a dot (e.g., "args.", "target.signing_time.", "ancestors[0].")
+        // Captures the full expression before the final dot, including bracket indexing
         const dotMatch = textUntilPosition.match(
-          /([\w]+(?:\.[\w]+)*)\.[\w]*$/,
+          /([\w]+(?:\[[^\]]*\])*(?:\.[\w]+(?:\[[^\]]*\])*)*)\.[\w]*$/,
         );
         if (dotMatch) {
           const varPath = dotMatch[1];
-          const varType = variableTypes.get(varPath);
+          // Strip bracket indices to resolve the base variable name (e.g. "ancestors[0]" → "ancestors")
+          const basePath = varPath.replace(/\[[^\]]*\]/g, "");
+          const varType = variableTypes.get(basePath);
 
           // Check for sub-field completions (e.g., "target." → "signing_time")
-          const prefix = varPath + ".";
+          const prefix = basePath + ".";
           const fieldCompletions: any[] = [];
           const seenFields = new Set<string>();
 
@@ -961,6 +976,21 @@ export function registerCELLanguage(
               suggestions: [...fieldCompletions, ...mapMethodCompletions],
             };
           } else if (varType === "list") {
+            // If indexing into the list (e.g. "ancestors[0]."), offer item fields
+            if (varPath !== basePath) {
+              const itemFields = listItemFields.get(basePath);
+              if (itemFields) {
+                return {
+                  suggestions: itemFields.map((f) => ({
+                    label: f.name,
+                    kind: monaco.languages.CompletionItemKind.Field,
+                    insertText: f.name,
+                    detail: f.type,
+                    documentation: f.documentation,
+                  })),
+                };
+              }
+            }
             return {
               suggestions: [...fieldCompletions, ...listMethodCompletions],
             };
@@ -975,6 +1005,26 @@ export function registerCELLanguage(
           } else if (varType) {
             // Known type without specific method completions (int, bool, etc.)
             return { suggestions: fieldCompletions };
+          }
+
+          // Check if this is a comprehension iteration variable
+          // e.g. "ancestors.filter(a, a." → varPath is "a", look back for "ancestors.filter(a,"
+          const comprehensionMatch = textUntilPosition.match(
+            /([\w]+)\.(?:all|exists|exists_one|filter|map|sortBy)\(\s*(\w+)\s*,/,
+          );
+          if (comprehensionMatch && comprehensionMatch[2] === varPath) {
+            const listName = comprehensionMatch[1];
+            const itemFields = listItemFields.get(listName);
+            if (itemFields) {
+              const itemFieldCompletions = itemFields.map((f) => ({
+                label: f.name,
+                kind: monaco.languages.CompletionItemKind.Field,
+                insertText: f.name,
+                detail: f.type,
+                documentation: f.documentation,
+              }));
+              return { suggestions: itemFieldCompletions };
+            }
           }
 
           // No type info: return fields if any, otherwise all methods as fallback

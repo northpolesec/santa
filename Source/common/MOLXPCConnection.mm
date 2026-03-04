@@ -54,6 +54,14 @@
 
 @implementation MOLXPCConnection
 
+// Snapshot a block property into a local variable and call it if non-nil.
+// This avoids a TOCTOU race where the property could be nilled by another
+// thread between a nil-check and the invocation, which would crash when
+// trying to invoke a NULL block.
+static inline void SafeCallBlock(void (^_Nullable block)(void)) {
+  if (block) block();
+}
+
 #pragma mark Initializers
 
 - (instancetype)initServerWithListener:(NSXPCListener *)listener {
@@ -130,7 +138,7 @@
       if (self.currentConnection.remoteObjectInterface != self.validationInterface) {
         self.currentConnection.remoteObjectInterface = nil;
       }
-      if (self.invalidationHandler) self.invalidationHandler();
+      SafeCallBlock(self.invalidationHandler);
     };
     [self.currentConnection resume];
     [[self.currentConnection remoteObjectProxy] connectWithReply:^{
@@ -140,7 +148,7 @@
       self.currentConnection.remoteObjectInterface = self.remoteInterface;
       [self.currentConnection resume];
       dispatch_semaphore_signal(sema);
-      if (self.acceptedHandler) self.acceptedHandler();
+      SafeCallBlock(self.acceptedHandler);
     }];
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC))) {
       // This is unusual - as we're not inside a block - but necessary in case the caller sets an
@@ -185,14 +193,14 @@
     STRONGIFY(connection);
     [connection suspend];
     connection.invalidationHandler = connection.interruptionHandler = ^{
-      if (self.invalidationHandler) self.invalidationHandler();
+      SafeCallBlock(self.invalidationHandler);
     };
     connection.exportedInterface = interface;
     connection.exportedObject = self.exportedObject;
     [connection resume];
 
     // The connection is now established.
-    if (self.acceptedHandler) self.acceptedHandler();
+    SafeCallBlock(self.acceptedHandler);
   };
   connection.exportedInterface = self.validationInterface;
   connection.exportedObject = ci;

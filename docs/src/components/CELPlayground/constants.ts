@@ -3,10 +3,10 @@ import { ReturnValueSchema as V2ReturnValueSchema } from "@buf/northpolesec_prot
 import { CELVariable } from "./autocompletion";
 
 export const VARIABLES: CELVariable[] = [
-  { name: "envs", type: "map", documentation: "Environment variables" },
-  { name: "args", type: "list", documentation: "Command line arguments" },
-  { name: "euid", type: "int", documentation: "Effective user ID" },
-  { name: "cwd", type: "string", documentation: "Current working directory" },
+  { name: "envs", type: "map", dynamic: true, documentation: "Environment variables" },
+  { name: "args", type: "list", dynamic: true, documentation: "Command line arguments" },
+  { name: "euid", type: "int", dynamic: true, documentation: "Effective user ID" },
+  { name: "cwd", type: "string", dynamic: true, documentation: "Current working directory" },
   {
     name: "target.signing_id",
     type: "string",
@@ -45,16 +45,26 @@ export const VARIABLES: CELVariable[] = [
     type: "string",
     documentation: "Require Touch ID only policy constant",
   },
+  {
+    name: "ancestors",
+    type: "list",
+    dynamic: true,
+    v2Only: true,
+    documentation:
+      "List of ancestor processes in the execution chain. Each ancestor has signing_id, team_id, path, and cdhash fields.",
+    itemFields: [
+      {
+        name: "signing_id",
+        type: "string",
+        documentation:
+          "Signing ID of the ancestor binary, prefixed with Team ID or 'platform'",
+      },
+      { name: "team_id", type: "string", documentation: "Team ID from code signature" },
+      { name: "path", type: "string", documentation: "Path to the ancestor binary" },
+      { name: "cdhash", type: "string", documentation: "Code directory hash" },
+    ],
+  },
 ];
-
-export const DYNAMIC_FIELDS = ["args", "envs", "euid", "cwd"] as const;
-
-export const V2_ONLY_FUNCTIONS = [
-  "require_touchid_with_cooldown_minutes",
-  "require_touchid_only_with_cooldown_minutes",
-] as const;
-
-export const FUNCTIONS = ["timestamp", ...V2_ONLY_FUNCTIONS] as const;
 
 // Build enum name→value and value→name maps from proto descriptors
 function enumEntries(schema: {
@@ -73,9 +83,3 @@ function enumEntries(schema: {
 export const v1Entries = enumEntries(V1ReturnValueSchema);
 export const v2Entries = enumEntries(V2ReturnValueSchema);
 
-export const CONSTANT_NAMES = Object.keys(v2Entries.nameToValue);
-
-// V2-only constant names (not in V1)
-export const V2_ONLY_CONSTANTS = new Set(
-  CONSTANT_NAMES.filter((name) => !(name in v1Entries.nameToValue)),
-);

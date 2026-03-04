@@ -400,7 +400,7 @@
 ///  Set the mode network extension settings as received from a sync server.
 ///
 - (void)setSyncServerSyncNetworkExtensionSettings:
-    (nonnull SNTSyncNetworkExtensionSettings *)syncNetworkExtensionSettings;
+    (nullable SNTSyncNetworkExtensionSettings *)syncNetworkExtensionSettings;
 
 ///
 ///  The push token chain as received from a sync server. This is used to

@@ -21,14 +21,13 @@
 #include <dispatch/dispatch.h>
 
 #include <atomic>
-#include <map>
 #include <memory>
 #include <string>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTMetricSet.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace santa {
 
@@ -87,10 +86,11 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
   void Export();
 
   // Used for tracking event sequence numbers to determine if drops occured
-  void UpdateEventStats(Processor processor, const es_message_t *msg);
+  void UpdateEventStats(Processor processor, es_event_type_t event_type, uint64_t seq_num,
+                        uint64_t global_seq_num);
 
   void SetEventMetrics(Processor processor, EventDisposition event_disposition, int64_t nanos,
-                       const santa::Message &msg);
+                       es_event_type_t event_type);
 
   void AddRateLimitingMetrics(int64_t events_rate_limited_count);
 
@@ -130,11 +130,11 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
   dispatch_queue_t events_q_;
 
   // Small caches for storing event metrics between metrics export operations
-  std::map<EventCountTuple, int64_t> event_counts_cache_;
-  std::map<EventTimesTuple, int64_t> event_times_cache_;
+  absl::flat_hash_map<EventCountTuple, int64_t> event_counts_cache_;
+  absl::flat_hash_map<EventTimesTuple, int64_t> event_times_cache_;
   std::atomic<int64_t> rate_limit_counts_cache_;
-  std::map<FileAccessEventCountTuple, int64_t> faa_event_counts_cache_;
-  std::map<EventStatsTuple, SequenceStats> drop_cache_;
+  absl::flat_hash_map<FileAccessEventCountTuple, int64_t> faa_event_counts_cache_;
+  absl::flat_hash_map<EventStatsTuple, SequenceStats> drop_cache_;
 };
 
 }  // namespace santa

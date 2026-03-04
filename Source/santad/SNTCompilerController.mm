@@ -26,6 +26,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
+#include "Source/common/String.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
@@ -209,7 +210,8 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
             LOGE(@"Unable to add new transitive rule to database: %@", error.localizedDescription);
           }
         } else {
-          logger->LogAllowlist(esMsg, [targetFile.SHA256 UTF8String]);
+          logger->LogAllowlist(esMsg, santa::NSStringToUTF8StringView(targetFile.SHA256),
+                               santa::NSStringToUTF8StringView(targetFile.path));
         }
       }
     }

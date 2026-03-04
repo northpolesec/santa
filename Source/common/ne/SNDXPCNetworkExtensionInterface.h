@@ -14,12 +14,17 @@
 
 #import <Foundation/Foundation.h>
 
+@class SNTNetworkExtensionSettings;
+
 ///
 ///  Protocol implemented by the network extension (santanetd) and utilized by daemon
 ///  for communication with the network extension.
 ///
 @protocol SNDNetworkExtensionXPC
 
-- (void)updateNetworkExtensionSettings:(NSDictionary *)settings reply:(void (^)(BOOL))reply;
+- (void)updateNetworkExtensionSettings:(SNTNetworkExtensionSettings *)settings
+                                 reply:(void (^)(BOOL))reply;
+
+- (void)bundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
 
 @end

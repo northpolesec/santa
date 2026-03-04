@@ -17,6 +17,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
 static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.netd";
 
@@ -24,6 +25,12 @@ static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
 
 + (NSXPCInterface *)networkExtensionInterface {
   NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNDNetworkExtensionXPC)];
+
+  [r setClasses:[NSSet setWithObject:[SNTNetworkExtensionSettings class]]
+        forSelector:@selector(updateNetworkExtensionSettings:reply:)
+      argumentIndex:0
+            ofReply:NO];
+
   return r;
 }
 

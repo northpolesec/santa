@@ -41,8 +41,14 @@
 - (IBAction)showWindow:(id)sender {
   [self.window setLevel:NSModalPanelWindowLevel];
   [self.window setMovableByWindowBackground:YES];
-  [self.window makeKeyAndOrderFront:sender];
+
+  // Force layout so NSHostingController sizes the window to fit the SwiftUI content
+  // before it becomes visible. Without this, the window briefly appears too small then
+  // snaps to the correct size once SwiftUI layout completes.
+  [self.window layoutIfNeeded];
   [self.window center];
+
+  [self.window makeKeyAndOrderFront:sender];
   [NSApp activateIgnoringOtherApps:YES];
 }
 

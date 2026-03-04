@@ -22,6 +22,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "src/santanetd/SNDFlowInfo.h"
 #import "src/santanetd/SNDProcessFlows.h"
 #import "src/santanetd/SNDProcessInfo.h"
@@ -91,6 +92,11 @@ static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
         forSelector:@selector(reportNetworkFlows:windowStart:windowEnd:reply:)
       argumentIndex:0
             ofReply:NO];
+
+  [r setClasses:[NSSet setWithObject:[SNTNetworkExtensionSettings class]]
+        forSelector:@selector(registerNetworkExtensionWithProtocolVersion:reply:)
+      argumentIndex:0
+            ofReply:YES];
 }
 
 + (NSXPCInterface *)controlInterface {

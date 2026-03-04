@@ -58,6 +58,15 @@ using santa::MountFromName;
   }
 
   {
+    es_file_t cloneSourceFile = MakeESFile("clone_source");
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_CLONE;
+    esMsg.event.clone.source = &cloneSourceFile;
+    Message msg(mockESApi, &esMsg);
+    es_file_t *target = GetAllowListTargetFile(msg);
+    XCTAssertEqual(target, &cloneSourceFile);
+  }
+
+  {
     esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXIT;
     Message msg(mockESApi, &esMsg);
     XCTAssertThrows(GetAllowListTargetFile(msg));

@@ -31,8 +31,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #import "Source/santad/SNTDecisionCache.h"
 
-@class SNDFlowInfo;
-@class SNDProcessInfo;
+@class SNDProcessFlows;
 @class SNTStoredExecutionEvent;
 
 namespace santa {
@@ -101,18 +100,18 @@ class Serializer {
       const santa::EnrichedProcess &enriched_process, size_t target_index,
       std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision);
 
-  virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message &,
+  virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view,
                                                   const std::string_view) = 0;
 
   virtual std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) = 0;
 
-  virtual std::vector<uint8_t> SerializeNetworkFlow(SNDProcessInfo *process_info, SNDFlowInfo *flow,
-                                                    struct timespec window_start,
-                                                    struct timespec window_end,
-                                                    SNTCachedDecision *cd) = 0;
-  std::vector<uint8_t> SerializeNetworkFlow(SNDProcessInfo *process_info, SNDFlowInfo *flow,
-                                            struct timespec window_start,
-                                            struct timespec window_end);
+  virtual std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows *processFlows,
+                                                     struct timespec window_start,
+                                                     struct timespec window_end,
+                                                     SNTCachedDecision *cd) = 0;
+  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows *processFlows,
+                                             struct timespec window_start,
+                                             struct timespec window_end);
 
   virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *, bool) = 0;
   virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) = 0;

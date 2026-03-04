@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include <sys/qos.h>
 
 #import <Foundation/Foundation.h>
 
@@ -69,6 +70,7 @@ double watchdogRAMPeak = 0;
 @property SNTNotificationQueue *notQueue;
 @property SNTSyncdQueue *syncdQueue;
 @property SNTNetworkExtensionQueue *netExtQueue;
+@property dispatch_queue_t generalQ;
 @property dispatch_queue_t commandQ;
 @property dispatch_queue_t netFlowQ;
 
@@ -116,6 +118,10 @@ double watchdogRAMPeak = 0;
     _cacheCountsBlock = cacheCountBlock;
     _checkCacheBlock = checkCacheBlock;
 
+    _generalQ = dispatch_queue_create_with_target(
+        "com.northpolesec.santa.generalXPCq", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+        dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
+
     _commandQ = dispatch_queue_create_with_target(
         "com.northpolesec.santa.cmdq", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
         dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
@@ -143,6 +149,7 @@ double watchdogRAMPeak = 0;
 
 - (void)flushCache:(void (^)(BOOL))reply {
   self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kExplicitCommand);
+  reply(YES);
 }
 
 - (void)checkCacheForVnodeID:(SantaVnode)vnodeID withReply:(void (^)(SNTAction))reply {
@@ -704,6 +711,12 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)installNetworkExtension:(void (^)(BOOL))reply {
+  if (![self.netExtQueue shouldInstallNetworkExtension]) {
+    LOGI(@"Network extension installation/upgrade not authorized");
+    reply(NO);
+    return;
+  }
+
   LOGI(@"Trigger santanetd (network extension) installation");
 
   // Verify the network extension bundle exists
@@ -719,13 +732,34 @@ double watchdogRAMPeak = 0;
     return;
   }
 
+  // Let the caller know the installation will be triggered.
+  // The actual installation happens asynchronously.
   reply(YES);
 
   [self reloadNetworkExtension];
 }
 
+- (void)installNetworkExtensionForce:(BOOL)force reply:(void (^)(BOOL))reply {
+  // Don't bother checking bundle version info if the network extension isn't authorized
+  if (![self.netExtQueue shouldInstallNetworkExtension]) {
+    reply(NO);
+    return;
+  }
+
+  if (!force && ![self.netExtQueue networkExtensionNeedsUpgrade]) {
+    reply(NO);
+    return;
+  }
+
+  [self installNetworkExtension:reply];
+}
+
+- (void)shouldInstallNetworkExtension:(void (^)(BOOL))reply {
+  reply([self.netExtQueue shouldInstallNetworkExtension]);
+}
+
 - (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion
-                                              reply:(void (^)(NSDictionary *settings,
+                                              reply:(void (^)(SNTNetworkExtensionSettings *settings,
                                                               NSString *santaProtocolVersion,
                                                               NSError *error))reply {
   NSError *error;
@@ -738,8 +772,8 @@ double watchdogRAMPeak = 0;
     return;
   }
 
-  NSDictionary *settings = [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion
-                                                                             error:&error];
+  SNTNetworkExtensionSettings *settings =
+      [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion error:&error];
   reply(settings, kSantaNetworkExtensionProtocolVersion, error);
 
   // When the network extension registers, it may have just been enabled which can
@@ -752,8 +786,11 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)exportTelemetryWithReply:(void (^)(BOOL))reply {
-  _logger->ExportTelemetry();
-  reply(YES);
+  // Perform work asynchronously to not hold up processing other XPC messages
+  dispatch_async(self.generalQ, ^{
+    _logger->ExportTelemetry();
+    reply(YES);
+  });
 }
 
 - (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber *)requestedDuration
@@ -792,10 +829,18 @@ double watchdogRAMPeak = 0;
   reply();
 }
 
+- (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply {
+  [self.netExtQueue networkExtensionBundleVersionInfo:reply];
+}
+
 - (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply {
   SNTSyncNetworkExtensionSettings *settings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
   reply(settings ? settings.enable : NO);
+}
+
+- (void)networkExtensionLoaded:(void (^)(BOOL loaded))reply {
+  reply([self.netExtQueue isLoaded]);
 }
 
 @end

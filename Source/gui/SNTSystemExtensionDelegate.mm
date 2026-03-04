@@ -73,8 +73,33 @@
   // the main queue. This process will exit either after the request finishes
   // (either successfully or unsuccessfully).
   dispatch_async(self.q, ^{
-    if (self.isNetworkExtension && !self.isActivation) {
-      [SNDFilterConfigurationHelper disableFilterConfiguration];
+    if (self.isNetworkExtension) {
+      if (self.isActivation) {
+        // Verify with the daemon that network extension installation is authorized
+        MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+        daemonConn.unprivilegedInterface = [SNTXPCUnprivilegedControlInterface controlInterface];
+        [daemonConn resume];
+
+        __block BOOL authorized = NO;
+        dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+        [[daemonConn remoteObjectProxy] shouldInstallNetworkExtension:^(BOOL shouldInstall) {
+          authorized = shouldInstall;
+          dispatch_semaphore_signal(sema);
+        }];
+
+        if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
+          LOGW(@"Timeout waiting for network extension install/upgrade authorization");
+        }
+
+        [daemonConn invalidate];
+
+        if (!authorized) {
+          LOGE(@"Network extension install/upgrade not authorized, aborting");
+          exit(EXIT_FAILURE);
+        }
+      } else {
+        [SNDFilterConfigurationHelper disableFilterConfiguration];
+      }
     }
     [[OSSystemExtensionManager sharedManager] submitRequest:self.request];
   });

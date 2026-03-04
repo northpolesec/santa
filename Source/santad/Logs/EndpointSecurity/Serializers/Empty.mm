@@ -151,8 +151,8 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedTCCModification &) {
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> Empty::SerializeNetworkFlow(SNDProcessInfo *, SNDFlowInfo *, struct timespec,
-                                                 struct timespec, SNTCachedDecision *) {
+std::vector<uint8_t> Empty::SerializeNetworkFlows(SNDProcessFlows *, struct timespec,
+                                                  struct timespec, SNTCachedDecision *) {
   return {};
 }
 
@@ -164,7 +164,8 @@ std::vector<uint8_t> Empty::SerializeFileAccess(
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeAllowlist(const Message &msg, const std::string_view hash) {
+std::vector<uint8_t> Empty::SerializeAllowlist(const Message &msg, const std::string_view hash,
+                                               const std::string_view target_path) {
   return {};
 }
 

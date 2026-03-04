@@ -303,15 +303,15 @@ Tokens
 
 ProcessToken::ProcessToken(std::shared_ptr<ProcessTree> tree,
                            std::vector<struct Pid> pids)
-    : tree_(std::move(tree)), pids_(std::move(pids)) {
-  if (tree_) {
-    tree_->RetainProcess(pids_);
+    : state_(std::make_shared<State>(std::move(tree), std::move(pids))) {
+  if (state_->tree) {
+    state_->tree->RetainProcess(state_->pids);
   }
 }
 
-ProcessToken::~ProcessToken() {
-  if (tree_) {
-    tree_->ReleaseProcess(pids_);
+ProcessToken::State::~State() {
+  if (tree) {
+    tree->ReleaseProcess(pids);
   }
 }
 

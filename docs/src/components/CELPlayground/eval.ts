@@ -1,11 +1,11 @@
 import { Environment } from "@marcbachmann/cel-js";
 import { parse as parseYAML } from "yaml";
 import {
-  V2_ONLY_FUNCTIONS,
-  DYNAMIC_FIELDS,
-  V2_ONLY_CONSTANTS,
+  VARIABLES,
+  v1Entries,
   v2Entries,
 } from "./constants";
+import { celWorkshopFunctions } from "./autocompletion";
 
 
 export const DEFAULT_EXPRESSION = `target.signing_time >= timestamp('2025-05-31T00:00:00Z')`;
@@ -18,7 +18,12 @@ args:
 envs:
   HOME: "/Users/user"
 euid: 501
-cwd: "/Users/user"`;
+cwd: "/Users/user"
+ancestors:
+  - signing_id: "platform:com.apple.Terminal"
+    team_id: ""
+    path: "/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal"
+    cdhash: "abc123"`;
 
 function buildEnvironment(): Environment {
   const env = new Environment({ unlistedVariablesAreDyn: true });
@@ -29,6 +34,7 @@ function buildEnvironment(): Environment {
   env.registerVariable("envs", "map");
   env.registerVariable("euid", "int");
   env.registerVariable("cwd", "string");
+  env.registerVariable("ancestors", "list");
 
   // Register all V2 enum constants (superset of V1)
   for (const [name, value] of Object.entries(v2Entries.nameToValue)) {
@@ -109,17 +115,17 @@ function usesV2Features(
   identifiers: Set<string>,
   calls: Set<string>,
 ): boolean {
-  for (const name of V2_ONLY_CONSTANTS) {
-    if (identifiers.has(name)) return true;
+  for (const name of Object.keys(v2Entries.nameToValue)) {
+    if (!(name in v1Entries.nameToValue) && identifiers.has(name)) return true;
   }
-  for (const fn of V2_ONLY_FUNCTIONS) {
-    if (calls.has(fn)) return true;
-  }
+  if (VARIABLES.some((v) => v.v2Only && identifiers.has(v.name))) return true;
+  if (celWorkshopFunctions.some((f) => f.v2Only && calls.has(f.label)))
+    return true;
   return false;
 }
 
 function isCacheable(identifiers: Set<string>): boolean {
-  return !DYNAMIC_FIELDS.some((field) => identifiers.has(field));
+  return !VARIABLES.some((v) => v.dynamic && identifiers.has(v.name));
 }
 
 export interface EvalResult {

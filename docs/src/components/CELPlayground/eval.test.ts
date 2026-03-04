@@ -91,6 +91,17 @@ describe("evaluate", () => {
     expect(result.isV2).toBe(true);
   });
 
+  it("detects V2 variable ancestors", () => {
+    const yaml = `ancestors:\n  - signing_id: "platform:com.apple.bash"\n    path: "/bin/bash"`;
+    const result = evaluate(
+      'ancestors.exists(a, a.signing_id == "platform:com.apple.bash")',
+      yaml,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.isV2).toBe(true);
+    expect(result.cacheable).toBe(false);
+  });
+
   it("marks V1-only expressions as not V2", () => {
     const result = evaluate("ALLOWLIST", DEFAULT_YAML);
     expect(result.valid).toBe(true);

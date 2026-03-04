@@ -23,7 +23,7 @@
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/String.h"
 #import "Source/santad/SNTDecisionCache.h"
-#import "src/santanetd/SNDProcessInfo.h"
+#import "src/santanetd/SNDProcessFlows.h"
 
 namespace santa {
 
@@ -110,12 +110,12 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(
                              std::move(enriched_event_target), decision, state.HexDigest());
 }
 
-std::vector<uint8_t> Serializer::SerializeNetworkFlow(SNDProcessInfo *process_info,
-                                                      SNDFlowInfo *flow,
-                                                      struct timespec window_start,
-                                                      struct timespec window_end) {
-  return SerializeNetworkFlow(process_info, flow, window_start, window_end,
-                              [decision_cache_ cachedDecisionForVnode:[process_info vnode]]);
+std::vector<uint8_t> Serializer::SerializeNetworkFlows(SNDProcessFlows *processFlows,
+                                                       struct timespec window_start,
+                                                       struct timespec window_end) {
+  return SerializeNetworkFlows(
+      processFlows, window_start, window_end,
+      [decision_cache_ cachedDecisionForVnode:[processFlows.processInfo vnode]]);
 }
 
 };  // namespace santa

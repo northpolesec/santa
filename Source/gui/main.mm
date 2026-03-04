@@ -30,9 +30,7 @@ int main(int argc, const char *argv[]) {
     } else if ([args containsObject:@"--unload-system-extension"]) {
       LOGI(@"Requesting Santa System Extension deactivation");
       delegate = [SNTSystemExtensionDelegate delegateForSantadDeactivation];
-    }
-#ifdef DEBUG
-    else if ([args containsObject:@"--load-network-extension"]) {
+    } else if ([args containsObject:@"--load-network-extension"]) {
       LOGI(@"Requesting Santa Network Extension (Content Filter) activation");
       LOGW(@"WARNING: All network connections will reset when filter activates");
       delegate = [SNTSystemExtensionDelegate delegateForSantanetdActivation];
@@ -41,7 +39,6 @@ int main(int argc, const char *argv[]) {
       LOGW(@"WARNING: All network connections will reset when filter activates");
       delegate = [SNTSystemExtensionDelegate delegateForSantanetdDeactivation];
     }
-#endif
 
     if (delegate) {
       [delegate submitAndExitAsync];

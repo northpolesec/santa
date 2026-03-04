@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <memory>
 
+#include "Source/common/PowerMonitor.h"
 #include "Source/common/PrefixTree.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -802,6 +803,31 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                      logger->StartTimer();
                    });
   }
+
+  void (^installNetworkExtension)(NSString *reason) = ^(NSString *reason) {
+    LOGD(@"%@, triggering network extension install/upgrade if authorized", reason);
+    [dc installNetworkExtensionForce:NO
+                               reply:^(BOOL success) {
+                                 if (!success) {
+                                   LOGD(@"Network extension install skipped "
+                                        @"(not enabled, not authorized, or version matches)");
+                                 } else {
+                                   LOGD(@"Success: triggered network extension install/upgrade");
+                                 }
+                               }];
+  };
+
+  // Trigger network extension install/upgrade if this is the first launch after boot.
+  if ([configurator isFirstLaunchAfterBoot]) {
+    installNetworkExtension(@"First launch after boot");
+  }
+
+  // Trigger network extension install/upgrade when the system wakes up.
+  auto power_monitor = santa::PowerMonitor::Create(^(santa::PowerEvent event) {
+    if (event == santa::PowerEvent::kHasPoweredOn) {
+      installNetworkExtension(@"System woke up");
+    }
+  });
 
   [[NSRunLoop mainRunLoop] run];
 }

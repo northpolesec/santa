@@ -233,7 +233,10 @@ struct SNTFileAccessMessageWindowView: View {
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
   var effectiveURL: NSString? {
-    customURL ?? configState.fileAccessEventDetailURL as NSString?
+    if let customURL = customURL {
+      return (customURL as String) == "null" ? nil : customURL
+    }
+    return configState.fileAccessEventDetailURL as NSString?
   }
 
   var effectiveText: String? {

@@ -25,7 +25,6 @@
 #include <sys/wait.h>
 #include <time.h>
 
-#include <functional>
 #include <optional>
 #include <string_view>
 
@@ -60,7 +59,10 @@ std::shared_ptr<Protobuf> Protobuf::Create(std::shared_ptr<EndpointSecurityAPI> 
 
 Protobuf::Protobuf(std::shared_ptr<EndpointSecurityAPI> esapi, SNTDecisionCache *decision_cache,
                    bool json)
-    : Serializer(std::move(decision_cache)), esapi_(esapi), json_(json) {}
+    : Serializer(std::move(decision_cache)),
+      esapi_(std::move(esapi)),
+      json_(json),
+      boot_session_uuid_(NSStringToUTF8String([SNTSystemInfo bootSessionUUID])) {}
 
 static inline void EncodeTimestamp(Timestamp *timestamp, struct timespec ts) {
   timestamp->set_seconds(ts.tv_sec);
@@ -95,19 +97,22 @@ static inline void EncodePath(std::string *buf, const es_file_t *es_file) {
   buf->append(std::string_view(es_file->path.data, es_file->path.length));
 }
 
-static inline void EncodeString(std::function<std::string *()> lazy_f, NSString *value) {
+template <typename F>
+static inline void EncodeString(F &&lazy_f, NSString *value) {
   if (value) {
     lazy_f()->append(NSStringToUTF8StringView(value));
   }
 }
 
-static inline void EncodeString(std::function<std::string *()> lazy_f, std::string_view value) {
+template <typename F>
+static inline void EncodeString(F &&lazy_f, std::string_view value) {
   if (value.length() > 0) {
     lazy_f()->append(value);
   }
 }
 
-static inline void EncodeStringToken(std::function<std::string *()> lazy_f, es_string_token_t tok) {
+template <typename F>
+static inline void EncodeStringToken(F &&lazy_f, es_string_token_t tok) {
   if (tok.length > 0) {
     lazy_f()->append(StringTokenToStringView(tok));
   }
@@ -121,19 +126,24 @@ static inline void EncodeUserInfo(::pbv1::UserInfo *pb_user_info, uid_t uid,
   }
 }
 
-static inline void EncodeUserInfo(std::function<::pbv1::UserInfo *()> lazy_f,
-                                  std::optional<uid_t> uid, const std::string_view &name) {
-  if (uid.has_value()) {
-    lazy_f()->set_uid(uid.value());
-  }
-  if (name.length() > 0) {
-    lazy_f()->set_name(name.data(), name.length());
+template <typename F>
+static inline void EncodeUserInfo(F &&lazy_f, std::optional<uid_t> uid,
+                                  const std::string_view &name) {
+  if (uid.has_value() || name.length() > 0) {
+    auto *pb_user_info = lazy_f();
+    if (uid.has_value()) {
+      pb_user_info->set_uid(uid.value());
+    }
+    if (name.length() > 0) {
+      pb_user_info->set_name(name.data(), name.length());
+    }
   }
 }
 
-static inline void EncodeUserInfo(std::function<::pbv1::UserInfo *()> lazy_f,
-                                  std::optional<uid_t> uid, const es_string_token_t &name) {
-  EncodeUserInfo(std::move(lazy_f), std::move(uid), StringTokenToStringView(name));
+template <typename F>
+static inline void EncodeUserInfo(F &&lazy_f, std::optional<uid_t> uid,
+                                  const es_string_token_t &name) {
+  EncodeUserInfo(std::forward<F>(lazy_f), std::move(uid), StringTokenToStringView(name));
 }
 
 static inline void EncodeGroupInfo(::pbv1::GroupInfo *pb_group_info, gid_t gid,
@@ -187,8 +197,8 @@ static inline void EncodeFileInfoLight(::pbv1::FileInfoLight *pb_file, const es_
   pb_file->set_truncated(es_file->path_truncated);
 }
 
-static inline void EncodeAnnotations(std::function<::pbv1::process_tree::Annotations *()> lazy_f,
-                                     const EnrichedProcess &enriched_proc) {
+template <typename F>
+static inline void EncodeAnnotations(F &&lazy_f, const EnrichedProcess &enriched_proc) {
   if (std::optional<pbv1::process_tree::Annotations> proc_annotations = enriched_proc.annotations();
       proc_annotations) {
     *lazy_f() = *proc_annotations;
@@ -417,8 +427,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
   }
   EncodeTimestamp(santa_msg->mutable_event_time(), event_time);
   EncodeTimestamp(santa_msg->mutable_processed_time(), processed_time);
-  EncodeString([santa_msg] { return santa_msg->mutable_boot_session_uuid(); },
-               [SNTSystemInfo bootSessionUUID]);
+  santa_msg->set_boot_session_uuid(boot_session_uuid_);
 
   return santa_msg;
 }
@@ -512,8 +521,6 @@ void EncodeEntitlements(::pbv1::Execution *pb_exec, SNTCachedDecision *cd) {
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec &msg, SNTCachedDecision *cd) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, msg);
-
-  GetDecisionEnum(cd.decision);
 
   ::pbv1::Execution *pb_exec = santa_msg->mutable_execution();
 
@@ -733,9 +740,9 @@ static inline void EncodeSocketAddress(::pbv1::SocketAddress *pb_socket_addr, st
   pb_socket_addr->set_type(GetSocketAddressType(type));
 }
 
-static inline void EncodeUserInfo(std::function<::pbv1::UserInfo *()> lazy_f,
-                                  const es_string_token_t &name) {
-  EncodeUserInfo(lazy_f, std::nullopt, name);
+template <typename F>
+static inline void EncodeUserInfo(F &&lazy_f, const es_string_token_t &name) {
+  EncodeUserInfo(std::forward<F>(lazy_f), std::nullopt, name);
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionLogin &msg) {
@@ -915,12 +922,12 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogout &msg) 
   return FinalizeProto(santa_msg);
 }
 
-void EncodeEventProcessOrFallback(
+template <typename F1, typename F2>
+static inline void EncodeEventProcessOrFallback(
     const EnrichedEventType &event, const es_process_t *eventProcess,
     std::optional<audit_token_t> eventProcessToken,
-    const std::optional<EnrichedProcess> &enrichedEventProcess,
-    std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
-    std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
+    const std::optional<EnrichedProcess> &enrichedEventProcess, F1 &&lazy_auth_instigator_f,
+    F2 &&lazy_auth_instigator_fallback_f) {
   if (eventProcess && enrichedEventProcess.has_value()) {
     EncodeProcessInfoLight(lazy_auth_instigator_f(), eventProcess, *enrichedEventProcess);
   } else if (eventProcessToken.has_value()) {
@@ -929,13 +936,13 @@ void EncodeEventProcessOrFallback(
   }
 }
 
-void EncodeEventInstigatorOrFallback(
-    const EnrichedEventWithInstigator &event,
-    std::function<::pbv1::ProcessInfoLight *()> lazy_auth_instigator_f,
-    std::function<::pbv1::ProcessID *()> lazy_auth_instigator_fallback_f) {
-  return EncodeEventProcessOrFallback(event, event.EventInstigator(), event.EventInstigatorToken(),
-                                      event.EnrichedEventInstigator(), lazy_auth_instigator_f,
-                                      lazy_auth_instigator_fallback_f);
+template <typename F1, typename F2>
+static inline void EncodeEventInstigatorOrFallback(const EnrichedEventWithInstigator &event,
+                                                   F1 &&lazy_auth_instigator_f,
+                                                   F2 &&lazy_auth_instigator_fallback_f) {
+  return EncodeEventProcessOrFallback(
+      event, event.EventInstigator(), event.EventInstigatorToken(), event.EnrichedEventInstigator(),
+      std::forward<F1>(lazy_auth_instigator_f), std::forward<F2>(lazy_auth_instigator_fallback_f));
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD &msg) {
@@ -1360,15 +1367,15 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification &m
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> Protobuf::SerializeNetworkFlow(SNDProcessInfo *pi, SNDFlowInfo *flow,
-                                                    struct timespec window_start,
-                                                    struct timespec window_end,
-                                                    SNTCachedDecision *cd) {
+std::vector<uint8_t> Protobuf::SerializeNetworkFlows(SNDProcessFlows *processFlows,
+                                                     struct timespec window_start,
+                                                     struct timespec window_end,
+                                                     SNTCachedDecision *cd) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena, window_start, window_end);
   auto *na = santa_msg->mutable_network_activity();
   auto *process = na->add_processes();
-  santanetd::PopulateNetworkActivityFlow(&arena, process, pi, flow, cd);
+  santanetd::PopulateNetworkActivityProcess(&arena, process, processFlows, cd);
   return FinalizeProto(santa_msg);
 }
 
@@ -1404,7 +1411,8 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
   return FinalizeProto(santa_msg);
 }
 
-std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message &msg, const std::string_view hash) {
+std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message &msg, const std::string_view hash,
+                                                  const std::string_view target_path) {
   Arena arena;
   ::pbv1::SantaMessage *santa_msg = CreateDefaultProto(&arena);
 
@@ -1416,8 +1424,17 @@ std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message &msg, const std:
   ::pbv1::Allowlist *pb_allowlist = santa_msg->mutable_allowlist();
   EncodeProcessInfoLight(pb_allowlist->mutable_instigator(), msg->process, enriched_process);
 
-  EncodeFileInfo(pb_allowlist->mutable_target(), es_file, enriched_file,
-                 [NSString stringWithFormat:@"%s", hash.data()]);
+  EncodeFileInfo(pb_allowlist->mutable_target(), es_file, enriched_file);
+  if (!hash.empty()) {
+    auto *pb_hash = pb_allowlist->mutable_target()->mutable_hash();
+    pb_hash->set_type(::pbv1::Hash::HASH_ALGO_SHA256);
+    pb_hash->mutable_hash()->append(hash.data(), hash.length());
+  }
+
+  // The real path might not match the path that was used in `EncodeFileInfo`. This is because
+  // we know the stat information will be appropriate, but the path might've been built from
+  // components in the ES message.
+  *pb_allowlist->mutable_target()->mutable_path() = std::string(target_path);
 
   return FinalizeProto(santa_msg);
 }
@@ -1482,7 +1499,6 @@ static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDict
         .tv_nsec = (long)(fractional * NSEC_PER_SEC),
     };
     EncodeTimestamp(pb_disk->mutable_appearance(), ts);
-    Timestamp timestamp = pb_disk->appearance();
   }
 }
 

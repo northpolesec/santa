@@ -46,6 +46,18 @@ describe("convertEsloggerEvent", () => {
     });
   });
 
+  it("always includes fake ancestors", () => {
+    const result = toObject(convertEsloggerEvent(MINIMAL_EXEC_EVENT));
+    expect(result.ancestors).toEqual([
+      {
+        signing_id: "platform:com.apple.Terminal",
+        team_id: "",
+        path: "/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal",
+        cdhash: "",
+      },
+    ]);
+  });
+
   it("handles env values containing '='", () => {
     const event = JSON.stringify({
       event: {

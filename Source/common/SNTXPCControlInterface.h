@@ -19,6 +19,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
 @class SNDProcessFlows;
 @class SNTStoredEvent;
@@ -81,7 +82,7 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)installNetworkExtension:(void (^)(BOOL))reply;
 
 - (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion
-                                              reply:(void (^)(NSDictionary *settings,
+                                              reply:(void (^)(SNTNetworkExtensionSettings *settings,
                                                               NSString *santaProtocolVersion,
                                                               NSError *error))reply;
 
