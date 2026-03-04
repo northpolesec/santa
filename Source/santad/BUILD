@@ -1049,7 +1049,6 @@ objc_library(
     srcs = ["Metrics.mm"],
     hdrs = ["Metrics.h"],
     deps = [
-        ":EndpointSecurityMessage",
         ":SNTApplicationCoreMetrics",
         "//Source/common:MOLXPCConnection",
         "//Source/common:Platform",
@@ -1057,6 +1056,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTXPCMetricServiceInterface",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 
@@ -1599,9 +1599,7 @@ santa_unit_test(
     name = "MetricsTest",
     srcs = ["MetricsTest.mm"],
     deps = [
-        ":EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
         "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTMetricSet",
