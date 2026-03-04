@@ -30,9 +30,9 @@ You will need the following information to configure this profile:
 
 - Show In Notification Center: True
 
-- Show In Lock Screen: False
+- Show In Lock Screen: True
 
-- Alert Type: Banner
+- Alert Type: Temporary
 
 - Badges Enabled: True
 
