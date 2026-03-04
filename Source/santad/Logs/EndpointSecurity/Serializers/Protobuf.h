@@ -115,6 +115,8 @@ class Protobuf : public Serializer {
   // Toggle for transforming protobuf output to its JSON form.
   // See https://protobuf.dev/programming-guides/proto3/#json
   bool json_;
+  // Cached boot session UUID to avoid repeated ObjC dispatch on every event.
+  std::string boot_session_uuid_;
 };
 
 }  // namespace santa
