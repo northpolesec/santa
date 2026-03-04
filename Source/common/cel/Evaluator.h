@@ -93,6 +93,13 @@ class Evaluator {
       absl::string_view cel_expr, const ActivationT &activation);
 
  private:
+  absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>>
+  CompileWithArena(absl::string_view cel_expr, google::protobuf::Arena *arena);
+
+  absl::StatusOr<EvaluationResultT> EvaluateWithArena(
+      ::google::api::expr::runtime::CelExpression const *expression_plan,
+      const ActivationT &activation, google::protobuf::Arena *arena);
+
   std::unique_ptr<google::protobuf::Arena> arena_;
   std::unique_ptr<::cel::Compiler> compiler_;
 };

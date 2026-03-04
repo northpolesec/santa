@@ -103,8 +103,8 @@ absl::StatusOr<std::unique_ptr<Evaluator<IsV2>>> Evaluator<IsV2>::Create() {
 }
 
 template <bool IsV2>
-absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::Compile(
-    absl::string_view expr) {
+absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::CompileWithArena(
+    absl::string_view expr, google::protobuf::Arena *arena) {
   if (!compiler_) {
     return absl::InvalidArgumentError("Evaluator not properly initialized");
   }
@@ -127,7 +127,7 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
   // Setup a default environment for building expressions.
   cel_runtime::InterpreterOptions options;
   options.constant_folding = true;
-  options.constant_arena = arena_.get();
+  options.constant_arena = arena;
   options.enable_regex_precompilation = true;
 
   std::unique_ptr<cel_runtime::CelExpressionBuilder> builder =
@@ -161,11 +161,17 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
 };
 
 template <bool IsV2>
-absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
-    const ::cel_runtime::CelExpression *expression_plan, const ActivationT &activation) {
+absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::Compile(
+    absl::string_view expr) {
+  return CompileWithArena(expr, arena_.get());
+}
+
+template <bool IsV2>
+absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::EvaluateWithArena(
+    const ::cel_runtime::CelExpression *expression_plan, const ActivationT &activation,
+    google::protobuf::Arena *arena) {
   // Evaluate the parsed expression.
-  absl::StatusOr<cel_runtime::CelValue> result =
-      expression_plan->Evaluate(activation, arena_.get());
+  absl::StatusOr<cel_runtime::CelValue> result = expression_plan->Evaluate(activation, arena);
 
   if (!result.ok()) {
     return result.status();
@@ -217,13 +223,21 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
 }
 
 template <bool IsV2>
+absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
+    const ::cel_runtime::CelExpression *expression_plan, const ActivationT &activation) {
+  return EvaluateWithArena(expression_plan, activation, arena_.get());
+}
+
+template <bool IsV2>
 absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::CompileAndEvaluate(
     absl::string_view cel_expr, const ActivationT &activation) {
-  absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> expr = Compile(cel_expr);
+  google::protobuf::Arena eval_arena;
+  absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> expr =
+      CompileWithArena(cel_expr, &eval_arena);
   if (!expr.ok()) {
     return expr.status();
   }
-  return Evaluate(expr->get(), activation);
+  return EvaluateWithArena(expr->get(), activation, &eval_arena);
 }
 
 // Explicit template instantiations
