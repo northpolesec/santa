@@ -1897,6 +1897,7 @@ test_suite(
         ":SNTSyncdQueueTest",
         ":SantadTest",
         ":TemporaryMonitorModeTest",
+        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:StreamBatchersTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
         "//Source/santad/ProcessTree:process_tree_test",
         "//Source/santad/ProcessTree/annotations:originator_test",

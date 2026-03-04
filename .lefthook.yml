@@ -10,3 +10,5 @@ pre-push:
   commands:
     lint:
       run: ./Testing/lint.sh
+    test-suites:
+      run: ./Testing/check_test_suites.sh
