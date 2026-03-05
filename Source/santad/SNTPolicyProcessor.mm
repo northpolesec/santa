@@ -70,8 +70,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // Arena used for constant folding during compilation of fallback expressions.
   // Declared before celFallbackExpressions_ so that C++ reverse destruction
   // order destroys expressions first, then the arena they reference.
-  std::unique_ptr<google::protobuf::Arena> celFallbackArena_;
-  std::vector<std::unique_ptr<::google::api::expr::runtime::CelExpression>> celFallbackExpressions_;
+  std::shared_ptr<google::protobuf::Arena> celFallbackArena_;
+  std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> celFallbackExpressions_;
   dispatch_queue_t celFallbackQueue_;
   SNTKVOManager *celFallbackExpressionsObserver_;
 }
@@ -139,8 +139,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // Create a fresh arena for this batch of compiled expressions.
   // The arena must outlive the compiled plans since constant folding stores
   // data on it.
-  __block auto arena = std::make_unique<google::protobuf::Arena>();
-  __block std::vector<std::unique_ptr<::google::api::expr::runtime::CelExpression>> compiled;
+  __block auto arena = std::make_shared<google::protobuf::Arena>();
+  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled;
   for (NSString *expr in expressions) {
     auto result = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(expr), arena.get());
     if (result.ok()) {
@@ -164,21 +164,21 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     return NO;
   }
 
-  // Snapshot the compiled expressions under the lock
-  __block std::vector<::google::api::expr::runtime::CelExpression *> expressionPtrs;
+  // Snapshot the compiled expressions and arena under the lock so their
+  // lifetimes extend through evaluation even if compileFallbackExpressions
+  // swaps them concurrently.
+  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> expressions;
+  __block std::shared_ptr<google::protobuf::Arena> arenaRef;
   dispatch_sync(celFallbackQueue_, ^{
-    expressionPtrs.reserve(celFallbackExpressions_.size());
-    for (const auto &expr : celFallbackExpressions_) {
-      expressionPtrs.push_back(expr.get());
-    }
+    expressions = celFallbackExpressions_;
+    arenaRef = celFallbackArena_;
   });
 
-  if (expressionPtrs.empty()) {
+  if (expressions.empty()) {
     return NO;
   }
 
-  LOGD(@"Evaluating %zu CEL fallback expression(s) for sha256=%@", expressionPtrs.size(),
-       cd.sha256);
+  LOGD(@"Evaluating %zu CEL fallback expression(s) for sha256=%@", expressions.size(), cd.sha256);
 
   auto activation = activationCallback(/*useV2=*/true);
 
@@ -187,10 +187,10 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // Use a stack-local arena for evaluation temporaries.
   google::protobuf::Arena evalArena;
 
-  for (size_t i = 0; i < expressionPtrs.size(); ++i) {
+  for (size_t i = 0; i < expressions.size(); ++i) {
     LOGD(@"Evaluating CEL fallback expression %zu", i);
     auto evalResult = celEvaluatorV2_->Evaluate(
-        expressionPtrs[i], *static_cast<santa::cel::Activation<true> *>(activation.get()),
+        expressions[i].get(), *static_cast<santa::cel::Activation<true> *>(activation.get()),
         &evalArena);
 
     if (!evalResult.ok()) {

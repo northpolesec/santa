@@ -67,6 +67,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   self.processor = [[SNTPolicyProcessor alloc] init];
 }
 
+- (void)tearDown {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
+}
+
 - (void)testRule:(SNTRule *)rule
      transitiveRules:(BOOL)transitiveRules
                final:(BOOL)final
@@ -1043,8 +1047,6 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 - (void)testCELFallbackExpressionAllow {
   [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[ @"ALLOWLIST" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1053,15 +1055,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
 - (void)testCELFallbackExpressionBlock {
   [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[ @"BLOCKLIST" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1070,15 +1067,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
 - (void)testCELFallbackExpressionSilentBlock {
   [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[ @"SILENT_BLOCKLIST" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1088,16 +1080,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
   XCTAssertTrue(cd.silentBlock);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
 - (void)testCELFallbackUnspecifiedSkipsToNext {
   [[SNTConfigurator configurator]
       setSyncServerCELFallbackExpressions:@[ @"UNSPECIFIED", @"ALLOWLIST" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1106,16 +1093,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
 - (void)testCELFallbackAllUnspecifiedFallsThrough {
   [[SNTConfigurator configurator]
       setSyncServerCELFallbackExpressions:@[ @"UNSPECIFIED", @"UNSPECIFIED" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1123,16 +1105,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
       [self.processor evaluateCELFallbackExpressions:cd
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertFalse(handled);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
 - (void)testCELFallbackFirstMatchWins {
   [[SNTConfigurator configurator]
       setSyncServerCELFallbackExpressions:@[ @"BLOCKLIST", @"ALLOWLIST" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1141,15 +1118,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
 - (void)testCELFallbackEmptyExpressionsReturnNO {
   [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1163,8 +1135,6 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[
     @"target.signing_id == 'ZMCG7MLDV9:com.example.testbinary' ? ALLOWLIST : UNSPECIFIED"
   ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1173,36 +1143,26 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
-- (void)testCELFallbackUncacheableFieldsAreEmpty {
-  // Args should be empty in fallback expressions (restricted activation).
-  // The original activation has args, but fallback should get empty args.
+- (void)testCELFallbackUncacheableFieldsAreAvailable {
+  // The full activation (including args) is passed through to fallback expressions.
   [[SNTConfigurator configurator]
       setSyncServerCELFallbackExpressions:@[ @"size(args) > 0 ? BLOCKLIST : UNSPECIFIED" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
                                   activationCallback:[self fallbackTestActivationCallback]];
-  // args should be empty in fallback, so UNSPECIFIED, so falls through
-  XCTAssertFalse(handled);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
+  // args has ["arg0", "arg1"], so size(args) > 0 is true, returning BLOCKLIST
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
 }
 
 - (void)testCELFallbackInvalidExpressionSkipped {
   [[SNTConfigurator configurator]
       setSyncServerCELFallbackExpressions:@[ @"this is invalid !!!", @"ALLOWLIST" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1212,23 +1172,15 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   // The invalid expression is skipped at compile time, only ALLOWLIST remains
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
 - (void)testCELFallbackNilActivationCallbackReturnNO {
   [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[ @"ALLOWLIST" ]];
-  [NSThread sleepForTimeInterval:0.1];
-
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled = [self.processor evaluateCELFallbackExpressions:cd activationCallback:nil];
   XCTAssertFalse(handled);
-
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
-  [NSThread sleepForTimeInterval:0.1];
 }
 
 @end
