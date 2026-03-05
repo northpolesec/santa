@@ -54,6 +54,10 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 - (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
                             withCommandUUID:(NSString *)uuid
                                     onArena:(google::protobuf::Arena *)arena;
+- (::pbv1::EventUploadResponse *)handleEventUploadRequest:
+                                     (const ::pbv1::EventUploadRequest &)eventUploadRequest
+                                          withCommandUUID:(NSString *)uuid
+                                                  onArena:(google::protobuf::Arena *)arena;
 - (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
                                       (const ::pbv1::SantaCommandRequest &)command
                                                         onArena:(google::protobuf::Arena *)arena;
@@ -805,6 +809,126 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   // Then: Should be rejected
   XCTAssertTrue(response->has_error(), @"UUID in previousNonces should be rejected");
   XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
+}
+
+#pragma mark - EventUpload Handler Tests
+
+- (void)testHandleEventUploadRequestEmptyPath {
+  // Given: An EventUploadRequest with an empty path
+  ::pbv1::EventUploadRequest eventUploadRequest;
+
+  // When: Handling the event upload request
+  ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
+                                                                withCommandUUID:@"uuid"
+                                                                        onArena:self.arena];
+
+  // Then: Should return response with ERROR_INVALID_PATH
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertTrue(response->has_error(), @"Should have error set");
+  XCTAssertEqual(response->error(), ::pbv1::EventUploadResponse::ERROR_INVALID_PATH,
+                 @"Empty path should return ERROR_INVALID_PATH");
+}
+
+- (void)testHandleEventUploadRequestNilSyncDelegate {
+  // Given: An EventUploadRequest with a valid path but no sync delegate
+  SNTPushClientNATS *clientWithoutDelegate = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
+
+  ::pbv1::EventUploadRequest eventUploadRequest;
+  eventUploadRequest.set_path("/Applications/Safari.app");
+
+  // When: Handling the event upload request without a sync delegate
+  ::pbv1::EventUploadResponse *response =
+      [clientWithoutDelegate handleEventUploadRequest:eventUploadRequest
+                                      withCommandUUID:@"uuid"
+                                              onArena:self.arena];
+
+  // Then: Should return response with ERROR_INTERNAL
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertTrue(response->has_error(), @"Should have error set");
+  XCTAssertEqual(response->error(), ::pbv1::EventUploadResponse::ERROR_INTERNAL,
+                 @"Nil sync delegate should return ERROR_INTERNAL");
+}
+
+- (void)testHandleEventUploadRequestSuccess {
+  // Given: An EventUploadRequest with a valid path
+  ::pbv1::EventUploadRequest eventUploadRequest;
+  eventUploadRequest.set_path("/Applications/Safari.app");
+
+  // Mock delegate - handler fires and forgets, so we just need the stub
+  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
+                                              reply:[OCMArg any]]);
+
+  // When: Handling the event upload request
+  ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
+                                                                withCommandUUID:@"uuid"
+                                                                        onArena:self.arena];
+
+  // Then: Should return a successful response with no error
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertFalse(response->has_error(), @"Successful request should not have error");
+}
+
+- (void)testHandleEventUploadRequestFiresDelegate {
+  // Given: An EventUploadRequest with a valid path
+  ::pbv1::EventUploadRequest eventUploadRequest;
+  eventUploadRequest.set_path("/Applications/Safari.app");
+
+  // Mock delegate to verify it gets called (fire-and-forget)
+  OCMExpect([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
+                                                reply:[OCMArg any]]);
+
+  // When: Handling the event upload request
+  ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
+                                                                withCommandUUID:@"uuid"
+                                                                        onArena:self.arena];
+
+  // Then: Should return immediately with no error and delegate method should be called
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertFalse(response->has_error(), @"Should not have error");
+  OCMVerifyAll(self.mockSyncDelegate);
+}
+
+- (void)testDispatchSantaCommandToHandlerEventUpload {
+  // Given: An EventUploadRequest command
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_event_upload()->set_path("/Applications/Safari.app");
+
+  [self signCommandRequest:&command];
+
+  // Mock delegate - handler fires and forgets
+  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
+                                              reply:[OCMArg any]]);
+
+  // When: Dispatching the command
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should return a successful event upload response
+  XCTAssertFalse(response->has_error());
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kEventUpload,
+                 @"EventUpload command should return event upload response");
+}
+
+- (void)testDispatchSantaCommandToHandlerEventUploadError {
+  // Given: An EventUploadRequest command with empty path
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_event_upload();  // No path set
+
+  [self signCommandRequest:&command];
+
+  // When: Dispatching the command
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should return EventUploadResponse with ERROR_INVALID_PATH (not top-level error)
+  XCTAssertFalse(response->has_error(), @"Should not have top-level error");
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kEventUpload,
+                 @"Should have event_upload response set");
+  XCTAssertTrue(response->event_upload().has_error(), @"EventUploadResponse should have error");
+  XCTAssertEqual(response->event_upload().error(), ::pbv1::EventUploadResponse::ERROR_INVALID_PATH,
+                 @"Should return ERROR_INVALID_PATH on empty path");
 }
 
 @end
