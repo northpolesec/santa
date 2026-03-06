@@ -142,6 +142,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // data on it.
   __block auto arena = std::make_shared<google::protobuf::Arena>();
   __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled;
+  __block auto arena = std::make_shared<google::protobuf::Arena>();
+  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled;
+  bool compileFailed = false;
   for (NSString *expr in expressions) {
     auto result = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(expr), arena.get());
     if (result.ok()) {
@@ -149,7 +152,13 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     } else {
       LOGE(@"Failed to compile CEL fallback expression '%@': %s", expr,
            std::string(result.status().message()).c_str());
+      compileFailed = true;
+      break;
     }
+  }
+
+  if (compileFailed) {
+    return;
   }
 
   dispatch_sync(celFallbackQueue_, ^{
