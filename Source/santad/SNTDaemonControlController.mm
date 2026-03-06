@@ -478,6 +478,10 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerTelemetryFilterExpressions:val];
   }];
 
+  [result celFallbackExpressions:^(NSArray<NSString *> *val) {
+    [configurator setSyncServerCELFallbackExpressions:val];
+  }];
+
   [result eventDetailURL:^(NSString *val) {
     [configurator setSyncServerEventDetailURL:val];
   }];

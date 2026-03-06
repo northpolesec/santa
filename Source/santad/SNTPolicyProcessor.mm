@@ -27,6 +27,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
@@ -34,6 +35,7 @@
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 #include "cel/v1.pb.h"
 
 enum class PlatformBinaryState {
@@ -66,6 +68,13 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   std::unique_ptr<santa::cel::Evaluator<false>> celEvaluatorV1_;
   std::unique_ptr<santa::cel::Evaluator<true>> celEvaluatorV2_;
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter_;
+  // Arena used for constant folding during compilation of fallback expressions.
+  // Declared before celFallbackExpressions_ so that C++ reverse destruction
+  // order destroys expressions first, then the arena they reference.
+  std::shared_ptr<google::protobuf::Arena> celFallbackArena_;
+  std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> celFallbackExpressions_;
+  dispatch_queue_t celFallbackQueue_;
+  SNTKVOManager *celFallbackExpressionsObserver_;
 }
 @property SNTRuleTable *ruleTable;
 @property SNTConfigurator *configurator;
@@ -93,6 +102,22 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       LOGW(@"Failed to create CEL v2 evaluator: %s",
            std::string(evaluatorV2.status().message()).c_str());
     }
+
+    celFallbackQueue_ =
+        dispatch_queue_create("com.northpolesec.santa.cel_fallback", DISPATCH_QUEUE_SERIAL);
+
+    // Pre-compile any existing fallback expressions
+    [self compileFallbackExpressions:_configurator.celFallbackExpressions];
+
+    // Observe changes to fallback expressions
+    __weak __typeof(self) weakSelf = self;
+    celFallbackExpressionsObserver_ =
+        [[SNTKVOManager alloc] initWithObject:_configurator
+                                     selector:@selector(celFallbackExpressions)
+                                         type:[NSArray class]
+                                     callback:^(id oldValue, id newValue) {
+                                       [weakSelf compileFallbackExpressions:(NSArray *)newValue];
+                                     }];
   }
   return self;
 }
@@ -107,28 +132,111 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   return self;
 }
 
-- (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule *)rule
-                                     cachedDecision:(SNTCachedDecision *)cd
-                                 activationCallback:(ActivationCallbackBlock)activationCallback {
-  bool useV2 = (rule.state == SNTRuleStateCELv2);
-  auto activation = activationCallback(useV2);
+- (void)compileFallbackExpressions:(NSArray<NSString *> *)expressions {
+  if (!celEvaluatorV2_) {
+    return;
+  }
 
-  // Evaluate the CEL expression and extract results
+  // Create a fresh arena for this batch of compiled expressions.
+  // The arena must outlive the compiled plans since constant folding stores
+  // data on it.
+  __block auto arena = std::make_shared<google::protobuf::Arena>();
+  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled;
+  bool compileFailed = false;
+  for (NSString *expr in expressions) {
+    auto result = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(expr), arena.get());
+    if (result.ok()) {
+      compiled.push_back(std::move(*result));
+    } else {
+      LOGE(@"Failed to compile CEL fallback expression '%@': %s", expr,
+           std::string(result.status().message()).c_str());
+      compileFailed = true;
+      break;
+    }
+  }
+
+  if (compileFailed) {
+    return;
+  }
+
+  dispatch_sync(celFallbackQueue_, ^{
+    // Release old expressions before the old arena (order matters).
+    celFallbackExpressions_ = std::move(compiled);
+    celFallbackArena_ = std::move(arena);
+  });
+}
+
+- (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision *)cd
+                    activationCallback:(ActivationCallbackBlock)activationCallback {
+  if (!celEvaluatorV2_ || !activationCallback) {
+    return NO;
+  }
+
+  // Snapshot the compiled expressions and arena under the lock so their
+  // lifetimes extend through evaluation even if compileFallbackExpressions
+  // swaps them concurrently.
+  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> expressions;
+  __block std::shared_ptr<google::protobuf::Arena> arenaRef;
+  dispatch_sync(celFallbackQueue_, ^{
+    expressions = celFallbackExpressions_;
+    arenaRef = celFallbackArena_;
+  });
+
+  if (expressions.empty()) {
+    return NO;
+  }
+
+  LOGD(@"Evaluating %zu CEL fallback expression(s) for sha256=%@", expressions.size(), cd.sha256);
+
+  auto activation = activationCallback(/*useV2=*/true);
+
+  // Use a stack-local arena for evaluation temporaries.
+  google::protobuf::Arena evalArena;
+
+  for (size_t i = 0; i < expressions.size(); ++i) {
+    LOGD(@"Evaluating CEL fallback expression %zu", i);
+
+    CELEvaluationResult celResult = [self evaluateCompiledCELExpression:expressions[i].get()
+                                                                  useV2:true
+                                                         cachedDecision:cd
+                                                             activation:*activation
+                                                              evalArena:&evalArena];
+
+    if (!celResult.succeeded) {
+      if (celResult.decisionMade) {
+        return YES;
+      }
+      continue;
+    }
+
+    cd.decision = (celResult.resultState == SNTRuleStateAllow ||
+                   celResult.resultState == SNTRuleStateAllowTransitive)
+                      ? SNTEventStateAllowCELFallback
+                      : SNTEventStateBlockCELFallback;
+    return YES;
+  }
+
+  LOGD(@"All CEL fallback expressions exhausted without a decision for sha256=%@", cd.sha256);
+  return NO;
+}
+
+- (CELEvaluationResult)
+    evaluateCompiledCELExpression:(const ::google::api::expr::runtime::CelExpression *)expression
+                            useV2:(bool)useV2
+                   cachedDecision:(SNTCachedDecision *)cd
+                       activation:(const ::google::api::expr::runtime::BaseActivation &)activation
+                        evalArena:(google::protobuf::Arena *)evalArena {
   int returnValue = 0;
   bool cacheable = true;
   std::optional<uint64_t> touchIDCooldownMinutes;
 
   if (useV2) {
-    auto *v2Activation = static_cast<santa::cel::Activation<true> *>(activation.get());
-    // In debug builds, ensure the returned type matches expectations, but no
-    // need to pay the RTTI cost in release builds since the number of returned
-    // types is small and should rarely change.
-    assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
-    auto evalResult = self->celEvaluatorV2_->CompileAndEvaluate(
-        santa::NSStringToUTF8StringView(rule.celExpr), *v2Activation);
+    const auto &v2Activation = static_cast<const santa::cel::Activation<true> &>(activation);
+    assert(dynamic_cast<const santa::cel::Activation<true> *>(&activation) != nullptr);
+    auto evalResult = celEvaluatorV2_->Evaluate(expression, v2Activation, evalArena);
 
     if (!evalResult.ok()) {
-      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
+      LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
       if ([SNTConfigurator configurator].failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
@@ -141,13 +249,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     cacheable = evalResult->cacheable;
     touchIDCooldownMinutes = evalResult->touchIDCooldownMinutes;
   } else {
-    auto *v1Activation = static_cast<santa::cel::Activation<false> *>(activation.get());
-    assert(dynamic_cast<santa::cel::Activation<false> *>(activation.get()) != nullptr);
-    auto evalResult = self->celEvaluatorV1_->CompileAndEvaluate(
-        santa::NSStringToUTF8StringView(rule.celExpr), *v1Activation);
+    const auto &v1Activation = static_cast<const santa::cel::Activation<false> &>(activation);
+    assert(dynamic_cast<const santa::cel::Activation<false> *>(&activation) != nullptr);
+    auto evalResult = celEvaluatorV1_->Evaluate(expression, v1Activation, evalArena);
 
     if (!evalResult.ok()) {
-      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
+      LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
       if ([SNTConfigurator configurator].failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
@@ -167,6 +274,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   if (useV2) {
     using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
     switch (static_cast<ReturnValue>(returnValue)) {
+      case ReturnValue::UNSPECIFIED:
+        LOGD(@"CEL expression returned UNSPECIFIED, skipping");
+        return {.succeeded = false, .decisionMade = false, .resultState = {}};
       case ReturnValue::ALLOWLIST: resultState = SNTRuleStateAllow; break;
       case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowTransitive; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
@@ -185,7 +295,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
           cd.touchIDCooldownMinutes = @(touchIDCooldownMinutes.value());
         }
         break;
-      default: resultState = rule.state; break;
+      default:
+        LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
+        return {.succeeded = false, .decisionMade = false, .resultState = {}};
     }
   } else {
     using ReturnValue = santa::cel::CELProtoTraits<false>::ReturnValue;
@@ -194,8 +306,14 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowTransitive; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
       case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
-      default: resultState = rule.state; break;
+      default:
+        LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
+        return {.succeeded = false, .decisionMade = false, .resultState = {}};
     }
+  }
+
+  if (resultState == SNTRuleStateSilentBlock) {
+    cd.silentBlock = YES;
   }
 
   if (!cacheable) {
@@ -203,6 +321,51 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   }
 
   return {.succeeded = true, .decisionMade = false, .resultState = resultState};
+}
+
+- (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule *)rule
+                                     cachedDecision:(SNTCachedDecision *)cd
+                                 activationCallback:(ActivationCallbackBlock)activationCallback {
+  bool useV2 = (rule.state == SNTRuleStateCELv2);
+  auto activation = activationCallback(useV2);
+
+  LOGD(@"Evaluating CEL expression: %@", rule.celExpr);
+
+  google::protobuf::Arena arena;
+
+  if ((useV2 && !celEvaluatorV2_) || (!useV2 && !celEvaluatorV1_)) {
+    LOGE(@"CEL v%d evaluator unavailable", useV2 ? 2 : 1);
+    if ([SNTConfigurator configurator].failClosed) {
+      cd.decision = SNTEventStateBlockUnknown;
+      return {.succeeded = false, .decisionMade = true, .resultState = {}};
+    }
+    return {.succeeded = false, .decisionMade = false, .resultState = {}};
+  }
+
+  absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> compileResult;
+  if (useV2) {
+    assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
+    compileResult = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
+  } else {
+    assert(dynamic_cast<santa::cel::Activation<false> *>(activation.get()) != nullptr);
+    compileResult = celEvaluatorV1_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
+  }
+
+  if (!compileResult.ok()) {
+    LOGE(@"Failed to compile CEL rule (%@): %s", rule.celExpr,
+         std::string(compileResult.status().message()).c_str());
+    if ([SNTConfigurator configurator].failClosed) {
+      cd.decision = SNTEventStateBlockUnknown;
+      return {.succeeded = false, .decisionMade = true, .resultState = {}};
+    }
+    return {.succeeded = false, .decisionMade = false, .resultState = {}};
+  }
+
+  return [self evaluateCompiledCELExpression:compileResult->get()
+                                       useV2:useV2
+                              cachedDecision:cd
+                                  activation:*activation
+                                   evalArena:&arena];
 }
 
 // This method applies the rules to the cached decision object.
@@ -422,6 +585,10 @@ static void UpdateCachedDecisionSigningInfo(
     cd.decisionExtra =
         [NSString stringWithFormat:@"Blocked due to signature error: %ld", (long)csInfoError.code];
     cd.decision = SNTEventStateBlockCertificate;
+    return cd;
+  }
+
+  if ([self evaluateCELFallbackExpressions:cd activationCallback:activationCallback]) {
     return cd;
   }
 

@@ -91,6 +91,7 @@ std::string GetReasonString(SNTEventState event_state) {
     case SNTEventStateAllowCompilerSigningID: return "SIGNINGID";
     case SNTEventStateAllowCDHash: return "CDHASH";
     case SNTEventStateAllowCompilerCDHash: return "CDHASH";
+    case SNTEventStateAllowCELFallback: return "CEL_FALLBACK";
     case SNTEventStateAllowUnknown: return "UNKNOWN";
     case SNTEventStateBlockBinary: return "BINARY";
     case SNTEventStateBlockCertificate: return "CERT";
@@ -98,6 +99,7 @@ std::string GetReasonString(SNTEventState event_state) {
     case SNTEventStateBlockTeamID: return "TEAMID";
     case SNTEventStateBlockSigningID: return "SIGNINGID";
     case SNTEventStateBlockCDHash: return "CDHASH";
+    case SNTEventStateBlockCELFallback: return "CEL_FALLBACK";
     case SNTEventStateBlockLongPath: return "LONG_PATH";
     case SNTEventStateBlockUnknown: return "UNKNOWN";
     case SNTEventStateUnknown: return "UNKNOWN";

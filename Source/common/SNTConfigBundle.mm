@@ -46,6 +46,7 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
+@property NSArray<NSString *> *celFallbackExpressions;
 @end
 
 @implementation SNTConfigBundle
@@ -81,6 +82,7 @@
   ENCODE(coder, networkExtensionSettings);
   ENCODE(coder, pushTokenChain);
   ENCODE(coder, telemetryFilterExpressions);
+  ENCODE(coder, celFallbackExpressions);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -112,6 +114,7 @@
     DECODE(decoder, networkExtensionSettings, SNTSyncNetworkExtensionSettings);
     DECODE_ARRAY(decoder, pushTokenChain, NSString);
     DECODE_ARRAY(decoder, telemetryFilterExpressions, NSString);
+    DECODE_ARRAY(decoder, celFallbackExpressions, NSString);
   }
   return self;
 }
@@ -268,6 +271,12 @@
 - (void)telemetryFilterExpressions:(void (^)(NSArray<NSString *> *))block {
   if (self.telemetryFilterExpressions) {
     block(self.telemetryFilterExpressions);
+  }
+}
+
+- (void)celFallbackExpressions:(void (^)(NSArray<NSString *> *))block {
+  if (self.celFallbackExpressions) {
+    block(self.celFallbackExpressions);
   }
 }
 

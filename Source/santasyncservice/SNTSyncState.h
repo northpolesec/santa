@@ -94,6 +94,7 @@
 @property NSString *fileAccessEventDetailURL;
 @property NSString *fileAccessEventDetailText;
 @property(copy) NSArray<NSString *> *telemetryFilterExpressions;
+@property(copy) NSArray<NSString *> *celFallbackExpressions;
 
 /// Clean sync flag, if True, all existing rules should be deleted before inserting any new rules.
 @property SNTSyncType syncType;

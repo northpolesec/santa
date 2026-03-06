@@ -117,6 +117,31 @@ ActivationCallbackBlock CreateCELActivationBlock(
             csInfo.secureSigningTime.timeIntervalSince1970);
       }
 
+      if constexpr (IsV2) {
+        if (csInfo && csInfo.entitlements) {
+          auto *entitlements = f->mutable_entitlements();
+          [csInfo.entitlements
+              enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
+                NSError *err;
+                NSData *jsonData;
+                @try {
+                  jsonData = [NSJSONSerialization dataWithJSONObject:value
+                                                             options:NSJSONWritingFragmentsAllowed
+                                                               error:&err];
+                } @catch (NSException *) {
+                }
+                if (!jsonData) {
+                  // Skip entitlements that can't be serialized to JSON.
+                  return;
+                }
+                NSString *jsonStr = [[NSString alloc] initWithData:jsonData
+                                                          encoding:NSUTF8StringEncoding];
+                (*entitlements)[santa::NSStringToUTF8String(key)] =
+                    santa::NSStringToUTF8String(jsonStr);
+              }];
+        }
+      }
+
       return std::make_unique<santa::cel::Activation<IsV2>>(
           std::move(f),
           ^std::vector<std::string>() {

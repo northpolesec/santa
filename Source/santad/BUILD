@@ -253,6 +253,7 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeepCopy",
         "//Source/common:SNTFileInfo",
+        "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",

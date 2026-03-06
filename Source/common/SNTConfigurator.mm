@@ -201,6 +201,7 @@ static NSString *const kEnableNATS =
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
 static NSString *const kTelemetryFilterExpressionsKey = @"TelemetryFilterExpressions";
+static NSString *const kCELFallbackExpressionsKey = @"CELFallbackExpressions";
 
 static NSString *const kOnStartUSBOptions = @"OnStartUSBOptions";
 
@@ -295,6 +296,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kNetworkExtensionSettingsKey : data,
       kPushTokenChainKey : array,
       kTelemetryFilterExpressionsKey : array,
+      kCELFallbackExpressionsKey : array,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
       kFileAccessEventDetailURLKey : string,
@@ -819,6 +821,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 + (NSSet *)keyPathsForValuesAffectingTelemetryFilterExpressions {
   return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingCelFallbackExpressions {
+  return [self syncStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingTelemetry {
@@ -1876,6 +1882,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (void)setSyncServerTelemetryFilterExpressions:(NSArray<NSString *> *)expressions {
   [self updateSyncStateForKey:kTelemetryFilterExpressionsKey
                         value:EnsureArrayOfStrings(expressions)];
+}
+
+- (NSArray *)celFallbackExpressions {
+  return EnsureArrayOfStrings(self.syncState[kCELFallbackExpressionsKey]);
+}
+
+- (void)setSyncServerCELFallbackExpressions:(NSArray<NSString *> *)expressions {
+  [self updateSyncStateForKey:kCELFallbackExpressionsKey value:EnsureArrayOfStrings(expressions)];
 }
 
 - (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {

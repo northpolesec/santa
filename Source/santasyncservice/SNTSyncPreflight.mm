@@ -438,6 +438,21 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
     syncState.telemetryFilterExpressions = [expressions copy];
   }
 
+  // Always set CEL fallback expressions (even if empty) to allow the server to clear them.
+  // Limit to 10 expressions.
+  {
+    int count = resp.cel_fallback_expressions_size();
+    if (count > 10) {
+      SLOGW(@"Received %d CEL fallback expressions, only the first 10 will be used", count);
+      count = 10;
+    }
+    NSMutableArray<NSString *> *expressions = [NSMutableArray arrayWithCapacity:count];
+    for (int i = 0; i < count; i++) {
+      [expressions addObject:StringToNSString(resp.cel_fallback_expressions(i))];
+    }
+    syncState.celFallbackExpressions = [expressions copy];
+  }
+
   if (resp.has_export_configuration()) {
     auto exportConfig = resp.export_configuration().signed_post();
     if (!exportConfig.url().empty() && !exportConfig.form_values().empty()) {
