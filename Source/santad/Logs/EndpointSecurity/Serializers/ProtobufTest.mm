@@ -553,7 +553,7 @@ void SerializeAndCheckNonESEvents(
       case SNTEventStateBlockLongPath: want = ::pbv1::Execution::REASON_LONG_PATH; break;
       case SNTEventStateBlockSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateBlockCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
-      case SNTEventStateBlockCELFallback: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateBlockCELFallback: want = ::pbv1::Execution::REASON_FALLBACK_CEL; break;
       case SNTEventStateAllowUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateAllowBinary: want = ::pbv1::Execution::REASON_BINARY; break;
       case SNTEventStateAllowCertificate: want = ::pbv1::Execution::REASON_CERT; break;
@@ -570,7 +570,7 @@ void SerializeAndCheckNonESEvents(
       case SNTEventStateAllowLocalSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateAllowCompilerSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateAllowCompilerCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
-      case SNTEventStateAllowCELFallback: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateAllowCELFallback: want = ::pbv1::Execution::REASON_FALLBACK_CEL; break;
       case SNTEventStateBlock: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateAllow: want = ::pbv1::Execution::REASON_UNKNOWN; break;
     }
