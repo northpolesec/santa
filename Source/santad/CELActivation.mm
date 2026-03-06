@@ -59,6 +59,9 @@ std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
 
     AncestorT ancestor;
     ancestor.set_path(p->program_->executable);
+    for (const auto &arg : p->program_->arguments) {
+      ancestor.add_args(arg);
+    }
 
     if (p->program_->code_signing) {
       const auto &cs = *p->program_->code_signing;
