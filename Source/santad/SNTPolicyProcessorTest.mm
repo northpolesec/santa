@@ -1169,9 +1169,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
                                   activationCallback:[self fallbackTestActivationCallback]];
-  // The invalid expression is skipped at compile time, only ALLOWLIST remains
-  XCTAssertTrue(handled);
-  XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
+  XCTAssertFalse(handled);
 }
 
 - (void)testCELFallbackNilActivationCallbackReturnNO {

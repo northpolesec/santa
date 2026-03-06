@@ -142,8 +142,6 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // data on it.
   __block auto arena = std::make_shared<google::protobuf::Arena>();
   __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled;
-  __block auto arena = std::make_shared<google::protobuf::Arena>();
-  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled;
   bool compileFailed = false;
   for (NSString *expr in expressions) {
     auto result = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(expr), arena.get());
