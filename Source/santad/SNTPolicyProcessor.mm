@@ -326,6 +326,15 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 
   google::protobuf::Arena arena;
 
+  if ((useV2 && !celEvaluatorV2_) || (!useV2 && !celEvaluatorV1_)) {
+    LOGE(@"CEL v%d evaluator unavailable", useV2 ? 2 : 1);
+    if ([SNTConfigurator configurator].failClosed) {
+      cd.decision = SNTEventStateBlockUnknown;
+      return {.succeeded = false, .decisionMade = true, .resultState = {}};
+    }
+    return {.succeeded = false, .decisionMade = false, .resultState = {}};
+  }
+
   absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> compileResult;
   if (useV2) {
     assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
