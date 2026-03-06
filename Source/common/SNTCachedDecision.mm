@@ -34,4 +34,36 @@
   return self;
 }
 
+- (id)copyWithZone:(NSZone *)zone {
+  SNTCachedDecision *copy = [[SNTCachedDecision alloc] initWithVnode:_vnodeId];
+  copy.decision = _decision;
+  copy.decisionClientMode = _decisionClientMode;
+  copy.decisionExtra = _decisionExtra;
+  copy.sha256 = _sha256;
+  copy.certSHA256 = _certSHA256;
+  copy.certCommonName = _certCommonName;
+  copy.certChain = _certChain;
+  copy.teamID = _teamID;
+  copy.signingID = _signingID;
+  copy.rawSigningID = _rawSigningID;
+  copy.cdhash = _cdhash;
+  copy.entitlements = _entitlements;
+  copy.entitlementsFiltered = _entitlementsFiltered;
+  copy.platformBinary = _platformBinary;
+  copy.codesigningFlags = _codesigningFlags;
+  copy.signingStatus = _signingStatus;
+  copy.secureSigningTime = _secureSigningTime;
+  copy.signingTime = _signingTime;
+  copy.quarantineURL = _quarantineURL;
+  copy.customMsg = _customMsg;
+  copy.customURL = _customURL;
+  copy.silentBlock = _silentBlock;
+  copy.staticRule = _staticRule;
+  copy.cacheable = _cacheable;
+  copy.holdAndAsk = _holdAndAsk;
+  copy.silentTouchID = _silentTouchID;
+  copy.touchIDCooldownMinutes = _touchIDCooldownMinutes;
+  return copy;
+}
+
 @end

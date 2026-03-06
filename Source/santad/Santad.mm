@@ -99,7 +99,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             return auth_result_cache->CacheCounts();
           }
           checkCacheBlock:^SNTAction(SantaVnode vnode) {
-            return auth_result_cache->CheckCache(vnode);
+            return auth_result_cache->CheckCache(vnode).action;
           }];
 
   control_connection.exportedObject = dc;

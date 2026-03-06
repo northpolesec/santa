@@ -23,7 +23,7 @@
 ///
 ///  Store information about executions from decision making for later logging.
 ///
-@interface SNTCachedDecision : NSObject
+@interface SNTCachedDecision : NSObject <NSCopying>
 
 - (instancetype)init;
 - (instancetype)initWithEndpointSecurityFile:(const es_file_t *)esFile;
@@ -40,9 +40,11 @@
 @property NSArray<MOLCertificate *> *certChain;
 @property NSString *teamID;
 @property NSString *signingID;
+@property NSString *rawSigningID;
 @property NSString *cdhash;
 @property NSDictionary *entitlements;
 @property BOOL entitlementsFiltered;
+@property BOOL platformBinary;
 @property uint32_t codesigningFlags;
 @property SNTSigningStatus signingStatus;
 @property NSDate *secureSigningTime;

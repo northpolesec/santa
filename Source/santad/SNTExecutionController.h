@@ -48,6 +48,7 @@ const static NSString *kAllowNoFileInfo = @"AllowNoFileInfo";
 const static NSString *kDenyNoFileInfo = @"DenyNoFileInfo";
 const static NSString *kBlockLongPath = @"BlockLongPath";
 
+@class SNTCachedDecision;
 @class SNTEventTable;
 @class SNTNotificationQueue;
 @class SNTRuleTable;
@@ -84,7 +85,9 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///  @param message The message received from the EndpointSecurity event provider.
 ///  @param postAction The block invoked with the desired response result.
 ///
-- (void)validateExecEvent:(const santa::Message &)esMsg postAction:(bool (^)(SNTAction))postAction;
+- (void)validateExecEvent:(const santa::Message &)esMsg
+           cachedDecision:(SNTCachedDecision *)existingDecision
+               postAction:(bool (^)(SNTAction, SNTCachedDecision *))postAction;
 
 ///
 ///  Handles the logic of deciding whether to allow a pid_suspend/pid_resume through to a binary or

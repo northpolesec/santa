@@ -42,14 +42,14 @@
 
 using santa::Message;
 
-using PostActionBlock = bool (^)(SNTAction);
+using PostActionBlock = bool (^)(SNTAction, SNTCachedDecision *);
 using VerifyPostActionBlock = PostActionBlock (^)(SNTAction);
 
 static const char *kExampleSigningID = "example.signing.id";
 static const char *kExampleTeamID = "myteamid";
 
 VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) {
-  return ^bool(SNTAction gotAction) {
+  return ^bool(SNTAction gotAction, SNTCachedDecision *cd) {
     XCTAssertEqual(gotAction, wantAction);
     return true;
   };
@@ -236,7 +236,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   {
     Message msg(mockESApi, &esMsg);
-    [self.sut validateExecEvent:msg postAction:verifyPostAction(wantAction)];
+    [self.sut validateExecEvent:msg cachedDecision:nil postAction:verifyPostAction(wantAction)];
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -789,7 +789,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
                                      targetProcess:&procExec
                                        configState:OCMOCK_ANY
-                                activationCallback:OCMOCK_ANY])
+                                activationCallback:OCMOCK_ANY
+                                    cachedDecision:OCMOCK_ANY])
       .ignoringNonObjectArgs()
       .andReturn(holdAndAskDecision);
 
@@ -813,7 +814,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   {
     Message msg(mockESApi, &esMsg);
     [controller validateExecEvent:msg
-                       postAction:^bool(SNTAction action) {
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision *cd) {
                          resultAction = action;
                          return true;
                        }];
@@ -896,7 +898,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
                                      targetProcess:&procExec
                                        configState:OCMOCK_ANY
-                                activationCallback:OCMOCK_ANY])
+                                activationCallback:OCMOCK_ANY
+                                    cachedDecision:OCMOCK_ANY])
       .ignoringNonObjectArgs()
       .andDo(^(NSInvocation *invocation) {
         [invocation setReturnValue:&currentDecision];
@@ -932,7 +935,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   {
     Message msg(mockESApi, &esMsg);
     [controller validateExecEvent:msg
-                       postAction:^bool(SNTAction action) {
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision *cd) {
                          [receivedActions addObject:@(action)];
                          return true;
                        }];
@@ -969,7 +973,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   {
     Message msg(mockESApi, &esMsg);
     [controller validateExecEvent:msg
-                       postAction:^bool(SNTAction action) {
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision *cd) {
                          [receivedActions addObject:@(action)];
                          return true;
                        }];

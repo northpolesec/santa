@@ -20,6 +20,7 @@
 #include <stdlib.h>
 
 #import "Source/common/BranchPrediction.h"
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
@@ -107,8 +108,11 @@ using santa::Message;
 
   const es_process_t *targetProc = msg->event.exec.target;
 
+  SNTCachedDecision *cd = nil;
+
   while (true) {
-    SNTAction returnAction = self->_authResultCache->CheckCache(targetProc->executable);
+    santa::CachedAuthResult cacheEntry = self->_authResultCache->CheckCache(targetProc->executable);
+    SNTAction returnAction = cacheEntry.action;
     if (RESPONSE_VALID(returnAction)) {
       es_auth_result_t authResult = ES_AUTH_RESULT_DENY;
 
@@ -126,6 +130,12 @@ using santa::Message;
            forcePreventCache:(returnAction == SNTActionRespondAllowCompiler)];
 
       return;
+    } else if (returnAction == SNTActionRespondAllowNoCache) {
+      // Cache hit — we have pre-computed identity data but need to re-evaluate policy.
+      cd = cacheEntry.cached_decision;
+      // Remove the entry so we can transition through RequestBinary for re-evaluation.
+      self->_authResultCache->RemoveFromCache(targetProc->executable);
+      break;
     } else if (returnAction == SNTActionRespondHold) {
       _ttyWriter->Write(
           targetProc,
@@ -155,8 +165,9 @@ using santa::Message;
   self->_authResultCache->AddToCache(targetProc->executable, SNTActionRequestBinary);
 
   [self.execController validateExecEvent:msg
-                              postAction:^bool(SNTAction action) {
-                                return [self postAction:action forMessage:msg];
+                          cachedDecision:cd
+                              postAction:^bool(SNTAction action, SNTCachedDecision *cd) {
+                                return [self postAction:action forMessage:msg withDecision:cd];
                               }];
 }
 
@@ -165,7 +176,7 @@ using santa::Message;
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:
       if (![self.execController synchronousShouldProcessExecEvent:esMsg]) {
-        [self postAction:SNTActionRespondDeny forMessage:esMsg];
+        [self postAction:SNTActionRespondDeny forMessage:esMsg withDecision:nil];
         recordEventMetrics(EventDisposition::kDropped);
         return;
       }
@@ -191,7 +202,9 @@ using santa::Message;
                }];
 }
 
-- (bool)postAction:(SNTAction)action forMessage:(const Message &)esMsg {
+- (bool)postAction:(SNTAction)action
+        forMessage:(const Message &)esMsg
+      withDecision:(SNTCachedDecision *)cd {
   es_auth_result_t authResult;
   bool cacheable = true;
 
@@ -212,12 +225,12 @@ using santa::Message;
       authResult = ES_AUTH_RESULT_ALLOW;
       break;
     case SNTActionRespondAllowNoCache:
-      // Do not cache when the action is SNTActionRespondAllowNoCache because this
-      // implies a CEL evaluation was performed and used per-process data to make
-      // its decision.
+      // Do not cache in the ES framework when the action is SNTActionRespondAllowNoCache
+      // because this implies a CEL evaluation was performed and used per-process data
+      // to make its decision. However, we do cache the decision in the AuthResultCache
+      // so that subsequent executions can skip expensive identity computation.
       cacheable = false;
       authResult = ES_AUTH_RESULT_ALLOW;
-      self->_authResultCache->RemoveFromCache(esMsg->event.exec.target->executable);
       break;
     case SNTActionRespondAllow: authResult = ES_AUTH_RESULT_ALLOW; break;
     case SNTActionRespondDeny: authResult = ES_AUTH_RESULT_DENY; break;
@@ -232,7 +245,7 @@ using santa::Message;
       [NSException raise:@"Invalid post action" format:@"Invalid post action: %ld", action];
   }
 
-  self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, action);
+  self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, action, cd);
 
   if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
     return [self respondToMessage:esMsg withAuthResult:authResult forcePreventCache:!cacheable];

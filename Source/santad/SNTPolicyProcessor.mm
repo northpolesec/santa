@@ -309,6 +309,8 @@ static void UpdateCachedDecisionSigningInfo(
   cd.certSHA256 = csInfo.leafCertificate.SHA256;
   cd.certCommonName = csInfo.leafCertificate.commonName;
   cd.certChain = csInfo.certificates;
+  cd.platformBinary = csInfo.platformBinary;
+  cd.rawSigningID = csInfo.signingID;
   // Check if we need to get teamID from code signing.
   if (!cd.teamID) {
     cd.teamID = csInfo.teamID;
@@ -351,44 +353,33 @@ static void UpdateCachedDecisionSigningInfo(
 - (nonnull SNTCachedDecision *)
            decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                    configState:(nonnull SNTConfigState *)configState
-                        cdhash:(nullable NSString *)cdhash
-                    fileSHA256:(nullable NSString *)fileSHA256
-             certificateSHA256:(nullable NSString *)certificateSHA256
-                        teamID:(nullable NSString *)teamID
-                     signingID:(nullable NSString *)signingID
+                cachedDecision:(nonnull SNTCachedDecision *)cd
            platformBinaryState:(PlatformBinaryState)platformBinaryState
          signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
             activationCallback:(nullable ActivationCallbackBlock)activationCallback
     entitlementsFilterCallback:
         (NSDictionary *_Nullable (^_Nullable)(NSDictionary *_Nullable entitlements))
             entitlementsFilterCallback {
-  // Check the hash before allocating a SNTCachedDecision.
-  NSString *fileHash = fileSHA256 ?: fileInfo.SHA256;
   SNTClientMode mode = configState.clientMode;
 
   // If the binary is a critical system binary, don't check its signature.
   // The binary was validated at startup when the rule table was initialized.
-  SNTCachedDecision *systemCd = self.ruleTable.criticalSystemBinaries[signingID];
+  SNTCachedDecision *systemCd = self.ruleTable.criticalSystemBinaries[cd.signingID];
 
   if (systemCd) {
     systemCd.decisionClientMode = mode;
     return systemCd;
   }
 
-  // Allocate a new cached decision for the execution.
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
-  cd.cdhash = cdhash;
-  cd.sha256 = fileHash;
-  cd.teamID = teamID;
-  cd.signingID = signingID;
+  if (!cd.sha256) {
+    cd.sha256 = fileInfo.SHA256;
+  }
   cd.signingStatus = signingStatusCallback();
   cd.decisionClientMode = mode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
   NSError *csInfoError;
-  if (certificateSHA256.length) {
-    cd.certSHA256 = certificateSHA256;
-  } else {
+  if (!cd.certSHA256.length) {
     // Grab the code signature, if there's an error don't try to capture
     // any of the signature details.
     // TODO(mlw): MOLCodesignChecker should be updated to still grab signing information
@@ -451,53 +442,64 @@ static void UpdateCachedDecisionSigningInfo(
                                      targetProcess:(nonnull const es_process_t *)targetProc
                                        configState:(nonnull SNTConfigState *)configState
                                 activationCallback:
-                                    (nullable ActivationCallbackBlock)activationCallback {
-  NSString *signingID;
-  NSString *teamID;
-  NSString *cdhash;
+                                    (nullable ActivationCallbackBlock)activationCallback
+                                    cachedDecision:(nullable SNTCachedDecision *)existingDecision {
+  PlatformBinaryState pbs = targetProc->is_platform_binary ? PlatformBinaryState::kRuntimeTrue
+                                                           : PlatformBinaryState::kRuntimeFalse;
 
   const char *entitlementsFilterTeamID = NULL;
+  SNTCachedDecision *cd;
 
-  if (targetProc->codesigning_flags & CS_SIGNED && targetProc->codesigning_flags & CS_VALID) {
-    if (targetProc->signing_id.length > 0) {
-      if (targetProc->team_id.length > 0) {
-        entitlementsFilterTeamID = targetProc->team_id.data;
-        teamID = [NSString stringWithUTF8String:targetProc->team_id.data];
-        signingID =
-            [NSString stringWithFormat:@"%@:%@", teamID,
-                                       [NSString stringWithUTF8String:targetProc->signing_id.data]];
-      } else if (targetProc->is_platform_binary) {
-        entitlementsFilterTeamID = "platform";
-        signingID =
-            [NSString stringWithFormat:@"platform:%@",
-                                       [NSString stringWithUTF8String:targetProc->signing_id.data]];
-      }
+  if (existingDecision) {
+    cd = [existingDecision copy];
+    // Derive entitlementsFilterTeamID from the cached decision. The cd.teamID
+    // was originally set under the same guards used in the else branch
+    // (CS_SIGNED, CS_VALID, signing_id exists, team_id exists), so a non-nil
+    // teamID implies all those conditions were satisfied.
+    if (cd.teamID.length) {
+      entitlementsFilterTeamID = cd.teamID.UTF8String;
+    } else if (targetProc->is_platform_binary) {
+      entitlementsFilterTeamID = "platform";
     }
+  } else {
+    cd = [[SNTCachedDecision alloc] init];
 
-    // Only consider the CDHash for processes that have CS_KILL or CS_HARD set.
-    // This ensures that the OS will kill the process if the CDHash was tampered
-    // with and code was loaded that didn't match a page hash.
-    if (targetProc->codesigning_flags & CS_KILL || targetProc->codesigning_flags & CS_HARD) {
-      static NSString *const kCDHashFormatString = @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
-                                                    "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
+    if (targetProc->codesigning_flags & CS_SIGNED && targetProc->codesigning_flags & CS_VALID) {
+      if (targetProc->signing_id.length > 0) {
+        if (targetProc->team_id.length > 0) {
+          entitlementsFilterTeamID = targetProc->team_id.data;
+          cd.teamID = [NSString stringWithUTF8String:targetProc->team_id.data];
+          cd.signingID = [NSString
+              stringWithFormat:@"%@:%@", cd.teamID,
+                               [NSString stringWithUTF8String:targetProc->signing_id.data]];
+        } else if (targetProc->is_platform_binary) {
+          entitlementsFilterTeamID = "platform";
+          cd.signingID = [NSString
+              stringWithFormat:@"platform:%@",
+                               [NSString stringWithUTF8String:targetProc->signing_id.data]];
+        }
+      }
 
-      const uint8_t *buf = targetProc->cdhash;
-      cdhash = [[NSString alloc] initWithFormat:kCDHashFormatString, buf[0], buf[1], buf[2], buf[3],
-                                                buf[4], buf[5], buf[6], buf[7], buf[8], buf[9],
-                                                buf[10], buf[11], buf[12], buf[13], buf[14],
-                                                buf[15], buf[16], buf[17], buf[18], buf[19]];
+      // Only consider the CDHash for processes that have CS_KILL or CS_HARD set.
+      // This ensures that the OS will kill the process if the CDHash was tampered
+      // with and code was loaded that didn't match a page hash.
+      if (targetProc->codesigning_flags & CS_KILL || targetProc->codesigning_flags & CS_HARD) {
+        static NSString *const kCDHashFormatString = @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
+                                                      "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
+
+        const uint8_t *buf = targetProc->cdhash;
+        cd.cdhash = [[NSString alloc]
+            initWithFormat:kCDHashFormatString, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5],
+                           buf[6], buf[7], buf[8], buf[9], buf[10], buf[11], buf[12], buf[13],
+                           buf[14], buf[15], buf[16], buf[17], buf[18], buf[19]];
+      }
     }
   }
 
   return [self decisionForFileInfo:fileInfo
       configState:configState
-      cdhash:cdhash
-      fileSHA256:nil
-      certificateSHA256:nil
-      teamID:teamID
-      signingID:signingID
-      platformBinaryState:targetProc->is_platform_binary ? PlatformBinaryState::kRuntimeTrue
-                                                         : PlatformBinaryState::kRuntimeFalse
+      cachedDecision:cd
+      platformBinaryState:pbs
       signingStatusCallback:^SNTSigningStatus {
         uint32_t csFlags = targetProc->codesigning_flags;
         if ((csFlags & CS_SIGNED) == 0) {
