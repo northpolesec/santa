@@ -233,3 +233,4 @@ static const char *kSantaNetdPath =
     "/Applications/Santa.app/Contents/Library/SystemExtensions/"
     "com.northpolesec.santa.netd.systemextension/Contents/MacOS/com.northpolesec.santa.netd";
 static const char *kSantaAppPath = "/Applications/Santa.app";
+static const char *kSleighPath = "/Applications/Santa.app/Contents/MacOS/sleigh";

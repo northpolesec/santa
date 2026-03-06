@@ -491,6 +491,16 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTLiteDetector",
+    srcs = ["SNTLiteDetector.mm"],
+    hdrs = ["SNTLiteDetector.h"],
+    module_name = "santa_common_SNTLiteDetector",
+    deps = [
+        ":SNTCommonEnums",
+    ],
+)
+
+objc_library(
     name = "SNTConfigurator",
     srcs = ["SNTConfigurator.mm"],
     hdrs = ["SNTConfigurator.h"],
@@ -503,6 +513,7 @@ objc_library(
         ":Pinning",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
+        ":SNTLiteDetector",
         ":SNTLogging",
         ":SNTModeTransition",
         ":SNTRule",

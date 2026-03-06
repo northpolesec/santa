@@ -219,3 +219,6 @@
 
 /* Version in About view */
 "Version **%@**" = "Version **%@**";
+
+/* Version in About view for Lite edition */
+"Version **%@** (Lite)" = "Version **%@** (Lite)";

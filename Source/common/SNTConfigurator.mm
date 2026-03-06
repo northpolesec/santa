@@ -23,6 +23,7 @@
 
 #import "Source/common/NKeyTokenValidator.h"
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
@@ -1591,6 +1592,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (BOOL)isSyncV2Enabled {
+  if (SNTIsLiteInstall()) {
+    return NO;
+  }
+
   // Only the daemon can read / write to the sync state. Ensure there are no attempts to read this
   // setting from non-daemon processes.
   if (![[[NSProcessInfo processInfo] processName]

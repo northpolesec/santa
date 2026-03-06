@@ -26,23 +26,35 @@ function die {
 
 ################################################################################
 
+# When called with LITE_APP set, use the pre-prepared LITE_APP instead of the
+# release root app bundle.
+if [[ -n "${LITE_APP}" ]]; then
+  LITE=1
+fi
+
 readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
 readonly APP_PKG_ROOT="${SCRATCH}/app_pkg_root"
 readonly APP_PKG_SCRIPTS="${SCRATCH}/pkg_scripts"
 
 /bin/mkdir -p "${APP_PKG_ROOT}" "${APP_PKG_SCRIPTS}"
 
-# Ensure _CodeSignature/CodeResources files have 0644 permissions so they can
-# be verified without using sudo.
-/usr/bin/find "${RELEASE_ROOT}/binaries" -type f -name CodeResources -exec chmod 0644 {} \;
-/usr/bin/find "${RELEASE_ROOT}/binaries" -type d -exec chmod 0755 {} \;
+if [[ "${LITE}" -eq 0 ]]; then
+  # Ensure _CodeSignature/CodeResources files have 0644 permissions so they can
+  # be verified without using sudo.
+  /usr/bin/find "${RELEASE_ROOT}/binaries" -type f -name CodeResources -exec chmod 0644 {} \;
+  /usr/bin/find "${RELEASE_ROOT}/binaries" -type d -exec chmod 0755 {} \;
+fi
 /usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.northpolesec.santa*" -exec chmod 0644 {} \;
 
 echo "creating app pkg"
 /bin/mkdir -p "${APP_PKG_ROOT}/var/db/santa/migration" \
   "${APP_PKG_ROOT}/Library/LaunchDaemons" \
   "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/var/db/santa/migration/"
+if [[ "${LITE}" -eq 1 ]]; then
+  /bin/cp -vXR "${LITE_APP}" "${APP_PKG_ROOT}/var/db/santa/migration/"
+else
+  /bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/var/db/santa/migration/"
+fi
 /bin/cp -vX "${RELEASE_ROOT}/conf/migration.sh" "${APP_PKG_ROOT}/var/db/santa/migration/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.migration.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/com.northpolesec.santa-migration.plist"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"

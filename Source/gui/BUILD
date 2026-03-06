@@ -49,6 +49,7 @@ swift_library(
         ":SNTMessageView",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLiteDetector",
         "//Source/common:SNTXPCSyncServiceInterface",
     ],
 )
@@ -192,6 +193,7 @@ objc_library(
         "//Source/common:SNTDeviceEvent",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTKVOManager",
+        "//Source/common:SNTLiteDetector",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
