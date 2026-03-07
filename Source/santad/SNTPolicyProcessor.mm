@@ -309,7 +309,6 @@ static void UpdateCachedDecisionSigningInfo(
   cd.certSHA256 = csInfo.leafCertificate.SHA256;
   cd.certCommonName = csInfo.leafCertificate.commonName;
   cd.certChain = csInfo.certificates;
-  cd.platformBinary = csInfo.platformBinary;
   cd.rawSigningID = csInfo.signingID;
   // Check if we need to get teamID from code signing.
   if (!cd.teamID) {
@@ -360,14 +359,11 @@ static void UpdateCachedDecisionSigningInfo(
     entitlementsFilterCallback:
         (NSDictionary *_Nullable (^_Nullable)(NSDictionary *_Nullable entitlements))
             entitlementsFilterCallback {
-  SNTClientMode mode = configState.clientMode;
-
   // If the binary is a critical system binary, don't check its signature.
   // The binary was validated at startup when the rule table was initialized.
   SNTCachedDecision *systemCd = self.ruleTable.criticalSystemBinaries[cd.signingID];
-
   if (systemCd) {
-    systemCd.decisionClientMode = mode;
+    systemCd.decisionClientMode = configState.clientMode;
     return systemCd;
   }
 
@@ -375,7 +371,8 @@ static void UpdateCachedDecisionSigningInfo(
     cd.sha256 = fileInfo.SHA256;
   }
   cd.signingStatus = signingStatusCallback();
-  cd.decisionClientMode = mode;
+  cd.platformBinary = (platformBinaryState == PlatformBinaryState::kRuntimeTrue);
+  cd.decisionClientMode = configState.clientMode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
   NSError *csInfoError;
@@ -430,7 +427,7 @@ static void UpdateCachedDecisionSigningInfo(
     return cd;
   }
 
-  switch (mode) {
+  switch (configState.clientMode) {
     case SNTClientModeMonitor: cd.decision = SNTEventStateAllowUnknown; return cd;
     case SNTClientModeStandalone: cd.holdAndAsk = YES; [[fallthrough]];
     case SNTClientModeLockdown: cd.decision = SNTEventStateBlockUnknown; return cd;
