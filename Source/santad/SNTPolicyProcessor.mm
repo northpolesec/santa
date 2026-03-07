@@ -361,7 +361,7 @@ static void UpdateCachedDecisionSigningInfo(
             entitlementsFilterCallback {
   // If the binary is a critical system binary, don't check its signature.
   // The binary was validated at startup when the rule table was initialized.
-  SNTCachedDecision *systemCd = self.ruleTable.criticalSystemBinaries[cd.signingID];
+  SNTCachedDecision *systemCd = [self.ruleTable.criticalSystemBinaries[cd.signingID] copy];
   if (systemCd) {
     systemCd.decisionClientMode = configState.clientMode;
     return systemCd;
