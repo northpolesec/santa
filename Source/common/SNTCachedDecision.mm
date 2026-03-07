@@ -34,6 +34,25 @@
   return self;
 }
 
+- (instancetype)initWithCachedIdentity:(SNTCachedDecision *)previous {
+  self = [self init];
+  if (self) {
+    _sha256 = previous.sha256;
+    _cdhash = previous.cdhash;
+    _teamID = previous.teamID;
+    _signingID = previous.signingID;
+    _rawSigningID = previous.rawSigningID;
+    _certSHA256 = previous.certSHA256;
+    _certCommonName = previous.certCommonName;
+    _certChain = previous.certChain;
+    _entitlements = previous.entitlements;
+    _entitlementsFiltered = previous.entitlementsFiltered;
+    _secureSigningTime = previous.secureSigningTime;
+    _signingTime = previous.signingTime;
+  }
+  return self;
+}
+
 - (id)copyWithZone:(NSZone *)zone {
   SNTCachedDecision *copy = [[SNTCachedDecision alloc] initWithVnode:_vnodeId];
   copy.decision = _decision;

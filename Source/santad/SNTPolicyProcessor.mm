@@ -448,12 +448,7 @@ static void UpdateCachedDecisionSigningInfo(
   SNTCachedDecision *cd;
 
   if (existingDecision) {
-    cd = [existingDecision copy];
-    // Reset cacheable to its default. The cached decision always has
-    // cacheable=NO (that's what made it AllowNoCache), but re-evaluation may
-    // match a different, cacheable rule. Since nothing in the evaluation path
-    // ever sets cacheable back to YES, the stale NO would persist.
-    cd.cacheable = YES;
+    cd = [[SNTCachedDecision alloc] initWithCachedIdentity:existingDecision];
     // Derive entitlementsFilterTeamID from the cached decision. The cd.teamID
     // was originally set under the same guards used in the else branch
     // (CS_SIGNED, CS_VALID, signing_id exists, team_id exists), so a non-nil
