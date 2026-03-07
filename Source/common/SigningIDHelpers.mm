@@ -17,18 +17,22 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTLogging.h"
 
-NSString *FormatSigningID(MOLCodesignChecker *csc) {
-  if (!csc.signingID.length) {
+NSString *FormatSigningID(NSString *signingID, NSString *teamID, BOOL isPlatformBinary) {
+  if (!signingID.length) {
     return nil;
   }
 
-  if (!csc.teamID.length) {
-    if (csc.platformBinary) {
-      return [NSString stringWithFormat:@"%@:%@", @"platform", csc.signingID];
+  if (!teamID.length) {
+    if (isPlatformBinary) {
+      return [NSString stringWithFormat:@"%@:%@", @"platform", signingID];
     } else {
       return nil;
     }
   }
 
-  return [NSString stringWithFormat:@"%@:%@", csc.teamID, csc.signingID];
+  return [NSString stringWithFormat:@"%@:%@", teamID, signingID];
+}
+
+NSString *FormatSigningID(MOLCodesignChecker *csc) {
+  return FormatSigningID(csc.signingID, csc.teamID, csc.platformBinary);
 }
