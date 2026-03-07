@@ -112,7 +112,7 @@ bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision,
                         requestBinary);
 
     case SNTActionRespondAllowNoCache: {
-      CachedAuthResult entry = {SNTActionRespondAllowNoCache, GetCurrentUptime(), cd};
+      CachedAuthResult entry = {SNTActionRespondAllowNoCache, GetCurrentUptime(), [cd copy]};
       return cache->set(vnode_id, entry, requestBinary);
     }
 
