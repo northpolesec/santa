@@ -42,7 +42,6 @@ struct CachedAuthResult {
   bool operator==(const CachedAuthResult &rhs) const {
     return action == rhs.action && timestamp == rhs.timestamp;
   }
-  bool operator!=(const CachedAuthResult &rhs) const { return !(*this == rhs); }
 };
 
 enum class FlushCacheMode {
