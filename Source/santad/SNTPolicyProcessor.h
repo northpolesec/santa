@@ -63,7 +63,8 @@ using ActivationCallbackBlock =
                                      targetProcess:(nonnull const es_process_t *)targetProc
                                        configState:(nonnull SNTConfigState *)configState
                                 activationCallback:
-                                    (nullable ActivationCallbackBlock)activationCallback;
+                                    (nullable ActivationCallbackBlock)activationCallback
+                                    cachedDecision:(nullable SNTCachedDecision *)existingDecision;
 
 ///
 /// Updates a decision for a given file and agent configuration.
