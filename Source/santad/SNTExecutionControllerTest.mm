@@ -622,16 +622,39 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   cd.decision = SNTEventStateAllowSigningID;
   OCMStub([self.mockRuleDatabase criticalSystemBinaries]).andReturn(@{signingID : cd});
 
-  [self validateExecEvent:SNTActionRespondAllow
-             messageSetup:^(es_message_t *msg) {
-               msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
-               msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
-               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
-             }];
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
+  procExec.team_id = MakeESStringToken(kExampleTeamID);
+  procExec.signing_id = MakeESStringToken(kExampleSigningID);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  __block SNTCachedDecision *returnedCd = nil;
+  {
+    Message msg(mockESApi, &esMsg);
+    [self.sut validateExecEvent:msg
+                 cachedDecision:nil
+                     postAction:^bool(SNTAction action, SNTCachedDecision *resultCd) {
+                       XCTAssertEqual(action, SNTActionRespondAllow);
+                       returnedCd = resultCd;
+                       return true;
+                     }];
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   [self checkMetricCounters:kAllowSigningID expected:@1];
   [self checkMetricCounters:kAllowUnknown expected:@0];
 
-  XCTAssertEqual(cd.decisionClientMode, SNTClientModeLockdown);
+  // The returned cd should be a copy with the correct mode, not the shared dictionary entry.
+  XCTAssertEqual(returnedCd.decisionClientMode, SNTClientModeLockdown);
+  XCTAssertEqual(cd.decisionClientMode, SNTClientModeUnknown);
 }
 
 - (void)testDefaultDecision {
