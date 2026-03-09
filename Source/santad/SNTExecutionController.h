@@ -47,6 +47,8 @@ const static NSString *kBlockPrinterWorkaround = @"BlockPrinterWorkaround";
 const static NSString *kAllowNoFileInfo = @"AllowNoFileInfo";
 const static NSString *kDenyNoFileInfo = @"DenyNoFileInfo";
 const static NSString *kBlockLongPath = @"BlockLongPath";
+const static NSString *kBlockCELFallback = @"BlockCELFallback";
+const static NSString *kAllowCELFallback = @"AllowCELFallback";
 
 @class SNTCachedDecision;
 @class SNTEventTable;

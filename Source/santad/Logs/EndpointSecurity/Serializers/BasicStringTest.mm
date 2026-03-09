@@ -1408,6 +1408,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {SNTEventStateBlockScope, "DENY"},
       {SNTEventStateBlockTeamID, "DENY"},
       {SNTEventStateBlockLongPath, "DENY"},
+      {SNTEventStateBlockCELFallback, "DENY"},
       {SNTEventStateAllowUnknown, "ALLOW"},
       {SNTEventStateAllowBinary, "ALLOW"},
       {SNTEventStateAllowCertificate, "ALLOW"},
@@ -1418,6 +1419,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {SNTEventStateAllowTransitive, "ALLOW"},
       {SNTEventStateAllowPendingTransitive, "ALLOW"},
       {SNTEventStateAllowTeamID, "ALLOW"},
+      {SNTEventStateAllowCELFallback, "ALLOW"},
   };
 
   for (const auto &kv : stateToDecision) {
@@ -1441,6 +1443,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       case SNTEventStateBlockLongPath: want = "LONG_PATH"; break;
       case SNTEventStateBlockSigningID: want = "SIGNINGID"; break;
       case SNTEventStateBlockCDHash: want = "CDHASH"; break;
+      case SNTEventStateBlockCELFallback: want = "CEL_FALLBACK"; break;
       case SNTEventStateAllowUnknown: want = "UNKNOWN"; break;
       case SNTEventStateAllowBinary: want = "BINARY"; break;
       case SNTEventStateAllowCertificate: want = "CERT"; break;
@@ -1455,6 +1458,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       case SNTEventStateAllowLocalSigningID: want = "SIGNINGID"; break;
       case SNTEventStateAllowCompilerSigningID: want = "SIGNINGID"; break;
       case SNTEventStateAllowCompilerCDHash: want = "CDHASH"; break;
+      case SNTEventStateAllowCELFallback: want = "CEL_FALLBACK"; break;
       case SNTEventStateBlock: want = "UNKNOWN"; break;
       case SNTEventStateAllow: want = "UNKNOWN"; break;
     }

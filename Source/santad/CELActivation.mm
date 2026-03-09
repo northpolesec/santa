@@ -92,7 +92,7 @@ namespace santa {
 
 ActivationCallbackBlock CreateCELActivationBlock(
     const Message &esMsg, NSString *signingID, NSString *teamID, BOOL isPlatformBinary,
-    NSDate *signingTime, NSDate *secureSigningTime,
+    NSDate *signingTime, NSDate *secureSigningTime, NSDictionary *entitlementsDict,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
   std::shared_ptr<EndpointSecurityAPI> esApi = esMsg.ESAPI();
   NSString *formattedSigningID = FormatSigningID(signingID, teamID, isPlatformBinary);
@@ -115,6 +115,31 @@ ActivationCallbackBlock CreateCELActivationBlock(
       }
       if (secureSigningTime) {
         f->mutable_secure_signing_time()->set_seconds(secureSigningTime.timeIntervalSince1970);
+      }
+
+      if constexpr (IsV2) {
+        if (entitlementsDict) {
+          auto *entitlements = f->mutable_entitlements();
+          [entitlementsDict
+              enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
+                NSError *err;
+                NSData *jsonData;
+                @try {
+                  jsonData = [NSJSONSerialization dataWithJSONObject:value
+                                                             options:NSJSONWritingFragmentsAllowed
+                                                               error:&err];
+                } @catch (NSException *) {
+                }
+                if (!jsonData) {
+                  // Skip entitlements that can't be serialized to JSON.
+                  return;
+                }
+                NSString *jsonStr = [[NSString alloc] initWithData:jsonData
+                                                          encoding:NSUTF8StringEncoding];
+                (*entitlements)[santa::NSStringToUTF8String(key)] =
+                    santa::NSStringToUTF8String(jsonStr);
+              }];
+        }
       }
 
       return std::make_unique<santa::cel::Activation<IsV2>>(
@@ -150,7 +175,7 @@ ActivationCallbackBlock CreateCELActivationBlock(
     const Message &esMsg, MOLCodesignChecker *csInfo,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
   return CreateCELActivationBlock(esMsg, csInfo.signingID, csInfo.teamID, csInfo.platformBinary,
-                                  csInfo.signingTime, csInfo.secureSigningTime,
+                                  csInfo.signingTime, csInfo.secureSigningTime, csInfo.entitlements,
                                   std::move(processTree));
 }
 

@@ -17,6 +17,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 
+@class SNTCELFallbackRule;
 @class SNTExportConfiguration;
 @class SNTModeTransition;
 @class SNTSyncNetworkExtensionSettings;
@@ -324,6 +325,13 @@
 @property(nullable, readonly, nonatomic) NSArray<NSString *> *telemetryFilterExpressions;
 
 ///
+///  CEL rules evaluated as fallback when no rules match, before scope checks.
+///
+///  @note: This property is KVO compliant.
+///
+@property(nullable, readonly, nonatomic) NSArray<SNTCELFallbackRule *> *celFallbackRules;
+
+///
 ///  If set, contains the filesystem access policy configuration.
 ///
 ///  @note: The property fileAccessPolicyPlist will be ignored if
@@ -418,6 +426,11 @@
 ///  Set the telemetry filter expressions as received from a sync server.
 ///
 - (void)setSyncServerTelemetryFilterExpressions:(nullable NSArray<NSString *> *)expressions;
+
+///
+///  Set the CEL fallback expressions as received from a sync server.
+///
+- (void)setSyncServerCELFallbackRules:(nullable NSArray<SNTCELFallbackRule *> *)rules;
 
 #pragma mark - GUI Settings
 

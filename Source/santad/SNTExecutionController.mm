@@ -86,6 +86,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     case SNTEventStateBlockTeamID: return SNTEventStateAllowTeamID;
     case SNTEventStateBlockSigningID: return SNTEventStateAllowSigningID;
     case SNTEventStateBlockCDHash: return SNTEventStateAllowCDHash;
+    case SNTEventStateBlockCELFallback: return SNTEventStateAllowCELFallback;
     case SNTEventStateBlockLongPath: return SNTEventStateAllowUnknown;  // No direct equivalent
     default: return SNTEventStateAllowUnknown;
   }
@@ -173,6 +174,8 @@ static NSString *const kPrinterProxy =
     case SNTEventStateAllowCompilerSigningID: eventTypeStr = kAllowCompilerSigningID; break;
     case SNTEventStateAllowTransitive: eventTypeStr = kAllowTransitive; break;
     case SNTEventStateBlockLongPath: eventTypeStr = kBlockLongPath; break;
+    case SNTEventStateBlockCELFallback: eventTypeStr = kBlockCELFallback; break;
+    case SNTEventStateAllowCELFallback: eventTypeStr = kAllowCELFallback; break;
     default: eventTypeStr = kUnknownEventState; break;
   }
 
@@ -264,12 +267,13 @@ static NSString *const kPrinterProxy =
   // When re-evaluating with a cached decision, use the pre-computed signing
   // metadata to avoid expensive codesign verification.
   ActivationCallbackBlock activationBlock =
-      existingDecision ? santa::CreateCELActivationBlock(
-                             esMsg, existingDecision.rawSigningID, existingDecision.teamID,
-                             existingDecision.platformBinary, existingDecision.signingTime,
-                             existingDecision.secureSigningTime, _processTree)
-                       : santa::CreateCELActivationBlock(
-                             esMsg, [binInfo codesignCheckerWithError:NULL], _processTree);
+      existingDecision
+          ? santa::CreateCELActivationBlock(
+                esMsg, existingDecision.rawSigningID, existingDecision.teamID,
+                existingDecision.platformBinary, existingDecision.signingTime,
+                existingDecision.secureSigningTime, existingDecision.rawEntitlements, _processTree)
+          : santa::CreateCELActivationBlock(esMsg, [binInfo codesignCheckerWithError:NULL],
+                                            _processTree);
 
   SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo
                                                       targetProcess:targetProc

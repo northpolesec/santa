@@ -186,6 +186,7 @@
 
       cd.cdhash = csc.cdhash;
 
+      cd.rawEntitlements = csc.entitlements;
       cd.entitlements = entitlementsFilter->Filter(
           csc.platformBinary ? santa::kPlatformTeamID.UTF8String : csc.teamID.UTF8String,
           csc.entitlements);
