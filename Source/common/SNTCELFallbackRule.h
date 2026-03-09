@@ -1,0 +1,36 @@
+/// Copyright 2026 North Pole Security, Inc.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///     https://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
+#import <Foundation/Foundation.h>
+
+///
+///  Represents a CEL fallback rule evaluated when no other rules match.
+///
+@interface SNTCELFallbackRule : NSObject <NSSecureCoding>
+
+/// The CEL expression to evaluate. Required.
+@property(readonly, copy) NSString *celExpr;
+
+/// Optional custom message shown in the block notification modal.
+@property(readonly, copy) NSString *customMsg;
+
+/// Optional custom URL for the "Open" button in the block notification.
+/// Supports the same format values as EventDetailURL.
+@property(readonly, copy) NSString *customURL;
+
+- (instancetype)initWithCELExpr:(NSString *)celExpr
+                      customMsg:(NSString *)customMsg
+                      customURL:(NSString *)customURL;
+
+@end

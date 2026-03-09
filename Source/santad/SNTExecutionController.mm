@@ -270,7 +270,7 @@ static NSString *const kPrinterProxy =
       existingDecision ? santa::CreateCELActivationBlock(
                              esMsg, existingDecision.rawSigningID, existingDecision.teamID,
                              existingDecision.platformBinary, existingDecision.signingTime,
-                             existingDecision.secureSigningTime, _processTree)
+                             existingDecision.secureSigningTime, nil, _processTree)
                        : santa::CreateCELActivationBlock(
                              esMsg, [binInfo codesignCheckerWithError:NULL], _processTree);
 

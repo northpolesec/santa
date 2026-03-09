@@ -447,12 +447,16 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
       SLOGW(@"Received %d CEL fallback rules, only the first 10 will be used", count);
       count = 10;
     }
+    SLOGD(@"Received %d CEL fallback rule(s)", count);
     NSMutableArray<SNTCELFallbackRule *> *rules = [NSMutableArray arrayWithCapacity:count];
     for (int i = 0; i < count; i++) {
       const auto &rule = resp.cel_fallback_rules(i);
+      NSString *celExpr = StringToNSString(rule.cel_expr());
       NSString *customMsg = !rule.custom_msg().empty() ? StringToNSString(rule.custom_msg()) : nil;
       NSString *customURL = !rule.custom_url().empty() ? StringToNSString(rule.custom_url()) : nil;
-      [rules addObject:[[SNTCELFallbackRule alloc] initWithCELExpr:StringToNSString(rule.cel_expr())
+      SLOGD(@"CEL fallback rule %d: expr='%@' customMsg='%@' customURL='%@'", i, celExpr, customMsg,
+            customURL);
+      [rules addObject:[[SNTCELFallbackRule alloc] initWithCELExpr:celExpr
                                                          customMsg:customMsg
                                                          customURL:customURL]];
     }

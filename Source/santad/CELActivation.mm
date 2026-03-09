@@ -92,7 +92,7 @@ namespace santa {
 
 ActivationCallbackBlock CreateCELActivationBlock(
     const Message &esMsg, NSString *signingID, NSString *teamID, BOOL isPlatformBinary,
-    NSDate *signingTime, NSDate *secureSigningTime,
+    NSDate *signingTime, NSDate *secureSigningTime, NSDictionary *entitlementsDict,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
   std::shared_ptr<EndpointSecurityAPI> esApi = esMsg.ESAPI();
   NSString *formattedSigningID = FormatSigningID(signingID, teamID, isPlatformBinary);
@@ -118,9 +118,9 @@ ActivationCallbackBlock CreateCELActivationBlock(
       }
 
       if constexpr (IsV2) {
-        if (csInfo && csInfo.entitlements) {
+        if (entitlementsDict) {
           auto *entitlements = f->mutable_entitlements();
-          [csInfo.entitlements
+          [entitlementsDict
               enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
                 NSError *err;
                 NSData *jsonData;
@@ -175,7 +175,7 @@ ActivationCallbackBlock CreateCELActivationBlock(
     const Message &esMsg, MOLCodesignChecker *csInfo,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
   return CreateCELActivationBlock(esMsg, csInfo.signingID, csInfo.teamID, csInfo.platformBinary,
-                                  csInfo.signingTime, csInfo.secureSigningTime,
+                                  csInfo.signingTime, csInfo.secureSigningTime, csInfo.entitlements,
                                   std::move(processTree));
 }
 
