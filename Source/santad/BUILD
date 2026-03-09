@@ -247,6 +247,7 @@ objc_library(
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTCELFallbackRule",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigState",
@@ -272,6 +273,7 @@ santa_unit_test(
     srcs = ["SNTPolicyProcessorTest.mm"],
     deps = [
         ":SNTPolicyProcessor",
+        "//Source/common:SNTCELFallbackRule",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTRule",
@@ -1025,6 +1027,7 @@ objc_library(
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:Pinning",
+        "//Source/common:SNTCELFallbackRule",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",

@@ -14,6 +14,7 @@
 
 #import <Foundation/Foundation.h>
 
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
@@ -46,7 +47,7 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
-@property NSArray<NSString *> *celFallbackExpressions;
+@property NSArray<SNTCELFallbackRule *> *celFallbackRules;
 @end
 
 SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState) {
@@ -84,7 +85,7 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.fileAccessEventDetailText = syncState.fileAccessEventDetailText;
   bundle.networkExtensionSettings = syncState.networkExtensionSettings;
   bundle.telemetryFilterExpressions = syncState.telemetryFilterExpressions;
-  bundle.celFallbackExpressions = syncState.celFallbackExpressions;
+  bundle.celFallbackRules = syncState.celFallbackRules;
 
   bundle.fullSyncLastSuccess = [NSDate now];
 

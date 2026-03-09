@@ -23,6 +23,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
 #include "Source/common/Pinning.h"
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -478,8 +479,8 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerTelemetryFilterExpressions:val];
   }];
 
-  [result celFallbackExpressions:^(NSArray<NSString *> *val) {
-    [configurator setSyncServerCELFallbackExpressions:val];
+  [result celFallbackRules:^(NSArray<SNTCELFallbackRule *> *val) {
+    [configurator setSyncServerCELFallbackRules:val];
   }];
 
   [result eventDetailURL:^(NSString *val) {

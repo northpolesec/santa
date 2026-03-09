@@ -16,6 +16,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 
+@class SNTCELFallbackRule;
 @class SNTExportConfiguration;
 @class SNTModeTransition;
 @class SNTSyncNetworkExtensionSettings;
@@ -49,6 +50,6 @@
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block;
 - (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block;
 - (void)telemetryFilterExpressions:(void (^)(NSArray<NSString *> *))block;
-- (void)celFallbackExpressions:(void (^)(NSArray<NSString *> *))block;
+- (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule *> *))block;
 
 @end

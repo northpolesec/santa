@@ -15,6 +15,7 @@
 #import "Source/common/SNTConfigBundle.h"
 
 #import "Source/common/CoderMacros.h"
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
@@ -46,7 +47,7 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
-@property NSArray<NSString *> *celFallbackExpressions;
+@property NSArray<SNTCELFallbackRule *> *celFallbackRules;
 @end
 
 @implementation SNTConfigBundle
@@ -82,7 +83,7 @@
   ENCODE(coder, networkExtensionSettings);
   ENCODE(coder, pushTokenChain);
   ENCODE(coder, telemetryFilterExpressions);
-  ENCODE(coder, celFallbackExpressions);
+  ENCODE(coder, celFallbackRules);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -114,7 +115,7 @@
     DECODE(decoder, networkExtensionSettings, SNTSyncNetworkExtensionSettings);
     DECODE_ARRAY(decoder, pushTokenChain, NSString);
     DECODE_ARRAY(decoder, telemetryFilterExpressions, NSString);
-    DECODE_ARRAY(decoder, celFallbackExpressions, NSString);
+    DECODE_ARRAY(decoder, celFallbackRules, SNTCELFallbackRule);
   }
   return self;
 }
@@ -274,9 +275,9 @@
   }
 }
 
-- (void)celFallbackExpressions:(void (^)(NSArray<NSString *> *))block {
-  if (self.celFallbackExpressions) {
-    block(self.celFallbackExpressions);
+- (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule *> *))block {
+  if (self.celFallbackRules) {
+    block(self.celFallbackRules);
   }
 }
 

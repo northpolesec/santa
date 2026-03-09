@@ -22,6 +22,7 @@
 #include "Source/common/Pinning.h"
 
 #import "Source/common/NKeyTokenValidator.h"
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTModeTransition.h"
@@ -201,7 +202,7 @@ static NSString *const kEnableNATS =
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
 static NSString *const kTelemetryFilterExpressionsKey = @"TelemetryFilterExpressions";
-static NSString *const kCELFallbackExpressionsKey = @"CELFallbackExpressions";
+static NSString *const kCELFallbackRulesKey = @"CELFallbackRules";
 
 static NSString *const kOnStartUSBOptions = @"OnStartUSBOptions";
 
@@ -296,7 +297,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kNetworkExtensionSettingsKey : data,
       kPushTokenChainKey : array,
       kTelemetryFilterExpressionsKey : array,
-      kCELFallbackExpressionsKey : array,
+      kCELFallbackRulesKey : data,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
       kFileAccessEventDetailURLKey : string,
@@ -823,7 +824,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self syncAndConfigStateSet];
 }
 
-+ (NSSet *)keyPathsForValuesAffectingCelFallbackExpressions {
++ (NSSet *)keyPathsForValuesAffectingCelFallbackRules {
   return [self syncStateSet];
 }
 
@@ -1884,12 +1885,34 @@ static SNTConfigurator *sharedConfigurator = nil;
                         value:EnsureArrayOfStrings(expressions)];
 }
 
-- (NSArray *)celFallbackExpressions {
-  return EnsureArrayOfStrings(self.syncState[kCELFallbackExpressionsKey]);
+- (NSArray<SNTCELFallbackRule *> *)celFallbackRules {
+  NSData *data = self.syncState[kCELFallbackRulesKey];
+  if (![data isKindOfClass:[NSData class]]) {
+    return nil;
+  }
+  NSError *error;
+  NSSet *classes = [NSSet setWithObjects:[NSArray class], [SNTCELFallbackRule class], nil];
+  NSArray *rules = [NSKeyedUnarchiver unarchivedObjectOfClasses:classes fromData:data error:&error];
+  if (error) {
+    LOGE(@"Failed to deserialize CEL fallback rules: %@", error);
+    return nil;
+  }
+  return rules;
 }
 
-- (void)setSyncServerCELFallbackExpressions:(NSArray<NSString *> *)expressions {
-  [self updateSyncStateForKey:kCELFallbackExpressionsKey value:EnsureArrayOfStrings(expressions)];
+- (void)setSyncServerCELFallbackRules:(NSArray<SNTCELFallbackRule *> *)rules {
+  NSData *data = nil;
+  if (rules) {
+    NSError *error;
+    data = [NSKeyedArchiver archivedDataWithRootObject:rules
+                                 requiringSecureCoding:YES
+                                                 error:&error];
+    if (error) {
+      LOGE(@"Failed to serialize CEL fallback rules: %@", error);
+      return;
+    }
+  }
+  [self updateSyncStateForKey:kCELFallbackRulesKey value:data];
 }
 
 - (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {

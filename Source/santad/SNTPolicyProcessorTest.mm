@@ -17,6 +17,7 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -68,7 +69,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)tearDown {
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[]];
 }
 
 - (void)testRule:(SNTRule *)rule
@@ -1045,8 +1046,14 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   };
 }
 
+- (SNTCELFallbackRule *)ruleWithExpr:(NSString *)expr {
+  return [[SNTCELFallbackRule alloc] initWithCELExpr:expr customMsg:nil customURL:nil];
+}
+
 - (void)testCELFallbackExpressionAllow {
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[ @"ALLOWLIST" ]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1058,7 +1065,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackExpressionBlock {
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[ @"BLOCKLIST" ]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"BLOCKLIST"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1070,7 +1079,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackExpressionSilentBlock {
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[ @"SILENT_BLOCKLIST" ]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"SILENT_BLOCKLIST"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1083,8 +1094,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackUnspecifiedSkipsToNext {
-  [[SNTConfigurator configurator]
-      setSyncServerCELFallbackExpressions:@[ @"UNSPECIFIED", @"ALLOWLIST" ]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"UNSPECIFIED"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1096,8 +1109,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackAllUnspecifiedFallsThrough {
-  [[SNTConfigurator configurator]
-      setSyncServerCELFallbackExpressions:@[ @"UNSPECIFIED", @"UNSPECIFIED" ]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"UNSPECIFIED"],
+    [self ruleWithExpr:@"UNSPECIFIED"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1108,8 +1123,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackFirstMatchWins {
-  [[SNTConfigurator configurator]
-      setSyncServerCELFallbackExpressions:@[ @"BLOCKLIST", @"ALLOWLIST" ]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"BLOCKLIST"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1120,8 +1137,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
 }
 
-- (void)testCELFallbackEmptyExpressionsReturnNO {
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[]];
+- (void)testCELFallbackEmptyRulesReturnNO {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1132,8 +1149,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackWithTargetField {
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[
-    @"target.signing_id == 'ZMCG7MLDV9:com.example.testbinary' ? ALLOWLIST : UNSPECIFIED"
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self
+        ruleWithExpr:
+            @"target.signing_id == 'ZMCG7MLDV9:com.example.testbinary' ? ALLOWLIST : UNSPECIFIED"],
   ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
@@ -1146,9 +1165,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackUncacheableFieldsAreAvailable {
-  // The full activation (including args) is passed through to fallback expressions.
-  [[SNTConfigurator configurator]
-      setSyncServerCELFallbackExpressions:@[ @"size(args) > 0 ? BLOCKLIST : UNSPECIFIED" ]];
+  // The full activation (including args) is passed through to fallback rules.
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"size(args) > 0 ? BLOCKLIST : UNSPECIFIED"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1161,8 +1181,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackInvalidExpressionSkipped {
-  [[SNTConfigurator configurator]
-      setSyncServerCELFallbackExpressions:@[ @"this is invalid !!!", @"ALLOWLIST" ]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"this is invalid !!!"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
@@ -1173,12 +1195,32 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackNilActivationCallbackReturnNO {
-  [[SNTConfigurator configurator] setSyncServerCELFallbackExpressions:@[ @"ALLOWLIST" ]];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
   SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled = [self.processor evaluateCELFallbackExpressions:cd activationCallback:nil];
   XCTAssertFalse(handled);
+}
+
+- (void)testCELFallbackCustomMsgAndURL {
+  SNTCELFallbackRule *rule =
+      [[SNTCELFallbackRule alloc] initWithCELExpr:@"BLOCKLIST"
+                                        customMsg:@"Custom block message"
+                                        customURL:@"https://example.com/details"];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[ rule ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
+  XCTAssertEqualObjects(cd.customMsg, @"Custom block message");
+  XCTAssertEqualObjects(cd.customURL, @"https://example.com/details");
 }
 
 @end

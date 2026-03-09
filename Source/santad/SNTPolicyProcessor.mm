@@ -23,6 +23,7 @@
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeepCopy.h"
@@ -68,16 +69,21 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   std::unique_ptr<santa::cel::Evaluator<false>> celEvaluatorV1_;
   std::unique_ptr<santa::cel::Evaluator<true>> celEvaluatorV2_;
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter_;
-  // Arena used for constant folding during compilation of fallback expressions.
-  // Declared before celFallbackExpressions_ so that C++ reverse destruction
-  // order destroys expressions first, then the arena they reference.
+  // Arena used for constant folding during compilation of fallback rules.
+  // Declared before celFallbackRules_ so that C++ reverse destruction
+  // order destroys rules first, then the arena they reference.
   std::shared_ptr<google::protobuf::Arena> celFallbackArena_;
-  std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> celFallbackExpressions_;
+  struct CompiledFallbackRule {
+    std::shared_ptr<::google::api::expr::runtime::CelExpression> expression;
+    NSString *customMsg;
+    NSString *customURL;
+  };
+  std::vector<CompiledFallbackRule> celFallbackRules_;
 }
 @property SNTRuleTable *ruleTable;
 @property SNTConfigurator *configurator;
 @property dispatch_queue_t celFallbackQueue;
-@property SNTKVOManager *celFallbackExpressionsObserver;
+@property SNTKVOManager *celFallbackRulesObserver;
 @end
 
 @implementation SNTPolicyProcessor
@@ -103,20 +109,20 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
            std::string(evaluatorV2.status().message()).c_str());
     }
 
-    celFallbackQueue_ =
+    _celFallbackQueue =
         dispatch_queue_create("com.northpolesec.santa.cel_fallback", DISPATCH_QUEUE_SERIAL);
 
-    // Pre-compile any existing fallback expressions
-    [self compileFallbackExpressions:_configurator.celFallbackExpressions];
+    // Pre-compile any existing fallback rules
+    [self compileFallbackRules:_configurator.celFallbackRules];
 
-    // Observe changes to fallback expressions
+    // Observe changes to fallback rules
     __weak __typeof(self) weakSelf = self;
-    celFallbackExpressionsObserver_ =
+    _celFallbackRulesObserver =
         [[SNTKVOManager alloc] initWithObject:_configurator
-                                     selector:@selector(celFallbackExpressions)
+                                     selector:@selector(celFallbackRules)
                                          type:[NSArray class]
                                      callback:^(id oldValue, id newValue) {
-                                       [weakSelf compileFallbackExpressions:(NSArray *)newValue];
+                                       [weakSelf compileFallbackRules:(NSArray *)newValue];
                                      }];
   }
   return self;
@@ -132,29 +138,30 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   return self;
 }
 
-- (void)compileFallbackExpressions:(NSArray<NSString *> *)expressions {
+- (void)compileFallbackRules:(NSArray<SNTCELFallbackRule *> *)rules {
   if (!celEvaluatorV2_) {
     return;
   }
 
-  if (expressions.count > 10) {
-    LOGE(@"Number of CEL fallback expressions is above the limit of 10");
-    compileFailed = true;
+  if (rules.count > 10) {
+    LOGE(@"Number of CEL fallback rules is above the limit of 10");
     return;
   }
 
-  // Create a fresh arena for this batch of compiled expressions.
+  // Create a fresh arena for this batch of compiled rules.
   // The arena must outlive the compiled plans since constant folding stores
   // data on it.
   __block auto arena = std::make_shared<google::protobuf::Arena>();
-  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled(expressions.count);
+  __block std::vector<CompiledFallbackRule> compiled;
+  compiled.reserve(rules.count);
   bool compileFailed = false;
-  for (NSString *expr in expressions) {
-    auto result = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(expr), arena.get());
+  for (SNTCELFallbackRule *rule in rules) {
+    auto result =
+        celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), arena.get());
     if (result.ok()) {
-      compiled.push_back(std::move(*result));
+      compiled.push_back({std::move(*result), rule.customMsg, rule.customURL});
     } else {
-      LOGE(@"Failed to compile CEL fallback expression '%@': %s", expr,
+      LOGE(@"Failed to compile CEL fallback expression '%@': %s", rule.celExpr,
            std::string(result.status().message()).c_str());
       compileFailed = true;
       break;
@@ -166,8 +173,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   }
 
   dispatch_sync(self.celFallbackQueue, ^{
-    // Release old expressions before the old arena (order matters).
-    celFallbackExpressions_ = std::move(compiled);
+    // Release old rules before the old arena (order matters).
+    celFallbackRules_ = std::move(compiled);
     celFallbackArena_ = std::move(arena);
   });
 }
@@ -178,31 +185,31 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     return NO;
   }
 
-  // Snapshot the compiled expressions and arena under the lock so their
-  // lifetimes extend through evaluation even if compileFallbackExpressions
+  // Snapshot the compiled rules and arena under the lock so their
+  // lifetimes extend through evaluation even if compileFallbackRules
   // swaps them concurrently.
-  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> expressions;
+  __block std::vector<CompiledFallbackRule> rules;
   __block std::shared_ptr<google::protobuf::Arena> arenaRef;
   dispatch_sync(self.celFallbackQueue, ^{
-    expressions = celFallbackExpressions_;
+    rules = celFallbackRules_;
     arenaRef = celFallbackArena_;
   });
 
-  if (expressions.empty()) {
+  if (rules.empty()) {
     return NO;
   }
 
-  LOGD(@"Evaluating %zu CEL fallback expression(s) for sha256=%@", expressions.size(), cd.sha256);
+  LOGD(@"Evaluating %zu CEL fallback rule(s) for sha256=%@", rules.size(), cd.sha256);
 
   auto activation = activationCallback(/*useV2=*/true);
 
   // Use a stack-local arena for evaluation temporaries.
   google::protobuf::Arena evalArena;
 
-  for (size_t i = 0; i < expressions.size(); ++i) {
-    LOGD(@"Evaluating CEL fallback expression %zu", i);
+  for (size_t i = 0; i < rules.size(); ++i) {
+    LOGD(@"Evaluating CEL fallback rule %zu", i);
 
-    CELEvaluationResult celResult = [self evaluateCompiledCELExpression:expressions[i].get()
+    CELEvaluationResult celResult = [self evaluateCompiledCELExpression:rules[i].expression.get()
                                                                   useV2:true
                                                          cachedDecision:cd
                                                              activation:*activation
@@ -219,10 +226,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
                    celResult.resultState == SNTRuleStateAllowTransitive)
                       ? SNTEventStateAllowCELFallback
                       : SNTEventStateBlockCELFallback;
+    cd.customMsg = rules[i].customMsg;
+    cd.customURL = rules[i].customURL;
     return YES;
   }
 
-  LOGD(@"All CEL fallback expressions exhausted without a decision for sha256=%@", cd.sha256);
+  LOGD(@"All CEL fallback rules exhausted without a decision for sha256=%@", cd.sha256);
   return NO;
 }
 
