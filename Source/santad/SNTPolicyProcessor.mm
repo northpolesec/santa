@@ -223,7 +223,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     }
 
     cd.decision = (celResult.resultState == SNTRuleStateAllow ||
-                   celResult.resultState == SNTRuleStateAllowTransitive)
+                   celResult.resultState == SNTRuleStateAllowCompiler)
                       ? SNTEventStateAllowCELFallback
                       : SNTEventStateBlockCELFallback;
     cd.customMsg = rules[i].customMsg;
