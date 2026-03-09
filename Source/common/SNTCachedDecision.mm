@@ -46,6 +46,7 @@
     _certCommonName = previous.certCommonName;
     _certChain = previous.certChain;
     _entitlements = previous.entitlements;
+    _rawEntitlements = previous.rawEntitlements;
     _entitlementsFiltered = previous.entitlementsFiltered;
     _secureSigningTime = previous.secureSigningTime;
     _signingTime = previous.signingTime;
@@ -67,6 +68,7 @@
   copy.rawSigningID = _rawSigningID;
   copy.cdhash = _cdhash;
   copy.entitlements = _entitlements;
+  copy.rawEntitlements = _rawEntitlements;
   copy.entitlementsFiltered = _entitlementsFiltered;
   copy.platformBinary = _platformBinary;
   copy.codesigningFlags = _codesigningFlags;

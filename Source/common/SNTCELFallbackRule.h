@@ -33,4 +33,7 @@
                       customMsg:(NSString *)customMsg
                       customURL:(NSString *)customURL;
 
++ (NSData *)serializeArray:(NSArray<SNTCELFallbackRule *> *)rules;
++ (NSArray<SNTCELFallbackRule *> *)deserializeArray:(NSData *)data;
+
 @end

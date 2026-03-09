@@ -514,12 +514,13 @@ static void UpdateCachedDecisionSigningInfo(
   }
 
   NSDictionary *entitlements = csInfo.entitlements;
+  cd.rawEntitlements = [entitlements sntDeepCopy];
 
   if (entitlementsFilterCallback) {
     cd.entitlements = entitlementsFilterCallback(entitlements);
     cd.entitlementsFiltered = (cd.entitlements.count != entitlements.count);
   } else {
-    cd.entitlements = [entitlements sntDeepCopy];
+    cd.entitlements = cd.rawEntitlements;
     cd.entitlementsFiltered = NO;
   }
 

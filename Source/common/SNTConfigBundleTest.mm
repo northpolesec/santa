@@ -48,6 +48,7 @@
 @property NSNumber *enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
+@property NSArray<SNTCELFallbackRule *> *celFallbackRules;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase

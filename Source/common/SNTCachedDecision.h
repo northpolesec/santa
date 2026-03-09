@@ -50,6 +50,7 @@
 @property NSString *rawSigningID;
 @property NSString *cdhash;
 @property NSDictionary *entitlements;
+@property NSDictionary *rawEntitlements;
 @property BOOL entitlementsFiltered;
 @property BOOL platformBinary;
 @property uint32_t codesigningFlags;

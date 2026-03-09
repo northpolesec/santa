@@ -1886,33 +1886,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (NSArray<SNTCELFallbackRule *> *)celFallbackRules {
-  NSData *data = self.syncState[kCELFallbackRulesKey];
-  if (![data isKindOfClass:[NSData class]]) {
-    return nil;
-  }
-  NSError *error;
-  NSSet *classes = [NSSet setWithObjects:[NSArray class], [SNTCELFallbackRule class], nil];
-  NSArray *rules = [NSKeyedUnarchiver unarchivedObjectOfClasses:classes fromData:data error:&error];
-  if (error) {
-    LOGE(@"Failed to deserialize CEL fallback rules: %@", error);
-    return nil;
-  }
-  return rules;
+  return [SNTCELFallbackRule deserializeArray:self.syncState[kCELFallbackRulesKey]];
 }
 
 - (void)setSyncServerCELFallbackRules:(NSArray<SNTCELFallbackRule *> *)rules {
-  NSData *data = nil;
-  if (rules) {
-    NSError *error;
-    data = [NSKeyedArchiver archivedDataWithRootObject:rules
-                                 requiringSecureCoding:YES
-                                                 error:&error];
-    if (error) {
-      LOGE(@"Failed to serialize CEL fallback rules: %@", error);
-      return;
-    }
-  }
-  [self updateSyncStateForKey:kCELFallbackRulesKey value:data];
+  [self updateSyncStateForKey:kCELFallbackRulesKey value:[SNTCELFallbackRule serializeArray:rules]];
 }
 
 - (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {

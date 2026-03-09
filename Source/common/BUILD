@@ -643,6 +643,7 @@ objc_library(
     ],
     deps = [
         ":CoderMacros",
+        ":SNTLogging",
     ],
 )
 

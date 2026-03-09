@@ -267,12 +267,13 @@ static NSString *const kPrinterProxy =
   // When re-evaluating with a cached decision, use the pre-computed signing
   // metadata to avoid expensive codesign verification.
   ActivationCallbackBlock activationBlock =
-      existingDecision ? santa::CreateCELActivationBlock(
-                             esMsg, existingDecision.rawSigningID, existingDecision.teamID,
-                             existingDecision.platformBinary, existingDecision.signingTime,
-                             existingDecision.secureSigningTime, nil, _processTree)
-                       : santa::CreateCELActivationBlock(
-                             esMsg, [binInfo codesignCheckerWithError:NULL], _processTree);
+      existingDecision
+          ? santa::CreateCELActivationBlock(
+                esMsg, existingDecision.rawSigningID, existingDecision.teamID,
+                existingDecision.platformBinary, existingDecision.signingTime,
+                existingDecision.secureSigningTime, existingDecision.rawEntitlements, _processTree)
+          : santa::CreateCELActivationBlock(esMsg, [binInfo codesignCheckerWithError:NULL],
+                                            _processTree);
 
   SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo
                                                       targetProcess:targetProc

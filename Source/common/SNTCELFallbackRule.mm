@@ -15,6 +15,7 @@
 #import "Source/common/SNTCELFallbackRule.h"
 
 #import "Source/common/CoderMacros.h"
+#import "Source/common/SNTLogging.h"
 
 @interface SNTCELFallbackRule ()
 @property(readwrite, copy) NSString *celExpr;
@@ -54,6 +55,35 @@
     DECODE(decoder, customURL, NSString);
   }
   return self;
+}
+
++ (NSData *)serializeArray:(NSArray<SNTCELFallbackRule *> *)rules {
+  if (!rules) {
+    return nil;
+  }
+  NSError *error;
+  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:rules
+                                       requiringSecureCoding:YES
+                                                       error:&error];
+  if (error) {
+    LOGE(@"CEL fallback rules serialization failed: %@", error.localizedDescription);
+    return nil;
+  }
+  return data;
+}
+
++ (NSArray<SNTCELFallbackRule *> *)deserializeArray:(NSData *)data {
+  if (!data) {
+    return nil;
+  }
+  NSError *error;
+  NSSet *classes = [NSSet setWithObjects:[NSArray class], [SNTCELFallbackRule class], nil];
+  NSArray *rules = [NSKeyedUnarchiver unarchivedObjectOfClasses:classes fromData:data error:&error];
+  if (error) {
+    LOGE(@"CEL fallback rules deserialization failed: %@", error.localizedDescription);
+    return nil;
+  }
+  return rules;
 }
 
 @end
