@@ -49,6 +49,7 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
+@property NSArray<NSString *> *celFallbackExpressions;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -86,6 +87,7 @@
   XCTAssertNil(bundle.eventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
   XCTAssertNil(bundle.telemetryFilterExpressions);
+  XCTAssertNil(bundle.celFallbackExpressions);
 }
 
 - (void)testPostflightConfigBundle {
@@ -182,6 +184,7 @@
   XCTAssertNil(bundle.networkExtensionSettings);
   XCTAssertNil(bundle.pushTokenChain);
   XCTAssertNil(bundle.telemetryFilterExpressions);
+  XCTAssertNil(bundle.celFallbackExpressions);
 }
 
 - (void)testSyncTypeConfigBundle {
@@ -220,6 +223,7 @@
   XCTAssertNil(bundle.networkExtensionSettings);
   XCTAssertNil(bundle.pushTokenChain);
   XCTAssertNil(bundle.telemetryFilterExpressions);
+  XCTAssertNil(bundle.celFallbackExpressions);
 }
 
 @end

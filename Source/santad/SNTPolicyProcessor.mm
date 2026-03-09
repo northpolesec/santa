@@ -73,11 +73,11 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // order destroys expressions first, then the arena they reference.
   std::shared_ptr<google::protobuf::Arena> celFallbackArena_;
   std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> celFallbackExpressions_;
-  dispatch_queue_t celFallbackQueue_;
-  SNTKVOManager *celFallbackExpressionsObserver_;
 }
 @property SNTRuleTable *ruleTable;
 @property SNTConfigurator *configurator;
+@property dispatch_queue_t celFallbackQueue;
+@property SNTKVOManager *celFallbackExpressionsObserver;
 @end
 
 @implementation SNTPolicyProcessor
@@ -137,11 +137,17 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     return;
   }
 
+  if (expressions.count > 10) {
+    LOGE(@"Number of CEL fallback expressions is above the limit of 10");
+    compileFailed = true;
+    return;
+  }
+
   // Create a fresh arena for this batch of compiled expressions.
   // The arena must outlive the compiled plans since constant folding stores
   // data on it.
   __block auto arena = std::make_shared<google::protobuf::Arena>();
-  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled;
+  __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> compiled(expressions.count);
   bool compileFailed = false;
   for (NSString *expr in expressions) {
     auto result = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(expr), arena.get());
@@ -159,7 +165,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     return;
   }
 
-  dispatch_sync(celFallbackQueue_, ^{
+  dispatch_sync(self.celFallbackQueue, ^{
     // Release old expressions before the old arena (order matters).
     celFallbackExpressions_ = std::move(compiled);
     celFallbackArena_ = std::move(arena);
@@ -177,7 +183,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   // swaps them concurrently.
   __block std::vector<std::shared_ptr<::google::api::expr::runtime::CelExpression>> expressions;
   __block std::shared_ptr<google::protobuf::Arena> arenaRef;
-  dispatch_sync(celFallbackQueue_, ^{
+  dispatch_sync(self.celFallbackQueue, ^{
     expressions = celFallbackExpressions_;
     arenaRef = celFallbackArena_;
   });
@@ -278,7 +284,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
         LOGD(@"CEL expression returned UNSPECIFIED, skipping");
         return {.succeeded = false, .decisionMade = false, .resultState = {}};
       case ReturnValue::ALLOWLIST: resultState = SNTRuleStateAllow; break;
-      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowTransitive; break;
+      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowCompiler; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
       case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
       case ReturnValue::REQUIRE_TOUCHID_ONLY:
@@ -303,7 +309,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     using ReturnValue = santa::cel::CELProtoTraits<false>::ReturnValue;
     switch (static_cast<ReturnValue>(returnValue)) {
       case ReturnValue::ALLOWLIST: resultState = SNTRuleStateAllow; break;
-      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowTransitive; break;
+      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowCompiler; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
       case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
       default:
