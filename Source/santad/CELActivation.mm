@@ -91,9 +91,11 @@ std::vector<santa::cel::CELProtoTraits<false>::AncestorT> Ancestors<false>(
 namespace santa {
 
 ActivationCallbackBlock CreateCELActivationBlock(
-    const Message &esMsg, MOLCodesignChecker *csInfo,
+    const Message &esMsg, NSString *signingID, NSString *teamID, BOOL isPlatformBinary,
+    NSDate *signingTime, NSDate *secureSigningTime,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
   std::shared_ptr<EndpointSecurityAPI> esApi = esMsg.ESAPI();
+  NSString *formattedSigningID = FormatSigningID(signingID, teamID, isPlatformBinary);
 
   return ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
     auto makeActivation =
@@ -104,17 +106,15 @@ ActivationCallbackBlock CreateCELActivationBlock(
 
       auto f = std::make_unique<ExecutableFileT>();
 
-      NSString *signingID = FormatSigningID(csInfo);
-      if (signingID) {
-        f->set_signing_id(santa::NSStringToUTF8String(signingID));
+      if (formattedSigningID) {
+        f->set_signing_id(santa::NSStringToUTF8String(formattedSigningID));
       }
 
-      if (csInfo.signingTime) {
-        f->mutable_signing_time()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
+      if (signingTime) {
+        f->mutable_signing_time()->set_seconds(signingTime.timeIntervalSince1970);
       }
-      if (csInfo.secureSigningTime) {
-        f->mutable_secure_signing_time()->set_seconds(
-            csInfo.secureSigningTime.timeIntervalSince1970);
+      if (secureSigningTime) {
+        f->mutable_secure_signing_time()->set_seconds(secureSigningTime.timeIntervalSince1970);
       }
 
       if constexpr (IsV2) {
@@ -169,6 +169,14 @@ ActivationCallbackBlock CreateCELActivationBlock(
       return makeActivation.operator()<false>();
     }
   };
+}
+
+ActivationCallbackBlock CreateCELActivationBlock(
+    const Message &esMsg, MOLCodesignChecker *csInfo,
+    std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
+  return CreateCELActivationBlock(esMsg, csInfo.signingID, csInfo.teamID, csInfo.platformBinary,
+                                  csInfo.signingTime, csInfo.secureSigningTime,
+                                  std::move(processTree));
 }
 
 }  // namespace santa

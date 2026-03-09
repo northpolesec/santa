@@ -23,11 +23,18 @@
 ///
 ///  Store information about executions from decision making for later logging.
 ///
-@interface SNTCachedDecision : NSObject
+@interface SNTCachedDecision : NSObject <NSCopying>
 
 - (instancetype)init;
 - (instancetype)initWithEndpointSecurityFile:(const es_file_t *)esFile;
 - (instancetype)initWithVnode:(SantaVnode)vnode NS_DESIGNATED_INITIALIZER;
+
+/// Creates a new decision seeded with only the identity fields (SHA-256, code
+/// signature, signing IDs, entitlements) from a previously computed decision.
+/// All evaluation-output fields (decision, cacheable, customMsg, etc.) start
+/// at their defaults so that a fresh policy evaluation is not polluted by
+/// stale state from the prior run.
+- (instancetype)initWithCachedIdentity:(SNTCachedDecision *)previous;
 
 @property SantaVnode vnodeId;
 @property SNTEventState decision;
@@ -40,9 +47,11 @@
 @property NSArray<MOLCertificate *> *certChain;
 @property NSString *teamID;
 @property NSString *signingID;
+@property NSString *rawSigningID;
 @property NSString *cdhash;
 @property NSDictionary *entitlements;
 @property BOOL entitlementsFiltered;
+@property BOOL platformBinary;
 @property uint32_t codesigningFlags;
 @property SNTSigningStatus signingStatus;
 @property NSDate *secureSigningTime;

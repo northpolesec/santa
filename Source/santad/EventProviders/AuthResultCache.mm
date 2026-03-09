@@ -17,6 +17,7 @@
 
 #include <mach/clock_types.h>
 
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SystemResources.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Client.h"
@@ -36,20 +37,6 @@ static NSString *const kFlushCacheReasonEntitlementsTeamIDFilterChanged =
     @"EntitlementsTeamIDFilterChanged";
 
 namespace santa {
-
-// Decision is stored in upper 8 bits, timestamp in remaining 56.
-static inline uint64_t CacheableAction(SNTAction action,
-                                       uint64_t timestamp = ::GetCurrentUptime()) {
-  return ((uint64_t)action << 56) | (timestamp & 0xFFFFFFFFFFFFFF);
-}
-
-static inline SNTAction ActionFromCachedValue(uint64_t cachedValue) {
-  return (SNTAction)(cachedValue >> 56);
-}
-
-static inline uint64_t TimestampFromCachedValue(uint64_t cachedValue) {
-  return (cachedValue & ~(0xFF00000000000000));
-}
 
 NSString *const FlushCacheReasonToString(FlushCacheReason reason) {
   switch (reason) {
@@ -86,8 +73,8 @@ AuthResultCache::AuthResultCache(std::shared_ptr<EndpointSecurityAPI> esapi,
     : esapi_(esapi),
       flush_count_(flush_count),
       cache_deny_time_ns_(cache_deny_time_ms * NSEC_PER_MSEC) {
-  root_cache_ = new SantaCache<SantaVnode, uint64_t>();
-  nonroot_cache_ = new SantaCache<SantaVnode, uint64_t>();
+  root_cache_ = new SantaCache<SantaVnode, CachedAuthResult>();
+  nonroot_cache_ = new SantaCache<SantaVnode, CachedAuthResult>();
 
   struct stat sb;
   if (stat("/", &sb) == 0) {
@@ -105,23 +92,29 @@ AuthResultCache::~AuthResultCache() {
   delete nonroot_cache_;
 }
 
-bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision) {
+bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision,
+                                 SNTCachedDecision *cd) {
   SantaVnode vnode_id = SantaVnode::VnodeForFile(es_file);
-  SantaCache<SantaVnode, uint64_t> *cache = CacheForVnodeID(vnode_id);
+  SantaCache<SantaVnode, CachedAuthResult> *cache = CacheForVnodeID(vnode_id);
+  CachedAuthResult requestBinary = {SNTActionRequestBinary, 0, nil};
+
   switch (decision) {
     // SNTActionRequestBinary and SNTActionRespondHold are not terminal states and should not
     // contain a timestamp to allow for proper transitions out of the state.
-    case SNTActionRequestBinary:
-      return cache->set(vnode_id, CacheableAction(SNTActionRequestBinary, 0), 0);
+    case SNTActionRequestBinary: return cache->set(vnode_id, requestBinary, CachedAuthResult{});
     case SNTActionRespondHold:
-      return cache->set(vnode_id, CacheableAction(SNTActionRespondHold, 0),
-                        CacheableAction(SNTActionRequestBinary, 0));
+      return cache->set(vnode_id, CachedAuthResult{SNTActionRespondHold, 0, nil}, requestBinary);
 
     case SNTActionRespondAllow: OS_FALLTHROUGH;
     case SNTActionRespondAllowCompiler: OS_FALLTHROUGH;
     case SNTActionRespondDeny:
-      return cache->set(vnode_id, CacheableAction(decision),
-                        CacheableAction(SNTActionRequestBinary, 0));
+      return cache->set(vnode_id, CachedAuthResult{decision, GetCurrentUptime(), nil},
+                        requestBinary);
+
+    case SNTActionRespondAllowNoCache: {
+      CachedAuthResult entry = {SNTActionRespondAllowNoCache, GetCurrentUptime(), [cd copy]};
+      return cache->set(vnode_id, entry, requestBinary);
+    }
 
     // SNTActionHoldAllowed and SNTActionHoldDenied are used for transitions, however the
     // cached action is translated to SNTActionRespondAllow or SNTActionRespondDeny respectively.
@@ -129,7 +122,6 @@ bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision) {
     case SNTActionHoldAllowed: OS_FALLTHROUGH;
     case SNTActionHoldDenied: cache->remove(vnode_id); return YES;
 
-    case SNTActionRespondAllowNoCache: return YES;
     default:
       // This is a programming error. Bail.
       LOGE(@"Invalid cache value, exiting.");
@@ -142,32 +134,30 @@ void AuthResultCache::RemoveFromCache(const es_file_t *es_file) {
   CacheForVnodeID(vnode_id)->remove(vnode_id);
 }
 
-SNTAction AuthResultCache::CheckCache(const es_file_t *es_file) {
+CachedAuthResult AuthResultCache::CheckCache(const es_file_t *es_file) {
   return CheckCache(SantaVnode::VnodeForFile(es_file));
 }
 
-SNTAction AuthResultCache::CheckCache(SantaVnode vnode_id) {
-  SantaCache<SantaVnode, uint64_t> *cache = CacheForVnodeID(vnode_id);
+CachedAuthResult AuthResultCache::CheckCache(SantaVnode vnode_id) {
+  SantaCache<SantaVnode, CachedAuthResult> *cache = CacheForVnodeID(vnode_id);
 
-  uint64_t cached_val = cache->get(vnode_id);
-  if (cached_val == 0) {
-    return SNTActionUnset;
+  CachedAuthResult entry = cache->get(vnode_id);
+  if (entry == CachedAuthResult{}) {
+    return {};
   }
 
-  SNTAction result = ActionFromCachedValue(cached_val);
-
-  if (result == SNTActionRespondDeny) {
-    uint64_t expiry_time = TimestampFromCachedValue(cached_val) + cache_deny_time_ns_;
+  if (entry.action == SNTActionRespondDeny) {
+    uint64_t expiry_time = entry.timestamp + cache_deny_time_ns_;
     if (expiry_time < GetCurrentUptime()) {
       cache->remove(vnode_id);
-      return SNTActionUnset;
+      return {};
     }
   }
 
-  return result;
+  return entry;
 }
 
-SantaCache<SantaVnode, uint64_t> *AuthResultCache::CacheForVnodeID(SantaVnode vnode_id) {
+SantaCache<SantaVnode, CachedAuthResult> *AuthResultCache::CacheForVnodeID(SantaVnode vnode_id) {
   return (vnode_id.fsid == root_devno_ || root_devno_ == 0) ? root_cache_ : nonroot_cache_;
 }
 
