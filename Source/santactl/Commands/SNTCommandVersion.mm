@@ -56,12 +56,10 @@ REGISTER_COMMAND_NAME(@"version")
   // Skip XPC queries if the connection fails to avoid unnecessary timeouts.
   NSDictionary *loadedNetdInfo = nil;
   BOOL netExtEnabled = NO;
-  if (hasNetd) {
-    [self.daemonConn resume];
-    if (self.daemonConn.isConnected) {
-      loadedNetdInfo = [self queryLoadedNetdBundleInfo];
-      netExtEnabled = [self queryNetworkExtensionEnabled];
-    }
+  [self.daemonConn resume];
+  if (self.daemonConn.isConnected) {
+    loadedNetdInfo = [self queryLoadedNetdBundleInfo];
+    netExtEnabled = [self queryNetworkExtensionEnabled];
   }
   NSString *loadedNetdVersion = [self composeVersionsFromDict:loadedNetdInfo];
   NSString *bundledNetdVersion = hasNetd ? [self santanetdBundledVersion] : @"";

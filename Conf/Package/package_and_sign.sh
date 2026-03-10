@@ -174,7 +174,9 @@ if [ -n "${BUILD_LITE_PACKAGE}" ]; then
   readonly LITE_RELEASE_NAME="santa-${RELEASE_VERSION}-lite"
   readonly LITE_PKG_PATH="${ARTIFACTS_DIR}/${LITE_RELEASE_NAME}.pkg"
 
-  readonly LITE_ROOT=$(/usr/bin/mktemp -d "${TMPDIR}santa-lite-"XXXXXX)
+  _lite_root=$(/usr/bin/mktemp -d "${TMPDIR}santa-lite-"XXXXXX) || die "failed to create lite temp directory"
+  [[ -n "${_lite_root}" && -d "${_lite_root}" ]] || die "mktemp returned invalid directory: '${_lite_root}'"
+  readonly LITE_ROOT="${_lite_root}"
   readonly LITE_APP="${LITE_ROOT}/Santa.app"
 
   echo "creating lite app bundle"
@@ -183,6 +185,9 @@ if [ -n "${BUILD_LITE_PACKAGE}" ]; then
   # Remove sleigh and network extension
   /bin/rm -f "${LITE_APP}/Contents/MacOS/sleigh"
   /bin/rm -rf "${LITE_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.netd.systemextension"
+
+  # Mark the bundle as a Lite edition
+  /usr/bin/plutil -insert SNTIsLite -bool YES "${LITE_APP}/Contents/Info.plist"
 
   # Re-sign the app
   BN=$(/usr/bin/basename "${LITE_APP}")

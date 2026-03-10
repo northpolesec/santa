@@ -28,8 +28,12 @@ function die {
 
 # When called with LITE_APP set, use the pre-prepared LITE_APP instead of the
 # release root app bundle.
+LITE=0
 if [[ -n "${LITE_APP}" ]]; then
   LITE=1
+  readonly APP_BUNDLE="${LITE_APP}"
+else
+  readonly APP_BUNDLE="${RELEASE_ROOT}/binaries/Santa.app"
 fi
 
 readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
@@ -50,11 +54,7 @@ echo "creating app pkg"
 /bin/mkdir -p "${APP_PKG_ROOT}/var/db/santa/migration" \
   "${APP_PKG_ROOT}/Library/LaunchDaemons" \
   "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-if [[ "${LITE}" -eq 1 ]]; then
-  /bin/cp -vXR "${LITE_APP}" "${APP_PKG_ROOT}/var/db/santa/migration/"
-else
-  /bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/var/db/santa/migration/"
-fi
+/bin/cp -vXR "${APP_BUNDLE}" "${APP_PKG_ROOT}/var/db/santa/migration/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/migration.sh" "${APP_PKG_ROOT}/var/db/santa/migration/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.migration.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/com.northpolesec.santa-migration.plist"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
@@ -70,7 +70,7 @@ fi
 /usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
 
 # Build app package
-readonly APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${RELEASE_ROOT}/binaries/Santa.app/Contents/Info.plist")
+readonly APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${APP_BUNDLE}/Contents/Info.plist")
 /usr/bin/pkgbuild --identifier "com.northpolesec.santa" \
   --version "${APP_VERSION}" \
   --root "${APP_PKG_ROOT}" \

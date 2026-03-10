@@ -16,11 +16,9 @@
 #import "Source/common/SNTCommonEnums.h"
 
 BOOL SNTIsLiteAppBundle(NSString *appPath) {
-  NSFileManager *fm = [NSFileManager defaultManager];
-  return ![fm fileExistsAtPath:[appPath stringByAppendingPathComponent:@"Contents/MacOS/sleigh"]] ||
-         ![fm fileExistsAtPath:[appPath stringByAppendingPathComponent:
-                                            @"Contents/Library/SystemExtensions/"
-                                            @"com.northpolesec.santa.netd.systemextension"]];
+  NSString *plistPath = [appPath stringByAppendingPathComponent:@"Contents/Info.plist"];
+  NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+  return [plist[@"SNTIsLite"] boolValue];
 }
 
 BOOL SNTIsLiteInstall(void) {

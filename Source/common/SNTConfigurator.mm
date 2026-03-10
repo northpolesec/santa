@@ -1592,10 +1592,6 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (BOOL)isSyncV2Enabled {
-  if (SNTIsLiteInstall()) {
-    return NO;
-  }
-
   // Only the daemon can read / write to the sync state. Ensure there are no attempts to read this
   // setting from non-daemon processes.
   if (![[[NSProcessInfo processInfo] processName]
@@ -1605,6 +1601,10 @@ static SNTConfigurator *sharedConfigurator = nil;
     [NSException
          raise:@"Attempt to call isSyncV2Enabled from a non-daemon process"
         format:@"isSyncV2Enabled called from: %@", [[NSProcessInfo processInfo] processName]];
+  }
+
+  if (SNTIsLiteInstall()) {
+    return NO;
   }
 
   return santa::IsDomainPinned([self syncBaseURL]) || [self hasValidPushTokenChain];
