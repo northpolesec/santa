@@ -166,3 +166,78 @@ echo "notarizing dmg"
 
 echo "stapling dmg"
 /usr/bin/xcrun stapler staple "${DMG_PATH}" || die "failed to staple dmg"
+
+################################################################################
+# Lite package - strips sleigh and network extension from the app bundle
+################################################################################
+if [ -n "${BUILD_LITE_PACKAGE}" ]; then
+  readonly LITE_RELEASE_NAME="santa-${RELEASE_VERSION}-lite"
+  readonly LITE_PKG_PATH="${ARTIFACTS_DIR}/${LITE_RELEASE_NAME}.pkg"
+
+  _lite_root=$(/usr/bin/mktemp -d "${TMPDIR}santa-lite-"XXXXXX) || die "failed to create lite temp directory"
+  [[ -n "${_lite_root}" && -d "${_lite_root}" ]] || die "mktemp returned invalid directory: '${_lite_root}'"
+  readonly LITE_ROOT="${_lite_root}"
+  readonly LITE_APP="${LITE_ROOT}/Santa.app"
+
+  echo "creating lite app bundle"
+  /bin/cp -R "${INPUT_APP}" "${LITE_APP}"
+
+  # Remove sleigh and network extension
+  /bin/rm -f "${LITE_APP}/Contents/MacOS/sleigh"
+  /bin/rm -rf "${LITE_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.netd.systemextension"
+
+  # Mark the bundle as a Lite edition
+  /usr/bin/plutil -insert SNTIsLite -bool YES "${LITE_APP}/Contents/Info.plist"
+
+  # Re-sign the app
+  BN=$(/usr/bin/basename "${LITE_APP}")
+  echo "codesigning lite ${BN}"
+  /usr/bin/codesign \
+    --sign "${SIGNING_IDENTITY}" \
+    --keychain "${SIGNING_KEYCHAIN}" \
+    --preserve-metadata=entitlements \
+    --timestamp \
+    --force \
+    --prefix com.northpolesec.santa. \
+    --generate-entitlement-der \
+    --options library,kill,runtime \
+    "${LITE_APP}"
+
+  # Notarize the lite app
+  echo "zipping lite Santa.app"
+  /usr/bin/zip -9r "${LITE_ROOT}/Santa.app.zip" "${LITE_APP}"
+
+  echo "notarizing lite Santa.app"
+  "${NOTARIZATION_TOOL}" --file "${LITE_ROOT}/Santa.app.zip"
+
+  echo "stapling lite Santa.app"
+  /usr/bin/xcrun stapler staple -v "${LITE_APP}"
+
+  # Build the lite component pkg
+  export RELEASE_ROOT
+  export LITE_APP
+  export PKG_OUT_DIR="${LITE_ROOT}"
+  "${RELEASE_ROOT}/conf/package.sh"
+
+  # Build signed lite distribution package
+  echo "productbuild lite pkg"
+  /bin/mkdir -p "${LITE_ROOT}/${LITE_RELEASE_NAME}"
+  /usr/bin/productbuild \
+    --distribution "${RELEASE_ROOT}/conf/Distribution.xml" \
+    --package-path "${LITE_ROOT}" \
+    --version "${RELEASE_VERSION}" \
+    --sign "${INSTALLER_SIGNING_IDENTITY}" --keychain "${INSTALLER_SIGNING_KEYCHAIN}" \
+    "${LITE_ROOT}/${LITE_RELEASE_NAME}/${LITE_RELEASE_NAME}.pkg"
+
+  echo "verifying lite pkg signature"
+  /usr/sbin/pkgutil --check-signature "${LITE_ROOT}/${LITE_RELEASE_NAME}/${LITE_RELEASE_NAME}.pkg" || die "bad lite pkg signature"
+
+  echo "notarizing lite pkg"
+  "${NOTARIZATION_TOOL}" --file "${LITE_ROOT}/${LITE_RELEASE_NAME}/${LITE_RELEASE_NAME}.pkg"
+
+  echo "stapling lite pkg"
+  /usr/bin/xcrun stapler staple "${LITE_ROOT}/${LITE_RELEASE_NAME}/${LITE_RELEASE_NAME}.pkg" || die "failed to staple lite pkg"
+
+  echo "copying lite pkg to output"
+  cp "${LITE_ROOT}/${LITE_RELEASE_NAME}/${LITE_RELEASE_NAME}.pkg" "${LITE_PKG_PATH}"
+fi

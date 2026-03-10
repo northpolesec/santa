@@ -19,6 +19,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
@@ -48,18 +49,20 @@ REGISTER_COMMAND_NAME(@"version")
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
+  BOOL isLite = SNTIsLiteInstall();
+  BOOL hasNetd = [[NSFileManager defaultManager] fileExistsAtPath:@(kSantaNetdPath)];
+
   // Best-effort connection to santad for querying santanetd info.
   // Skip XPC queries if the connection fails to avoid unnecessary timeouts.
-  [self.daemonConn resume];
-
   NSDictionary *loadedNetdInfo = nil;
   BOOL netExtEnabled = NO;
+  [self.daemonConn resume];
   if (self.daemonConn.isConnected) {
     loadedNetdInfo = [self queryLoadedNetdBundleInfo];
     netExtEnabled = [self queryNetworkExtensionEnabled];
   }
   NSString *loadedNetdVersion = [self composeVersionsFromDict:loadedNetdInfo];
-  NSString *bundledNetdVersion = [self santanetdBundledVersion];
+  NSString *bundledNetdVersion = hasNetd ? [self santanetdBundledVersion] : @"";
 
   if ([arguments containsObject:@"--json"]) {
     NSMutableDictionary *versions = [@{
@@ -67,6 +70,10 @@ REGISTER_COMMAND_NAME(@"version")
       @"santactl" : [self santactlVersion],
       @"SantaGUI" : [self santaAppVersion],
     } mutableCopy];
+
+    if (isLite) {
+      versions[@"edition"] = @"Lite";
+    }
 
     if (loadedNetdVersion.length > 0) {
       versions[@"santanetd"] = loadedNetdVersion;
@@ -85,6 +92,9 @@ REGISTER_COMMAND_NAME(@"version")
                                                   encoding:NSUTF8StringEncoding];
     printf("%s\n", [versionsStr UTF8String]);
   } else {
+    if (isLite) {
+      printf("%-20s | %s\n", "Edition", "Lite");
+    }
     printf("%-20s | %s\n", "santad", [[self santadVersion] UTF8String]);
     printf("%-20s | %s\n", "santactl", [[self santactlVersion] UTF8String]);
     printf("%-20s | %s\n", "SantaGUI", [[self santaAppVersion] UTF8String]);

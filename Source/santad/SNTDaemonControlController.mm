@@ -31,6 +31,7 @@
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTKillCommand.h"
+#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTModeTransition.h"
@@ -677,6 +678,12 @@ double watchdogRAMPeak = 0;
 
 - (void)installSantaApp:(NSString *)tempPath reply:(void (^)(BOOL))reply {
   LOGI(@"Trigger Santa installation from: %@", tempPath);
+
+  if ([[SNTConfigurator configurator] isSyncV2Enabled] && SNTIsLiteAppBundle(tempPath)) {
+    LOGE(@"Refusing to install Lite version while SyncV2 is enabled");
+    reply(NO);
+    return;
+  }
 
   if (![self verifyPathIsSanta:tempPath]) {
     LOGE(@"Unable to verify Santa for installation: %@", tempPath);
