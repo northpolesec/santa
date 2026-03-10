@@ -217,7 +217,7 @@ if [ -n "${BUILD_LITE_PACKAGE}" ]; then
   export RELEASE_ROOT
   export LITE_APP
   export PKG_OUT_DIR="${LITE_ROOT}"
-  "${RELEASE_ROOT}/conf/package.sh" --lite
+  "${RELEASE_ROOT}/conf/package.sh"
 
   # Build signed lite distribution package
   echo "productbuild lite pkg"

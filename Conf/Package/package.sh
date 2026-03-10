@@ -36,7 +36,9 @@ else
   readonly APP_BUNDLE="${RELEASE_ROOT}/binaries/Santa.app"
 fi
 
-readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
+SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
+[[ -n "${SCRATCH}" && -d "${SCRATCH}" ]] || die "mktemp failed to create scratch directory"
+readonly SCRATCH
 readonly APP_PKG_ROOT="${SCRATCH}/app_pkg_root"
 readonly APP_PKG_SCRIPTS="${SCRATCH}/pkg_scripts"
 
@@ -70,7 +72,9 @@ echo "creating app pkg"
 /usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
 
 # Build app package
-readonly APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${APP_BUNDLE}/Contents/Info.plist")
+APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${APP_BUNDLE}/Contents/Info.plist")
+[[ -n "${APP_VERSION}" ]] || die "failed to extract APP_VERSION from ${APP_BUNDLE}/Contents/Info.plist"
+readonly APP_VERSION
 /usr/bin/pkgbuild --identifier "com.northpolesec.santa" \
   --version "${APP_VERSION}" \
   --root "${APP_PKG_ROOT}" \
