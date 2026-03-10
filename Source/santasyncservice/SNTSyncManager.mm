@@ -17,6 +17,9 @@
 
 #import <Network/Network.h>
 
+#include <atomic>
+#include <memory>
+
 #import "Source/common/MOLAuthenticatingURLSession.h"
 #import "Source/common/MOLXPCConnection.h"
 #include "Source/common/Pinning.h"
@@ -372,10 +375,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   }
 
   dispatch_async(self.syncQueue, ^{
-    __block BOOL replied = NO;
+    auto replied = std::make_shared<std::atomic<bool>>(false);
     void (^guardedReply)(NSError *) = ^(NSError *e) {
-      if (replied) return;
-      replied = YES;
+      if (replied->exchange(true)) return;
       if (reply) reply(e);
     };
 
@@ -409,7 +411,17 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
                                                dispatch_semaphore_signal(eventSema);
                                              }];
 
-    dispatch_semaphore_wait(eventSema, DISPATCH_TIME_FOREVER);
+    // Bound the wait to 10 minutes to avoid blocking the syncQueue forever
+    if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) !=
+        0) {
+      LOGE(@"EventUpload: Timeout waiting for bundle service to generate events");
+      [bs invalidate];
+      guardedReply([NSError
+          errorWithDomain:@"com.northpolesec.santa.syncservice"
+                     code:3
+                 userInfo:@{NSLocalizedDescriptionKey : @"Timeout generating events"}]);
+      return;
+    }
 
     if (!resultEvents) {
       LOGE(@"EventUpload: Bundle service failed to generate events (connection lost)");
