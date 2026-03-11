@@ -59,6 +59,9 @@ std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
 
     AncestorT ancestor;
     ancestor.set_path(p->program_->executable);
+    for (const auto &arg : p->program_->arguments) {
+      ancestor.add_args(arg);
+    }
 
     if (p->program_->code_signing) {
       const auto &cs = *p->program_->code_signing;
@@ -88,9 +91,11 @@ std::vector<santa::cel::CELProtoTraits<false>::AncestorT> Ancestors<false>(
 namespace santa {
 
 ActivationCallbackBlock CreateCELActivationBlock(
-    const Message &esMsg, MOLCodesignChecker *csInfo,
+    const Message &esMsg, NSString *signingID, NSString *teamID, BOOL isPlatformBinary,
+    NSDate *signingTime, NSDate *secureSigningTime, NSDictionary *entitlementsDict,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
   std::shared_ptr<EndpointSecurityAPI> esApi = esMsg.ESAPI();
+  NSString *formattedSigningID = FormatSigningID(signingID, teamID, isPlatformBinary);
 
   return ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
     auto makeActivation =
@@ -101,17 +106,40 @@ ActivationCallbackBlock CreateCELActivationBlock(
 
       auto f = std::make_unique<ExecutableFileT>();
 
-      NSString *signingID = FormatSigningID(csInfo);
-      if (signingID) {
-        f->set_signing_id(santa::NSStringToUTF8String(signingID));
+      if (formattedSigningID) {
+        f->set_signing_id(santa::NSStringToUTF8String(formattedSigningID));
       }
 
-      if (csInfo.signingTime) {
-        f->mutable_signing_time()->set_seconds(csInfo.signingTime.timeIntervalSince1970);
+      if (signingTime) {
+        f->mutable_signing_time()->set_seconds(signingTime.timeIntervalSince1970);
       }
-      if (csInfo.secureSigningTime) {
-        f->mutable_secure_signing_time()->set_seconds(
-            csInfo.secureSigningTime.timeIntervalSince1970);
+      if (secureSigningTime) {
+        f->mutable_secure_signing_time()->set_seconds(secureSigningTime.timeIntervalSince1970);
+      }
+
+      if constexpr (IsV2) {
+        if (entitlementsDict) {
+          auto *entitlements = f->mutable_entitlements();
+          [entitlementsDict
+              enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
+                NSError *err;
+                NSData *jsonData;
+                @try {
+                  jsonData = [NSJSONSerialization dataWithJSONObject:value
+                                                             options:NSJSONWritingFragmentsAllowed
+                                                               error:&err];
+                } @catch (NSException *) {
+                }
+                if (!jsonData) {
+                  // Skip entitlements that can't be serialized to JSON.
+                  return;
+                }
+                NSString *jsonStr = [[NSString alloc] initWithData:jsonData
+                                                          encoding:NSUTF8StringEncoding];
+                (*entitlements)[santa::NSStringToUTF8String(key)] =
+                    santa::NSStringToUTF8String(jsonStr);
+              }];
+        }
       }
 
       return std::make_unique<santa::cel::Activation<IsV2>>(
@@ -141,6 +169,14 @@ ActivationCallbackBlock CreateCELActivationBlock(
       return makeActivation.operator()<false>();
     }
   };
+}
+
+ActivationCallbackBlock CreateCELActivationBlock(
+    const Message &esMsg, MOLCodesignChecker *csInfo,
+    std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
+  return CreateCELActivationBlock(esMsg, csInfo.signingID, csInfo.teamID, csInfo.platformBinary,
+                                  csInfo.signingTime, csInfo.secureSigningTime, csInfo.entitlements,
+                                  std::move(processTree));
 }
 
 }  // namespace santa

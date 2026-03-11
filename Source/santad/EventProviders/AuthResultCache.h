@@ -29,7 +29,20 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClientBase.h"
 
+@class SNTCachedDecision;
+
 namespace santa {
+
+struct CachedAuthResult {
+  SNTAction action = SNTActionUnset;
+  uint64_t timestamp = 0;
+  SNTCachedDecision *cached_decision = nil;
+
+  // For equality purposes, only the SNTAction and timestamp are considered.
+  bool operator==(const CachedAuthResult &rhs) const {
+    return action == rhs.action && timestamp == rhs.timestamp;
+  }
+};
 
 enum class FlushCacheMode {
   kNonRootOnly,
@@ -67,10 +80,11 @@ class AuthResultCache {
   AuthResultCache(const AuthResultCache &other) = delete;
   AuthResultCache &operator=(const AuthResultCache &other) = delete;
 
-  virtual bool AddToCache(const es_file_t *es_file, SNTAction decision);
+  virtual bool AddToCache(const es_file_t *es_file, SNTAction decision,
+                          SNTCachedDecision *cd = nil);
   virtual void RemoveFromCache(const es_file_t *es_file);
-  virtual SNTAction CheckCache(const es_file_t *es_file);
-  virtual SNTAction CheckCache(SantaVnode vnode_id);
+  virtual CachedAuthResult CheckCache(const es_file_t *es_file);
+  virtual CachedAuthResult CheckCache(SantaVnode vnode_id);
 
   virtual void FlushCache(FlushCacheMode mode, FlushCacheReason reason);
 
@@ -79,10 +93,10 @@ class AuthResultCache {
   virtual void SetESClient(id<SNTEndpointSecurityClientBase> client);
 
  private:
-  virtual SantaCache<SantaVnode, uint64_t> *CacheForVnodeID(SantaVnode vnode_id);
+  virtual SantaCache<SantaVnode, CachedAuthResult> *CacheForVnodeID(SantaVnode vnode_id);
 
-  SantaCache<SantaVnode, uint64_t> *root_cache_;
-  SantaCache<SantaVnode, uint64_t> *nonroot_cache_;
+  SantaCache<SantaVnode, CachedAuthResult> *root_cache_;
+  SantaCache<SantaVnode, CachedAuthResult> *nonroot_cache_;
 
   std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
   SNTMetricCounter *flush_count_;

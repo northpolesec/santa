@@ -65,7 +65,7 @@ class Evaluator {
 
   Evaluator(std::unique_ptr<::cel::Compiler> compiler,
             std::unique_ptr<google::protobuf::Arena> arena)
-      : arena_(std::move(arena)), compiler_(std::move(compiler)) {};
+      : compiler_(std::move(compiler)), compiler_arena_(std::move(arena)) {};
   ~Evaluator() = default;
 
   Evaluator(Evaluator &&other) = default;
@@ -76,25 +76,26 @@ class Evaluator {
   Evaluator &operator=(const Evaluator &other) = delete;
 
   // Compile a CEL expression from a string into an expression plan
-  // ready for evaluation. These expression plans could be cached but it's
-  // important that the compiled expression is not used after the Evaluator
-  // is destroyed.
+  // ready for evaluation. The caller-provided arena is used for constant
+  // folding and must outlive the returned expression plan.
   absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>>
-  Compile(absl::string_view cel_expr);
+  Compile(absl::string_view cel_expr, google::protobuf::Arena *arena);
 
-  // Evaluate an expression plan with a SantaActivation object.
+  // Evaluate an expression plan with a SantaActivation object. The
+  // caller-provided arena is used for evaluation temporaries.
   absl::StatusOr<EvaluationResultT> Evaluate(
       ::google::api::expr::runtime::CelExpression const *expression_plan,
-      const ActivationT &activation);
+      const ActivationT &activation, google::protobuf::Arena *arena);
 
-  // Convenience method that combines Compile() and Evaluate() into a single
-  // call.
+  // Compile and evaluate a CEL expression in a single call. Uses a
+  // stack-local arena internally so no allocations persist after return.
   absl::StatusOr<EvaluationResultT> CompileAndEvaluate(
       absl::string_view cel_expr, const ActivationT &activation);
 
  private:
-  std::unique_ptr<google::protobuf::Arena> arena_;
   std::unique_ptr<::cel::Compiler> compiler_;
+  std::unique_ptr<google::protobuf::Arena>
+      compiler_arena_;  // Kept alive for compiler type refs
 };
 
 }  // namespace cel

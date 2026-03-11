@@ -23,10 +23,12 @@
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeepCopy.h"
 #import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
@@ -34,6 +36,7 @@
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 #include "cel/v1.pb.h"
 
 enum class PlatformBinaryState {
@@ -66,9 +69,21 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   std::unique_ptr<santa::cel::Evaluator<false>> celEvaluatorV1_;
   std::unique_ptr<santa::cel::Evaluator<true>> celEvaluatorV2_;
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter_;
+  // Arena used for constant folding during compilation of fallback rules.
+  // Declared before celFallbackRules_ so that C++ reverse destruction
+  // order destroys rules first, then the arena they reference.
+  std::shared_ptr<google::protobuf::Arena> celFallbackArena_;
+  struct CompiledFallbackRule {
+    std::shared_ptr<::google::api::expr::runtime::CelExpression> expression;
+    NSString *customMsg;
+    NSString *customURL;
+  };
+  std::vector<CompiledFallbackRule> celFallbackRules_;
 }
 @property SNTRuleTable *ruleTable;
 @property SNTConfigurator *configurator;
+@property dispatch_queue_t celFallbackQueue;
+@property SNTKVOManager *celFallbackRulesObserver;
 @end
 
 @implementation SNTPolicyProcessor
@@ -93,6 +108,22 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
       LOGW(@"Failed to create CEL v2 evaluator: %s",
            std::string(evaluatorV2.status().message()).c_str());
     }
+
+    _celFallbackQueue =
+        dispatch_queue_create("com.northpolesec.santa.cel_fallback", DISPATCH_QUEUE_SERIAL);
+
+    // Pre-compile any existing fallback rules
+    [self compileFallbackRules:_configurator.celFallbackRules];
+
+    // Observe changes to fallback rules
+    __weak __typeof(self) weakSelf = self;
+    _celFallbackRulesObserver =
+        [[SNTKVOManager alloc] initWithObject:_configurator
+                                     selector:@selector(celFallbackRules)
+                                         type:[NSArray class]
+                                     callback:^(id oldValue, id newValue) {
+                                       [weakSelf compileFallbackRules:(NSArray *)newValue];
+                                     }];
   }
   return self;
 }
@@ -107,28 +138,120 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   return self;
 }
 
-- (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule *)rule
-                                     cachedDecision:(SNTCachedDecision *)cd
-                                 activationCallback:(ActivationCallbackBlock)activationCallback {
-  bool useV2 = (rule.state == SNTRuleStateCELv2);
-  auto activation = activationCallback(useV2);
+- (void)compileFallbackRules:(NSArray<SNTCELFallbackRule *> *)rules {
+  if (!celEvaluatorV2_) {
+    return;
+  }
 
-  // Evaluate the CEL expression and extract results
+  if (rules.count > 10) {
+    LOGE(@"Number of CEL fallback rules is above the limit of 10");
+    return;
+  }
+
+  // Create a fresh arena for this batch of compiled rules.
+  // The arena must outlive the compiled plans since constant folding stores
+  // data on it.
+  __block auto arena = std::make_shared<google::protobuf::Arena>();
+  __block std::vector<CompiledFallbackRule> compiled;
+  compiled.reserve(rules.count);
+  bool compileFailed = false;
+  for (SNTCELFallbackRule *rule in rules) {
+    auto result =
+        celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), arena.get());
+    if (result.ok()) {
+      compiled.push_back({std::move(*result), rule.customMsg, rule.customURL});
+    } else {
+      LOGE(@"Failed to compile CEL fallback expression '%@': %s", rule.celExpr,
+           std::string(result.status().message()).c_str());
+      compileFailed = true;
+      break;
+    }
+  }
+
+  if (compileFailed) {
+    return;
+  }
+
+  dispatch_sync(self.celFallbackQueue, ^{
+    // Release old rules before the old arena (order matters).
+    celFallbackRules_ = std::move(compiled);
+    celFallbackArena_ = std::move(arena);
+  });
+}
+
+- (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision *)cd
+                    activationCallback:(ActivationCallbackBlock)activationCallback {
+  if (!celEvaluatorV2_ || !activationCallback) {
+    return NO;
+  }
+
+  // Snapshot the compiled rules and arena under the lock so their
+  // lifetimes extend through evaluation even if compileFallbackRules
+  // swaps them concurrently.
+  __block std::vector<CompiledFallbackRule> rules;
+  __block std::shared_ptr<google::protobuf::Arena> arenaRef;
+  dispatch_sync(self.celFallbackQueue, ^{
+    rules = celFallbackRules_;
+    arenaRef = celFallbackArena_;
+  });
+
+  if (rules.empty()) {
+    return NO;
+  }
+
+  LOGD(@"Evaluating %zu CEL fallback rule(s) for sha256=%@", rules.size(), cd.sha256);
+
+  auto activation = activationCallback(/*useV2=*/true);
+
+  // Use a stack-local arena for evaluation temporaries.
+  google::protobuf::Arena evalArena;
+
+  for (size_t i = 0; i < rules.size(); ++i) {
+    LOGD(@"Evaluating CEL fallback rule %zu", i);
+
+    CELEvaluationResult celResult = [self evaluateCompiledCELExpression:rules[i].expression.get()
+                                                                  useV2:true
+                                                         cachedDecision:cd
+                                                             activation:*activation
+                                                              evalArena:&evalArena];
+
+    if (!celResult.succeeded) {
+      if (celResult.decisionMade) {
+        return YES;
+      }
+      continue;
+    }
+
+    cd.decision = (celResult.resultState == SNTRuleStateAllow ||
+                   celResult.resultState == SNTRuleStateAllowCompiler)
+                      ? SNTEventStateAllowCELFallback
+                      : SNTEventStateBlockCELFallback;
+    cd.customMsg = rules[i].customMsg;
+    cd.customURL = rules[i].customURL;
+    return YES;
+  }
+
+  LOGD(@"All CEL fallback rules exhausted without a decision for sha256=%@", cd.sha256);
+  return NO;
+}
+
+- (CELEvaluationResult)
+    evaluateCompiledCELExpression:(const ::google::api::expr::runtime::CelExpression *)expression
+                            useV2:(bool)useV2
+                   cachedDecision:(SNTCachedDecision *)cd
+                       activation:(const ::google::api::expr::runtime::BaseActivation &)activation
+                        evalArena:(google::protobuf::Arena *)evalArena {
   int returnValue = 0;
   bool cacheable = true;
   std::optional<uint64_t> touchIDCooldownMinutes;
 
   if (useV2) {
-    auto *v2Activation = static_cast<santa::cel::Activation<true> *>(activation.get());
-    // In debug builds, ensure the returned type matches expectations, but no
-    // need to pay the RTTI cost in release builds since the number of returned
-    // types is small and should rarely change.
-    assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
-    auto evalResult = self->celEvaluatorV2_->CompileAndEvaluate(
-        santa::NSStringToUTF8StringView(rule.celExpr), *v2Activation);
+    const auto &v2Activation = static_cast<const santa::cel::Activation<true> &>(activation);
+    assert(dynamic_cast<const santa::cel::Activation<true> *>(&activation) != nullptr);
+    auto evalResult = celEvaluatorV2_->Evaluate(expression, v2Activation, evalArena);
 
     if (!evalResult.ok()) {
-      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
+      LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
       if ([SNTConfigurator configurator].failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
@@ -141,13 +264,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     cacheable = evalResult->cacheable;
     touchIDCooldownMinutes = evalResult->touchIDCooldownMinutes;
   } else {
-    auto *v1Activation = static_cast<santa::cel::Activation<false> *>(activation.get());
-    assert(dynamic_cast<santa::cel::Activation<false> *>(activation.get()) != nullptr);
-    auto evalResult = self->celEvaluatorV1_->CompileAndEvaluate(
-        santa::NSStringToUTF8StringView(rule.celExpr), *v1Activation);
+    const auto &v1Activation = static_cast<const santa::cel::Activation<false> &>(activation);
+    assert(dynamic_cast<const santa::cel::Activation<false> *>(&activation) != nullptr);
+    auto evalResult = celEvaluatorV1_->Evaluate(expression, v1Activation, evalArena);
 
     if (!evalResult.ok()) {
-      LOGE(@"Failed to evaluate CEL rule (%@): %s", rule.celExpr,
+      LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
       if ([SNTConfigurator configurator].failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
@@ -167,8 +289,11 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   if (useV2) {
     using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
     switch (static_cast<ReturnValue>(returnValue)) {
+      case ReturnValue::UNSPECIFIED:
+        LOGD(@"CEL expression returned UNSPECIFIED, skipping");
+        return {.succeeded = false, .decisionMade = false, .resultState = {}};
       case ReturnValue::ALLOWLIST: resultState = SNTRuleStateAllow; break;
-      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowTransitive; break;
+      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowCompiler; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
       case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
       case ReturnValue::REQUIRE_TOUCHID_ONLY:
@@ -185,17 +310,25 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
           cd.touchIDCooldownMinutes = @(touchIDCooldownMinutes.value());
         }
         break;
-      default: resultState = rule.state; break;
+      default:
+        LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
+        return {.succeeded = false, .decisionMade = false, .resultState = {}};
     }
   } else {
     using ReturnValue = santa::cel::CELProtoTraits<false>::ReturnValue;
     switch (static_cast<ReturnValue>(returnValue)) {
       case ReturnValue::ALLOWLIST: resultState = SNTRuleStateAllow; break;
-      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowTransitive; break;
+      case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowCompiler; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
       case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
-      default: resultState = rule.state; break;
+      default:
+        LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
+        return {.succeeded = false, .decisionMade = false, .resultState = {}};
     }
+  }
+
+  if (resultState == SNTRuleStateSilentBlock) {
+    cd.silentBlock = YES;
   }
 
   if (!cacheable) {
@@ -203,6 +336,51 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   }
 
   return {.succeeded = true, .decisionMade = false, .resultState = resultState};
+}
+
+- (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule *)rule
+                                     cachedDecision:(SNTCachedDecision *)cd
+                                 activationCallback:(ActivationCallbackBlock)activationCallback {
+  bool useV2 = (rule.state == SNTRuleStateCELv2);
+  auto activation = activationCallback(useV2);
+
+  LOGD(@"Evaluating CEL expression: %@", rule.celExpr);
+
+  google::protobuf::Arena arena;
+
+  if ((useV2 && !celEvaluatorV2_) || (!useV2 && !celEvaluatorV1_)) {
+    LOGE(@"CEL v%d evaluator unavailable", useV2 ? 2 : 1);
+    if ([SNTConfigurator configurator].failClosed) {
+      cd.decision = SNTEventStateBlockUnknown;
+      return {.succeeded = false, .decisionMade = true, .resultState = {}};
+    }
+    return {.succeeded = false, .decisionMade = false, .resultState = {}};
+  }
+
+  absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> compileResult;
+  if (useV2) {
+    assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
+    compileResult = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
+  } else {
+    assert(dynamic_cast<santa::cel::Activation<false> *>(activation.get()) != nullptr);
+    compileResult = celEvaluatorV1_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
+  }
+
+  if (!compileResult.ok()) {
+    LOGE(@"Failed to compile CEL rule (%@): %s", rule.celExpr,
+         std::string(compileResult.status().message()).c_str());
+    if ([SNTConfigurator configurator].failClosed) {
+      cd.decision = SNTEventStateBlockUnknown;
+      return {.succeeded = false, .decisionMade = true, .resultState = {}};
+    }
+    return {.succeeded = false, .decisionMade = false, .resultState = {}};
+  }
+
+  return [self evaluateCompiledCELExpression:compileResult->get()
+                                       useV2:useV2
+                              cachedDecision:cd
+                                  activation:*activation
+                                   evalArena:&arena];
 }
 
 // This method applies the rules to the cached decision object.
@@ -309,6 +487,7 @@ static void UpdateCachedDecisionSigningInfo(
   cd.certSHA256 = csInfo.leafCertificate.SHA256;
   cd.certCommonName = csInfo.leafCertificate.commonName;
   cd.certChain = csInfo.certificates;
+  cd.rawSigningID = csInfo.signingID;
   // Check if we need to get teamID from code signing.
   if (!cd.teamID) {
     cd.teamID = csInfo.teamID;
@@ -335,12 +514,13 @@ static void UpdateCachedDecisionSigningInfo(
   }
 
   NSDictionary *entitlements = csInfo.entitlements;
+  cd.rawEntitlements = [entitlements sntDeepCopy];
 
   if (entitlementsFilterCallback) {
     cd.entitlements = entitlementsFilterCallback(entitlements);
     cd.entitlementsFiltered = (cd.entitlements.count != entitlements.count);
   } else {
-    cd.entitlements = [entitlements sntDeepCopy];
+    cd.entitlements = cd.rawEntitlements;
     cd.entitlementsFiltered = NO;
   }
 
@@ -351,44 +531,31 @@ static void UpdateCachedDecisionSigningInfo(
 - (nonnull SNTCachedDecision *)
            decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
                    configState:(nonnull SNTConfigState *)configState
-                        cdhash:(nullable NSString *)cdhash
-                    fileSHA256:(nullable NSString *)fileSHA256
-             certificateSHA256:(nullable NSString *)certificateSHA256
-                        teamID:(nullable NSString *)teamID
-                     signingID:(nullable NSString *)signingID
+                cachedDecision:(nonnull SNTCachedDecision *)cd
            platformBinaryState:(PlatformBinaryState)platformBinaryState
          signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
             activationCallback:(nullable ActivationCallbackBlock)activationCallback
     entitlementsFilterCallback:
         (NSDictionary *_Nullable (^_Nullable)(NSDictionary *_Nullable entitlements))
             entitlementsFilterCallback {
-  // Check the hash before allocating a SNTCachedDecision.
-  NSString *fileHash = fileSHA256 ?: fileInfo.SHA256;
-  SNTClientMode mode = configState.clientMode;
-
   // If the binary is a critical system binary, don't check its signature.
   // The binary was validated at startup when the rule table was initialized.
-  SNTCachedDecision *systemCd = self.ruleTable.criticalSystemBinaries[signingID];
-
+  SNTCachedDecision *systemCd = [self.ruleTable.criticalSystemBinaries[cd.signingID] copy];
   if (systemCd) {
-    systemCd.decisionClientMode = mode;
+    systemCd.decisionClientMode = configState.clientMode;
     return systemCd;
   }
 
-  // Allocate a new cached decision for the execution.
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
-  cd.cdhash = cdhash;
-  cd.sha256 = fileHash;
-  cd.teamID = teamID;
-  cd.signingID = signingID;
+  if (!cd.sha256) {
+    cd.sha256 = fileInfo.SHA256;
+  }
   cd.signingStatus = signingStatusCallback();
-  cd.decisionClientMode = mode;
+  cd.platformBinary = (platformBinaryState == PlatformBinaryState::kRuntimeTrue);
+  cd.decisionClientMode = configState.clientMode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
   NSError *csInfoError;
-  if (certificateSHA256.length) {
-    cd.certSHA256 = certificateSHA256;
-  } else {
+  if (!cd.certSHA256.length) {
     // Grab the code signature, if there's an error don't try to capture
     // any of the signature details.
     // TODO(mlw): MOLCodesignChecker should be updated to still grab signing information
@@ -425,6 +592,10 @@ static void UpdateCachedDecisionSigningInfo(
     return cd;
   }
 
+  if ([self evaluateCELFallbackExpressions:cd activationCallback:activationCallback]) {
+    return cd;
+  }
+
   NSString *msg = [self fileIsScopeBlocked:fileInfo];
   if (msg) {
     cd.decisionExtra = msg;
@@ -439,7 +610,7 @@ static void UpdateCachedDecisionSigningInfo(
     return cd;
   }
 
-  switch (mode) {
+  switch (configState.clientMode) {
     case SNTClientModeMonitor: cd.decision = SNTEventStateAllowUnknown; return cd;
     case SNTClientModeStandalone: cd.holdAndAsk = YES; [[fallthrough]];
     case SNTClientModeLockdown: cd.decision = SNTEventStateBlockUnknown; return cd;
@@ -451,53 +622,64 @@ static void UpdateCachedDecisionSigningInfo(
                                      targetProcess:(nonnull const es_process_t *)targetProc
                                        configState:(nonnull SNTConfigState *)configState
                                 activationCallback:
-                                    (nullable ActivationCallbackBlock)activationCallback {
-  NSString *signingID;
-  NSString *teamID;
-  NSString *cdhash;
+                                    (nullable ActivationCallbackBlock)activationCallback
+                                    cachedDecision:(nullable SNTCachedDecision *)existingDecision {
+  PlatformBinaryState pbs = targetProc->is_platform_binary ? PlatformBinaryState::kRuntimeTrue
+                                                           : PlatformBinaryState::kRuntimeFalse;
 
   const char *entitlementsFilterTeamID = NULL;
+  SNTCachedDecision *cd;
 
-  if (targetProc->codesigning_flags & CS_SIGNED && targetProc->codesigning_flags & CS_VALID) {
-    if (targetProc->signing_id.length > 0) {
-      if (targetProc->team_id.length > 0) {
-        entitlementsFilterTeamID = targetProc->team_id.data;
-        teamID = [NSString stringWithUTF8String:targetProc->team_id.data];
-        signingID =
-            [NSString stringWithFormat:@"%@:%@", teamID,
-                                       [NSString stringWithUTF8String:targetProc->signing_id.data]];
-      } else if (targetProc->is_platform_binary) {
-        entitlementsFilterTeamID = "platform";
-        signingID =
-            [NSString stringWithFormat:@"platform:%@",
-                                       [NSString stringWithUTF8String:targetProc->signing_id.data]];
-      }
+  if (existingDecision) {
+    cd = [[SNTCachedDecision alloc] initWithCachedIdentity:existingDecision];
+    // Derive entitlementsFilterTeamID from the cached decision. The cd.teamID
+    // was originally set under the same guards used in the else branch
+    // (CS_SIGNED, CS_VALID, signing_id exists, team_id exists), so a non-nil
+    // teamID implies all those conditions were satisfied.
+    if (cd.teamID.length) {
+      entitlementsFilterTeamID = cd.teamID.UTF8String;
+    } else if (targetProc->is_platform_binary) {
+      entitlementsFilterTeamID = "platform";
     }
+  } else {
+    cd = [[SNTCachedDecision alloc] init];
 
-    // Only consider the CDHash for processes that have CS_KILL or CS_HARD set.
-    // This ensures that the OS will kill the process if the CDHash was tampered
-    // with and code was loaded that didn't match a page hash.
-    if (targetProc->codesigning_flags & CS_KILL || targetProc->codesigning_flags & CS_HARD) {
-      static NSString *const kCDHashFormatString = @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
-                                                    "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
+    if (targetProc->codesigning_flags & CS_SIGNED && targetProc->codesigning_flags & CS_VALID) {
+      if (targetProc->signing_id.length > 0) {
+        if (targetProc->team_id.length > 0) {
+          entitlementsFilterTeamID = targetProc->team_id.data;
+          cd.teamID = [NSString stringWithUTF8String:targetProc->team_id.data];
+          cd.signingID = [NSString
+              stringWithFormat:@"%@:%@", cd.teamID,
+                               [NSString stringWithUTF8String:targetProc->signing_id.data]];
+        } else if (targetProc->is_platform_binary) {
+          entitlementsFilterTeamID = "platform";
+          cd.signingID = [NSString
+              stringWithFormat:@"platform:%@",
+                               [NSString stringWithUTF8String:targetProc->signing_id.data]];
+        }
+      }
 
-      const uint8_t *buf = targetProc->cdhash;
-      cdhash = [[NSString alloc] initWithFormat:kCDHashFormatString, buf[0], buf[1], buf[2], buf[3],
-                                                buf[4], buf[5], buf[6], buf[7], buf[8], buf[9],
-                                                buf[10], buf[11], buf[12], buf[13], buf[14],
-                                                buf[15], buf[16], buf[17], buf[18], buf[19]];
+      // Only consider the CDHash for processes that have CS_KILL or CS_HARD set.
+      // This ensures that the OS will kill the process if the CDHash was tampered
+      // with and code was loaded that didn't match a page hash.
+      if (targetProc->codesigning_flags & CS_KILL || targetProc->codesigning_flags & CS_HARD) {
+        static NSString *const kCDHashFormatString = @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
+                                                      "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
+
+        const uint8_t *buf = targetProc->cdhash;
+        cd.cdhash = [[NSString alloc]
+            initWithFormat:kCDHashFormatString, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5],
+                           buf[6], buf[7], buf[8], buf[9], buf[10], buf[11], buf[12], buf[13],
+                           buf[14], buf[15], buf[16], buf[17], buf[18], buf[19]];
+      }
     }
   }
 
   return [self decisionForFileInfo:fileInfo
       configState:configState
-      cdhash:cdhash
-      fileSHA256:nil
-      certificateSHA256:nil
-      teamID:teamID
-      signingID:signingID
-      platformBinaryState:targetProc->is_platform_binary ? PlatformBinaryState::kRuntimeTrue
-                                                         : PlatformBinaryState::kRuntimeFalse
+      cachedDecision:cd
+      platformBinaryState:pbs
       signingStatusCallback:^SNTSigningStatus {
         uint32_t csFlags = targetProc->codesigning_flags;
         if ((csFlags & CS_SIGNED) == 0) {

@@ -84,3 +84,13 @@ santa_unit_test(
         "@northpolesec_protos//celv2:v2_cc_proto",
     ],
 )
+
+santa_unit_test(
+    name = "ArenaGrowthTest",
+    srcs = ["ArenaGrowthTest.mm"],
+    deps = [
+        ":CEL",
+        "@abseil-cpp//absl/status:statusor",
+        "@northpolesec_protos//celv2:v2_cc_proto",
+    ],
+)

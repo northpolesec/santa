@@ -227,6 +227,8 @@ typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
     case SNTEventStateBlockTeamID: e->set_decision(Traits::BLOCK_TEAMID); break;
     case SNTEventStateBlockSigningID: e->set_decision(Traits::BLOCK_SIGNINGID); break;
     case SNTEventStateBlockCDHash: e->set_decision(Traits::BLOCK_CDHASH); break;
+    case SNTEventStateBlockCELFallback: e->set_decision(Traits::BLOCK_CEL_FALLBACK); break;
+    case SNTEventStateAllowCELFallback: e->set_decision(Traits::ALLOW_CEL_FALLBACK); break;
     case SNTEventStateAllowTransitive: return nullptr;
     case SNTEventStateAllowLocalBinary: return nullptr;
     case SNTEventStateAllowLocalSigningID: return nullptr;

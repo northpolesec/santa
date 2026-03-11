@@ -28,13 +28,19 @@
 namespace santa {
 
 // Create a block that returns a santa::cel::Activation object for the given
-// Message and MOLCodesignChecker object. The block defines a bool parameter
-// that determines whether to create a v1 or v2 activation object.
+// Message and signing metadata. The block defines a bool parameter that
+// determines whether to create a v1 or v2 activation object.
 //
 // Note: The returned block captures a reference to the Message object and must
 // not use it after the Message object is destroyed. Care must be taken to not
 // use this in an asynchronous context outside of the evaluation of that
 // execution.
+ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
+    const Message &esMsg, NSString *_Nullable signingID, NSString *_Nullable teamID,
+    BOOL isPlatformBinary, NSDate *_Nullable signingTime, NSDate *_Nullable secureSigningTime,
+    NSDictionary *_Nullable entitlements,
+    std::shared_ptr<santad::process_tree::ProcessTree> processTree);
+
 ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
     const Message &esMsg, MOLCodesignChecker *_Nullable csInfo,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree);

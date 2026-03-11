@@ -176,10 +176,13 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
 
   // Add variables for all of the return values so that users can use names like
   // ALLOWLIST or BLOCKLIST in their CEL expressions without having to use the
-  // proto package name prefix. Start from value number 1 to avoid the
-  // UNSPECIFIED value.
+  // proto package name prefix.
   auto retDescriptor = Traits::ReturnValue_descriptor();
-  for (int i = 1; i < retDescriptor->value_count(); i++) {
+  // For V2, start from value 0 to include UNSPECIFIED — needed for fallback
+  // expressions where UNSPECIFIED means "no decision, try next expression".
+  // For V1, start from 1 to skip UNSPECIFIED.
+  int startIdx = IsV2 ? 0 : 1;
+  for (int i = startIdx; i < retDescriptor->value_count(); i++) {
     auto value = retDescriptor->value(i);
     if constexpr (IsV2) {
       // For V2, register as a Result message type so they can be mixed with

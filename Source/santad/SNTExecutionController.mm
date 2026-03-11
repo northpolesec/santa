@@ -86,6 +86,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     case SNTEventStateBlockTeamID: return SNTEventStateAllowTeamID;
     case SNTEventStateBlockSigningID: return SNTEventStateAllowSigningID;
     case SNTEventStateBlockCDHash: return SNTEventStateAllowCDHash;
+    case SNTEventStateBlockCELFallback: return SNTEventStateAllowCELFallback;
     case SNTEventStateBlockLongPath: return SNTEventStateAllowUnknown;  // No direct equivalent
     default: return SNTEventStateAllowUnknown;
   }
@@ -173,6 +174,8 @@ static NSString *const kPrinterProxy =
     case SNTEventStateAllowCompilerSigningID: eventTypeStr = kAllowCompilerSigningID; break;
     case SNTEventStateAllowTransitive: eventTypeStr = kAllowTransitive; break;
     case SNTEventStateBlockLongPath: eventTypeStr = kBlockLongPath; break;
+    case SNTEventStateBlockCELFallback: eventTypeStr = kBlockCELFallback; break;
+    case SNTEventStateAllowCELFallback: eventTypeStr = kAllowCELFallback; break;
     default: eventTypeStr = kUnknownEventState; break;
   }
 
@@ -216,7 +219,9 @@ static NSString *const kPrinterProxy =
   return YES;
 }
 
-- (void)validateExecEvent:(const Message &)esMsg postAction:(bool (^)(SNTAction))postAction {
+- (void)validateExecEvent:(const Message &)esMsg
+           cachedDecision:(SNTCachedDecision *)existingDecision
+               postAction:(bool (^)(SNTAction, SNTCachedDecision *))postAction {
   if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
     // Programming error. Bail.
     LOGE(@"Attempt to validate non-EXEC event. Event type: %d", esMsg->event_type);
@@ -238,12 +243,12 @@ static NSString *const kPrinterProxy =
     if (config.failClosed) {
       LOGE(@"Failed to read file %@: %@ and denying action", @(targetProc->executable->path.data),
            fileInfoError.localizedDescription);
-      postAction(SNTActionRespondDeny);
+      postAction(SNTActionRespondDeny, nil);
       [self.events incrementForFieldValues:@[ (NSString *)kDenyNoFileInfo ]];
     } else {
       LOGE(@"Failed to read file %@: %@ but allowing action", @(targetProc->executable->path.data),
            fileInfoError.localizedDescription);
-      postAction(SNTActionRespondAllow);
+      postAction(SNTActionRespondAllow, nil);
       [self.events incrementForFieldValues:@[ (NSString *)kAllowNoFileInfo ]];
     }
     return;
@@ -251,7 +256,7 @@ static NSString *const kPrinterProxy =
 
   // PrinterProxy workaround, see description above the method for more details.
   if ([self printerProxyWorkaround:binInfo]) {
-    postAction(SNTActionRespondDeny);
+    postAction(SNTActionRespondDeny, nil);
     [self.events incrementForFieldValues:@[ (NSString *)kBlockPrinterWorkaround ]];
     return;
   }
@@ -259,12 +264,22 @@ static NSString *const kPrinterProxy =
   // TODO(markowsky): Maybe add a metric here for how many large executables we're seeing.
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
-  SNTCachedDecision *cd = [self.policyProcessor
-      decisionForFileInfo:binInfo
-            targetProcess:targetProc
-              configState:configState
-       activationCallback:santa::CreateCELActivationBlock(
-                              esMsg, [binInfo codesignCheckerWithError:NULL], _processTree)];
+  // When re-evaluating with a cached decision, use the pre-computed signing
+  // metadata to avoid expensive codesign verification.
+  ActivationCallbackBlock activationBlock =
+      existingDecision
+          ? santa::CreateCELActivationBlock(
+                esMsg, existingDecision.rawSigningID, existingDecision.teamID,
+                existingDecision.platformBinary, existingDecision.signingTime,
+                existingDecision.secureSigningTime, existingDecision.rawEntitlements, _processTree)
+          : santa::CreateCELActivationBlock(esMsg, [binInfo codesignCheckerWithError:NULL],
+                                            _processTree);
+
+  SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo
+                                                      targetProcess:targetProc
+                                                        configState:configState
+                                                 activationCallback:activationBlock
+                                                     cachedDecision:existingDecision];
 
   cd.codesigningFlags = targetProc->codesigning_flags;
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
@@ -322,10 +337,10 @@ static NSString *const kPrinterProxy =
     // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
     stoppedProc = self.processControlBlock(newProcPid, ProcessControl::Suspend);
-    postAction(SNTActionRespondHold);
+    postAction(SNTActionRespondHold, cd);
   } else {
     // Respond with the decision.
-    postAction(action);
+    postAction(action, cd);
   }
 
   // Increment metric counters
@@ -495,7 +510,7 @@ static NSString *const kPrinterProxy =
             self->_logger(std::move(esMsgCopy));
 
             _procSignalCache->remove(pidAndVersion);
-            postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied);
+            postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
           };
         }
 

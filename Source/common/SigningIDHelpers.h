@@ -17,8 +17,6 @@
 
 @class MOLCodesignChecker;
 
-__BEGIN_DECLS
-
 /**
   Return a string representing normalized SigningID (prefixed with TeamID and a
   colon).
@@ -29,4 +27,15 @@ __BEGIN_DECLS
 */
 NSString *_Nullable FormatSigningID(MOLCodesignChecker *_Nullable csc);
 
-__END_DECLS
+/**
+  Return a string representing normalized SigningID (prefixed with TeamID and a
+  colon) from individual components.
+
+  @param signingID The raw signing ID
+  @param teamID The team ID (may be nil)
+  @param isPlatformBinary Whether the binary is a platform binary
+
+  @return An NSString formated as teamID:signingID or nil if there isn't a valid signing ID.
+*/
+NSString *_Nullable FormatSigningID(NSString *_Nullable signingID, NSString *_Nullable teamID,
+                                    BOOL isPlatformBinary);

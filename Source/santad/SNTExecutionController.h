@@ -47,7 +47,10 @@ const static NSString *kBlockPrinterWorkaround = @"BlockPrinterWorkaround";
 const static NSString *kAllowNoFileInfo = @"AllowNoFileInfo";
 const static NSString *kDenyNoFileInfo = @"DenyNoFileInfo";
 const static NSString *kBlockLongPath = @"BlockLongPath";
+const static NSString *kBlockCELFallback = @"BlockCELFallback";
+const static NSString *kAllowCELFallback = @"AllowCELFallback";
 
+@class SNTCachedDecision;
 @class SNTEventTable;
 @class SNTNotificationQueue;
 @class SNTRuleTable;
@@ -81,10 +84,17 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///  the given `postAction` block. Also logs the event to the log and if necessary stores the event
 ///  in the database and sends a notification to the GUI agent.
 ///
-///  @param message The message received from the EndpointSecurity event provider.
-///  @param postAction The block invoked with the desired response result.
+///  @param esMsg The message received from the EndpointSecurity event provider.
+///  @param existingDecision A previously cached decision containing pre-computed identity data
+///      (SHA-256, codesign info, etc.) that can be reused to skip expensive recomputation.
+///      Pass nil for a fresh evaluation.
+///  @param postAction Block invoked with the resulting SNTAction and the SNTCachedDecision
+///      used to make the decision. The caller uses these to update the auth result cache
+///      and respond to EndpointSecurity. Returns whether the ES response succeeded.
 ///
-- (void)validateExecEvent:(const santa::Message &)esMsg postAction:(bool (^)(SNTAction))postAction;
+- (void)validateExecEvent:(const santa::Message &)esMsg
+           cachedDecision:(SNTCachedDecision *)existingDecision
+               postAction:(bool (^)(SNTAction, SNTCachedDecision *))postAction;
 
 ///
 ///  Handles the logic of deciding whether to allow a pid_suspend/pid_resume through to a binary or

@@ -17,6 +17,7 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -28,6 +29,11 @@
 #import "cel/v1.pb.h"
 
 extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd);
+
+@interface SNTPolicyProcessor (Testing)
+- (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision *)cd
+                    activationCallback:(ActivationCallbackBlock)activationCallback;
+@end
 
 BOOL CompareMaybeNilStrings(NSString *s1, NSString *s2) {
   return (!s1 && !s2) || [s1 isEqualToString:s2];
@@ -60,6 +66,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 @implementation SNTPolicyProcessorTest
 - (void)setUp {
   self.processor = [[SNTPolicyProcessor alloc] init];
+}
+
+- (void)tearDown {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[]];
 }
 
 - (void)testRule:(SNTRule *)rule
@@ -981,6 +991,236 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.cacheable);
   }
+}
+
+#pragma mark - CEL Fallback Expression Tests
+
+- (ActivationCallbackBlock)fallbackTestActivationCallback {
+  return ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
+    using ExecutableFileT = typename santa::cel::CELProtoTraits<true>::ExecutableFileT;
+    using AncestorT = typename santa::cel::CELProtoTraits<true>::AncestorT;
+
+    auto ef = std::make_unique<ExecutableFileT>();
+    ef->set_signing_id("ZMCG7MLDV9:com.example.testbinary");
+
+    if (useV2) {
+      return std::make_unique<santa::cel::Activation<true>>(
+          std::move(ef),
+          ^std::vector<std::string>() {
+            return {"arg0", "arg1"};
+          },
+          ^std::map<std::string, std::string>() {
+            return {{"HOME", "/Users/test"}};
+          },
+          ^uid_t() {
+            return 501;
+          },
+          ^std::string() {
+            return "/tmp";
+          },
+          ^std::vector<AncestorT>() {
+            return {};
+          });
+    } else {
+      using V1FileT = typename santa::cel::CELProtoTraits<false>::ExecutableFileT;
+      using V1AncestorT = typename santa::cel::CELProtoTraits<false>::AncestorT;
+      auto v1ef = std::make_unique<V1FileT>();
+      return std::make_unique<santa::cel::Activation<false>>(
+          std::move(v1ef),
+          ^std::vector<std::string>() {
+            return {};
+          },
+          ^std::map<std::string, std::string>() {
+            return {};
+          },
+          ^uid_t() {
+            return 0;
+          },
+          ^std::string() {
+            return "";
+          },
+          ^std::vector<V1AncestorT>() {
+            return {};
+          });
+    }
+  };
+}
+
+- (SNTCELFallbackRule *)ruleWithExpr:(NSString *)expr {
+  return [[SNTCELFallbackRule alloc] initWithCELExpr:expr customMsg:nil customURL:nil];
+}
+
+- (void)testCELFallbackExpressionAllow {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
+}
+
+- (void)testCELFallbackExpressionBlock {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"BLOCKLIST"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
+}
+
+- (void)testCELFallbackExpressionSilentBlock {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"SILENT_BLOCKLIST"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
+  XCTAssertTrue(cd.silentBlock);
+}
+
+- (void)testCELFallbackUnspecifiedSkipsToNext {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"UNSPECIFIED"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
+}
+
+- (void)testCELFallbackAllUnspecifiedFallsThrough {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"UNSPECIFIED"],
+    [self ruleWithExpr:@"UNSPECIFIED"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertFalse(handled);
+}
+
+- (void)testCELFallbackFirstMatchWins {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"BLOCKLIST"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
+}
+
+- (void)testCELFallbackEmptyRulesReturnNO {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertFalse(handled);
+}
+
+- (void)testCELFallbackWithTargetField {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self
+        ruleWithExpr:
+            @"target.signing_id == 'ZMCG7MLDV9:com.example.testbinary' ? ALLOWLIST : UNSPECIFIED"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
+}
+
+- (void)testCELFallbackUncacheableFieldsAreAvailable {
+  // The full activation (including args) is passed through to fallback rules.
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"size(args) > 0 ? BLOCKLIST : UNSPECIFIED"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  // args has ["arg0", "arg1"], so size(args) > 0 is true, returning BLOCKLIST
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
+}
+
+- (void)testCELFallbackInvalidExpressionSkipped {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"this is invalid !!!"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertFalse(handled);
+}
+
+- (void)testCELFallbackNilActivationCallbackReturnNO {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled = [self.processor evaluateCELFallbackExpressions:cd activationCallback:nil];
+  XCTAssertFalse(handled);
+}
+
+- (void)testCELFallbackCustomMsgAndURL {
+  SNTCELFallbackRule *rule =
+      [[SNTCELFallbackRule alloc] initWithCELExpr:@"BLOCKLIST"
+                                        customMsg:@"Custom block message"
+                                        customURL:@"https://example.com/details"];
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[ rule ]];
+  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
+  XCTAssertEqualObjects(cd.customMsg, @"Custom block message");
+  XCTAssertEqualObjects(cd.customURL, @"https://example.com/details");
 }
 
 @end
