@@ -374,10 +374,20 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     return;
   }
 
+  if (dispatch_semaphore_wait(self.syncLimiter, DISPATCH_TIME_NOW)) {
+    if (reply) {
+      reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
+                                code:5
+                            userInfo:@{NSLocalizedDescriptionKey : @"Too many syncs in progress"}]);
+    }
+    return;
+  }
+
   dispatch_async(self.syncQueue, ^{
     auto replied = std::make_shared<std::atomic<bool>>(false);
     void (^guardedReply)(NSError *) = ^(NSError *e) {
       if (replied->exchange(true)) return;
+      dispatch_semaphore_signal(self.syncLimiter);
       if (reply) reply(e);
     };
 
@@ -396,8 +406,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
 
     dispatch_semaphore_t eventSema = dispatch_semaphore_create(0);
+    __block BOOL expectedInvalidation = NO;
     bs.invalidationHandler = ^{
-      LOGE(@"EventUpload: Bundle service connection invalidated");
+      if (!expectedInvalidation) {
+        LOGE(@"EventUpload: Bundle service connection invalidated unexpectedly");
+      }
       dispatch_semaphore_signal(eventSema);
     };
 
@@ -415,6 +428,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) !=
         0) {
       LOGE(@"EventUpload: Timeout waiting for bundle service to generate events");
+      expectedInvalidation = YES;
       [bs invalidate];
       guardedReply([NSError
           errorWithDomain:@"com.northpolesec.santa.syncservice"
@@ -425,6 +439,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     if (!resultEvents) {
       LOGE(@"EventUpload: Bundle service failed to generate events (connection lost)");
+      expectedInvalidation = YES;
       [bs invalidate];
       guardedReply([NSError
           errorWithDomain:@"com.northpolesec.santa.syncservice"
@@ -434,6 +449,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     }
 
     if (!resultEvents.count) {
+      expectedInvalidation = YES;
       [bs invalidate];
       guardedReply(nil);
       return;
@@ -452,6 +468,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
                                             NSLocalizedDescriptionKey : @"Failed to upload events"
                                           }]);
                              }
+                             expectedInvalidation = YES;
                              [bs invalidate];
                            }];
   });
