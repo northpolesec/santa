@@ -322,6 +322,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                    reply:^(NSError *error) {
                      if (error) {
                        LOGE(@"NATS: EventUploadRequest failed for path %@: %@", path, error);
+                       [strongSyncDelegate sync];
                      } else {
                        LOGI(@"NATS: EventUploadRequest completed for path %@", path);
                      }

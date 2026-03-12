@@ -910,6 +910,32 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
                  @"EventUpload command should return event upload response");
 }
 
+- (void)testHandleEventUploadRequestErrorEnqueuesSync {
+  // Given: An EventUploadRequest with a valid path
+  ::pbv1::EventUploadRequest eventUploadRequest;
+  eventUploadRequest.set_path("/Applications/Safari.app");
+
+  // Mock delegate to invoke the reply block with an error
+  NSError *uploadError =
+      [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
+                          code:4
+                      userInfo:@{NSLocalizedDescriptionKey : @"Failed to upload"}];
+  OCMStub([self.mockSyncDelegate
+      eventUploadForPath:@"/Applications/Safari.app"
+                   reply:([OCMArg invokeBlockWithArgs:uploadError, nil])]);
+  OCMExpect([self.mockSyncDelegate sync]);
+
+  // When: Handling the event upload request
+  ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
+                                                                withCommandUUID:@"uuid"
+                                                                        onArena:self.arena];
+
+  // Then: Should return a successful response (error is async) and enqueue a sync
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertFalse(response->has_error(), @"Should not have error on the response");
+  OCMVerifyAll(self.mockSyncDelegate);
+}
+
 - (void)testDispatchSantaCommandToHandlerEventUploadError {
   // Given: An EventUploadRequest command with empty path
   ::pbv1::SantaCommandRequest command;
