@@ -1422,6 +1422,9 @@ santa_unit_test(
         "bsm",
         "EndpointSecurity",
     ],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityEnricher",
