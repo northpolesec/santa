@@ -441,10 +441,12 @@ static NSString *const kPrinterProxy =
           NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
           // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
           [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
-          [msg appendFormat:@"\033[1mPath:      \033[0m %@\n"
+          [msg appendFormat:@"\033[1mReason:    \033[0m %@\n"
+                            @"\033[1mPath:      \033[0m %@\n"
                             @"\033[1mIdentifier:\033[0m %@\n"
                             @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                            se.filePath, se.fileSHA256, se.parentName, se.ppid];
+                            [SNTBlockMessage blockReasonForEventState:cd.decision], se.filePath,
+                            se.fileSHA256, se.parentName, se.ppid];
           NSURL *detailURL =
               [SNTBlockMessage eventDetailURLForEvent:se
                                             customURL:(cd.customURL ?: config.eventDetailURL)];
