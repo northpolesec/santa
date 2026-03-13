@@ -127,6 +127,33 @@ static id ValueOrNull(id value) {
   return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBannedMessage];
 }
 
++ (NSString *)blockReasonForEventState:(SNTEventState)decision {
+  switch (decision) {
+    case SNTEventStateBlockBinary:
+      return NSLocalizedString(@"Binary rule", @"Block reason for binary rule match");
+    case SNTEventStateBlockCertificate:
+      return NSLocalizedString(@"Certificate rule", @"Block reason for certificate rule match");
+    case SNTEventStateBlockTeamID:
+      return NSLocalizedString(@"Team ID rule", @"Block reason for Team ID rule match");
+    case SNTEventStateBlockSigningID:
+      return NSLocalizedString(@"Signing ID rule", @"Block reason for Signing ID rule match");
+    case SNTEventStateBlockCDHash:
+      return NSLocalizedString(@"CDHash rule", @"Block reason for CDHash rule match");
+    case SNTEventStateBlockScope:
+      return NSLocalizedString(@"Blocked path regex", @"Block reason for blocked path regex match");
+    case SNTEventStateBlockCELFallback:
+      return NSLocalizedString(@"CEL fallback rule", @"Block reason for CEL fallback rule match");
+    case SNTEventStateBlockLongPath:
+      return NSLocalizedString(@"Path too long",
+                               @"Block reason when file path exceeds maximum length");
+    case SNTEventStateBlockUnknown:
+      return NSLocalizedString(@"No matching rule",
+                               @"Block reason when no rule matched in lockdown mode");
+    default:
+      return NSLocalizedString(@"Unknown", @"Block reason when decision state is unrecognized");
+  }
+}
+
 + (NSString *)stringFromHTML:(NSString *)html {
   NSError *error;
   NSXMLNodeOptions options = NSXMLDocumentIncludeContentTypeDeclaration |

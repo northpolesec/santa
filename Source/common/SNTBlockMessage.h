@@ -19,6 +19,8 @@
 #import <Foundation/Foundation.h>
 #endif
 
+#import "Source/common/SNTCommonEnums.h"
+
 @class SNTDeviceEvent;
 @class SNTStoredExecutionEvent;
 @class SNTStoredFileAccessEvent;
@@ -60,6 +62,11 @@ NS_ASSUME_NONNULL_BEGIN
                                  customURL:(nullable NSString *)url;
 + (nullable NSURL *)eventDetailURLForFileAccessEvent:(nullable SNTStoredFileAccessEvent *)event
                                            customURL:(nullable NSString *)url;
+
+///
+///  Returns a human-readable string describing the block reason for the given event state.
+///
++ (NSString *)blockReasonForEventState:(SNTEventState)decision;
 
 ///
 ///  Strip HTML from a string, replacing <br /> with newline.
