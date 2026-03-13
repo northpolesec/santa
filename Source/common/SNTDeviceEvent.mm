@@ -21,6 +21,7 @@
   ENCODE(coder, mntonname);
   ENCODE(coder, mntfromname);
   ENCODE(coder, remountArgs);
+  ENCODE_BOXABLE(coder, isEncrypted);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -29,6 +30,7 @@
     DECODE(decoder, mntonname, NSString);
     DECODE(decoder, mntfromname, NSString);
     DECODE_ARRAY(decoder, remountArgs, NSString);
+    DECODE_SELECTOR(decoder, isEncrypted, NSNumber, boolValue);
   }
   return self;
 }
