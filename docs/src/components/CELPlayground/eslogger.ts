@@ -22,6 +22,22 @@ function parseExecEvent(input: string): Record<string, any> {
   throw new Error("No exec event found in eslogger output");
 }
 
+// Map eslogger PROX_FDTYPE_* values to CEL proto FD_TYPE_* values.
+// The numeric values differ: e.g. PROX_FDTYPE_VNODE=1 but FD_TYPE_VNODE=2.
+const FDTYPE_ES_TO_CEL: Record<number, number> = {
+  0: 1,   // PROX_FDTYPE_ATALK   → FD_TYPE_ATALK
+  1: 2,   // PROX_FDTYPE_VNODE   → FD_TYPE_VNODE
+  2: 3,   // PROX_FDTYPE_SOCKET  → FD_TYPE_SOCKET
+  3: 4,   // PROX_FDTYPE_PSHM    → FD_TYPE_PSHM
+  4: 5,   // PROX_FDTYPE_PSEM    → FD_TYPE_PSEM
+  5: 6,   // PROX_FDTYPE_KQUEUE  → FD_TYPE_KQUEUE
+  6: 7,   // PROX_FDTYPE_PIPE    → FD_TYPE_PIPE
+  7: 8,   // PROX_FDTYPE_FSEVENTS → FD_TYPE_FSEVENTS
+  9: 9,   // PROX_FDTYPE_NETPOLICY → FD_TYPE_NETPOLICY
+  10: 10, // PROX_FDTYPE_CHANNEL → FD_TYPE_CHANNEL
+  11: 11, // PROX_FDTYPE_NEXUS   → FD_TYPE_NEXUS
+};
+
 export function convertEsloggerEvent(input: string): string {
   const event = parseExecEvent(input);
   const exec = event.event.exec;
@@ -66,6 +82,14 @@ export function convertEsloggerEvent(input: string): string {
     } else if (target.team_id) {
       context.target.signing_id = target.team_id + ":" + target.signing_id;
     }
+  }
+
+  // fds: array of {fd, fdtype} → {fd, type} with PROX_FDTYPE→FD_TYPE mapping
+  if (Array.isArray(exec.fds)) {
+    context.fds = exec.fds.map((entry: any) => ({
+      fd: entry.fd,
+      type: FDTYPE_ES_TO_CEL[entry.fdtype] ?? 0, // unknown types → FD_TYPE_UNKNOWN
+    }));
   }
 
   // Make up signing times and ancestors (eslogger events don't include these)

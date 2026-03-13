@@ -23,6 +23,18 @@ export const VARIABLES: CELVariable[] = [
     type: "timestamp",
     documentation: "Secure code signing timestamp",
   },
+  { name: "FD_TYPE_UNKNOWN", type: "int", documentation: "Unknown file descriptor type" },
+  { name: "FD_TYPE_ATALK", type: "int", documentation: "AppleTalk file descriptor" },
+  { name: "FD_TYPE_VNODE", type: "int", documentation: "Vnode (regular file) file descriptor" },
+  { name: "FD_TYPE_SOCKET", type: "int", documentation: "Socket file descriptor" },
+  { name: "FD_TYPE_PSHM", type: "int", documentation: "POSIX shared memory file descriptor" },
+  { name: "FD_TYPE_PSEM", type: "int", documentation: "POSIX semaphore file descriptor" },
+  { name: "FD_TYPE_KQUEUE", type: "int", documentation: "Kqueue file descriptor" },
+  { name: "FD_TYPE_PIPE", type: "int", documentation: "Pipe file descriptor" },
+  { name: "FD_TYPE_FSEVENTS", type: "int", documentation: "FSEvents file descriptor" },
+  { name: "FD_TYPE_NETPOLICY", type: "int", documentation: "Network policy file descriptor" },
+  { name: "FD_TYPE_CHANNEL", type: "int", documentation: "Channel file descriptor" },
+  { name: "FD_TYPE_NEXUS", type: "int", documentation: "Nexus file descriptor" },
   { name: "ALLOWLIST", type: "string", documentation: "Allow policy constant" },
   { name: "BLOCKLIST", type: "string", documentation: "Block policy constant" },
   {
@@ -62,6 +74,23 @@ export const VARIABLES: CELVariable[] = [
       { name: "team_id", type: "string", documentation: "Team ID from code signature" },
       { name: "path", type: "string", documentation: "Path to the ancestor binary" },
       { name: "cdhash", type: "string", documentation: "Code directory hash" },
+    ],
+  },
+  {
+    name: "fds",
+    type: "list",
+    dynamic: true,
+    v2Only: true,
+    documentation:
+      "List of open file descriptors at exec time. Each entry has fd (number) and type (FDType enum).",
+    itemFields: [
+      { name: "fd", type: "int", documentation: "File descriptor number" },
+      {
+        name: "type",
+        type: "int",
+        documentation:
+          "File descriptor type enum (FD_TYPE_VNODE, FD_TYPE_SOCKET, FD_TYPE_PIPE, etc.)",
+      },
     ],
   },
 ];
