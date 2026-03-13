@@ -21,6 +21,7 @@
 @property NSString *mntonname;
 @property NSString *mntfromname;
 @property NSArray<NSString *> *remountArgs;
+@property BOOL isEncrypted;
 
 - (NSString *)readableRemountArgs;
 

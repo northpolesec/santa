@@ -570,6 +570,7 @@ NS_ASSUME_NONNULL_BEGIN
   SNTDeviceEvent *event = [[SNTDeviceEvent alloc]
       initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
             fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
+  event.isEncrypted = isEncrypted;
 
   NSString *model = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
@@ -598,7 +599,8 @@ NS_ASSUME_NONNULL_BEGIN
                 mountOnName:@(eventStatFS->f_mntonname)
                    protocol:protocol
                    decision:SNTStoredUSBMountEventDecisionAllowedWithRemount
-                remountArgs:event.remountArgs];
+                remountArgs:event.remountArgs
+                isEncrypted:isEncrypted];
   } else {
     // The mount is going to be blocked, log it
     NSMutableDictionary *props = [CFBridgingRelease(DADiskCopyDescription(disk)) mutableCopy];
@@ -610,7 +612,8 @@ NS_ASSUME_NONNULL_BEGIN
                                                 mountOnName:@(eventStatFS->f_mntonname)
                                                    protocol:protocol
                                                    decision:SNTStoredUSBMountEventDecisionBlocked
-                                                remountArgs:nil];
+                                                remountArgs:nil
+                                                isEncrypted:isEncrypted];
   }
 
   if (self.deviceBlockCallback) {
@@ -719,6 +722,7 @@ NS_ASSUME_NONNULL_BEGIN
   if (self.deviceBlockCallback) {
     SNTDeviceEvent *event = [[SNTDeviceEvent alloc] initWithOnName:mountOnName fromName:bsdName];
     event.remountArgs = self.remountArgs;
+    event.isEncrypted = YES;
 
     SNTStoredUSBMountEvent *storedEvent = [[SNTStoredUSBMountEvent alloc]
         initWithDeviceModel:model
@@ -726,7 +730,8 @@ NS_ASSUME_NONNULL_BEGIN
                 mountOnName:mountOnName
                    protocol:protocol
                    decision:SNTStoredUSBMountEventDecisionAllowedWithRemount
-                remountArgs:self.remountArgs];
+                remountArgs:self.remountArgs
+                isEncrypted:YES];
 
     self.deviceBlockCallback(event, storedEvent);
   }
