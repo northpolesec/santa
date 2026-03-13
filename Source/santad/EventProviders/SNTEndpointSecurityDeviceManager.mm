@@ -669,18 +669,14 @@ NS_ASSUME_NONNULL_BEGIN
 
   [self.remountingDisks addObject:bsdName];
 
-  CFRetain(disk);
-  dispatch_async(self.diskQueue, ^{
-    NSArray<NSString *> *args = self.remountArgs;
-    CFStringRef *argv = (CFStringRef *)calloc(args.count + 1, sizeof(CFStringRef));
-    CFArrayGetValues((__bridge CFArrayRef)args, CFRangeMake(0, (CFIndex)args.count),
-                     (const void **)argv);
+  NSArray<NSString *> *args = self.remountArgs;
+  CFStringRef *argv = (CFStringRef *)calloc(args.count + 1, sizeof(CFStringRef));
+  CFArrayGetValues((__bridge CFArrayRef)args, CFRangeMake(0, (CFIndex)args.count),
+                   (const void **)argv);
 
-    DADiskMountWithArguments(disk, NULL, kDADiskMountOptionDefault, DiskRemountCompletionCallback,
-                             (__bridge void *)self, argv);
-    free(argv);
-    CFRelease(disk);
-  });
+  DADiskMountWithArguments(disk, NULL, kDADiskMountOptionDefault, DiskRemountCompletionCallback,
+                           (__bridge void *)self, argv);
+  free(argv);
 
   return DADissenterCreate(kCFAllocatorDefault, kDAReturnBusy,
                            CFSTR("Remounting with restricted flags"));
