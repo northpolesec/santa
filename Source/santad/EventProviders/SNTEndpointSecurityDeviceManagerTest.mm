@@ -196,14 +196,14 @@ class MockAuthResultCache : public AuthResultCache {
         return true;
       }));
 
-  [deviceManager
-           handleMessage:Message(mockESApi, &esMsg)
-      recordEventMetrics:^(EventDisposition d) {
-        XCTAssertEqual(d, (deviceManager.blockUSBMount || deviceManager.blockUnencryptedRemovableMediaMount)
-                              ? EventDisposition::kProcessed
-                              : EventDisposition::kDropped);
-        dispatch_semaphore_signal(semaMetrics);
-      }];
+  [deviceManager handleMessage:Message(mockESApi, &esMsg)
+            recordEventMetrics:^(EventDisposition d) {
+              XCTAssertEqual(d, (deviceManager.blockUSBMount ||
+                                 deviceManager.blockUnencryptedRemovableMediaMount)
+                                    ? EventDisposition::kProcessed
+                                    : EventDisposition::kDropped);
+              dispatch_semaphore_signal(semaMetrics);
+            }];
 
   [self waitForExpectations:@[ mountExpectation ] timeout:60.0];
 

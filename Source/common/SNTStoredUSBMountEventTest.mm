@@ -73,7 +73,7 @@
                  protocol:@"USB"
                  decision:SNTStoredUSBMountEventDecisionAllowedWithRemount
               remountArgs:@[ @"noexec", @"rdonly" ]
-                isEncrypted:YES];
+              isEncrypted:YES];
   NSString *originalUUID = event.uuid;
 
   // Archive the event

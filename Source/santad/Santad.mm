@@ -120,7 +120,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                            startupPreferences:[configurator onStartUSBOptions]];
 
   // maybe have a new device event callback?
-  device_client.blockUnencryptedRemovableMediaMount = [configurator blockUnencryptedRemovableMediaMount];
+  device_client.blockUnencryptedRemovableMediaMount =
+      [configurator blockUnencryptedRemovableMediaMount];
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
     [syncd_queue addStoredEvent:usbEvent];
@@ -403,8 +404,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                      return;
                                    }
 
-                                   LOGI(@"BlockUnencryptedRemovableMediaMount changed: %d -> %d", oldBool,
-                                        newBool);
+                                   LOGI(@"BlockUnencryptedRemovableMediaMount changed: %d -> %d",
+                                        oldBool, newBool);
                                    device_client.blockUnencryptedRemovableMediaMount = newBool;
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
