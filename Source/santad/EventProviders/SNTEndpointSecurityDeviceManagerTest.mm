@@ -920,9 +920,7 @@ class MockAuthResultCache : public AuthResultCache {
     (__bridge NSString *)kDADiskDescriptionDeviceModelKey : @"Test Model",
     (__bridge NSString *)kDADiskDescriptionDeviceVendorKey : @"Test Vendor",
   } mutableCopy];
-  if (encrypted) {
-    desc[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey] = @YES;
-  }
+  desc[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey] = @(encrypted);
   mockDisk.diskDescription = desc;
   [self.mockDA insert:mockDisk];
   return mockDisk;
