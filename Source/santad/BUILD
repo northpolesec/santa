@@ -1733,6 +1733,9 @@ santa_unit_test(
     sdk_dylibs = [
         "EndpointSecurity",
     ],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":MockEndpointSecurityAPI",
         ":SNTEndpointSecurityDataFileAccessAuthorizer",
@@ -1763,6 +1766,9 @@ santa_unit_test(
 santa_unit_test(
     name = "FAAPolicyProcessorTest",
     srcs = ["EventProviders/FAAPolicyProcessorTest.mm"],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":EndpointSecurityMessage",
         ":FAAPolicyProcessor",
@@ -1784,6 +1790,9 @@ santa_unit_test(
     srcs = ["EventProviders/SNTEndpointSecurityTamperResistanceTest.mm"],
     sdk_dylibs = [
         "EndpointSecurity",
+    ],
+    sdk_frameworks = [
+        "DiskArbitration",
     ],
     deps = [
         ":EndpointSecurityClient",
@@ -1839,6 +1848,9 @@ santa_unit_test(
     sdk_dylibs = [
         "bsm",
         "EndpointSecurity",
+    ],
+    sdk_frameworks = [
+        "DiskArbitration",
     ],
     deps = [
         ":AuthResultCache",
