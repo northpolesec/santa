@@ -81,7 +81,7 @@
 @property NSNumber *enableAllEventUpload;
 @property NSNumber *disableUnknownEventUpload;
 @property NSNumber *blockUSBMount;
-@property NSNumber *blockUnencryptedUSBMount;
+@property NSNumber *blockUnencryptedRemovableMediaMount;
 // Array of mount args for the forced remounting feature.
 @property NSArray *remountUSBMode;
 @property NSNumber *blockNetworkMount;

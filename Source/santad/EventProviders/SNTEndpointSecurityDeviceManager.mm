@@ -478,7 +478,7 @@ NS_ASSUME_NONNULL_BEGIN
 #endif  // HAVE_MACOS_15
 
   if ((isNetworkMount && !self.configurator.blockNetworkMount) ||
-      (!isNetworkMount && !self.blockUSBMount && !self.blockUnencryptedUSBMount)) {
+      (!isNetworkMount && !self.blockUSBMount && !self.blockUnencryptedRemovableMediaMount)) {
     // TODO: We should also unsubscribe from events when these aren't set, but
     // this is generally a low-volume event type and handling dynamic subscriptions adds
     // a lot of code complexity.
@@ -556,16 +556,16 @@ NS_ASSUME_NONNULL_BEGIN
   // When only encryption enforcement is active (blockUSBMount is OFF),
   // encrypted devices are allowed through (subject to remountArgs if configured).
   // Unencrypted devices fall through to the block/remount logic below.
-  if (self.blockUnencryptedUSBMount && !self.blockUSBMount && isEncrypted) {
+  if (self.blockUnencryptedRemovableMediaMount && !self.blockUSBMount && isEncrypted) {
     if (![self haveRemountArgs]) {
       return ES_AUTH_RESULT_ALLOW;
     }
     // Encrypted device with remountArgs: fall through to remount logic.
   }
 
-  // When blockUnencryptedUSBMount is ON and device is unencrypted, always block
+  // When blockUnencryptedRemovableMediaMount is ON and device is unencrypted, always block
   // (never remount — remounting still exposes unencrypted data).
-  BOOL shouldBlockUnencrypted = self.blockUnencryptedUSBMount && !isEncrypted;
+  BOOL shouldBlockUnencrypted = self.blockUnencryptedRemovableMediaMount && !isEncrypted;
 
   SNTDeviceEvent *event = [[SNTDeviceEvent alloc]
       initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
@@ -651,7 +651,7 @@ NS_ASSUME_NONNULL_BEGIN
 
   // Only intercept when encryption enforcement is active and blockUSBMount is off.
   // When blockUSBMount is on, ES handles everything (block all).
-  if (!self.blockUnencryptedUSBMount || self.blockUSBMount) {
+  if (!self.blockUnencryptedRemovableMediaMount || self.blockUSBMount) {
     return NULL;
   }
 

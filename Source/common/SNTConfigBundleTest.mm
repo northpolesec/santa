@@ -28,7 +28,7 @@
 @property NSString *allowlistRegex;
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
-@property NSNumber *blockUnencryptedUSBMount;
+@property NSNumber *blockUnencryptedRemovableMediaMount;
 @property NSArray *remountUSBMode;
 @property NSNumber *blockNetworkMount;
 @property NSString *bannedNetworkMountBlockMessage;
@@ -68,7 +68,7 @@
   bundle.allowlistRegex = @"allow";
   bundle.blocklistRegex = @"block";
   bundle.blockUSBMount = @(YES);
-  bundle.blockUnencryptedUSBMount = @(YES);
+  bundle.blockUnencryptedRemovableMediaMount = @(YES);
   bundle.remountUSBMode = @[ @"foo" ];
   bundle.blockNetworkMount = @(YES);
   bundle.bannedNetworkMountBlockMessage = @"Network mount blocked";
@@ -117,7 +117,7 @@
     [exp fulfill];
   }];
 
-  [bundle blockUnencryptedUSBMount:^(BOOL val) {
+  [bundle blockUnencryptedRemovableMediaMount:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
@@ -254,7 +254,7 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle blockUnencryptedUSBMount:^(BOOL val) {
+  [bundle blockUnencryptedRemovableMediaMount:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
   }];
 
