@@ -104,6 +104,19 @@ DASessionRef __nullable DASessionCreate(CFAllocatorRef __nullable allocator);
 
 void DADiskUnmount(DADiskRef disk, DADiskUnmountOptions options,
                    DADiskUnmountCallback __nullable callback, void *__nullable context);
+
+const char *__nullable DADiskGetBSDName(DADiskRef disk);
+
+DADissenterRef __nullable DADissenterCreate(CFAllocatorRef __nullable allocator, DAReturn status,
+                                            CFStringRef __nullable statusString);
+
+void DARegisterDiskMountApprovalCallback(DASessionRef session, CFDictionaryRef __nullable match,
+                                         DADiskMountApprovalCallback callback,
+                                         void *__nullable context);
+
+DAReturn DADissenterGetStatus(DADissenterRef dissenter);
+CFStringRef __nullable DADissenterGetStatusString(DADissenterRef dissenter);
+
 int getmntinfo_r_np(struct statfs *__nullable *__nullable mntbufp, int flags);
 
 CF_EXTERN_C_END

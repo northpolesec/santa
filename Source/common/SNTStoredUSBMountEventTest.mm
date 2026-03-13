@@ -28,7 +28,8 @@
                                               mountOnName:@"/Volumes/USB_DRIVE"
                                                  protocol:@"USB"
                                                  decision:SNTStoredUSBMountEventDecisionBlocked
-                                              remountArgs:nil];
+                                              remountArgs:nil
+                                              isEncrypted:NO];
 
   XCTAssertNotNil(event.uuid);
   XCTAssertGreaterThan(event.uuid.length, 0);
@@ -39,7 +40,8 @@
                                               mountOnName:@"/Volumes/USB_DRIVE"
                                                  protocol:@"USB"
                                                  decision:SNTStoredUSBMountEventDecisionBlocked
-                                              remountArgs:nil];
+                                              remountArgs:nil
+                                              isEncrypted:NO];
 
   XCTAssertNotEqualObjects(event.uuid, event2.uuid);
 }
@@ -51,7 +53,8 @@
                                               mountOnName:@"/Volumes/USB_DRIVE"
                                                  protocol:@"USB"
                                                  decision:SNTStoredUSBMountEventDecisionBlocked
-                                              remountArgs:nil];
+                                              remountArgs:nil
+                                              isEncrypted:NO];
 
   XCTAssertEqualObjects([event uniqueID], @"/Volumes/USB_DRIVE");
 }
@@ -69,7 +72,8 @@
               mountOnName:@"/Volumes/USB_DRIVE"
                  protocol:@"USB"
                  decision:SNTStoredUSBMountEventDecisionAllowedWithRemount
-              remountArgs:@[ @"noexec", @"rdonly" ]];
+              remountArgs:@[ @"noexec", @"rdonly" ]
+              isEncrypted:YES];
   NSString *originalUUID = event.uuid;
 
   // Archive the event
@@ -98,6 +102,7 @@
   XCTAssertEqualObjects(decodedEvent.protocol, @"USB");
   XCTAssertEqual(decodedEvent.decision, SNTStoredUSBMountEventDecisionAllowedWithRemount);
   XCTAssertEqualObjects(decodedEvent.remountArgs, (@[ @"noexec", @"rdonly" ]));
+  XCTAssertTrue(decodedEvent.isEncrypted);
 }
 
 - (void)testEncodeDecodeWithNilValues {
@@ -107,7 +112,8 @@
                                               mountOnName:@"/Volumes/USB_DRIVE"
                                                  protocol:@"USB"
                                                  decision:SNTStoredUSBMountEventDecisionBlocked
-                                              remountArgs:nil];
+                                              remountArgs:nil
+                                              isEncrypted:NO];
 
   NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
                                                 requiringSecureCoding:YES
@@ -138,7 +144,8 @@
                                               mountOnName:@"/Volumes/USB_DRIVE"
                                                  protocol:@"USB"
                                                  decision:SNTStoredUSBMountEventDecisionBlocked
-                                              remountArgs:nil];
+                                              remountArgs:nil
+                                              isEncrypted:NO];
 
   NSString *description = [event description];
 

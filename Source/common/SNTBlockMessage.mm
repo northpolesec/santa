@@ -110,7 +110,9 @@ static id ValueOrNull(id value) {
                         @"The default message to show the user when a Removable Media "
                         @"(e.g. USB device) is blocked from mounting");
 
-  if ([[SNTConfigurator configurator] remountUSBMode]) {
+  // Use the actual event.remountArgs rather than global config,
+  // since RemountUSBMode can be both for BlockUnencryptedRemovableMediaMount and BlockUSBMount
+  if (event.remountArgs.count > 0) {
     return [SNTBlockMessage formatMessage:[[SNTConfigurator configurator] remountUSBBlockMessage]
                              withFallback:defaultRemountMessage];
   }

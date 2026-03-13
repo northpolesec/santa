@@ -119,6 +119,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                remountUSBMode:[configurator remountUSBMode]
                                            startupPreferences:[configurator onStartUSBOptions]];
 
+  // maybe have a new device event callback?
+  device_client.blockUnencryptedRemovableMediaMount =
+      [configurator blockUnencryptedRemovableMediaMount];
+
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
     [syncd_queue addStoredEvent:usbEvent];
     [[notifier_queue.notifierConnection remoteObjectProxy] postUSBBlockNotification:event];
@@ -388,6 +392,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    LOGI(@"BlockUSBMount changed: %d -> %d", oldBool, newBool);
                                    device_client.blockUSBMount = newBool;
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(blockUnencryptedRemovableMediaMount)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"BlockUnencryptedRemovableMediaMount changed: %d -> %d",
+                                        oldBool, newBool);
+                                   device_client.blockUnencryptedRemovableMediaMount = newBool;
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(remountUSBMode)
