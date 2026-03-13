@@ -217,7 +217,8 @@ static NSString *const kEnabledProcessAnnotations = @"EnabledProcessAnnotations"
 // The keys managed by a sync server or mobileconfig.
 static NSString *const kClientModeKey = @"ClientMode";
 static NSString *const kBlockUSBMountKey = @"BlockUSBMount";
-static NSString *const kBlockUnencryptedRemovableMediaMountKey = @"BlockUnencryptedRemovableMediaMount";
+static NSString *const kBlockUnencryptedRemovableMediaMountKey =
+    @"BlockUnencryptedRemovableMediaMount";
 static NSString *const kRemountUSBModeKey = @"RemountUSBMode";
 static NSString *const kBlockNetworkMountKey = @"BlockNetworkMount";
 static NSString *const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
