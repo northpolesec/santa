@@ -940,7 +940,9 @@ class MockAuthResultCache : public AuthResultCache {
 
   // Verify remount was triggered and tracking set was cleaned up
   XCTAssertTrue(mockDisk.wasMounted);
-  XCTAssertFalse([dm.remountingDisks containsObject:@"/dev/disk2s1"]);
+  dispatch_sync(dm.diskQueue, ^{
+    XCTAssertFalse([dm.remountingDisks containsObject:@"/dev/disk2s1"]);
+  });
 }
 
 - (void)testMountApproval_SelfRemount_Approves {
@@ -951,7 +953,9 @@ class MockAuthResultCache : public AuthResultCache {
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
 
   // Pre-populate tracking set to simulate an in-flight remount
-  [dm.remountingDisks addObject:@"/dev/disk2s1"];
+  dispatch_sync(dm.diskQueue, ^{
+    [dm.remountingDisks addObject:@"/dev/disk2s1"];
+  });
 
   // Should approve because BSD name is in tracking set
   DADissenterRef result = [dm handleMountApproval:(__bridge DADiskRef)mockDisk];
@@ -1029,12 +1033,16 @@ class MockAuthResultCache : public AuthResultCache {
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
 
   // Pre-populate tracking set
-  [dm.remountingDisks addObject:@"/dev/disk2s1"];
+  dispatch_sync(dm.diskQueue, ^{
+    [dm.remountingDisks addObject:@"/dev/disk2s1"];
+  });
 
   [dm handleRemountCompletion:(__bridge DADiskRef)mockDisk dissenter:NULL];
 
-  XCTAssertFalse([dm.remountingDisks containsObject:@"/dev/disk2s1"],
-                 @"Should remove from tracking set after completion");
+  dispatch_sync(dm.diskQueue, ^{
+    XCTAssertFalse([dm.remountingDisks containsObject:@"/dev/disk2s1"],
+                   @"Should remove from tracking set after completion");
+  });
 }
 
 - (void)testRemountCompletion_Success_FiresCallback {
@@ -1044,7 +1052,9 @@ class MockAuthResultCache : public AuthResultCache {
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
 
-  [dm.remountingDisks addObject:@"/dev/disk2s1"];
+  dispatch_sync(dm.diskQueue, ^{
+    [dm.remountingDisks addObject:@"/dev/disk2s1"];
+  });
 
   __block BOOL callbackCalled = NO;
   __block SNTStoredUSBMountEventDecision gotDecision;
@@ -1068,7 +1078,9 @@ class MockAuthResultCache : public AuthResultCache {
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
 
-  [dm.remountingDisks addObject:@"/dev/disk2s1"];
+  dispatch_sync(dm.diskQueue, ^{
+    [dm.remountingDisks addObject:@"/dev/disk2s1"];
+  });
 
   dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
     XCTFail(@"deviceBlockCallback should not fire on failed remount");
@@ -1078,8 +1090,10 @@ class MockAuthResultCache : public AuthResultCache {
   DADissenterRef mockDissenter = DADissenterCreate(kCFAllocatorDefault, kDAReturnBusy, NULL);
   [dm handleRemountCompletion:(__bridge DADiskRef)mockDisk dissenter:mockDissenter];
 
-  XCTAssertFalse([dm.remountingDisks containsObject:@"/dev/disk2s1"],
-                 @"Should still clean up tracking set on failure");
+  dispatch_sync(dm.diskQueue, ^{
+    XCTAssertFalse([dm.remountingDisks containsObject:@"/dev/disk2s1"],
+                   @"Should still clean up tracking set on failure");
+  });
 
   if (mockDissenter) CFRelease(mockDissenter);
 }

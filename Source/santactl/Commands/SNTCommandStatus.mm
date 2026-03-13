@@ -312,7 +312,10 @@ REGISTER_COMMAND_NAME(@"status")
         @"watchdog_ram_peak" : @(ramPeak),
         @"block_usb" : @(blockUSBMount),
         @"block_unencrypted_removable_media" : @(blockUnencryptedRemovableMediaMount),
-        @"remount_usb_mode" : (blockUSBMount && remountUSBMode.count ? remountUSBMode : @""),
+        @"remount_usb_mode" :
+            ((blockUSBMount || blockUnencryptedRemovableMediaMount) && remountUSBMode.count
+                 ? remountUSBMode
+                 : @""),
         @"on_start_usb_options" : StartupOptionToString(configurator.onStartUSBOptions),
         @"static_rules" : @(staticRuleCount),
       },
