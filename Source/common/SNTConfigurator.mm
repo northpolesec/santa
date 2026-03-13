@@ -217,7 +217,7 @@ static NSString *const kEnabledProcessAnnotations = @"EnabledProcessAnnotations"
 // The keys managed by a sync server or mobileconfig.
 static NSString *const kClientModeKey = @"ClientMode";
 static NSString *const kBlockUSBMountKey = @"BlockUSBMount";
-static NSString *const kBlockUnencryptedUSBMountKey = @"BlockUnencryptedUSBMount";
+static NSString *const kBlockUnencryptedRemovableMediaMountKey = @"BlockUnencryptedRemovableMediaMount";
 static NSString *const kRemountUSBModeKey = @"RemountUSBMode";
 static NSString *const kBlockNetworkMountKey = @"BlockNetworkMount";
 static NSString *const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
@@ -282,7 +282,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kBlockedPathRegexKey : re,
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
-      kBlockUnencryptedUSBMountKey : number,
+      kBlockUnencryptedRemovableMediaMountKey : number,
       kRemountUSBModeKey : array,
       kBlockNetworkMountKey : number,
       kBannedNetworkMountBlockMessage : string,
@@ -319,7 +319,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kBlockedPathRegexKey : re,
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
-      kBlockUnencryptedUSBMountKey : number,
+      kBlockUnencryptedRemovableMediaMountKey : number,
       kRemountUSBModeKey : array,
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
@@ -783,7 +783,7 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self syncAndConfigStateSet];
 }
 
-+ (NSSet *)keyPathsForValuesAffectingBlockUnencryptedUSBMount {
++ (NSSet *)keyPathsForValuesAffectingBlockUnencryptedRemovableMediaMount {
   return [self syncAndConfigStateSet];
 }
 
@@ -1652,15 +1652,15 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self.configState[kBlockUSBMountKey] boolValue];
 }
 
-- (void)setSyncServerBlockUnencryptedUSBMount:(BOOL)enabled {
-  [self updateSyncStateForKey:kBlockUnencryptedUSBMountKey value:@(enabled)];
+- (void)setSyncServerBlockUnencryptedRemovableMediaMount:(BOOL)enabled {
+  [self updateSyncStateForKey:kBlockUnencryptedRemovableMediaMountKey value:@(enabled)];
 }
 
-- (BOOL)blockUnencryptedUSBMount {
-  NSNumber *n = self.syncState[kBlockUnencryptedUSBMountKey];
+- (BOOL)blockUnencryptedRemovableMediaMount {
+  NSNumber *n = self.syncState[kBlockUnencryptedRemovableMediaMountKey];
   if (n) return [n boolValue];
 
-  return [self.configState[kBlockUnencryptedUSBMountKey] boolValue];
+  return [self.configState[kBlockUnencryptedRemovableMediaMountKey] boolValue];
 }
 
 - (void)setSyncServerBannedNetworkMountBlockMessage:(NSString *)msg {
