@@ -1447,6 +1447,9 @@ santa_unit_test(
 santa_unit_test(
     name = "EndpointSecuritySerializerProtobufTest",
     srcs = ["Logs/EndpointSecurity/Serializers/ProtobufTest.mm"],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     structured_resources = [
         "//Source/santad/testdata:protobuf_json_testdata",
     ],
@@ -1542,6 +1545,9 @@ santa_unit_test(
     sdk_dylibs = [
         "bsm",
         "EndpointSecurity",
+    ],
+    sdk_frameworks = [
+        "DiskArbitration",
     ],
     deps = [
         ":EndpointSecurityLogger",
@@ -1700,6 +1706,9 @@ santa_unit_test(
     sdk_dylibs = [
         "EndpointSecurity",
     ],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":AuthResultCache",
         ":EndpointSecurityClient",
@@ -1797,6 +1806,9 @@ santa_unit_test(
     sdk_dylibs = [
         "EndpointSecurity",
     ],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":AuthResultCache",
         ":EndpointSecurityClient",
@@ -1853,6 +1865,9 @@ santa_unit_test(
     srcs = ["SNTCompilerControllerTest.mm"],
     sdk_dylibs = [
         "EndpointSecurity",
+    ],
+    sdk_frameworks = [
+        "DiskArbitration",
     ],
     deps = [
         ":EndpointSecurityLogger",
