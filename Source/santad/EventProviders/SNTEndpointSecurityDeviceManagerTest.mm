@@ -938,15 +938,9 @@ class MockAuthResultCache : public AuthResultCache {
   DADissenterRef result = [dm handleMountApproval:(__bridge DADiskRef)mockDisk];
   XCTAssertTrue(result != NULL, @"Should return a dissenter for encrypted device with remountArgs");
 
-  // Verify disk was added to tracking set
-  XCTAssertTrue([dm.remountingDisks containsObject:@"/dev/disk2s1"]);
-
-  // Wait for async remount to complete
-  dispatch_sync(dm.diskQueue, ^{
-                });
-
-  // Verify remount was triggered
+  // Verify remount was triggered and tracking set was cleaned up
   XCTAssertTrue(mockDisk.wasMounted);
+  XCTAssertFalse([dm.remountingDisks containsObject:@"/dev/disk2s1"]);
 }
 
 - (void)testMountApproval_SelfRemount_Approves {
@@ -956,13 +950,12 @@ class MockAuthResultCache : public AuthResultCache {
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
 
-  // First call: dissent and schedule remount
-  DADissenterRef result1 = [dm handleMountApproval:(__bridge DADiskRef)mockDisk];
-  XCTAssertTrue(result1 != NULL);
+  // Pre-populate tracking set to simulate an in-flight remount
+  [dm.remountingDisks addObject:@"/dev/disk2s1"];
 
-  // Second call (simulating our remount): should approve because BSD name is in tracking set
-  DADissenterRef result2 = [dm handleMountApproval:(__bridge DADiskRef)mockDisk];
-  XCTAssertTrue(result2 == NULL, @"Should approve our own remount");
+  // Should approve because BSD name is in tracking set
+  DADissenterRef result = [dm handleMountApproval:(__bridge DADiskRef)mockDisk];
+  XCTAssertTrue(result == NULL, @"Should approve our own remount");
 }
 
 - (void)testMountApproval_UnencryptedDevice_Approves {
