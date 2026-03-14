@@ -52,6 +52,17 @@ typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredExecutionEvent *
                           listener:(NSXPCListenerEndpoint *)listener
                              reply:(SNTBundleHashBlock)reply;
 
+///
+///  Generate events for one or more paths. The path supports glob patterns
+///  (e.g. /Applications/*.app). For each match an SNTStoredExecutionEvent is
+///  created. When enableBundles is YES and the path resolves to a bundle,
+///  full bundle hashing is performed and the resulting related-binary events
+///  are included in the reply.
+///
+- (void)generateEventsFromPath:(NSString *)path
+                 enableBundles:(BOOL)enableBundles
+                         reply:(void (^)(NSArray<SNTStoredExecutionEvent *> *events))reply;
+
 @end
 
 @interface SNTXPCBundleServiceInterface : NSObject
