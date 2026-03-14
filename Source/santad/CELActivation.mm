@@ -142,6 +142,13 @@ ActivationCallbackBlock CreateCELActivationBlock(
         }
       }
 
+      std::optional<::santa::pb::v1::process_tree::Annotations> processAnnotations;
+      if (processTree) {
+        auto targetPid = santa::santad::process_tree::PidFromAuditToken(
+            esMsg->event.exec.target->audit_token);
+        processAnnotations = processTree->ExportAnnotations(targetPid);
+      }
+
       return std::make_unique<santa::cel::Activation<IsV2>>(
           std::move(f),
           ^std::vector<std::string>() {
@@ -160,7 +167,8 @@ ActivationCallbackBlock CreateCELActivationBlock(
           },
           ^std::vector<AncestorT>() {
             return Ancestors<IsV2>(processTree, esMsg);
-          });
+          },
+          std::move(processAnnotations));
     };
 
     if (useV2) {

@@ -38,6 +38,7 @@ objc_library(
     deps = [
         ":result_cc_proto",
         "//Source/common:Memoizer",
+        "//Source/santad/ProcessTree:process_tree_cc_proto",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",

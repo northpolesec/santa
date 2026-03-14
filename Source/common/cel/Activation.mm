@@ -165,6 +165,17 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
       return cel_runtime::CelValue::CreateList(
           arena->Create<cel_runtime::ContainerBackedListImpl>(arena, ancestorValues));
     }
+
+  }
+
+  if (name == "process") {
+    process_accessed_ = true;
+    auto *annotations =
+        arena->Create<::santa::pb::v1::process_tree::Annotations>(arena);
+    if (process_annotations_) {
+      annotations->CopyFrom(*process_annotations_);
+    }
+    return cel_runtime::CelProtoWrapper::CreateMessage(annotations, arena);
   }
   return {};
 }
@@ -214,12 +225,16 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
     v.push_back({field->name(), type});
   }
 
+  v.push_back({"process", ::cel::MessageType(
+                              ::santa::pb::v1::process_tree::Annotations::descriptor())});
+
   return v;
 }
 
 template <bool IsV2>
 bool Activation<IsV2>::IsResultCacheable() const {
-  if (args_.HasValue() || envs_.HasValue() || euid_.HasValue() || cwd_.HasValue()) {
+  if (args_.HasValue() || envs_.HasValue() || euid_.HasValue() || cwd_.HasValue() ||
+      process_accessed_) {
     return false;
   }
 

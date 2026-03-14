@@ -16,11 +16,13 @@
 #define SANTA__COMMON__CEL__CONTEXT_H
 
 #include <map>
+#include <optional>
 #include <type_traits>
 #include <vector>
 
 #include "Source/common/Memoizer.h"
 #include "Source/common/cel/CELProtoTraits.h"
+#include "Source/santad/ProcessTree/process_tree.pb.h"
 
 #include "absl/strings/string_view.h"
 
@@ -48,13 +50,16 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
 
   Activation(std::unique_ptr<ExecutableFileT> file, std::vector<std::string> (^args)(),
              std::map<std::string, std::string> (^envs)(), uid_t (^euid)(), std::string (^cwd)(),
-             std::vector<AncestorT> (^ancestors)())
+             std::vector<AncestorT> (^ancestors)(),
+             std::optional<::santa::pb::v1::process_tree::Annotations> process_annotations =
+                 std::nullopt)
       : file_(std::move(file)),
         args_(args),
         envs_(envs),
         euid_(euid),
         cwd_(cwd),
-        ancestors_(ancestors) {};
+        ancestors_(ancestors),
+        process_annotations_(std::move(process_annotations)) {};
   ~Activation() = default;
 
   std::optional<::google::api::expr::runtime::CelValue> FindValue(
@@ -79,6 +84,8 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   Memoizer<uid_t> euid_;
   Memoizer<std::string> cwd_;
   Memoizer<std::vector<AncestorT>> ancestors_;
+  std::optional<::santa::pb::v1::process_tree::Annotations> process_annotations_;
+  mutable bool process_accessed_ = false;
 
   bool IsResultCacheable() const;
 

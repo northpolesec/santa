@@ -17,9 +17,10 @@
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 
 #import "Source/santad/EventProviders/AuthResultCache.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityTreeAwareClient.h"
 #include "Source/santad/Metrics.h"
+#include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
 #include "Source/santad/TTYWriter.h"
@@ -27,14 +28,15 @@
 /// ES Client focused on subscribing to AUTH variants and authorizing the events
 /// based on configured policy.
 @interface SNTEndpointSecurityAuthorizer
-    : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler>
+    : SNTEndpointSecurityTreeAwareClient <SNTEndpointSecurityEventHandler>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::Metrics>)metrics
                execController:(SNTExecutionController *)execController
            compilerController:(SNTCompilerController *)compilerController
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
-                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
+                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
+                  processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
 
 - (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher;
 

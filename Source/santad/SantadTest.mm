@@ -159,7 +159,8 @@ static const char *kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
                                             execController:deps->ExecController()
                                         compilerController:deps->CompilerController()
                                            authResultCache:deps->AuthResultCache()
-                                                 ttyWriter:deps->TTYWriter()];
+                                                 ttyWriter:deps->TTYWriter()
+                                               processTree:deps->ProcessTree()];
 
   XCTestExpectation *expectation =
       [self expectationWithDescription:@"Wait for santa's Auth dispatch queue"];

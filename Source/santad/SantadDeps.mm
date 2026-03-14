@@ -33,6 +33,7 @@
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessTree/annotations/originator.h"
+#include "Source/santad/ProcessTree/annotations/sandbox_exec.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTDatabaseController.h"
 #include "Source/santad/SNTDecisionCache.h"
@@ -111,6 +112,10 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   // Create ProcessTree early so it can be passed to policy processor and exec controller
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
   std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>> annotators;
+
+  // SandboxExecAnnotator is always enabled — it's zero overhead when
+  // sandbox-exec isn't used and is required for sandbox_policy CEL rules.
+  annotators.emplace_back(std::make_unique<santa::santad::process_tree::SandboxExecAnnotator>());
 
   for (NSString *annotation in [configurator enabledProcessAnnotations]) {
     if ([[annotation lowercaseString] isEqualToString:@"originator"]) {

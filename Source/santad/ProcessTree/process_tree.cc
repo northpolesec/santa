@@ -36,6 +36,11 @@
 
 namespace santa::santad::process_tree {
 
+// When true, the current thread already holds mtx_ (called from within
+// HandleExec/HandleFork/BackfillInsertChildren).  AnnotateProcess checks this
+// to avoid a deadlock on the non-reentrant absl::Mutex.
+static thread_local bool in_annotator_callback = false;
+
 void ProcessTree::BackfillInsertChildren(
     absl::flat_hash_map<pid_t, std::vector<Process>> &parent_map,
     std::shared_ptr<Process> parent, const Process &unlinked_proc) {
@@ -49,17 +54,21 @@ void ProcessTree::BackfillInsertChildren(
   {
     absl::MutexLock lock(&mtx_);
     map_.emplace(unlinked_proc.pid_, proc);
-  }
 
-  // The only case where we should not have a parent is the root processes
-  // (e.g. init, kthreadd).
-  if (parent) {
-    for (auto &annotator : annotators_) {
-      annotator->AnnotateFork(*this, *(proc->parent_), *proc);
-      if (proc->program_ != proc->parent_->program_) {
-        annotator->AnnotateExec(*this, *(proc->parent_), *proc);
+    // Run annotators under the lock so that ExportAnnotations never sees
+    // a process node before its annotations are populated.
+    in_annotator_callback = true;
+    // The only case where we should not have a parent is the root processes
+    // (e.g. init, kthreadd).
+    if (parent) {
+      for (auto &annotator : annotators_) {
+        annotator->AnnotateFork(*this, *(proc->parent_), *proc);
+        if (proc->program_ != proc->parent_->program_) {
+          annotator->AnnotateExec(*this, *(proc->parent_), *proc);
+        }
       }
     }
+    in_annotator_callback = false;
   }
 
   for (const Process &child : parent_map[unlinked_proc.pid_.pid]) {
@@ -70,16 +79,15 @@ void ProcessTree::BackfillInsertChildren(
 void ProcessTree::HandleFork(uint64_t timestamp, const Process &parent,
                              const Pid new_pid) {
   if (Step(timestamp)) {
-    std::shared_ptr<Process> child;
-    {
-      absl::MutexLock lock(&mtx_);
-      child = std::make_shared<Process>(new_pid, parent.effective_cred_,
-                                        parent.program_, map_[parent.pid_]);
-      map_.emplace(new_pid, child);
-    }
+    absl::MutexLock lock(&mtx_);
+    auto child = std::make_shared<Process>(new_pid, parent.effective_cred_,
+                                      parent.program_, map_[parent.pid_]);
+    map_.emplace(new_pid, child);
+    in_annotator_callback = true;
     for (const auto &annotator : annotators_) {
       annotator->AnnotateFork(*this, parent, *child);
     }
+    in_annotator_callback = false;
   }
 }
 
@@ -93,14 +101,14 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process &p,
 
     auto new_proc = std::make_shared<Process>(
         new_pid, c, std::make_shared<const Program>(prog), p.parent_);
-    {
-      absl::MutexLock lock(&mtx_);
-      remove_at_.push_back({timestamp, p.pid_});
-      map_.emplace(new_proc->pid_, new_proc);
-    }
+    absl::MutexLock lock(&mtx_);
+    remove_at_.push_back({timestamp, p.pid_});
+    map_.emplace(new_proc->pid_, new_proc);
+    in_annotator_callback = true;
     for (const auto &annotator : annotators_) {
       annotator->AnnotateExec(*this, p, *new_proc);
     }
+    in_annotator_callback = false;
   }
 }
 
@@ -187,14 +195,23 @@ Annotation get/set
 
 void ProcessTree::AnnotateProcess(const Process &p,
                                   std::shared_ptr<const Annotator> a) {
-  absl::MutexLock lock(&mtx_);
   const Annotator &x = *a;
-  map_[p.pid_]->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
+  auto emplace = [&]() ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    map_[p.pid_]->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
+  };
+  if (in_annotator_callback) {
+    // Already holding mtx_ from HandleExec/HandleFork/BackfillInsertChildren.
+    emplace();
+  } else {
+    absl::MutexLock lock(&mtx_);
+    emplace();
+  }
 }
 
 std::optional<::santa::pb::v1::process_tree::Annotations>
 ProcessTree::ExportAnnotations(const Pid p) {
-  auto proc = Get(p);
+  absl::ReaderMutexLock lock(&mtx_);
+  auto proc = GetLocked(p);
   if (!proc || (*proc)->annotations_.empty()) {
     return std::nullopt;
   }

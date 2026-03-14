@@ -393,6 +393,7 @@ objc_library(
         "//Source/common/cel:CEL",
         "//Source/santad/ProcessTree:process",
         "//Source/santad/ProcessTree:process_tree",
+        "//Source/santad/ProcessTree:process_tree_cc_proto",
     ],
 )
 
@@ -553,14 +554,15 @@ objc_library(
         ":EndpointSecurityMessage",
         ":Metrics",
         ":SNTCompilerController",
-        ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
+        ":SNTEndpointSecurityTreeAwareClient",
         ":SNTExecutionController",
         ":TTYWriter",
         "//Source/common:BranchPrediction",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
+        "//Source/santad/ProcessTree:process_tree",
     ],
 )
 
@@ -1153,6 +1155,7 @@ objc_library(
         "//Source/common/faa:WatchItems",
         "//Source/santad/ProcessTree:process_tree",
         "//Source/santad/ProcessTree/annotations:originator",
+        "//Source/santad/ProcessTree/annotations:sandbox_exec",
     ],
 )
 
@@ -1909,6 +1912,7 @@ test_suite(
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
         "//Source/santad/ProcessTree:process_tree_test",
         "//Source/santad/ProcessTree/annotations:originator_test",
+        "//Source/santad/ProcessTree/annotations:sandbox_exec_test",
     ],
     visibility = ["//:santa_package_group"],
 )
