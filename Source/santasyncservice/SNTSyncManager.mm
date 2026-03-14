@@ -374,20 +374,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     return;
   }
 
-  if (dispatch_semaphore_wait(self.syncLimiter, DISPATCH_TIME_NOW)) {
-    if (reply) {
-      reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
-                                code:5
-                            userInfo:@{NSLocalizedDescriptionKey : @"Too many syncs in progress"}]);
-    }
-    return;
-  }
-
   dispatch_async(self.syncQueue, ^{
     auto replied = std::make_shared<std::atomic<bool>>(false);
     void (^guardedReply)(NSError *) = ^(NSError *e) {
       if (replied->exchange(true)) return;
-      dispatch_semaphore_signal(self.syncLimiter);
       if (reply) reply(e);
     };
 
