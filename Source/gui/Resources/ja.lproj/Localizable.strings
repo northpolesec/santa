@@ -34,6 +34,15 @@
 /* No comment provided by engineer. */
 "Binary Path" = "バイナリーパス";
 
+/* Block reason for binary rule match */
+"Binary rule" = "バイナリルール";
+
+/* No comment provided by engineer. */
+"Block Reason" = "ブロック理由";
+
+/* Block reason for blocked path regex match */
+"Blocked path regex" = "ブロックされたパス正規表現";
+
 /* No comment provided by engineer. */
 "Bundle Hash" = "バンドルハッシュ";
 
@@ -42,6 +51,15 @@
 
 /* No comment provided by engineer. */
 "CDHash" = "CDハッシュ";
+
+/* Block reason for CDHash rule match */
+"CDHash rule" = "CDHashルール";
+
+/* Block reason for CEL fallback rule match */
+"CEL fallback rule" = "CELフォールバックルール";
+
+/* Block reason for certificate rule match */
+"Certificate rule" = "証明書ルール";
 
 /* No comment provided by engineer. */
 "Clean Sync" = "クリーン同期";
@@ -103,6 +121,9 @@
 /* No comment provided by engineer. */
 "Network Share" = "ネットワーク共有";
 
+/* Block reason when no rule matched in lockdown mode */
+"No matching rule" = "一致するルールなし";
+
 /* Default text for Open button */
 "Open..." = "開く…";
 
@@ -114,6 +135,9 @@
 
 /* No comment provided by engineer. */
 "Path Accessed" = "アクセスされたパス";
+
+/* Block reason when file path exceeds maximum length */
+"Path too long" = "パスが長すぎます";
 
 /* No comment provided by engineer. */
 "Publisher" = "発行者";
@@ -154,6 +178,9 @@
 /* No comment provided by engineer. */
 "Signing ID" = "署名ID";
 
+/* Block reason for Signing ID rule match */
+"Signing ID rule" = "署名IDルール";
+
 /* No comment provided by engineer. */
 "Sync" = "同期";
 
@@ -193,6 +220,9 @@
 /* No comment provided by engineer. */
 "Team ID" = "チームID";
 
+/* Block reason for Team ID rule match */
+"Team ID rule" = "チームIDルール";
+
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "次のアプリケーションは信頼性を判断できないため、<br />実行がブロックされました";
 
@@ -213,6 +243,9 @@
 
 /* No comment provided by engineer. */
 "unknown" = "不明";
+
+/* Block reason when decision state is unrecognized */
+"Unknown" = "不明";
 
 /* No comment provided by engineer. */
 "User" = "ユーザー";
