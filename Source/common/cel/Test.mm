@@ -276,8 +276,6 @@
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
   using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
-  using FDType = ::santa::cel::v2::FileDescriptor::FDType;
-
   auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
   santa::cel::Activation<true> activation(
@@ -300,13 +298,13 @@
       ^std::vector<FileDescriptorT>() {
         FileDescriptorT fd0;
         fd0.set_fd(0);
-        fd0.set_type(FDType::FD_TYPE_VNODE);
+        fd0.set_type(FileDescriptorT::FD_TYPE_VNODE);
         FileDescriptorT fd1;
         fd1.set_fd(1);
-        fd1.set_type(FDType::FD_TYPE_PIPE);
+        fd1.set_type(FileDescriptorT::FD_TYPE_PIPE);
         FileDescriptorT fd2;
         fd2.set_fd(2);
-        fd2.set_type(FDType::FD_TYPE_SOCKET);
+        fd2.set_type(FileDescriptorT::FD_TYPE_SOCKET);
         return {fd0, fd1, fd2};
       });
 
@@ -325,7 +323,7 @@
   }
   {
     // Test fd number access
-    auto result = sut.value()->CompileAndEvaluate("fds[0].fd == 0", activation);
+    auto result = sut.value()->CompileAndEvaluate("fds[0].fd == 0u", activation);
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
