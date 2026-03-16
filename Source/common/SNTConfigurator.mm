@@ -1332,12 +1332,20 @@ static SNTConfigurator *sharedConfigurator = nil;
   return kDefaultFullSyncInterval;
 }
 
+- (void)setFullSyncInterval:(NSUInteger)interval {
+  [self updateSyncStateForKey:kFullSyncInterval value:@(interval)];
+}
+
 - (NSUInteger)pushNotificationsFullSyncInterval {
   NSNumber *interval = self.syncState[kFCMFullSyncInterval];
   if (interval) {
     return [interval unsignedIntegerValue];
   }
   return kDefaultPushNotificationsFullSyncInterval;
+}
+
+- (void)setPushNotificationsFullSyncInterval:(NSUInteger)interval {
+  [self updateSyncStateForKey:kFCMFullSyncInterval value:@(interval)];
 }
 
 - (NSString *)machineOwner {

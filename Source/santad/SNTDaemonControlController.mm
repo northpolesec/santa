@@ -433,6 +433,14 @@ double watchdogRAMPeak = 0;
   reply(configurator.blockNetworkMount ? @(configurator.allowedNetworkMountHosts.count) : nil);
 }
 
+- (void)fullSyncInterval:(void (^)(NSUInteger))reply {
+  reply([SNTConfigurator configurator].fullSyncInterval);
+}
+
+- (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))reply {
+  reply([SNTConfigurator configurator].pushNotificationsFullSyncInterval);
+}
+
 - (void)enableBundles:(void (^)(BOOL))reply {
   reply([SNTConfigurator configurator].enableBundles);
 }
@@ -562,6 +570,14 @@ double watchdogRAMPeak = 0;
 
   [result fileAccessEventDetailText:^(NSString *val) {
     [configurator setSyncServerFileAccessEventDetailText:val];
+  }];
+
+  [result fullSyncInterval:^(NSUInteger val) {
+    [configurator setFullSyncInterval:val];
+  }];
+
+  [result pushNotificationsFullSyncInterval:^(NSUInteger val) {
+    [configurator setPushNotificationsFullSyncInterval:val];
   }];
 
   reply();

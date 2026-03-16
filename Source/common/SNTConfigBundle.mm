@@ -48,6 +48,8 @@
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
 @property NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property NSNumber *fullSyncInterval;
+@property NSNumber *pushNotificationsFullSyncInterval;
 @end
 
 @implementation SNTConfigBundle
@@ -84,6 +86,8 @@
   ENCODE(coder, pushTokenChain);
   ENCODE(coder, telemetryFilterExpressions);
   ENCODE(coder, celFallbackRules);
+  ENCODE(coder, fullSyncInterval);
+  ENCODE(coder, pushNotificationsFullSyncInterval);
 }
 
 - (instancetype)initWithCoder:(NSCoder *)decoder {
@@ -116,6 +120,8 @@
     DECODE_ARRAY(decoder, pushTokenChain, NSString);
     DECODE_ARRAY(decoder, telemetryFilterExpressions, NSString);
     DECODE_ARRAY(decoder, celFallbackRules, SNTCELFallbackRule);
+    DECODE(decoder, fullSyncInterval, NSNumber);
+    DECODE(decoder, pushNotificationsFullSyncInterval, NSNumber);
   }
   return self;
 }
@@ -278,6 +284,18 @@
 - (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule *> *))block {
   if (self.celFallbackRules) {
     block(self.celFallbackRules);
+  }
+}
+
+- (void)fullSyncInterval:(void (^)(NSUInteger))block {
+  if (self.fullSyncInterval) {
+    block([self.fullSyncInterval unsignedIntegerValue]);
+  }
+}
+
+- (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))block {
+  if (self.pushNotificationsFullSyncInterval) {
+    block([self.pushNotificationsFullSyncInterval unsignedIntegerValue]);
   }
 }
 

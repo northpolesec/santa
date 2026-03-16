@@ -78,6 +78,8 @@ struct RuleCounts {
 - (void)blockUSBMount:(void (^)(BOOL))reply;
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply;
 - (void)blockNetworkMount:(void (^)(NSNumber *))reply;
+- (void)fullSyncInterval:(void (^)(NSUInteger))reply;
+- (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))reply;
 
 ///
 /// FAA Retrieval ops

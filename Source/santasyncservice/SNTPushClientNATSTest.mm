@@ -190,7 +190,7 @@ extern "C" {
   syncState.pushJWT = @"test-jwt";
   syncState.pushDeviceID = @"test-device-id";
   syncState.pushTags = @[ @"tag1", @"tag2" ];
-  syncState.pushNotificationsFullSyncInterval = 3600;
+  syncState.pushNotificationsFullSyncInterval = @(3600);
 
   [self.client handlePreflightSyncState:syncState];
 
@@ -221,7 +221,7 @@ extern "C" {
 
   // When: Preflight sync state with new interval is handled
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
-  syncState.pushNotificationsFullSyncInterval = 7200;  // 2 hours
+  syncState.pushNotificationsFullSyncInterval = @(7200);  // 2 hours
 
   [self.client handlePreflightSyncState:syncState];
 
@@ -321,7 +321,7 @@ extern "C" {
   syncState.pushDeviceID = @"test-device-id";
   syncState.pushTags =
       @[ @"production", @"santa.host.7228546F079C54169E2C929EACE830BE", @"staging" ];
-  syncState.pushNotificationsFullSyncInterval = 3600;
+  syncState.pushNotificationsFullSyncInterval = @(3600);
 
   [self.client handlePreflightSyncState:syncState];
 

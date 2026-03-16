@@ -51,5 +51,7 @@
 - (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block;
 - (void)telemetryFilterExpressions:(void (^)(NSArray<NSString *> *))block;
 - (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule *> *))block;
+- (void)fullSyncInterval:(void (^)(NSUInteger))block;
+- (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))block;
 
 @end

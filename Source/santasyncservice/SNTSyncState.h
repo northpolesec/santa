@@ -43,9 +43,9 @@
 /// The header name to use when sending the XSRF token back to the server.
 @property NSString *xsrfTokenHeader;
 
-/// Full sync interval in seconds, defaults to kDefaultFullSyncInterval. If push notifications are
-/// being used this interval will be ignored in favor of pushNotificationsFullSyncInterval.
-@property NSUInteger fullSyncInterval;
+/// Full sync interval in seconds. If push notifications are being used this interval will be
+/// ignored in favor of pushNotificationsFullSyncInterval. nil if the server did not set this field.
+@property NSNumber *fullSyncInterval;
 
 /// An token to subscribe to push notifications.
 @property(copy) NSString *pushNotificationsToken;
@@ -59,9 +59,9 @@
 @property(copy) NSArray<NSString *> *pushTags;  // Tags to subscribe to
 @property(copy) NSData *pushHMACKey;            // HMAC key for validating push commands
 
-/// Full sync interval in seconds while listening for push notifications, defaults to
-/// kDefaultPushNotificationsFullSyncInterval.
-@property NSUInteger pushNotificationsFullSyncInterval;
+/// Full sync interval in seconds while listening for push notifications. nil if the server did not
+/// set this field.
+@property NSNumber *pushNotificationsFullSyncInterval;
 
 /// Leeway time in seconds when receiving a global rule sync push notification, defaults to
 /// kDefaultPushNotificationsGlobalRuleSyncDeadline.

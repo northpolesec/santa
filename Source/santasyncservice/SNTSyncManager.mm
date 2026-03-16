@@ -409,11 +409,13 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       [self rescheduleTimerQueue:self.fullSyncTimer
                   secondsFromNow:self.pushNotifications.fullSyncInterval];
     } else {
-      LOGD(@"Push notifications are not enabled. Sync every %lu min.",
-           syncState.fullSyncInterval / 60);
+      NSUInteger interval = syncState.fullSyncInterval
+                                ? syncState.fullSyncInterval.unsignedIntegerValue
+                                : kDefaultFullSyncInterval;
+      LOGD(@"Push notifications are not enabled. Sync every %lu min.", interval / 60);
 
       // Always reschedule
-      [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:syncState.fullSyncInterval];
+      [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:interval];
     }
 
     if (syncState.preflightOnly) return SNTSyncStatusTypeSuccess;

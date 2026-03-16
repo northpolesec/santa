@@ -63,7 +63,9 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
 }
 
 - (void)listenWithSyncState:(SNTSyncState *)syncState {
-  self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval;
+  if (syncState.pushNotificationsFullSyncInterval) {
+    self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval.unsignedIntegerValue;
+  }
   self.globalRuleSyncDeadline = syncState.pushNotificationsGlobalRuleSyncDeadline;
 
   if ([self.token isEqualToString:syncState.pushNotificationsToken]) {

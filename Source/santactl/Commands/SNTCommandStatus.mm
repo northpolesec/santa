@@ -288,8 +288,16 @@ REGISTER_COMMAND_NAME(@"status")
           ?: @"Never";
 
   NSString *syncURLStr = configurator.syncBaseURL.absoluteString;
-  NSUInteger fullSyncInterval = configurator.fullSyncInterval;
-  NSUInteger pushNotificationsFullSyncInterval = configurator.pushNotificationsFullSyncInterval;
+
+  __block NSUInteger fullSyncInterval = 0;
+  [rop fullSyncInterval:^(NSUInteger interval) {
+    fullSyncInterval = interval;
+  }];
+
+  __block NSUInteger pushNotificationsFullSyncInterval = 0;
+  [rop pushNotificationsFullSyncInterval:^(NSUInteger interval) {
+    pushNotificationsFullSyncInterval = interval;
+  }];
 
   BOOL exportMetrics = configurator.exportMetrics;
   NSURL *metricsURLStr = configurator.metricURL;
