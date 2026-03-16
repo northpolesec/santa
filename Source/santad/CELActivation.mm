@@ -87,22 +87,22 @@ std::vector<santa::cel::CELProtoTraits<false>::AncestorT> Ancestors<false>(
   return {};
 }
 
-using FDType = ::santa::cel::v2::FileDescriptor::FDType;
+using FD = ::santa::cel::v2::FileDescriptor;
 
-FDType FDTypeFromES(uint32_t fdtype) {
+FD::FDType FDTypeFromES(uint32_t fdtype) {
   switch (fdtype) {
-    case PROX_FDTYPE_VNODE: return FDType::FD_TYPE_VNODE;
-    case PROX_FDTYPE_SOCKET: return FDType::FD_TYPE_SOCKET;
-    case PROX_FDTYPE_PSHM: return FDType::FD_TYPE_PSHM;
-    case PROX_FDTYPE_PSEM: return FDType::FD_TYPE_PSEM;
-    case PROX_FDTYPE_KQUEUE: return FDType::FD_TYPE_KQUEUE;
-    case PROX_FDTYPE_PIPE: return FDType::FD_TYPE_PIPE;
-    case PROX_FDTYPE_FSEVENTS: return FDType::FD_TYPE_FSEVENTS;
-    case PROX_FDTYPE_ATALK: return FDType::FD_TYPE_ATALK;
-    case PROX_FDTYPE_NETPOLICY: return FDType::FD_TYPE_NETPOLICY;
-    case PROX_FDTYPE_CHANNEL: return FDType::FD_TYPE_CHANNEL;
-    case PROX_FDTYPE_NEXUS: return FDType::FD_TYPE_NEXUS;
-    default: return FDType::FD_TYPE_UNKNOWN;
+    case PROX_FDTYPE_VNODE: return FD::FD_TYPE_VNODE;
+    case PROX_FDTYPE_SOCKET: return FD::FD_TYPE_SOCKET;
+    case PROX_FDTYPE_PSHM: return FD::FD_TYPE_PSHM;
+    case PROX_FDTYPE_PSEM: return FD::FD_TYPE_PSEM;
+    case PROX_FDTYPE_KQUEUE: return FD::FD_TYPE_KQUEUE;
+    case PROX_FDTYPE_PIPE: return FD::FD_TYPE_PIPE;
+    case PROX_FDTYPE_FSEVENTS: return FD::FD_TYPE_FSEVENTS;
+    case PROX_FDTYPE_ATALK: return FD::FD_TYPE_ATALK;
+    case PROX_FDTYPE_NETPOLICY: return FD::FD_TYPE_NETPOLICY;
+    case PROX_FDTYPE_CHANNEL: return FD::FD_TYPE_CHANNEL;
+    case PROX_FDTYPE_NEXUS: return FD::FD_TYPE_NEXUS;
+    default: return FD::FD_TYPE_UNKNOWN;
   }
 }
 
