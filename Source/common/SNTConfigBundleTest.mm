@@ -49,6 +49,8 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property NSNumber *fullSyncInterval;
+@property NSNumber *pushNotificationsFullSyncInterval;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -58,7 +60,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 25;
+  exp.expectedFulfillmentCount = 27;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -89,6 +91,8 @@
   bundle.enableNotificationSilences = @(YES);
   bundle.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
   bundle.pushTokenChain = @[ @"issuerJWT", @"userJWT" ];
+  bundle.fullSyncInterval = @(600);
+  bundle.pushNotificationsFullSyncInterval = @(21600);
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -220,6 +224,16 @@
     [exp fulfill];
   }];
 
+  [bundle fullSyncInterval:^(NSUInteger val) {
+    XCTAssertEqual(val, 600);
+    [exp fulfill];
+  }];
+
+  [bundle pushNotificationsFullSyncInterval:^(NSUInteger val) {
+    XCTAssertEqual(val, 21600);
+    [exp fulfill];
+  }];
+
   // Low timeout because code above is synchronous
   [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
@@ -324,6 +338,14 @@
   }];
 
   [bundle pushTokenChain:^(NSArray<NSString *> *val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle fullSyncInterval:^(NSUInteger val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle pushNotificationsFullSyncInterval:^(NSUInteger val) {
     XCTFail(@"This shouldn't be called");
   }];
 }

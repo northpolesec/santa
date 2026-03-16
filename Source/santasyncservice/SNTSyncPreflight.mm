@@ -189,9 +189,7 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
   // Don't let these go too low
   uint64_t value = resp.push_notification_full_sync_interval_seconds()
                        ?: resp.deprecated_fcm_full_sync_interval_seconds();
-  if (value > 0) {
-    self.syncState.pushNotificationsFullSyncInterval = @(MAX(value, kMinimumFullSyncInterval));
-  }
+  self.syncState.pushNotificationsFullSyncInterval = @(MAX(value, kMinimumFullSyncInterval));
 
   value = resp.push_notification_global_rule_sync_deadline_seconds()
               ?: resp.deprecated_fcm_global_rule_sync_deadline_seconds();
@@ -202,9 +200,7 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
 
   // Check if our sync interval has changed
   value = resp.full_sync_interval_seconds();
-  if (value > 0) {
-    self.syncState.fullSyncInterval = @(MAX(value, kMinimumFullSyncInterval));
-  }
+  self.syncState.fullSyncInterval = @(MAX(value, kMinimumFullSyncInterval));
 
   switch (resp.client_mode()) {
     case Traits::MONITOR: self.syncState.clientMode = SNTClientModeMonitor; break;
