@@ -48,6 +48,8 @@
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
 @property NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property NSNumber *fullSyncInterval;
+@property NSNumber *pushNotificationsFullSyncInterval;
 @end
 
 SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState) {
@@ -86,6 +88,8 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.networkExtensionSettings = syncState.networkExtensionSettings;
   bundle.telemetryFilterExpressions = syncState.telemetryFilterExpressions;
   bundle.celFallbackRules = syncState.celFallbackRules;
+  bundle.fullSyncInterval = syncState.fullSyncInterval;
+  bundle.pushNotificationsFullSyncInterval = syncState.pushNotificationsFullSyncInterval;
 
   bundle.fullSyncLastSuccess = [NSDate now];
 

@@ -51,6 +51,8 @@
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
 @property NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property NSNumber *fullSyncInterval;
+@property NSNumber *pushNotificationsFullSyncInterval;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -153,6 +155,21 @@
   syncState.telemetryFilterExpressions = @[ @"expr1", @"expr2" ];
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.telemetryFilterExpressions, syncState.telemetryFilterExpressions);
+
+  syncState.fullSyncInterval = @(1200);
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.fullSyncInterval, @(1200));
+
+  syncState.pushNotificationsFullSyncInterval = @(7200);
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.pushNotificationsFullSyncInterval, @(7200));
+
+  // When the server doesn't set the intervals, they should be nil
+  syncState.fullSyncInterval = nil;
+  syncState.pushNotificationsFullSyncInterval = nil;
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertNil(bundle.fullSyncInterval);
+  XCTAssertNil(bundle.pushNotificationsFullSyncInterval);
 }
 
 - (void)testRuleSyncConfigBundle {

@@ -999,8 +999,8 @@ static void closedCallback(natsConnection *nc, void *closure) {
   }
 
   // Update sync interval to avoid polling Workshop.
-  if (syncState.pushNotificationsFullSyncInterval > 0) {
-    self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval;
+  if (syncState.pushNotificationsFullSyncInterval) {
+    self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval.unsignedIntegerValue;
   }
 }
 

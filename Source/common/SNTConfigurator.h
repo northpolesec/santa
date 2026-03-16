@@ -766,10 +766,20 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 @property(readonly, nonatomic) NSUInteger fullSyncInterval;
 
 ///
+///  Set the full sync interval as received from a sync server.
+///
+- (void)setFullSyncInterval:(NSUInteger)interval;
+
+///
 ///  Full sync interval in seconds while listening for push notifications.
 ///  Defaults to kDefaultPushNotificationsFullSyncInterval.
 ///
 @property(readonly, nonatomic) NSUInteger pushNotificationsFullSyncInterval;
+
+///
+///  Set the push notifications full sync interval as received from a sync server.
+///
+- (void)setPushNotificationsFullSyncInterval:(NSUInteger)interval;
 
 ///
 ///  Enable statistics uploading to polaris.northpole.security.
