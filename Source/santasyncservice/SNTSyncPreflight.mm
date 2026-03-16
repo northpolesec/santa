@@ -18,6 +18,7 @@
 #include <string>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTExportConfiguration.h"
@@ -436,6 +437,30 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
       [expressions addObject:StringToNSString(expr)];
     }
     syncState.telemetryFilterExpressions = [expressions copy];
+  }
+
+  // Always set CEL fallback rules (even if empty) to allow the server to clear them.
+  // Limit to 10 rules.
+  {
+    int count = resp.cel_fallback_rules_size();
+    if (count > 10) {
+      SLOGW(@"Received %d CEL fallback rules, only the first 10 will be used", count);
+      count = 10;
+    }
+    SLOGD(@"Received %d CEL fallback rule(s)", count);
+    NSMutableArray<SNTCELFallbackRule *> *rules = [NSMutableArray arrayWithCapacity:count];
+    for (int i = 0; i < count; i++) {
+      const auto &rule = resp.cel_fallback_rules(i);
+      NSString *celExpr = StringToNSString(rule.cel_expr());
+      NSString *customMsg = !rule.custom_msg().empty() ? StringToNSString(rule.custom_msg()) : nil;
+      NSString *customURL = !rule.custom_url().empty() ? StringToNSString(rule.custom_url()) : nil;
+      SLOGD(@"CEL fallback rule %d: expr='%@' customMsg='%@' customURL='%@'", i, celExpr, customMsg,
+            customURL);
+      [rules addObject:[[SNTCELFallbackRule alloc] initWithCELExpr:celExpr
+                                                         customMsg:customMsg
+                                                         customURL:customURL]];
+    }
+    syncState.celFallbackRules = [rules copy];
   }
 
   if (resp.has_export_configuration()) {

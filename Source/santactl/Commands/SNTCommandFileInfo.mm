@@ -48,6 +48,7 @@ static NSString *const kCodeSigned = @"Code-signed";
 static NSString *const kValidation = @"Validation";
 static NSString *const kAssessment = @"Security Assessment";
 static NSString *const kRule = @"Rule";
+static NSString *const kDecision = @"Expected Decision";
 static NSString *const kSigningChain = @"Signing Chain";
 static NSString *const kUniversalSigningChain = @"Universal Signing Chain";
 static NSString *const kTeamID = @"Team ID";
@@ -144,6 +145,7 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 @property(readonly, copy, nonatomic) SNTAttributeBlock validation;
 @property(readonly, copy, nonatomic) SNTAttributeBlock assessment;
 @property(readonly, copy, nonatomic) SNTAttributeBlock rule;
+@property(readonly, copy, nonatomic) SNTAttributeBlock decision;
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock universalSigningChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock entitlements;
@@ -253,6 +255,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     kSecureSigningTime,
     kSigningTime,
     kRule,
+    kDecision,
     kEntitlements,
     kSigningChain,
     kUniversalSigningChain,
@@ -287,6 +290,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kValidation : self.validation,
       kAssessment : self.assessment,
       kRule : self.rule,
+      kDecision : self.decision,
       kSigningChain : self.signingChain,
       kUniversalSigningChain : self.universalSigningChain,
       kTeamID : self.teamID,
@@ -469,14 +473,18 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   };
 }
 
+static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
+  static dispatch_once_t token;
+  dispatch_once(&token, ^{
+    [cmd.daemonConn resume];
+  });
+}
+
 - (SNTAttributeBlock)rule {
   return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
     // If we previously were unable to connect, don't try again.
     if (cmd.daemonUnavailable) return kCommunicationErrorMsg;
-    static dispatch_once_t token;
-    dispatch_once(&token, ^{
-      [cmd.daemonConn resume];
-    });
+    ResumeDaemonConnection(cmd);
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
     NSError *err;
@@ -516,6 +524,57 @@ REGISTER_COMMAND_NAME(@"fileinfo")
                                 }
                                 dispatch_semaphore_signal(sema);
                               }];
+
+    if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
+      cmd.daemonUnavailable = YES;
+      return kCommunicationErrorMsg;
+    }
+    return output;
+  };
+}
+
+- (SNTAttributeBlock)decision {
+  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+    if (cmd.daemonUnavailable) return kCommunicationErrorMsg;
+    ResumeDaemonConnection(cmd);
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+    NSError *err;
+    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:&err];
+    SNTSigningStatus signingStatus = SigningStatus(csc, err);
+
+    struct RuleIdentifiers identifiers = {
+        .cdhash = csc.cdhash,
+        .binarySHA256 = fileInfo.SHA256,
+        .signingID = FormatSigningID(csc),
+        .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
+        .teamID = csc.teamID,
+    };
+
+    SNTRuleIdentifiers *lookupIdentifiers =
+        signingStatus == SNTSigningStatusDevelopment
+            ? [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
+            : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers
+                                                 andSigningStatus:signingStatus];
+
+    __block NSString *output;
+    id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
+    [rop
+        staticDecisionForFilePath:fileInfo.path
+                      identifiers:lookupIdentifiers
+                            reply:^(SNTRule *r, NSString *decisionStr) {
+                              if (signingStatus == SNTSigningStatusDevelopment && r &&
+                                  (r.type == SNTRuleTypeSigningID || r.type == SNTRuleTypeTeamID)) {
+                                output = [NSString
+                                    stringWithFormat:@"None (%@ rule ignored because code signed "
+                                                     @"with a development certificate.)",
+                                                     r.type == SNTRuleTypeTeamID ? @"TeamID"
+                                                                                 : @"SigningID"];
+                              } else {
+                                output = decisionStr;
+                              }
+                              dispatch_semaphore_signal(sema);
+                            }];
 
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
       cmd.daemonUnavailable = YES;

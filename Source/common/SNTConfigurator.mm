@@ -22,6 +22,7 @@
 #include "Source/common/Pinning.h"
 
 #import "Source/common/NKeyTokenValidator.h"
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTLogging.h"
@@ -202,6 +203,7 @@ static NSString *const kEnableNATS =
 static NSString *const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString *const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
 static NSString *const kTelemetryFilterExpressionsKey = @"TelemetryFilterExpressions";
+static NSString *const kCELFallbackRulesKey = @"CELFallbackRules";
 
 static NSString *const kOnStartUSBOptions = @"OnStartUSBOptions";
 
@@ -296,6 +298,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kNetworkExtensionSettingsKey : data,
       kPushTokenChainKey : array,
       kTelemetryFilterExpressionsKey : array,
+      kCELFallbackRulesKey : data,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
       kFileAccessEventDetailURLKey : string,
@@ -820,6 +823,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 + (NSSet *)keyPathsForValuesAffectingTelemetryFilterExpressions {
   return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingCelFallbackRules {
+  return [self syncStateSet];
 }
 
 + (NSSet *)keyPathsForValuesAffectingTelemetry {
@@ -1881,6 +1888,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (void)setSyncServerTelemetryFilterExpressions:(NSArray<NSString *> *)expressions {
   [self updateSyncStateForKey:kTelemetryFilterExpressionsKey
                         value:EnsureArrayOfStrings(expressions)];
+}
+
+- (NSArray<SNTCELFallbackRule *> *)celFallbackRules {
+  return [SNTCELFallbackRule deserializeArray:self.syncState[kCELFallbackRulesKey]];
+}
+
+- (void)setSyncServerCELFallbackRules:(NSArray<SNTCELFallbackRule *> *)rules {
+  [self updateSyncStateForKey:kCELFallbackRulesKey value:[SNTCELFallbackRule serializeArray:rules]];
 }
 
 - (void)migrateDeprecatedStatsStatePath:(NSString *)oldPath {

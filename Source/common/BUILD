@@ -511,6 +511,7 @@ objc_library(
     deps = [
         ":NKeyTokenValidator",
         ":Pinning",
+        ":SNTCELFallbackRule",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
         ":SNTLiteDetector",
@@ -530,6 +531,7 @@ objc_library(
     module_name = "santa_common_SNTConfigBundle",
     deps = [
         ":CoderMacros",
+        ":SNTCELFallbackRule",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
         ":SNTModeTransition",
@@ -641,6 +643,19 @@ objc_library(
 objc_library(
     name = "Unit",
     hdrs = ["Unit.h"],
+)
+
+objc_library(
+    name = "SNTCELFallbackRule",
+    srcs = ["SNTCELFallbackRule.mm"],
+    hdrs = ["SNTCELFallbackRule.h"],
+    sdk_frameworks = [
+        "Foundation",
+    ],
+    deps = [
+        ":CoderMacros",
+        ":SNTLogging",
+    ],
 )
 
 objc_library(

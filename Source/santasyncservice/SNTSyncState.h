@@ -20,6 +20,7 @@
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
+@class SNTCELFallbackRule;
 @class SNTSyncManager;
 @class MOLXPCConnection;
 
@@ -94,6 +95,7 @@
 @property NSString *fileAccessEventDetailURL;
 @property NSString *fileAccessEventDetailText;
 @property(copy) NSArray<NSString *> *telemetryFilterExpressions;
+@property(copy) NSArray<SNTCELFallbackRule *> *celFallbackRules;
 
 /// Clean sync flag, if True, all existing rules should be deleted before inserting any new rules.
 @property SNTSyncType syncType;

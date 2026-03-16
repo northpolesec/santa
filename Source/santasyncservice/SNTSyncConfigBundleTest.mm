@@ -17,6 +17,7 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTModeTransition.h"
@@ -49,6 +50,7 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
+@property NSArray<SNTCELFallbackRule *> *celFallbackRules;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -86,6 +88,7 @@
   XCTAssertNil(bundle.eventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
   XCTAssertNil(bundle.telemetryFilterExpressions);
+  XCTAssertNil(bundle.celFallbackRules);
 }
 
 - (void)testPostflightConfigBundle {
@@ -182,6 +185,7 @@
   XCTAssertNil(bundle.networkExtensionSettings);
   XCTAssertNil(bundle.pushTokenChain);
   XCTAssertNil(bundle.telemetryFilterExpressions);
+  XCTAssertNil(bundle.celFallbackRules);
 }
 
 - (void)testSyncTypeConfigBundle {
@@ -220,6 +224,7 @@
   XCTAssertNil(bundle.networkExtensionSettings);
   XCTAssertNil(bundle.pushTokenChain);
   XCTAssertNil(bundle.telemetryFilterExpressions);
+  XCTAssertNil(bundle.celFallbackRules);
 }
 
 @end

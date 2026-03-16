@@ -23,6 +23,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
 #include "Source/common/Pinning.h"
+#import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -257,6 +258,71 @@ double watchdogRAMPeak = 0;
   reply([[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]]);
 }
 
+- (void)staticDecisionForFilePath:(NSString *)filePath
+                      identifiers:(SNTRuleIdentifiers *)identifiers
+                            reply:(void (^)(SNTRule *rule, NSString *decision))reply {
+  SNTRule *rule =
+      [[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]];
+
+  if (rule) {
+    NSString *action;
+    switch (rule.state) {
+      case SNTRuleStateBlock:
+      case SNTRuleStateSilentBlock: action = @"Denied by rule"; break;
+      default: action = @"Allowed by rule"; break;
+    }
+    reply(rule, action);
+    return;
+  }
+
+  SNTConfigurator *config = [SNTConfigurator configurator];
+
+  // CEL fallback rules cannot be evaluated statically (they require an
+  // ActivationCallbackBlock with process-level context like ancestors and
+  // args). Report their existence so the user knows the static prediction
+  // is incomplete.
+  if (config.celFallbackRules.count > 0) {
+    reply(nil, @"Unknown - cannot evaluate statically");
+    return;
+  }
+
+  // Check blocked path regex (mirrors SNTPolicyProcessor.fileIsScopeBlocked:)
+  NSRegularExpression *blockedRe = config.blockedPathRegex;
+  if (blockedRe && [blockedRe numberOfMatchesInString:filePath
+                                              options:0
+                                                range:NSMakeRange(0, filePath.length)]) {
+    reply(nil, @"Blocked (Regex)");
+    return;
+  }
+
+  // Note: Page zero protection (enablePageZeroProtection + isMissingPageZero)
+  // and bad signature protection (enableBadSignatureProtection) are omitted.
+  // Both require reading/validating the file at runtime. The fileinfo output
+  // already has dedicated "Page Zero" and "Validation" keys for these checks.
+
+  // Check allowed path regex (mirrors SNTPolicyProcessor.fileIsScopeAllowed:)
+  NSRegularExpression *allowedRe = config.allowedPathRegex;
+  if (allowedRe && [allowedRe numberOfMatchesInString:filePath
+                                              options:0
+                                                range:NSMakeRange(0, filePath.length)]) {
+    reply(nil, @"Allowed (Regex)");
+    return;
+  }
+
+  // Note: SNTPolicyProcessor.fileIsScopeAllowed: also returns "Not a Mach-O"
+  // for non-Mach-O files, effectively allowing them. This check requires an
+  // SNTFileInfo object (not just a path). The fileinfo "Type" key already
+  // shows whether the file is a Mach-O, so users can cross-reference.
+
+  // Default based on client mode
+  switch (config.clientMode) {
+    case SNTClientModeMonitor: reply(nil, @"Allowed (Unknown, Monitor mode)"); return;
+    case SNTClientModeStandalone: reply(nil, @"Blocked (Unknown, Standalone mode)"); return;
+    case SNTClientModeLockdown: reply(nil, @"Blocked (Unknown, Lockdown mode)"); return;
+    default: reply(nil, @"Blocked (Unknown)"); return;
+  }
+}
+
 - (void)dataFileAccessRuleForTarget:(NSString *)path reply:(void (^)(NSString *, NSString *))reply {
   __block NSString *ruleName;
   __block NSString *ruleVersion;
@@ -477,6 +543,10 @@ double watchdogRAMPeak = 0;
 
   [result telemetryFilterExpressions:^(NSArray<NSString *> *val) {
     [configurator setSyncServerTelemetryFilterExpressions:val];
+  }];
+
+  [result celFallbackRules:^(NSArray<SNTCELFallbackRule *> *val) {
+    [configurator setSyncServerCELFallbackRules:val];
   }];
 
   [result eventDetailURL:^(NSString *val) {

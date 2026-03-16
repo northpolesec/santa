@@ -57,6 +57,9 @@ struct RuleCounts {
                                     NSString *fileAccessRulesHash))reply;
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
                              reply:(void (^)(SNTRule *))reply;
+- (void)staticDecisionForFilePath:(NSString *)filePath
+                      identifiers:(SNTRuleIdentifiers *)identifiers
+                            reply:(void (^)(SNTRule *rule, NSString *decision))reply;
 
 ///
 ///  Config ops
