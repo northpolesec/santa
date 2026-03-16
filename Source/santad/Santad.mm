@@ -148,7 +148,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                             execController:exec_controller
                                         compilerController:compiler_controller
                                            authResultCache:auth_result_cache
-                                                 ttyWriter:tty_writer];
+                                                 ttyWriter:tty_writer
+                                               processTree:process_tree];
 
   // While any client could be used, this implementation chooses to use the
   // authorizer client as it is most concerned with the state of ES caches.

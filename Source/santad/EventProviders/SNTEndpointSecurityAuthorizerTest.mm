@@ -101,15 +101,21 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testEnable {
-  // Ensure the client subscribes to expected event types
+  // Ensure the client subscribes to expected event types.
+  // TreeAwareClient adds NOTIFY_FORK and NOTIFY_EXIT for process lifecycle tracking.
   std::set<es_event_type_t> expectedEventSubs{ES_EVENT_TYPE_AUTH_EXEC,
-                                              ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME};
+                                              ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+                                              ES_EVENT_TYPE_NOTIFY_FORK, ES_EVENT_TYPE_NOTIFY_EXIT};
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
 
-  id authClient =
-      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                   metrics:nullptr
-                                                 processor:santa::Processor::kAuthorizer];
+  id authClient = [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                               metrics:nullptr
+                                                        execController:nil
+                                                    compilerController:nil
+                                                       authResultCache:nullptr
+                                                             ttyWriter:nullptr
+                                                           processTree:nullptr];
 
   EXPECT_CALL(*mockESApi, ClearCache)
       .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
@@ -160,7 +166,8 @@ class MockAuthResultCache : public AuthResultCache {
                                               execController:self.mockExecController
                                           compilerController:nil
                                              authResultCache:nullptr
-                                                   ttyWriter:nullptr];
+                                                   ttyWriter:nullptr
+                                                 processTree:nullptr];
 
     // Temporarily change the event type
     esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXEC;
@@ -185,7 +192,8 @@ class MockAuthResultCache : public AuthResultCache {
                                               execController:self.mockExecController
                                           compilerController:nil
                                              authResultCache:nullptr
-                                                   ttyWriter:nullptr];
+                                                   ttyWriter:nullptr
+                                                 processTree:nullptr];
 
     id mockAuthClient = OCMPartialMock(authClient);
 
@@ -235,7 +243,8 @@ class MockAuthResultCache : public AuthResultCache {
                                               execController:self.mockExecController
                                           compilerController:nil
                                              authResultCache:nullptr
-                                                   ttyWriter:nullptr];
+                                                   ttyWriter:nullptr
+                                                 processTree:nullptr];
 
     id mockAuthClient = OCMPartialMock(authClient);
 
@@ -301,7 +310,8 @@ class MockAuthResultCache : public AuthResultCache {
           execController:(SNTExecutionController *)fakeExecController
       compilerController:mockCompilerController
          authResultCache:mockAuthCache
-               ttyWriter:santa::TTYWriter::Create(true)];
+               ttyWriter:santa::TTYWriter::Create(true)
+             processTree:nullptr];
   id mockAuthClient = OCMPartialMock(authClient);
 
   // This block tests that processing is held up until an outstanding thread
@@ -385,7 +395,8 @@ class MockAuthResultCache : public AuthResultCache {
                                             execController:nil
                                         compilerController:mockCompilerController
                                            authResultCache:mockAuthCache
-                                                 ttyWriter:nullptr];
+                                                 ttyWriter:nullptr
+                                               processTree:nullptr];
   id mockAuthClient = OCMPartialMock(authClient);
 
   {

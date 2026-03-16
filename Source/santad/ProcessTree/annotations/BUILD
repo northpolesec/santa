@@ -36,3 +36,26 @@ santa_unit_test(
         "//Source/santad/ProcessTree:process_tree_test_helpers",
     ],
 )
+
+cc_library(
+    name = "sandbox_exec",
+    srcs = ["sandbox_exec.cc"],
+    hdrs = ["sandbox_exec.h"],
+    deps = [
+        ":annotator",
+        "//Source/santad/ProcessTree:process",
+        "//Source/santad/ProcessTree:process_tree",
+        "//Source/santad/ProcessTree:process_tree_cc_proto",
+    ],
+)
+
+santa_unit_test(
+    name = "sandbox_exec_test",
+    srcs = ["sandbox_exec_test.mm"],
+    deps = [
+        ":sandbox_exec",
+        "//Source/santad/ProcessTree:process",
+        "//Source/santad/ProcessTree:process_tree_cc_proto",
+        "//Source/santad/ProcessTree:process_tree_test_helpers",
+    ],
+)

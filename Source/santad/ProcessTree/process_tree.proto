@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package santa.pb.v1.process_tree;
 
+message SandboxPolicy {
+  string profile_path = 1;
+}
+
 message Annotations {
   enum Originator {
     UNSPECIFIED = 0;
@@ -10,4 +14,5 @@ message Annotations {
   }
 
   Originator originator = 1;
+  optional SandboxPolicy sandbox_policy = 2;
 }
