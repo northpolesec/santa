@@ -34,7 +34,7 @@ struct SandboxPolicyInfo {
 };
 
 // Parse sandbox-exec argv to extract the sandbox profile info.
-// Returns nullopt if argv is malformed or doesn't contain -f or -p.
+// Returns nullopt if argv is malformed or doesn't contain -f.
 std::optional<SandboxPolicyInfo> ParseSandboxExecArgv(
     const std::vector<std::string> &argv);
 

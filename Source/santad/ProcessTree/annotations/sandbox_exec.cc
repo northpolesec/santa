@@ -38,19 +38,12 @@ bool IsSandboxExec(const Process &p) {
 
 std::optional<SandboxPolicyInfo> ParseSandboxExecArgv(
     const std::vector<std::string> &argv) {
-  // argv: ["sandbox-exec", "-f", "<path>", ...] or
-  //       ["sandbox-exec", "-p", "<profile>", ...]
-  // Scan for -f or -p flags.
+  // argv: ["sandbox-exec", "-f", "<path>", ...]
+  // Scan for the -f flag.
   for (size_t i = 0; i < argv.size(); i++) {
     if (argv[i] == "-f" && i + 1 < argv.size()) {
       return SandboxPolicyInfo{
           .profile_path = argv[i + 1],
-          .status = SandboxPolicyStatus::kPending,
-      };
-    }
-    if (argv[i] == "-p" && i + 1 < argv.size()) {
-      return SandboxPolicyInfo{
-          .profile_path = "",
           .status = SandboxPolicyStatus::kPending,
       };
     }
@@ -59,8 +52,8 @@ std::optional<SandboxPolicyInfo> ParseSandboxExecArgv(
 }
 
 void SandboxExecAnnotator::AnnotateFork(ProcessTree &tree,
-                                         const Process &parent,
-                                         const Process &child) {
+                                        const Process &parent,
+                                        const Process &child) {
   auto annotation = tree.GetAnnotation<SandboxExecAnnotator>(parent);
   if (!annotation) return;
 
@@ -72,8 +65,8 @@ void SandboxExecAnnotator::AnnotateFork(ProcessTree &tree,
 }
 
 void SandboxExecAnnotator::AnnotateExec(ProcessTree &tree,
-                                         const Process &orig_process,
-                                         const Process &new_process) {
+                                        const Process &orig_process,
+                                        const Process &new_process) {
   // Check if the previous process had a pending annotation to confirm.
   if (auto annotation =
           tree.GetAnnotation<SandboxExecAnnotator>(orig_process)) {
@@ -82,9 +75,8 @@ void SandboxExecAnnotator::AnnotateExec(ProcessTree &tree,
       // Promote pending to confirmed on the new process.
       auto confirmed_info = (*annotation)->info_.value();
       confirmed_info.status = SandboxPolicyStatus::kConfirmed;
-      tree.AnnotateProcess(
-          new_process,
-          std::make_shared<SandboxExecAnnotator>(std::move(confirmed_info)));
+      tree.AnnotateProcess(new_process, std::make_shared<SandboxExecAnnotator>(
+                                            std::move(confirmed_info)));
       return;
     }
     // Propagate confirmed annotations through exec.
@@ -96,9 +88,8 @@ void SandboxExecAnnotator::AnnotateExec(ProcessTree &tree,
   if (IsSandboxExec(new_process)) {
     auto info = ParseSandboxExecArgv(new_process.program_->arguments);
     if (info) {
-      tree.AnnotateProcess(
-          new_process,
-          std::make_shared<SandboxExecAnnotator>(std::move(*info)));
+      tree.AnnotateProcess(new_process, std::make_shared<SandboxExecAnnotator>(
+                                            std::move(*info)));
     }
   }
 }

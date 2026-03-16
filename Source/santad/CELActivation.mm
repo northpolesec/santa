@@ -144,8 +144,8 @@ ActivationCallbackBlock CreateCELActivationBlock(
 
       std::optional<::santa::pb::v1::process_tree::Annotations> processAnnotations;
       if (processTree) {
-        auto targetPid = santa::santad::process_tree::PidFromAuditToken(
-            esMsg->event.exec.target->audit_token);
+        auto targetPid =
+            santa::santad::process_tree::PidFromAuditToken(esMsg->event.exec.target->audit_token);
         processAnnotations = processTree->ExportAnnotations(targetPid);
       }
 

@@ -51,7 +51,8 @@ using santa::Message;
            compilerController:(SNTCompilerController *)compilerController
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-                  processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
+                  processTree:
+                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kAuthorizer

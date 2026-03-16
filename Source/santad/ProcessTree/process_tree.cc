@@ -81,7 +81,7 @@ void ProcessTree::HandleFork(uint64_t timestamp, const Process &parent,
   if (Step(timestamp)) {
     absl::MutexLock lock(&mtx_);
     auto child = std::make_shared<Process>(new_pid, parent.effective_cred_,
-                                      parent.program_, map_[parent.pid_]);
+                                           parent.program_, map_[parent.pid_]);
     map_.emplace(new_pid, child);
     in_annotator_callback = true;
     for (const auto &annotator : annotators_) {
@@ -197,7 +197,8 @@ void ProcessTree::AnnotateProcess(const Process &p,
                                   std::shared_ptr<const Annotator> a) {
   const Annotator &x = *a;
   auto emplace = [&]() ABSL_NO_THREAD_SAFETY_ANALYSIS {
-    map_[p.pid_]->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
+    map_[p.pid_]->annotations_.emplace(std::type_index(typeid(x)),
+                                       std::move(a));
   };
   if (in_annotator_callback) {
     // Already holding mtx_ from HandleExec/HandleFork/BackfillInsertChildren.

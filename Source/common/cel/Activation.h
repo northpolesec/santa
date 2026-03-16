@@ -48,11 +48,11 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   using ReturnValue = typename Traits::ReturnValue;
   using AncestorT = typename Traits::AncestorT;
 
-  Activation(std::unique_ptr<ExecutableFileT> file, std::vector<std::string> (^args)(),
-             std::map<std::string, std::string> (^envs)(), uid_t (^euid)(), std::string (^cwd)(),
-             std::vector<AncestorT> (^ancestors)(),
-             std::optional<::santa::pb::v1::process_tree::Annotations> process_annotations =
-                 std::nullopt)
+  Activation(
+      std::unique_ptr<ExecutableFileT> file, std::vector<std::string> (^args)(),
+      std::map<std::string, std::string> (^envs)(), uid_t (^euid)(), std::string (^cwd)(),
+      std::vector<AncestorT> (^ancestors)(),
+      std::optional<::santa::pb::v1::process_tree::Annotations> process_annotations = std::nullopt)
       : file_(std::move(file)),
         args_(args),
         envs_(envs),

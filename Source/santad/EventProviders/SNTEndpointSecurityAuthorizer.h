@@ -36,7 +36,8 @@
            compilerController:(SNTCompilerController *)compilerController
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-                  processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
+                  processTree:
+                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
 
 - (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher;
 
