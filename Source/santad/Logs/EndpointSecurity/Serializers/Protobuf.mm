@@ -346,7 +346,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
     case SNTEventStateAllowCompilerSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
     case SNTEventStateAllowCDHash: return ::pbv1::Execution::REASON_CDHASH;
     case SNTEventStateAllowCompilerCDHash: return ::pbv1::Execution::REASON_CDHASH;
-    case SNTEventStateAllowCELFallback: return ::pbv1::Execution::REASON_FALLBACK_CEL;
+    case SNTEventStateAllowCELFallback: return ::pbv1::Execution::REASON_CEL_FALLBACK;
     case SNTEventStateAllowUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
     case SNTEventStateBlockBinary: return ::pbv1::Execution::REASON_BINARY;
     case SNTEventStateBlockCertificate: return ::pbv1::Execution::REASON_CERT;
@@ -354,7 +354,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
     case SNTEventStateBlockTeamID: return ::pbv1::Execution::REASON_TEAM_ID;
     case SNTEventStateBlockSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
     case SNTEventStateBlockCDHash: return ::pbv1::Execution::REASON_CDHASH;
-    case SNTEventStateBlockCELFallback: return ::pbv1::Execution::REASON_FALLBACK_CEL;
+    case SNTEventStateBlockCELFallback: return ::pbv1::Execution::REASON_CEL_FALLBACK;
     case SNTEventStateBlockLongPath: return ::pbv1::Execution::REASON_LONG_PATH;
     case SNTEventStateBlockUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
     case SNTEventStateUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
