@@ -422,7 +422,10 @@ NS_ASSUME_NONNULL_BEGIN
       LOGI(@"Attempting to mount device again changing flags: 0x%08x --> 0x%08x", sfs->f_flags,
            newMode);
 
-      [self remount:disk mountMode:newMode semaphore:self.diskSema];
+      [self remount:disk
+          mountMode:newMode
+           callback:DiskMountedCallback
+            context:(__bridge void *)self.diskSema];
 
       if (dispatch_semaphore_wait(self.diskSema,
                                   dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
@@ -594,7 +597,7 @@ NS_ASSUME_NONNULL_BEGIN
     uint32_t newMode = [self updatedMountFlags:eventStatFS];
     LOGI(@"SNTEndpointSecurityDeviceManager: remounting device '%s'->'%s', flags (%u) -> (%u)",
          eventStatFS->f_mntfromname, eventStatFS->f_mntonname, eventStatFS->f_flags, newMode);
-    [self remount:disk mountMode:newMode semaphore:nil];
+    [self remount:disk mountMode:newMode callback:DiskMountedCallback context:nil];
     storedUSBMountEvent = [[SNTStoredUSBMountEvent alloc]
         initWithDeviceModel:model
                deviceVendor:vendor
@@ -627,14 +630,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)remount:(DADiskRef)disk
       mountMode:(uint32_t)remountMask
-      semaphore:(nullable dispatch_semaphore_t)sema {
+       callback:(DADiskMountCallback)callback
+        context:(nullable void *)context {
   NSArray<NSString *> *args = maskToMountArgs(remountMask);
   CFStringRef *argv = (CFStringRef *)calloc(args.count + 1, sizeof(CFStringRef));
   CFArrayGetValues((__bridge CFArrayRef)args, CFRangeMake(0, (CFIndex)args.count),
                    (const void **)argv);
 
-  DADiskMountWithArguments(disk, NULL, kDADiskMountOptionDefault, DiskMountedCallback,
-                           (__bridge void *)sema, (CFStringRef *)argv);
+  DADiskMountWithArguments(disk, NULL, kDADiskMountOptionDefault, callback, context,
+                           (CFStringRef *)argv);
 
   free(argv);
 }
@@ -671,14 +675,10 @@ NS_ASSUME_NONNULL_BEGIN
 
   [self.remountingDisks addObject:bsdName];
 
-  NSArray<NSString *> *args = self.remountArgs;
-  CFStringRef *argv = (CFStringRef *)calloc(args.count + 1, sizeof(CFStringRef));
-  CFArrayGetValues((__bridge CFArrayRef)args, CFRangeMake(0, (CFIndex)args.count),
-                   (const void **)argv);
-
-  DADiskMountWithArguments(disk, NULL, kDADiskMountOptionDefault, DiskRemountCompletionCallback,
-                           (__bridge void *)self, argv);
-  free(argv);
+  [self remount:disk
+      mountMode:mountArgsToMask(self.remountArgs)
+       callback:DiskRemountCompletionCallback
+        context:(__bridge void *)self];
 
   return DADissenterCreate(kCFAllocatorDefault, kDAReturnBusy,
                            CFSTR("Remounting with restricted flags"));
