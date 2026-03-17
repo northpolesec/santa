@@ -45,16 +45,18 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   using ExecutableFileT = typename Traits::ExecutableFileT;
   using ReturnValue = typename Traits::ReturnValue;
   using AncestorT = typename Traits::AncestorT;
+  using FileDescriptorT = typename Traits::FileDescriptorT;
 
   Activation(std::unique_ptr<ExecutableFileT> file, std::vector<std::string> (^args)(),
              std::map<std::string, std::string> (^envs)(), uid_t (^euid)(), std::string (^cwd)(),
-             std::vector<AncestorT> (^ancestors)())
+             std::vector<AncestorT> (^ancestors)(), std::vector<FileDescriptorT> (^fds)())
       : file_(std::move(file)),
         args_(args),
         envs_(envs),
         euid_(euid),
         cwd_(cwd),
-        ancestors_(ancestors) {};
+        ancestors_(ancestors),
+        fds_(fds) {};
   ~Activation() = default;
 
   std::optional<::google::api::expr::runtime::CelValue> FindValue(
@@ -79,6 +81,7 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   Memoizer<uid_t> euid_;
   Memoizer<std::string> cwd_;
   Memoizer<std::vector<AncestorT>> ancestors_;
+  Memoizer<std::vector<FileDescriptorT>> fds_;
 
   bool IsResultCacheable() const;
 

@@ -58,6 +58,39 @@ describe("convertEsloggerEvent", () => {
     ]);
   });
 
+  it("extracts fds and maps PROX_FDTYPE to CEL FD_TYPE", () => {
+    const event = JSON.stringify({
+      event: {
+        exec: {
+          args: ["/usr/bin/ls"],
+          fds: [
+            { fd: 0, fdtype: 1 },  // PROX_FDTYPE_VNODE
+            { fd: 1, fdtype: 6 },  // PROX_FDTYPE_PIPE
+            { fd: 3, fdtype: 2 },  // PROX_FDTYPE_SOCKET
+          ],
+        },
+      },
+    });
+    const result = toObject(convertEsloggerEvent(event));
+    expect(result.fds).toEqual([
+      { fd: 0, type: 2 },  // FD_TYPE_VNODE
+      { fd: 1, type: 7 },  // FD_TYPE_PIPE
+      { fd: 3, type: 3 },  // FD_TYPE_SOCKET
+    ]);
+  });
+
+  it("maps unknown fdtype to FD_TYPE_UNKNOWN (0)", () => {
+    const event = JSON.stringify({
+      event: {
+        exec: {
+          fds: [{ fd: 0, fdtype: 99 }],
+        },
+      },
+    });
+    const result = toObject(convertEsloggerEvent(event));
+    expect(result.fds).toEqual([{ fd: 0, type: 0 }]);
+  });
+
   it("handles env values containing '='", () => {
     const event = JSON.stringify({
       event: {

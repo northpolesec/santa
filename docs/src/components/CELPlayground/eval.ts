@@ -23,7 +23,14 @@ ancestors:
   - signing_id: "platform:com.apple.Terminal"
     team_id: ""
     path: "/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal"
-    cdhash: "abc123"`;
+    cdhash: "abc123"
+fds:
+  - fd: 0
+    type: 2
+  - fd: 1
+    type: 7
+  - fd: 2
+    type: 7`;
 
 function buildEnvironment(): Environment {
   const env = new Environment({ unlistedVariablesAreDyn: true });
@@ -35,9 +42,29 @@ function buildEnvironment(): Environment {
   env.registerVariable("euid", "int");
   env.registerVariable("cwd", "string");
   env.registerVariable("ancestors", "list");
+  env.registerVariable("fds", "list");
 
   // Register all V2 enum constants (superset of V1)
   for (const [name, value] of Object.entries(v2Entries.nameToValue)) {
+    env.registerConstant(name, "int", value);
+  }
+
+  // Register FDType enum constants
+  const fdTypeValues: Record<string, bigint> = {
+    FD_TYPE_UNKNOWN: 0n,
+    FD_TYPE_ATALK: 1n,
+    FD_TYPE_VNODE: 2n,
+    FD_TYPE_SOCKET: 3n,
+    FD_TYPE_PSHM: 4n,
+    FD_TYPE_PSEM: 5n,
+    FD_TYPE_KQUEUE: 6n,
+    FD_TYPE_PIPE: 7n,
+    FD_TYPE_FSEVENTS: 8n,
+    FD_TYPE_NETPOLICY: 9n,
+    FD_TYPE_CHANNEL: 10n,
+    FD_TYPE_NEXUS: 11n,
+  };
+  for (const [name, value] of Object.entries(fdTypeValues)) {
     env.registerConstant(name, "int", value);
   }
 
@@ -71,6 +98,14 @@ function prepareContext(parsed: Record<string, any>): Record<string, any> {
 
   if (typeof ctx.euid === "number") {
     ctx.euid = BigInt(ctx.euid);
+  }
+
+  if (Array.isArray(ctx.fds)) {
+    ctx.fds = ctx.fds.map((entry: any) => ({
+      ...entry,
+      fd: typeof entry.fd === "number" ? BigInt(entry.fd) : entry.fd,
+      type: typeof entry.type === "number" ? BigInt(entry.type) : entry.type,
+    }));
   }
 
   return ctx;
