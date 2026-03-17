@@ -1610,7 +1610,7 @@ static SNTConfigurator *sharedConfigurator = nil;
         format:@"isSyncV2Enabled called from: %@", [[NSProcessInfo processInfo] processName]];
   }
 
-  if (SNTIsLiteInstall()) {
+  if (santa::SNTIsLiteInstall()) {
     return NO;
   }
 

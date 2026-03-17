@@ -124,7 +124,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   NSString *santaVersionString = [NSString
       stringWithFormat:@"Santa v%@%@",
                        [[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"],
-                       SNTIsLiteInstall() ? @" (Lite)" : @""];
+                       santa::SNTIsLiteInstall() ? @" (Lite)" : @""];
   [menu addItem:[self menuItemWithTitle:santaVersionString andAction:nil]];
   [menu addItem:[self menuItemWithTitle:@"About Santa" andAction:@selector(aboutMenuItemClicked:)]];
 

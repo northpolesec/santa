@@ -15,6 +15,8 @@
 #import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTCommonEnums.h"
 
+namespace santa {
+
 BOOL SNTIsLiteAppBundle(NSString *appPath) {
   NSString *plistPath = [appPath stringByAppendingPathComponent:@"Contents/Info.plist"];
   NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:plistPath];
@@ -29,3 +31,5 @@ BOOL SNTIsLiteInstall(void) {
   });
   return isLite;
 }
+
+}  // namespace santa

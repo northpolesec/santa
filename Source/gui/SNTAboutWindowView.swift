@@ -19,7 +19,7 @@ struct SNTAboutWindowView: View {
   let w: NSWindow?
   let c = SNTConfigurator.configurator()
   let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-  let isLite = SNTIsLiteInstall()
+  let isLite = santa.SNTIsLiteInstall()
 
   @State private var isDragging = false
   @State private var menuItemEnabled: Bool = true

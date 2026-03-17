@@ -49,7 +49,7 @@ REGISTER_COMMAND_NAME(@"version")
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
-  BOOL isLite = SNTIsLiteInstall();
+  BOOL isLite = santa::SNTIsLiteInstall();
   BOOL hasNetd = [[NSFileManager defaultManager] fileExistsAtPath:@(kSantaNetdPath)];
 
   // Best-effort connection to santad for querying santanetd info.

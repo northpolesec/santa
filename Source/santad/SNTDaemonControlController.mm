@@ -744,7 +744,7 @@ double watchdogRAMPeak = 0;
 - (void)installSantaApp:(NSString *)tempPath reply:(void (^)(BOOL))reply {
   LOGI(@"Trigger Santa installation from: %@", tempPath);
 
-  if ([[SNTConfigurator configurator] isSyncV2Enabled] && SNTIsLiteAppBundle(tempPath)) {
+  if ([[SNTConfigurator configurator] isSyncV2Enabled] && santa::SNTIsLiteAppBundle(tempPath)) {
     LOGE(@"Refusing to install Lite version while SyncV2 is enabled");
     reply(NO);
     return;
