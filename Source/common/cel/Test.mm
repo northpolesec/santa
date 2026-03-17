@@ -35,6 +35,7 @@
   using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
 
   auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
@@ -53,6 +54,9 @@
         return "/";
       },
       ^std::vector<AncestorT>() {
+        return {};
+      },
+      ^std::vector<FileDescriptorT>() {
         return {};
       });
 
@@ -123,6 +127,9 @@
         },
         ^std::vector<santa::cel::v2::Ancestor>() {
           return {};
+        },
+        ^std::vector<FileDescriptorT>() {
+          return {};
         });
 
     auto result2 = sut.value()->Evaluate(expr.value().get(), activation2, &arena);
@@ -174,6 +181,9 @@
         },
         ^std::vector<santa::cel::v2::Ancestor>() {
           return {};
+        },
+        ^std::vector<FileDescriptorT>() {
+          return {};
         });
 
     auto result = sut.value()->CompileAndEvaluate(
@@ -217,13 +227,19 @@
   auto ancestorsV2Fn = ^std::vector<santa::cel::CELProtoTraits<true>::AncestorT>() {
     return {};
   };
+  auto fdsV1Fn = ^std::vector<santa::cel::CELProtoTraits<false>::FileDescriptorT>() {
+    return {};
+  };
+  auto fdsV2Fn = ^std::vector<santa::cel::CELProtoTraits<true>::FileDescriptorT>() {
+    return {};
+  };
 
   {
     // V1
     auto f = std::make_unique<santa::cel::CELProtoTraits<false>::ExecutableFileT>();
     f->mutable_signing_time()->set_seconds(1748436989);
     santa::cel::Activation<false> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn,
-                                             ancestorsV1Fn);
+                                             ancestorsV1Fn, fdsV1Fn);
     auto sut = santa::cel::Evaluator<false>::Create();
     XCTAssertTrue(sut.ok());
 
@@ -239,7 +255,7 @@
     auto f = std::make_unique<santa::cel::CELProtoTraits<true>::ExecutableFileT>();
     f->mutable_signing_time()->set_seconds(1748436989);
     santa::cel::Activation<true> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn,
-                                            ancestorsV2Fn);
+                                            ancestorsV2Fn, fdsV2Fn);
     auto sut = santa::cel::Evaluator<true>::Create();
     XCTAssertTrue(sut.ok());
 
@@ -255,10 +271,105 @@
   }
 }
 
+- (void)testFds {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
+  auto f = std::make_unique<ExecutableFileT>();
+  f->mutable_signing_time()->set_seconds(1748436989);
+  santa::cel::Activation<true> activation(
+      std::move(f),
+      ^std::vector<std::string>() {
+        return {};
+      },
+      ^std::map<std::string, std::string>() {
+        return {};
+      },
+      ^uid_t() {
+        return 0;
+      },
+      ^std::string() {
+        return "/";
+      },
+      ^std::vector<AncestorT>() {
+        return {};
+      },
+      ^std::vector<FileDescriptorT>() {
+        FileDescriptorT fd0;
+        fd0.set_fd(0);
+        fd0.set_type(FileDescriptorT::FD_TYPE_VNODE);
+        FileDescriptorT fd1;
+        fd1.set_fd(1);
+        fd1.set_type(FileDescriptorT::FD_TYPE_PIPE);
+        FileDescriptorT fd2;
+        fd2.set_fd(2);
+        fd2.set_type(FileDescriptorT::FD_TYPE_SOCKET);
+        return {fd0, fd1, fd2};
+      });
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  {
+    // Test fds size
+    auto result = sut.value()->CompileAndEvaluate("size(fds) == 3", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
+    }
+  }
+  {
+    // Test fd number access
+    auto result = sut.value()->CompileAndEvaluate("fds[0].fd == 0u", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
+    }
+  }
+  {
+    // Test fd type enum comparison
+    auto result = sut.value()->CompileAndEvaluate("fds[0].type == FD_TYPE_VNODE", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
+    }
+  }
+  {
+    // Test exists comprehension over fds
+    auto result =
+        sut.value()->CompileAndEvaluate("fds.exists(f, f.type == FD_TYPE_SOCKET)", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
+    }
+  }
+  {
+    // Test no match with exists
+    auto result =
+        sut.value()->CompileAndEvaluate("fds.exists(f, f.type == FD_TYPE_KQUEUE)", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+      XCTAssertEqual(result.value().cacheable, false);
+    }
+  }
+}
+
 - (void)testTouchIDCooldownFunctions {
   using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
 
   auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
@@ -277,6 +388,9 @@
         return "/";
       },
       ^std::vector<AncestorT>() {
+        return {};
+      },
+      ^std::vector<FileDescriptorT>() {
         return {};
       });
 
@@ -358,6 +472,7 @@
 - (void)testTouchIDCooldownNotAvailableInV1 {
   using ExecutableFileT = santa::cel::CELProtoTraits<false>::ExecutableFileT;
   using AncestorT = santa::cel::CELProtoTraits<false>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<false>::FileDescriptorT;
 
   auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
@@ -376,6 +491,9 @@
         return "/";
       },
       ^std::vector<AncestorT>() {
+        return {};
+      },
+      ^std::vector<FileDescriptorT>() {
         return {};
       });
 

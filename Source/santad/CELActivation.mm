@@ -15,6 +15,7 @@
 #import "Source/santad/CELActivation.h"
 
 #include <bsm/libbsm.h>
+#include <sys/proc_info.h>
 
 #include <map>
 #include <memory>
@@ -86,6 +87,25 @@ std::vector<santa::cel::CELProtoTraits<false>::AncestorT> Ancestors<false>(
   return {};
 }
 
+using FD = ::santa::cel::v2::FileDescriptor;
+
+FD::FDType FDTypeFromES(uint32_t fdtype) {
+  switch (fdtype) {
+    case PROX_FDTYPE_VNODE: return FD::FD_TYPE_VNODE;
+    case PROX_FDTYPE_SOCKET: return FD::FD_TYPE_SOCKET;
+    case PROX_FDTYPE_PSHM: return FD::FD_TYPE_PSHM;
+    case PROX_FDTYPE_PSEM: return FD::FD_TYPE_PSEM;
+    case PROX_FDTYPE_KQUEUE: return FD::FD_TYPE_KQUEUE;
+    case PROX_FDTYPE_PIPE: return FD::FD_TYPE_PIPE;
+    case PROX_FDTYPE_FSEVENTS: return FD::FD_TYPE_FSEVENTS;
+    case PROX_FDTYPE_ATALK: return FD::FD_TYPE_ATALK;
+    case PROX_FDTYPE_NETPOLICY: return FD::FD_TYPE_NETPOLICY;
+    case PROX_FDTYPE_CHANNEL: return FD::FD_TYPE_CHANNEL;
+    case PROX_FDTYPE_NEXUS: return FD::FD_TYPE_NEXUS;
+    default: return FD::FD_TYPE_UNKNOWN;
+  }
+}
+
 }  // namespace
 
 namespace santa {
@@ -103,6 +123,7 @@ ActivationCallbackBlock CreateCELActivationBlock(
       using Traits = santa::cel::CELProtoTraits<IsV2>;
       using ExecutableFileT = typename Traits::ExecutableFileT;
       using AncestorT = typename Traits::AncestorT;
+      using FileDescriptorT = typename Traits::FileDescriptorT;
 
       auto f = std::make_unique<ExecutableFileT>();
 
@@ -160,6 +181,23 @@ ActivationCallbackBlock CreateCELActivationBlock(
           },
           ^std::vector<AncestorT>() {
             return Ancestors<IsV2>(processTree, esMsg);
+          },
+          ^std::vector<FileDescriptorT>() {
+            if constexpr (IsV2) {
+              std::vector<FileDescriptorT> fds;
+              uint32_t fdCount = esApi->ExecFDCount(&esMsg->event.exec);
+              fds.reserve(fdCount);
+              for (uint32_t i = 0; i < fdCount; i++) {
+                const es_fd_t *esFD = esApi->ExecFD(&esMsg->event.exec, i);
+                FileDescriptorT fd;
+                fd.set_fd(esFD->fd);
+                fd.set_type(FDTypeFromES(esFD->fdtype));
+                fds.push_back(std::move(fd));
+              }
+              return fds;
+            } else {
+              return {};
+            }
           });
     };
 

@@ -33,6 +33,7 @@ struct CELProtoTraits<false> {
   using ExecutionContextT = ::santa::cel::v1::ExecutionContext;
   using ExecutableFileT = ::santa::cel::v1::ExecutableFile;
   using AncestorT = std::nullptr_t;
+  using FileDescriptorT = std::nullptr_t;
 
   // Enum aliases
   using ReturnValue = ::santa::cel::v1::ReturnValue;
@@ -61,6 +62,7 @@ struct CELProtoTraits<true> {
   using ExecutionContextT = ::santa::cel::v2::ExecutionContext;
   using ExecutableFileT = ::santa::cel::v2::ExecutableFile;
   using AncestorT = ::santa::cel::v2::Ancestor;
+  using FileDescriptorT = ::santa::cel::v2::FileDescriptor;
 
   // Enum aliases
   using ReturnValue = ::santa::cel::v2::ReturnValue;
@@ -79,6 +81,10 @@ struct CELProtoTraits<true> {
   // Descriptor accessors
   static const google::protobuf::EnumDescriptor* ReturnValue_descriptor() {
     return ::santa::cel::v2::ReturnValue_descriptor();
+  }
+
+  static const google::protobuf::EnumDescriptor* FDType_descriptor() {
+    return ::santa::cel::v2::FileDescriptor::FDType_descriptor();
   }
 
   static const google::protobuf::Descriptor* ExecutionContext_descriptor() {
