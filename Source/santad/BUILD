@@ -642,6 +642,9 @@ objc_library(
     name = "SNTEndpointSecurityDeviceManager",
     srcs = ["EventProviders/SNTEndpointSecurityDeviceManager.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityDeviceManager.h"],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":AuthResultCache",
         ":EndpointSecurityAPI",
@@ -785,6 +788,9 @@ objc_library(
     name = "EndpointSecuritySerializerBasicString",
     srcs = ["Logs/EndpointSecurity/Serializers/BasicString.mm"],
     hdrs = ["Logs/EndpointSecurity/Serializers/BasicString.h"],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":EndpointSecurityAPI",
         ":EndpointSecuritySanitizableString",
@@ -805,6 +811,9 @@ objc_library(
     name = "EndpointSecuritySerializerProtobuf",
     srcs = ["Logs/EndpointSecurity/Serializers/Protobuf.mm"],
     hdrs = ["Logs/EndpointSecurity/Serializers/Protobuf.h"],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":EndpointSecurityAPI",
         ":EndpointSecuritySerializer",
@@ -1346,9 +1355,6 @@ santa_unit_test(
     sdk_dylibs = [
         "bsm",
         "EndpointSecurity",
-    ],
-    sdk_frameworks = [
-        "DiskArbitration",
     ],
     structured_resources = [
         "//Source/santad/testdata:binaryrules_testdata",
