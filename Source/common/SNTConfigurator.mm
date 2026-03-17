@@ -1811,8 +1811,7 @@ static SNTConfigurator *sharedConfigurator = nil;
     return @[];
   }
 
-  NSMutableArray<NSString *> *filtered =
-      [[NSMutableArray alloc] initWithCapacity:commands.count];
+  NSMutableArray<NSString *> *filtered = [[NSMutableArray alloc] initWithCapacity:commands.count];
 
   for (id command in commands) {
     if ([command isKindOfClass:[NSString class]]) {
