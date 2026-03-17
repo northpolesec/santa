@@ -328,14 +328,15 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
       {FlushCacheReason::kFilesystemUnmounted, @"FilesystemUnmounted"},
       {FlushCacheReason::kEntitlementsPrefixFilterChanged, @"EntitlementsPrefixFilterChanged"},
       {FlushCacheReason::kEntitlementsTeamIDFilterChanged, @"EntitlementsTeamIDFilterChanged"},
+      {FlushCacheReason::kCELFallbackRulesChanged, @"CELFallbackRulesChanged"},
   };
 
   for (const auto &kv : reasonToString) {
     XCTAssertEqualObjects(FlushCacheReasonToString(kv.first), kv.second);
   }
 
-  XCTAssertThrows(FlushCacheReasonToString((
-      FlushCacheReason)(static_cast<int>(FlushCacheReason::kEntitlementsTeamIDFilterChanged) + 1)));
+  XCTAssertThrows(FlushCacheReasonToString(
+      (FlushCacheReason)(static_cast<int>(FlushCacheReason::kCELFallbackRulesChanged) + 1)));
 }
 
 @end

@@ -58,6 +58,7 @@ enum class FlushCacheReason {
   kFilesystemUnmounted,
   kEntitlementsPrefixFilterChanged,
   kEntitlementsTeamIDFilterChanged,
+  kCELFallbackRulesChanged,
 };
 
 class AuthResultCache {

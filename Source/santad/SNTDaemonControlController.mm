@@ -553,7 +553,12 @@ double watchdogRAMPeak = 0;
   }];
 
   [result celFallbackRules:^(NSArray<SNTCELFallbackRule *> *val) {
+    NSData *oldData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
+    NSData *newData = [SNTCELFallbackRule serializeArray:val];
     [configurator setSyncServerCELFallbackRules:val];
+    if (oldData != newData && ![oldData isEqualToData:newData] && self.flushCacheBlock) {
+      self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
+    }
   }];
 
   [result eventDetailURL:^(NSString *val) {
