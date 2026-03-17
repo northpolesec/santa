@@ -109,19 +109,16 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     metrics->StartPoll();
   }
 
-  SNTEndpointSecurityDeviceManager *device_client =
-      [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:esapi
-                                                      metrics:metrics
-                                                       logger:logger
-                                                     enricher:enricher
-                                              authResultCache:auth_result_cache
-                                                blockUSBMount:[configurator blockUSBMount]
-                                               remountUSBMode:[configurator remountUSBMode]
-                                           startupPreferences:[configurator onStartUSBOptions]];
-
-  // maybe have a new device event callback?
-  device_client.blockUnencryptedRemovableMediaMount =
-      [configurator blockUnencryptedRemovableMediaMount];
+  SNTEndpointSecurityDeviceManager *device_client = [[SNTEndpointSecurityDeviceManager alloc]
+                            initWithESAPI:esapi
+                                  metrics:metrics
+                                   logger:logger
+                                 enricher:enricher
+                          authResultCache:auth_result_cache
+                            blockUSBMount:[configurator blockUSBMount]
+      blockUnencryptedRemovableMediaMount:[configurator blockUnencryptedRemovableMediaMount]
+                           remountUSBMode:[configurator remountUSBMode]
+                       startupPreferences:[configurator onStartUSBOptions]];
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
     [syncd_queue addStoredEvent:usbEvent];

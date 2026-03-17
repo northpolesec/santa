@@ -208,13 +208,14 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
-                       logger:(std::shared_ptr<Logger>)logger
-                     enricher:(std::shared_ptr<santa::Enricher>)enricher
-              authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
-                blockUSBMount:(BOOL)blockUSBMount
-               remountUSBMode:(nullable NSArray<NSString *> *)remountUSBMode
-           startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs {
+                                metrics:(std::shared_ptr<santa::Metrics>)metrics
+                                 logger:(std::shared_ptr<Logger>)logger
+                               enricher:(std::shared_ptr<santa::Enricher>)enricher
+                        authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
+                          blockUSBMount:(BOOL)blockUSBMount
+    blockUnencryptedRemovableMediaMount:(BOOL)blockUnencryptedRemovableMediaMount
+                         remountUSBMode:(nullable NSArray<NSString *> *)remountUSBMode
+                     startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kDeviceManager];
@@ -223,6 +224,7 @@ NS_ASSUME_NONNULL_BEGIN
     _enricher = std::move(enricher);
     _authResultCache = std::move(authResultCache);
     _blockUSBMount = blockUSBMount;
+    _blockUnencryptedRemovableMediaMount = blockUnencryptedRemovableMediaMount;
     _remountArgs = remountUSBMode;
     _configurator = [SNTConfigurator configurator];
     _remountingDisks = [NSMutableSet set];

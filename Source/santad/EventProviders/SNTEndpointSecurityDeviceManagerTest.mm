@@ -100,6 +100,19 @@ class MockAuthResultCache : public AuthResultCache {
             diskInfoOverrides:(NSDictionary *)diskInfo
            expectedAuthResult:(es_auth_result_t)expectedAuthResult
            deviceManagerSetup:(void (^)(SNTEndpointSecurityDeviceManager *))setupDMCallback {
+  [self triggerTestMountEvent:eventType
+                        diskInfoOverrides:diskInfo
+                       expectedAuthResult:expectedAuthResult
+      blockUnencryptedRemovableMediaMount:false
+                       deviceManagerSetup:setupDMCallback];
+}
+
+- (void)triggerTestMountEvent:(es_event_type_t)eventType
+                      diskInfoOverrides:(NSDictionary *)diskInfo
+                     expectedAuthResult:(es_auth_result_t)expectedAuthResult
+    blockUnencryptedRemovableMediaMount:(BOOL)blockUnencryptedRemovableMediaMount
+                     deviceManagerSetup:
+                         (void (^)(SNTEndpointSecurityDeviceManager *))setupDMCallback {
   struct statfs fs = {0};
   NSString *test_mntfromname = @"/dev/disk2s1";
   NSString *test_mntonname = @"/Volumes/KATE'S 4G";
@@ -134,14 +147,15 @@ class MockAuthResultCache : public AuthResultCache {
   auto mockEnricher = std::make_shared<santa::MockEnricher>();
 
   SNTEndpointSecurityDeviceManager *deviceManager = [[SNTEndpointSecurityDeviceManager alloc]
-           initWithESAPI:mockESApi
-                 metrics:nullptr
-                  logger:nullptr
-                enricher:mockEnricher
-         authResultCache:nullptr
-           blockUSBMount:false
-          remountUSBMode:nil
-      startupPreferences:SNTDeviceManagerStartupPreferencesNone];
+                            initWithESAPI:mockESApi
+                                  metrics:nullptr
+                                   logger:nullptr
+                                 enricher:mockEnricher
+                          authResultCache:nullptr
+                            blockUSBMount:false
+      blockUnencryptedRemovableMediaMount:blockUnencryptedRemovableMediaMount
+                           remountUSBMode:nil
+                       startupPreferences:SNTDeviceManagerStartupPreferencesNone];
 
   setupDMCallback(deviceManager);
 
@@ -414,14 +428,15 @@ class MockAuthResultCache : public AuthResultCache {
   EXPECT_CALL(*mockAuthCache, FlushCache);
 
   SNTEndpointSecurityDeviceManager *deviceManager = [[SNTEndpointSecurityDeviceManager alloc]
-           initWithESAPI:mockESApi
-                 metrics:nullptr
-                  logger:nullptr
-                enricher:nullptr
-         authResultCache:mockAuthCache
-           blockUSBMount:YES
-          remountUSBMode:nil
-      startupPreferences:SNTDeviceManagerStartupPreferencesNone];
+                            initWithESAPI:mockESApi
+                                  metrics:nullptr
+                                   logger:nullptr
+                                 enricher:nullptr
+                          authResultCache:mockAuthCache
+                            blockUSBMount:YES
+      blockUnencryptedRemovableMediaMount:false
+                           remountUSBMode:nil
+                       startupPreferences:SNTDeviceManagerStartupPreferencesNone];
 
   deviceManager.blockUSBMount = YES;
 
@@ -607,14 +622,15 @@ class MockAuthResultCache : public AuthResultCache {
   auto mockEnricher = std::make_shared<santa::MockEnricher>();
 
   SNTEndpointSecurityDeviceManager *deviceManager = [[SNTEndpointSecurityDeviceManager alloc]
-           initWithESAPI:mockESApi
-                 metrics:nullptr
-                  logger:nullptr
-                enricher:mockEnricher
-         authResultCache:nullptr
-           blockUSBMount:false
-          remountUSBMode:nil
-      startupPreferences:SNTDeviceManagerStartupPreferencesNone];
+                            initWithESAPI:mockESApi
+                                  metrics:nullptr
+                                   logger:nullptr
+                                 enricher:mockEnricher
+                          authResultCache:nullptr
+                            blockUSBMount:false
+      blockUnencryptedRemovableMediaMount:false
+                           remountUSBMode:nil
+                       startupPreferences:SNTDeviceManagerStartupPreferencesNone];
 
   setupDMCallback(deviceManager);
 
@@ -801,106 +817,114 @@ class MockAuthResultCache : public AuthResultCache {
 
 - (void)testBlockUnencryptedRemovableMediaMount_EncryptedDevice_Allowed {
   [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-            diskInfoOverrides:@{
-              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @YES,
-            }
-           expectedAuthResult:ES_AUTH_RESULT_ALLOW
-           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-             dm.blockUnencryptedRemovableMediaMount = YES;
-           }];
+                        diskInfoOverrides:@{
+                          (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @YES,
+                        }
+                       expectedAuthResult:ES_AUTH_RESULT_ALLOW
+      blockUnencryptedRemovableMediaMount:YES
+                       deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm){
+                       }];
 }
 
 - (void)testBlockUnencryptedRemovableMediaMount_UnencryptedDevice_Blocked {
   [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-            diskInfoOverrides:@{
-              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
-            }
-           expectedAuthResult:ES_AUTH_RESULT_DENY
-           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-             dm.blockUnencryptedRemovableMediaMount = YES;
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
-               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
-             };
-           }];
+                        diskInfoOverrides:@{
+                          (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
+                        }
+                       expectedAuthResult:ES_AUTH_RESULT_DENY
+      blockUnencryptedRemovableMediaMount:YES
+                       deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+                         dm.deviceBlockCallback = ^(SNTDeviceEvent *event,
+                                                    SNTStoredUSBMountEvent *usbEvent) {
+                           XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+                         };
+                       }];
 }
 
 - (void)testBlockUnencryptedRemovableMediaMount_MissingKey_DeniedByDefault {
   // No kDADiskDescriptionMediaEncryptedKey in diskInfo at all (nil).
   // This simulates the async race where DA hasn't populated the key yet.
   [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-            diskInfoOverrides:nil
-           expectedAuthResult:ES_AUTH_RESULT_DENY
-           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-             dm.blockUnencryptedRemovableMediaMount = YES;
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
-               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
-             };
-           }];
+                        diskInfoOverrides:nil
+                       expectedAuthResult:ES_AUTH_RESULT_DENY
+      blockUnencryptedRemovableMediaMount:YES
+                       deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+                         dm.deviceBlockCallback = ^(SNTDeviceEvent *event,
+                                                    SNTStoredUSBMountEvent *usbEvent) {
+                           XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+                         };
+                       }];
 }
 
 - (void)testBlockUnencryptedRemovableMediaMount_EncryptedDevice_Remounted {
   NSArray<NSString *> *wantRemountArgs = @[ @"rdonly", @"noexec" ];
   [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-            diskInfoOverrides:@{
-              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @YES,
-            }
-           expectedAuthResult:ES_AUTH_RESULT_DENY
-           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-             dm.blockUnencryptedRemovableMediaMount = YES;
-             dm.remountArgs = wantRemountArgs;
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
-               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionAllowedWithRemount);
-               XCTAssertEqualObjects(usbEvent.remountArgs, wantRemountArgs);
-             };
-           }];
+                        diskInfoOverrides:@{
+                          (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @YES,
+                        }
+                       expectedAuthResult:ES_AUTH_RESULT_DENY
+      blockUnencryptedRemovableMediaMount:YES
+                       deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+                         dm.remountArgs = wantRemountArgs;
+                         dm.deviceBlockCallback =
+                             ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+                               XCTAssertEqual(usbEvent.decision,
+                                              SNTStoredUSBMountEventDecisionAllowedWithRemount);
+                               XCTAssertEqualObjects(usbEvent.remountArgs, wantRemountArgs);
+                             };
+                       }];
 }
 
 - (void)testBlockUnencryptedRemovableMediaMount_UnencryptedDevice_NoRemount {
   [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-            diskInfoOverrides:@{
-              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
-            }
-           expectedAuthResult:ES_AUTH_RESULT_DENY
-           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-             dm.blockUnencryptedRemovableMediaMount = YES;
-             dm.remountArgs = @[ @"rdonly", @"noexec" ];
-             dm.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
-               // Must be blocked, NOT remounted — remounting would still
-               // expose unencrypted data.
-               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
-               XCTAssertNil(usbEvent.remountArgs);
-             };
-           }];
+                        diskInfoOverrides:@{
+                          (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
+                        }
+                       expectedAuthResult:ES_AUTH_RESULT_DENY
+      blockUnencryptedRemovableMediaMount:YES
+                       deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
+                         dm.remountArgs = @[ @"rdonly", @"noexec" ];
+                         dm.deviceBlockCallback = ^(SNTDeviceEvent *event,
+                                                    SNTStoredUSBMountEvent *usbEvent) {
+                           // Must be blocked, NOT remounted — remounting would still
+                           // expose unencrypted data.
+                           XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionBlocked);
+                           XCTAssertNil(usbEvent.remountArgs);
+                         };
+                       }];
 }
 
 - (void)testBlockUnencryptedRemovableMediaMount_Disabled_AllowsAll {
   [self triggerTestMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-            diskInfoOverrides:@{
-              (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
-            }
-           expectedAuthResult:ES_AUTH_RESULT_ALLOW
-           deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm) {
-             dm.blockUnencryptedRemovableMediaMount = NO;
-             // blockUSBMount also OFF (default from init)
-           }];
+                        diskInfoOverrides:@{
+                          (__bridge NSString *)kDADiskDescriptionMediaEncryptedKey : @NO,
+                        }
+                       expectedAuthResult:ES_AUTH_RESULT_ALLOW
+      blockUnencryptedRemovableMediaMount:NO
+                       deviceManagerSetup:^(SNTEndpointSecurityDeviceManager *dm){
+                           // blockUSBMount also OFF (default from init)
+                       }];
 }
 
 #pragma mark - DA Mount Approval (Dissenter) Tests
 
-- (SNTEndpointSecurityDeviceManager *)createDeviceManagerForApprovalTests {
+- (SNTEndpointSecurityDeviceManager *)
+    createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:
+        (BOOL)blockUnencryptedRemovableMediaMount {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
   auto mockEnricher = std::make_shared<santa::MockEnricher>();
 
   SNTEndpointSecurityDeviceManager *dm = [[SNTEndpointSecurityDeviceManager alloc]
-           initWithESAPI:mockESApi
-                 metrics:nullptr
-                  logger:nullptr
-                enricher:mockEnricher
-         authResultCache:nullptr
-           blockUSBMount:false
-          remountUSBMode:nil
-      startupPreferences:SNTDeviceManagerStartupPreferencesNone];
+                            initWithESAPI:mockESApi
+                                  metrics:nullptr
+                                   logger:nullptr
+                                 enricher:mockEnricher
+                          authResultCache:nullptr
+                            blockUSBMount:false
+      blockUnencryptedRemovableMediaMount:blockUnencryptedRemovableMediaMount
+                           remountUSBMode:nil
+                       startupPreferences:SNTDeviceManagerStartupPreferencesNone];
 
   // Stub logDiskAppeared since logger is nil
   id partialDM = OCMPartialMock(dm);
@@ -927,8 +951,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testMountApproval_EncryptedDevice_ReturnsDissenter {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
-  dm.blockUnencryptedRemovableMediaMount = YES;
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:YES];
   dm.remountArgs = @[ @"rdonly", @"noexec" ];
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
@@ -944,8 +968,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testMountApproval_SelfRemount_Approves {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
-  dm.blockUnencryptedRemovableMediaMount = YES;
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:YES];
   dm.remountArgs = @[ @"rdonly", @"noexec" ];
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
@@ -961,8 +985,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testMountApproval_UnencryptedDevice_Approves {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
-  dm.blockUnencryptedRemovableMediaMount = YES;
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:YES];
   dm.remountArgs = @[ @"rdonly" ];
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:NO];
@@ -972,8 +996,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testMountApproval_BlockUnencryptedOff_Approves {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
-  dm.blockUnencryptedRemovableMediaMount = NO;
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:NO];
   dm.remountArgs = @[ @"rdonly" ];
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
@@ -983,8 +1007,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testMountApproval_BothFlagsOn_Approves {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
-  dm.blockUnencryptedRemovableMediaMount = YES;
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:YES];
   dm.blockUSBMount = YES;
   dm.remountArgs = @[ @"rdonly" ];
 
@@ -995,8 +1019,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testMountApproval_InternalDevice_Approves {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
-  dm.blockUnencryptedRemovableMediaMount = YES;
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:YES];
   dm.remountArgs = @[ @"rdonly" ];
 
   MockDADisk *mockDisk = [[MockDADisk alloc] init];
@@ -1014,8 +1038,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testMountApproval_NoRemountArgs_Approves {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
-  dm.blockUnencryptedRemovableMediaMount = YES;
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:YES];
   // No remountArgs set
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
@@ -1025,7 +1049,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testRemountCompletion_CleansUpTrackingSet {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:NO];
   dm.remountArgs = @[ @"rdonly" ];
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
@@ -1044,8 +1069,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testRemountCompletion_Success_FiresCallback {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
-  dm.blockUnencryptedRemovableMediaMount = YES;
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:YES];
   dm.remountArgs = @[ @"rdonly", @"noexec" ];
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
@@ -1071,7 +1096,8 @@ class MockAuthResultCache : public AuthResultCache {
 }
 
 - (void)testRemountCompletion_Failure_DoesNotFireCallback {
-  SNTEndpointSecurityDeviceManager *dm = [self createDeviceManagerForApprovalTests];
+  SNTEndpointSecurityDeviceManager *dm =
+      [self createDeviceManagerForApprovalTestsWithBlockUnencryptedRemovableMediaMount:NO];
   dm.remountArgs = @[ @"rdonly" ];
 
   MockDADisk *mockDisk = [self createMockDiskWithEncrypted:YES];
