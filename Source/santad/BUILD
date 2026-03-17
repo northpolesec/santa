@@ -642,6 +642,9 @@ objc_library(
     name = "SNTEndpointSecurityDeviceManager",
     srcs = ["EventProviders/SNTEndpointSecurityDeviceManager.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityDeviceManager.h"],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":AuthResultCache",
         ":EndpointSecurityAPI",
@@ -785,6 +788,9 @@ objc_library(
     name = "EndpointSecuritySerializerBasicString",
     srcs = ["Logs/EndpointSecurity/Serializers/BasicString.mm"],
     hdrs = ["Logs/EndpointSecurity/Serializers/BasicString.h"],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":EndpointSecurityAPI",
         ":EndpointSecuritySanitizableString",
@@ -805,6 +811,9 @@ objc_library(
     name = "EndpointSecuritySerializerProtobuf",
     srcs = ["Logs/EndpointSecurity/Serializers/Protobuf.mm"],
     hdrs = ["Logs/EndpointSecurity/Serializers/Protobuf.h"],
+    sdk_frameworks = [
+        "DiskArbitration",
+    ],
     deps = [
         ":EndpointSecurityAPI",
         ":EndpointSecuritySerializer",
@@ -1347,9 +1356,6 @@ santa_unit_test(
         "bsm",
         "EndpointSecurity",
     ],
-    sdk_frameworks = [
-        "DiskArbitration",
-    ],
     structured_resources = [
         "//Source/santad/testdata:binaryrules_testdata",
     ],
@@ -1423,9 +1429,6 @@ santa_unit_test(
         "bsm",
         "EndpointSecurity",
     ],
-    sdk_frameworks = [
-        "DiskArbitration",
-    ],
     deps = [
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityEnricher",
@@ -1448,9 +1451,6 @@ santa_unit_test(
 santa_unit_test(
     name = "EndpointSecuritySerializerProtobufTest",
     srcs = ["Logs/EndpointSecurity/Serializers/ProtobufTest.mm"],
-    sdk_frameworks = [
-        "DiskArbitration",
-    ],
     structured_resources = [
         "//Source/santad/testdata:protobuf_json_testdata",
     ],
@@ -1546,9 +1546,6 @@ santa_unit_test(
     sdk_dylibs = [
         "bsm",
         "EndpointSecurity",
-    ],
-    sdk_frameworks = [
-        "DiskArbitration",
     ],
     deps = [
         ":EndpointSecurityLogger",
@@ -1707,9 +1704,6 @@ santa_unit_test(
     sdk_dylibs = [
         "EndpointSecurity",
     ],
-    sdk_frameworks = [
-        "DiskArbitration",
-    ],
     deps = [
         ":AuthResultCache",
         ":EndpointSecurityClient",
@@ -1733,9 +1727,6 @@ santa_unit_test(
     srcs = ["EventProviders/SNTEndpointSecurityDataFileAccessAuthorizerTest.mm"],
     sdk_dylibs = [
         "EndpointSecurity",
-    ],
-    sdk_frameworks = [
-        "DiskArbitration",
     ],
     deps = [
         ":MockEndpointSecurityAPI",
@@ -1767,9 +1758,6 @@ santa_unit_test(
 santa_unit_test(
     name = "FAAPolicyProcessorTest",
     srcs = ["EventProviders/FAAPolicyProcessorTest.mm"],
-    sdk_frameworks = [
-        "DiskArbitration",
-    ],
     deps = [
         ":EndpointSecurityMessage",
         ":FAAPolicyProcessor",
@@ -1792,9 +1780,6 @@ santa_unit_test(
     sdk_dylibs = [
         "EndpointSecurity",
     ],
-    sdk_frameworks = [
-        "DiskArbitration",
-    ],
     deps = [
         ":EndpointSecurityClient",
         ":EndpointSecurityMessage",
@@ -1815,9 +1800,6 @@ santa_unit_test(
     srcs = ["EventProviders/SNTEndpointSecurityRecorderTest.mm"],
     sdk_dylibs = [
         "EndpointSecurity",
-    ],
-    sdk_frameworks = [
-        "DiskArbitration",
     ],
     deps = [
         ":AuthResultCache",
@@ -1850,9 +1832,6 @@ santa_unit_test(
         "bsm",
         "EndpointSecurity",
     ],
-    sdk_frameworks = [
-        "DiskArbitration",
-    ],
     deps = [
         ":AuthResultCache",
         ":DiskArbitrationTestLib",
@@ -1878,9 +1857,6 @@ santa_unit_test(
     srcs = ["SNTCompilerControllerTest.mm"],
     sdk_dylibs = [
         "EndpointSecurity",
-    ],
-    sdk_frameworks = [
-        "DiskArbitration",
     ],
     deps = [
         ":EndpointSecurityLogger",
