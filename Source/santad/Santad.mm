@@ -109,15 +109,16 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     metrics->StartPoll();
   }
 
-  SNTEndpointSecurityDeviceManager *device_client =
-      [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:esapi
-                                                      metrics:metrics
-                                                       logger:logger
-                                                     enricher:enricher
-                                              authResultCache:auth_result_cache
-                                                blockUSBMount:[configurator blockUSBMount]
-                                               remountUSBMode:[configurator remountUSBMode]
-                                           startupPreferences:[configurator onStartUSBOptions]];
+  SNTEndpointSecurityDeviceManager *device_client = [[SNTEndpointSecurityDeviceManager alloc]
+                            initWithESAPI:esapi
+                                  metrics:metrics
+                                   logger:logger
+                                 enricher:enricher
+                          authResultCache:auth_result_cache
+                            blockUSBMount:[configurator blockUSBMount]
+      blockUnencryptedRemovableMediaMount:[configurator blockUnencryptedRemovableMediaMount]
+                           remountUSBMode:[configurator remountUSBMode]
+                       startupPreferences:[configurator onStartUSBOptions]];
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
     [syncd_queue addStoredEvent:usbEvent];
@@ -388,6 +389,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    LOGI(@"BlockUSBMount changed: %d -> %d", oldBool, newBool);
                                    device_client.blockUSBMount = newBool;
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(blockUnencryptedRemovableMediaMount)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"BlockUnencryptedRemovableMediaMount changed: %d -> %d",
+                                        oldBool, newBool);
+                                   device_client.blockUnencryptedRemovableMediaMount = newBool;
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(remountUSBMode)

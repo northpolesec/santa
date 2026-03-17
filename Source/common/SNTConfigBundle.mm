@@ -26,6 +26,7 @@
 @property NSString *allowlistRegex;
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
+@property NSNumber *blockUnencryptedRemovableMediaMount;
 @property NSArray *remountUSBMode;
 @property NSNumber *blockNetworkMount;
 @property NSString *bannedNetworkMountBlockMessage;
@@ -64,6 +65,7 @@
   ENCODE(coder, allowlistRegex);
   ENCODE(coder, blocklistRegex);
   ENCODE(coder, blockUSBMount);
+  ENCODE(coder, blockUnencryptedRemovableMediaMount);
   ENCODE(coder, remountUSBMode);
   ENCODE(coder, blockNetworkMount);
   ENCODE(coder, bannedNetworkMountBlockMessage);
@@ -98,6 +100,7 @@
     DECODE(decoder, allowlistRegex, NSString);
     DECODE(decoder, blocklistRegex, NSString);
     DECODE(decoder, blockUSBMount, NSNumber);
+    DECODE(decoder, blockUnencryptedRemovableMediaMount, NSNumber);
     DECODE_ARRAY(decoder, remountUSBMode, NSString);
     DECODE(decoder, blockNetworkMount, NSNumber);
     DECODE(decoder, bannedNetworkMountBlockMessage, NSString);
@@ -153,6 +156,12 @@
 - (void)blockUSBMount:(void (^)(BOOL))block {
   if (self.blockUSBMount) {
     block([self.blockUSBMount boolValue]);
+  }
+}
+
+- (void)blockUnencryptedRemovableMediaMount:(void (^)(BOOL))block {
+  if (self.blockUnencryptedRemovableMediaMount) {
+    block([self.blockUnencryptedRemovableMediaMount boolValue]);
   }
 }
 

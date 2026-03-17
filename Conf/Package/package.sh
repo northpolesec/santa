@@ -26,23 +26,37 @@ function die {
 
 ################################################################################
 
-readonly SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
+# When called with LITE_APP set, use the pre-prepared LITE_APP instead of the
+# release root app bundle.
+LITE=0
+if [[ -n "${LITE_APP}" ]]; then
+  LITE=1
+  readonly APP_BUNDLE="${LITE_APP}"
+else
+  readonly APP_BUNDLE="${RELEASE_ROOT}/binaries/Santa.app"
+fi
+
+SCRATCH=$(/usr/bin/mktemp -d "${TMPDIR}santa-"XXXXXX)
+[[ -n "${SCRATCH}" && -d "${SCRATCH}" ]] || die "mktemp failed to create scratch directory"
+readonly SCRATCH
 readonly APP_PKG_ROOT="${SCRATCH}/app_pkg_root"
 readonly APP_PKG_SCRIPTS="${SCRATCH}/pkg_scripts"
 
 /bin/mkdir -p "${APP_PKG_ROOT}" "${APP_PKG_SCRIPTS}"
 
-# Ensure _CodeSignature/CodeResources files have 0644 permissions so they can
-# be verified without using sudo.
-/usr/bin/find "${RELEASE_ROOT}/binaries" -type f -name CodeResources -exec chmod 0644 {} \;
-/usr/bin/find "${RELEASE_ROOT}/binaries" -type d -exec chmod 0755 {} \;
+if [[ "${LITE}" -eq 0 ]]; then
+  # Ensure _CodeSignature/CodeResources files have 0644 permissions so they can
+  # be verified without using sudo.
+  /usr/bin/find "${RELEASE_ROOT}/binaries" -type f -name CodeResources -exec chmod 0644 {} \;
+  /usr/bin/find "${RELEASE_ROOT}/binaries" -type d -exec chmod 0755 {} \;
+fi
 /usr/bin/find "${RELEASE_ROOT}/conf" -type f -name "com.northpolesec.santa*" -exec chmod 0644 {} \;
 
 echo "creating app pkg"
 /bin/mkdir -p "${APP_PKG_ROOT}/var/db/santa/migration" \
   "${APP_PKG_ROOT}/Library/LaunchDaemons" \
   "${APP_PKG_ROOT}/private/etc/newsyslog.d"
-/bin/cp -vXR "${RELEASE_ROOT}/binaries/Santa.app" "${APP_PKG_ROOT}/var/db/santa/migration/"
+/bin/cp -vXR "${APP_BUNDLE}" "${APP_PKG_ROOT}/var/db/santa/migration/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/migration.sh" "${APP_PKG_ROOT}/var/db/santa/migration/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.migration.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/com.northpolesec.santa-migration.plist"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
@@ -58,7 +72,9 @@ echo "creating app pkg"
 /usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
 
 # Build app package
-readonly APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${RELEASE_ROOT}/binaries/Santa.app/Contents/Info.plist")
+APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${APP_BUNDLE}/Contents/Info.plist")
+[[ -n "${APP_VERSION}" ]] || die "failed to extract APP_VERSION from ${APP_BUNDLE}/Contents/Info.plist"
+readonly APP_VERSION
 /usr/bin/pkgbuild --identifier "com.northpolesec.santa" \
   --version "${APP_VERSION}" \
   --root "${APP_PKG_ROOT}" \

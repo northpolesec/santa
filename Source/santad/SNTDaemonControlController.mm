@@ -31,6 +31,7 @@
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTKillCommand.h"
+#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTModeTransition.h"
@@ -422,6 +423,10 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] blockUSBMount]);
 }
 
+- (void)blockUnencryptedRemovableMediaMount:(void (^)(BOOL))reply {
+  reply([[SNTConfigurator configurator] blockUnencryptedRemovableMediaMount]);
+}
+
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply {
   reply([[SNTConfigurator configurator] remountUSBMode]);
 }
@@ -484,6 +489,10 @@ double watchdogRAMPeak = 0;
 
   [result blockUSBMount:^(BOOL val) {
     [configurator setSyncServerBlockUSBMount:val];
+  }];
+
+  [result blockUnencryptedRemovableMediaMount:^(BOOL val) {
+    [configurator setSyncServerBlockUnencryptedRemovableMediaMount:val];
   }];
 
   [result remountUSBMode:^(NSArray *val) {
@@ -770,6 +779,12 @@ double watchdogRAMPeak = 0;
 
 - (void)installSantaApp:(NSString *)tempPath reply:(void (^)(BOOL))reply {
   LOGI(@"Trigger Santa installation from: %@", tempPath);
+
+  if ([[SNTConfigurator configurator] isSyncV2Enabled] && santa::SNTIsLiteAppBundle(tempPath)) {
+    LOGE(@"Refusing to install Lite version while SyncV2 is enabled");
+    reply(NO);
+    return;
+  }
 
   if (![self verifyPathIsSanta:tempPath]) {
     LOGE(@"Unable to verify Santa for installation: %@", tempPath);

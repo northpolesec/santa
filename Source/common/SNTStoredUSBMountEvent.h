@@ -46,11 +46,15 @@ typedef NS_ENUM(NSInteger, SNTStoredUSBMountEventDecision) {
 /// The decision on whether the mount was blocked, or allowed with remount
 @property(readonly) SNTStoredUSBMountEventDecision decision;
 
+/// Whether the device is encrypted
+@property(readonly) BOOL isEncrypted;
+
 - (instancetype)initWithDeviceModel:(NSString *)deviceModel
                        deviceVendor:(NSString *)deviceVendor
                         mountOnName:(NSString *)mountOnName
                            protocol:(NSString *)protocol
                            decision:(SNTStoredUSBMountEventDecision)decision
-                        remountArgs:(NSArray<NSString *> *)remountArgs;
+                        remountArgs:(NSArray<NSString *> *)remountArgs
+                        isEncrypted:(BOOL)isEncrypted;
 
 @end

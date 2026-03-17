@@ -40,18 +40,20 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
     : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler>
 
 @property(nonatomic, readwrite) BOOL blockUSBMount;
+@property(nonatomic, readwrite) BOOL blockUnencryptedRemovableMediaMount;
 @property(nonatomic, readwrite, nullable) NSArray<NSString *> *remountArgs;
 @property(nonatomic, nullable) SNTDeviceBlockCallback deviceBlockCallback;
 @property(nonatomic, nullable) SNTNetworkMountCallback networkMountCallback;
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
-                       logger:(std::shared_ptr<santa::Logger>)logger
-                     enricher:(std::shared_ptr<santa::Enricher>)enricher
-              authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
-                blockUSBMount:(BOOL)blockUSBMount
-               remountUSBMode:(nullable NSArray<NSString *> *)remountUSBMode
-           startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs;
+                                metrics:(std::shared_ptr<santa::Metrics>)metrics
+                                 logger:(std::shared_ptr<santa::Logger>)logger
+                               enricher:(std::shared_ptr<santa::Enricher>)enricher
+                        authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
+                          blockUSBMount:(BOOL)blockUSBMount
+    blockUnencryptedRemovableMediaMount:(BOOL)blockUnencryptedRemovableMediaMount
+                         remountUSBMode:(nullable NSArray<NSString *> *)remountUSBMode
+                     startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs;
 
 @end
 

@@ -1,4 +1,4 @@
-/// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,15 +14,12 @@
 
 #import <Foundation/Foundation.h>
 
-@interface SNTDeviceEvent : NSObject <NSSecureCoding>
+namespace santa {
 
-- (instancetype)initWithOnName:(NSString *)mntonname fromName:(NSString *)mntfromname;
+/// Returns YES if this is a Lite installation (sleigh or santanetd is missing).
+BOOL SNTIsLiteInstall(void);
 
-@property NSString *mntonname;
-@property NSString *mntfromname;
-@property NSArray<NSString *> *remountArgs;
-@property BOOL isEncrypted;
+/// Returns YES if the app bundle at the given path would be a Lite installation.
+BOOL SNTIsLiteAppBundle(NSString *appPath);
 
-- (NSString *)readableRemountArgs;
-
-@end
+}  // namespace santa

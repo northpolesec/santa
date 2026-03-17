@@ -252,3 +252,6 @@
 
 /* No comment provided by engineer. */
 "Version **%@**" = "Версия **%@**";
+
+/* Version in About view for Lite edition */
+"Version **%@** (Lite)" = "Версия **%@** (Lite)";

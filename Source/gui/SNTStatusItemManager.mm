@@ -21,6 +21,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTKVOManager.h"
+#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
@@ -121,8 +122,9 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 
   // Add version string and about menu item
   NSString *santaVersionString = [NSString
-      stringWithFormat:@"Santa v%@",
-                       [[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"]];
+      stringWithFormat:@"Santa v%@%@",
+                       [[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"],
+                       santa::SNTIsLiteInstall() ? @" (Lite)" : @""];
   [menu addItem:[self menuItemWithTitle:santaVersionString andAction:nil]];
   [menu addItem:[self menuItemWithTitle:@"About Santa" andAction:@selector(aboutMenuItemClicked:)]];
 

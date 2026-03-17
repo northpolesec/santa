@@ -24,6 +24,7 @@
 #import "Source/common/NKeyTokenValidator.h"
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
@@ -218,6 +219,8 @@ static NSString *const kAllowedSantaCommandsKey = @"AllowedSantaCommands";
 // The keys managed by a sync server or mobileconfig.
 static NSString *const kClientModeKey = @"ClientMode";
 static NSString *const kBlockUSBMountKey = @"BlockUSBMount";
+static NSString *const kBlockUnencryptedRemovableMediaMountKey =
+    @"BlockUnencryptedRemovableMediaMount";
 static NSString *const kRemountUSBModeKey = @"RemountUSBMode";
 static NSString *const kBlockNetworkMountKey = @"BlockNetworkMount";
 static NSString *const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
@@ -282,6 +285,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kBlockedPathRegexKey : re,
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
+      kBlockUnencryptedRemovableMediaMountKey : number,
       kRemountUSBModeKey : array,
       kBlockNetworkMountKey : number,
       kBannedNetworkMountBlockMessage : string,
@@ -318,6 +322,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kBlockedPathRegexKey : re,
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
+      kBlockUnencryptedRemovableMediaMountKey : number,
       kRemountUSBModeKey : array,
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
@@ -779,6 +784,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 + (NSSet *)keyPathsForValuesAffectingBlockUSBMount {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingBlockUnencryptedRemovableMediaMount {
   return [self syncAndConfigStateSet];
 }
 
@@ -1623,6 +1632,10 @@ static SNTConfigurator *sharedConfigurator = nil;
         format:@"isSyncV2Enabled called from: %@", [[NSProcessInfo processInfo] processName]];
   }
 
+  if (santa::SNTIsLiteInstall()) {
+    return NO;
+  }
+
   return santa::IsDomainPinned([self syncBaseURL]) || [self hasValidPushTokenChain];
 }
 
@@ -1649,6 +1662,17 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (n) return [n boolValue];
 
   return [self.configState[kBlockUSBMountKey] boolValue];
+}
+
+- (void)setSyncServerBlockUnencryptedRemovableMediaMount:(BOOL)enabled {
+  [self updateSyncStateForKey:kBlockUnencryptedRemovableMediaMountKey value:@(enabled)];
+}
+
+- (BOOL)blockUnencryptedRemovableMediaMount {
+  NSNumber *n = self.syncState[kBlockUnencryptedRemovableMediaMountKey];
+  if (n) return [n boolValue];
+
+  return [self.configState[kBlockUnencryptedRemovableMediaMountKey] boolValue];
 }
 
 - (void)setSyncServerBannedNetworkMountBlockMessage:(NSString *)msg {
