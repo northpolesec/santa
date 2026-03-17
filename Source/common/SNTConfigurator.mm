@@ -1801,7 +1801,28 @@ static SNTConfigurator *sharedConfigurator = nil;
 }
 
 - (NSArray<NSString *> *)allowedSantaCommands {
-  return EnsureArrayOfStrings(self.configState[kAllowedSantaCommandsKey]);
+  NSArray *commands = self.configState[kAllowedSantaCommandsKey];
+  if (!commands) {
+    return nil;
+  }
+
+  if (![commands isKindOfClass:[NSArray class]]) {
+    LOGW(@"AllowedSantaCommands is not an array, blocking all commands");
+    return @[];
+  }
+
+  NSMutableArray<NSString *> *filtered =
+      [[NSMutableArray alloc] initWithCapacity:commands.count];
+
+  for (id command in commands) {
+    if ([command isKindOfClass:[NSString class]]) {
+      [filtered addObject:command];
+    } else {
+      LOGW(@"AllowedSantaCommands contains non-string value, ignoring: %@", [command class]);
+    }
+  }
+
+  return filtered;
 }
 
 #pragma mark - Private

@@ -814,16 +814,16 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
   ::pbv1::SantaCommandRequest command;
   command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
-  command.mutable_ping();
+  command.mutable_kill();
   [self signCommandRequest:&command];
 
-  // When: Dispatching a ping command
+  // When: Dispatching a kill command
   ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should succeed
-  XCTAssertFalse(response->has_error(), @"Ping command should be allowed when in allowlist");
-  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kPing);
+  XCTAssertFalse(response->has_error(), @"Kill command should be allowed when in allowlist");
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kKill);
 }
 
 - (void)testAllowedCommandsConfigUnsetAllowsAll {
@@ -842,6 +842,55 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   // Then: Should succeed (backward compatible)
   XCTAssertFalse(response->has_error(), @"All commands should be allowed when config is unset");
   XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kPing);
+}
+
+- (void)testAllowedCommandsConfigUnsetAllowsKill {
+  // Given: AllowedSantaCommands is nil (default)
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(nil);
+
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_kill();
+  [self signCommandRequest:&command];
+
+  // When: Dispatching a kill command
+  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: Should succeed (backward compatible)
+  XCTAssertFalse(response->has_error(), @"Kill should be allowed when config is unset");
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kKill);
+}
+
+- (void)testAllowedCommandsEmptyArrayBlocksAll {
+  // Given: AllowedSantaCommands is an empty array (e.g. all elements were invalid and filtered out)
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[]);
+
+  ::pbv1::SantaCommandRequest pingCommand;
+  pingCommand.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  pingCommand.mutable_ping();
+  [self signCommandRequest:&pingCommand];
+
+  // When: Dispatching a ping command
+  ::pbv1::SantaCommandResponse *pingResponse =
+      [self.client dispatchSantaCommandToHandler:pingCommand onArena:self.arena];
+
+  // Then: Should be rejected
+  XCTAssertTrue(pingResponse->has_error(), @"Ping should be rejected when allowlist is empty");
+  XCTAssertEqual(pingResponse->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+
+  ::pbv1::SantaCommandRequest killCommand;
+  killCommand.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  killCommand.mutable_kill();
+  [self signCommandRequest:&killCommand];
+
+  // When: Dispatching a kill command
+  ::pbv1::SantaCommandResponse *killResponse =
+      [self.client dispatchSantaCommandToHandler:killCommand onArena:self.arena];
+
+  // Then: Should also be rejected
+  XCTAssertTrue(killResponse->has_error(), @"Kill should be rejected when allowlist is empty");
+  XCTAssertEqual(killResponse->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
 }
 
 - (void)testAllowedCommandsPingBlocked {
