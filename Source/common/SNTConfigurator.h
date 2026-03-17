@@ -1079,6 +1079,15 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 @property(nullable, readonly, nonatomic) NSArray<NSString *> *enabledProcessAnnotations;
 
 ///
+///  If set, only the listed command types will be accepted from the sync server.
+///  Command names are lowercase strings matching proto field names: "kill", "ping".
+///  When unset (nil), all commands are allowed.
+///
+///  This is a forced config key (MDM only) — not settable via sync server.
+///
+@property(nullable, readonly, nonatomic) NSArray<NSString *> *allowedSantaCommands;
+
+///
 ///  Retrieve an initialized singleton configurator object using the default file path.
 ///
 + (nonnull instancetype)configurator NS_SWIFT_NAME(configurator());
