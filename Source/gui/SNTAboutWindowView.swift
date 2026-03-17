@@ -3,6 +3,7 @@ import SwiftUI
 import santa_common_MOLXPCConnection
 import santa_common_SNTCommonEnums
 import santa_common_SNTConfigurator
+import santa_common_SNTLiteDetector
 import santa_common_SNTXPCSyncServiceInterface
 import santa_gui_SNTMessageView
 
@@ -18,6 +19,7 @@ struct SNTAboutWindowView: View {
   let w: NSWindow?
   let c = SNTConfigurator.configurator()
   let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+  let isLite = santa.SNTIsLiteInstall()
 
   @State private var isDragging = false
   @State private var menuItemEnabled: Bool = true
@@ -37,13 +39,11 @@ struct SNTAboutWindowView: View {
       }
 
       // Calling .init explicitly to get Markdown rendering
-      let versionString = String.localizedStringWithFormat(
-        NSLocalizedString(
-          "Version **%@**",
-          comment: "Version in About view"
-        ),
-        v
-      )
+      let format =
+        isLite
+        ? NSLocalizedString("Version **%@** (Lite)", comment: "Version in About view for Lite edition")
+        : NSLocalizedString("Version **%@**", comment: "Version in About view")
+      let versionString = String.localizedStringWithFormat(format, v)
       Text(.init(versionString)).padding(10.0)
 
       HStack {

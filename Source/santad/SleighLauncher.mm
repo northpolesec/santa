@@ -45,6 +45,10 @@ SleighLauncher::SleighLauncher(std::string sleigh_path) : sleigh_path_(std::move
 
 absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
                                     uint32_t timeout_secs) {
+  if (access(sleigh_path_.c_str(), X_OK) != 0) {
+    return absl::NotFoundError("Sleigh binary not executable: " + sleigh_path_);
+  }
+
   // Phase 1: Open all input files (as root) and collect FD numbers
   std::vector<int> input_fds;
   absl::Cleanup close_fds = [&input_fds]() {
