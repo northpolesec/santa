@@ -374,7 +374,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     return;
   }
 
-  dispatch_async(self.syncQueue, ^{
+  // Run on a dedicated queue to avoid blocking syncQueue (which would starve regular syncs).
+  // postEventsToSyncServer: is thread-safe and doesn't require syncQueue serialization.
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     auto replied = std::make_shared<std::atomic<bool>>(false);
     void (^guardedReply)(NSError *) = ^(NSError *e) {
       if (replied->exchange(true)) return;
@@ -414,7 +416,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
                                                dispatch_semaphore_signal(eventSema);
                                              }];
 
-    // Bound the wait to 10 minutes to avoid blocking the syncQueue forever
+    // Bound the wait to 10 minutes to avoid blocking forever
     if (dispatch_semaphore_wait(eventSema, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) !=
         0) {
       LOGE(@"EventUpload: Timeout waiting for bundle service to generate events");
