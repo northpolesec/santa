@@ -24,8 +24,8 @@
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaSetCache.h"
+#include "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 
 using santa::FAAPolicyProcessor;
 using santa::IterateProcessPoliciesBlock;
@@ -48,7 +48,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+                        metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
              faaPolicyProcessor:
                  (std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
     iterateProcessPoliciesBlock:(IterateProcessPoliciesBlock)iterateProcessPoliciesBlock {

@@ -30,9 +30,9 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/String.h"
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/Message.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/Metrics.h"
 
 using santa::EndpointSecurityAPI;
 using santa::EventDisposition;
@@ -129,7 +129,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
+                      metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                        logger:(std::shared_ptr<Logger>)logger {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)

@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <bsm/libbsm.h>
@@ -33,18 +33,18 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SystemResources.h"
+#include "Source/common/es/Client.h"
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Client.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/Metrics.h"
 
 using santa::Client;
 using santa::EndpointSecurityAPI;
 using santa::EnrichedMessage;
+using santa::ESMetricsObserver;
 using santa::EventDisposition;
 using santa::Message;
-using santa::Metrics;
 using santa::Processor;
 
 @interface SNTEndpointSecurityClient ()
@@ -56,7 +56,7 @@ using santa::Processor;
 
 @implementation SNTEndpointSecurityClient {
   std::shared_ptr<EndpointSecurityAPI> _esApi;
-  std::shared_ptr<Metrics> _metrics;
+  std::shared_ptr<ESMetricsObserver> _metrics;
   Client _esClient;
   dispatch_queue_t _authQueue;
   dispatch_queue_t _notifyQueue;
@@ -64,7 +64,7 @@ using santa::Processor;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<Metrics>)metrics
+                      metrics:(std::shared_ptr<ESMetricsObserver>)metrics
                     processor:(Processor)processor {
   self = [super init];
   if (self) {

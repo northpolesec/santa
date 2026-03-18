@@ -36,8 +36,8 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTStrengthify.h"
+#include "Source/common/es/Message.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 
 using santa::EndpointSecurityAPI;
@@ -56,7 +56,7 @@ using santa::Message;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+                        metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                          logger:(std::shared_ptr<santa::Logger>)logger
                        enricher:(std::shared_ptr<santa::Enricher>)enricher
              faaPolicyProcessor:

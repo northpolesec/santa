@@ -14,13 +14,13 @@
 
 #import "Source/common/PrefixTree.h"
 #import "Source/common/Unit.h"
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Enricher.h"
+#import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTreeAwareClient.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
-#import "Source/santad/Metrics.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTCompilerController.h"
 
@@ -30,7 +30,7 @@
     : SNTEndpointSecurityTreeAwareClient <SNTEndpointSecurityEventHandler>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
+                      metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                        logger:(std::shared_ptr<santa::Logger>)logger
                      enricher:(std::shared_ptr<santa::Enricher>)enricher
            compilerController:(SNTCompilerController *)compilerController

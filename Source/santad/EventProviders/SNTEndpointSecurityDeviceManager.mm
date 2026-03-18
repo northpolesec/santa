@@ -38,9 +38,9 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTProcessChain.h"
 #include "Source/common/String.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
-#include "Source/santad/Metrics.h"
 #include "Source/santad/SNTDecisionCache.h"
 
 using santa::AuthResultCache;
@@ -208,7 +208,7 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                                metrics:(std::shared_ptr<santa::Metrics>)metrics
+                                metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                                  logger:(std::shared_ptr<Logger>)logger
                                enricher:(std::shared_ptr<santa::Enricher>)enricher
                         authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache

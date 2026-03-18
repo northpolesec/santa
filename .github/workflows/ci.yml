@@ -18,7 +18,7 @@ jobs:
     name: "Lint"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
       - name: Get clang-format-19
         run: sudo apt-get install --no-install-recommends -y clang-format-19
       - name: Set clang-format-19 as default
@@ -33,7 +33,7 @@ jobs:
     name: "Check Localization"
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
       - name: Check missing localization strings
         run: |
           ./Testing/localization.py
@@ -49,9 +49,9 @@ jobs:
     name: "Check Test Suites"
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8 # ratchet:bazel-contrib/setup-bazel@0.15.0
+        uses: bazel-contrib/setup-bazel@083175551ceeceebc757ebee2127fde78840ca77 # ratchet:bazel-contrib/setup-bazel@0.18.0
         with:
           bazelisk-cache: true
       - name: Check all unit tests are in test suites
@@ -70,23 +70,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # ratchet:actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
       - name: Auth to GCP
         if: ${{ !github.event.pull_request.head.repo.fork }} # This step will only run if it's NOT a fork
         continue-on-error: true
         id: auth
-        uses: "google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f" # ratchet:google-github-actions/auth@v2
+        uses: "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" # ratchet:google-github-actions/auth@v3
         with:
           workload_identity_provider: "projects/131531281042/locations/global/workloadIdentityPools/github/providers/github"
           project_id: "santa-build-cache"
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@4fd964a13a440a8aeb0be47350db2fc640f19ca8 # ratchet:bazel-contrib/setup-bazel@0.15.0
+        uses: bazel-contrib/setup-bazel@083175551ceeceebc757ebee2127fde78840ca77 # ratchet:bazel-contrib/setup-bazel@0.18.0
         with:
           bazelisk-cache: true
           disk-cache: ${{ matrix.os }}
           repository-cache: true
       - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # ratchet:maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # ratchet:maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
       - name: Build

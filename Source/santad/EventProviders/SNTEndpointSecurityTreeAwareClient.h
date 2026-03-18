@@ -12,17 +12,17 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
+#include "Source/common/es/SNTEndpointSecurityClient.h"
 
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/Metrics.h"
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 
 @interface SNTEndpointSecurityTreeAwareClient : SNTEndpointSecurityClient
 @property std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
+                      metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                     processor:(santa::Processor)processor
                   processTree:
                       (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;

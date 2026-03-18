@@ -22,16 +22,16 @@
 
 #import <Foundation/Foundation.h>
 
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/Metrics.h"
 
 @protocol SNTEndpointSecurityClientBase
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
+                      metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                     processor:(santa::Processor)processor;
 
 /// @note If this fails to establish a new ES client via `es_new_client`, an exception is raised

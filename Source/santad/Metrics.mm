@@ -423,10 +423,10 @@ void Metrics::StopPoll() {
   });
 }
 
-void Metrics::SetEventMetrics(Processor processor, EventDisposition event_disposition,
-                              int64_t nanos, es_event_type_t event_type) {
+void Metrics::SetEventMetrics(Processor processor, EventDisposition disposition, int64_t nanos,
+                              es_event_type_t event_type) {
   dispatch_async(events_q_, ^{
-    event_counts_cache_[EventCountTuple{processor, event_type, event_disposition}]++;
+    event_counts_cache_[EventCountTuple{processor, event_type, disposition}]++;
     event_times_cache_[EventTimesTuple{processor, event_type}] = nanos;
   });
 }

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#include "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
-#include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
@@ -24,9 +24,9 @@
 #include <set>
 
 #include "Source/common/TestUtils.h"
+#include "Source/common/es/Message.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/MockFAAPolicyProcessor.h"
 
 using santa::CheckPolicyBlock;
