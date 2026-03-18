@@ -76,17 +76,6 @@ objc_library(
 )
 
 objc_library(
-    name = "SNTEndpointSecurityEventHandler",
-    hdrs = ["EventProviders/SNTEndpointSecurityEventHandler.h"],
-    deps = [
-        "//Source/common:SNTStoredFileAccessEvent",
-        "//Source/common/es:ESMetricsObserver",
-        "//Source/common/es:EndpointSecurityMessage",
-        "//Source/common/faa:WatchItemPolicy",
-    ],
-)
-
-objc_library(
     name = "SNTApplicationCoreMetrics",
     srcs = ["SNTApplicationCoreMetrics.mm"],
     hdrs = ["SNTApplicationCoreMetrics.h"],
@@ -435,48 +424,14 @@ objc_library(
 )
 
 objc_library(
-    name = "SNTEndpointSecurityClientBase",
-    hdrs = ["EventProviders/SNTEndpointSecurityClientBase.h"],
-    deps = [
-        "//Source/common/es:ESMetricsObserver",
-        "//Source/common/es:EndpointSecurityAPI",
-        "//Source/common/es:EndpointSecurityClient",
-        "//Source/common/es:EndpointSecurityEnrichedTypes",
-        "//Source/common/es:EndpointSecurityMessage",
-        "//Source/common/faa:WatchItemPolicy",
-    ],
-)
-
-objc_library(
-    name = "SNTEndpointSecurityClient",
-    srcs = ["EventProviders/SNTEndpointSecurityClient.mm"],
-    hdrs = ["EventProviders/SNTEndpointSecurityClient.h"],
-    deps = [
-        ":SNTEndpointSecurityClientBase",
-        "//Source/common:AuditUtilities",
-        "//Source/common:BranchPrediction",
-        "//Source/common:SNTCommonEnums",
-        "//Source/common:SNTConfigurator",
-        "//Source/common:SNTLogging",
-        "//Source/common:SystemResources",
-        "//Source/common/es:ESMetricsObserver",
-        "//Source/common/es:EndpointSecurityAPI",
-        "//Source/common/es:EndpointSecurityClient",
-        "//Source/common/es:EndpointSecurityEnrichedTypes",
-        "//Source/common/es:EndpointSecurityMessage",
-        "//Source/common/faa:WatchItemPolicy",
-    ],
-)
-
-objc_library(
     name = "SNTEndpointSecurityTreeAwareClient",
     srcs = ["EventProviders/SNTEndpointSecurityTreeAwareClient.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityTreeAwareClient.h"],
     deps = [
-        ":SNTEndpointSecurityClient",
         "//Source/common/es:ESMetricsObserver",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:SNTEndpointSecurityClient",
         "//Source/santad/ProcessTree:SNTEndpointSecurityAdapter",
         "//Source/santad/ProcessTree:process_tree",
     ],
@@ -507,7 +462,6 @@ objc_library(
         ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":SNTCompilerController",
-        ":SNTEndpointSecurityEventHandler",
         ":SNTEndpointSecurityTreeAwareClient",
         "//Source/common:Platform",
         "//Source/common:PrefixTree",
@@ -521,6 +475,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityEnrichedTypes",
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/santad/ProcessTree:process_tree",
     ],
 )
@@ -531,12 +486,12 @@ objc_library(
     hdrs = ["EventProviders/SNTEndpointSecurityTamperResistance.h"],
     deps = [
         ":EndpointSecurityLogger",
-        ":SNTEndpointSecurityClient",
-        ":SNTEndpointSecurityEventHandler",
         "//Source/common:SNTLogging",
         "//Source/common/es:ESMetricsObserver",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:SNTEndpointSecurityClient",
+        "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/common/faa:WatchItemPolicy",
     ],
 )
@@ -548,8 +503,6 @@ objc_library(
     deps = [
         ":AuthResultCache",
         ":SNTCompilerController",
-        ":SNTEndpointSecurityClient",
-        ":SNTEndpointSecurityEventHandler",
         ":SNTExecutionController",
         ":TTYWriter",
         "//Source/common:BranchPrediction",
@@ -561,6 +514,8 @@ objc_library(
         "//Source/common/es:EndpointSecurityEnrichedTypes",
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:SNTEndpointSecurityClient",
+        "//Source/common/es:SNTEndpointSecurityEventHandler",
     ],
 )
 
@@ -574,7 +529,6 @@ objc_library(
         ":Metrics",
         ":RateLimiter",
         ":SNTDecisionCache",
-        ":SNTEndpointSecurityEventHandler",
         ":TTYWriter",
         "//Source/common:AuditUtilities",
         "//Source/common:MOLCertificate",
@@ -590,6 +544,7 @@ objc_library(
         "//Source/common:String",
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/common/faa:WatchItemPolicy",
     ],
 )
@@ -604,8 +559,6 @@ objc_library(
     deps = [
         ":EndpointSecurityLogger",
         ":FAAPolicyProcessor",
-        ":SNTEndpointSecurityClient",
-        ":SNTEndpointSecurityEventHandler",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTMetricSet",
@@ -613,6 +566,8 @@ objc_library(
         "//Source/common/es:ESMetricsObserver",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:SNTEndpointSecurityClient",
+        "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
     ],
@@ -624,8 +579,6 @@ objc_library(
     hdrs = ["EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"],
     deps = [
         ":FAAPolicyProcessor",
-        ":SNTEndpointSecurityClient",
-        ":SNTEndpointSecurityEventHandler",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTLogging",
         "//Source/common:SantaCache",
@@ -633,6 +586,8 @@ objc_library(
         "//Source/common/es:ESMetricsObserver",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:SNTEndpointSecurityClient",
+        "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
     ],
@@ -649,8 +604,6 @@ objc_library(
         ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":EndpointSecuritySerializerUtilities",
-        ":SNTEndpointSecurityClient",
-        ":SNTEndpointSecurityEventHandler",
         "//Source/common:AuditUtilities",
         "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
@@ -666,6 +619,8 @@ objc_library(
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:SNTEndpointSecurityClient",
+        "//Source/common/es:SNTEndpointSecurityEventHandler",
     ],
 )
 
@@ -674,7 +629,6 @@ objc_library(
     srcs = ["EventProviders/AuthResultCache.mm"],
     hdrs = ["EventProviders/AuthResultCache.h"],
     deps = [
-        ":SNTEndpointSecurityClientBase",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
@@ -683,6 +637,7 @@ objc_library(
         "//Source/common:SantaVnode",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityClient",
+        "//Source/common/es:SNTEndpointSecurityClientBase",
     ],
 )
 
@@ -1279,7 +1234,6 @@ santa_unit_test(
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
-        ":SNTEndpointSecurityClient",
         ":SantadDeps",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
@@ -1288,6 +1242,7 @@ santa_unit_test(
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
+        "//Source/common/es:SNTEndpointSecurityClient",
         "@OCMock",
         "@googletest//:gtest",
     ],
@@ -1397,12 +1352,12 @@ santa_unit_test(
     ],
     deps = [
         ":AuthResultCache",
-        ":SNTEndpointSecurityClientBase",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "//Source/common/es:MockEndpointSecurityAPI",
+        "//Source/common/es:SNTEndpointSecurityClientBase",
         "@OCMock",
         "@googletest//:gtest",
     ],
@@ -1512,31 +1467,6 @@ santa_unit_test(
         "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "@OCMock",
-    ],
-)
-
-santa_unit_test(
-    name = "SNTEndpointSecurityClientTest",
-    srcs = ["EventProviders/SNTEndpointSecurityClientTest.mm"],
-    sdk_dylibs = [
-        "bsm",
-        "EndpointSecurity",
-    ],
-    deps = [
-        ":Metrics",
-        ":SNTEndpointSecurityClient",
-        "//Source/common:AuditUtilities",
-        "//Source/common:SNTCommonEnums",
-        "//Source/common:SNTConfigurator",
-        "//Source/common:SystemResources",
-        "//Source/common:TestUtils",
-        "//Source/common/es:EndpointSecurityClient",
-        "//Source/common/es:EndpointSecurityEnrichedTypes",
-        "//Source/common/es:EndpointSecurityMessage",
-        "//Source/common/es:MockEndpointSecurityAPI",
-        "//Source/common/faa:WatchItemPolicy",
-        "@OCMock",
-        "@googletest//:gtest",
     ],
 )
 
@@ -1710,7 +1640,6 @@ santa_unit_test(
         ":AuthResultCache",
         ":DiskArbitrationTestLib",
         ":Metrics",
-        ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityDeviceManager",
         "//Source/common:Platform",
         "//Source/common:SNTCommonEnums",
@@ -1721,6 +1650,7 @@ santa_unit_test(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
         "//Source/common/es:MockEnricher",
+        "//Source/common/es:SNTEndpointSecurityClient",
         "@OCMock",
         "@googletest//:gtest",
     ],
@@ -1768,7 +1698,6 @@ test_suite(
         ":SNTCompilerControllerTest",
         ":SNTDecisionCacheTest",
         ":SNTEndpointSecurityAuthorizerTest",
-        ":SNTEndpointSecurityClientTest",
         ":SNTEndpointSecurityDataFileAccessAuthorizerTest",
         ":SNTEndpointSecurityDeviceManagerTest",
         ":SNTEndpointSecurityProcessFileAccessAuthorizerTest",
@@ -1786,6 +1715,7 @@ test_suite(
         "//Source/common/es:EndpointSecurityClientTest",
         "//Source/common/es:EndpointSecurityEnricherTest",
         "//Source/common/es:EndpointSecurityMessageTest",
+        "//Source/common/es:SNTEndpointSecurityClientTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:StreamBatchersTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
         "//Source/santad/ProcessTree:process_tree_test",

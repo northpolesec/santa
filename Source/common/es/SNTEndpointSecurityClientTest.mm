@@ -32,9 +32,8 @@
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
-#include "Source/santad/Metrics.h"
 
 using santa::Client;
 using santa::EnrichedClose;
