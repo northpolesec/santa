@@ -310,10 +310,10 @@ REGISTER_COMMAND_NAME(@"status")
 
   NSArray<NSString *> *allowedCommands = configurator.allowedSantaCommands;
   NSString *allowedStr = !allowedCommands ? @"All"
-      : allowedCommands.count > 0
-          ? [[allowedCommands sortedArrayUsingSelector:@selector(compare:)]
-                componentsJoinedByString:@", "]
-          : @"None (all blocked)";
+                         : allowedCommands.count > 0
+                             ? [[allowedCommands sortedArrayUsingSelector:@selector(compare:)]
+                                   componentsJoinedByString:@", "]
+                             : @"None (all blocked)";
 
   if ([arguments containsObject:@"--json"]) {
     NSMutableDictionary *stats = [@{
@@ -366,8 +366,7 @@ REGISTER_COMMAND_NAME(@"status")
 
     if (allowedCommands) {
       NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
-      daemon[@"allowed_commands"] =
-          [allowedCommands sortedArrayUsingSelector:@selector(compare:)];
+      daemon[@"allowed_commands"] = [allowedCommands sortedArrayUsingSelector:@selector(compare:)];
       stats[@"daemon"] = daemon;
     }
 
