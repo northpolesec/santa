@@ -357,6 +357,14 @@ REGISTER_COMMAND_NAME(@"status")
       };
     }
 
+    NSArray<NSString *> *allowedCommandsJSON = configurator.allowedSantaCommands;
+    if (allowedCommandsJSON) {
+      NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
+      daemon[@"allowed_commands"] =
+          [allowedCommandsJSON sortedArrayUsingSelector:@selector(compare:)];
+      stats[@"daemon"] = daemon;
+    }
+
     if (syncURLStr.length) {
       stats[@"sync"] = [@{
         @"enabled" : @(YES),
@@ -448,6 +456,14 @@ REGISTER_COMMAND_NAME(@"status")
       }
     }
     printf("  %-40s | %lld\n", "Static Rules", staticRuleCount);
+    NSArray<NSString *> *allowedCommands = configurator.allowedSantaCommands;
+    if (allowedCommands) {
+      NSString *allowedStr = allowedCommands.count > 0
+                                 ? [[allowedCommands sortedArrayUsingSelector:@selector(compare:)]
+                                       componentsJoinedByString:@", "]
+                                 : @"None (all blocked)";
+      printf("  %-40s | %s\n", "Allowed Commands", [allowedStr UTF8String]);
+    }
     printf("  %-40s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
     printf("  %-40s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
 
