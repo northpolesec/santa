@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <bsm/libbsm.h>

@@ -17,9 +17,9 @@
 #include "Source/common/es/Enricher.h"
 
 #include "Source/common/es/ESMetricsObserver.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
+#import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
 #include "Source/santad/TTYWriter.h"

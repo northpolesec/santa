@@ -18,8 +18,8 @@
 
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
+#import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 /// ES Client focused on mitigating accidental or malicious tampering of Santa and its components.

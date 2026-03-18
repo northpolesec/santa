@@ -35,9 +35,9 @@
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/common/es/MockEnricher.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/DiskArbitrationTestUtil.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDeviceManager.h"
 #include "Source/santad/Metrics.h"
 

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#include "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
-#include "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
