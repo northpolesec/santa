@@ -18,8 +18,8 @@
 #include <EndpointSecurity/EndpointSecurity.h>
 
 #include "Source/common/es/ESMetricsObserver.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/ProcessTree/SNTEndpointSecurityAdapter.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #include "Source/santad/ProcessTree/process_tree_macos.h"

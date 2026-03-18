@@ -35,9 +35,9 @@
 #include "Source/common/SystemResources.h"
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Client.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Client.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
 
 using santa::Client;
 using santa::EndpointSecurityAPI;

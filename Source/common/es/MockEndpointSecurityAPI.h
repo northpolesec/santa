@@ -12,8 +12,8 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MOCKENDPOINTSECURITYAPI_H
-#define SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MOCKENDPOINTSECURITYAPI_H
+#ifndef SANTA__COMMON__ES__MOCKENDPOINTSECURITYAPI_H
+#define SANTA__COMMON__ES__MOCKENDPOINTSECURITYAPI_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -24,9 +24,9 @@
 #include <set>
 
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Client.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Client.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Message.h"
 
 using santa::Client;
 

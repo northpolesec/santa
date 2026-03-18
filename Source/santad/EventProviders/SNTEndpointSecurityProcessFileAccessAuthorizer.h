@@ -18,7 +18,7 @@
 
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/faa/WatchItems.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"

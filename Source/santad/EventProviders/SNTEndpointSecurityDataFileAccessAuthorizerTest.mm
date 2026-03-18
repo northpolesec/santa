@@ -32,7 +32,7 @@
 
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"
 
 void SetExpectationsForDataFileAccessAuthorizerInit(

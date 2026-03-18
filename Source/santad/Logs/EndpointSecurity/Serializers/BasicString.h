@@ -17,7 +17,7 @@
 #define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_BASICSTRING_H
 
 #import <Foundation/Foundation.h>
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
+#include "Source/common/es/EnrichedTypes.h"
 
 #include <memory>
 #include <sstream>
@@ -25,7 +25,7 @@
 
 #include "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #import "Source/santad/SNTDecisionCache.h"
 

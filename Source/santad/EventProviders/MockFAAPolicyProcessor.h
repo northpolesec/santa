@@ -24,7 +24,7 @@
 
 #import "Source/common/SNTCachedDecision.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
+#include "Source/common/es/Enricher.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
 #include "Source/santad/SNTDecisionCache.h"

@@ -65,8 +65,8 @@ objc_library(
     deps = [
         ":process_tree",
         "//Source/common:String",
-        "//Source/santad:EndpointSecurityAPI",
-        "//Source/santad:EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityMessage",
         "@abseil-cpp//absl/status:statusor",
     ],
 )

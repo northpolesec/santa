@@ -25,8 +25,8 @@
 #import "Source/common/SNTLogging.h"
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
 
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;

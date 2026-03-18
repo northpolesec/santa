@@ -23,8 +23,8 @@
 
 #include "Source/common/AuditUtilities.h"
 #include "Source/common/TestUtils.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/common/es/Message.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
 
 using santa::Message;
 

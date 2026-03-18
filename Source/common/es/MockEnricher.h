@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MOCKENRICHER_H
-#define SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MOCKENRICHER_H
+#ifndef SANTA__COMMON__ES__MOCKENRICHER_H
+#define SANTA__COMMON__ES__MOCKENRICHER_H
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -21,8 +21,8 @@
 #include <memory>
 #include <optional>
 
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Enricher.h"
+#include "Source/common/es/Message.h"
 
 namespace santa {
 
@@ -37,4 +37,4 @@ class MockEnricher : public Enricher {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_MOCKENRICHER_H
+#endif  // SANTA__COMMON__ES__MOCKENRICHER_H

@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Enricher.h"
 
 #include "Source/common/es/ESMetricsObserver.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"

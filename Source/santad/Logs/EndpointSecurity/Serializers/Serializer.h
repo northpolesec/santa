@@ -28,7 +28,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTXxhash.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
+#include "Source/common/es/EnrichedTypes.h"
 #import "Source/santad/SNTDecisionCache.h"
 
 @class SNDProcessFlows;

@@ -13,14 +13,14 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Message.h"
 
 #include <bsm/libbsm.h>
 #include <libproc.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 
 namespace santa {
 

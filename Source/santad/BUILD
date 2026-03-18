@@ -79,7 +79,7 @@ objc_library(
     name = "SNTEndpointSecurityEventHandler",
     hdrs = ["EventProviders/SNTEndpointSecurityEventHandler.h"],
     deps = [
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common/es:ESMetricsObserver",
         "//Source/common/faa:WatchItemPolicy",
@@ -142,7 +142,7 @@ objc_library(
     hdrs = ["SNTCompilerController.h"],
     deps = [
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTRuleTable",
@@ -384,8 +384,8 @@ objc_library(
     srcs = ["CELActivation.mm"],
     hdrs = ["CELActivation.h"],
     deps = [
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTPolicyProcessor",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:SigningIDHelpers",
@@ -402,8 +402,8 @@ objc_library(
     hdrs = ["SNTExecutionController.h"],
     deps = [
         ":CELActivation",
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityMessage",
         ":ProcessControl",
         ":SNTDecisionCache",
         ":SNTEventTable",
@@ -438,10 +438,10 @@ objc_library(
     name = "SNTEndpointSecurityClientBase",
     hdrs = ["EventProviders/SNTEndpointSecurityClientBase.h"],
     deps = [
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityClient",
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityClient",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:ESMetricsObserver",
         "//Source/common/faa:WatchItemPolicy",
     ],
@@ -452,10 +452,10 @@ objc_library(
     srcs = ["EventProviders/SNTEndpointSecurityClient.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityClient.h"],
     deps = [
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityClient",
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityClient",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTEndpointSecurityClientBase",
         "//Source/common:AuditUtilities",
         "//Source/common:BranchPrediction",
@@ -473,8 +473,8 @@ objc_library(
     srcs = ["EventProviders/SNTEndpointSecurityTreeAwareClient.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityTreeAwareClient.h"],
     deps = [
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTEndpointSecurityClient",
         "//Source/common/es:ESMetricsObserver",
         "//Source/santad/ProcessTree:SNTEndpointSecurityAdapter",
@@ -489,9 +489,9 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTEndpointSecurityTreeAwareClient",
         "//Source/common:TestUtils",
         "@OCMock",
@@ -505,11 +505,11 @@ objc_library(
     hdrs = ["EventProviders/SNTEndpointSecurityRecorder.h"],
     deps = [
         ":AuthResultCache",
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTCompilerController",
         ":SNTEndpointSecurityEventHandler",
         ":SNTEndpointSecurityTreeAwareClient",
@@ -530,9 +530,9 @@ objc_library(
     srcs = ["EventProviders/SNTEndpointSecurityTamperResistance.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityTamperResistance.h"],
     deps = [
-        ":EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityAPI",
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
         "//Source/common:SNTLogging",
@@ -547,10 +547,10 @@ objc_library(
     hdrs = ["EventProviders/SNTEndpointSecurityAuthorizer.h"],
     deps = [
         ":AuthResultCache",
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityEnricher",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTCompilerController",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
@@ -569,9 +569,9 @@ objc_library(
     srcs = ["EventProviders/FAAPolicyProcessor.mm"],
     hdrs = ["EventProviders/FAAPolicyProcessor.h"],
     deps = [
-        ":EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":EntitlementsFilter",
         ":Metrics",
         ":RateLimiter",
@@ -602,9 +602,9 @@ objc_library(
         "bsm",
     ],
     deps = [
-        ":EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityAPI",
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":FAAPolicyProcessor",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
@@ -623,8 +623,8 @@ objc_library(
     srcs = ["EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityProcessFileAccessAuthorizer.h"],
     deps = [
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityMessage",
         ":FAAPolicyProcessor",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
@@ -647,10 +647,10 @@ objc_library(
     ],
     deps = [
         ":AuthResultCache",
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":EndpointSecuritySerializerUtilities",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityEventHandler",
@@ -674,8 +674,8 @@ objc_library(
     srcs = ["EventProviders/AuthResultCache.mm"],
     hdrs = ["EventProviders/AuthResultCache.h"],
     deps = [
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityClient",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityClient",
         ":SNTEndpointSecurityClientBase",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
@@ -699,38 +699,12 @@ objc_library(
 )
 
 objc_library(
-    name = "EndpointSecurityEnricher",
-    srcs = ["EventProviders/EndpointSecurity/Enricher.mm"],
-    hdrs = ["EventProviders/EndpointSecurity/Enricher.h"],
-    deps = [
-        ":EndpointSecurityEnrichedTypes",
-        "//Source/common:Platform",
-        "//Source/common:SNTLogging",
-        "//Source/common:SantaCache",
-        "//Source/common:String",
-        "//Source/santad/ProcessTree:SNTEndpointSecurityAdapter",
-        "//Source/santad/ProcessTree:process_tree",
-    ],
-)
-
-objc_library(
-    name = "EndpointSecurityEnrichedTypes",
-    hdrs = ["EventProviders/EndpointSecurity/EnrichedTypes.h"],
-    deps = [
-        ":EndpointSecurityMessage",
-        "//Source/common:Platform",
-        "//Source/common:TelemetryEventMap",
-        "//Source/santad/ProcessTree:process_tree_cc_proto",
-    ],
-)
-
-objc_library(
     name = "EndpointSecuritySerializer",
     srcs = ["Logs/EndpointSecurity/Serializers/Serializer.mm"],
     hdrs = ["Logs/EndpointSecurity/Serializers/Serializer.h"],
     deps = [
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTDecisionCache",
         "//Source/common:AuditUtilities",
         "//Source/common:Platform",
@@ -752,7 +726,7 @@ objc_library(
         "bsm",
     ],
     deps = [
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":SNTDecisionCache",
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
@@ -779,7 +753,7 @@ objc_library(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         "//Source/common:String",
     ],
 )
@@ -792,7 +766,7 @@ objc_library(
         "DiskArbitration",
     ],
     deps = [
-        ":EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityAPI",
         ":EndpointSecuritySanitizableString",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerUtilities",
@@ -815,7 +789,7 @@ objc_library(
         "DiskArbitration",
     ],
     deps = [
-        ":EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityAPI",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerUtilities",
         ":SNTDecisionCache",
@@ -909,9 +883,9 @@ objc_library(
     srcs = ["Logs/EndpointSecurity/Logger.mm"],
     hdrs = ["Logs/EndpointSecurity/Logger.h"],
     deps = [
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityMessage",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerBasicString",
         ":EndpointSecuritySerializerEmpty",
@@ -934,41 +908,6 @@ objc_library(
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
-    ],
-)
-
-objc_library(
-    name = "EndpointSecurityMessage",
-    srcs = [
-        "EventProviders/EndpointSecurity/EndpointSecurityAPI.h",
-        "EventProviders/EndpointSecurity/Message.mm",
-    ],
-    hdrs = ["EventProviders/EndpointSecurity/Message.h"],
-    deps = [
-        ":EndpointSecurityClient",
-        "//Source/common:String",
-        "//Source/common/faa:WatchItemPolicy",
-        "//Source/santad/ProcessTree:process_tree",
-    ],
-)
-
-objc_library(
-    name = "EndpointSecurityClient",
-    hdrs = ["EventProviders/EndpointSecurity/Client.h"],
-)
-
-objc_library(
-    name = "EndpointSecurityAPI",
-    srcs = ["EventProviders/EndpointSecurity/EndpointSecurityAPI.mm"],
-    hdrs = ["EventProviders/EndpointSecurity/EndpointSecurityAPI.h"],
-    sdk_dylibs = [
-        "EndpointSecurity",
-    ],
-    deps = [
-        ":EndpointSecurityClient",
-        ":EndpointSecurityMessage",
-        "//Source/common:Platform",
-        "//Source/common/faa:WatchItemPolicy",
     ],
 )
 
@@ -1084,8 +1023,8 @@ objc_library(
     deps = [
         ":AuthResultCache",
         ":DaemonConfigBundle",
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":FAAPolicyProcessor",
         ":Metrics",
@@ -1132,8 +1071,8 @@ objc_library(
     hdrs = ["SantadDeps.h"],
     deps = [
         ":AuthResultCache",
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":EntitlementsFilter",
         ":Metrics",
@@ -1233,33 +1172,6 @@ macos_bundle(
 #
 
 objc_library(
-    name = "MockEndpointSecurityAPI",
-    testonly = 1,
-    hdrs = ["EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"],
-    sdk_dylibs = [
-        "EndpointSecurity",
-    ],
-    deps = [
-        ":EndpointSecurityAPI",
-        ":EndpointSecurityClient",
-        ":EndpointSecurityMessage",
-        "//Source/common/faa:WatchItemPolicy",
-        "@googletest//:gtest",
-    ],
-)
-
-objc_library(
-    name = "MockEnricher",
-    testonly = 1,
-    hdrs = ["EventProviders/EndpointSecurity/MockEnricher.h"],
-    deps = [
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityEnricher",
-        "@googletest//:gtest",
-    ],
-)
-
-objc_library(
     name = "MockFAAPolicyProcessor",
     testonly = 1,
     hdrs = ["EventProviders/MockFAAPolicyProcessor.h"],
@@ -1267,7 +1179,7 @@ objc_library(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
         ":Metrics",
         ":SNTDecisionCache",
@@ -1283,9 +1195,9 @@ objc_library(
     testonly = 1,
     hdrs = ["Logs/EndpointSecurity/MockLogger.h"],
     deps = [
-        ":EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         "//Source/common:TelemetryEventMap",
         "@googletest//:gtest",
     ],
@@ -1362,9 +1274,9 @@ santa_unit_test(
     ],
     tags = ["exclusive"],
     deps = [
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
@@ -1414,9 +1326,9 @@ santa_unit_test(
     name = "EndpointSecuritySerializerUtilitiesTest",
     srcs = ["Logs/EndpointSecurity/Serializers/UtilitiesTest.mm"],
     deps = [
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":EndpointSecuritySerializerUtilities",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         "//Source/common:TestUtils",
         "@OCMock",
         "@googletest//:gtest",
@@ -1431,12 +1343,12 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityEnricher",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityMessage",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerBasicString",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTDecisionCache",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
@@ -1456,12 +1368,12 @@ santa_unit_test(
         "//Source/santad/testdata:protobuf_json_testdata",
     ],
     deps = [
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityEnricher",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityMessage",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerProtobuf",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTDecisionCache",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
@@ -1485,7 +1397,7 @@ santa_unit_test(
     ],
     deps = [
         ":AuthResultCache",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTEndpointSecurityClientBase",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
@@ -1513,7 +1425,7 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
         ":EndpointSecuritySerializerEmpty",
         "@OCMock",
     ],
@@ -1550,7 +1462,7 @@ santa_unit_test(
     ],
     deps = [
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":EndpointSecuritySerializer",
         ":EndpointSecuritySerializerBasicString",
         ":EndpointSecuritySerializerEmpty",
@@ -1560,52 +1472,13 @@ santa_unit_test(
         ":EndpointSecurityWriterNull",
         ":EndpointSecurityWriterSpool",
         ":EndpointSecurityWriterSyslog",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SleighLauncher",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTExportConfiguration",
         "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
-        "@googletest//:gtest",
-    ],
-)
-
-santa_unit_test(
-    name = "EndpointSecurityClientTest",
-    srcs = ["EventProviders/EndpointSecurity/ClientTest.mm"],
-    deps = [
-        ":EndpointSecurityClient",
-        "@OCMock",
-    ],
-)
-
-santa_unit_test(
-    name = "EndpointSecurityEnricherTest",
-    srcs = ["EventProviders/EndpointSecurity/EnricherTest.mm"],
-    sdk_dylibs = [
-        "bsm",
-    ],
-    deps = [
-        ":EndpointSecurityEnricher",
-        "//Source/common:TestUtils",
-        "@OCMock",
-    ],
-)
-
-santa_unit_test(
-    name = "EndpointSecurityMessageTest",
-    srcs = ["EventProviders/EndpointSecurity/MessageTest.mm"],
-    sdk_dylibs = [
-        "bsm",
-        "EndpointSecurity",
-    ],
-    deps = [
-        ":EndpointSecurityMessage",
-        ":MockEndpointSecurityAPI",
-        "//Source/common:AuditUtilities",
-        "//Source/common:TestUtils",
-        "@OCMock",
         "@googletest//:gtest",
     ],
 )
@@ -1650,11 +1523,11 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityClient",
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityClient",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTEndpointSecurityClient",
         "//Source/common:AuditUtilities",
         "//Source/common:SNTCommonEnums",
@@ -1675,9 +1548,9 @@ santa_unit_test(
         "bsm",
     ],
     deps = [
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":EntitlementsFilter",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
@@ -1707,10 +1580,10 @@ santa_unit_test(
     ],
     deps = [
         ":AuthResultCache",
-        ":EndpointSecurityClient",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityClient",
+        "//Source/common/es:EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTCompilerController",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTExecutionController",
@@ -1730,7 +1603,7 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTEndpointSecurityDataFileAccessAuthorizer",
         "//Source/common:SNTConfigurator",
         "//Source/common:TestUtils",
@@ -1746,8 +1619,8 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityMessage",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":MockFAAPolicyProcessor",
         ":SNTEndpointSecurityProcessFileAccessAuthorizer",
         "//Source/common:TestUtils",
@@ -1760,9 +1633,9 @@ santa_unit_test(
     name = "FAAPolicyProcessorTest",
     srcs = ["EventProviders/FAAPolicyProcessorTest.mm"],
     deps = [
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":FAAPolicyProcessor",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":MockFAAPolicyProcessor",
         ":SNTDecisionCache",
         "//Source/common:MOLCertificate",
@@ -1782,10 +1655,10 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":EndpointSecurityClient",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityClient",
+        "//Source/common/es:EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTEndpointSecurityTamperResistance",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
@@ -1804,14 +1677,14 @@ santa_unit_test(
     ],
     deps = [
         ":AuthResultCache",
-        ":EndpointSecurityClient",
-        ":EndpointSecurityEnrichedTypes",
-        ":EndpointSecurityEnricher",
+        "//Source/common/es:EndpointSecurityClient",
+        "//Source/common/es:EndpointSecurityEnrichedTypes",
+        "//Source/common/es:EndpointSecurityEnricher",
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
-        ":MockEnricher",
+        "//Source/common/es:MockEndpointSecurityAPI",
+        "//Source/common/es:MockEnricher",
         ":MockLogger",
         ":SNTCompilerController",
         ":SNTEndpointSecurityRecorder",
@@ -1836,11 +1709,11 @@ santa_unit_test(
     deps = [
         ":AuthResultCache",
         ":DiskArbitrationTestLib",
-        ":EndpointSecurityClient",
-        ":EndpointSecurityMessage",
+        "//Source/common/es:EndpointSecurityClient",
+        "//Source/common/es:EndpointSecurityMessage",
         ":Metrics",
-        ":MockEndpointSecurityAPI",
-        ":MockEnricher",
+        "//Source/common/es:MockEndpointSecurityAPI",
+        "//Source/common/es:MockEnricher",
         ":SNTEndpointSecurityClient",
         ":SNTEndpointSecurityDeviceManager",
         "//Source/common:Platform",
@@ -1861,8 +1734,8 @@ santa_unit_test(
     ],
     deps = [
         ":EndpointSecurityLogger",
-        ":EndpointSecurityMessage",
-        ":MockEndpointSecurityAPI",
+        "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:MockEndpointSecurityAPI",
         ":SNTCompilerController",
         ":SNTDecisionCache",
         "//Source/common:SNTCachedDecision",
@@ -1878,10 +1751,10 @@ test_suite(
     tests = [
         ":AuthResultCacheTest",
         ":DaemonConfigBundleTest",
-        ":EndpointSecurityClientTest",
-        ":EndpointSecurityEnricherTest",
+        "//Source/common/es:EndpointSecurityClientTest",
+        "//Source/common/es:EndpointSecurityEnricherTest",
         ":EndpointSecurityLoggerTest",
-        ":EndpointSecurityMessageTest",
+        "//Source/common/es:EndpointSecurityMessageTest",
         ":EndpointSecuritySanitizableStringTest",
         ":EndpointSecuritySerializerBasicStringTest",
         ":EndpointSecuritySerializerEmptyTest",

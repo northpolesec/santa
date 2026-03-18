@@ -50,7 +50,7 @@
 #include "Source/santad/CELActivation.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
