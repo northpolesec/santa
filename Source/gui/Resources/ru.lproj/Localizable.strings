@@ -1,257 +1,512 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "Теперь можно запустить %@";
 
+
+
+
 /* The default message to show the user when access to a file is blocked */
-"Access to a file has been denied" = "Доступ к файлу был запрещен";
+"Access to a file has been denied" = "Доступ к файлу запрещён";
+
+
+
 
 /* No comment provided by engineer. */
-"Accessed Path" = "Доступный путь";
+"Accessed Path" = "Путь, к которому был получен доступ";
+
+
+
 
 /* No comment provided by engineer. */
 "An unknown error occurred. Please try again." = "Произошла неизвестная ошибка. Пожалуйста, попробуйте снова.";
 
+
+
+
 /* No comment provided by engineer. */
 "Application" = "Приложение";
 
+
+
+
 /* Default text for Approve */
-"Approve" = "Утвердить";
+"Approve" = "Разрешить";
+
+
+
 
 /* Message for reset silences confirmation dialog */
-"Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Вы уверены, что хотите сбросить все отключения уведомлений? Вы снова начнете получать уведомления для ранее отключенных событий.";
+"Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Вы уверены, что хотите сбросить все отключения уведомлений? Вы снова начнёте получать уведомления о событиях, для которых уведомления были ранее отключены.";
+
+
+
 
 /* Authorize execution fallback */
-"authorize execution" = "разрешить исполнение";
+"authorize execution" = "разрешить запуск";
+
+
+
 
 /* Authorize execution of an application with Signing ID or Path */
-"authorize execution of %@" = "разрешить исполнение %@";
+"authorize execution of %@" = "разрешить запуск %@";
+
+
+
 
 /* Authorize execution of an application with name */
-"authorize execution of the application %@" = "разрешить выполнение заявки %@";
+"authorize execution of the application %@" = "разрешить запуск приложения %@";
+
+
+
 
 /* Authorize temporary Monitor Mode exception */
-"authorize temporary Monitor Mode" = "разрешить временный режим монитора";
+"authorize temporary Monitor Mode" = "разрешить временный режим мониторинга";
+
+
+
 
 /* No comment provided by engineer. */
-"Binary Path" = "Бинарный путь";
+"Binary Path" = "Путь к исполняемому файлу";
+
+
+
 
 /* Block reason for binary rule match */
-"Binary rule" = "Правило бинарного файла";
+"Binary rule" = "Правило исполняемого файла";
+
+
+
 
 /* No comment provided by engineer. */
 "Block Reason" = "Причина блокировки";
 
+
+
+
 /* Block reason for blocked path regex match */
 "Blocked path regex" = "Заблокированный путь по regex";
 
+
+
+
 /* No comment provided by engineer. */
-"Bundle Hash" = "Бандл-хэш";
+"Bundle Hash" = "Хэш пакета";
+
+
+
 
 /* Cancel button title */
 "Cancel" = "Отмена";
 
+
+
+
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
+
+
+
 
 /* Block reason for CDHash rule match */
 "CDHash rule" = "Правило CDHash";
 
+
+
+
 /* Block reason for CEL fallback rule match */
 "CEL fallback rule" = "Резервное правило CEL";
+
+
+
 
 /* Block reason for certificate rule match */
 "Certificate rule" = "Правило сертификата";
 
+
+
+
 /* No comment provided by engineer. */
-"Clean Sync" = "Чистая синхронизация";
+"Clean Sync" = "Синхронизация с очисткой";
+
+
+
 
 /* Copy Details */
-"Copy Details" = "Копия Подробности";
+"Copy Details" = "Скопировать сведения";
+
+
+
 
 /* No comment provided by engineer. */
 "Destination" = "Точка монтирования";
 
+
+
+
 /* Dismiss button in more details dialog */
-"Dismiss" = "Увольте";
+"Dismiss" = "Закрыть";
+
+
+
 
 /* No comment provided by engineer. */
-"Dismiss & Silence" = "Отказ и молчание";
+"Dismiss & Silence" = "Закрыть и отключить уведомления";
+
+
+
 
 /* No comment provided by engineer. */
-"Drop for application info" = "Перетащите для информации о приложении";
+"Drop for application info" = "Перетащите сюда приложение, чтобы увидеть сведения о нём";
+
+
+
 
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Не удалось подключиться к службе синхронизации. Пожалуйста, попробуйте позже.";
 
+
+
+
 /* Error shown when user tries to enter TMM and an unknown error occurred. */
-"Failed to enter temporary monitor mode: an unknown error occurred" = "Не удалось перейти во временный режим монитора: произошла неизвестная ошибка";
+"Failed to enter temporary monitor mode: an unknown error occurred" = "Не удалось перейти во временный режим мониторинга: произошла неизвестная ошибка";
+
+
+
 
 /* Error message shown when user tries to enter TMM but authorization failed */
-"Failed to enter temporary monitor mode: authorization failed" = "Не удалось перейти во временный режим монитора: ошибка авторизации";
+"Failed to enter temporary monitor mode: authorization failed" = "Не удалось перейти во временный режим мониторинга: ошибка авторизации";
+
+
+
 
 /* Error message shown when user tries to enter TMM while not in lockdown */
-"Failed to enter temporary monitor mode: not currently in lockdown" = "Не удалось перейти во временный режим монитора: в данный момент не в режиме блокировки";
+"Failed to enter temporary monitor mode: not currently in lockdown" = "Не удалось перейти во временный режим мониторинга: сейчас не включён режим блокировки";
+
+
+
 
 /* Error message shown when user tries to enter TMM while not using Workshop */
-"Failed to enter temporary monitor mode: not using a supported sync server" = "Не удалось перейти во временный режим монитора: не используется поддерживаемый сервер синхронизации";
+"Failed to enter temporary monitor mode: not using a supported sync server" = "Не удалось перейти во временный режим мониторинга: не используется поддерживаемый сервер синхронизации";
+
+
+
 
 /* Error message shown when user tries to enter TMM mode without a policy */
-"Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Не удалось перейти во временный режим монитора: на этом компьютере в настоящее время нет политики, разрешающей временный режим монитора";
+"Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Не удалось перейти во временный режим мониторинга: на этом компьютере сейчас нет политики, разрешающей временный режим мониторинга";
+
+
+
 
 /* No comment provided by engineer. */
 "Filename" = "Имя файла";
 
+
+
+
 /* No comment provided by engineer. */
-"FS Type" = "Тип ФС";
+"FS Type" = "Тип файловой системы";
+
+
+
 
 /* No comment provided by engineer. */
 "Label after time period picker" = "\U2800";
 
+
+
+
 /* No comment provided by engineer. */
-"Label before time period picker" = "Предотвращение будущих уведомлений для этого приложения для ";
+"Label before time period picker" = "Отключить будущие уведомления для этого приложения на ";
+
+
+
 
 /* Label shown before company branding */
-"Managed by:" = "Управляется:";
+"Managed by:" = "Под управлением:";
+
+
+
 
 /* More Details button */
 "More Details" = "Подробнее";
 
+
+
+
 /* No comment provided by engineer. */
-"More Info..." = "Дополнительная информация...";
+"More Info..." = "Дополнительные сведения...";
+
+
+
 
 /* No comment provided by engineer. */
 "Network Share" = "Сетевой ресурс";
 
+
+
+
 /* Block reason when no rule matched in lockdown mode */
-"No matching rule" = "Нет подходящего правила";
+"No matching rule" = "Совпадающее правило не найдено";
+
+
+
 
 /* Default text for Open button */
 "Open..." = "Открыть...";
 
+
+
+
 /* No comment provided by engineer. */
-"Parent" = "Родитель";
+"Parent" = "Родительский процесс";
+
+
+
 
 /* No comment provided by engineer. */
 "Path" = "Путь";
 
+
+
+
 /* No comment provided by engineer. */
-"Path Accessed" = "Доступ к пути";
+"Path Accessed" = "Путь, к которому был получен доступ";
+
+
+
 
 /* Block reason when file path exceeds maximum length */
 "Path too long" = "Путь слишком длинный";
 
+
+
+
 /* No comment provided by engineer. */
 "Publisher" = "Издатель";
 
+
+
+
 /* No comment provided by engineer. */
-"Remount Mode" = "Режим демонтажа";
+"Remount Mode" = "Режим перемонтирования";
+
+
+
 
 /* Notification message shown when an unknown app has been unblocked */
-"Requested application can now be run" = "Запрошенное приложение теперь может быть запущено";
+"Requested application can now be run" = "Запрошенное приложение теперь можно запустить";
+
+
+
 
 /* Reset button title */
 "Reset" = "Сбросить";
 
+
+
+
 /* Title for reset silences confirmation dialog */
-"Reset Silenced Notifications" = "Сбросить заглушённые уведомления";
+"Reset Silenced Notifications" = "Сброс отключений уведомлений";
+
+
+
 
 /* No comment provided by engineer. */
 "Rule Name" = "Название правила";
 
+
+
+
 /* No comment provided by engineer. */
 "Rule Version" = "Версия правил";
 
+
+
+
 /* Explanation in About view */
-"Santa is a security system providing application,\ndevice, and file-access controls." = "Santa - этo система безопасности, обеспечивающая контроль\nнад приложениями, устройствами и доступом к файлам";
+"Santa is a security system providing application,\ndevice, and file-access controls." = "Santa — это система безопасности, обеспечивающая контроль приложений,\nустройств и доступа к файлам.";
+
+
+
 
 /* No comment provided by engineer. */
-"Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santa создана с ❤️ эльфами из [North Pole Security](https://northpole.security)\nвместе с вкладом нашего замечательного сообщества";
+"Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santa создана ❤️ эльфами из [North Pole Security](https://northpole.security)\nпри участии нашего замечательного сообщества";
+
+
+
 
 /* No comment provided by engineer. */
 "SHA-256" = "SHA-256";
 
+
+
+
 /* No comment provided by engineer. */
-"Show menu bar icon" = "Показать значок в строке меню";
+"Show menu bar icon" = "Показывать значок в строке меню";
+
+
+
 
 /* No comment provided by engineer. */
 "Signed" = "Подписано";
 
+
+
+
 /* No comment provided by engineer. */
-"Signing ID" = "Signing ID";
+"Signing ID" = "Идентификатор подписи";
+
+
+
 
 /* Block reason for Signing ID rule match */
-"Signing ID rule" = "Правило Signing ID";
+"Signing ID rule" = "Правило идентификатора подписи";
+
+
+
 
 /* Client mode change: LOCKDOWN */
 "Switching into Lockdown mode" = "Переход в режим блокировки";
 
+
+
+
 /* Client mode change: MONITOR */
-"Switching into Monitor mode" = "Переход в режим монитора";
+"Switching into Monitor mode" = "Переход в режим мониторинга";
+
+
+
 
 /* Client mode change: STANDALONE */
 "Switching into Standalone mode" = "Переход в автономный режим";
 
+
+
+
 /* No comment provided by engineer. */
 "Sync" = "Синхронизация";
+
+
+
 
 /* Notification message shown when a sync completes successfully */
 "Sync completed successfully" = "Синхронизация успешно завершена";
 
+
+
+
 /* Notification message shown when a sync fails */
-"Sync failed" = "Ошибка синхронизации";
+"Sync failed" = "Синхронизация не удалась";
+
+
+
 
 /* No comment provided by engineer. */
-"Team ID" = "ID команды";
+"Team ID" = "Идентификатор команды";
+
+
+
 
 /* Block reason for Team ID rule match */
-"Team ID rule" = "Правило Team ID";
+"Team ID rule" = "Правило идентификатора команды";
+
+
+
 
 /* No comment provided by engineer. */
-"The event upload failed. Please check your network connection and try again." = "Не удалось загрузить событие. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
+"The event upload failed. Please check your network connection and try again." = "Не удалось отправить событие. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
+
+
+
 
 /* No comment provided by engineer. */
-"The postflight check failed. Please check your network connection and try again." = "Проверка после полета не удалась. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
+"The postflight check failed. Please check your network connection and try again." = "Не удалось выполнить заключительную проверку. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
+
+
+
 
 /* No comment provided by engineer. */
-"The preflight check failed. Please check your network connection and try again." = "Предварительная проверка не удалась. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
+"The preflight check failed. Please check your network connection and try again." = "Не удалось выполнить предварительную проверку. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
+
+
+
 
 /* No comment provided by engineer. */
-"The rule download failed. Please check your network connection and try again." = "Не удалось загрузить правило. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
+"The rule download failed. Please check your network connection and try again." = "Не удалось загрузить правила. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
+
+
+
 
 /* No comment provided by engineer. */
-"The sync operation failed. Please try again." = "Операция синхронизации не удалась. Пожалуйста, попробуйте снова.";
+"The sync operation failed. Please try again." = "Не удалось выполнить синхронизацию. Пожалуйста, попробуйте снова.";
+
+
+
 
 /* No comment provided by engineer. */
-"Too many syncs are in progress. Please try again later." = "Слишком много синхронизаций выполняется. Пожалуйста, попробуйте позже.";
+"Too many syncs are in progress. Please try again later." = "Уже выполняется слишком много операций синхронизации. Пожалуйста, попробуйте позже.";
+
+
+
 
 /* The default message to show the user when an unknown application is blocked */
-"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Следующее приложение было заблокировано для выполнения,<br />поскольку его надежность не может быть определена";
+"The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Запуск следующего приложения был заблокирован,<br />поскольку невозможно определить, можно ли этому приложению доверять";
+
+
+
 
 /* The default message to show the user when a banned application is blocked */
-"The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "Следующее приложение было заблокировано для выполнения,<br />потому что она была признана вредоносной или противоречащей политике";
+"The following application has been blocked from<br />executing because it has been deemed malicious or against policy" = "Запуск следующего приложения был заблокирован,<br />поскольку оно было признано вредоносным или нарушающим политику";
+
+
+
 
 /* The default message to show the user when a program requires TouchID/password */
-"The following application requires authorization before it can be used" = "Следующее приложение требует авторизации перед использованием";
+"The following application requires authorization before it can be used" = "Перед использованием следующего приложения требуется авторизация";
+
+
+
 
 /* The default message to show the user when a Removable Media (e.g. USB device) is blocked from mounting */
-"The following device has been blocked from mounting" = "Следующее устройство было заблокировано для установки";
+"The following device has been blocked from mounting" = "Монтирование следующего устройства было заблокировано";
+
+
+
 
 /* The default message to show the user when a Removable Media (e.g. USB device) is remounted with reduced permissions */
-"The following device has been remounted with reduced permissions" = "Следующее устройство было перемонтировано с пониженными разрешениями";
+"The following device has been remounted with reduced permissions" = "Следующее устройство было перемонтировано с ограниченными правами доступа";
+
+
+
 
 /* The default message to show the user when a network share mount is blocked */
 "The following network share has been blocked from mounting" = "Монтирование следующего сетевого ресурса было заблокировано";
 
+
+
+
 /* No comment provided by engineer. */
 "unknown" = "неизвестно";
+
+
+
 
 /* Block reason when decision state is unrecognized */
 "Unknown" = "Неизвестно";
 
+
+
+
 /* No comment provided by engineer. */
 "User" = "Пользователь";
 
+
+
+
 /* No comment provided by engineer. */
 "Version **%@**" = "Версия **%@**";
+
+
+
 
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Версия **%@** (Lite)";
