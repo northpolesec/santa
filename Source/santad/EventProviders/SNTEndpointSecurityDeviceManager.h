@@ -19,13 +19,13 @@
 #import "Source/common/SNTDeviceEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/common/SNTStoredUSBMountEvent.h"
+#include "Source/common/es/ESMetricsObserver.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
-#include "Source/santad/Metrics.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -46,7 +46,7 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
 @property(nonatomic, nullable) SNTNetworkMountCallback networkMountCallback;
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                                metrics:(std::shared_ptr<santa::Metrics>)metrics
+                                metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                                  logger:(std::shared_ptr<santa::Logger>)logger
                                enricher:(std::shared_ptr<santa::Enricher>)enricher
                         authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache

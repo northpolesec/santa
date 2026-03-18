@@ -56,7 +56,7 @@ using santa::Message;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+                        metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                          logger:(std::shared_ptr<santa::Logger>)logger
                        enricher:(std::shared_ptr<santa::Enricher>)enricher
              faaPolicyProcessor:
