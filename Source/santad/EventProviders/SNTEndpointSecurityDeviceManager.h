@@ -22,9 +22,9 @@
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Enricher.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
+#import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 NS_ASSUME_NONNULL_BEGIN

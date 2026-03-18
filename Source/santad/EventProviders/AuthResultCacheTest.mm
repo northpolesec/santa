@@ -29,8 +29,8 @@
 #include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
+#import "Source/common/es/SNTEndpointSecurityClientBase.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClientBase.h"
 
 using santa::AuthResultCache;
 using santa::FlushCacheMode;

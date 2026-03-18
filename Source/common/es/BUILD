@@ -141,3 +141,72 @@ santa_unit_test(
         "@googletest//:gtest",
     ],
 )
+
+objc_library(
+    name = "SNTEndpointSecurityEventHandler",
+    hdrs = ["SNTEndpointSecurityEventHandler.h"],
+    deps = [
+        ":ESMetricsObserver",
+        ":EndpointSecurityMessage",
+        "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common/faa:WatchItemPolicy",
+    ],
+)
+
+objc_library(
+    name = "SNTEndpointSecurityClientBase",
+    hdrs = ["SNTEndpointSecurityClientBase.h"],
+    deps = [
+        ":ESMetricsObserver",
+        ":EndpointSecurityAPI",
+        ":EndpointSecurityClient",
+        ":EndpointSecurityEnrichedTypes",
+        ":EndpointSecurityMessage",
+        "//Source/common/faa:WatchItemPolicy",
+    ],
+)
+
+objc_library(
+    name = "SNTEndpointSecurityClient",
+    srcs = ["SNTEndpointSecurityClient.mm"],
+    hdrs = ["SNTEndpointSecurityClient.h"],
+    deps = [
+        ":ESMetricsObserver",
+        ":EndpointSecurityAPI",
+        ":EndpointSecurityClient",
+        ":EndpointSecurityEnrichedTypes",
+        ":EndpointSecurityMessage",
+        ":SNTEndpointSecurityClientBase",
+        "//Source/common:AuditUtilities",
+        "//Source/common:BranchPrediction",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
+        "//Source/common:SystemResources",
+        "//Source/common/faa:WatchItemPolicy",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTEndpointSecurityClientTest",
+    srcs = ["SNTEndpointSecurityClientTest.mm"],
+    sdk_dylibs = [
+        "bsm",
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":EndpointSecurityClient",
+        ":EndpointSecurityEnrichedTypes",
+        ":EndpointSecurityMessage",
+        ":MockEndpointSecurityAPI",
+        ":SNTEndpointSecurityClient",
+        "//Source/common:AuditUtilities",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SystemResources",
+        "//Source/common:TestUtils",
+        "//Source/common/faa:WatchItemPolicy",
+        "@OCMock",
+        "@googletest//:gtest",
+    ],
+)

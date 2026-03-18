@@ -27,7 +27,7 @@
 #include "Source/common/SantaCache.h"
 #import "Source/common/SantaVnode.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClientBase.h"
+#import "Source/common/es/SNTEndpointSecurityClientBase.h"
 
 @class SNTCachedDecision;
 
