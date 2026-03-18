@@ -11,14 +11,14 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
-#ifndef SANTA__SANTAD_PROCESSTREE_ANNOTATIONS_ORIGINATOR_H
-#define SANTA__SANTAD_PROCESSTREE_ANNOTATIONS_ORIGINATOR_H
+#ifndef SANTA__COMMON__PROCESSTREE__ANNOTATIONS__ORIGINATOR_H
+#define SANTA__COMMON__PROCESSTREE__ANNOTATIONS__ORIGINATOR_H
 
 #include <optional>
 
-#include "Source/santad/ProcessTree/annotations/annotator.h"
-#include "Source/santad/ProcessTree/process.h"
-#include "Source/santad/ProcessTree/process_tree.pb.h"
+#include "Source/common/processtree/annotations/annotator.h"
+#include "Source/common/processtree/process.h"
+#include "Source/common/processtree/process_tree.pb.h"
 
 namespace santa::santad::process_tree {
 

@@ -15,7 +15,7 @@ proto_library(
     name = "santa_proto",
     srcs = ["santa.proto"],
     deps = [
-        "//Source/santad/ProcessTree:process_tree_proto",
+        "//Source/common/processtree:process_tree_proto",
         "@protobuf//:any_proto",
         "@protobuf//:timestamp_proto",
     ],
@@ -255,6 +255,15 @@ objc_library(
 objc_library(
     name = "String",
     hdrs = ["String.h"],
+)
+
+objc_library(
+    name = "CSOpsHelper",
+    srcs = ["CSOpsHelper.mm"],
+    hdrs = ["CSOpsHelper.h"],
+    deps = [
+        ":String",
+    ],
 )
 
 objc_library(

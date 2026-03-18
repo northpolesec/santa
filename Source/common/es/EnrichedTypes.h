@@ -30,7 +30,7 @@
 #include "Source/common/Platform.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/es/Message.h"
-#include "Source/santad/ProcessTree/process_tree.pb.h"
+#include "Source/common/processtree/process_tree.pb.h"
 
 namespace santa {
 

@@ -31,7 +31,7 @@ objc_library(
         ":EndpointSecurityClient",
         "//Source/common:String",
         "//Source/common/faa:WatchItemPolicy",
-        "//Source/santad/ProcessTree:process_tree",
+        "//Source/common/processtree:process_tree",
     ],
 )
 
@@ -57,7 +57,7 @@ objc_library(
         ":EndpointSecurityMessage",
         "//Source/common:Platform",
         "//Source/common:TelemetryEventMap",
-        "//Source/santad/ProcessTree:process_tree_cc_proto",
+        "//Source/common/processtree:process_tree_cc_proto",
     ],
 )
 
@@ -71,8 +71,8 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SantaCache",
         "//Source/common:String",
-        "//Source/santad/ProcessTree:SNTEndpointSecurityAdapter",
-        "//Source/santad/ProcessTree:process_tree",
+        "//Source/common/processtree:SNTEndpointSecurityAdapter",
+        "//Source/common/processtree:process_tree",
     ],
 )
 
