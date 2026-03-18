@@ -609,13 +609,6 @@ double watchdogRAMPeak = 0;
 #pragma mark Command Ops
 
 - (void)killProcesses:(SNTKillRequest *)killRequest reply:(void (^)(SNTKillResponse *))reply {
-  NSArray<NSString *> *allowed = [[SNTConfigurator configurator] allowedSantaCommands];
-  if (allowed && ![allowed containsObject:@"kill"]) {
-    LOGW(@"Kill command rejected - not in AllowedSantaCommands");
-    reply([[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest]);
-    return;
-  }
-
   // Perform work asynchronously to not hold up processing other XPC messages
   dispatch_async(self.commandQ, ^{
     reply(santa::KillingMachine(killRequest));

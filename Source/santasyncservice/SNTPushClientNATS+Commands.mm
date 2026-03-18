@@ -327,11 +327,13 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   ::pbv1::SantaCommandRequest::CommandCase commandCase = command.command_case();
 
   // Check if command type is allowed by client configuration
+  // No default case — compiler enforces all proto cases are handled (-Werror + -Wswitch)
   NSString *commandName = nil;
   switch (commandCase) {
     case ::pbv1::SantaCommandRequest::kPing: commandName = @"ping"; break;
     case ::pbv1::SantaCommandRequest::kKill: commandName = @"kill"; break;
-    default: break;  // Unknown commands are handled by the existing default case
+    case ::pbv1::SantaCommandRequest::kEventUpload: commandName = @"event_upload"; break;
+    case ::pbv1::SantaCommandRequest::COMMAND_NOT_SET: break;
   }
 
   if (commandName) {

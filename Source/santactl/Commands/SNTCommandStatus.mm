@@ -308,6 +308,13 @@ REGISTER_COMMAND_NAME(@"status")
   NSURL *metricsURLStr = configurator.metricURL;
   NSUInteger metricExportInterval = configurator.metricExportInterval;
 
+  NSArray<NSString *> *allowedCommands = configurator.allowedSantaCommands;
+  NSString *allowedStr = !allowedCommands ? @"All"
+      : allowedCommands.count > 0
+          ? [[allowedCommands sortedArrayUsingSelector:@selector(compare:)]
+                componentsJoinedByString:@", "]
+          : @"None (all blocked)";
+
   if ([arguments containsObject:@"--json"]) {
     NSMutableDictionary *stats = [@{
       @"daemon" : @{
@@ -357,11 +364,10 @@ REGISTER_COMMAND_NAME(@"status")
       };
     }
 
-    NSArray<NSString *> *allowedCommandsJSON = configurator.allowedSantaCommands;
-    if (allowedCommandsJSON) {
+    if (allowedCommands) {
       NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
       daemon[@"allowed_commands"] =
-          [allowedCommandsJSON sortedArrayUsingSelector:@selector(compare:)];
+          [allowedCommands sortedArrayUsingSelector:@selector(compare:)];
       stats[@"daemon"] = daemon;
     }
 
@@ -456,14 +462,7 @@ REGISTER_COMMAND_NAME(@"status")
       }
     }
     printf("  %-40s | %lld\n", "Static Rules", staticRuleCount);
-    NSArray<NSString *> *allowedCommands = configurator.allowedSantaCommands;
-    if (allowedCommands) {
-      NSString *allowedStr = allowedCommands.count > 0
-                                 ? [[allowedCommands sortedArrayUsingSelector:@selector(compare:)]
-                                       componentsJoinedByString:@", "]
-                                 : @"None (all blocked)";
-      printf("  %-40s | %s\n", "Allowed Commands", [allowedStr UTF8String]);
-    }
+    printf("  %-40s | %s\n", "Allowed Commands", [allowedStr UTF8String]);
     printf("  %-40s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
     printf("  %-40s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
 
