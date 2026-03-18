@@ -341,6 +341,104 @@ static const CodeSigningInfo kSandboxExecCS = {
   XCTAssertEqual((*final_opt)->info()->profile_path, "/inner.sb");
 }
 
+// Test: malformed sandbox-exec argv does not inherit stale annotation.
+- (void)testMalformedSandboxExecDoesNotInheritStaleAnnotation {
+  uint64_t event_id = 1;
+
+  // Set up confirmed sandbox annotation: sandbox-exec -f /old.sb -> /usr/bin/ls
+  const struct Pid fork_pid = {.pid = 2, .pidversion = 2};
+  self.tree->HandleFork(event_id++, *self.initProc, fork_pid);
+
+  const struct Pid sandbox_pid = {.pid = 2, .pidversion = 3};
+  const struct Program sandbox_prog = {
+      .executable = "/usr/bin/sandbox-exec",
+      .arguments = {"sandbox-exec", "-f", "/old.sb", "/usr/bin/ls"},
+      .code_signing = kSandboxExecCS,
+  };
+  auto forked = *self.tree->Get(fork_pid);
+  self.tree->HandleExec(event_id++, *forked, sandbox_pid, sandbox_prog, cred);
+
+  const struct Pid confirmed_pid = {.pid = 2, .pidversion = 4};
+  const struct Program confirmed_prog = {
+      .executable = "/usr/bin/ls",
+      .arguments = {"/usr/bin/ls"},
+  };
+  auto sandbox_proc = *self.tree->Get(sandbox_pid);
+  self.tree->HandleExec(event_id++, *sandbox_proc, confirmed_pid, confirmed_prog, cred);
+
+  // Exec into sandbox-exec with malformed argv (no -f flag).
+  const struct Pid malformed_pid = {.pid = 2, .pidversion = 5};
+  const struct Program malformed_prog = {
+      .executable = "/usr/bin/sandbox-exec",
+      .arguments = {"sandbox-exec", "/usr/bin/id"},
+      .code_signing = kSandboxExecCS,
+  };
+  auto confirmed_proc = *self.tree->Get(confirmed_pid);
+  self.tree->HandleExec(event_id++, *confirmed_proc, malformed_pid, malformed_prog, cred);
+
+  // The malformed sandbox-exec should NOT have any annotation (no stale carry-over).
+  auto malformed_proc = *self.tree->Get(malformed_pid);
+  auto ann = self.tree->GetAnnotation<SandboxExecAnnotator>(*malformed_proc);
+  XCTAssertFalse(ann.has_value());
+}
+
+// Test: confirmed process re-sandboxing with new profile picks up the new one.
+- (void)testReSandboxFromConfirmedUsesNewProfile {
+  uint64_t event_id = 1;
+
+  // Set up confirmed sandbox annotation: sandbox-exec -f /first.sb -> /bin/sh
+  const struct Pid fork_pid = {.pid = 2, .pidversion = 2};
+  self.tree->HandleFork(event_id++, *self.initProc, fork_pid);
+
+  const struct Pid sandbox_pid = {.pid = 2, .pidversion = 3};
+  const struct Program sandbox_prog = {
+      .executable = "/usr/bin/sandbox-exec",
+      .arguments = {"sandbox-exec", "-f", "/first.sb", "/bin/sh"},
+      .code_signing = kSandboxExecCS,
+  };
+  auto forked = *self.tree->Get(fork_pid);
+  self.tree->HandleExec(event_id++, *forked, sandbox_pid, sandbox_prog, cred);
+
+  const struct Pid shell_pid = {.pid = 2, .pidversion = 4};
+  const struct Program shell_prog = {
+      .executable = "/bin/sh",
+      .arguments = {"/bin/sh"},
+  };
+  auto sandbox_proc = *self.tree->Get(sandbox_pid);
+  self.tree->HandleExec(event_id++, *sandbox_proc, shell_pid, shell_prog, cred);
+
+  // Confirmed with /first.sb. Now exec sandbox-exec again with a different profile.
+  const struct Pid resandbox_pid = {.pid = 2, .pidversion = 5};
+  const struct Program resandbox_prog = {
+      .executable = "/usr/bin/sandbox-exec",
+      .arguments = {"sandbox-exec", "-f", "/second.sb", "/usr/bin/id"},
+      .code_signing = kSandboxExecCS,
+  };
+  auto shell_proc = *self.tree->Get(shell_pid);
+  self.tree->HandleExec(event_id++, *shell_proc, resandbox_pid, resandbox_prog, cred);
+
+  // Should be pending with /second.sb.
+  auto resandbox_proc = *self.tree->Get(resandbox_pid);
+  auto pending_opt = self.tree->GetAnnotation<SandboxExecAnnotator>(*resandbox_proc);
+  XCTAssertTrue(pending_opt.has_value());
+  XCTAssertEqual((*pending_opt)->info()->status, SandboxPolicyStatus::kPending);
+  XCTAssertEqual((*pending_opt)->info()->profile_path, "/second.sb");
+
+  // Exec the final target — should confirm /second.sb.
+  const struct Pid final_pid = {.pid = 2, .pidversion = 6};
+  const struct Program final_prog = {
+      .executable = "/usr/bin/id",
+      .arguments = {"/usr/bin/id"},
+  };
+  self.tree->HandleExec(event_id++, *resandbox_proc, final_pid, final_prog, cred);
+
+  auto final_proc = *self.tree->Get(final_pid);
+  auto final_opt = self.tree->GetAnnotation<SandboxExecAnnotator>(*final_proc);
+  XCTAssertTrue(final_opt.has_value());
+  XCTAssertEqual((*final_opt)->info()->status, SandboxPolicyStatus::kConfirmed);
+  XCTAssertEqual((*final_opt)->info()->profile_path, "/second.sb");
+}
+
 // Test: ExportAnnotations includes sandbox_policy.
 - (void)testExportAnnotations {
   uint64_t event_id = 1;

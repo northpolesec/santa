@@ -74,8 +74,10 @@ void SandboxExecAnnotator::AnnotateExec(ProcessTree &tree,
     if (auto info = ParseSandboxExecArgv(new_process.program_->arguments)) {
       tree.AnnotateProcess(new_process, std::make_shared<SandboxExecAnnotator>(
                                             std::move(*info)));
-      return;
     }
+    // Always return here — never fall through and propagate a prior annotation
+    // onto a new sandbox-exec process.
+    return;
   }
 
   // Check if the previous process had a pending annotation to confirm.
