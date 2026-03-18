@@ -23,10 +23,10 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTLogging.h"
+#include "Source/common/es/ESMetricsObserver.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/Metrics.h"
 
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;
@@ -46,7 +46,7 @@ using santa::Message;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
+                      metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                execController:(SNTExecutionController *)execController
            compilerController:(SNTCompilerController *)compilerController
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache

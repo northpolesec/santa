@@ -17,6 +17,7 @@
 
 #include <memory>
 
+#include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/faa/WatchItems.h"
 #include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
@@ -24,7 +25,6 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
-#include "Source/santad/Metrics.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -34,7 +34,7 @@
                                  SNTEndpointSecurityProbe>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+                        metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                          logger:(std::shared_ptr<santa::Logger>)logger
                        enricher:(std::shared_ptr<santa::Enricher>)enricher
              faaPolicyProcessor:
