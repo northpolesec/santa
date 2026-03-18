@@ -26,8 +26,8 @@
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
+#include "Source/common/processtree/process_tree.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTDecisionCache.h"
 
 using santa::AuthResultCache;

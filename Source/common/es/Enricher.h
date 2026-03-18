@@ -19,7 +19,7 @@
 
 #include "Source/common/SantaCache.h"
 #include "Source/common/es/EnrichedTypes.h"
-#include "Source/santad/ProcessTree/process_tree.h"
+#include "Source/common/processtree/process_tree.h"
 
 namespace santa {
 

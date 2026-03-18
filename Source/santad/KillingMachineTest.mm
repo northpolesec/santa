@@ -23,7 +23,7 @@
 #include <functional>
 #include <vector>
 
-#include "Source/santad/CSOpsHelper.h"
+#include "Source/common/CSOpsHelper.h"
 
 // Forward declare test-only functions exposed by KillingMachine.mm
 namespace santa {

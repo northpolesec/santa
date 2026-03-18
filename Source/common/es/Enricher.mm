@@ -28,9 +28,9 @@
 #include "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
 #include "Source/common/es/EnrichedTypes.h"
-#include "Source/santad/ProcessTree/SNTEndpointSecurityAdapter.h"
-#include "Source/santad/ProcessTree/process_tree.h"
-#include "Source/santad/ProcessTree/process_tree_macos.h"
+#include "Source/common/processtree/SNTEndpointSecurityAdapter.h"
+#include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_macos.h"
 
 namespace santa {
 
