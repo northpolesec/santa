@@ -31,8 +31,8 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/String.h"
 #include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/Message.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 
 using santa::EndpointSecurityAPI;
 using santa::EventDisposition;

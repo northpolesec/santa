@@ -17,7 +17,7 @@
 
 #include <memory>
 
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 @interface SNTCompilerController : NSObject

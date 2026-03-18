@@ -19,8 +19,8 @@
 #include <bsm/libbsm.h>
 
 #include "Source/common/String.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #include "Source/santad/ProcessTree/process_tree_macos.h"
 #include "absl/status/statusor.h"

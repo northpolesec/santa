@@ -19,8 +19,8 @@
 #include <memory>
 
 #include "Source/common/TestUtils.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/common/es/Message.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 
 using santa::GetAllowListTargetFile;

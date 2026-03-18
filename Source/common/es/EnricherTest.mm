@@ -16,7 +16,7 @@
 #import <XCTest/XCTest.h>
 
 #include "Source/common/TestUtils.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
+#include "Source/common/es/Enricher.h"
 
 using santa::Enricher;
 

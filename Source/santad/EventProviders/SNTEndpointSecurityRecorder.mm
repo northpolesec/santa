@@ -24,9 +24,9 @@
 #include "Source/common/String.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTDecisionCache.h"
 

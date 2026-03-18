@@ -12,8 +12,8 @@
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
 
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_CLIENT_H
-#define SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_CLIENT_H
+#ifndef SANTA__COMMON__ES__CLIENT_H
+#define SANTA__COMMON__ES__CLIENT_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 

@@ -16,7 +16,7 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 
 namespace santa::santad::process_tree {
