@@ -24,8 +24,8 @@
 
 #include "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
-#include "Source/common/santa_proto_include_wrapper.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/santa_proto_include_wrapper.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #import "Source/santad/SNTDecisionCache.h"
 

@@ -21,9 +21,9 @@
 #include <set>
 #include <string_view>
 
-#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/es/Client.h"
 #include "Source/common/es/Message.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 
 namespace santa {
 

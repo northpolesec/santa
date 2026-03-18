@@ -20,8 +20,8 @@
 
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/common/es/ESMetricsObserver.h"
-#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/es/Message.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 
 // Protocol that all subclasses of `SNTEndpointSecurityClient` should adhere to.
 @protocol SNTEndpointSecurityEventHandler <NSObject>

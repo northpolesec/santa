@@ -27,10 +27,10 @@
 
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"
-#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/es/Client.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #import "Source/santad/Metrics.h"
 
 using santa::Client;

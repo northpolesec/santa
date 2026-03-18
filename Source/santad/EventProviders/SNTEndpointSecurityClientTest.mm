@@ -28,11 +28,11 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SystemResources.h"
 #include "Source/common/TestUtils.h"
-#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/es/Client.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 #include "Source/santad/Metrics.h"
 

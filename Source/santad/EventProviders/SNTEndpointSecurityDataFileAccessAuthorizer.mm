@@ -36,8 +36,8 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTStrengthify.h"
-#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/es/Message.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 
 using santa::EndpointSecurityAPI;

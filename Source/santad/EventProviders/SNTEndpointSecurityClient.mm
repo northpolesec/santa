@@ -33,11 +33,11 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SystemResources.h"
-#include "Source/common/es/ESMetricsObserver.h"
-#include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/es/Client.h"
+#include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
+#include "Source/common/faa/WatchItemPolicy.h"
 
 using santa::Client;
 using santa::EndpointSecurityAPI;
