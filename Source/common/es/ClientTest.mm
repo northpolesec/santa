@@ -18,7 +18,7 @@
 
 #include <utility>
 
-#include "Source/santad/EventProviders/EndpointSecurity/Client.h"
+#include "Source/common/es/Client.h"
 
 using santa::Client;
 

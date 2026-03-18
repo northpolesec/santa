@@ -15,7 +15,7 @@
 #include "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
 
 #include "Source/common/es/ESMetricsObserver.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 
 @interface SNTEndpointSecurityTreeAwareClient : SNTEndpointSecurityClient

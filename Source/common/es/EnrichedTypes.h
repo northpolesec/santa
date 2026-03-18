@@ -17,8 +17,8 @@
 /// objects that are constructed to hold all enriched event data prior
 /// to being logged.
 
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_ENRICHEDTYPES_H
-#define SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_ENRICHEDTYPES_H
+#ifndef SANTA__COMMON__ES__ENRICHEDTYPES_H
+#define SANTA__COMMON__ES__ENRICHEDTYPES_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <time.h>
@@ -29,7 +29,7 @@
 
 #include "Source/common/Platform.h"
 #include "Source/common/TelemetryEventMap.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/ProcessTree/process_tree.pb.h"
 
 namespace santa {

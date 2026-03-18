@@ -23,7 +23,7 @@
 #import "Source/common/SNTBlockMessage.h"
 #include "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/common/String.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
+#include "Source/common/es/EnrichedTypes.h"
 
 // Terminal value that will never match a valid cert hash.
 NSString *const kBadCertHash = @"BAD_CERT_HASH";

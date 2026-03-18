@@ -11,14 +11,14 @@
 ///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ///    See the License for the specific language governing permissions and
 ///    limitations under the License.
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_ENRICHER_H
-#define SANTA__SANTAD__EVENTPROVIDERS_ENDPOINTSECURITY_ENRICHER_H
+#ifndef SANTA__COMMON__ES__ENRICHER_H
+#define SANTA__COMMON__ES__ENRICHER_H
 
 #include <memory>
 #include <string_view>
 
 #include "Source/common/SantaCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
+#include "Source/common/es/EnrichedTypes.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 
 namespace santa {

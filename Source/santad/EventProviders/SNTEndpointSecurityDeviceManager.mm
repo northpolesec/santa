@@ -39,7 +39,7 @@
 #import "Source/common/SNTProcessChain.h"
 #include "Source/common/String.h"
 #include "Source/common/es/ESMetricsObserver.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #include "Source/santad/SNTDecisionCache.h"
 

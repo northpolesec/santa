@@ -27,7 +27,7 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Activation.h"
 #include "Source/common/cel/CELProtoTraits.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/ProcessTree/process_tree_macos.h"
 
 namespace {

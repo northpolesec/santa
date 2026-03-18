@@ -20,8 +20,8 @@
 #include <gtest/gtest.h>
 
 #include "Source/common/TelemetryEventMap.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 class MockLogger : public santa::Logger {

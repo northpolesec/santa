@@ -20,7 +20,7 @@
 #import <Foundation/Foundation.h>
 #include <bsm/libbsm.h>
 
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/Message.h"
 
 namespace santa {
 

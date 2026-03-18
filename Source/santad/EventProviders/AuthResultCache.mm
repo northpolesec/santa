@@ -20,7 +20,7 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SystemResources.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Client.h"
+#include "Source/common/es/Client.h"
 
 using santa::Client;
 using santa::EndpointSecurityAPI;

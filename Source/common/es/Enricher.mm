@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
+#include "Source/common/es/Enricher.h"
 
 #include <EndpointSecurity/ESTypes.h>
 #include <bsm/libbsm.h>
@@ -27,7 +27,7 @@
 #include "Source/common/Platform.h"
 #include "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
+#include "Source/common/es/EnrichedTypes.h"
 #include "Source/santad/ProcessTree/SNTEndpointSecurityAdapter.h"
 #include "Source/santad/ProcessTree/process_tree.h"
 #include "Source/santad/ProcessTree/process_tree_macos.h"
