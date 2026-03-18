@@ -20,9 +20,9 @@
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Message.h"
-#include "Source/santad/ProcessTree/SNTEndpointSecurityAdapter.h"
-#include "Source/santad/ProcessTree/process_tree.h"
-#include "Source/santad/ProcessTree/process_tree_macos.h"
+#include "Source/common/processtree/SNTEndpointSecurityAdapter.h"
+#include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_macos.h"
 
 using santa::EndpointSecurityAPI;
 using santa::ESMetricsObserver;

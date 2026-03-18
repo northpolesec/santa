@@ -11,20 +11,29 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
-#ifndef SANTA__SANTAD_PROCESSTREE_SNTENDPOINTSECURITYADAPTER_H
-#define SANTA__SANTAD_PROCESSTREE_SNTENDPOINTSECURITYADAPTER_H
+#ifndef SANTA__COMMON__PROCESSTREE__ANNOTATIONS__ANNOTATOR_H
+#define SANTA__COMMON__PROCESSTREE__ANNOTATIONS__ANNOTATOR_H
 
-#include <EndpointSecurity/EndpointSecurity.h>
+#include <optional>
 
-#include "Source/common/es/Message.h"
-#include "Source/santad/ProcessTree/process_tree.h"
+#include "Source/common/processtree/process_tree.pb.h"
 
 namespace santa::santad::process_tree {
 
-// Inform the tree of the ES event in msg.
-// This is idempotent on the tree, so can be called from multiple places with
-// the same msg.
-void InformFromESEvent(ProcessTree &tree, const santa::Message &msg);
+class ProcessTree;
+class Process;
+
+class Annotator {
+ public:
+  virtual ~Annotator() = default;
+
+  virtual void AnnotateFork(ProcessTree &tree, const Process &parent,
+                            const Process &child) = 0;
+  virtual void AnnotateExec(ProcessTree &tree, const Process &orig_process,
+                            const Process &new_process) = 0;
+  virtual std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
+      const = 0;
+};
 
 }  // namespace santa::santad::process_tree
 

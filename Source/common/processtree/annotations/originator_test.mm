@@ -14,10 +14,10 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
-#include "Source/santad/ProcessTree/annotations/originator.h"
-#include "Source/santad/ProcessTree/process.h"
-#include "Source/santad/ProcessTree/process_tree.pb.h"
-#include "Source/santad/ProcessTree/process_tree_test_helpers.h"
+#include "Source/common/processtree/annotations/originator.h"
+#include "Source/common/processtree/process.h"
+#include "Source/common/processtree/process_tree.pb.h"
+#include "Source/common/processtree/process_tree_test_helpers.h"
 
 using namespace santa::santad::process_tree;
 namespace ptpb = ::santa::pb::v1::process_tree;

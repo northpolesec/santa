@@ -25,13 +25,13 @@
 #include <optional>
 #include <vector>
 
+#include "Source/common/CSOpsHelper.h"
 #include "Source/common/CodeSigningIdentifierUtils.h"
 #import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
-#include "Source/santad/CSOpsHelper.h"
 #include "absl/cleanup/cleanup.h"
 
 namespace santa {

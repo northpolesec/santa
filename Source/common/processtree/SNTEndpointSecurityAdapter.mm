@@ -11,7 +11,7 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
-#include "Source/santad/ProcessTree/SNTEndpointSecurityAdapter.h"
+#include "Source/common/processtree/SNTEndpointSecurityAdapter.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -21,8 +21,8 @@
 #include "Source/common/String.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Message.h"
-#include "Source/santad/ProcessTree/process_tree.h"
-#include "Source/santad/ProcessTree/process_tree_macos.h"
+#include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_macos.h"
 #include "absl/status/statusor.h"
 
 using santa::EndpointSecurityAPI;

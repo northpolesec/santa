@@ -250,7 +250,7 @@ objc_library(
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
-        "//Source/santad/ProcessTree:process_tree",
+        "//Source/common/processtree:process_tree",
         "@FMDB",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@northpolesec_protos//cel:v1_cc_proto",
@@ -380,8 +380,8 @@ objc_library(
         "//Source/common/cel:CEL",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",
-        "//Source/santad/ProcessTree:process",
-        "//Source/santad/ProcessTree:process_tree",
+        "//Source/common/processtree:process",
+        "//Source/common/processtree:process_tree",
     ],
 )
 
@@ -417,8 +417,8 @@ objc_library(
         "//Source/common:Unit",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",
-        "//Source/santad/ProcessTree:process",
-        "//Source/santad/ProcessTree:process_tree",
+        "//Source/common/processtree:process",
+        "//Source/common/processtree:process_tree",
         "@abseil-cpp//absl/synchronization",
     ],
 )
@@ -432,8 +432,8 @@ objc_library(
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:SNTEndpointSecurityClient",
-        "//Source/santad/ProcessTree:SNTEndpointSecurityAdapter",
-        "//Source/santad/ProcessTree:process_tree",
+        "//Source/common/processtree:SNTEndpointSecurityAdapter",
+        "//Source/common/processtree:process_tree",
     ],
 )
 
@@ -476,7 +476,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:SNTEndpointSecurityEventHandler",
-        "//Source/santad/ProcessTree:process_tree",
+        "//Source/common/processtree:process_tree",
     ],
 )
 
@@ -867,15 +867,6 @@ objc_library(
 )
 
 objc_library(
-    name = "CSOpsHelper",
-    srcs = ["CSOpsHelper.mm"],
-    hdrs = ["CSOpsHelper.h"],
-    deps = [
-        "//Source/common:String",
-    ],
-)
-
-objc_library(
     name = "KillingMachine",
     srcs = ["KillingMachine.mm"],
     hdrs = ["KillingMachine.h"],
@@ -883,7 +874,7 @@ objc_library(
         "bsm",
     ],
     deps = [
-        ":CSOpsHelper",
+        "//Source/common:CSOpsHelper",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",
         "//Source/common:SNTLogging",
@@ -900,8 +891,8 @@ santa_unit_test(
         "KillingMachineTest.mm",
     ],
     deps = [
-        ":CSOpsHelper",
         ":KillingMachine",
+        "//Source/common:CSOpsHelper",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",
         "//Source/common:SNTLogging",
@@ -1016,7 +1007,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
-        "//Source/santad/ProcessTree:process_tree",
+        "//Source/common/processtree:process_tree",
     ],
 )
 
@@ -1056,8 +1047,8 @@ objc_library(
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/faa:WatchItems",
-        "//Source/santad/ProcessTree:process_tree",
-        "//Source/santad/ProcessTree/annotations:originator",
+        "//Source/common/processtree:process_tree",
+        "//Source/common/processtree/annotations:originator",
     ],
 )
 
@@ -1716,10 +1707,10 @@ test_suite(
         "//Source/common/es:EndpointSecurityEnricherTest",
         "//Source/common/es:EndpointSecurityMessageTest",
         "//Source/common/es:SNTEndpointSecurityClientTest",
+        "//Source/common/processtree:process_tree_test",
+        "//Source/common/processtree/annotations:originator_test",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:StreamBatchersTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
-        "//Source/santad/ProcessTree:process_tree_test",
-        "//Source/santad/ProcessTree/annotations:originator_test",
     ],
     visibility = ["//:santa_package_group"],
 )

@@ -18,10 +18,10 @@
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Enricher.h"
 #import "Source/common/es/SNTEndpointSecurityEventHandler.h"
+#include "Source/common/processtree/process_tree.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTreeAwareClient.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
-#include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTCompilerController.h"
 
 /// ES Client focused on subscribing to NOTIFY event variants with the intention of enriching

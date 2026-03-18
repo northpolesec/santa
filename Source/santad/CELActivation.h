@@ -20,7 +20,7 @@
 #include <memory>
 
 #include "Source/common/es/Message.h"
-#include "Source/santad/ProcessTree/process_tree.h"
+#include "Source/common/processtree/process_tree.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 
 @class MOLCodesignChecker;

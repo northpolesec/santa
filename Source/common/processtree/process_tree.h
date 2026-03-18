@@ -11,14 +11,14 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
-#ifndef SANTA__SANTAD_PROCESSTREE_TREE_H
-#define SANTA__SANTAD_PROCESSTREE_TREE_H
+#ifndef SANTA__COMMON__PROCESSTREE__PROCESS_TREE_H
+#define SANTA__COMMON__PROCESSTREE__PROCESS_TREE_H
 
 #include <memory>
 #include <typeinfo>
 #include <vector>
 
-#include "Source/santad/ProcessTree/process.h"
+#include "Source/common/processtree/process.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
