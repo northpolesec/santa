@@ -291,6 +291,56 @@ static const CodeSigningInfo kSandboxExecCS = {
   XCTAssertFalse(annotation.has_value());
 }
 
+// Test: nested sandbox-exec picks up the new profile, not the stale one.
+- (void)testNestedSandboxExecUsesNewProfile {
+  uint64_t event_id = 1;
+
+  // fork -> sandbox-exec -f /outer.sb /usr/bin/sandbox-exec
+  const struct Pid fork_pid = {.pid = 2, .pidversion = 2};
+  self.tree->HandleFork(event_id++, *self.initProc, fork_pid);
+
+  const struct Pid outer_sandbox_pid = {.pid = 2, .pidversion = 3};
+  const struct Program outer_sandbox_prog = {
+      .executable = "/usr/bin/sandbox-exec",
+      .arguments = {"sandbox-exec", "-f", "/outer.sb", "/usr/bin/sandbox-exec"},
+      .code_signing = kSandboxExecCS,
+  };
+  auto forked = *self.tree->Get(fork_pid);
+  self.tree->HandleExec(event_id++, *forked, outer_sandbox_pid, outer_sandbox_prog, cred);
+
+  // Confirm outer: exec target
+  const struct Pid outer_target_pid = {.pid = 2, .pidversion = 4};
+  const struct Program outer_target_prog = {
+      .executable = "/usr/bin/sandbox-exec",
+      .arguments = {"sandbox-exec", "-f", "/inner.sb", "/usr/bin/ls"},
+      .code_signing = kSandboxExecCS,
+  };
+  auto outer_sandbox = *self.tree->Get(outer_sandbox_pid);
+  self.tree->HandleExec(event_id++, *outer_sandbox, outer_target_pid, outer_target_prog, cred);
+
+  // The annotation should be pending with the INNER profile, not the outer.
+  auto proc = *self.tree->Get(outer_target_pid);
+  auto opt = self.tree->GetAnnotation<SandboxExecAnnotator>(*proc);
+  XCTAssertTrue(opt.has_value());
+  XCTAssertTrue((*opt)->info().has_value());
+  XCTAssertEqual((*opt)->info()->status, SandboxPolicyStatus::kPending);
+  XCTAssertEqual((*opt)->info()->profile_path, "/inner.sb");
+
+  // Now exec the final target — should confirm /inner.sb.
+  const struct Pid inner_target_pid = {.pid = 2, .pidversion = 5};
+  const struct Program inner_target_prog = {
+      .executable = "/usr/bin/ls",
+      .arguments = {"/usr/bin/ls"},
+  };
+  self.tree->HandleExec(event_id++, *proc, inner_target_pid, inner_target_prog, cred);
+
+  auto final_proc = *self.tree->Get(inner_target_pid);
+  auto final_opt = self.tree->GetAnnotation<SandboxExecAnnotator>(*final_proc);
+  XCTAssertTrue(final_opt.has_value());
+  XCTAssertEqual((*final_opt)->info()->status, SandboxPolicyStatus::kConfirmed);
+  XCTAssertEqual((*final_opt)->info()->profile_path, "/inner.sb");
+}
+
 // Test: ExportAnnotations includes sandbox_policy.
 - (void)testExportAnnotations {
   uint64_t event_id = 1;

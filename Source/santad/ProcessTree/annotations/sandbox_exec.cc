@@ -67,6 +67,17 @@ void SandboxExecAnnotator::AnnotateFork(ProcessTree &tree,
 void SandboxExecAnnotator::AnnotateExec(ProcessTree &tree,
                                         const Process &orig_process,
                                         const Process &new_process) {
+  // If the new image is sandbox-exec, always parse its argv for a new pending
+  // policy. This must come first so nested sandbox-exec invocations pick up the
+  // new profile rather than retaining a stale one from the parent.
+  if (IsSandboxExec(new_process)) {
+    if (auto info = ParseSandboxExecArgv(new_process.program_->arguments)) {
+      tree.AnnotateProcess(new_process, std::make_shared<SandboxExecAnnotator>(
+                                            std::move(*info)));
+      return;
+    }
+  }
+
   // Check if the previous process had a pending annotation to confirm.
   if (auto annotation =
           tree.GetAnnotation<SandboxExecAnnotator>(orig_process)) {
@@ -82,15 +93,6 @@ void SandboxExecAnnotator::AnnotateExec(ProcessTree &tree,
     // Propagate confirmed annotations through exec.
     tree.AnnotateProcess(new_process, std::move(*annotation));
     return;
-  }
-
-  // Check if the new process is sandbox-exec.
-  if (IsSandboxExec(new_process)) {
-    auto info = ParseSandboxExecArgv(new_process.program_->arguments);
-    if (info) {
-      tree.AnnotateProcess(new_process, std::make_shared<SandboxExecAnnotator>(
-                                            std::move(*info)));
-    }
   }
 }
 
