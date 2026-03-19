@@ -1806,11 +1806,6 @@ static SNTConfigurator *sharedConfigurator = nil;
     return nil;
   }
 
-  if (![commands isKindOfClass:[NSArray class]]) {
-    LOGW(@"AllowedSantaCommands is not an array, blocking all commands");
-    return @[];
-  }
-
   NSMutableArray<NSString *> *filtered = [[NSMutableArray alloc] initWithCapacity:commands.count];
 
   for (id command in commands) {

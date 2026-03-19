@@ -340,7 +340,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
     NSArray<NSString *> *allowed = [[SNTConfigurator configurator] allowedSantaCommands];
     if (allowed && ![allowed containsObject:commandName]) {
       LOGW(@"NATS: Command '%@' rejected - not in AllowedSantaCommands", commandName);
-      response->set_error(::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+      response->set_error(::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
       return response;
     }
   }
