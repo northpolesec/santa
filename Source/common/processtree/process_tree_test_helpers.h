@@ -15,6 +15,7 @@
 
 #ifndef SANTA_COMMON_PROCESSTREE_PROCESSTREETESTHELPERS_H
 #define SANTA_COMMON_PROCESSTREE_PROCESSTREETESTHELPERS_H
+
 #include <memory>
 
 #include "Source/common/processtree/process_tree.h"

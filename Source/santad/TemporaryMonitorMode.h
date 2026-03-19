@@ -25,7 +25,20 @@
 #include "absl/synchronization/mutex.h"
 
 #ifndef SANTA_SANTAD_TEMPORARYMONITORMODE_H
+#ifndef SANTA_SANTAD_TEMPORARYMONITORMODE_H
 #define SANTA_SANTAD_TEMPORARYMONITORMODE_H
+
+#include <memory>
+#include <optional>
+
+#include "Source/common/PassKey.h"
+#import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTKVOManager.h"
+#import "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
+#include "Source/common/Timer.h"
+#import "Source/santad/SNTNotificationQueue.h"
+#include "absl/synchronization/mutex.h"
 
 extern NSString *const kStateTempMonitorModeBootUUIDKey;
 extern NSString *const kStateTempMonitorModeDeadlineKey;
