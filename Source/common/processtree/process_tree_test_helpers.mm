@@ -29,7 +29,7 @@ class ProcessTreeTestPeer : public ProcessTree {
 };
 
 std::shared_ptr<const Process> ProcessTreeTestPeer::InsertInit() {
-  absl::MutexLock lock(&mtx_);
+  absl::MutexLock lock(mtx_);
   struct Pid initpid = {
       .pid = 1,
       .pidversion = 1,

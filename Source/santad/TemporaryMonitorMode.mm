@@ -76,7 +76,7 @@ void TemporaryMonitorMode::SetupFromState(PassKey, NSDictionary *tmm) {
               }
             }] ];
 
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   uint32_t secs_remaining = static_cast<uint32_t>(
       std::min(GetSecondsRemainingFromInitialStateLocked(tmm, [SNTSystemInfo bootSessionUUID],
                                                          configurator_.syncBaseURL),
@@ -212,7 +212,7 @@ uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSEr
   SNTModeTransition *mode_transition = [configurator_ modeTransition];
   uint32_t duration_min = [mode_transition getDurationMinutes:requested_duration];
 
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   SNTTemporaryMonitorModeEnterReason reason;
   if (BeginLocked(duration_min * 60, true)) {
     reason = SNTTemporaryMonitorModeEnterReasonOnDemand;
@@ -228,7 +228,7 @@ uint32_t TemporaryMonitorMode::RequestMinutes(NSNumber *requested_duration, NSEr
 }
 
 std::optional<uint64_t> TemporaryMonitorMode::SecondsRemaining() const {
-  absl::ReaderMutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(lock_);
   if (IsStarted()) {
     return SecondsRemaining(deadline_);
   } else {
@@ -269,7 +269,7 @@ bool TemporaryMonitorMode::BeginLocked(uint32_t seconds, bool gen_uuid_on_start)
 }
 
 bool TemporaryMonitorMode::Cancel() {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (EndLocked()) {
     handle_audit_event_block_([[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
         initWithUUID:[current_uuid_ UUIDString]
@@ -282,7 +282,7 @@ bool TemporaryMonitorMode::Cancel() {
 }
 
 bool TemporaryMonitorMode::Revoke(SNTTemporaryMonitorModeLeaveReason reason) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   return RevokeLocked(reason);
 }
 
@@ -310,7 +310,7 @@ bool TemporaryMonitorMode::EndLocked() {
 }
 
 bool TemporaryMonitorMode::OnTimer() {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   [configurator_ leaveTemporaryMonitorMode];
   [[notification_queue_.notifierConnection remoteObjectProxy] leaveTemporaryMonitorMode];
 
