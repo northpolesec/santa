@@ -45,22 +45,22 @@ class PrefixTree {
   ~PrefixTree() { PruneLocked(root_); }
 
   bool InsertPrefix(const char *s, ValueT value) {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     return InsertLocked(s, value, NodeType::kPrefix);
   }
 
   bool InsertLiteral(const char *s, ValueT value) {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     return InsertLocked(s, value, NodeType::kLiteral);
   }
 
   bool HasPrefix(const char *input) {
-    absl::ReaderMutexLock lock(&lock_);
+    absl::ReaderMutexLock lock(lock_);
     return HasPrefixLocked(input);
   }
 
   std::optional<ValueT> LookupLongestMatchingPrefix(const std::string &input) {
-    absl::ReaderMutexLock lock(&lock_);
+    absl::ReaderMutexLock lock(lock_);
     return LookupLongestMatchingPrefixLocked(input);
   }
 
@@ -71,19 +71,19 @@ class PrefixTree {
       return false;
     }
 
-    absl::ReaderMutexLock lock(&lock_);
+    absl::ReaderMutexLock lock(lock_);
     return ContainsLocked(input);
   }
 
   void Reset() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     PruneLocked(root_);
     root_ = new TreeNode();
     node_count_ = 0;
   }
 
   uint32_t NodeCount() {
-    absl::ReaderMutexLock lock(&lock_);
+    absl::ReaderMutexLock lock(lock_);
     return node_count_;
   }
 
@@ -91,7 +91,7 @@ class PrefixTree {
   void Print() {
     std::vector<char> buf(max_depth_ + 1);
 
-    absl::ReaderMutexLock lock(&lock_);
+    absl::ReaderMutexLock lock(lock_);
     PrintLocked(root_, buf.data(), 0);
   }
 #endif

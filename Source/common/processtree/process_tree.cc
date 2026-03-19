@@ -49,7 +49,7 @@ void ProcessTree::BackfillInsertChildren(
           : unlinked_proc.program_,
       parent);
   {
-    absl::MutexLock lock(&mtx_);
+    absl::MutexLock lock(mtx_);
     map_.emplace(unlinked_proc.pid_, proc);
   }
 
@@ -74,7 +74,7 @@ void ProcessTree::HandleFork(uint64_t timestamp, const Process &parent,
   if (Step(timestamp)) {
     std::shared_ptr<Process> child;
     {
-      absl::MutexLock lock(&mtx_);
+      absl::MutexLock lock(mtx_);
       child = std::make_shared<Process>(new_pid, parent.effective_cred_,
                                         parent.program_, map_[parent.pid_]);
       map_.emplace(new_pid, child);
@@ -96,7 +96,7 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process &p,
     auto new_proc = std::make_shared<Process>(
         new_pid, c, std::make_shared<const Program>(prog), p.parent_);
     {
-      absl::MutexLock lock(&mtx_);
+      absl::MutexLock lock(mtx_);
       remove_at_.push_back({timestamp, p.pid_});
       map_.emplace(new_proc->pid_, new_proc);
     }
@@ -108,13 +108,13 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process &p,
 
 void ProcessTree::HandleExit(uint64_t timestamp, const Process &p) {
   if (Step(timestamp)) {
-    absl::MutexLock lock(&mtx_);
+    absl::MutexLock lock(mtx_);
     remove_at_.push_back({timestamp, p.pid_});
   }
 }
 
 bool ProcessTree::Step(uint64_t timestamp) {
-  absl::MutexLock lock(&mtx_);
+  absl::MutexLock lock(mtx_);
   uint64_t new_cutoff = seen_timestamps_.front();
   if (timestamp < new_cutoff) {
     // Event timestamp is before the rolling list of seen events.
@@ -160,7 +160,7 @@ bool ProcessTree::Step(uint64_t timestamp) {
 }
 
 void ProcessTree::RetainProcess(std::vector<struct Pid> &pids) {
-  absl::MutexLock lock(&mtx_);
+  absl::MutexLock lock(mtx_);
   for (const struct Pid &p : pids) {
     auto proc = GetLocked(p);
     if (proc) {
@@ -170,7 +170,7 @@ void ProcessTree::RetainProcess(std::vector<struct Pid> &pids) {
 }
 
 void ProcessTree::ReleaseProcess(std::vector<struct Pid> &pids) {
-  absl::MutexLock lock(&mtx_);
+  absl::MutexLock lock(mtx_);
   for (const struct Pid &p : pids) {
     auto proc = GetLocked(p);
     if (proc) {
@@ -189,7 +189,7 @@ Annotation get/set
 
 void ProcessTree::AnnotateProcess(const Process &p,
                                   std::shared_ptr<const Annotator> a) {
-  absl::MutexLock lock(&mtx_);
+  absl::MutexLock lock(mtx_);
   const Annotator &x = *a;
   map_[p.pid_]->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
 }
@@ -227,7 +227,7 @@ void ProcessTree::Iterate(
     std::function<void(std::shared_ptr<const Process> p)> f) const {
   std::vector<std::shared_ptr<const Process>> procs;
   {
-    absl::ReaderMutexLock lock(&mtx_);
+    absl::ReaderMutexLock lock(mtx_);
     procs.reserve(map_.size());
     for (auto &[_, proc] : map_) {
       procs.push_back(proc);
@@ -241,7 +241,7 @@ void ProcessTree::Iterate(
 
 std::optional<std::shared_ptr<const Process>> ProcessTree::Get(
     const Pid target) const {
-  absl::ReaderMutexLock lock(&mtx_);
+  absl::ReaderMutexLock lock(mtx_);
   return GetLocked(target);
 }
 
@@ -260,7 +260,7 @@ std::shared_ptr<const Process> ProcessTree::GetParent(const Process &p) const {
 
 #if SANTA_PROCESS_TREE_DEBUG
 void ProcessTree::DebugDump(std::ostream &stream) const {
-  absl::ReaderMutexLock lock(&mtx_);
+  absl::ReaderMutexLock lock(mtx_);
   stream << map_.size() << " processes" << std::endl;
   DebugDumpLocked(stream, 0, 0);
 }
