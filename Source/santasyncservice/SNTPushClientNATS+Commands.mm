@@ -17,6 +17,7 @@
 #include <CommonCrypto/CommonHMAC.h>
 #include <google/protobuf/descriptor.h>
 
+#import "Source/common/SNTConfigurator.h"
 #include "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -324,6 +325,26 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   }
 
   ::pbv1::SantaCommandRequest::CommandCase commandCase = command.command_case();
+
+  // Check if command type is allowed by client configuration
+  // No default case — compiler enforces all proto cases are handled (-Werror + -Wswitch)
+  NSString *commandName = nil;
+  switch (commandCase) {
+    case ::pbv1::SantaCommandRequest::kPing: commandName = @"ping"; break;
+    case ::pbv1::SantaCommandRequest::kKill: commandName = @"kill"; break;
+    case ::pbv1::SantaCommandRequest::kEventUpload: commandName = @"event_upload"; break;
+    case ::pbv1::SantaCommandRequest::COMMAND_NOT_SET: break;
+  }
+
+  if (commandName) {
+    NSArray<NSString *> *allowed = [[SNTConfigurator configurator] allowedSantaCommands];
+    if (allowed && ![allowed containsObject:commandName]) {
+      LOGW(@"NATS: Command '%@' rejected - not in AllowedSantaCommands", commandName);
+      response->set_error(::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
+      return response;
+    }
+  }
+
   switch (commandCase) {
     case ::pbv1::SantaCommandRequest::kPing: {
       LOGI(@"NATS: Dispatching PingRequest command");

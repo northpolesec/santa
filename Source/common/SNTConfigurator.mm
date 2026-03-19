@@ -214,6 +214,7 @@ static NSString *const kMetricExportTimeout = @"MetricExportTimeout";
 static NSString *const kMetricExtraLabels = @"MetricExtraLabels";
 
 static NSString *const kEnabledProcessAnnotations = @"EnabledProcessAnnotations";
+static NSString *const kAllowedSantaCommandsKey = @"AllowedSantaCommands";
 
 // The keys managed by a sync server or mobileconfig.
 static NSString *const kClientModeKey = @"ClientMode";
@@ -411,6 +412,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kBrandingCompanyName : string,
       kBrandingCompanyLogo : string,
       kBrandingCompanyLogoDark : string,
+      kAllowedSantaCommandsKey : array,
     };
 
     _syncStateFilePath = syncStateFilePath;
@@ -879,6 +881,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 + (NSSet *)keyPathsForValuesAffectingPushTokenChain {
   return [self syncStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingAllowedSantaCommands {
+  return [self configStateSet];
 }
 
 #pragma mark Public Interface
@@ -1792,6 +1798,25 @@ static SNTConfigurator *sharedConfigurator = nil;
     }
   }
   return annotations;
+}
+
+- (NSArray<NSString *> *)allowedSantaCommands {
+  NSArray *commands = self.configState[kAllowedSantaCommandsKey];
+  if (!commands) {
+    return nil;
+  }
+
+  NSMutableArray<NSString *> *filtered = [[NSMutableArray alloc] initWithCapacity:commands.count];
+
+  for (id command in commands) {
+    if ([command isKindOfClass:[NSString class]]) {
+      [filtered addObject:command];
+    } else {
+      LOGW(@"AllowedSantaCommands contains non-string value, ignoring: %@", [command class]);
+    }
+  }
+
+  return filtered;
 }
 
 #pragma mark - Private
