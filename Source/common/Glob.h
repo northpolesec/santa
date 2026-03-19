@@ -15,7 +15,7 @@
 #ifndef SANTA__COMMON__GLOB_H
 #define SANTA__COMMON__GLOB_H
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #include <string>
 #include <vector>

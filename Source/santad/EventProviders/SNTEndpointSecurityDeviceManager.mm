@@ -41,7 +41,7 @@
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
-#include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTDecisionCache.h"
 
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;

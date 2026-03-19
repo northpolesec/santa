@@ -27,7 +27,7 @@
 #import "Source/common/cel/Activation.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 
-#import "cel/v1.pb.h"
+#include "cel/v1.pb.h"
 
 extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd);
 

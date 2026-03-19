@@ -38,7 +38,7 @@
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
-#include "Source/santad/SNTExecutionController.h"
+#import "Source/santad/SNTExecutionController.h"
 #include "Source/santad/SantadDeps.h"
 
 using santa::Message;

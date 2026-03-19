@@ -35,9 +35,9 @@
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EntitlementsFilter.h"
 #import "Source/santad/SNTDatabaseController.h"
-#include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNetworkExtensionQueue.h"
-#include "Source/santad/SNTPolicyProcessor.h"
+#import "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TTYWriter.h"
 

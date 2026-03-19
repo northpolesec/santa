@@ -18,7 +18,7 @@
 #include <google/protobuf/descriptor.h>
 
 #import "Source/common/SNTConfigurator.h"
-#include "Source/common/SNTKillCommand.h"
+#import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #include "Source/common/String.h"

@@ -13,7 +13,6 @@
 /// limitations under the License.
 
 #include "Source/common/SantaSetCache.h"
-#include "XCTest/XCTest.h"
 
 #import <XCTest/XCTest.h>
 

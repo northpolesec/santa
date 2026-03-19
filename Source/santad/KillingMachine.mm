@@ -14,7 +14,7 @@
 
 #include "Source/santad/KillingMachine.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
 #include <libproc.h>

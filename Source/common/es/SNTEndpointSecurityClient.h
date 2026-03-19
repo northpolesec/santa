@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/es/SNTEndpointSecurityClientBase.h"
+#import "Source/common/es/SNTEndpointSecurityClientBase.h"
 
 /// This should be treated as an Abstract Base Class and not directly instantiated
 @interface SNTEndpointSecurityClient : NSObject <SNTEndpointSecurityClientBase>

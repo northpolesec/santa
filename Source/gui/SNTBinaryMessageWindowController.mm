@@ -17,7 +17,7 @@
 #import "Source/gui/SNTAuthorizationHelper.h"
 #import "Source/gui/SNTBinaryMessageWindowView-Swift.h"
 
-#include <AppKit/AppKit.h>
+#import <AppKit/AppKit.h>
 #import <SecurityInterface/SFCertificatePanel.h>
 #include <dispatch/dispatch.h>
 

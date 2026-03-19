@@ -15,7 +15,7 @@
 #ifndef SANTA__SANTASYNCSERVICE__PINNING_H
 #define SANTA__SANTASYNCSERVICE__PINNING_H
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 namespace santa {
 

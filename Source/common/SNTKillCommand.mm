@@ -13,7 +13,7 @@
 /// limitations under the License.
 
 #import "Source/common/SNTKillCommand.h"
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #import "Source/common/CodeSigningIdentifierUtils.h"
 #include "Source/common/CoderMacros.h"

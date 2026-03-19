@@ -13,7 +13,7 @@
 /// limitations under the License.
 
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #import "Source/common/CoderMacros.h"
 

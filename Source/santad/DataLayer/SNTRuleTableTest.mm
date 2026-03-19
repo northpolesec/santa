@@ -17,12 +17,12 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <stdint.h>
-#include "Source/common/SNTError.h"
+#import "Source/common/SNTError.h"
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
-#include "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTFileInfo.h"

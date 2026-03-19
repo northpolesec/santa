@@ -20,7 +20,7 @@
 ///
 /// This will put output in `/tmp/file_access_rule_archive.plist`
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #include <stdlib.h>
 #include <unistd.h>

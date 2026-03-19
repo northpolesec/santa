@@ -27,7 +27,7 @@
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
-#include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
 namespace santa {

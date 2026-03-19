@@ -15,7 +15,7 @@
 #ifndef SANTA__COMMON__NKEYTOKENVALIDATOR_H
 #define SANTA__COMMON__NKEYTOKENVALIDATOR_H
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #include <set>
 #include <string>

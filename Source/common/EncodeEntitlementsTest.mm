@@ -13,7 +13,6 @@
 /// limitations under the License.
 
 #include "Source/common/EncodeEntitlements.h"
-#include "XCTest/XCTest.h"
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>

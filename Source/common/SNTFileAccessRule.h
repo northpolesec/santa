@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 typedef NS_ENUM(NSInteger, SNTFileAccessRuleState) {
   SNTFileAccessRuleStateUnknown,

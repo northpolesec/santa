@@ -27,7 +27,7 @@
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
-#include "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
+#import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTStoredUSBMountEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"

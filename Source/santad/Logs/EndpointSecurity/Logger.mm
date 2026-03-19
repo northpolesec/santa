@@ -15,7 +15,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <sys/stat.h>
 
 #include <algorithm>
@@ -27,8 +27,8 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTExportConfiguration.h"
 #include "Source/common/SNTLogging.h"
-#include "Source/common/SNTStoredExecutionEvent.h"
-#include "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTSystemInfo.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"
@@ -41,7 +41,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Writers/Null.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Spool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Syslog.h"
-#include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/SleighLauncher.h"
 #include "absl/container/flat_hash_map.h"
 

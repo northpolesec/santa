@@ -15,7 +15,7 @@
 #ifndef SANTA__COMMON__TIMER_H
 #define SANTA__COMMON__TIMER_H
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 #include <sys/qos.h>
 

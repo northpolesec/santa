@@ -31,7 +31,7 @@
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/MockFAAPolicyProcessor.h"
-#include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTDecisionCache.h"
 
 using santa::FAAPolicyProcessor;
 using santa::Message;

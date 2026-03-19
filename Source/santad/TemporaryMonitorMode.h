@@ -16,9 +16,9 @@
 #include <optional>
 
 #include "Source/common/PassKey.h"
-#include "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTKVOManager.h"
-#include "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/Timer.h"
 #import "Source/santad/SNTNotificationQueue.h"

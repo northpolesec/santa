@@ -14,9 +14,9 @@
 /// limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncRuleDownload.h"
-#include "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTCommonEnums.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTFileAccessRule.h"

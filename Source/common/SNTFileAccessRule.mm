@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/common/SNTFileAccessRule.h"
+#import "Source/common/SNTFileAccessRule.h"
 
 #import "Source/common/CoderMacros.h"
 

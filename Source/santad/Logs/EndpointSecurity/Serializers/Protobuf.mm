@@ -32,17 +32,17 @@
 #include "Source/common/AuditUtilities.h"
 #include "Source/common/EncodeEntitlements.h"
 #import "Source/common/SNTCachedDecision.h"
-#include "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTCommonEnums.h"
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
-#include "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTSystemInfo.h"
 #import "Source/common/String.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "absl/status/status.h"
 #include "google/protobuf/timestamp.pb.h"
-#include "src/santanetd/SNDNetworkFlowsSerializer.h"
+#import "src/santanetd/SNDNetworkFlowsSerializer.h"
 
 using google::protobuf::Arena;
 using google::protobuf::Timestamp;

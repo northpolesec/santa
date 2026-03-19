@@ -26,7 +26,7 @@
 #include <vector>
 
 #import "Source/common/SNTCommonEnums.h"
-#include "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTExportConfiguration.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/EnrichedTypes.h"

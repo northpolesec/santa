@@ -27,7 +27,7 @@
 
 #include "Source/common/Platform.h"
 #import "Source/common/SNTCommonEnums.h"
-#include "Source/common/SNTMetricSet.h"
+#import "Source/common/SNTMetricSet.h"
 #include "Source/common/TestUtils.h"
 
 using santa::EventCountTuple;

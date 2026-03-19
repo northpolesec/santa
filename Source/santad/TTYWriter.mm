@@ -21,7 +21,7 @@
 #include <sys/ioctl.h>
 #include <sys/param.h>
 
-#include "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
 

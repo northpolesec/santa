@@ -35,8 +35,8 @@
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/faa/WatchItems.h"
 #include "Source/santad/DaemonConfigBundle.h"
-#include "Source/santad/DataLayer/SNTEventTable.h"
-#include "Source/santad/DataLayer/SNTRuleTable.h"
+#import "Source/santad/DataLayer/SNTEventTable.h"
+#import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
@@ -46,9 +46,9 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
-#include "Source/santad/SNTDaemonControlController.h"
-#include "Source/santad/SNTDatabaseController.h"
-#include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTDaemonControlController.h"
+#import "Source/santad/SNTDatabaseController.h"
+#import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;

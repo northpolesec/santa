@@ -17,7 +17,7 @@
 #define SANTA__COMMON__SCOPEDTYPEREF_H
 
 #include <CoreFoundation/CoreFoundation.h>
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <assert.h>
 
 #include <functional>

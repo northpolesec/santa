@@ -14,7 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTPolicyProcessor.h"
-#include "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTCommonEnums.h"
 
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
