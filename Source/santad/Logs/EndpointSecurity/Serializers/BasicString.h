@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_BASICSTRING_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_BASICSTRING_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_BASICSTRING_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_BASICSTRING_H
 
 #import <Foundation/Foundation.h>
 #include "Source/common/es/EnrichedTypes.h"
@@ -105,4 +105,4 @@ class BasicString : public Serializer {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_BASICSTRING_H

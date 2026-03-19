@@ -24,7 +24,7 @@
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaSetCache.h"
-#include "Source/common/es/SNTEndpointSecurityEventHandler.h"
+#import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 
 using santa::FAAPolicyProcessor;

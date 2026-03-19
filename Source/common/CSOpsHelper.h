@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CSOPSHELPER_H
-#define SANTA__COMMON__CSOPSHELPER_H
+#ifndef SANTA_COMMON_CSOPSHELPER_H
+#define SANTA_COMMON_CSOPSHELPER_H
 
 #include <Kernel/kern/cs_blobs.h>
 #include <sys/cdefs.h>
@@ -66,4 +66,4 @@ std::optional<std::string> CSOpsGetSigningID(pid_t pid,
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__CSOPSHELPER_H
+#endif  // SANTA_COMMON_CSOPSHELPER_H

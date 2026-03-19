@@ -1,5 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__ES__MESSAGE_H
-#define SANTA__COMMON__ES__MESSAGE_H
+#ifndef SANTA_COMMON_ES_MESSAGE_H
+#define SANTA_COMMON_ES_MESSAGE_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 
@@ -90,4 +90,4 @@ class Message {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_COMMON_ES_MESSAGE_H

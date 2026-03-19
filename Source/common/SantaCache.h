@@ -1,5 +1,5 @@
 /// Copyright 2016-2022 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTA_DRIVER__SANTACACHE_H
-#define SANTA__SANTA_DRIVER__SANTACACHE_H
+#ifndef SANTA_COMMON_SANTACACHE_H
+#define SANTA_COMMON_SANTACACHE_H
 
 #include <libkern/OSAtomic.h>
 #include <libkern/OSTypes.h>
@@ -464,4 +464,4 @@ class SantaCache {
 
 #pragma clang diagnostic pop
 
-#endif  // SANTA__SANTA_DRIVER__SANTACACHE_H
+#endif  // SANTA_COMMON_SANTACACHE_H

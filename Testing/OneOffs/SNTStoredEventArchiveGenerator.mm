@@ -23,7 +23,7 @@
 /// To convert the output to xml format for the sync tests:
 ///   plutil -convert xml1 -o my.plist /tmp/stored_event_archive.plist
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 #include <Kernel/kern/cs_blobs.h>
 

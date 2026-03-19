@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_MOCKLOGGER_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_MOCKLOGGER_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_MOCKLOGGER_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_MOCKLOGGER_H
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -43,4 +43,4 @@ class MockLogger : public santa::Logger {
                FileAccessPolicyDecision decision));
 };
 
-#endif
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_MOCKLOGGER_H
