@@ -17,8 +17,8 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/es/Message.h"
+#include "Source/common/processtree/process_tree.h"
 #include "Source/santad/ProcessControl.h"
-#include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/TTYWriter.h"
 

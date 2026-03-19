@@ -11,8 +11,8 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
-#ifndef SANTA__SANTAD_PROCESSTREE_PROCESS_H
-#define SANTA__SANTAD_PROCESSTREE_PROCESS_H
+#ifndef SANTA__COMMON__PROCESSTREE__PROCESS_H
+#define SANTA__COMMON__PROCESSTREE__PROCESS_H
 
 #include <sys/types.h>
 
@@ -23,7 +23,7 @@
 #include <typeindex>
 #include <vector>
 
-#include "Source/santad/ProcessTree/annotations/annotator.h"
+#include "Source/common/processtree/annotations/annotator.h"
 #include "absl/container/flat_hash_map.h"
 
 namespace santa::santad::process_tree {

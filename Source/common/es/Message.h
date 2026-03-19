@@ -21,7 +21,7 @@
 #include <memory>
 #include <string>
 
-#include "Source/santad/ProcessTree/process_tree.h"
+#include "Source/common/processtree/process_tree.h"
 
 namespace santa {
 

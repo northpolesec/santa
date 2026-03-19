@@ -19,9 +19,9 @@
 #include <memory>
 #include <string>
 
-#include "Source/santad/ProcessTree/annotations/annotator.h"
-#include "Source/santad/ProcessTree/process.h"
-#include "Source/santad/ProcessTree/process_tree_test_helpers.h"
+#include "Source/common/processtree/annotations/annotator.h"
+#include "Source/common/processtree/process.h"
+#include "Source/common/processtree/process_tree_test_helpers.h"
 #include "absl/synchronization/mutex.h"
 
 namespace ptpb = ::santa::pb::v1::process_tree;

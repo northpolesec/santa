@@ -11,22 +11,32 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
-#ifndef SANTA__SANTAD_PROCESSTREE_TREE_TEST_HELPERS_H
-#define SANTA__SANTAD_PROCESSTREE_TREE_TEST_HELPERS_H
-#include <memory>
+#import <Foundation/Foundation.h>
 
-#include "Source/santad/ProcessTree/process_tree.h"
+#include <memory>
+#include <string_view>
+
+#include "Source/common/processtree/process.h"
+#include "Source/common/processtree/process_tree.h"
 
 namespace santa::santad::process_tree {
 
 class ProcessTreeTestPeer : public ProcessTree {
  public:
-  explicit ProcessTreeTestPeer(
-      std::vector<std::unique_ptr<Annotator>> &&annotators)
-      : ProcessTree(std::move(annotators)) {}
   std::shared_ptr<const Process> InsertInit();
 };
 
-}  // namespace santa::santad::process_tree
+std::shared_ptr<const Process> ProcessTreeTestPeer::InsertInit() {
+  absl::MutexLock lock(&mtx_);
+  struct Pid initpid = {
+      .pid = 1,
+      .pidversion = 1,
+  };
+  auto proc = std::make_shared<Process>(
+      initpid, (Cred){.uid = 0, .gid = 0},
+      std::make_shared<Program>((Program){.executable = "/init", .arguments = {"/init"}}), nullptr);
+  map_.emplace(initpid, proc);
+  return proc;
+}
 
-#endif
+}  // namespace santa::santad::process_tree

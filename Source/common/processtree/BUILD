@@ -4,14 +4,14 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
-    default_visibility = ["//:santa_package_group"],
+    default_visibility = ["//visibility:public"],
 )
 
 cc_library(
     name = "process",
     hdrs = ["process.h"],
     deps = [
-        "//Source/santad/ProcessTree/annotations:annotator",
+        "//Source/common/processtree/annotations:annotator",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/synchronization",
@@ -33,10 +33,10 @@ objc_library(
     ],
     deps = [
         ":process",
+        ":process_tree_cc_proto",
+        "//Source/common:CSOpsHelper",
         "//Source/common:SystemResources",
-        "//Source/santad:CSOpsHelper",
-        "//Source/santad/ProcessTree:process_tree_cc_proto",
-        "//Source/santad/ProcessTree/annotations:annotator",
+        "//Source/common/processtree/annotations:annotator",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
@@ -88,7 +88,7 @@ santa_unit_test(
     deps = [
         ":process",
         ":process_tree_test_helpers",
-        "//Source/santad/ProcessTree/annotations:annotator",
+        "//Source/common/processtree/annotations:annotator",
         "@abseil-cpp//absl/synchronization",
     ],
 )
