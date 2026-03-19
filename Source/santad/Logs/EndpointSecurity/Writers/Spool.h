@@ -26,7 +26,7 @@
 #include <vector>
 
 #import "Source/common/SNTLogging.h"
-#include "Source/common/santa_proto_include_wrapper.h"
+#include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
 #include "absl/container/flat_hash_map.h"
