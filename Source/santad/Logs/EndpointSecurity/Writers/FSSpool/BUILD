@@ -23,7 +23,6 @@ cc_proto_library(
     ],
 )
 
-
 cc_library(
     name = "fsspool_nowindows",
     srcs = ["fsspool_nowindows.cc"],

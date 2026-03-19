@@ -39,6 +39,8 @@
 
   auto f = std::make_unique<ExecutableFileT>();
   f->mutable_signing_time()->set_seconds(1748436989);
+  f->set_is_platform_binary(false);
+  f->set_team_id("EQHXZ8M8AV");
   santa::cel::Activation<true> activation(
       std::move(f),
       ^std::vector<std::string>() {
@@ -52,6 +54,9 @@
       },
       ^std::string() {
         return "/";
+      },
+      ^std::string() {
+        return "/usr/bin/test";
       },
       ^std::vector<AncestorT>() {
         return {};
@@ -93,6 +98,37 @@
     }
   }
   {
+    // Static - is_platform_binary on target
+    auto result = sut.value()->CompileAndEvaluate("target.is_platform_binary == false", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, true);
+    }
+  }
+  {
+    // Static - team_id on target
+    auto result = sut.value()->CompileAndEvaluate("target.team_id == 'EQHXZ8M8AV'", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, true);
+    }
+  }
+  {
+    // Combined - is_platform_binary and team_id
+    auto result = sut.value()->CompileAndEvaluate(
+        "!target.is_platform_binary && target.team_id == 'EQHXZ8M8AV'", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, true);
+    }
+  }
+  {
     // Re-use of a compiled expression.
     google::protobuf::Arena arena;
     auto expr =
@@ -124,6 +160,9 @@
         },
         ^std::string() {
           return "/Users/foo";
+        },
+        ^std::string() {
+          return "/usr/bin/test";
         },
         ^std::vector<santa::cel::v2::Ancestor>() {
           return {};
@@ -179,6 +218,9 @@
         ^std::string {
           return "/";
         },
+        ^std::string() {
+          return "/usr/bin/test";
+        },
         ^std::vector<santa::cel::v2::Ancestor>() {
           return {};
         },
@@ -206,6 +248,26 @@
       XCTAssertEqual(result.value().cacheable, false);
     }
   }
+  {
+    // Dynamic - filepath via path field
+    auto result = sut.value()->CompileAndEvaluate("path == '/usr/bin/test'", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
+    }
+  }
+  {
+    // Dynamic - path with startsWith
+    auto result = sut.value()->CompileAndEvaluate("path.startsWith('/usr/bin')", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(result.value().cacheable, false);
+    }
+  }
 }
 
 - (void)testV2Only {
@@ -220,6 +282,9 @@
   };
   auto cwdFn = ^std::string() {
     return "/";
+  };
+  auto pathFn = ^std::string() {
+    return "/usr/bin/test";
   };
   auto ancestorsV1Fn = ^std::vector<santa::cel::CELProtoTraits<false>::AncestorT>() {
     return {};
@@ -238,7 +303,7 @@
     // V1
     auto f = std::make_unique<santa::cel::CELProtoTraits<false>::ExecutableFileT>();
     f->mutable_signing_time()->set_seconds(1748436989);
-    santa::cel::Activation<false> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn,
+    santa::cel::Activation<false> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn, pathFn,
                                              ancestorsV1Fn, fdsV1Fn);
     auto sut = santa::cel::Evaluator<false>::Create();
     XCTAssertTrue(sut.ok());
@@ -254,7 +319,7 @@
     using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
     auto f = std::make_unique<santa::cel::CELProtoTraits<true>::ExecutableFileT>();
     f->mutable_signing_time()->set_seconds(1748436989);
-    santa::cel::Activation<true> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn,
+    santa::cel::Activation<true> activation(std::move(f), argsFn, envsFn, euidFn, cwdFn, pathFn,
                                             ancestorsV2Fn, fdsV2Fn);
     auto sut = santa::cel::Evaluator<true>::Create();
     XCTAssertTrue(sut.ok());
@@ -291,6 +356,9 @@
       },
       ^std::string() {
         return "/";
+      },
+      ^std::string() {
+        return "/usr/bin/test";
       },
       ^std::vector<AncestorT>() {
         return {};
@@ -386,6 +454,9 @@
       },
       ^std::string() {
         return "/";
+      },
+      ^std::string() {
+        return "/usr/bin/test";
       },
       ^std::vector<AncestorT>() {
         return {};
@@ -489,6 +560,9 @@
       },
       ^std::string() {
         return "/";
+      },
+      ^std::string() {
+        return "/usr/bin/test";
       },
       ^std::vector<AncestorT>() {
         return {};

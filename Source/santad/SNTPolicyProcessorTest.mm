@@ -695,6 +695,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
           ^std::string() {
             return "/";
           },
+          ^std::string() {
+            return "/usr/bin/test";
+          },
           ^std::vector<AncestorT>() {
             return {};
           },
@@ -846,6 +849,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
           },
           ^std::string() {
             return "/Users/admin";
+          },
+          ^std::string() {
+            return "/usr/bin/test";
           },
           ^std::vector<ActivationAncestorT>() {
             if constexpr (IsV2) {
@@ -1027,6 +1033,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
           ^std::string() {
             return "/tmp";
           },
+          ^std::string() {
+            return "/usr/bin/test";
+          },
           ^std::vector<AncestorT>() {
             return {};
           },
@@ -1051,6 +1060,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
           },
           ^std::string() {
             return "";
+          },
+          ^std::string() {
+            return "/usr/bin/test";
           },
           ^std::vector<V1AncestorT>() {
             return {};
