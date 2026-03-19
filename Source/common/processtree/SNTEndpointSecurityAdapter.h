@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__PROCESSTREE_SNTENDPOINTSECURITYADAPTER_H
-#define SANTA__COMMON__PROCESSTREE_SNTENDPOINTSECURITYADAPTER_H
+#ifndef SANTA_COMMON_PROCESSTREE_SNTENDPOINTSECURITYADAPTER_H
+#define SANTA_COMMON_PROCESSTREE_SNTENDPOINTSECURITYADAPTER_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 
@@ -30,4 +30,4 @@ void InformFromESEvent(ProcessTree &tree, const santa::Message &msg);
 
 }  // namespace santa::santad::process_tree
 
-#endif  // SANTA__COMMON__PROCESSTREE_SNTENDPOINTSECURITYADAPTER_H
+#endif  // SANTA_COMMON_PROCESSTREE_SNTENDPOINTSECURITYADAPTER_H

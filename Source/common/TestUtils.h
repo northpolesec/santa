@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__TESTUTILS_H
-#define SANTA__COMMON__TESTUTILS_H
+#ifndef SANTA_COMMON_TESTUTILS_H
+#define SANTA_COMMON_TESTUTILS_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <XCTest/XCTest.h>
@@ -103,4 +103,4 @@ es_message_t MakeESMessage(es_event_type_t et, es_process_t *proc,
 uint32_t MaxSupportedESMessageVersionForCurrentOS();
 uint32_t MinSupportedESMessageVersion(es_event_type_t event_type);
 
-#endif  // SANTA__COMMON__TESTUTILS_H
+#endif  // SANTA_COMMON_TESTUTILS_H

@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_AUTHRESULTCACHE_H
-#define SANTA__SANTAD__EVENTPROVIDERS_AUTHRESULTCACHE_H
+#ifndef SANTA_SANTAD_EVENTPROVIDERS_AUTHRESULTCACHE_H
+#define SANTA_SANTAD_EVENTPROVIDERS_AUTHRESULTCACHE_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -109,4 +109,4 @@ class AuthResultCache {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__EVENTPROVIDERS_AUTHRESULTCACHE_H
+#endif  // SANTA_SANTAD_EVENTPROVIDERS_AUTHRESULTCACHE_H

@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__FAA_WATCHITEMPOLICY_H
-#define SANTA__COMMON__FAA_WATCHITEMPOLICY_H
+#ifndef SANTA_COMMON_FAA_WATCHITEMPOLICY_H
+#define SANTA_COMMON_FAA_WATCHITEMPOLICY_H
 
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
@@ -339,4 +339,4 @@ struct SharedPtrValueEqual {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__FAA_WATCHITEMPOLICY_H
+#endif  // SANTA_COMMON_FAA_WATCHITEMPOLICY_H

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__SCOPEDCFTYPEREF_H
-#define SANTA__COMMON__SCOPEDCFTYPEREF_H
+#ifndef SANTA_COMMON_SCOPEDCFTYPEREF_H
+#define SANTA_COMMON_SCOPEDCFTYPEREF_H
 
 #include <CoreFoundation/CoreFoundation.h>
 
@@ -26,4 +26,4 @@ using ScopedCFTypeRef = ScopedTypeRef<CFT, (CFT)NULL, CFRetain, CFRelease>;
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__SCOPEDCFTYPEREF_H
+#endif  // SANTA_COMMON_SCOPEDCFTYPEREF_H

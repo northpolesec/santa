@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__POWERMONITOR_H
-#define SANTA__COMMON__POWERMONITOR_H
+#ifndef SANTA_COMMON_POWERMONITOR_H
+#define SANTA_COMMON_POWERMONITOR_H
 
 #include <IOKit/IOKitLib.h>
 #include <IOKit/pwr_mgt/IOPMLib.h>
@@ -74,4 +74,4 @@ class PowerMonitor : public PassKey<PowerMonitor> {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__POWERMONITOR_H
+#endif  // SANTA_COMMON_POWERMONITOR_H

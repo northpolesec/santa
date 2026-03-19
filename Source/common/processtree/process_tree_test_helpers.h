@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__PROCESSTREE_PROCESSTREETESTHELPERS_H
-#define SANTA__COMMON__PROCESSTREE_PROCESSTREETESTHELPERS_H
+#ifndef SANTA_COMMON_PROCESSTREE_PROCESSTREETESTHELPERS_H
+#define SANTA_COMMON_PROCESSTREE_PROCESSTREETESTHELPERS_H
 #include <memory>
 
 #include "Source/common/processtree/process_tree.h"
@@ -31,4 +31,4 @@ class ProcessTreeTestPeer : public ProcessTree {
 
 }  // namespace santa::santad::process_tree
 
-#endif  // SANTA__COMMON__PROCESSTREE_PROCESSTREETESTHELPERS_H
+#endif  // SANTA_COMMON_PROCESSTREE_PROCESSTREETESTHELPERS_H

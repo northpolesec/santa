@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_PROTOBUF_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_PROTOBUF_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_PROTOBUF_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_PROTOBUF_H
 
 #import <Foundation/Foundation.h>
 #include <google/protobuf/arena.h>
@@ -121,4 +121,4 @@ class Protobuf : public Serializer {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_PROTOBUF_H
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_PROTOBUF_H

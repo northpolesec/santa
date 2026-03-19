@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__CELACTIVATION_H
-#define SANTA__SANTAD__CELACTIVATION_H
+#ifndef SANTA_SANTAD_CELACTIVATION_H
+#define SANTA_SANTAD_CELACTIVATION_H
 
 #import <Foundation/Foundation.h>
 
@@ -47,4 +47,4 @@ ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__CELACTIVATION_H
+#endif  // SANTA_SANTAD_CELACTIVATION_H

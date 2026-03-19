@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__PLATFORM_H
-#define SANTA__COMMON__PLATFORM_H
+#ifndef SANTA_COMMON_PLATFORM_H
+#define SANTA_COMMON_PLATFORM_H
 
 #include <Availability.h>
 
@@ -34,4 +34,4 @@
 #undef HAVE_MACOS_15_4
 #endif
 
-#endif  // SANTA__COMMON__PLATFORM_H
+#endif  // SANTA_COMMON_PLATFORM_H

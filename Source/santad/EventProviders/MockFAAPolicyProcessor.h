@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_MOCKFAAPOLICYPROCESSOR_H
-#define SANTA__SANTAD__EVENTPROVIDERS_MOCKFAAPOLICYPROCESSOR_H
+#ifndef SANTA_SANTAD_EVENTPROVIDERS_MOCKFAAPOLICYPROCESSOR_H
+#define SANTA_SANTAD_EVENTPROVIDERS_MOCKFAAPOLICYPROCESSOR_H
 
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 
@@ -82,4 +82,4 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__EVENTPROVIDERS_MOCKFAAPOLICYPROCESSOR_H
+#endif  // SANTA_SANTAD_EVENTPROVIDERS_MOCKFAAPOLICYPROCESSOR_H

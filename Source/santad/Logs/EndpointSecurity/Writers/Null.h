@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_NULL_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_NULL_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_NULL_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_NULL_H
 
 #include <memory>
 #include <vector>
@@ -33,4 +33,4 @@ class Null : public Writer {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_NULL_H
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_NULL_H

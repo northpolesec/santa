@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__ENCODEENTITLEMENTS_H
-#define SANTA__COMMON__ENCODEENTITLEMENTS_H
+#ifndef SANTA_COMMON_ENCODEENTITLEMENTS_H
+#define SANTA_COMMON_ENCODEENTITLEMENTS_H
 
 #import <Foundation/Foundation.h>
 
@@ -26,4 +26,4 @@ void EncodeEntitlementsCommon(NSDictionary *entitlements, BOOL entitlements_filt
 
 }
 
-#endif  // SANTA__COMMON__ENCODEENTITLEMENTS_H
+#endif  // SANTA_COMMON_ENCODEENTITLEMENTS_H

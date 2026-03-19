@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTASYNCSERVICE__PROTOTRAITS_H
-#define SANTA__SANTASYNCSERVICE__PROTOTRAITS_H
+#ifndef SANTA_SANTASYNCSERVICE_PROTOTRAITS_H
+#define SANTA_SANTASYNCSERVICE_PROTOTRAITS_H
 
 #include <type_traits>
 
@@ -225,4 +225,4 @@ struct ProtoTraits<true> {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTASYNCSERVICE__PROTOTRAITS_H
+#endif  // SANTA_SANTASYNCSERVICE_PROTOTRAITS_H

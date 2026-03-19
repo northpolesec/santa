@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__SANTAVNODE_H
-#define SANTA__COMMON__SANTAVNODE_H
+#ifndef SANTA_COMMON_SANTAVNODE_H
+#define SANTA_COMMON_SANTAVNODE_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <sys/types.h>
@@ -51,4 +51,4 @@ typedef struct SantaVnode {
 #endif
 } SantaVnode;
 
-#endif  // SANTA__COMMON__SANTAVNODE_H
+#endif  // SANTA_COMMON_SANTAVNODE_H

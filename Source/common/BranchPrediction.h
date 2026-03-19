@@ -12,11 +12,11 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__BRANCHPREDICTION_H
-#define SANTA__COMMON__BRANCHPREDICTION_H
+#ifndef SANTA_COMMON_BRANCHPREDICTION_H
+#define SANTA_COMMON_BRANCHPREDICTION_H
 
 // Helpful macros to use when the the outcome is largely known
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#endif  // SANTA__COMMON__BRANCHPREDICTION_H
+#endif  // SANTA_COMMON_BRANCHPREDICTION_H

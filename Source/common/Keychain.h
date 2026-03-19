@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__KEYCHAIN_H
-#define SANTA__COMMON__KEYCHAIN_H
+#ifndef SANTA_COMMON_KEYCHAIN_H
+#define SANTA_COMMON_KEYCHAIN_H
 
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
@@ -75,4 +75,4 @@ class Item {
 }  // namespace keychain
 }  // namespace santa
 
-#endif  // SANTA__COMMON__KEYCHAIN_H
+#endif  // SANTA_COMMON_KEYCHAIN_H

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__UNIT_H
-#define SANTA__COMMON__UNIT_H
+#ifndef SANTA_COMMON_UNIT_H
+#define SANTA_COMMON_UNIT_H
 
 namespace santa {
 
@@ -21,4 +21,4 @@ struct Unit {};
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__UNIT_H
+#endif  // SANTA_COMMON_UNIT_H

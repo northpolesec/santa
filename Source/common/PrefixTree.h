@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__PREFIXTREE_H
-#define SANTA__COMMON__PREFIXTREE_H
+#ifndef SANTA_COMMON_PREFIXTREE_H
+#define SANTA_COMMON_PREFIXTREE_H
 
 #include <sys/syslimits.h>
 
@@ -330,4 +330,4 @@ class PrefixTree {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__PREFIXTREE_H
+#endif  // SANTA_COMMON_PREFIXTREE_H

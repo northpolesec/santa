@@ -17,8 +17,8 @@
 /// objects that are constructed to hold all enriched event data prior
 /// to being logged.
 
-#ifndef SANTA__COMMON__ES_ENRICHEDTYPES_H
-#define SANTA__COMMON__ES_ENRICHEDTYPES_H
+#ifndef SANTA_COMMON_ES_ENRICHEDTYPES_H
+#define SANTA_COMMON_ES_ENRICHEDTYPES_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <time.h>
@@ -815,4 +815,4 @@ class EnrichedMessage {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__ES_ENRICHEDTYPES_H
+#endif  // SANTA_COMMON_ES_ENRICHEDTYPES_H

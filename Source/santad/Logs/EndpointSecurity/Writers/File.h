@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_FILE_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_FILE_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FILE_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FILE_H
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
 
@@ -73,4 +73,4 @@ class File : public Writer, public std::enable_shared_from_this<File> {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_FILE_H
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FILE_H

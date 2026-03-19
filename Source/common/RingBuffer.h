@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__RINGBUFFER_H
-#define SANTA__COMMON__RINGBUFFER_H
+#ifndef SANTA_COMMON_RINGBUFFER_H
+#define SANTA_COMMON_RINGBUFFER_H
 
 #import <Foundation/Foundation.h>
 
@@ -113,4 +113,4 @@ class RingBuffer {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__RINGBUFFER_H
+#endif  // SANTA_COMMON_RINGBUFFER_H

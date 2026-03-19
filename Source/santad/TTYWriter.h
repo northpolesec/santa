@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__TTYWRITER_H
-#define SANTA__SANTAD__TTYWRITER_H
+#ifndef SANTA_SANTAD_TTYWRITER_H
+#define SANTA_SANTAD_TTYWRITER_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -57,4 +57,4 @@ class TTYWriter {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__TTYWRITER_H
+#endif  // SANTA_SANTAD_TTYWRITER_H

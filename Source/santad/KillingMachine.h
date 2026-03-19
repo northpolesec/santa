@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__KILLINGMACHINE_H
-#define SANTA__SANTAD__KILLINGMACHINE_H
+#ifndef SANTA_SANTAD_KILLINGMACHINE_H
+#define SANTA_SANTAD_KILLINGMACHINE_H
 
 #import <Foundation/Foundation.h>
 
@@ -25,4 +25,4 @@ SNTKillResponse *KillingMachine(SNTKillRequest *request);
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__KILLINGMACHINE_H
+#endif  // SANTA_SANTAD_KILLINGMACHINE_H

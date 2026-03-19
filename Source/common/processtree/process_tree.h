@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__PROCESSTREE_PROCESSTREE_H
-#define SANTA__COMMON__PROCESSTREE_PROCESSTREE_H
+#ifndef SANTA_COMMON_PROCESSTREE_PROCESSTREE_H
+#define SANTA_COMMON_PROCESSTREE_PROCESSTREE_H
 
 #include <memory>
 #include <typeinfo>
@@ -188,4 +188,4 @@ class ProcessToken {
 
 }  // namespace santa::santad::process_tree
 
-#endif  // SANTA__COMMON__PROCESSTREE_PROCESSTREE_H
+#endif  // SANTA_COMMON_PROCESSTREE_PROCESSTREE_H

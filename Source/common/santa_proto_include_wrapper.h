@@ -12,9 +12,9 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__SANTAPROTOINCLUDEWRAPPER_H
-#define SANTA__COMMON__SANTAPROTOINCLUDEWRAPPER_H
+#ifndef SANTA_COMMON_SANTAPROTOINCLUDEWRAPPER_H
+#define SANTA_COMMON_SANTAPROTOINCLUDEWRAPPER_H
 
 #include "Source/common/santa.pb.h"
 
-#endif  // SANTA__COMMON__SANTAPROTOINCLUDEWRAPPER_H
+#endif  // SANTA_COMMON_SANTAPROTOINCLUDEWRAPPER_H

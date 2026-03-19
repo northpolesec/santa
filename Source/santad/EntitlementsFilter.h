@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__ENTITLEMENTSFILTER_H
-#define SANTA__SANTAD__ENTITLEMENTSFILTER_H
+#ifndef SANTA_SANTAD_ENTITLEMENTSFILTER_H
+#define SANTA_SANTAD_ENTITLEMENTSFILTER_H
 
 #import <Foundation/Foundation.h>
 
@@ -60,4 +60,4 @@ class EntitlementsFilter {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__ENTITLEMENTSFILTER_H
+#endif  // SANTA_SANTAD_ENTITLEMENTSFILTER_H

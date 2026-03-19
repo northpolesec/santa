@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__PROCESSTREE_PROCESSTREEMACOS_H
-#define SANTA__COMMON__PROCESSTREE_PROCESSTREEMACOS_H
+#ifndef SANTA_COMMON_PROCESSTREE_PROCESSTREEMACOS_H
+#define SANTA_COMMON_PROCESSTREE_PROCESSTREEMACOS_H
 
 #include <bsm/libbsm.h>
 
@@ -25,4 +25,4 @@ struct Pid PidFromAuditToken(const audit_token_t &tok);
 
 }  // namespace santa::santad::process_tree
 
-#endif  // SANTA__COMMON__PROCESSTREE_PROCESSTREEMACOS_H
+#endif  // SANTA_COMMON_PROCESSTREE_PROCESSTREEMACOS_H

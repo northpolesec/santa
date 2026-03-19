@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__AUDITUTILITIES_H
-#define SANTA__COMMON__AUDITUTILITIES_H
+#ifndef SANTA_COMMON_AUDITUTILITIES_H
+#define SANTA_COMMON_AUDITUTILITIES_H
 
 #include <bsm/libbsm.h>
 
@@ -79,4 +79,4 @@ static inline std::optional<audit_token_t> GetMyAuditToken() {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__AUDITUTILITIES_H
+#endif  // SANTA_COMMON_AUDITUTILITIES_H

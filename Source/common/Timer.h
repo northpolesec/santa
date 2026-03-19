@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__TIMER_H
-#define SANTA__COMMON__TIMER_H
+#ifndef SANTA_COMMON_TIMER_H
+#define SANTA_COMMON_TIMER_H
 
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
@@ -234,4 +234,4 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__TIMER_H
+#endif  // SANTA_COMMON_TIMER_H

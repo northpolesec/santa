@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__SCOPEDTYPEREF_H
-#define SANTA__COMMON__SCOPEDTYPEREF_H
+#ifndef SANTA_COMMON_SCOPEDTYPEREF_H
+#define SANTA_COMMON_SCOPEDTYPEREF_H
 
 #include <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
@@ -149,4 +149,4 @@ class ScopedTypeRef {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__SCOPEDTYPEREF_H
+#endif  // SANTA_COMMON_SCOPEDTYPEREF_H

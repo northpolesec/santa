@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__MEMOIZER_H
-#define SANTA__COMMON__MEMOIZER_H
+#ifndef SANTA_COMMON_MEMOIZER_H
+#define SANTA_COMMON_MEMOIZER_H
 
 #include <functional>
 #include <optional>
@@ -51,4 +51,4 @@ class Memoizer {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__MEMOIZER_H
+#endif  // SANTA_COMMON_MEMOIZER_H

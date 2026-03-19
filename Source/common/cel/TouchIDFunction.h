@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CEL_TOUCHIDFUNCTION_H
-#define SANTA__COMMON__CEL_TOUCHIDFUNCTION_H
+#ifndef SANTA_COMMON_CEL_TOUCHIDFUNCTION_H
+#define SANTA_COMMON_CEL_TOUCHIDFUNCTION_H
 
 #include "absl/status/status.h"
 
@@ -41,4 +41,4 @@ absl::Status RegisterTouchIDCooldownFunctions(
 }  // namespace cel
 }  // namespace santa
 
-#endif  // SANTA__COMMON__CEL_TOUCHIDFUNCTION_H
+#endif  // SANTA_COMMON_CEL_TOUCHIDFUNCTION_H

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__SCOPEDIOOBJECTREF_H
-#define SANTA__COMMON__SCOPEDIOOBJECTREF_H
+#ifndef SANTA_COMMON_SCOPEDIOOBJECTREF_H
+#define SANTA_COMMON_SCOPEDIOOBJECTREF_H
 
 #include <IOKit/IOKitLib.h>
 
@@ -27,4 +27,4 @@ using ScopedIOObjectRef =
 
 }
 
-#endif  // SANTA__COMMON__SCOPEDIOOBJECTREF_H
+#endif  // SANTA_COMMON_SCOPEDIOOBJECTREF_H

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__SLEIGHLAUNCHER_H
-#define SANTA__SANTAD__SLEIGHLAUNCHER_H
+#ifndef SANTA_SANTAD_SLEIGHLAUNCHER_H
+#define SANTA_SANTAD_SLEIGHLAUNCHER_H
 
 #include <memory>
 #include <string>
@@ -49,4 +49,4 @@ class SleighLauncher {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__SLEIGHLAUNCHER_H
+#endif  // SANTA_SANTAD_SLEIGHLAUNCHER_H

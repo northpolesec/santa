@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__ES_ENDPOINTSECURITYAPI_H
-#define SANTA__COMMON__ES_ENDPOINTSECURITYAPI_H
+#ifndef SANTA_COMMON_ES_ENDPOINTSECURITYAPI_H
+#define SANTA_COMMON_ES_ENDPOINTSECURITYAPI_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -77,4 +77,4 @@ class EndpointSecurityAPI : public std::enable_shared_from_this<EndpointSecurity
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__ES_ENDPOINTSECURITYAPI_H
+#endif  // SANTA_COMMON_ES_ENDPOINTSECURITYAPI_H

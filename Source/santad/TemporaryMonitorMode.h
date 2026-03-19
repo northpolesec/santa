@@ -24,8 +24,8 @@
 #import "Source/santad/SNTNotificationQueue.h"
 #include "absl/synchronization/mutex.h"
 
-#ifndef SANTA__SANTAD__TEMPORARYMONITORMODE_H
-#define SANTA__SANTAD__TEMPORARYMONITORMODE_H
+#ifndef SANTA_SANTAD_TEMPORARYMONITORMODE_H
+#define SANTA_SANTAD_TEMPORARYMONITORMODE_H
 
 extern NSString *const kStateTempMonitorModeBootUUIDKey;
 extern NSString *const kStateTempMonitorModeDeadlineKey;
@@ -119,4 +119,4 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__TEMPORARYMONITORMODE_H
+#endif  // SANTA_SANTAD_TEMPORARYMONITORMODE_H

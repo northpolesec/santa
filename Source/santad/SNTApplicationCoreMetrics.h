@@ -12,11 +12,11 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__SNTAPPLICATIONCOREMETRICS_H
-#define SANTA__SANTAD__SNTAPPLICATIONCOREMETRICS_H
+#ifndef SANTA_SANTAD_SNTAPPLICATIONCOREMETRICS_H
+#define SANTA_SANTAD_SNTAPPLICATIONCOREMETRICS_H
 
 #include <sys/cdefs.h>
 
 void SNTRegisterCoreMetrics();
 
-#endif  // SANTA__SANTAD__SNTAPPLICATIONCOREMETRICS_H
+#endif  // SANTA_SANTAD_SNTAPPLICATIONCOREMETRICS_H

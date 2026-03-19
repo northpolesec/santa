@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_UTILITIES_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_UTILITIES_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_UTILITIES_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_UTILITIES_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -45,4 +45,4 @@ NSString *ConcatPrefixIfRelativePath(es_string_token_t path, es_string_token_t p
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_UTILITIES_H
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_SERIALIZERS_UTILITIES_H

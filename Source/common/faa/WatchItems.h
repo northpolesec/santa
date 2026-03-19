@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__FAA_WATCHITEMS_H
-#define SANTA__COMMON__FAA_WATCHITEMS_H
+#ifndef SANTA_COMMON_FAA_WATCHITEMS_H
+#define SANTA_COMMON_FAA_WATCHITEMS_H
 
 #include <CommonCrypto/CommonDigest.h>
 #import <Foundation/Foundation.h>
@@ -237,4 +237,4 @@ struct WatchItemsState {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__FAA_WATCHITEMS_H
+#endif  // SANTA_COMMON_FAA_WATCHITEMS_H

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__DAEMONCONFIGBUNDLE_H
-#define SANTA__SANTAD__DAEMONCONFIGBUNDLE_H
+#ifndef SANTA_SANTAD_DAEMONCONFIGBUNDLE_H
+#define SANTA_SANTAD_DAEMONCONFIGBUNDLE_H
 
 #import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTConfigurator.h"
@@ -25,4 +25,4 @@ SNTConfigBundle *NetworkMountConfigBundle(SNTConfigurator *configurator);
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__DAEMONCONFIGBUNDLE_H
+#endif  // SANTA_SANTAD_DAEMONCONFIGBUNDLE_H

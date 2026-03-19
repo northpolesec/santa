@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CODERMACROS_H
-#define SANTA__COMMON__CODERMACROS_H
+#ifndef SANTA_COMMON_CODERMACROS_H
+#define SANTA_COMMON_CODERMACROS_H
 
 /// Encode the property keyed by the property name.
 #define ENCODE(c, o)                        \
@@ -89,4 +89,4 @@ static inline constexpr id SmartBoxVaue(T value) {
     _##o = [d decodeObjectOfClasses:s forKey:@(#o)]; \
   } while (0)
 
-#endif  // SANTA__COMMON__CODERMACROS_H
+#endif  // SANTA_COMMON_CODERMACROS_H

@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_LOGGER_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_LOGGER_H
 
 #import <Foundation/Foundation.h>
 
@@ -178,4 +178,4 @@ class Logger : public Timer<Logger> {
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_LOGGER_H

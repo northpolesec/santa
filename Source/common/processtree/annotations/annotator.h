@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__PROCESSTREE_ANNOTATIONS_ANNOTATOR_H
-#define SANTA__COMMON__PROCESSTREE_ANNOTATIONS_ANNOTATOR_H
+#ifndef SANTA_COMMON_PROCESSTREE_ANNOTATIONS_ANNOTATOR_H
+#define SANTA_COMMON_PROCESSTREE_ANNOTATIONS_ANNOTATOR_H
 
 #include <optional>
 
@@ -39,4 +39,4 @@ class Annotator {
 
 }  // namespace santa::santad::process_tree
 
-#endif  // SANTA__COMMON__PROCESSTREE_ANNOTATIONS_ANNOTATOR_H
+#endif  // SANTA_COMMON_PROCESSTREE_ANNOTATIONS_ANNOTATOR_H

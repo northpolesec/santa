@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__SANTACACHE_H
-#define SANTA__COMMON__SANTACACHE_H
+#ifndef SANTA_COMMON_SANTACACHE_H
+#define SANTA_COMMON_SANTACACHE_H
 
 #include <libkern/OSAtomic.h>
 #include <libkern/OSTypes.h>
@@ -464,4 +464,4 @@ class SantaCache {
 
 #pragma clang diagnostic pop
 
-#endif  // SANTA__COMMON__SANTACACHE_H
+#endif  // SANTA_COMMON_SANTACACHE_H
