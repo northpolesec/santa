@@ -805,7 +805,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
   // Then: Should be rejected
   XCTAssertTrue(response->has_error(), @"Kill command should be rejected when not in allowlist");
-  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
 }
 
 - (void)testAllowedCommandsKillAllowed {
@@ -877,7 +877,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
   // Then: Should be rejected
   XCTAssertTrue(pingResponse->has_error(), @"Ping should be rejected when allowlist is empty");
-  XCTAssertEqual(pingResponse->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+  XCTAssertEqual(pingResponse->error(), ::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
 
   ::pbv1::SantaCommandRequest killCommand;
   killCommand.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
@@ -890,7 +890,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
   // Then: Should also be rejected
   XCTAssertTrue(killResponse->has_error(), @"Kill should be rejected when allowlist is empty");
-  XCTAssertEqual(killResponse->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+  XCTAssertEqual(killResponse->error(), ::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
 }
 
 - (void)testAllowedCommandsPingBlocked {
@@ -908,7 +908,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
   // Then: Should be rejected
   XCTAssertTrue(response->has_error(), @"Ping command should be rejected when not in allowlist");
-  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
 }
 
 - (void)testNonceCachePreviousGenerationReplay {
