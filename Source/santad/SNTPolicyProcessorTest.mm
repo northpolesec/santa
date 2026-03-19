@@ -25,7 +25,6 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/cel/Activation.h"
-#import "Source/santad/SNTPolicyProcessor.h"
 
 #include "cel/v1.pb.h"
 

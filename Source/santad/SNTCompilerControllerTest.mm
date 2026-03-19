@@ -30,7 +30,6 @@
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
-#import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTDecisionCache.h"
 
 using santa::Logger;
