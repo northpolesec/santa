@@ -1904,11 +1904,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSArray *)telemetryFilterExpressions {
   NSMutableArray *merged = [NSMutableArray array];
-  NSArray *syncExpressions = EnsureArrayOfStrings(self.syncState[kTelemetryFilterExpressionsKey]);
-  if (syncExpressions) [merged addObjectsFromArray:syncExpressions];
+
   NSArray *configExpressions =
       EnsureArrayOfStrings(self.configState[kTelemetryFilterExpressionsKey]);
   if (configExpressions) [merged addObjectsFromArray:configExpressions];
+
+  NSArray *syncExpressions = EnsureArrayOfStrings(self.syncState[kTelemetryFilterExpressionsKey]);
+  if (syncExpressions) [merged addObjectsFromArray:syncExpressions];
+
   return merged.count ? [merged copy] : nil;
 }
 
