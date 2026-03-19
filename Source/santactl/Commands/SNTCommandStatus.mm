@@ -362,12 +362,13 @@ REGISTER_COMMAND_NAME(@"status")
         @"enabled" : @(networkExtensionEnabled),
         @"loaded" : @(networkExtensionLoaded),
       };
-    }
 
-    if (allowedCommands) {
-      NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
-      daemon[@"allowed_commands"] = [allowedCommands sortedArrayUsingSelector:@selector(compare:)];
-      stats[@"daemon"] = daemon;
+      if (allowedCommands) {
+        NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
+        daemon[@"allowed_commands"] =
+            [allowedCommands sortedArrayUsingSelector:@selector(compare:)];
+        stats[@"daemon"] = daemon;
+      }
     }
 
     if (syncURLStr.length) {
@@ -459,9 +460,9 @@ REGISTER_COMMAND_NAME(@"status")
       } else {
         printf("\n");
       }
+      printf("  %-40s | %s\n", "Allowed Commands", [allowedStr UTF8String]);
     }
     printf("  %-40s | %lld\n", "Static Rules", staticRuleCount);
-    printf("  %-40s | %s\n", "Allowed Commands", [allowedStr UTF8String]);
     printf("  %-40s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
     printf("  %-40s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
 
