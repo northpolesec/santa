@@ -1,4 +1,4 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -238,4 +238,4 @@ class DataFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
 
 #pragma clang diagnostic pop
 
-#endif
+#endif  // SANTA__SANTAD__EVENTPROVIDERS_FAAPOLICYPROCESSOR_H

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__ES__ESMETRICSOBSERVER_H
-#define SANTA__COMMON__ES__ESMETRICSOBSERVER_H
+#ifndef SANTA__COMMON__ES_ESMETRICSOBSERVER_H
+#define SANTA__COMMON__ES_ESMETRICSOBSERVER_H
 
 #include <EndpointSecurity/ESTypes.h>
 
@@ -48,4 +48,4 @@ class ESMetricsObserver {
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__ES__ESMETRICSOBSERVER_H
+#endif  // SANTA__COMMON__ES_ESMETRICSOBSERVER_H

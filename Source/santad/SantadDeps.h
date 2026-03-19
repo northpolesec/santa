@@ -1,5 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__SANTAD_DEPS_H
-#define SANTA__SANTAD__SANTAD_DEPS_H
+#ifndef SANTA__SANTAD__SANTADDEPS_H
+#define SANTA__SANTAD__SANTADDEPS_H
 
 #import <Foundation/Foundation.h>
 
@@ -103,4 +103,4 @@ class SantadDeps {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA__SANTAD__SANTADDEPS_H

@@ -1,11 +1,11 @@
 /// Copyright 2015 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__LOGGING_H
-#define SANTA__COMMON__LOGGING_H
+#ifndef SANTA__COMMON__SNTLOGGING_H
+#define SANTA__COMMON__SNTLOGGING_H
 
 #import <Foundation/Foundation.h>
 #include <os/log.h>
@@ -64,4 +64,4 @@ __BEGIN_DECLS
 
 __END_DECLS
 
-#endif  // SANTA__COMMON__LOGGING_H
+#endif  // SANTA__COMMON__SNTLOGGING_H

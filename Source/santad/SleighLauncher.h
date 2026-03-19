@@ -49,4 +49,4 @@ class SleighLauncher {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA__SANTAD__SLEIGHLAUNCHER_H

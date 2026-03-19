@@ -1,4 +1,4 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__XXHASH_H
-#define SANTA__COMMON__XXHASH_H
+#ifndef SANTA__COMMON__SNTXXHASH_H
+#define SANTA__COMMON__SNTXXHASH_H
 
 #include <functional>
 #include <string>
@@ -143,4 +143,4 @@ using Xxhash128 = Xxhash<XxhashFuncPtrs128>;
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__XXHASH_H
+#endif  // SANTA__COMMON__SNTXXHASH_H

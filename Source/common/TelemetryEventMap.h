@@ -1,4 +1,4 @@
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -88,4 +88,4 @@ TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event);
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA__COMMON__TELEMETRYEVENTMAP_H

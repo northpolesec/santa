@@ -1,11 +1,11 @@
 /// Copyright 2022 Google LLC
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -216,4 +216,4 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_SPOOL_H

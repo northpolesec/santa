@@ -1,5 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -87,4 +87,4 @@ class Empty : public Serializer {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA__SANTAD__LOGS_ENDPOINTSECURITY_SERIALIZERS_EMPTY_H
