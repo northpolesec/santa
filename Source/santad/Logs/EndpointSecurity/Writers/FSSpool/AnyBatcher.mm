@@ -14,7 +14,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 
-#include "Source/common/santa_proto_include_wrapper.h"
+#include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_platform_specific.h"
 #include "absl/strings/str_cat.h"
 
