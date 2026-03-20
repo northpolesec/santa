@@ -1,10 +1,11 @@
 /// Copyright 2024 Google LLC
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +28,8 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
             syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
                 stateAccessAuthorizer:(StateFileAccessAuthorizer)stateAccessAuthorizer;
 
-@property NSDictionary *syncState;
+@property NSMutableDictionary *configState;
+@property NSMutableDictionary *syncState;
 @end
 
 @interface SNTConfiguratorTest : XCTestCase
@@ -105,6 +107,52 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                                 XCTAssertNil(cfg.syncState[@"SyncCleanRequired"]);
                                 XCTAssertNil(cfg.syncState[@"SyncTypeRequired"]);
                               }];
+}
+
+- (void)testTelemetryFilterExpressions {
+  SNTConfigurator *sut = [[SNTConfigurator alloc] init];
+
+  {
+    // No keys set, returns nil
+    sut.configState[@"TelemetryFilterExpressions"] = nil;
+    sut.syncState[@"TelemetryFilterExpressions"] = nil;
+    XCTAssertNil(sut.telemetryFilterExpressions);
+  }
+  {
+    // MDM config only, returns 1 valid expression
+    sut.configState[@"TelemetryFilterExpressions"] = @[ @"true" ];
+    sut.syncState[@"TelemetryFilterExpressions"] = nil;
+    XCTAssertNotNil(sut.telemetryFilterExpressions);
+    XCTAssertEqual(sut.telemetryFilterExpressions.count, 1);
+  }
+  {
+    // Sync config only, returns 1 valid expression
+    sut.configState[@"TelemetryFilterExpressions"] = nil;
+    sut.syncState[@"TelemetryFilterExpressions"] = @[ @"true" ];
+    XCTAssertNotNil(sut.telemetryFilterExpressions);
+    XCTAssertEqual(sut.telemetryFilterExpressions.count, 1);
+  }
+  {
+    // MDM & Sync config present, returns merged set, MDM config first
+    sut.configState[@"TelemetryFilterExpressions"] = @[ @"true" ];
+    sut.syncState[@"TelemetryFilterExpressions"] = @[ @"false" ];
+    XCTAssertNotNil(sut.telemetryFilterExpressions);
+    XCTAssertEqual(sut.telemetryFilterExpressions.count, 2);
+    XCTAssertEqualObjects(sut.telemetryFilterExpressions[0], @"true");
+    XCTAssertEqualObjects(sut.telemetryFilterExpressions[1], @"false");
+  }
+  {
+    // Config with non-array is rejected
+    sut.configState[@"TelemetryFilterExpressions"] = @"true";
+    sut.syncState[@"TelemetryFilterExpressions"] = nil;
+    XCTAssertNil(sut.telemetryFilterExpressions);
+  }
+  {
+    // Config with array of non-strings is rejected
+    sut.configState[@"TelemetryFilterExpressions"] = @[ @YES ];
+    sut.syncState[@"TelemetryFilterExpressions"] = nil;
+    XCTAssertNil(sut.telemetryFilterExpressions);
+  }
 }
 
 @end

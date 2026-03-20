@@ -1,4 +1,4 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CODESIGNINGIDENTIFIERUTILS_H
-#define SANTA__COMMON__CODESIGNINGIDENTIFIERUTILS_H
+#ifndef SANTA_COMMON_CODESIGNINGIDENTIFIERUTILS_H
+#define SANTA_COMMON_CODESIGNINGIDENTIFIERUTILS_H
 
 #import <Foundation/Foundation.h>
 
@@ -40,4 +40,4 @@ std::pair<NSString *, NSString *> SplitSigningID(NSString *sid);
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__CODESIGNINGIDENTIFIERUTILS_H
+#endif  // SANTA_COMMON_CODESIGNINGIDENTIFIERUTILS_H

@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__TELEMETRYEVENTMAP_H
-#define SANTA__COMMON__TELEMETRYEVENTMAP_H
+#ifndef SANTA_COMMON_TELEMETRYEVENTMAP_H
+#define SANTA_COMMON_TELEMETRYEVENTMAP_H
 
 #import <EndpointSecurity/ESTypes.h>
 #import <Foundation/Foundation.h>
@@ -88,4 +88,4 @@ TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event);
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_COMMON_TELEMETRYEVENTMAP_H

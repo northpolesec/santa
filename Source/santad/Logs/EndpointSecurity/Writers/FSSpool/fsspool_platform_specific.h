@@ -5,7 +5,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
 
 #include <functional>
 #include <string>
@@ -58,4 +58,4 @@ absl::StatusOr<size_t> EstimateDirSize(const std::string& dir);
 
 }  // namespace fsspool
 
-#endif  // SANTA__SANTAD__LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H

@@ -64,8 +64,3 @@ build:ubsan --copt="-DUNDEFINED_SANITIZER=1"
 build:ubsan --copt="-fno-sanitize=function" --copt="-fno-sanitize=vptr"
 build:ubsan --linkopt="-fsanitize=undefined"
 build:ubsan --test_env="UBSAN_OPTIONS=log_path=/tmp/san_out"
-
-build:fuzz --config=san-common
-build:fuzz --@rules_fuzzing//fuzzing:cc_engine=@rules_fuzzing//fuzzing/engines:libfuzzer
-build:fuzz --@rules_fuzzing//fuzzing:cc_engine_instrumentation=libfuzzer
-build:fuzz --@rules_fuzzing//fuzzing:cc_engine_sanitizer=asan

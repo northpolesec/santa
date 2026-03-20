@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__SANTAD_DEPS_H
-#define SANTA__SANTAD__SANTAD_DEPS_H
+#ifndef SANTA_SANTAD_SANTADDEPS_H
+#define SANTA_SANTAD_SANTADDEPS_H
 
 #import <Foundation/Foundation.h>
 
@@ -103,4 +103,4 @@ class SantadDeps {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_SANTAD_SANTADDEPS_H

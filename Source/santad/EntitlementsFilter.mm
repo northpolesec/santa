@@ -1,10 +1,10 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,7 +36,7 @@ NSDictionary *EntitlementsFilter::Filter(const char *teamID, NSDictionary *entit
     return nil;
   }
 
-  absl::ReaderMutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(lock_);
 
   if (teamID && teamid_filter_.count(std::string(teamID)) > 0) {
     // Dropping entitlement logging for configured TeamID
@@ -65,7 +65,7 @@ NSDictionary *EntitlementsFilter::Filter(const char *teamID, NSDictionary *entit
 }
 
 void EntitlementsFilter::UpdateTeamIDFilter(NSArray<NSString *> *filter) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   UpdateTeamIDFilterLocked(filter);
 }
 
@@ -78,7 +78,7 @@ void EntitlementsFilter::UpdateTeamIDFilterLocked(NSArray<NSString *> *filter) {
 }
 
 void EntitlementsFilter::UpdatePrefixFilter(NSArray<NSString *> *filter) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   UpdatePrefixFilterLocked(filter);
 }
 

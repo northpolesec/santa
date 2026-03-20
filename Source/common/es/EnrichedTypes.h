@@ -1,5 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 /// objects that are constructed to hold all enriched event data prior
 /// to being logged.
 
-#ifndef SANTA__COMMON__ES__ENRICHEDTYPES_H
-#define SANTA__COMMON__ES__ENRICHEDTYPES_H
+#ifndef SANTA_COMMON_ES_ENRICHEDTYPES_H
+#define SANTA_COMMON_ES_ENRICHEDTYPES_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <time.h>
@@ -815,4 +815,4 @@ class EnrichedMessage {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_COMMON_ES_ENRICHEDTYPES_H

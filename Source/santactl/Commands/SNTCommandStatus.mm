@@ -1,5 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -308,6 +308,13 @@ REGISTER_COMMAND_NAME(@"status")
   NSURL *metricsURLStr = configurator.metricURL;
   NSUInteger metricExportInterval = configurator.metricExportInterval;
 
+  NSArray<NSString *> *allowedCommands = configurator.allowedSantaCommands;
+  NSString *allowedStr = !allowedCommands ? @"All"
+                         : allowedCommands.count > 0
+                             ? [[allowedCommands sortedArrayUsingSelector:@selector(compare:)]
+                                   componentsJoinedByString:@", "]
+                             : @"None (all blocked)";
+
   if ([arguments containsObject:@"--json"]) {
     NSMutableDictionary *stats = [@{
       @"daemon" : @{
@@ -355,6 +362,13 @@ REGISTER_COMMAND_NAME(@"status")
         @"enabled" : @(networkExtensionEnabled),
         @"loaded" : @(networkExtensionLoaded),
       };
+
+      if (allowedCommands) {
+        NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
+        daemon[@"allowed_commands"] =
+            [allowedCommands sortedArrayUsingSelector:@selector(compare:)];
+        stats[@"daemon"] = daemon;
+      }
     }
 
     if (syncURLStr.length) {
@@ -446,6 +460,7 @@ REGISTER_COMMAND_NAME(@"status")
       } else {
         printf("\n");
       }
+      printf("  %-40s | %s\n", "Allowed Commands", [allowedStr UTF8String]);
     }
     printf("  %-40s | %lld\n", "Static Rules", staticRuleCount);
     printf("  %-40s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);

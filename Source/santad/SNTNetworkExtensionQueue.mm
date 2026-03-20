@@ -23,7 +23,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTFileInfo.h"
-#include "Source/common/SNTKVOManager.h"
+#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"

@@ -21,7 +21,7 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTBlockMessage.h"
-#include "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/common/String.h"
 #include "Source/common/es/EnrichedTypes.h"
 
