@@ -409,11 +409,14 @@
 
   NSData *respData =
       [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
-       @"\"block_unencrypted_removable_media\": true}" dataUsingEncoding:NSUTF8StringEncoding];
+       @"\"block_unencrypted_removable_media\": true, "
+       @"\"remount_usb_mode\": [\"rdonly\", \"noexec\"]}" dataUsingEncoding:NSUTF8StringEncoding];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
   XCTAssertEqualObjects(self.syncState.blockUnencryptedRemovableMediaMount, @1);
+  NSArray<NSString *> *wantRemountUSBMode = @[ @"rdonly", @"noexec" ];
+  XCTAssertEqualObjects(self.syncState.remountUSBMode, wantRemountUSBMode);
 }
 
 - (void)testPreflightTurnOffBlockUnencryptedRemovableMedia {

@@ -223,16 +223,20 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
 
   if (resp.has_block_usb_mount()) {
     self.syncState.blockUSBMount = @(resp.block_usb_mount());
-
-    self.syncState.remountUSBMode = [NSMutableArray array];
-    for (const std::string &mode : resp.remount_usb_mode()) {
-      [(NSMutableArray *)self.syncState.remountUSBMode addObject:StringToNSString(mode)];
-    }
   }
 
   if (resp.has_block_unencrypted_removable_media()) {
     self.syncState.blockUnencryptedRemovableMediaMount =
         @(resp.block_unencrypted_removable_media());
+  }
+
+  // remount_usb_mode is shared between block_usb_mount and
+  // block_unencrypted_removable_media (which are mutually exclusive).
+  if (resp.has_block_usb_mount() || resp.has_block_unencrypted_removable_media()) {
+    self.syncState.remountUSBMode = [NSMutableArray array];
+    for (const std::string &mode : resp.remount_usb_mode()) {
+      [(NSMutableArray *)self.syncState.remountUSBMode addObject:StringToNSString(mode)];
+    }
   }
 
   if (resp.has_override_file_access_action()) {
