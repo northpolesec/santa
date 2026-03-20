@@ -36,7 +36,7 @@ NSDictionary *EntitlementsFilter::Filter(const char *teamID, NSDictionary *entit
     return nil;
   }
 
-  absl::ReaderMutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(lock_);
 
   if (teamID && teamid_filter_.count(std::string(teamID)) > 0) {
     // Dropping entitlement logging for configured TeamID
@@ -65,7 +65,7 @@ NSDictionary *EntitlementsFilter::Filter(const char *teamID, NSDictionary *entit
 }
 
 void EntitlementsFilter::UpdateTeamIDFilter(NSArray<NSString *> *filter) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   UpdateTeamIDFilterLocked(filter);
 }
 
@@ -78,7 +78,7 @@ void EntitlementsFilter::UpdateTeamIDFilterLocked(NSArray<NSString *> *filter) {
 }
 
 void EntitlementsFilter::UpdatePrefixFilter(NSArray<NSString *> *filter) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   UpdatePrefixFilterLocked(filter);
 }
 

@@ -26,7 +26,6 @@ cc_proto_library(
     deps = [":santa_proto"],
 )
 
-
 objc_library(
     name = "PowerMonitor",
     srcs = ["PowerMonitor.mm"],

@@ -138,6 +138,11 @@ ActivationCallbackBlock CreateCELActivationBlock(
         f->mutable_secure_signing_time()->set_seconds(secureSigningTime.timeIntervalSince1970);
       }
 
+      f->set_is_platform_binary(isPlatformBinary);
+      if (teamID) {
+        f->set_team_id(santa::NSStringToUTF8String(teamID));
+      }
+
       if constexpr (IsV2) {
         if (entitlementsDict) {
           auto *entitlements = f->mutable_entitlements();
@@ -176,6 +181,11 @@ ActivationCallbackBlock CreateCELActivationBlock(
           },
           ^std::string() {
             es_file_t *f = esMsg->event.exec.cwd;
+            if (!f) return std::string();
+            return std::string(f->path.data, f->path.length);
+          },
+          ^std::string() {
+            es_file_t *f = esMsg->event.exec.target->executable;
             if (!f) return std::string();
             return std::string(f->path.data, f->path.length);
           },

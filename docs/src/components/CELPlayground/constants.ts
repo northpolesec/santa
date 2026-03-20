@@ -7,6 +7,7 @@ export const VARIABLES: CELVariable[] = [
   { name: "args", type: "list", dynamic: true, documentation: "Command line arguments" },
   { name: "euid", type: "int", dynamic: true, documentation: "Effective user ID" },
   { name: "cwd", type: "string", dynamic: true, documentation: "Current working directory" },
+  { name: "path", type: "string", dynamic: true, documentation: "File path of the executable" },
   {
     name: "target.signing_id",
     type: "string",
@@ -22,6 +23,16 @@ export const VARIABLES: CELVariable[] = [
     name: "target.secure_signing_time",
     type: "timestamp",
     documentation: "Secure code signing timestamp",
+  },
+  {
+    name: "target.is_platform_binary",
+    type: "bool",
+    documentation: "Whether the binary is signed with Apple platform certificates",
+  },
+  {
+    name: "target.team_id",
+    type: "string",
+    documentation: "Team ID from the binary's code signature",
   },
   { name: "FD_TYPE_UNKNOWN", type: "int", documentation: "Unknown file descriptor type" },
   { name: "FD_TYPE_ATALK", type: "int", documentation: "AppleTalk file descriptor" },

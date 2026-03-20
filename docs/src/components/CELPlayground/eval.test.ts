@@ -66,6 +66,35 @@ describe("evaluate", () => {
     expect(result.cacheable).toBe(false);
   });
 
+  it("marks expressions referencing path as non-cacheable", () => {
+    const result = evaluate(
+      'path.startsWith("/Applications")',
+      DEFAULT_YAML,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.cacheable).toBe(false);
+  });
+
+  it("evaluates target.is_platform_binary", () => {
+    const result = evaluate(
+      "target.is_platform_binary == false",
+      DEFAULT_YAML,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.value).toBe("ALLOWLIST");
+    expect(result.cacheable).toBe(true);
+  });
+
+  it("evaluates target.team_id", () => {
+    const result = evaluate(
+      'target.team_id == "EQHXZ8M8AV"',
+      DEFAULT_YAML,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.value).toBe("ALLOWLIST");
+    expect(result.cacheable).toBe(true);
+  });
+
   it("does not false-positive on dynamic field names in strings", () => {
     // "args" appears as a string literal, not as the variable
     const result = evaluate(
