@@ -327,6 +327,27 @@ The following fields are available on the `target` object:
 | `target.signing_id` | `string` | Signing ID of the target binary, prefixed with Team ID or `platform` (e.g. `EQHXZ8M8AV:com.google.Chrome` or `platform:com.apple.curl`) |
 | `target.signing_time` | `timestamp` | Code signing timestamp (developer-provided) |
 | `target.secure_signing_time` | `timestamp` | Secure code signing timestamp (from a timestamp authority) |
+| `target.is_platform_binary` | `bool` | Whether the binary is signed with Apple platform certificates |
+| `target.team_id` | `string` | Team ID from the binary's code signature |
+
+The following additional fields are available in the execution context:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `path` | `string` | File path of the executable |
+| `args` | `list<string>` | Command-line arguments passed to the binary |
+| `envs` | `map<string, string>` | Environment variables available to the process |
+| `euid` | `int` | Effective user ID (0 for root, etc.) |
+| `cwd` | `string` | Current working directory of the process |
+
+:::note
+
+Fields accessed from `target.*` are **cacheable** — their result is cached so
+subsequent executions are faster. All other fields (`path`, `args`, `envs`,
+`euid`, `cwd`) are **not cacheable** and may impact performance if used in
+rules for frequently-executed binaries.
+
+:::
 
 Some examples of valid CEL expressions:
 
@@ -353,6 +374,10 @@ euid != 0
 
 // Disallow execution from inside /Library/LaunchDaemons. Requires Santa 2025.12+
 cwd != '/Library/LaunchDaemons'
+
+// Only allow platform binaries from a specific path.
+// This expression will NOT be cacheable.
+target.is_platform_binary && path.startsWith('/usr/bin/')
 ```
 
 ### Rule Dictionary Format

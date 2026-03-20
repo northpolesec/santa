@@ -158,6 +158,8 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
     return CELValue(euid_(), arena);
   } else if (name == "cwd") {
     return CELValue(cwd_(), arena);
+  } else if (name == "path") {
+    return CELValue(path_(), arena);
   }
 
   // Handle the V2 specific fields
@@ -248,7 +250,8 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
 
 template <bool IsV2>
 bool Activation<IsV2>::IsResultCacheable() const {
-  if (args_.HasValue() || envs_.HasValue() || euid_.HasValue() || cwd_.HasValue()) {
+  if (args_.HasValue() || envs_.HasValue() || euid_.HasValue() || cwd_.HasValue() ||
+      path_.HasValue()) {
     return false;
   }
 

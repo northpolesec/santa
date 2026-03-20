@@ -93,6 +93,9 @@ static size_t GetResidentMemoryBytes() {
           ^std::string() {
             return "/usr/local/bin";
           },
+          ^std::string() {
+            return "/usr/bin/test";
+          },
           ^std::vector<AncestorT>() {
             return {};
           },
@@ -132,6 +135,9 @@ static size_t GetResidentMemoryBytes() {
           },
           ^std::string() {
             return "/usr/local/bin";
+          },
+          ^std::string() {
+            return "/usr/bin/test";
           },
           ^std::vector<AncestorT>() {
             return {};
