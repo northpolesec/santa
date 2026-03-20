@@ -431,6 +431,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
     default: pbUSBMountEvent->set_decision(::pbv2::USBMountEvent::USB_MOUNT_DECISION_UNSPECIFIED);
   }
 
+  pbUSBMountEvent->set_encrypted(event.isEncrypted);
+
   return pbUSBMountEvent;
 }
 
