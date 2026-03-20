@@ -403,6 +403,43 @@
   XCTAssertNil(self.syncState.blockUSBMount);
 }
 
+- (void)testPreflightTurnOnBlockUnencryptedRemovableMedia {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData *respData =
+      [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+       @"\"block_unencrypted_removable_media\": true}" dataUsingEncoding:NSUTF8StringEncoding];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqualObjects(self.syncState.blockUnencryptedRemovableMediaMount, @1);
+}
+
+- (void)testPreflightTurnOffBlockUnencryptedRemovableMedia {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData *respData =
+      [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+       @"\"block_unencrypted_removable_media\": false}" dataUsingEncoding:NSUTF8StringEncoding];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqualObjects(self.syncState.blockUnencryptedRemovableMediaMount, @0);
+}
+
+- (void)testPreflightBlockUnencryptedRemovableMediaAbsent {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData *respData = [self dataFromFixture:@"sync_preflight_blockusb_absent.json"];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertNil(self.syncState.blockUnencryptedRemovableMediaMount);
+}
+
 - (void)testPreflightOverrideFileAccessAction {
   [self setupDefaultDaemonConnResponses];
   SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
