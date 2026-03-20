@@ -74,6 +74,11 @@ export function convertEsloggerEvent(input: string): string {
     context.cwd = exec.cwd.path;
   }
 
+  // path: executable file path
+  if (exec.target?.executable?.path) {
+    context.path = exec.target.executable.path;
+  }
+
   // signing_id: format as "teamID:signingID" or "platform:signingID"
   const target = exec.target;
   if (target?.signing_id) {
@@ -82,6 +87,14 @@ export function convertEsloggerEvent(input: string): string {
     } else if (target.team_id) {
       context.target.signing_id = target.team_id + ":" + target.signing_id;
     }
+  }
+
+  // is_platform_binary and team_id
+  if (target?.is_platform_binary != null) {
+    context.target.is_platform_binary = target.is_platform_binary;
+  }
+  if (target?.team_id) {
+    context.target.team_id = target.team_id;
   }
 
   // fds: array of {fd, fdtype} → {fd, type} with PROX_FDTYPE→FD_TYPE mapping

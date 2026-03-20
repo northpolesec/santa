@@ -13,12 +13,15 @@ export const DEFAULT_EXPRESSION = `target.signing_time >= timestamp('2025-05-31T
 export const DEFAULT_YAML = `target:
   signing_id: "EQHXZ8M8AV:com.google.Chrome"
   signing_time: "2025-06-01T00:00:00Z"
+  is_platform_binary: false
+  team_id: "EQHXZ8M8AV"
 args:
   - "--flag"
 envs:
   HOME: "/Users/user"
 euid: 501
 cwd: "/Users/user"
+path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 ancestors:
   - signing_id: "platform:com.apple.Terminal"
     team_id: ""
@@ -41,6 +44,7 @@ function buildEnvironment(): Environment {
   env.registerVariable("envs", "map");
   env.registerVariable("euid", "int");
   env.registerVariable("cwd", "string");
+  env.registerVariable("path", "string");
   env.registerVariable("ancestors", "list");
   env.registerVariable("fds", "list");
 
