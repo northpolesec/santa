@@ -26,12 +26,12 @@
 #include <vector>
 
 #import "Source/common/SNTCommonEnums.h"
-#include "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTExportConfiguration.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/TestUtils.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"

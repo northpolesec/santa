@@ -15,6 +15,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
 
+#include <DiskArbitration/DiskArbitration.h>
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Security/Security.h>
 #include <bsm/libbsm.h>
@@ -40,7 +41,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #import "Source/santad/SNTDecisionCache.h"
-#include "src/santanetd/SNDNetworkFlowsSerializer.h"
+#import "src/santanetd/SNDNetworkFlowsSerializer.h"
 
 namespace santa {
 
@@ -1194,6 +1195,12 @@ std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props, boo
     str.append([NonNull(MountFromName([props[@"DAVolumePath"] path])) UTF8String]);
   } else {
     str.append([NonNull(props[santa::kMountFromNameKey]) UTF8String]);
+  }
+
+  NSNumber *encrypted = props[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey];
+  if (encrypted != nil) {
+    str.append("|encrypted=");
+    str.append([encrypted boolValue] ? "true" : "false");
   }
 
   return FinalizeString(str);

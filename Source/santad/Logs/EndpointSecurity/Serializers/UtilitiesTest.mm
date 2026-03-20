@@ -5,7 +5,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +19,8 @@
 #include <memory>
 
 #include "Source/common/TestUtils.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/common/es/Message.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 
 using santa::GetAllowListTargetFile;

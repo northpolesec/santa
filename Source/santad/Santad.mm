@@ -30,14 +30,14 @@
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Enricher.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/faa/WatchItems.h"
 #include "Source/santad/DaemonConfigBundle.h"
-#include "Source/santad/DataLayer/SNTEventTable.h"
-#include "Source/santad/DataLayer/SNTRuleTable.h"
+#import "Source/santad/DataLayer/SNTEventTable.h"
+#import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDataFileAccessAuthorizer.h"
@@ -46,9 +46,9 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
-#include "Source/santad/SNTDaemonControlController.h"
-#include "Source/santad/SNTDatabaseController.h"
-#include "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTDaemonControlController.h"
+#import "Source/santad/SNTDatabaseController.h"
+#import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;
@@ -109,15 +109,16 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     metrics->StartPoll();
   }
 
-  SNTEndpointSecurityDeviceManager *device_client =
-      [[SNTEndpointSecurityDeviceManager alloc] initWithESAPI:esapi
-                                                      metrics:metrics
-                                                       logger:logger
-                                                     enricher:enricher
-                                              authResultCache:auth_result_cache
-                                                blockUSBMount:[configurator blockUSBMount]
-                                               remountUSBMode:[configurator remountUSBMode]
-                                           startupPreferences:[configurator onStartUSBOptions]];
+  SNTEndpointSecurityDeviceManager *device_client = [[SNTEndpointSecurityDeviceManager alloc]
+                            initWithESAPI:esapi
+                                  metrics:metrics
+                                   logger:logger
+                                 enricher:enricher
+                          authResultCache:auth_result_cache
+                            blockUSBMount:[configurator blockUSBMount]
+      blockUnencryptedRemovableMediaMount:[configurator blockUnencryptedRemovableMediaMount]
+                           remountUSBMode:[configurator remountUSBMode]
+                       startupPreferences:[configurator onStartUSBOptions]];
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
     [syncd_queue addStoredEvent:usbEvent];
@@ -388,6 +389,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    LOGI(@"BlockUSBMount changed: %d -> %d", oldBool, newBool);
                                    device_client.blockUSBMount = newBool;
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(blockUnencryptedRemovableMediaMount)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   BOOL oldBool = [oldValue boolValue];
+                                   BOOL newBool = [newValue boolValue];
+
+                                   if (oldBool == newBool) {
+                                     return;
+                                   }
+
+                                   LOGI(@"BlockUnencryptedRemovableMediaMount changed: %d -> %d",
+                                        oldBool, newBool);
+                                   device_client.blockUnencryptedRemovableMediaMount = newBool;
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(remountUSBMode)

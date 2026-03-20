@@ -1,20 +1,20 @@
 /// Copyright 2022 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
-#ifndef SANTA__SANTAD__METRICS_H
-#define SANTA__SANTAD__METRICS_H
+#ifndef SANTA_SANTAD_METRICS_H
+#define SANTA_SANTAD_METRICS_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -27,27 +27,13 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTMetricSet.h"
+#include "Source/common/es/ESMetricsObserver.h"
 #include "absl/container/flat_hash_map.h"
 
 namespace santa {
 
 // Test interface - forward declaration
 class MetricsPeer;
-
-enum class EventDisposition {
-  kProcessed = 0,
-  kDropped,
-};
-
-enum class Processor {
-  kUnknown = 0,
-  kAuthorizer,
-  kDeviceManager,
-  kRecorder,
-  kTamperResistance,
-  kDataFileAccessAuthorizer,
-  kProcessFileAccessAuthorizer,
-};
 
 enum class FileAccessMetricStatus {
   kOK = 0,
@@ -65,7 +51,7 @@ using FileAccessEventCountTuple =
 
 NSString *const EventTypeToString(es_event_type_t eventType);
 
-class Metrics : public std::enable_shared_from_this<Metrics> {
+class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Metrics> {
  public:
   static std::shared_ptr<Metrics> Create(SNTMetricSet *metric_set, uint64_t interval);
 
@@ -87,10 +73,10 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
 
   // Used for tracking event sequence numbers to determine if drops occured
   void UpdateEventStats(Processor processor, es_event_type_t event_type, uint64_t seq_num,
-                        uint64_t global_seq_num);
+                        uint64_t global_seq_num) override;
 
-  void SetEventMetrics(Processor processor, EventDisposition event_disposition, int64_t nanos,
-                       es_event_type_t event_type);
+  void SetEventMetrics(Processor processor, EventDisposition disposition, int64_t nanos,
+                       es_event_type_t event_type) override;
 
   void AddRateLimitingMetrics(int64_t events_rate_limited_count);
 
@@ -139,4 +125,4 @@ class Metrics : public std::enable_shared_from_this<Metrics> {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_SANTAD_METRICS_H

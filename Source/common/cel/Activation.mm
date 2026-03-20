@@ -4,7 +4,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -138,6 +138,15 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
     }
   }
 
+  // Handle FDType enum values (V2 only).
+  if constexpr (IsV2) {
+    auto fdTypeDescriptor = Traits::FDType_descriptor();
+    auto fdTypeValue = fdTypeDescriptor->FindValueByName(name);
+    if (fdTypeValue != nullptr) {
+      return CELValue(fdTypeValue->number(), arena);
+    }
+  }
+
   // Handle the fields from the CELContext message.
   if (name == "target" && file_ != nullptr) {
     return cel_runtime::CelProtoWrapper::CreateMessage(file_.get(), arena);
@@ -165,6 +174,17 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
       return cel_runtime::CelValue::CreateList(
           arena->Create<cel_runtime::ContainerBackedListImpl>(arena, ancestorValues));
     }
+    if (name == "fds") {
+      using FileDescriptorT = typename Traits::FileDescriptorT;
+      std::vector<cel_runtime::CelValue> fdValues;
+      for (const auto &fd : fds_()) {
+        auto *proto = arena->Create<FileDescriptorT>(arena);
+        proto->CopyFrom(fd);
+        fdValues.push_back(cel_runtime::CelProtoWrapper::CreateMessage(proto, arena));
+      }
+      return cel_runtime::CelValue::CreateList(
+          arena->Create<cel_runtime::ContainerBackedListImpl>(arena, fdValues));
+    }
   }
   return {};
 }
@@ -189,6 +209,15 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
       // functions in ternary expressions.
       v.push_back({value->name(), ::cel::MessageType(::santa::cel::Result::descriptor())});
     } else {
+      v.push_back({value->name(), ::cel::IntType()});
+    }
+  }
+
+  // Add FDType enum values for V2 so users can write e.g. FD_TYPE_VNODE.
+  if constexpr (IsV2) {
+    auto fdTypeDescriptor = Traits::FDType_descriptor();
+    for (int i = 0; i < fdTypeDescriptor->value_count(); i++) {
+      auto value = fdTypeDescriptor->value(i);
       v.push_back({value->name(), ::cel::IntType()});
     }
   }
@@ -224,7 +253,7 @@ bool Activation<IsV2>::IsResultCacheable() const {
   }
 
   if constexpr (IsV2) {
-    return !ancestors_.HasValue();
+    return !ancestors_.HasValue() && !fds_.HasValue();
   }
 
   return true;

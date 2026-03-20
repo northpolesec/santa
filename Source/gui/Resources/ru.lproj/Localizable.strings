@@ -34,6 +34,15 @@
 /* No comment provided by engineer. */
 "Binary Path" = "Бинарный путь";
 
+/* Block reason for binary rule match */
+"Binary rule" = "Правило бинарного файла";
+
+/* No comment provided by engineer. */
+"Block Reason" = "Причина блокировки";
+
+/* Block reason for blocked path regex match */
+"Blocked path regex" = "Заблокированный путь по regex";
+
 /* No comment provided by engineer. */
 "Bundle Hash" = "Бандл-хэш";
 
@@ -42,6 +51,15 @@
 
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
+
+/* Block reason for CDHash rule match */
+"CDHash rule" = "Правило CDHash";
+
+/* Block reason for CEL fallback rule match */
+"CEL fallback rule" = "Резервное правило CEL";
+
+/* Block reason for certificate rule match */
+"Certificate rule" = "Правило сертификата";
 
 /* No comment provided by engineer. */
 "Clean Sync" = "Чистая синхронизация";
@@ -103,6 +121,9 @@
 /* No comment provided by engineer. */
 "Network Share" = "Сетевой ресурс";
 
+/* Block reason when no rule matched in lockdown mode */
+"No matching rule" = "Нет подходящего правила";
+
 /* Default text for Open button */
 "Open..." = "Открыть...";
 
@@ -114,6 +135,9 @@
 
 /* No comment provided by engineer. */
 "Path Accessed" = "Доступ к пути";
+
+/* Block reason when file path exceeds maximum length */
+"Path too long" = "Путь слишком длинный";
 
 /* No comment provided by engineer. */
 "Publisher" = "Издатель";
@@ -149,10 +173,13 @@
 "Show menu bar icon" = "Показать значок в строке меню";
 
 /* No comment provided by engineer. */
-"Signing ID" = "Signing ID";
+"Signed" = "Подписано";
 
 /* No comment provided by engineer. */
-"Signed" = "Подписано";
+"Signing ID" = "Signing ID";
+
+/* Block reason for Signing ID rule match */
+"Signing ID rule" = "Правило Signing ID";
 
 /* Client mode change: LOCKDOWN */
 "Switching into Lockdown mode" = "Переход в режим блокировки";
@@ -174,6 +201,9 @@
 
 /* No comment provided by engineer. */
 "Team ID" = "ID команды";
+
+/* Block reason for Team ID rule match */
+"Team ID rule" = "Правило Team ID";
 
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "Не удалось загрузить событие. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
@@ -214,8 +244,14 @@
 /* No comment provided by engineer. */
 "unknown" = "неизвестно";
 
+/* Block reason when decision state is unrecognized */
+"Unknown" = "Неизвестно";
+
 /* No comment provided by engineer. */
 "User" = "Пользователь";
 
 /* No comment provided by engineer. */
 "Version **%@**" = "Версия **%@**";
+
+/* Version in About view for Lite edition */
+"Version **%@** (Lite)" = "Версия **%@** (Lite)";

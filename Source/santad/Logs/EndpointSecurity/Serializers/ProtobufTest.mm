@@ -5,7 +5,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,11 +35,11 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/TestUtils.h"
-#include "Source/common/santa_proto_include_wrapper.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Enricher.h"
+#include "Source/common/es/Message.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
+#include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #import "Source/santad/SNTDecisionCache.h"
@@ -553,7 +553,7 @@ void SerializeAndCheckNonESEvents(
       case SNTEventStateBlockLongPath: want = ::pbv1::Execution::REASON_LONG_PATH; break;
       case SNTEventStateBlockSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateBlockCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
-      case SNTEventStateBlockCELFallback: want = ::pbv1::Execution::REASON_FALLBACK_CEL; break;
+      case SNTEventStateBlockCELFallback: want = ::pbv1::Execution::REASON_CEL_FALLBACK; break;
       case SNTEventStateAllowUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateAllowBinary: want = ::pbv1::Execution::REASON_BINARY; break;
       case SNTEventStateAllowCertificate: want = ::pbv1::Execution::REASON_CERT; break;
@@ -570,7 +570,7 @@ void SerializeAndCheckNonESEvents(
       case SNTEventStateAllowLocalSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateAllowCompilerSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateAllowCompilerCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
-      case SNTEventStateAllowCELFallback: want = ::pbv1::Execution::REASON_FALLBACK_CEL; break;
+      case SNTEventStateAllowCELFallback: want = ::pbv1::Execution::REASON_CEL_FALLBACK; break;
       case SNTEventStateBlock: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateAllow: want = ::pbv1::Execution::REASON_UNKNOWN; break;
     }

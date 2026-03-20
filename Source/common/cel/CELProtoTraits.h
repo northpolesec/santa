@@ -1,10 +1,10 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__CEL__CELPROTOTRAITS_H
-#define SANTA__COMMON__CEL__CELPROTOTRAITS_H
+#ifndef SANTA_COMMON_CEL_CELPROTOTRAITS_H
+#define SANTA_COMMON_CEL_CELPROTOTRAITS_H
 
 #include <type_traits>
 
@@ -33,6 +33,7 @@ struct CELProtoTraits<false> {
   using ExecutionContextT = ::santa::cel::v1::ExecutionContext;
   using ExecutableFileT = ::santa::cel::v1::ExecutableFile;
   using AncestorT = std::nullptr_t;
+  using FileDescriptorT = std::nullptr_t;
 
   // Enum aliases
   using ReturnValue = ::santa::cel::v1::ReturnValue;
@@ -61,6 +62,7 @@ struct CELProtoTraits<true> {
   using ExecutionContextT = ::santa::cel::v2::ExecutionContext;
   using ExecutableFileT = ::santa::cel::v2::ExecutableFile;
   using AncestorT = ::santa::cel::v2::Ancestor;
+  using FileDescriptorT = ::santa::cel::v2::FileDescriptor;
 
   // Enum aliases
   using ReturnValue = ::santa::cel::v2::ReturnValue;
@@ -81,6 +83,10 @@ struct CELProtoTraits<true> {
     return ::santa::cel::v2::ReturnValue_descriptor();
   }
 
+  static const google::protobuf::EnumDescriptor* FDType_descriptor() {
+    return ::santa::cel::v2::FileDescriptor::FDType_descriptor();
+  }
+
   static const google::protobuf::Descriptor* ExecutionContext_descriptor() {
     return ::santa::cel::v2::ExecutionContext::descriptor();
   }
@@ -89,4 +95,4 @@ struct CELProtoTraits<true> {
 }  // namespace cel
 }  // namespace santa
 
-#endif  // SANTA__COMMON__CEL__CELPROTOTRAITS_H
+#endif  // SANTA_COMMON_CEL_CELPROTOTRAITS_H

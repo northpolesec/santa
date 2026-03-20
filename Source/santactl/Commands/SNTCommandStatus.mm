@@ -1,5 +1,5 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -250,6 +250,11 @@ REGISTER_COMMAND_NAME(@"status")
     blockUSBMount = response;
   }];
 
+  __block BOOL blockUnencryptedRemovableMediaMount = NO;
+  [rop blockUnencryptedRemovableMediaMount:^(BOOL response) {
+    blockUnencryptedRemovableMediaMount = response;
+  }];
+
   __block NSArray<NSString *> *remountUSBMode;
   [rop remountUSBMode:^(NSArray<NSString *> *response) {
     remountUSBMode = response;
@@ -288,12 +293,27 @@ REGISTER_COMMAND_NAME(@"status")
           ?: @"Never";
 
   NSString *syncURLStr = configurator.syncBaseURL.absoluteString;
-  NSUInteger fullSyncInterval = configurator.fullSyncInterval;
-  NSUInteger pushNotificationsFullSyncInterval = configurator.pushNotificationsFullSyncInterval;
+
+  __block NSUInteger fullSyncInterval = 0;
+  [rop fullSyncInterval:^(NSUInteger interval) {
+    fullSyncInterval = interval;
+  }];
+
+  __block NSUInteger pushNotificationsFullSyncInterval = 0;
+  [rop pushNotificationsFullSyncInterval:^(NSUInteger interval) {
+    pushNotificationsFullSyncInterval = interval;
+  }];
 
   BOOL exportMetrics = configurator.exportMetrics;
   NSURL *metricsURLStr = configurator.metricURL;
   NSUInteger metricExportInterval = configurator.metricExportInterval;
+
+  NSArray<NSString *> *allowedCommands = configurator.allowedSantaCommands;
+  NSString *allowedStr = !allowedCommands ? @"All"
+                         : allowedCommands.count > 0
+                             ? [[allowedCommands sortedArrayUsingSelector:@selector(compare:)]
+                                   componentsJoinedByString:@", "]
+                             : @"None (all blocked)";
 
   if ([arguments containsObject:@"--json"]) {
     NSMutableDictionary *stats = [@{
@@ -306,7 +326,11 @@ REGISTER_COMMAND_NAME(@"status")
         @"watchdog_cpu_peak" : @(cpuPeak),
         @"watchdog_ram_peak" : @(ramPeak),
         @"block_usb" : @(blockUSBMount),
-        @"remount_usb_mode" : (blockUSBMount && remountUSBMode.count ? remountUSBMode : @""),
+        @"block_unencrypted_removable_media" : @(blockUnencryptedRemovableMediaMount),
+        @"remount_usb_mode" :
+            ((blockUSBMount || blockUnencryptedRemovableMediaMount) && remountUSBMode.count
+                 ? remountUSBMode
+                 : @""),
         @"on_start_usb_options" : StartupOptionToString(configurator.onStartUSBOptions),
         @"static_rules" : @(staticRuleCount),
       },
@@ -338,6 +362,13 @@ REGISTER_COMMAND_NAME(@"status")
         @"enabled" : @(networkExtensionEnabled),
         @"loaded" : @(networkExtensionLoaded),
       };
+
+      if (allowedCommands) {
+        NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
+        daemon[@"allowed_commands"] =
+            [allowedCommands sortedArrayUsingSelector:@selector(compare:)];
+        stats[@"daemon"] = daemon;
+      }
     }
 
     if (syncURLStr.length) {
@@ -409,73 +440,76 @@ REGISTER_COMMAND_NAME(@"status")
     printf("%s\n", [statsStr UTF8String]);
   } else {
     printf(">>> Daemon Info\n");
-    printf("  %-35s | %s\n", "Mode", [clientMode UTF8String]);
-    printf("  %-35s | %s\n", "Log Type", [eventLogType UTF8String]);
-    printf("  %-35s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
-    printf("  %-35s | %s\n", "Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
-    if (blockUSBMount && remountUSBMode.count > 0) {
-      printf("  %-35s | %s\n", "Removable Media Remounting Mode",
+    printf("  %-40s | %s\n", "Mode", [clientMode UTF8String]);
+    printf("  %-40s | %s\n", "Log Type", [eventLogType UTF8String]);
+    printf("  %-40s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
+    printf("  %-40s | %s\n", "Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
+    printf("  %-40s | %s\n", "Unencrypted Removable Media Blocking",
+           (blockUnencryptedRemovableMediaMount ? "Yes" : "No"));
+    if ((blockUSBMount || blockUnencryptedRemovableMediaMount) && remountUSBMode.count > 0) {
+      printf("  %-40s | %s\n", "Removable Media Remounting Mode",
              [[remountUSBMode componentsJoinedByString:@", "] UTF8String]);
     }
-    printf("  %-35s | %s\n", "On Start Removable Media Options",
+    printf("  %-40s | %s\n", "On Start Removable Media Options",
            StartupOptionToString(configurator.onStartUSBOptions).UTF8String);
     if (isSyncV2Enabled) {
-      printf("  %-35s | %s", "Network Mount Blocking", (networkMountExceptions ? "Yes" : "No"));
+      printf("  %-40s | %s", "Network Mount Blocking", (networkMountExceptions ? "Yes" : "No"));
       if (networkMountExceptions) {
         printf(" (%d host exception%s)\n", [networkMountExceptions intValue],
                [networkMountExceptions intValue] == 1 ? "" : "s");
       } else {
         printf("\n");
       }
+      printf("  %-40s | %s\n", "Allowed Commands", [allowedStr UTF8String]);
     }
-    printf("  %-35s | %lld\n", "Static Rules", staticRuleCount);
-    printf("  %-35s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
-    printf("  %-35s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
+    printf("  %-40s | %lld\n", "Static Rules", staticRuleCount);
+    printf("  %-40s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
+    printf("  %-40s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
 
     printf(">>> Cache Info\n");
-    printf("  %-35s | %lld\n", "Root cache count", rootCacheCount);
-    printf("  %-35s | %lld\n", "Non-root cache count", nonRootCacheCount);
+    printf("  %-40s | %lld\n", "Root cache count", rootCacheCount);
+    printf("  %-40s | %lld\n", "Non-root cache count", nonRootCacheCount);
 
     printf(">>> Transitive Allowlisting\n");
-    printf("  %-35s | %s\n", "Enabled", (enableTransitiveRules ? "Yes" : "No"));
-    printf("  %-35s | %lld\n", "Compiler Rules", ruleCounts.compiler);
-    printf("  %-35s | %lld\n", "Transitive Rules", ruleCounts.transitive);
+    printf("  %-40s | %s\n", "Enabled", (enableTransitiveRules ? "Yes" : "No"));
+    printf("  %-40s | %lld\n", "Compiler Rules", ruleCounts.compiler);
+    printf("  %-40s | %lld\n", "Transitive Rules", ruleCounts.transitive);
 
     if (isSyncV2Enabled) {
       printf(">>> Network Extension\n");
-      printf("  %-35s | %s\n", "Enabled", (networkExtensionEnabled ? "Yes" : "No"));
-      printf("  %-35s | %s\n", "Loaded", (networkExtensionLoaded ? "Yes" : "No"));
+      printf("  %-40s | %s\n", "Enabled", (networkExtensionEnabled ? "Yes" : "No"));
+      printf("  %-40s | %s\n", "Loaded", (networkExtensionLoaded ? "Yes" : "No"));
     }
 
     printf(">>> Rule Types\n");
-    printf("  %-35s | %lld\n", "Binary Rules", ruleCounts.binary);
-    printf("  %-35s | %lld\n", "Certificate Rules", ruleCounts.certificate);
-    printf("  %-35s | %lld\n", "TeamID Rules", ruleCounts.teamID);
-    printf("  %-35s | %lld\n", "SigningID Rules", ruleCounts.signingID);
-    printf("  %-35s | %lld\n", "CDHash Rules", ruleCounts.cdhash);
+    printf("  %-40s | %lld\n", "Binary Rules", ruleCounts.binary);
+    printf("  %-40s | %lld\n", "Certificate Rules", ruleCounts.certificate);
+    printf("  %-40s | %lld\n", "TeamID Rules", ruleCounts.teamID);
+    printf("  %-40s | %lld\n", "SigningID Rules", ruleCounts.signingID);
+    printf("  %-40s | %lld\n", "CDHash Rules", ruleCounts.cdhash);
 
     printf(">>> Watch Items\n");
-    printf("  %-35s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
+    printf("  %-40s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
     if (watchItemsEnabled) {
-      printf("  %-35s | %s\n", "Data Source",
+      printf("  %-40s | %s\n", "Data Source",
              santa::WatchItems::DataSourceName(watchItemsDataSource).UTF8String);
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDetachedConfig) {
-        printf("  %-35s | %s\n", "Config Path", (watchItemsConfigPath ?: @"null").UTF8String);
+        printf("  %-40s | %s\n", "Config Path", (watchItemsConfigPath ?: @"null").UTF8String);
       }
       if (watchItemsPolicyVersion.length > 0) {
-        printf("  %-35s | %s\n", "Policy Version", watchItemsPolicyVersion.UTF8String);
+        printf("  %-40s | %s\n", "Policy Version", watchItemsPolicyVersion.UTF8String);
       }
-      printf("  %-35s | %llu\n", "Rule Count", watchItemsRuleCount);
-      printf("  %-35s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
+      printf("  %-40s | %llu\n", "Rule Count", watchItemsRuleCount);
+      printf("  %-40s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
     }
 
     printf(">>> Sync\n");
-    printf("  %-35s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");
+    printf("  %-40s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");
     if (syncURLStr.length) {
-      printf("  %-35s | %s\n", "Sync Server", [syncURLStr UTF8String]);
-      printf("  %-35s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
-      printf("  %-35s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
-      printf("  %-35s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
+      printf("  %-40s | %s\n", "Sync Server", [syncURLStr UTF8String]);
+      printf("  %-40s | %s\n", "Clean Sync Required", (syncCleanReqd ? "Yes" : "No"));
+      printf("  %-40s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
+      printf("  %-40s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
 
       // If push notifications are enabled, show the push notifications full
       // sync interval since it's the active configuration.
@@ -485,7 +519,7 @@ REGISTER_COMMAND_NAME(@"status")
             [NSString stringWithFormat:@"%@ (with Push Notifications)",
                                        FormatInterval(pushNotificationsFullSyncInterval)];
       }
-      printf("  %-35s | %s\n", "Full Sync Interval", [fullSyncIntervalStr UTF8String]);
+      printf("  %-40s | %s\n", "Full Sync Interval", [fullSyncIntervalStr UTF8String]);
 
       // Format push notifications output
       NSString *pushNotificationsOutput = pushNotifications;
@@ -493,22 +527,22 @@ REGISTER_COMMAND_NAME(@"status")
         pushNotificationsOutput =
             [NSString stringWithFormat:@"NPS Push Service (%@)", pushServerAddress];
       }
-      printf("  %-35s | %s\n", "Push Notifications", [pushNotificationsOutput UTF8String]);
+      printf("  %-40s | %s\n", "Push Notifications", [pushNotificationsOutput UTF8String]);
 
-      printf("  %-35s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
-      printf("  %-35s | %lld\n", "Events Pending Upload", eventCount);
-      printf("  %-35s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
+      printf("  %-40s | %s\n", "Bundle Scanning", (enableBundles ? "Yes" : "No"));
+      printf("  %-40s | %lld\n", "Events Pending Upload", eventCount);
+      printf("  %-40s | %s\n", "Execution Rules Hash", [executionRulesHash UTF8String]);
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
-        printf("  %-35s | %s\n", "File Access Rules Hash",
+        printf("  %-40s | %s\n", "File Access Rules Hash",
                [(fileAccessRulesHash ?: @"null") UTF8String]);
       }
     }
 
     printf(">>> Metrics\n");
-    printf("  %-35s | %s\n", "Enabled", exportMetrics ? "Yes" : "No");
+    printf("  %-40s | %s\n", "Enabled", exportMetrics ? "Yes" : "No");
     if (exportMetrics) {
-      printf("  %-35s | %s\n", "Metrics Server", [[metricsURLStr absoluteString] UTF8String]);
-      printf("  %-35s | %lu\n", "Export Interval (seconds)", metricExportInterval);
+      printf("  %-40s | %s\n", "Metrics Server", [[metricsURLStr absoluteString] UTF8String]);
+      printf("  %-40s | %lu\n", "Export Interval (seconds)", metricExportInterval);
     }
   }
 

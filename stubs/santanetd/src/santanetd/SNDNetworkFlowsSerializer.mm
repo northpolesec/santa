@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "src/santanetd/SNDNetworkFlowsSerializer.h"
+#import "src/santanetd/SNDNetworkFlowsSerializer.h"
 
 @class SNDProcessFlows;
 @class SNTCachedDecision;

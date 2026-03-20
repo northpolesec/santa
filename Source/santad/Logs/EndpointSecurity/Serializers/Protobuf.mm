@@ -5,7 +5,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 
+#include <DiskArbitration/DiskArbitration.h>
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
@@ -31,17 +32,17 @@
 #include "Source/common/AuditUtilities.h"
 #include "Source/common/EncodeEntitlements.h"
 #import "Source/common/SNTCachedDecision.h"
-#include "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTCommonEnums.h"
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
-#include "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTSystemInfo.h"
 #import "Source/common/String.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "absl/status/status.h"
 #include "google/protobuf/timestamp.pb.h"
-#include "src/santanetd/SNDNetworkFlowsSerializer.h"
+#import "src/santanetd/SNDNetworkFlowsSerializer.h"
 
 using google::protobuf::Arena;
 using google::protobuf::Timestamp;
@@ -345,7 +346,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
     case SNTEventStateAllowCompilerSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
     case SNTEventStateAllowCDHash: return ::pbv1::Execution::REASON_CDHASH;
     case SNTEventStateAllowCompilerCDHash: return ::pbv1::Execution::REASON_CDHASH;
-    case SNTEventStateAllowCELFallback: return ::pbv1::Execution::REASON_FALLBACK_CEL;
+    case SNTEventStateAllowCELFallback: return ::pbv1::Execution::REASON_CEL_FALLBACK;
     case SNTEventStateAllowUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
     case SNTEventStateBlockBinary: return ::pbv1::Execution::REASON_BINARY;
     case SNTEventStateBlockCertificate: return ::pbv1::Execution::REASON_CERT;
@@ -353,7 +354,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo *pb_cert_info, 
     case SNTEventStateBlockTeamID: return ::pbv1::Execution::REASON_TEAM_ID;
     case SNTEventStateBlockSigningID: return ::pbv1::Execution::REASON_SIGNING_ID;
     case SNTEventStateBlockCDHash: return ::pbv1::Execution::REASON_CDHASH;
-    case SNTEventStateBlockCELFallback: return ::pbv1::Execution::REASON_FALLBACK_CEL;
+    case SNTEventStateBlockCELFallback: return ::pbv1::Execution::REASON_CEL_FALLBACK;
     case SNTEventStateBlockLongPath: return ::pbv1::Execution::REASON_LONG_PATH;
     case SNTEventStateBlockUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
     case SNTEventStateUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
@@ -1501,6 +1502,11 @@ static void EncodeDisk(::pbv1::Disk *pb_disk, ::pbv1::Disk_Action action, NSDict
         .tv_nsec = (long)(fractional * NSEC_PER_SEC),
     };
     EncodeTimestamp(pb_disk->mutable_appearance(), ts);
+  }
+
+  NSNumber *encrypted = props[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey];
+  if (encrypted != nil) {
+    pb_disk->set_encrypted([encrypted boolValue]);
   }
 }
 

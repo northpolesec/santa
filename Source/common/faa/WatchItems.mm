@@ -1,11 +1,11 @@
 /// Copyright 2022 Google LLC
-/// Copyright 2024 North Pole Security, Inc.
+/// Copyright 2025 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -801,14 +801,14 @@ NSString *WatchItems::DataSourceName(DataSource data_source) {
 }
 
 void WatchItems::RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!data_watch_items_updated_callback_) {
     data_watch_items_updated_callback_ = std::move(callback);
   }
 }
 
 void WatchItems::RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!proc_watch_items_updated_callback_) {
     proc_watch_items_updated_callback_ = std::move(callback);
   }
@@ -817,7 +817,7 @@ void WatchItems::RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBloc
 void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
                                     ProcessWatchItems new_proc_watch_items,
                                     NSDictionary *new_config, uint64_t rules_loaded) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
 
   // The following conditions require updating the current config:
   // 1. The current config doesn't exist but the new one does
@@ -907,7 +907,7 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
 }
 
 NSDictionary *WatchItems::ReadConfig() {
-  absl::ReaderMutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(lock_);
   return ReadConfigLocked();
 }
 
@@ -930,18 +930,18 @@ bool WatchItems::OnTimer() {
 }
 
 void WatchItems::FindPoliciesForTargets(IterateTargetsBlock iterateTargetsBlock) {
-  absl::ReaderMutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(lock_);
   data_watch_items_.FindPolicies(iterateTargetsBlock);
 }
 
 void WatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
-  absl::ReaderMutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(lock_);
   proc_watch_items_.IterateProcessPolicies(checkPolicyBlock);
 }
 
 void WatchItems::SetDBRules(NSDictionary *rules) {
   {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     config_path_ = nil;
     embedded_config_ = @{kWatchItemConfigKeyWatchItems : rules};
     data_source_ = DataSource::kDatabase;
@@ -954,7 +954,7 @@ void WatchItems::SetConfigPath(NSString *config_path) {
   // the lock before reloading the config
   NSDictionary *config;
   {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     config_path_ = config_path;
     embedded_config_ = nil;
     data_source_ = DataSource::kDetachedConfig;
@@ -965,7 +965,7 @@ void WatchItems::SetConfigPath(NSString *config_path) {
 
 void WatchItems::SetConfig(NSDictionary *config) {
   {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     config_path_ = nil;
     embedded_config_ = config;
     data_source_ = DataSource::kEmbeddedConfig;
@@ -974,7 +974,7 @@ void WatchItems::SetConfig(NSDictionary *config) {
 }
 
 std::optional<WatchItemsState> WatchItems::State() {
-  absl::ReaderMutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(lock_);
 
   if (!current_config_) {
     return std::nullopt;
@@ -993,7 +993,7 @@ std::optional<WatchItemsState> WatchItems::State() {
 
 std::pair<NSString *, NSString *> WatchItems::EventDetailLinkInfo(
     const std::shared_ptr<WatchItemPolicyBase> &watch_item) {
-  absl::ReaderMutexLock lock(&lock_);
+  absl::ReaderMutexLock lock(lock_);
   if (!watch_item) {
     return {policy_event_detail_url_, policy_event_detail_text_};
   }

@@ -1,11 +1,11 @@
 /// Copyright 2022 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,9 +28,9 @@
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
+#import "Source/common/es/SNTEndpointSecurityClientBase.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClientBase.h"
 
 using santa::AuthResultCache;
 using santa::FlushCacheMode;
@@ -328,14 +328,15 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
       {FlushCacheReason::kFilesystemUnmounted, @"FilesystemUnmounted"},
       {FlushCacheReason::kEntitlementsPrefixFilterChanged, @"EntitlementsPrefixFilterChanged"},
       {FlushCacheReason::kEntitlementsTeamIDFilterChanged, @"EntitlementsTeamIDFilterChanged"},
+      {FlushCacheReason::kCELFallbackRulesChanged, @"CELFallbackRulesChanged"},
   };
 
   for (const auto &kv : reasonToString) {
     XCTAssertEqualObjects(FlushCacheReasonToString(kv.first), kv.second);
   }
 
-  XCTAssertThrows(FlushCacheReasonToString((
-      FlushCacheReason)(static_cast<int>(FlushCacheReason::kEntitlementsTeamIDFilterChanged) + 1)));
+  XCTAssertThrows(FlushCacheReasonToString(
+      (FlushCacheReason)(static_cast<int>(FlushCacheReason::kCELFallbackRulesChanged) + 1)));
 }
 
 @end

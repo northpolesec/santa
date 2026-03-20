@@ -1,16 +1,18 @@
 /// Copyright 2021 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
 #import <Foundation/Foundation.h>
 
 #include <stdlib.h>
@@ -116,9 +118,8 @@ void DADiskMountWithArguments(DADiskRef _Nonnull disk, CFURLRef __nullable path,
   MockDADisk *mockDisk = (__bridge MockDADisk *)disk;
   mockDisk.wasMounted = YES;
 
-  if (context) {
-    dispatch_semaphore_t sema = (__bridge dispatch_semaphore_t)context;
-    dispatch_semaphore_signal(sema);
+  if (callback) {
+    callback(disk, NULL, context);
   }
 }
 
@@ -179,6 +180,31 @@ void DADiskUnmount(DADiskRef disk, DADiskUnmountOptions options,
 
   dispatch_semaphore_t sema = (__bridge dispatch_semaphore_t)context;
   dispatch_semaphore_signal(sema);
+}
+
+const char *__nullable DADiskGetBSDName(DADiskRef disk) {
+  MockDADisk *mockDisk = (__bridge MockDADisk *)disk;
+  return [mockDisk.diskDescription[@"DAMediaBSDName"] UTF8String];
+}
+
+DADissenterRef __nullable DADissenterCreate(CFAllocatorRef __nullable allocator, DAReturn status,
+                                            CFStringRef __nullable statusString) {
+  // Return a non-NULL sentinel to indicate a dissenter was created.
+  return (DADissenterRef)CFBridgingRetain(@"MockDissenter");
+}
+
+void DARegisterDiskMountApprovalCallback(DASessionRef session, CFDictionaryRef __nullable match,
+                                         DADiskMountApprovalCallback callback,
+                                         void *__nullable context) {
+  // Stub — tests call handleMountApproval: directly.
+}
+
+DAReturn DADissenterGetStatus(DADissenterRef dissenter) {
+  return kDAReturnBusy;
+}
+
+CFStringRef __nullable DADissenterGetStatusString(DADissenterRef dissenter) {
+  return CFSTR("Mock dissenter status");
 }
 
 int getmntinfo_r_np(struct statfs *__nullable *__nullable mntbufp, int flags) {

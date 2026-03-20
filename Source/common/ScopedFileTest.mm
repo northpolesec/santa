@@ -14,8 +14,8 @@
 
 #include "Source/common/ScopedFile.h"
 
-#include <Foundation/Foundation.h>
-#include <XCTest/XCTest.h>
+#import <Foundation/Foundation.h>
+#import <XCTest/XCTest.h>
 #include <errno.h>
 
 #include "Source/common/TestUtils.h"

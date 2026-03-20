@@ -5,27 +5,27 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
-#ifndef SANTA__SANTAD_SANTAD_H
-#define SANTA__SANTAD_SANTAD_H
+#ifndef SANTA_SANTAD_SANTAD_H
+#define SANTA_SANTAD_SANTAD_H
 
 #import "Source/common/MOLXPCConnection.h"
 #include "Source/common/PrefixTree.h"
 #include "Source/common/Unit.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Enricher.h"
 #include "Source/common/faa/WatchItems.h"
+#include "Source/common/processtree/process_tree.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
-#include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
 #import "Source/santad/SNTNetworkExtensionQueue.h"
@@ -50,4 +50,4 @@ void SantadMain(
     std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
     std::shared_ptr<santa::EntitlementsFilter> entitlements_filter);
 
-#endif
+#endif  // SANTA_SANTAD_SANTAD_H

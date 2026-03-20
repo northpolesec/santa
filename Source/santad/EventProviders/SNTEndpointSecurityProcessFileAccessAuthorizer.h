@@ -16,12 +16,12 @@
 
 #include <memory>
 
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
+#import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/common/faa/WatchItems.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClient.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
-#import "Source/santad/Metrics.h"
 
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer
     : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler,
@@ -29,7 +29,7 @@
                                  SNTEndpointSecurityProbe>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
-                        metrics:(std::shared_ptr<santa::Metrics>)metrics
+                        metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
              faaPolicyProcessor:
                  (std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
     iterateProcessPoliciesBlock:(santa::IterateProcessPoliciesBlock)findProcessPoliciesBlock;

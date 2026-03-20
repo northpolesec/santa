@@ -1,16 +1,17 @@
 /// Copyright 2024 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #import "Source/santad/SNTPolicyProcessor.h"
 
@@ -24,9 +25,8 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/cel/Activation.h"
-#import "Source/santad/SNTPolicyProcessor.h"
 
-#import "cel/v1.pb.h"
+#include "cel/v1.pb.h"
 
 extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd);
 
@@ -675,6 +675,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
       using ExecutableFileT = typename santa::cel::CELProtoTraits<IsV2>::ExecutableFileT;
       using AncestorT = typename santa::cel::CELProtoTraits<IsV2>::AncestorT;
+      using FileDescriptorT = typename santa::cel::CELProtoTraits<IsV2>::FileDescriptorT;
       auto ef = std::make_unique<ExecutableFileT>();
       ef->mutable_signing_time()->set_seconds(1717987200);
       ef->mutable_secure_signing_time()->set_seconds(1717987200);
@@ -695,6 +696,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
             return "/";
           },
           ^std::vector<AncestorT>() {
+            return {};
+          },
+          ^std::vector<FileDescriptorT>() {
             return {};
           });
     };
@@ -826,6 +830,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
       using ExecutableFileT = typename santa::cel::CELProtoTraits<IsV2>::ExecutableFileT;
       using ActivationAncestorT = typename santa::cel::CELProtoTraits<IsV2>::AncestorT;
+      using ActivationFileDescriptorT = typename santa::cel::CELProtoTraits<IsV2>::FileDescriptorT;
       auto ef = std::make_unique<ExecutableFileT>();
 
       return std::make_unique<santa::cel::Activation<IsV2>>(
@@ -872,6 +877,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
             } else {
               return {};
             }
+          },
+          ^std::vector<ActivationFileDescriptorT>() {
+            return {};
           });
     };
 
@@ -999,6 +1007,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   return ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
     using ExecutableFileT = typename santa::cel::CELProtoTraits<true>::ExecutableFileT;
     using AncestorT = typename santa::cel::CELProtoTraits<true>::AncestorT;
+    using FileDescriptorT = typename santa::cel::CELProtoTraits<true>::FileDescriptorT;
 
     auto ef = std::make_unique<ExecutableFileT>();
     ef->set_signing_id("ZMCG7MLDV9:com.example.testbinary");
@@ -1020,10 +1029,14 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
           },
           ^std::vector<AncestorT>() {
             return {};
+          },
+          ^std::vector<FileDescriptorT>() {
+            return {};
           });
     } else {
       using V1FileT = typename santa::cel::CELProtoTraits<false>::ExecutableFileT;
       using V1AncestorT = typename santa::cel::CELProtoTraits<false>::AncestorT;
+      using V1FileDescriptorT = typename santa::cel::CELProtoTraits<false>::FileDescriptorT;
       auto v1ef = std::make_unique<V1FileT>();
       return std::make_unique<santa::cel::Activation<false>>(
           std::move(v1ef),
@@ -1040,6 +1053,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
             return "";
           },
           ^std::vector<V1AncestorT>() {
+            return {};
+          },
+          ^std::vector<V1FileDescriptorT>() {
             return {};
           });
     }

@@ -34,6 +34,15 @@
 /* No comment provided by engineer. */
 "Binary Path" = "Chemin du binaire";
 
+/* Block reason for binary rule match */
+"Binary rule" = "Règle de binaire";
+
+/* No comment provided by engineer. */
+"Block Reason" = "Raison du blocage";
+
+/* Block reason for blocked path regex match */
+"Blocked path regex" = "Regex de chemin bloqué";
+
 /* No comment provided by engineer. */
 "Bundle Hash" = "Hash du bundle";
 
@@ -42,6 +51,15 @@
 
 /* No comment provided by engineer. */
 "CDHash" = "CDHash";
+
+/* Block reason for CDHash rule match */
+"CDHash rule" = "Règle CDHash";
+
+/* Block reason for CEL fallback rule match */
+"CEL fallback rule" = "Règle de repli CEL";
+
+/* Block reason for certificate rule match */
+"Certificate rule" = "Règle de certificat";
 
 /* No comment provided by engineer. */
 "Clean Sync" = "Synchronisation complète";
@@ -103,6 +121,9 @@
 /* No comment provided by engineer. */
 "Network Share" = "Partage réseau";
 
+/* Block reason when no rule matched in lockdown mode */
+"No matching rule" = "Aucune règle correspondante";
+
 /* Default text for Open button */
 "Open..." = "Ouvrir...";
 
@@ -114,6 +135,9 @@
 
 /* No comment provided by engineer. */
 "Path Accessed" = "Chemin accédé";
+
+/* Block reason when file path exceeds maximum length */
+"Path too long" = "Chemin trop long";
 
 /* No comment provided by engineer. */
 "Publisher" = "Éditeur";
@@ -154,6 +178,9 @@
 /* No comment provided by engineer. */
 "Signing ID" = "Signing ID";
 
+/* Block reason for Signing ID rule match */
+"Signing ID rule" = "Règle de Signing ID";
+
 /* Client mode change: LOCKDOWN */
 "Switching into Lockdown mode" = "Passage en mode Verrouillage";
 
@@ -174,6 +201,9 @@
 
 /* No comment provided by engineer. */
 "Team ID" = "Team ID";
+
+/* Block reason for Team ID rule match */
+"Team ID rule" = "Règle de Team ID";
 
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "L'envoi de l'événement a échoué. Veuillez vérifier votre connexion réseau et réessayer.";
@@ -214,8 +244,14 @@
 /* No comment provided by engineer. */
 "unknown" = "inconnu";
 
+/* Block reason when decision state is unrecognized */
+"Unknown" = "Inconnu";
+
 /* No comment provided by engineer. */
 "User" = "Utilisateur";
 
 /* Version in About view */
 "Version **%@**" = "Version **%@**";
+
+/* Version in About view for Lite edition */
+"Version **%@** (Lite)" = "Version **%@** (Lite)";

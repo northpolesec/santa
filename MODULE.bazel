@@ -1,24 +1,23 @@
 module(name = "santa")
 
-bazel_dep(name = "abseil-cpp", version = "20250814.1")
+bazel_dep(name = "abseil-cpp", version = "20260107.1")
 bazel_dep(name = "apple_support", version = "1.24.5")
 bazel_dep(name = "cel-cpp", version = "0.14.0")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
-bazel_dep(name = "protobuf", version = "33.1")
-bazel_dep(name = "rules_apple", version = "4.3.2")
-bazel_dep(name = "rules_cc", version = "0.2.14")
-bazel_dep(name = "rules_fuzzing", version = "0.6.0")
+bazel_dep(name = "protobuf", version = "33.6")
+bazel_dep(name = "rules_apple", version = "4.3.3")
+bazel_dep(name = "rules_cc", version = "0.2.17")
 bazel_dep(name = "rules_shell", version = "0.6.1")
 bazel_dep(name = "rules_swift", version = "2.9.0")
-bazel_dep(name = "xxhash", version = "0.8.3")
-bazel_dep(name = "zstd", version = "1.5.7")
-bazel_dep(name = "boringssl", version = "0.20251110.0")
+bazel_dep(name = "xxhash", version = "0.8.3.bcr.1")
+bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
+bazel_dep(name = "boringssl", version = "0.20260211.0")
 
 # North Pole Protos
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    commit = "fa0ad3f19cd1e32ec4946331e94fb1e13e9df4ea",
+    commit = "53b9f4e4db95e927f095754c24c12028bae03abc",
     remote = "https://github.com/northpolesec/protos",
 )
 

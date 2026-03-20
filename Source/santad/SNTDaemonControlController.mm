@@ -1,11 +1,11 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,6 +31,7 @@
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTKillCommand.h"
+#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTModeTransition.h"
@@ -257,6 +258,71 @@ double watchdogRAMPeak = 0;
   reply([[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]]);
 }
 
+- (void)staticDecisionForFilePath:(NSString *)filePath
+                      identifiers:(SNTRuleIdentifiers *)identifiers
+                            reply:(void (^)(SNTRule *rule, NSString *decision))reply {
+  SNTRule *rule =
+      [[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]];
+
+  if (rule) {
+    NSString *action;
+    switch (rule.state) {
+      case SNTRuleStateBlock:
+      case SNTRuleStateSilentBlock: action = @"Denied by rule"; break;
+      default: action = @"Allowed by rule"; break;
+    }
+    reply(rule, action);
+    return;
+  }
+
+  SNTConfigurator *config = [SNTConfigurator configurator];
+
+  // CEL fallback rules cannot be evaluated statically (they require an
+  // ActivationCallbackBlock with process-level context like ancestors and
+  // args). Report their existence so the user knows the static prediction
+  // is incomplete.
+  if (config.celFallbackRules.count > 0) {
+    reply(nil, @"Unknown - cannot evaluate statically");
+    return;
+  }
+
+  // Check blocked path regex (mirrors SNTPolicyProcessor.fileIsScopeBlocked:)
+  NSRegularExpression *blockedRe = config.blockedPathRegex;
+  if (blockedRe && [blockedRe numberOfMatchesInString:filePath
+                                              options:0
+                                                range:NSMakeRange(0, filePath.length)]) {
+    reply(nil, @"Blocked (Regex)");
+    return;
+  }
+
+  // Note: Page zero protection (enablePageZeroProtection + isMissingPageZero)
+  // and bad signature protection (enableBadSignatureProtection) are omitted.
+  // Both require reading/validating the file at runtime. The fileinfo output
+  // already has dedicated "Page Zero" and "Validation" keys for these checks.
+
+  // Check allowed path regex (mirrors SNTPolicyProcessor.fileIsScopeAllowed:)
+  NSRegularExpression *allowedRe = config.allowedPathRegex;
+  if (allowedRe && [allowedRe numberOfMatchesInString:filePath
+                                              options:0
+                                                range:NSMakeRange(0, filePath.length)]) {
+    reply(nil, @"Allowed (Regex)");
+    return;
+  }
+
+  // Note: SNTPolicyProcessor.fileIsScopeAllowed: also returns "Not a Mach-O"
+  // for non-Mach-O files, effectively allowing them. This check requires an
+  // SNTFileInfo object (not just a path). The fileinfo "Type" key already
+  // shows whether the file is a Mach-O, so users can cross-reference.
+
+  // Default based on client mode
+  switch (config.clientMode) {
+    case SNTClientModeMonitor: reply(nil, @"Allowed (Unknown, Monitor mode)"); return;
+    case SNTClientModeStandalone: reply(nil, @"Blocked (Unknown, Standalone mode)"); return;
+    case SNTClientModeLockdown: reply(nil, @"Blocked (Unknown, Lockdown mode)"); return;
+    default: reply(nil, @"Blocked (Unknown)"); return;
+  }
+}
+
 - (void)dataFileAccessRuleForTarget:(NSString *)path reply:(void (^)(NSString *, NSString *))reply {
   __block NSString *ruleName;
   __block NSString *ruleVersion;
@@ -357,6 +423,10 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] blockUSBMount]);
 }
 
+- (void)blockUnencryptedRemovableMediaMount:(void (^)(BOOL))reply {
+  reply([[SNTConfigurator configurator] blockUnencryptedRemovableMediaMount]);
+}
+
 - (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply {
   reply([[SNTConfigurator configurator] remountUSBMode]);
 }
@@ -366,6 +436,14 @@ double watchdogRAMPeak = 0;
   // host exceptions, otherwise nil.
   SNTConfigurator *configurator = [SNTConfigurator configurator];
   reply(configurator.blockNetworkMount ? @(configurator.allowedNetworkMountHosts.count) : nil);
+}
+
+- (void)fullSyncInterval:(void (^)(NSUInteger))reply {
+  reply([SNTConfigurator configurator].fullSyncInterval);
+}
+
+- (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))reply {
+  reply([SNTConfigurator configurator].pushNotificationsFullSyncInterval);
 }
 
 - (void)enableBundles:(void (^)(BOOL))reply {
@@ -411,6 +489,10 @@ double watchdogRAMPeak = 0;
 
   [result blockUSBMount:^(BOOL val) {
     [configurator setSyncServerBlockUSBMount:val];
+  }];
+
+  [result blockUnencryptedRemovableMediaMount:^(BOOL val) {
+    [configurator setSyncServerBlockUnencryptedRemovableMediaMount:val];
   }];
 
   [result remountUSBMode:^(NSArray *val) {
@@ -480,7 +562,12 @@ double watchdogRAMPeak = 0;
   }];
 
   [result celFallbackRules:^(NSArray<SNTCELFallbackRule *> *val) {
+    NSData *oldData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
+    NSData *newData = [SNTCELFallbackRule serializeArray:val];
     [configurator setSyncServerCELFallbackRules:val];
+    if (oldData != newData && ![oldData isEqualToData:newData] && self.flushCacheBlock) {
+      self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
+    }
   }];
 
   [result eventDetailURL:^(NSString *val) {
@@ -497,6 +584,14 @@ double watchdogRAMPeak = 0;
 
   [result fileAccessEventDetailText:^(NSString *val) {
     [configurator setSyncServerFileAccessEventDetailText:val];
+  }];
+
+  [result fullSyncInterval:^(NSUInteger val) {
+    [configurator setFullSyncInterval:val];
+  }];
+
+  [result pushNotificationsFullSyncInterval:^(NSUInteger val) {
+    [configurator setPushNotificationsFullSyncInterval:val];
   }];
 
   reply();
@@ -677,6 +772,12 @@ double watchdogRAMPeak = 0;
 
 - (void)installSantaApp:(NSString *)tempPath reply:(void (^)(BOOL))reply {
   LOGI(@"Trigger Santa installation from: %@", tempPath);
+
+  if ([[SNTConfigurator configurator] isSyncV2Enabled] && santa::SNTIsLiteAppBundle(tempPath)) {
+    LOGE(@"Refusing to install Lite version while SyncV2 is enabled");
+    reply(NO);
+    return;
+  }
 
   if (![self verifyPathIsSanta:tempPath]) {
     LOGE(@"Unable to verify Santa for installation: %@", tempPath);

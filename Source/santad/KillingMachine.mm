@@ -1,4 +1,4 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 #include "Source/santad/KillingMachine.h"
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
 #include <libproc.h>
@@ -25,13 +25,13 @@
 #include <optional>
 #include <vector>
 
+#include "Source/common/CSOpsHelper.h"
 #include "Source/common/CodeSigningIdentifierUtils.h"
 #import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
-#include "Source/santad/CSOpsHelper.h"
 #include "absl/cleanup/cleanup.h"
 
 namespace santa {

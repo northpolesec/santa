@@ -23,11 +23,11 @@
 #import "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
 #include "Source/common/TelemetryEventMap.h"
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
+#include "Source/common/processtree/process_tree.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/Metrics.h"
-#include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTDecisionCache.h"
 
 using santa::AuthResultCache;
@@ -67,7 +67,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
+                      metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                        logger:(std::shared_ptr<Logger>)logger
                      enricher:(std::shared_ptr<Enricher>)enricher
            compilerController:(SNTCompilerController *)compilerController

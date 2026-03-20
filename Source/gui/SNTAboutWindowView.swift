@@ -1,8 +1,23 @@
+/// Copyright 2024 North Pole Security, Inc.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///     http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
 import SwiftUI
 
 import santa_common_MOLXPCConnection
 import santa_common_SNTCommonEnums
 import santa_common_SNTConfigurator
+import santa_common_SNTLiteDetector
 import santa_common_SNTXPCSyncServiceInterface
 import santa_gui_SNTMessageView
 
@@ -18,6 +33,7 @@ struct SNTAboutWindowView: View {
   let w: NSWindow?
   let c = SNTConfigurator.configurator()
   let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+  let isLite = santa.SNTIsLiteInstall()
 
   @State private var isDragging = false
   @State private var menuItemEnabled: Bool = true
@@ -37,13 +53,11 @@ struct SNTAboutWindowView: View {
       }
 
       // Calling .init explicitly to get Markdown rendering
-      let versionString = String.localizedStringWithFormat(
-        NSLocalizedString(
-          "Version **%@**",
-          comment: "Version in About view"
-        ),
-        v
-      )
+      let format =
+        isLite
+        ? NSLocalizedString("Version **%@** (Lite)", comment: "Version in About view for Lite edition")
+        : NSLocalizedString("Version **%@**", comment: "Version in About view")
+      let versionString = String.localizedStringWithFormat(format, v)
       Text(.init(versionString)).padding(10.0)
 
       HStack {

@@ -1,11 +1,11 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <dispatch/dispatch.h>
-#include "Source/santad/ProcessTree/process_tree.h"
+#include "Source/common/processtree/process_tree.h"
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -29,11 +29,11 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #include "Source/common/TestUtils.h"
+#include "Source/common/es/Message.h"
+#include "Source/common/es/MockEndpointSecurityAPI.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EntitlementsFilter.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/EventProviders/EndpointSecurity/MockEndpointSecurityAPI.h"
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTExecutionController.h"

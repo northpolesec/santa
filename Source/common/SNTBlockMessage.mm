@@ -110,7 +110,9 @@ static id ValueOrNull(id value) {
                         @"The default message to show the user when a Removable Media "
                         @"(e.g. USB device) is blocked from mounting");
 
-  if ([[SNTConfigurator configurator] remountUSBMode]) {
+  // Use the actual event.remountArgs rather than global config,
+  // since RemountUSBMode can be both for BlockUnencryptedRemovableMediaMount and BlockUSBMount
+  if (event.remountArgs.count > 0) {
     return [SNTBlockMessage formatMessage:[[SNTConfigurator configurator] remountUSBBlockMessage]
                              withFallback:defaultRemountMessage];
   }
@@ -125,6 +127,33 @@ static id ValueOrNull(id value) {
                         @"The default message to show the user when a network mount is blocked");
 
   return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBannedMessage];
+}
+
++ (NSString *)blockReasonForEventState:(SNTEventState)decision {
+  switch (decision) {
+    case SNTEventStateBlockBinary:
+      return NSLocalizedString(@"Binary rule", @"Block reason for binary rule match");
+    case SNTEventStateBlockCertificate:
+      return NSLocalizedString(@"Certificate rule", @"Block reason for certificate rule match");
+    case SNTEventStateBlockTeamID:
+      return NSLocalizedString(@"Team ID rule", @"Block reason for Team ID rule match");
+    case SNTEventStateBlockSigningID:
+      return NSLocalizedString(@"Signing ID rule", @"Block reason for Signing ID rule match");
+    case SNTEventStateBlockCDHash:
+      return NSLocalizedString(@"CDHash rule", @"Block reason for CDHash rule match");
+    case SNTEventStateBlockScope:
+      return NSLocalizedString(@"Blocked path regex", @"Block reason for blocked path regex match");
+    case SNTEventStateBlockCELFallback:
+      return NSLocalizedString(@"CEL fallback rule", @"Block reason for CEL fallback rule match");
+    case SNTEventStateBlockLongPath:
+      return NSLocalizedString(@"Path too long",
+                               @"Block reason when file path exceeds maximum length");
+    case SNTEventStateBlockUnknown:
+      return NSLocalizedString(@"No matching rule",
+                               @"Block reason when no rule matched in lockdown mode");
+    default:
+      return NSLocalizedString(@"Unknown", @"Block reason when decision state is unrecognized");
+  }
 }
 
 + (NSString *)stringFromHTML:(NSString *)html {

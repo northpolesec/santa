@@ -28,6 +28,7 @@
 @property NSString *allowlistRegex;
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
+@property NSNumber *blockUnencryptedRemovableMediaMount;
 @property NSArray *remountUSBMode;
 @property NSNumber *blockNetworkMount;
 @property NSString *bannedNetworkMountBlockMessage;
@@ -49,6 +50,8 @@
 @property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property NSNumber *fullSyncInterval;
+@property NSNumber *pushNotificationsFullSyncInterval;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -58,7 +61,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 25;
+  exp.expectedFulfillmentCount = 28;
   NSDate *nowDate = [NSDate now];
 
   SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
@@ -67,6 +70,7 @@
   bundle.allowlistRegex = @"allow";
   bundle.blocklistRegex = @"block";
   bundle.blockUSBMount = @(YES);
+  bundle.blockUnencryptedRemovableMediaMount = @(YES);
   bundle.remountUSBMode = @[ @"foo" ];
   bundle.blockNetworkMount = @(YES);
   bundle.bannedNetworkMountBlockMessage = @"Network mount blocked";
@@ -89,6 +93,8 @@
   bundle.enableNotificationSilences = @(YES);
   bundle.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
   bundle.pushTokenChain = @[ @"issuerJWT", @"userJWT" ];
+  bundle.fullSyncInterval = @(600);
+  bundle.pushNotificationsFullSyncInterval = @(21600);
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -111,6 +117,11 @@
   }];
 
   [bundle blockUSBMount:^(BOOL val) {
+    XCTAssertNotEqual(val, NO);
+    [exp fulfill];
+  }];
+
+  [bundle blockUnencryptedRemovableMediaMount:^(BOOL val) {
     XCTAssertNotEqual(val, NO);
     [exp fulfill];
   }];
@@ -220,6 +231,16 @@
     [exp fulfill];
   }];
 
+  [bundle fullSyncInterval:^(NSUInteger val) {
+    XCTAssertEqual(val, 600);
+    [exp fulfill];
+  }];
+
+  [bundle pushNotificationsFullSyncInterval:^(NSUInteger val) {
+    XCTAssertEqual(val, 21600);
+    [exp fulfill];
+  }];
+
   // Low timeout because code above is synchronous
   [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
@@ -244,6 +265,10 @@
   }];
 
   [bundle blockUSBMount:^(BOOL val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle blockUnencryptedRemovableMediaMount:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
   }];
 
@@ -324,6 +349,14 @@
   }];
 
   [bundle pushTokenChain:^(NSArray<NSString *> *val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle fullSyncInterval:^(NSUInteger val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle pushNotificationsFullSyncInterval:^(NSUInteger val) {
     XCTFail(@"This shouldn't be called");
   }];
 }

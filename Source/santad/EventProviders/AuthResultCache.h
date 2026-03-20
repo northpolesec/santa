@@ -5,7 +5,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_AUTHRESULTCACHE_H
-#define SANTA__SANTAD__EVENTPROVIDERS_AUTHRESULTCACHE_H
+#ifndef SANTA_SANTAD_EVENTPROVIDERS_AUTHRESULTCACHE_H
+#define SANTA_SANTAD_EVENTPROVIDERS_AUTHRESULTCACHE_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
@@ -26,8 +26,8 @@
 #import "Source/common/SNTMetricSet.h"
 #include "Source/common/SantaCache.h"
 #import "Source/common/SantaVnode.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityClientBase.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#import "Source/common/es/SNTEndpointSecurityClientBase.h"
 
 @class SNTCachedDecision;
 
@@ -58,6 +58,7 @@ enum class FlushCacheReason {
   kFilesystemUnmounted,
   kEntitlementsPrefixFilterChanged,
   kEntitlementsTeamIDFilterChanged,
+  kCELFallbackRulesChanged,
 };
 
 class AuthResultCache {
@@ -108,4 +109,4 @@ class AuthResultCache {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_SANTAD_EVENTPROVIDERS_AUTHRESULTCACHE_H

@@ -4,7 +4,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,6 +53,7 @@ static size_t GetResidentMemoryBytes() {
 - (void)testCompileAndEvaluateArenaGrowth {
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
 
   auto sut = santa::cel::Evaluator<true>::Create();
   if (!sut.ok()) {
@@ -94,6 +95,9 @@ static size_t GetResidentMemoryBytes() {
           },
           ^std::vector<AncestorT>() {
             return {};
+          },
+          ^std::vector<FileDescriptorT>() {
+            return {};
           });
       auto result = sut.value()->CompileAndEvaluate(expr, activation);
       if (!result.ok()) {
@@ -130,6 +134,9 @@ static size_t GetResidentMemoryBytes() {
             return "/usr/local/bin";
           },
           ^std::vector<AncestorT>() {
+            return {};
+          },
+          ^std::vector<FileDescriptorT>() {
             return {};
           });
       auto result = sut.value()->CompileAndEvaluate(expr, activation);

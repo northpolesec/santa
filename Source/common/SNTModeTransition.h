@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 
 // Semi-arbitrary min/max values for max minutes.
 // Max minutes must be less than 30 days (in minutes).

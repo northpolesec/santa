@@ -4,7 +4,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,20 +12,20 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#ifndef SANTA_SANTAD_TEMPORARYMONITORMODE_H
+#define SANTA_SANTAD_TEMPORARYMONITORMODE_H
+
 #include <memory>
 #include <optional>
 
 #include "Source/common/PassKey.h"
-#include "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTKVOManager.h"
-#include "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/Timer.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #include "absl/synchronization/mutex.h"
-
-#ifndef SANTA__SANTAD__TEMPORARYMONITORMODE_H
-#define SANTA__SANTAD__TEMPORARYMONITORMODE_H
 
 extern NSString *const kStateTempMonitorModeBootUUIDKey;
 extern NSString *const kStateTempMonitorModeDeadlineKey;
@@ -119,4 +119,4 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
 
 }  // namespace santa
 
-#endif  // SANTA__SANTAD__TEMPORARYMONITORMODE_H
+#endif  // SANTA_SANTAD_TEMPORARYMONITORMODE_H

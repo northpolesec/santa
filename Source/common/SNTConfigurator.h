@@ -1,11 +1,11 @@
 /// Copyright 2015-2022 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -766,10 +766,20 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 @property(readonly, nonatomic) NSUInteger fullSyncInterval;
 
 ///
+///  Set the full sync interval as received from a sync server.
+///
+- (void)setFullSyncInterval:(NSUInteger)interval;
+
+///
 ///  Full sync interval in seconds while listening for push notifications.
 ///  Defaults to kDefaultPushNotificationsFullSyncInterval.
 ///
 @property(readonly, nonatomic) NSUInteger pushNotificationsFullSyncInterval;
+
+///
+///  Set the push notifications full sync interval as received from a sync server.
+///
+- (void)setPushNotificationsFullSyncInterval:(NSUInteger)interval;
 
 ///
 ///  Enable statistics uploading to polaris.northpole.security.
@@ -845,6 +855,18 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///  Set the block USB mount state as received from a sync server.
 ///
 - (void)setSyncServerBlockUSBMount:(BOOL)enabled;
+
+///
+/// If YES, unencrypted external USB storage devices will be blocked from mounting.
+/// Encrypted devices will be allowed (or remounted per RemountUSBMode).
+/// This setting is independent of BlockUSBMount. Defaults to NO.
+///
+@property(nonatomic, readonly) BOOL blockUnencryptedRemovableMediaMount;
+
+///
+///  Set the block unencrypted USB mount state as received from a sync server.
+///
+- (void)setSyncServerBlockUnencryptedRemovableMediaMount:(BOOL)enabled;
 
 ///
 /// Comma-separated `$ mount -o` arguments used for forced remounting of USB devices. Default
@@ -1067,6 +1089,15 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 /// This property is not KVO compliant.
 ///
 @property(nullable, readonly, nonatomic) NSArray<NSString *> *enabledProcessAnnotations;
+
+///
+///  If set, only the listed command types will be accepted from the sync server.
+///  Command names are lowercase strings matching proto field names: "kill", "ping".
+///  When unset (nil), all commands are allowed.
+///
+///  This is a forced config key (MDM only) — not settable via sync server.
+///
+@property(nullable, readonly, nonatomic) NSArray<NSString *> *allowedSantaCommands;
 
 ///
 ///  Retrieve an initialized singleton configurator object using the default file path.

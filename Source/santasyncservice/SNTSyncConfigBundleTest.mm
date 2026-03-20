@@ -30,6 +30,7 @@
 @property NSString *allowlistRegex;
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
+@property NSNumber *blockUnencryptedRemovableMediaMount;
 @property NSArray *remountUSBMode;
 @property NSNumber *blockNetworkMount;
 @property NSString *bannedNetworkMountBlockMessage;
@@ -51,6 +52,8 @@
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
 @property NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property NSNumber *fullSyncInterval;
+@property NSNumber *pushNotificationsFullSyncInterval;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -71,6 +74,7 @@
   XCTAssertNil(bundle.allowlistRegex);
   XCTAssertNil(bundle.blocklistRegex);
   XCTAssertNil(bundle.blockUSBMount);
+  XCTAssertNil(bundle.blockUnencryptedRemovableMediaMount);
   XCTAssertNil(bundle.remountUSBMode);
   XCTAssertNil(bundle.blockNetworkMount);
   XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
@@ -136,6 +140,10 @@
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.fileAccessEventDetailText, syncState.fileAccessEventDetailText);
 
+  syncState.blockUnencryptedRemovableMediaMount = @(YES);
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertTrue([bundle.blockUnencryptedRemovableMediaMount boolValue]);
+
   syncState.blockNetworkMount = @(YES);
   syncState.bannedNetworkMountBlockMessage = @"banban";
   syncState.allowedNetworkMountHosts = @[ @"0.0.0.0", @"localhost" ];
@@ -153,6 +161,21 @@
   syncState.telemetryFilterExpressions = @[ @"expr1", @"expr2" ];
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.telemetryFilterExpressions, syncState.telemetryFilterExpressions);
+
+  syncState.fullSyncInterval = @(1200);
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.fullSyncInterval, @(1200));
+
+  syncState.pushNotificationsFullSyncInterval = @(7200);
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.pushNotificationsFullSyncInterval, @(7200));
+
+  // When the server doesn't set the intervals, they should be nil
+  syncState.fullSyncInterval = nil;
+  syncState.pushNotificationsFullSyncInterval = nil;
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertNil(bundle.fullSyncInterval);
+  XCTAssertNil(bundle.pushNotificationsFullSyncInterval);
 }
 
 - (void)testRuleSyncConfigBundle {
@@ -166,6 +189,7 @@
   XCTAssertNil(bundle.allowlistRegex);
   XCTAssertNil(bundle.blocklistRegex);
   XCTAssertNil(bundle.blockUSBMount);
+  XCTAssertNil(bundle.blockUnencryptedRemovableMediaMount);
   XCTAssertNil(bundle.remountUSBMode);
   XCTAssertNil(bundle.blockNetworkMount);
   XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
@@ -204,6 +228,7 @@
   XCTAssertNil(bundle.allowlistRegex);
   XCTAssertNil(bundle.blocklistRegex);
   XCTAssertNil(bundle.blockUSBMount);
+  XCTAssertNil(bundle.blockUnencryptedRemovableMediaMount);
   XCTAssertNil(bundle.remountUSBMode);
   XCTAssertNil(bundle.blockNetworkMount);
   XCTAssertNil(bundle.bannedNetworkMountBlockMessage);

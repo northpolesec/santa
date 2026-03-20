@@ -29,6 +29,7 @@
 - (void)allowlistRegex:(void (^)(NSString *))block;
 - (void)blocklistRegex:(void (^)(NSString *))block;
 - (void)blockUSBMount:(void (^)(BOOL))block;
+- (void)blockUnencryptedRemovableMediaMount:(void (^)(BOOL))block;
 - (void)remountUSBMode:(void (^)(NSArray *))block;
 - (void)blockNetworkMount:(void (^)(BOOL))block;
 - (void)bannedNetworkMountBlockMessage:(void (^)(NSString *))block;
@@ -51,5 +52,7 @@
 - (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block;
 - (void)telemetryFilterExpressions:(void (^)(NSArray<NSString *> *))block;
 - (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule *> *))block;
+- (void)fullSyncInterval:(void (^)(NSUInteger))block;
+- (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))block;
 
 @end

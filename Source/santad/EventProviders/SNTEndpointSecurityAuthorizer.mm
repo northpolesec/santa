@@ -1,11 +1,11 @@
 /// Copyright 2022 Google Inc. All rights reserved.
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,10 +23,10 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTLogging.h"
+#include "Source/common/es/ESMetricsObserver.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
-#include "Source/santad/Metrics.h"
 
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;
@@ -46,7 +46,7 @@ using santa::Message;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
-                      metrics:(std::shared_ptr<santa::Metrics>)metrics
+                      metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                execController:(SNTExecutionController *)execController
            compilerController:(SNTCompilerController *)compilerController
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache

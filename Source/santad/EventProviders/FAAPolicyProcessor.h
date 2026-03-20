@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__EVENTPROVIDERS_FAAPOLICYPROCESSOR_H
-#define SANTA__SANTAD__EVENTPROVIDERS_FAAPOLICYPROCESSOR_H
+#ifndef SANTA_SANTAD_EVENTPROVIDERS_FAAPOLICYPROCESSOR_H
+#define SANTA_SANTAD_EVENTPROVIDERS_FAAPOLICYPROCESSOR_H
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <dispatch/dispatch.h>
@@ -31,11 +31,11 @@
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaSetCache.h"
 #include "Source/common/SantaVnode.h"
+#include "Source/common/es/Enricher.h"
+#include "Source/common/es/Message.h"
+#import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/common/faa/WatchItemPolicy.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
 #include "Source/santad/EventProviders/RateLimiter.h"
-#import "Source/santad/EventProviders/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
 #import "Source/santad/SNTDecisionCache.h"
@@ -238,4 +238,4 @@ class DataFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
 
 #pragma clang diagnostic pop
 
-#endif
+#endif  // SANTA_SANTAD_EVENTPROVIDERS_FAAPOLICYPROCESSOR_H

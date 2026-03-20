@@ -1,16 +1,17 @@
 /// Copyright 2021-2022 Google Inc. All rights reserved.
+/// Copyright 2024 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///    http://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
-///    Unless required by applicable law or agreed to in writing, software
-///    distributed under the License is distributed on an "AS IS" BASIS,
-///    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-///    See the License for the specific language governing permissions and
-///    limitations under the License.
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
 
 #include <CoreFoundation/CFDictionary.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -104,6 +105,19 @@ DASessionRef __nullable DASessionCreate(CFAllocatorRef __nullable allocator);
 
 void DADiskUnmount(DADiskRef disk, DADiskUnmountOptions options,
                    DADiskUnmountCallback __nullable callback, void *__nullable context);
+
+const char *__nullable DADiskGetBSDName(DADiskRef disk);
+
+DADissenterRef __nullable DADissenterCreate(CFAllocatorRef __nullable allocator, DAReturn status,
+                                            CFStringRef __nullable statusString);
+
+void DARegisterDiskMountApprovalCallback(DASessionRef session, CFDictionaryRef __nullable match,
+                                         DADiskMountApprovalCallback callback,
+                                         void *__nullable context);
+
+DAReturn DADissenterGetStatus(DADissenterRef dissenter);
+CFStringRef __nullable DADissenterGetStatusString(DADissenterRef dissenter);
+
 int getmntinfo_r_np(struct statfs *__nullable *__nullable mntbufp, int flags);
 
 CF_EXTERN_C_END

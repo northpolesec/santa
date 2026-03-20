@@ -5,7 +5,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@
 #import "Source/common/NKeyTokenValidator.h"
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
+#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
@@ -213,10 +214,13 @@ static NSString *const kMetricExportTimeout = @"MetricExportTimeout";
 static NSString *const kMetricExtraLabels = @"MetricExtraLabels";
 
 static NSString *const kEnabledProcessAnnotations = @"EnabledProcessAnnotations";
+static NSString *const kAllowedSantaCommandsKey = @"AllowedSantaCommands";
 
 // The keys managed by a sync server or mobileconfig.
 static NSString *const kClientModeKey = @"ClientMode";
 static NSString *const kBlockUSBMountKey = @"BlockUSBMount";
+static NSString *const kBlockUnencryptedRemovableMediaMountKey =
+    @"BlockUnencryptedRemovableMediaMount";
 static NSString *const kRemountUSBModeKey = @"RemountUSBMode";
 static NSString *const kBlockNetworkMountKey = @"BlockNetworkMount";
 static NSString *const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
@@ -281,6 +285,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kBlockedPathRegexKey : re,
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
+      kBlockUnencryptedRemovableMediaMountKey : number,
       kRemountUSBModeKey : array,
       kBlockNetworkMountKey : number,
       kBannedNetworkMountBlockMessage : string,
@@ -317,6 +322,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kBlockedPathRegexKey : re,
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
+      kBlockUnencryptedRemovableMediaMountKey : number,
       kRemountUSBModeKey : array,
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
@@ -406,6 +412,7 @@ static NSString *const kPushTokenChainKey = @"PushTokenChain";
       kBrandingCompanyName : string,
       kBrandingCompanyLogo : string,
       kBrandingCompanyLogoDark : string,
+      kAllowedSantaCommandsKey : array,
     };
 
     _syncStateFilePath = syncStateFilePath;
@@ -780,6 +787,10 @@ static SNTConfigurator *sharedConfigurator = nil;
   return [self syncAndConfigStateSet];
 }
 
++ (NSSet *)keyPathsForValuesAffectingBlockUnencryptedRemovableMediaMount {
+  return [self syncAndConfigStateSet];
+}
+
 + (NSSet *)keyPathsForValuesAffectingBannedUSBBlockMessage {
   return [self configStateSet];
 }
@@ -870,6 +881,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 + (NSSet *)keyPathsForValuesAffectingPushTokenChain {
   return [self syncStateSet];
+}
+
++ (NSSet *)keyPathsForValuesAffectingAllowedSantaCommands {
+  return [self configStateSet];
 }
 
 #pragma mark Public Interface
@@ -1332,12 +1347,20 @@ static SNTConfigurator *sharedConfigurator = nil;
   return kDefaultFullSyncInterval;
 }
 
+- (void)setFullSyncInterval:(NSUInteger)interval {
+  [self updateSyncStateForKey:kFullSyncInterval value:@(interval)];
+}
+
 - (NSUInteger)pushNotificationsFullSyncInterval {
   NSNumber *interval = self.syncState[kFCMFullSyncInterval];
   if (interval) {
     return [interval unsignedIntegerValue];
   }
   return kDefaultPushNotificationsFullSyncInterval;
+}
+
+- (void)setPushNotificationsFullSyncInterval:(NSUInteger)interval {
+  [self updateSyncStateForKey:kFCMFullSyncInterval value:@(interval)];
 }
 
 - (NSString *)machineOwner {
@@ -1609,6 +1632,10 @@ static SNTConfigurator *sharedConfigurator = nil;
         format:@"isSyncV2Enabled called from: %@", [[NSProcessInfo processInfo] processName]];
   }
 
+  if (santa::SNTIsLiteInstall()) {
+    return NO;
+  }
+
   return santa::IsDomainPinned([self syncBaseURL]) || [self hasValidPushTokenChain];
 }
 
@@ -1635,6 +1662,17 @@ static SNTConfigurator *sharedConfigurator = nil;
   if (n) return [n boolValue];
 
   return [self.configState[kBlockUSBMountKey] boolValue];
+}
+
+- (void)setSyncServerBlockUnencryptedRemovableMediaMount:(BOOL)enabled {
+  [self updateSyncStateForKey:kBlockUnencryptedRemovableMediaMountKey value:@(enabled)];
+}
+
+- (BOOL)blockUnencryptedRemovableMediaMount {
+  NSNumber *n = self.syncState[kBlockUnencryptedRemovableMediaMountKey];
+  if (n) return [n boolValue];
+
+  return [self.configState[kBlockUnencryptedRemovableMediaMountKey] boolValue];
 }
 
 - (void)setSyncServerBannedNetworkMountBlockMessage:(NSString *)msg {
@@ -1762,6 +1800,25 @@ static SNTConfigurator *sharedConfigurator = nil;
   return annotations;
 }
 
+- (NSArray<NSString *> *)allowedSantaCommands {
+  NSArray *commands = self.configState[kAllowedSantaCommandsKey];
+  if (!commands) {
+    return nil;
+  }
+
+  NSMutableArray<NSString *> *filtered = [[NSMutableArray alloc] initWithCapacity:commands.count];
+
+  for (id command in commands) {
+    if ([command isKindOfClass:[NSString class]]) {
+      [filtered addObject:command];
+    } else {
+      LOGW(@"AllowedSantaCommands contains non-string value, ignoring: %@", [command class]);
+    }
+  }
+
+  return filtered;
+}
+
 #pragma mark - Private
 
 ///
@@ -1872,11 +1929,14 @@ static SNTConfigurator *sharedConfigurator = nil;
 
 - (NSArray *)telemetryFilterExpressions {
   NSMutableArray *merged = [NSMutableArray array];
-  NSArray *syncExpressions = EnsureArrayOfStrings(self.syncState[kTelemetryFilterExpressionsKey]);
-  if (syncExpressions) [merged addObjectsFromArray:syncExpressions];
+
   NSArray *configExpressions =
       EnsureArrayOfStrings(self.configState[kTelemetryFilterExpressionsKey]);
   if (configExpressions) [merged addObjectsFromArray:configExpressions];
+
+  NSArray *syncExpressions = EnsureArrayOfStrings(self.syncState[kTelemetryFilterExpressionsKey]);
+  if (syncExpressions) [merged addObjectsFromArray:syncExpressions];
+
   return merged.count ? [merged copy] : nil;
 }
 

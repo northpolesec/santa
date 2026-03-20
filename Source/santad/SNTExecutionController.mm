@@ -5,7 +5,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,10 +47,10 @@
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
 #include "Source/common/Unit.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/CELActivation.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
@@ -441,10 +441,12 @@ static NSString *const kPrinterProxy =
           NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
           // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
           [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
-          [msg appendFormat:@"\033[1mPath:      \033[0m %@\n"
+          [msg appendFormat:@"\033[1mReason:    \033[0m %@\n"
+                            @"\033[1mPath:      \033[0m %@\n"
                             @"\033[1mIdentifier:\033[0m %@\n"
                             @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                            se.filePath, se.fileSHA256, se.parentName, se.ppid];
+                            [SNTBlockMessage blockReasonForEventState:cd.decision], se.filePath,
+                            se.fileSHA256, se.parentName, se.ppid];
           NSURL *detailURL =
               [SNTBlockMessage eventDetailURLForEvent:se
                                             customURL:(cd.customURL ?: config.eventDetailURL)];

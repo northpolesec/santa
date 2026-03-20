@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__SANTAD_DEPS_H
-#define SANTA__SANTAD__SANTAD_DEPS_H
+#ifndef SANTA_SANTAD_SANTADDEPS_H
+#define SANTA_SANTAD_SANTADDEPS_H
 
 #import <Foundation/Foundation.h>
 
@@ -25,15 +25,15 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTMetricSet.h"
 #include "Source/common/Unit.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Enricher.h"
 #include "Source/common/faa/WatchItems.h"
+#include "Source/common/processtree/process_tree.h"
 #include "Source/santad/EntitlementsFilter.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Enricher.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
 #include "Source/santad/ProcessControl.h"
-#include "Source/santad/ProcessTree/process_tree.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
 #import "Source/santad/SNTNetworkExtensionQueue.h"
@@ -103,4 +103,4 @@ class SantadDeps {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_SANTAD_SANTADDEPS_H

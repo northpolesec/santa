@@ -15,7 +15,7 @@ proto_library(
     name = "santa_proto",
     srcs = ["santa.proto"],
     deps = [
-        "//Source/santad/ProcessTree:process_tree_proto",
+        "//Source/common/processtree:process_tree_proto",
         "@protobuf//:any_proto",
         "@protobuf//:timestamp_proto",
     ],
@@ -26,15 +26,6 @@ cc_proto_library(
     deps = [":santa_proto"],
 )
 
-# Note: Simple wrapper for a `cc_proto_library` target which cannot be directly
-# depended upon by an `objc_library` target.
-cc_library(
-    name = "santa_cc_proto_library_wrapper",
-    hdrs = ["santa_proto_include_wrapper.h"],
-    deps = [
-        ":santa_cc_proto",
-    ],
-)
 
 objc_library(
     name = "PowerMonitor",
@@ -255,6 +246,15 @@ objc_library(
 objc_library(
     name = "String",
     hdrs = ["String.h"],
+)
+
+objc_library(
+    name = "CSOpsHelper",
+    srcs = ["CSOpsHelper.mm"],
+    hdrs = ["CSOpsHelper.h"],
+    deps = [
+        ":String",
+    ],
 )
 
 objc_library(
@@ -491,6 +491,16 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTLiteDetector",
+    srcs = ["SNTLiteDetector.mm"],
+    hdrs = ["SNTLiteDetector.h"],
+    module_name = "santa_common_SNTLiteDetector",
+    deps = [
+        ":SNTCommonEnums",
+    ],
+)
+
+objc_library(
     name = "SNTConfigurator",
     srcs = ["SNTConfigurator.mm"],
     hdrs = ["SNTConfigurator.h"],
@@ -504,6 +514,7 @@ objc_library(
         ":SNTCELFallbackRule",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
+        ":SNTLiteDetector",
         ":SNTLogging",
         ":SNTModeTransition",
         ":SNTRule",

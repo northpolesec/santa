@@ -12,7 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#include "Source/santasyncservice/SNTPolaris.h"
+#import "Source/santasyncservice/SNTPolaris.h"
 
 #include <iostream>
 #include <sstream>
@@ -24,7 +24,7 @@
 #include <google/protobuf/arena.h>
 
 #include "Source/common/SNTLogging.h"
-#include "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 
 #include "stats/v1.pb.h"

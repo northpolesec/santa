@@ -27,6 +27,7 @@
 @property NSString *allowlistRegex;
 @property NSString *blocklistRegex;
 @property NSNumber *blockUSBMount;
+@property NSNumber *blockUnencryptedRemovableMediaMount;
 @property NSArray *remountUSBMode;
 @property NSNumber *blockNetworkMount;
 @property NSString *bannedNetworkMountBlockMessage;
@@ -48,6 +49,8 @@
 @property NSArray<NSString *> *pushTokenChain;
 @property NSArray<NSString *> *telemetryFilterExpressions;
 @property NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property NSNumber *fullSyncInterval;
+@property NSNumber *pushNotificationsFullSyncInterval;
 @end
 
 SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState) {
@@ -68,6 +71,7 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.allowlistRegex = syncState.allowlistRegex;
   bundle.blocklistRegex = syncState.blocklistRegex;
   bundle.blockUSBMount = syncState.blockUSBMount;
+  bundle.blockUnencryptedRemovableMediaMount = syncState.blockUnencryptedRemovableMediaMount;
   bundle.remountUSBMode = syncState.remountUSBMode;
   bundle.blockNetworkMount = syncState.blockNetworkMount;
   bundle.bannedNetworkMountBlockMessage = syncState.bannedNetworkMountBlockMessage;
@@ -86,6 +90,8 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   bundle.networkExtensionSettings = syncState.networkExtensionSettings;
   bundle.telemetryFilterExpressions = syncState.telemetryFilterExpressions;
   bundle.celFallbackRules = syncState.celFallbackRules;
+  bundle.fullSyncInterval = syncState.fullSyncInterval;
+  bundle.pushNotificationsFullSyncInterval = syncState.pushNotificationsFullSyncInterval;
 
   bundle.fullSyncLastSuccess = [NSDate now];
 

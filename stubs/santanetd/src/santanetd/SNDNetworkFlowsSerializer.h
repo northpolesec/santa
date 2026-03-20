@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SND_NETWORK_FLOWS_SERIALIZER_H
-#define SND_NETWORK_FLOWS_SERIALIZER_H
+#ifndef SANTA_STUBS_SANTANETD_SRC_SANTANETD_SNDNETWORKFLOWSSERIALIZER_H
+#define SANTA_STUBS_SANTANETD_SRC_SANTANETD_SNDNETWORKFLOWSSERIALIZER_H
 
 #include <string>
 
@@ -37,4 +37,4 @@ std::string FormatNetworkFlowsBasicString(SNDProcessFlows *processFlows, SNTCach
 
 }  // namespace santanetd
 
-#endif
+#endif  // SANTA_STUBS_SANTANETD_SRC_SANTANETD_SNDNETWORKFLOWSSERIALIZER_H

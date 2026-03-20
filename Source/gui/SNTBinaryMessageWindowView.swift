@@ -4,7 +4,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -59,6 +59,7 @@ import santa_gui_SNTMessageView
 
 func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: String?) {
   var s = "Santa blocked \((e?.fileBundleName?.isEmpty == false) ? e!.fileBundleName! : "an application")"
+  s += "\nReason     : \(SNTBlockMessage.blockReason(for: e?.decision ?? .unknown))"
   if let publisher = e?.publisherInfo {
     s += "\nPublisher  : \(publisher)"
   }
@@ -105,6 +106,13 @@ struct MoreDetailsView: View {
   var body: some View {
     HStack(spacing: 20.0) {
       VStack(spacing: 20.0) {
+        addLabel {
+          Text("Block Reason").bold().font(Font.system(size: 12.0))
+          Text(SNTBlockMessage.blockReason(for: e?.decision ?? .unknown)).textSelection(.enabled)
+        }
+
+        Divider()
+
         addLabel {
           Text("Path").bold().font(Font.system(size: 12.0))
           Text(e?.filePath ?? "unknown").textSelection(.enabled)

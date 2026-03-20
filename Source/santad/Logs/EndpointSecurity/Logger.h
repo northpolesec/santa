@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
-#define SANTA__SANTAD__LOGS_ENDPOINTSECURITY_LOGGER_H
+#ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_LOGGER_H
+#define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_LOGGER_H
 
 #import <Foundation/Foundation.h>
 
@@ -25,9 +25,9 @@
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/Timer.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EndpointSecurityAPI.h"
-#include "Source/santad/EventProviders/EndpointSecurity/EnrichedTypes.h"
-#include "Source/santad/EventProviders/EndpointSecurity/Message.h"
+#include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/EnrichedTypes.h"
+#include "Source/common/es/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
 #import "Source/santad/SNTDecisionCache.h"
@@ -178,4 +178,4 @@ class Logger : public Timer<Logger> {
 
 }  // namespace santa
 
-#endif
+#endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_LOGGER_H

@@ -4,7 +4,7 @@
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 
-#include "Source/common/santa_proto_include_wrapper.h"
+#include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_platform_specific.h"
 #include "absl/strings/str_cat.h"
 

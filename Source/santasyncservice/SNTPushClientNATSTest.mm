@@ -1,10 +1,10 @@
-/// Copyright 2025 North Pole Security, Inc.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
 /// You may obtain a copy of the License at
 ///
-///     https://www.apache.org/licenses/LICENSE-2.0
+///     http://www.apache.org/licenses/LICENSE-2.0
 ///
 /// Unless required by applicable law or agreed to in writing, software
 /// distributed under the License is distributed on an "AS IS" BASIS,
@@ -190,7 +190,7 @@ extern "C" {
   syncState.pushJWT = @"test-jwt";
   syncState.pushDeviceID = @"test-device-id";
   syncState.pushTags = @[ @"tag1", @"tag2" ];
-  syncState.pushNotificationsFullSyncInterval = 3600;
+  syncState.pushNotificationsFullSyncInterval = @(3600);
 
   [self.client handlePreflightSyncState:syncState];
 
@@ -221,7 +221,7 @@ extern "C" {
 
   // When: Preflight sync state with new interval is handled
   SNTSyncState *syncState = [[SNTSyncState alloc] init];
-  syncState.pushNotificationsFullSyncInterval = 7200;  // 2 hours
+  syncState.pushNotificationsFullSyncInterval = @(7200);  // 2 hours
 
   [self.client handlePreflightSyncState:syncState];
 
@@ -321,7 +321,7 @@ extern "C" {
   syncState.pushDeviceID = @"test-device-id";
   syncState.pushTags =
       @[ @"production", @"santa.host.7228546F079C54169E2C929EACE830BE", @"staging" ];
-  syncState.pushNotificationsFullSyncInterval = 3600;
+  syncState.pushNotificationsFullSyncInterval = @(3600);
 
   [self.client handlePreflightSyncState:syncState];
 

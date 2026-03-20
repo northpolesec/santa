@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA__COMMON__XXHASH_H
-#define SANTA__COMMON__XXHASH_H
+#ifndef SANTA_COMMON_SNTXXHASH_H
+#define SANTA_COMMON_SNTXXHASH_H
 
 #include <functional>
 #include <string>
@@ -143,4 +143,4 @@ using Xxhash128 = Xxhash<XxhashFuncPtrs128>;
 
 }  // namespace santa
 
-#endif  // SANTA__COMMON__XXHASH_H
+#endif  // SANTA_COMMON_SNTXXHASH_H
