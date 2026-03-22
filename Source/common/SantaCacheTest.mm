@@ -17,6 +17,7 @@
 
 #import <XCTest/XCTest.h>
 
+#include <atomic>
 #include <numeric>
 #include <set>
 #include <string>
@@ -531,6 +532,325 @@ struct S {
 
   XCTAssertEqual(sut.count(), 0);
   XCTAssertEqual(sut.get(2), nullptr);
+}
+
+// Mirrors the real Santa workload: many concurrent readers with fewer writers,
+// all hitting the same key space. Validates that os_unfair_lock correctly
+// serializes access without data corruption.
+- (void)testConcurrentReadersAndWriters {
+  auto sut = new SantaCache<uint64_t, uint64_t>(20000);
+  const int kKeyRange = 1000;
+
+  // Pre-populate so readers always have something to find
+  for (int i = 0; i < kKeyRange; ++i) {
+    sut->set(i, i + 1);
+  }
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 4 reader threads
+  for (int t = 0; t < 4; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+      for (int round = 0; round < 50; ++round) {
+        for (int i = 0; i < kKeyRange; ++i) {
+          uint64_t val = sut->get(i);
+          // Keys are pre-populated and never removed, so val must be one of the
+          // two written values — never 0 and never garbage.
+          XCTAssertTrue(val == (uint64_t)(i + 1) || val == (uint64_t)(i + 10001),
+                        @"Unexpected value %llu for key %d", val, i);
+        }
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // 2 writer threads overwriting the same keys
+  for (int t = 0; t < 2; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      for (int round = 0; round < 50; ++round) {
+        for (int i = 0; i < kKeyRange; ++i) {
+          sut->set(i, i + 10001);
+        }
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+  delete sut;
+}
+
+// Tests that clear() during concurrent reads/writes doesn't corrupt state.
+// After clear completes, subsequent operations must work correctly.
+- (void)testConcurrentClearDuringReadWrite {
+  auto sut = new SantaCache<uint64_t, uint64_t>(5000);
+  auto stop = new std::atomic<bool>{false};
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // Reader/writer threads: continuously set and get
+  for (int t = 0; t < 4; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      uint64_t i = 0;
+      while (!stop->load(std::memory_order_relaxed)) {
+        uint64_t key = (i++) % 2000;
+        sut->set(key, key + 1);
+        uint64_t val = sut->get(key);
+        // After a clear, the value may be 0. Otherwise it should be key+1.
+        XCTAssertTrue(val == 0 || val == key + 1, @"Unexpected value %llu for key %llu", val, key);
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // Clearing thread: clear until told to stop
+  dispatch_group_enter(group);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    while (!stop->load(std::memory_order_relaxed)) {
+      sut->clear();
+    }
+    dispatch_group_leave(group);
+  });
+
+  // Let threads run for a bounded time, then signal all to stop.
+  usleep(500000);  // 500ms
+  stop->store(true, std::memory_order_relaxed);
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  // Cache must be usable after the storm
+  sut->set(42, 99);
+  XCTAssertEqual(sut->get(42), 99);
+
+  delete stop;
+  delete sut;
+}
+
+// Tests the auto-clear-at-max-capacity path under contention. Multiple threads
+// race to insert the entry that triggers the capacity overflow. The lock dance
+// (unlock bucket -> lock clear_bucket -> maybe clear -> relock bucket -> unlock
+// clear_bucket) is the most complex locking sequence in SantaCache.
+- (void)testAutoOverflowClearUnderContention {
+  const uint64_t kMaxSize = 100;
+  auto sut = new SantaCache<uint64_t, uint64_t>(kMaxSize);
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 4 threads all racing to fill and overflow the cache
+  for (int t = 0; t < 4; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      for (int round = 0; round < 50; ++round) {
+        // Each thread writes into its own key range to maximize inserts
+        for (uint64_t i = t * 1000; i < (uint64_t)(t * 1000 + 200); ++i) {
+          sut->set(i, i + 1);
+        }
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  // Count must never exceed max. It may be less due to auto-clear.
+  XCTAssertLessThanOrEqual(sut->count(), kMaxSize);
+
+  // Cache must still be functional
+  sut->set(999999, 42);
+  XCTAssertEqual(sut->get(999999), 42);
+
+  delete sut;
+}
+
+// Tests compare-and-swap under contention. This mirrors AuthResultCache's
+// state machine transitions where multiple threads race to transition a key
+// from one state to another.
+- (void)testConcurrentCompareAndSwap {
+  auto sut = new SantaCache<uint64_t, uint64_t>(10000);
+  const int kKeys = 100;
+
+  // Pre-populate all keys with initial state = 1
+  for (int i = 0; i < kKeys; ++i) {
+    sut->set(i, 1);
+  }
+
+  // Track how many successful CAS transitions each thread achieves
+  auto total_wins = new std::atomic<int>{0};
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 4 threads race to CAS each key from 1 -> 2
+  for (int t = 0; t < 4; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      int wins = 0;
+      for (int i = 0; i < kKeys; ++i) {
+        if (sut->set(i, 2, 1)) {
+          wins++;
+        }
+      }
+      total_wins->fetch_add(wins, std::memory_order_relaxed);
+      dispatch_group_leave(group);
+    });
+  }
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  // Exactly one thread should win each CAS
+  XCTAssertEqual(total_wins->load(), kKeys, @"Expected exactly %d CAS wins, got %d", kKeys,
+                 total_wins->load());
+
+  // All keys should now be 2
+  for (int i = 0; i < kKeys; ++i) {
+    XCTAssertEqual(sut->get(i), 2);
+  }
+
+  delete total_wins;
+  delete sut;
+}
+
+// Tests concurrent update() calls on the same key. The update block runs
+// while holding the bucket lock, so concurrent updates must serialize.
+- (void)testConcurrentUpdate {
+  auto sut = new SantaCache<uint64_t, uint64_t>(10000);
+  const int kIncrementsPerThread = 10000;
+
+  sut->set(1, 0);
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 4 threads each increment the same key's value
+  for (int t = 0; t < 4; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      for (int i = 0; i < kIncrementsPerThread; ++i) {
+        sut->update(1, ^(uint64_t &val) {
+          val++;
+        });
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  // All increments must be accounted for (no lost updates)
+  XCTAssertEqual(sut->get(1), (uint64_t)(4 * kIncrementsPerThread));
+
+  delete sut;
+}
+
+// Tests concurrent remove and get on overlapping keys. A reader traversing
+// a bucket's linked list while another thread removes entries must not crash
+// or return corrupted data.
+- (void)testConcurrentRemoveAndGet {
+  auto sut = new SantaCache<uint64_t, uint64_t>(20000);
+  const int kKeyRange = 1000;
+  auto stop = new std::atomic<bool>{false};
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // Writer thread: continuously add entries
+  dispatch_group_enter(group);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    uint64_t round = 0;
+    while (!stop->load(std::memory_order_relaxed)) {
+      for (int i = 0; i < kKeyRange; ++i) {
+        sut->set(i, (round * kKeyRange) + i + 1);
+      }
+      round++;
+    }
+    dispatch_group_leave(group);
+  });
+
+  // Remover thread: continuously remove entries
+  dispatch_group_enter(group);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    while (!stop->load(std::memory_order_relaxed)) {
+      for (int i = 0; i < kKeyRange; ++i) {
+        sut->remove(i);
+      }
+    }
+    dispatch_group_leave(group);
+  });
+
+  // Reader threads: continuously read, expect either 0 or a valid value
+  for (int t = 0; t < 4; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+      while (!stop->load(std::memory_order_relaxed)) {
+        for (int i = 0; i < kKeyRange; ++i) {
+          uint64_t val = sut->get(i);
+          // Writer stores (round * kKeyRange) + i + 1, so for key i a valid
+          // non-zero value always satisfies (val - 1) % kKeyRange == i.
+          XCTAssertTrue(val == 0 || (val - 1) % kKeyRange == (uint64_t)i,
+                        @"Corrupted value %llu for key %d", val, i);
+        }
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // Let it run for a bit
+  usleep(500000);  // 500ms
+  stop->store(true, std::memory_order_relaxed);
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  delete stop;
+  delete sut;
+}
+
+// Tests that count() stays consistent when multiple threads are concurrently
+// adding and removing entries.
+- (void)testConcurrentCountConsistency {
+  auto sut = new SantaCache<uint64_t, uint64_t>(50000);
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 4 threads each add their own unique keys
+  for (int t = 0; t < 4; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      for (int i = 0; i < 5000; ++i) {
+        sut->set(t * 10000 + i, i + 1);
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out adding");
+
+  XCTAssertEqual(sut->count(), 20000);
+
+  // Now remove all of them concurrently
+  dispatch_group_t group2 = dispatch_group_create();
+  for (int t = 0; t < 4; ++t) {
+    dispatch_group_enter(group2);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      for (int i = 0; i < 5000; ++i) {
+        sut->remove(t * 10000 + i);
+      }
+      dispatch_group_leave(group2);
+    });
+  }
+
+  XCTAssertFalse(dispatch_group_wait(group2, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out removing");
+
+  XCTAssertEqual(sut->count(), 0);
+
+  delete sut;
 }
 
 @end
