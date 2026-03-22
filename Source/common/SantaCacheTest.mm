@@ -591,7 +591,7 @@ struct S {
 
   dispatch_group_t group = dispatch_group_create();
 
-  // Reader/writer thread: continuously set and get
+  // Reader/writer threads: continuously set and get
   for (int t = 0; t < 4; ++t) {
     dispatch_group_enter(group);
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
@@ -607,15 +607,18 @@ struct S {
     });
   }
 
-  // Clearing thread: periodically clear the cache
+  // Clearing thread: clear until told to stop
   dispatch_group_enter(group);
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
-    for (int i = 0; i < 100; ++i) {
+    while (!stop->load(std::memory_order_relaxed)) {
       sut->clear();
     }
-    stop->store(true, std::memory_order_relaxed);
     dispatch_group_leave(group);
   });
+
+  // Let threads run for a bounded time, then signal all to stop.
+  usleep(500000);  // 500ms
+  stop->store(true, std::memory_order_relaxed);
 
   XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
                  @"Timed out");
