@@ -555,8 +555,9 @@ struct S {
       for (int round = 0; round < 50; ++round) {
         for (int i = 0; i < kKeyRange; ++i) {
           uint64_t val = sut->get(i);
-          // Value is either the original or the writer's update, never garbage
-          XCTAssertTrue(val == 0 || val == (uint64_t)(i + 1) || val == (uint64_t)(i + 10001),
+          // Keys are pre-populated and never removed, so val must be one of the
+          // two written values — never 0 and never garbage.
+          XCTAssertTrue(val == (uint64_t)(i + 1) || val == (uint64_t)(i + 10001),
                         @"Unexpected value %llu for key %d", val, i);
         }
       }
@@ -785,8 +786,10 @@ struct S {
       while (!stop->load(std::memory_order_relaxed)) {
         for (int i = 0; i < kKeyRange; ++i) {
           uint64_t val = sut->get(i);
-          // Value is either 0 (removed) or non-zero (set by writer). Never garbage.
-          (void)val;
+          // Writer stores (round * kKeyRange) + i + 1, so for key i a valid
+          // non-zero value always satisfies (val - 1) % kKeyRange == i.
+          XCTAssertTrue(val == 0 || (val - 1) % kKeyRange == (uint64_t)i,
+                        @"Corrupted value %llu for key %d", val, i);
         }
       }
       dispatch_group_leave(group);

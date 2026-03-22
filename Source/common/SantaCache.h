@@ -342,77 +342,81 @@ class SantaCache {
     bool update_only = (update_block != nullptr);
 
     struct bucket *bucket = &buckets_[hash(key)];
-    lock(bucket);
-    struct entry *entry = bucket->head;
-    struct entry *previous_entry = nullptr;
-    while (entry != nullptr) {
-      if (entry->key == key) {
-        if (update_only) {
-          update_block(entry->value);
-        } else {
-          ValueT existing_value = entry->value;
 
-          if (has_prev_value && previous_value != existing_value) {
-            unlock(bucket);
-            return false;
-          }
-
-          entry->value = value;
-        }
-
-        if (!update_only && value == zero_) {
-          if (previous_entry != nullptr) {
-            previous_entry->next = entry->next;
-          } else {
-            bucket->head = entry->next;
-          }
-          delete entry;
-          count_.fetch_sub(1, std::memory_order_relaxed);
-        }
-
-        unlock(bucket);
-        return true;
-      }
-      previous_entry = entry;
-      entry = entry->next;
-    }
-
-    // If value is zero_, we're clearing but there's nothing to clear
-    // so we don't need to do anything else. Alternatively, if has_prev_value
-    // is true and is not zero_ we don't want to set a value.
-    if (!update_only &&
-        (value == zero_ || (has_prev_value && previous_value != zero_))) {
-      unlock(bucket);
-      return false;
-    }
-
-    // Check that adding this new item won't take the cache
-    // over its maximum size.
-    if (count_.load(std::memory_order_relaxed) + 1 > max_size_) {
-      unlock(bucket);
-      lock(&clear_bucket_);
-      // Check again in case clear has already run while waiting for lock
-      if (count_.load(std::memory_order_relaxed) + 1 > max_size_) {
-        clear();
-      }
+    while (true) {
       lock(bucket);
-      unlock(&clear_bucket_);
-    }
+      struct entry *entry = bucket->head;
+      struct entry *previous_entry = nullptr;
+      while (entry != nullptr) {
+        if (entry->key == key) {
+          if (update_only) {
+            update_block(entry->value);
+          } else {
+            ValueT existing_value = entry->value;
 
-    // Allocate a new entry, set the key and value, then put this new entry at
-    // the head of this bucket's linked list.
-    struct entry *new_entry = new struct entry(std::move(key));
-    if (update_block) {
-      update_block(new_entry->value);
-    } else {
-      new_entry->value = value;
-    }
-    new_entry->next = bucket->head;
-    bucket->head = new_entry;
-    count_.fetch_add(1, std::memory_order_relaxed);
+            if (has_prev_value && previous_value != existing_value) {
+              unlock(bucket);
+              return false;
+            }
 
-    unlock(bucket);
-    return true;
+            entry->value = value;
+          }
+
+          if (!update_only && value == zero_) {
+            if (previous_entry != nullptr) {
+              previous_entry->next = entry->next;
+            } else {
+              bucket->head = entry->next;
+            }
+            delete entry;
+            count_.fetch_sub(1, std::memory_order_relaxed);
+          }
+
+          unlock(bucket);
+          return true;
+        }
+        previous_entry = entry;
+        entry = entry->next;
+      }
+
+      // If value is zero_, we're clearing but there's nothing to clear
+      // so we don't need to do anything else. Alternatively, if has_prev_value
+      // is true and is not zero_ we don't want to set a value.
+      if (!update_only &&
+          (value == zero_ || (has_prev_value && previous_value != zero_))) {
+        unlock(bucket);
+        return false;
+      }
+
+      // Check that adding this new item won't take the cache
+      // over its maximum size.
+      if (count_.load(std::memory_order_relaxed) + 1 > max_size_) {
+        unlock(bucket);
+        lock(&clear_bucket_);
+        // Check again in case clear has already run while waiting for lock
+        if (count_.load(std::memory_order_relaxed) + 1 > max_size_) {
+          clear();
+        }
+        unlock(&clear_bucket_);
+        // Bucket was unlocked during the clear path. Another thread may have
+        // inserted the same key, so retry the lookup from scratch.
+        continue;
+      }
+
+      // Key not found and cache has capacity. Insert at head.
+      struct entry *new_entry = new struct entry(std::move(key));
+      if (update_block) {
+        update_block(new_entry->value);
+      } else {
+        new_entry->value = value;
+      }
+      new_entry->next = bucket->head;
+      bucket->head = new_entry;
+      count_.fetch_add(1, std::memory_order_relaxed);
+
+      unlock(bucket);
+      return true;
+    }
   }
 
   /**
