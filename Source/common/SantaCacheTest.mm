@@ -600,8 +600,7 @@ struct S {
         sut->set(key, key + 1);
         uint64_t val = sut->get(key);
         // After a clear, the value may be 0. Otherwise it should be key+1.
-        XCTAssertTrue(val == 0 || val == key + 1,
-                       @"Unexpected value %llu for key %llu", val, key);
+        XCTAssertTrue(val == 0 || val == key + 1, @"Unexpected value %llu for key %llu", val, key);
       }
       dispatch_group_leave(group);
     });
@@ -701,8 +700,8 @@ struct S {
                  @"Timed out");
 
   // Exactly one thread should win each CAS
-  XCTAssertEqual(total_wins->load(), kKeys,
-                 @"Expected exactly %d CAS wins, got %d", kKeys, total_wins->load());
+  XCTAssertEqual(total_wins->load(), kKeys, @"Expected exactly %d CAS wins, got %d", kKeys,
+                 total_wins->load());
 
   // All keys should now be 2
   for (int i = 0; i < kKeys; ++i) {

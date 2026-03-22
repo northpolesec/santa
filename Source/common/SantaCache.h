@@ -237,14 +237,15 @@ class SantaCache {
         delete entry;
         entry = next_entry;
       }
+      bucket->head = nullptr;
     }
 
-    // Reset cache count, no atomicity needed as we hold all the bucket locks.
+    // Reset cache count. All bucket locks are held so no concurrent set()
+    // can observe a stale count and trigger a redundant clear.
     count_.store(0, std::memory_order_relaxed);
 
-    // Reset each bucket's head pointer and release its lock.
+    // Release all bucket locks.
     for (uint32_t i = 0; i < bucket_count_; ++i) {
-      buckets_[i].head = nullptr;
       unlock(&buckets_[i]);
     }
   }
@@ -257,7 +258,9 @@ class SantaCache {
   /**
     Return number of entries currently in cache.
   */
-  inline uint64_t count() const { return count_.load(std::memory_order_relaxed); }
+  inline uint64_t count() const {
+    return count_.load(std::memory_order_relaxed);
+  }
 
   /**
     Fill in the per_bucket_counts array with the number of entries in each
