@@ -404,7 +404,7 @@ class SantaCache {
       }
 
       // Key not found and cache has capacity. Insert at head.
-      struct entry *new_entry = new struct entry(std::move(key));
+      struct entry *new_entry = new struct entry(key);
       if (update_block) {
         update_block(new_entry->value);
       } else {
@@ -433,7 +433,7 @@ class SantaCache {
     os_unfair_lock_unlock(&bucket->lock);
   }
 
-  std::atomic<int64_t> count_ = 0;
+  std::atomic<uint64_t> count_ = 0;
 
   uint64_t max_size_;
   uint32_t bucket_count_;
