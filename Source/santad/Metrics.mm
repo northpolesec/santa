@@ -74,6 +74,7 @@ static NSString *const kEventTypeNotifyLaunchItemAdd = @"NotifyLaunchItemAdd";
 static NSString *const kEventTypeNotifyLaunchItemRemove = @"NotifyLaunchItemRemove";
 static NSString *const kEventTypeNotifyXProtectDetected = @"NotifyXProtectDetected";
 static NSString *const kEventTypeNotifyXProtectRemediated = @"NotifyXProtectRemediated";
+static NSString *const kEventTypeNotifyProcSuspendResume = @"NotifyProcSuspendResume";
 #if HAVE_MACOS_15
 static NSString *const kEventTypeNotifyGatekeeperOverride = @"NotifyGatekeeperOverride";
 #endif  // HAVE_MACOS_15
@@ -163,6 +164,7 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: return kEventTypeNotifyLaunchItemRemove;
     case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED: return kEventTypeNotifyXProtectDetected;
     case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED: return kEventTypeNotifyXProtectRemediated;
+    case ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME: return kEventTypeNotifyProcSuspendResume;
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: return kEventTypeNotifyGatekeeperOverride;
 #endif  // HAVE_MACOS_15

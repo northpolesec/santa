@@ -49,6 +49,7 @@ enum class TelemetryEvent : uint64_t {
   kLaunchItem              = 1 << 21,
   kTCCModification         = 1 << 22,
   kXProtect                = 1 << 23,
+  kProcSuspendResume       = 1 << 24,
   kEverything              = ~0ULL,
 };
 // clang-format on

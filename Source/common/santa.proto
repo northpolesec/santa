@@ -1230,6 +1230,24 @@ message NetworkActivity {
   repeated Process processes = 1;
 }
 
+// Information about a process suspend/resume event
+message ProcSuspendResume {
+  // The process initiating the suspend/resume
+  optional ProcessInfoLight instigator = 1;
+
+  // The target process being suspended/resumed
+  optional ProcessInfo target = 2;
+
+  // The type of suspend/resume action
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    TYPE_SUSPEND = 1;
+    TYPE_RESUME = 2;
+    TYPE_SHUTDOWN_SOCKETS = 3;
+  }
+  optional Type type = 3;
+}
+
 // A message encapsulating a single event
 message SantaMessage {
   // Machine ID of the host emitting this log
@@ -1273,6 +1291,7 @@ message SantaMessage {
     TCCModification tcc_modification = 32;
     XProtect xprotect = 33;
     NetworkActivity network_activity = 34;
+    ProcSuspendResume proc_suspend_resume = 35;
   }
 }
 

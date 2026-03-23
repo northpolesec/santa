@@ -50,6 +50,7 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
       {"launchitem", TelemetryEvent::kLaunchItem},
       {"tccmodification", TelemetryEvent::kTCCModification},
       {"xprotect", TelemetryEvent::kXProtect},
+      {"procsuspendresume", TelemetryEvent::kProcSuspendResume},
       // IMPORTANT: When adding new keys to the map, keep the set of keys in
       // `docs/src/lib/santaconfig.ts` in sync.
 
@@ -114,6 +115,7 @@ TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event) {
 #if HAVE_MACOS_15_4
     case ES_EVENT_TYPE_NOTIFY_TCC_MODIFY: return TelemetryEvent::kTCCModification;
 #endif  // HAVE_MACOS_15_4
+    case ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME: return TelemetryEvent::kProcSuspendResume;
     default: return TelemetryEvent::kNone;
   }
 }

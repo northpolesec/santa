@@ -55,6 +55,7 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedProcSuspendResume &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogout &) override;
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLock &) override;

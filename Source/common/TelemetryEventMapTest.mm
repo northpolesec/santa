@@ -112,6 +112,7 @@ using santa::TelemetryEvent;
       {ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE, TelemetryEvent::kLaunchItem},
       {ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED, TelemetryEvent::kXProtect},
       {ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED, TelemetryEvent::kXProtect},
+      {ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME, TelemetryEvent::kProcSuspendResume},
 #if HAVE_MACOS_15
       {ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE, TelemetryEvent::kGatekeeperOverride},
 #endif  // HAVE_MACOS_15
