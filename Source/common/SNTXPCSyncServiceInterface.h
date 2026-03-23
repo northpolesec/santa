@@ -51,6 +51,9 @@
                    syncType:(SNTSyncType)syncType
                       reply:(void (^)(SNTSyncStatusType))reply;
 
+// Publish metrics to the sync server. The metrics dictionary is the output of SNTMetricSet export.
+- (void)publishMetrics:(NSDictionary *)metrics reply:(void (^)(BOOL))reply;
+
 // Spindown the syncservice. The syncservice will not automatically start back up.
 // A new connection to the syncservice will bring it back up. This allows us to avoid running
 // the syncservice needlessly when there is no configured sync server.

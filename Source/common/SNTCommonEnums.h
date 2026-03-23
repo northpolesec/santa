@@ -172,6 +172,7 @@ typedef NS_ENUM(NSInteger, SNTMetricFormatType) {
   SNTMetricFormatTypeUnknown,
   SNTMetricFormatTypeRawJSON,
   SNTMetricFormatTypeMonarchJSON,
+  SNTMetricFormatTypeProto,
 };
 
 typedef NS_ENUM(NSInteger, SNTOverrideFileAccessAction) {

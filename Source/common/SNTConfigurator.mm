@@ -1744,8 +1744,12 @@ static SNTConfigurator *sharedConfigurator = nil;
 /// otherwise.
 ///
 - (BOOL)exportMetrics {
-  return [self metricFormat] != SNTMetricFormatTypeUnknown &&
-         ![self.configState[kMetricURL] isEqualToString:@""];
+  SNTMetricFormatType format = [self metricFormat];
+  if (format == SNTMetricFormatTypeUnknown) return NO;
+  // Proto format exports via the sync service and doesn't require a metric URL.
+  if (format == SNTMetricFormatTypeProto) return YES;
+  NSString *url = self.configState[kMetricURL];
+  return url.length > 0;
 }
 
 - (SNTMetricFormatType)metricFormat {
@@ -1757,21 +1761,28 @@ static SNTConfigurator *sharedConfigurator = nil;
     return SNTMetricFormatTypeRawJSON;
   } else if ([normalized isEqualToString:@"monarchjson"]) {
     return SNTMetricFormatTypeMonarchJSON;
+  } else if ([normalized isEqualToString:@"proto"]) {
+    return SNTMetricFormatTypeProto;
+  } else if (normalized.length == 0 && santa::IsDomainPinned([self syncBaseURL])) {
+    return SNTMetricFormatTypeProto;
   } else {
     return SNTMetricFormatTypeUnknown;
   }
 }
 
 - (NSURL *)metricURL {
+  if ([self metricFormat] == SNTMetricFormatTypeProto) {
+    return [self syncBaseURL];
+  }
   return [NSURL URLWithString:self.configState[kMetricURL]];
 }
 
-// Returns a default value of 30 (for 30 seconds).
+// Returns a default value of 30 (for 30 seconds), or 600 (10 minutes) for proto format.
 - (NSUInteger)metricExportInterval {
   NSNumber *configuredInterval = self.configState[kMetricExportInterval];
 
   if (configuredInterval == nil) {
-    return 30;
+    return [self metricFormat] == SNTMetricFormatTypeProto ? 600 : 30;
   }
   return [configuredInterval unsignedIntegerValue];
 }

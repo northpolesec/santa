@@ -622,6 +622,19 @@ double watchdogRAMPeak = 0;
   reply([metricSet export]);
 }
 
+- (void)exportMetrics:(void (^)(BOOL))reply {
+  if (![[SNTConfigurator configurator] exportMetrics]) {
+    reply(NO);
+    return;
+  }
+
+  if (self.metricsExportBlock) {
+    self.metricsExportBlock(reply);
+  } else {
+    reply(NO);
+  }
+}
+
 #pragma mark GUI Ops
 
 - (void)setNotificationListener:(NSXPCListenerEndpoint *)listener {

@@ -102,6 +102,15 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             return auth_result_cache->CheckCache(vnode).action;
           }];
 
+  std::weak_ptr<Metrics> weak_metrics(metrics);
+  dc.metricsExportBlock = ^(void (^reply)(BOOL)) {
+    if (auto m = weak_metrics.lock()) {
+      m->Export(reply);
+    } else {
+      if (reply) reply(NO);
+    }
+  };
+
   control_connection.exportedObject = dc;
   [control_connection resume];
 

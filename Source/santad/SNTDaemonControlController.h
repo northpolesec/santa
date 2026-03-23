@@ -42,6 +42,9 @@
                           cacheCountBlock:(NSArray<NSNumber *> * (^)(void))cacheCountBlock
                           checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock;
 
+/// Block that triggers an immediate metric export. Set by the caller that owns the Metrics object.
+@property(nonatomic, copy) void (^metricsExportBlock)(void (^reply)(BOOL));
+
 /// Install the network extension, optionally checking whether an upgrade is needed first.
 /// When force is YES, delegates to installNetworkExtension: as long as installation is authorized.
 /// When force is NO, skips install if the loaded version already matches the on-disk version.

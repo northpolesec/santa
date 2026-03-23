@@ -124,6 +124,10 @@
   [self.syncManager pushNotificationReconnect];
 }
 
+- (void)publishMetrics:(NSDictionary *)metrics reply:(void (^)(BOOL))reply {
+  [self.syncManager publishMetrics:metrics reply:reply];
+}
+
 - (void)checkSyncServerStatus:(NSXPCListenerEndpoint *)logListener
                         reply:(void (^)(NSInteger statusCode, NSString *description))reply {
   MOLXPCConnection *ll;

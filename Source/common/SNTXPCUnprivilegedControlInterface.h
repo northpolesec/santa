@@ -91,6 +91,7 @@ struct RuleCounts {
 /// Metrics ops
 ///
 - (void)metrics:(void (^)(NSDictionary *))reply;
+- (void)exportMetrics:(void (^)(BOOL))reply;
 
 ///
 ///  GUI Ops

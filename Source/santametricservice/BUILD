@@ -22,6 +22,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTXPCMetricServiceInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/santametricservice/Formats:SNTMetricMonarchJSONFormat",
         "//Source/santametricservice/Formats:SNTMetricRawJSONFormat",
         "//Source/santametricservice/Writers:SNTMetricFileWriter",
