@@ -95,7 +95,7 @@ using santa::Processor;
   }
 
   // Now enumerate the processes that processing this event might require access to...
-  std::vector<struct santa::santad::process_tree::Pid> pids;
+  santa::santad::process_tree::PidList pids;
   pids.emplace_back(santa::santad::process_tree::PidFromAuditToken(esMsg->process->audit_token));
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:

@@ -39,18 +39,18 @@
 namespace santa::santad::process_tree {
 
 void ProcessTree::BackfillInsertChildren(
-    absl::flat_hash_map<pid_t, std::vector<Process>> &parent_map,
-    std::shared_ptr<Process> parent, const Process &unlinked_proc) {
+    absl::flat_hash_map<pid_t, std::vector<BackfilledProcess>> &parent_map,
+    std::shared_ptr<Process> parent, const BackfilledProcess &backfilled_proc) {
   auto proc = std::make_shared<Process>(
-      unlinked_proc.pid_, unlinked_proc.effective_cred_,
+      backfilled_proc.pid, backfilled_proc.cred,
       // Re-use shared pointers from parent if value equivalent
-      (parent && *(unlinked_proc.program_) == *(parent->program_))
+      (parent && *(backfilled_proc.program) == *(parent->program_))
           ? parent->program_
-          : unlinked_proc.program_,
+          : backfilled_proc.program,
       parent);
   {
     absl::MutexLock lock(mtx_);
-    map_.emplace(unlinked_proc.pid_, proc);
+    map_.emplace(backfilled_proc.pid, proc);
   }
 
   // The only case where we should not have a parent is the root processes
@@ -64,7 +64,7 @@ void ProcessTree::BackfillInsertChildren(
     }
   }
 
-  for (const Process &child : parent_map[unlinked_proc.pid_.pid]) {
+  for (const BackfilledProcess &child : parent_map[backfilled_proc.pid.pid]) {
     BackfillInsertChildren(parent_map, proc, child);
   }
 }
@@ -145,7 +145,7 @@ bool ProcessTree::Step(uint64_t timestamp) {
   for (auto it = remove_at_.begin(); it != remove_at_.end();) {
     if (it->first < new_cutoff) {
       if (auto target = GetLocked(it->second);
-          target && (*target)->refcnt_ > 0) {
+          target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
         (*target)->tombstoned_ = true;
       } else {
         map_.erase(it->second);
@@ -159,22 +159,28 @@ bool ProcessTree::Step(uint64_t timestamp) {
   return true;
 }
 
-void ProcessTree::RetainProcess(std::vector<struct Pid> &pids) {
-  absl::MutexLock lock(mtx_);
+void ProcessTree::RetainProcess(const PidList &pids) {
+  // Reader lock suffices: we only need the map to be stable for lookup.
+  // relaxed is safe because the increment has no dependent memory operations —
+  // we are only bumping a counter.
+  absl::ReaderMutexLock lock(mtx_);
   for (const struct Pid &p : pids) {
     auto proc = GetLocked(p);
     if (proc) {
-      (*proc)->refcnt_++;
+      (*proc)->refcnt_.fetch_add(1, std::memory_order_relaxed);
     }
   }
 }
 
-void ProcessTree::ReleaseProcess(std::vector<struct Pid> &pids) {
+void ProcessTree::ReleaseProcess(const PidList &pids) {
   absl::MutexLock lock(mtx_);
   for (const struct Pid &p : pids) {
     auto proc = GetLocked(p);
     if (proc) {
-      if (--(*proc)->refcnt_ == 0 && (*proc)->tombstoned_) {
+      // relaxed is safe: the exclusive lock provides ordering for
+      // tombstoned_ and map_.erase().
+      if ((*proc)->refcnt_.fetch_sub(1, std::memory_order_relaxed) == 1 &&
+          (*proc)->tombstoned_) {
         map_.erase(p);
       }
     }
@@ -303,8 +309,7 @@ Tokens
 ----
 */
 
-ProcessToken::ProcessToken(std::shared_ptr<ProcessTree> tree,
-                           std::vector<struct Pid> pids)
+ProcessToken::ProcessToken(std::shared_ptr<ProcessTree> tree, PidList pids)
     : state_(std::make_shared<State>(std::move(tree), std::move(pids))) {
   if (state_->tree) {
     state_->tree->RetainProcess(state_->pids);

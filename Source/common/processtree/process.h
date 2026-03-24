@@ -18,6 +18,7 @@
 
 #include <sys/types.h>
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -84,6 +85,14 @@ struct Program {
   }
 };
 
+// Lightweight container for process data loaded during backfill, before
+// a Process is constructed and inserted into the tree.
+struct BackfilledProcess {
+  struct Pid pid;
+  struct Cred cred;
+  std::shared_ptr<const Program> program;
+};
+
 // Fwd decls
 class ProcessTree;
 
@@ -99,9 +108,9 @@ class Process {
         parent_(parent),
         refcnt_(0),
         tombstoned_(false) {}
-  Process(const Process &) = default;
+  Process(const Process &) = delete;
   Process &operator=(const Process &) = delete;
-  Process(Process &&) = default;
+  Process(Process &&) = delete;
   Process &operator=(Process &&) = delete;
 
   // Const "attributes" are public
@@ -118,8 +127,7 @@ class Process {
   absl::flat_hash_map<std::type_index, std::shared_ptr<const Annotator>>
       annotations_;
   std::shared_ptr<const Process> parent_;
-  // TODO(nickmg): atomic here breaks the build.
-  int refcnt_;
+  std::atomic<int> refcnt_;
   // If the process is tombstoned, the event removing it from the tree has been
   // processed, but refcnt>0 keeps it alive.
   bool tombstoned_;
