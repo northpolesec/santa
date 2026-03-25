@@ -810,6 +810,246 @@ struct S {
   delete sut;
 }
 
+- (void)testRemoveIfSelectiveRemoval {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 10);
+  sut.set(2, 20);
+  sut.set(3, 30);
+  sut.set(4, 40);
+  sut.set(5, 50);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t &key, uint64_t &value) {
+    return value > 30;
+  });
+
+  XCTAssertEqual(removed, 2);
+  XCTAssertEqual(sut.count(), 3);
+  XCTAssertEqual(sut.get(1), 10);
+  XCTAssertEqual(sut.get(2), 20);
+  XCTAssertEqual(sut.get(3), 30);
+  XCTAssertEqual(sut.get(4), 0);
+  XCTAssertEqual(sut.get(5), 0);
+}
+
+- (void)testRemoveIfMutatesThenDecides {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 1);
+  sut.set(2, 1);
+  sut.set(3, 2);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t &key, uint64_t &value) {
+    value += 1;
+    return value >= 3;
+  });
+
+  XCTAssertEqual(removed, 1);
+  XCTAssertEqual(sut.count(), 2);
+  XCTAssertEqual(sut.get(1), 2);
+  XCTAssertEqual(sut.get(2), 2);
+  XCTAssertEqual(sut.get(3), 0);
+}
+
+- (void)testRemoveIfNoMatches {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 10);
+  sut.set(2, 20);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t &key, uint64_t &value) {
+    return false;
+  });
+
+  XCTAssertEqual(removed, 0);
+  XCTAssertEqual(sut.count(), 2);
+  XCTAssertEqual(sut.get(1), 10);
+  XCTAssertEqual(sut.get(2), 20);
+}
+
+- (void)testRemoveIfAllMatch {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 10);
+  sut.set(2, 20);
+  sut.set(3, 30);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t &key, uint64_t &value) {
+    return true;
+  });
+
+  XCTAssertEqual(removed, 3);
+  XCTAssertEqual(sut.count(), 0);
+}
+
+- (void)testRemoveIfSharedPtr {
+  SantaCache<uint64_t, std::shared_ptr<uint64_t>> sut;
+  sut.set(1, std::make_shared<uint64_t>(11));
+  sut.set(2, std::make_shared<uint64_t>(22));
+  sut.set(3, std::make_shared<uint64_t>(33));
+
+  std::weak_ptr<uint64_t> weak = sut.get(2);
+  XCTAssertFalse(weak.expired());
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t &key, std::shared_ptr<uint64_t> &value) {
+    return *value == 22;
+  });
+
+  XCTAssertEqual(removed, 1);
+  XCTAssertEqual(sut.count(), 2);
+  XCTAssertTrue(weak.expired());
+  XCTAssertEqual(*sut.get(1), 11);
+  XCTAssertEqual(sut.get(2), nullptr);
+  XCTAssertEqual(*sut.get(3), 33);
+}
+
+- (void)testRemoveIfEmptyCache {
+  SantaCache<uint64_t, uint64_t> sut;
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t &key, uint64_t &value) {
+    return true;
+  });
+
+  XCTAssertEqual(removed, 0);
+  XCTAssertEqual(sut.count(), 0);
+}
+
+- (void)testRemoveIfMultipleEntriesPerBucket {
+  SantaCache<uint64_t, uint64_t> sut(10, 10);
+  sut.set(1, 10);
+  sut.set(2, 20);
+  sut.set(3, 30);
+  sut.set(4, 40);
+  sut.set(5, 50);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t &key, uint64_t &value) {
+    return value % 20 == 0;
+  });
+
+  XCTAssertEqual(removed, 2);
+  XCTAssertEqual(sut.count(), 3);
+  XCTAssertEqual(sut.get(1), 10);
+  XCTAssertEqual(sut.get(2), 0);
+  XCTAssertEqual(sut.get(3), 30);
+  XCTAssertEqual(sut.get(4), 0);
+  XCTAssertEqual(sut.get(5), 50);
+}
+
+// Tests that remove_if works correctly while concurrent set/get operations
+// are modifying the cache. Writers continuously set entries, readers verify
+// they never see corrupted data, and a remove_if thread periodically sweeps.
+- (void)testConcurrentRemoveIfWithSetAndGet {
+  auto sut = new SantaCache<uint64_t, uint64_t>(20000);
+  const int kKeyRange = 1000;
+  auto stop = new std::atomic<bool>{false};
+
+  // Pre-populate so readers have entries to find
+  for (int i = 0; i < kKeyRange; ++i) {
+    sut->set(i, i + 1);
+  }
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 2 writer threads: continuously set entries
+  for (int t = 0; t < 2; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      while (!stop->load(std::memory_order_relaxed)) {
+        for (int i = 0; i < kKeyRange; ++i) {
+          sut->set(i, i + 1);
+        }
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // 2 reader threads: continuously get, expect either 0 (removed) or i+1
+  for (int t = 0; t < 2; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+      while (!stop->load(std::memory_order_relaxed)) {
+        for (int i = 0; i < kKeyRange; ++i) {
+          uint64_t val = sut->get(i);
+          XCTAssertTrue(val == 0 || val == (uint64_t)(i + 1),
+                        @"Corrupted value %llu for key %d", val, i);
+        }
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // 1 remove_if thread: periodically sweep even-keyed entries
+  dispatch_group_enter(group);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    while (!stop->load(std::memory_order_relaxed)) {
+      sut->remove_if(^bool(const uint64_t &key, uint64_t &value) {
+        return key % 2 == 0;
+      });
+    }
+    dispatch_group_leave(group);
+  });
+
+  usleep(500000);  // 500ms
+  stop->store(true, std::memory_order_relaxed);
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  // Cache must still be usable
+  sut->set(42, 99);
+  XCTAssertEqual(sut->get(42), 99);
+
+  delete stop;
+  delete sut;
+}
+
+// Tests remove_if racing against set-triggered auto-clear. The cache is kept
+// near max capacity so that set() frequently triggers clear() while remove_if
+// is iterating. Validates the interaction between remove_if's per-bucket
+// locking and clear()'s lock-all-buckets strategy.
+- (void)testConcurrentRemoveIfWithAutoOverflowClear {
+  const uint64_t kMaxSize = 100;
+  auto sut = new SantaCache<uint64_t, uint64_t>(kMaxSize);
+  auto stop = new std::atomic<bool>{false};
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 2 writer threads: race to fill and overflow the cache, triggering auto-clear
+  for (int t = 0; t < 2; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      uint64_t i = t * 10000;
+      while (!stop->load(std::memory_order_relaxed)) {
+        sut->set(i++, 42);
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // 1 remove_if thread: continuously sweep
+  dispatch_group_enter(group);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    while (!stop->load(std::memory_order_relaxed)) {
+      sut->remove_if(^bool(const uint64_t &key, uint64_t &value) {
+        return key % 3 == 0;
+      });
+    }
+    dispatch_group_leave(group);
+  });
+
+  usleep(500000);  // 500ms
+  stop->store(true, std::memory_order_relaxed);
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  // Count must never exceed max
+  XCTAssertLessThanOrEqual(sut->count(), kMaxSize);
+
+  // Cache must still be functional
+  sut->set(999999, 77);
+  XCTAssertEqual(sut->get(999999), 77);
+
+  delete stop;
+  delete sut;
+}
+
 // Tests that count() stays consistent when multiple threads are concurrently
 // adding and removing entries.
 - (void)testConcurrentCountConsistency {

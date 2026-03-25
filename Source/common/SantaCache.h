@@ -216,6 +216,57 @@ class SantaCache {
   bool contains(const KeyT &key) const { return contains(key, nullptr); }
 
   /**
+    Remove entries matching a predicate. The predicate receives each key
+    and a mutable reference to the value. Return true to remove the entry.
+
+    Buckets are locked one at a time (unlike foreach which locks all),
+    so the predicate may safely call methods on other SantaCache instances.
+
+    @warning The predicate MUST NOT call methods on this same SantaCache
+        instance. The bucket lock is held during the predicate call, and
+        re-entering the same cache would attempt to re-lock the same
+        os_unfair_lock, which is undefined behavior.
+
+    @param predicate Called for each entry under its bucket lock.
+        Return true to remove the entry.
+
+    @return The number of entries removed.
+  */
+  uint64_t remove_if(std::function<bool(const KeyT &, ValueT &)> predicate) {
+    assert(predicate != nullptr);
+
+    uint64_t removed = 0;
+
+    for (uint32_t i = 0; i < bucket_count_; ++i) {
+      struct bucket *bucket = &buckets_[i];
+      lock(bucket);
+
+      struct entry *entry = bucket->head;
+      struct entry *prev = nullptr;
+      while (entry != nullptr) {
+        struct entry *next = entry->next;
+        if (predicate(entry->key, entry->value)) {
+          if (prev) {
+            prev->next = next;
+          } else {
+            bucket->head = next;
+          }
+          delete entry;
+          count_.fetch_sub(1, std::memory_order_relaxed);
+          ++removed;
+        } else {
+          prev = entry;
+        }
+        entry = next;
+      }
+
+      unlock(bucket);
+    }
+
+    return removed;
+  }
+
+  /**
     Remove all entries and free bucket memory.
 
     @param clear_block If not NULL, will be called for all key
