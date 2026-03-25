@@ -94,7 +94,8 @@ void PopulateRequest(PublishMetricsRequest *request, NSDictionary *metrics) {
   }
 
   for (NSString *key in metrics[@"root_labels"]) {
-    (*request->mutable_root_labels())[[key UTF8String]] = [metrics[@"root_labels"][key] UTF8String];
+    NSString *value = metrics[@"root_labels"][key];
+    (*request->mutable_root_labels())[[key UTF8String]] = value ? [value UTF8String] : "";
   }
 }
 

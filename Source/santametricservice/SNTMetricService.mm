@@ -146,15 +146,19 @@
 }
 
 - (void)publishMetricsViaSyncService:(NSDictionary *)metrics reply:(void (^)(BOOL))reply {
-  if (!syncServiceConnection) {
-    syncServiceConnection = [SNTXPCSyncServiceInterface configuredConnection];
-    WEAKIFY(self);
-    syncServiceConnection.invalidationHandler = ^{
-      STRONGIFY(self);
-      LOGW(@"Sync service connection invalidated for metric publishing");
-      self->syncServiceConnection = nil;
-    };
-    [syncServiceConnection resume];
+  @synchronized(self) {
+    if (!syncServiceConnection) {
+      syncServiceConnection = [SNTXPCSyncServiceInterface configuredConnection];
+      WEAKIFY(self);
+      syncServiceConnection.invalidationHandler = ^{
+        STRONGIFY(self);
+        LOGW(@"Sync service connection invalidated for metric publishing");
+        @synchronized(self) {
+          self->syncServiceConnection = nil;
+        }
+      };
+      [syncServiceConnection resume];
+    }
   }
 
   [[syncServiceConnection remoteObjectProxy]
