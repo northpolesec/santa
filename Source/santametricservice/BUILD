@@ -21,6 +21,7 @@ objc_library(
         "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
+        "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCMetricServiceInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/santametricservice/Formats:SNTMetricMonarchJSONFormat",

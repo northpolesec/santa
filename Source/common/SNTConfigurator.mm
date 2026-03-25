@@ -1746,8 +1746,11 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (BOOL)exportMetrics {
   SNTMetricFormatType format = [self metricFormat];
   if (format == SNTMetricFormatTypeUnknown) return NO;
-  // Proto format exports via the sync service and doesn't require a metric URL.
-  if (format == SNTMetricFormatTypeProto) return YES;
+  // Proto format exports via the sync service; requires a configured SyncBaseURL.
+  if (format == SNTMetricFormatTypeProto) {
+    NSString *syncURL = self.configState[kSyncBaseURLKey];
+    return syncURL.length > 0;
+  }
   NSString *url = self.configState[kMetricURL];
   return url.length > 0;
 }

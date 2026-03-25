@@ -107,6 +107,7 @@ void PopulateRequest(PublishMetricsRequest *request, NSDictionary *metrics) {
   return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 }
 
+// Not used; this stage is invoked directly via publishMetrics: rather than the standard sync flow.
 - (BOOL)sync {
   return NO;
 }

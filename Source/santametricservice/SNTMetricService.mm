@@ -18,6 +18,7 @@
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 
 #import "SNTMetricService.h"
@@ -134,8 +135,9 @@
   if (writer) {
     BOOL ok = [writer write:formattedMetrics toURL:config.metricURL error:&err];
 
-    if (!ok && err != nil) {
-      LOGE(@"unable to write metrics: %@", [self messageFromError:err]);
+    if (!ok) {
+      LOGE(@"unable to write metrics: %@",
+           err ? [self messageFromError:err] : @"no error provided");
     }
     if (reply) reply(ok);
   } else {
@@ -146,7 +148,9 @@
 - (void)publishMetricsViaSyncService:(NSDictionary *)metrics reply:(void (^)(BOOL))reply {
   if (!syncServiceConnection) {
     syncServiceConnection = [SNTXPCSyncServiceInterface configuredConnection];
+    WEAKIFY(self);
     syncServiceConnection.invalidationHandler = ^{
+      STRONGIFY(self);
       LOGW(@"Sync service connection invalidated for metric publishing");
       self->syncServiceConnection = nil;
     };
