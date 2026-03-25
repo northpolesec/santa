@@ -966,8 +966,8 @@ struct S {
       while (!stop->load(std::memory_order_relaxed)) {
         for (int i = 0; i < kKeyRange; ++i) {
           uint64_t val = sut->get(i);
-          XCTAssertTrue(val == 0 || val == (uint64_t)(i + 1),
-                        @"Corrupted value %llu for key %d", val, i);
+          XCTAssertTrue(val == 0 || val == (uint64_t)(i + 1), @"Corrupted value %llu for key %d",
+                        val, i);
         }
       }
       dispatch_group_leave(group);
