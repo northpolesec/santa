@@ -2300,48 +2300,10 @@ static SNTConfigurator *sharedConfigurator = nil;
 - (NSArray *)validateFileAccessPolicy:(NSDictionary *)policy {
   NSMutableArray *errors = [NSMutableArray array];
 
-  // Validate that the WatchItems key, if present, is a dictionary.
-  id watchItemsValue = policy[kWatchItemConfigKeyWatchItems];
-  if (watchItemsValue && ![watchItemsValue isKindOfClass:[NSDictionary class]]) {
-    [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy: '%@' must be a dictionary",
-                                                 kWatchItemConfigKeyWatchItems]];
-    return errors;
-  }
-
-  NSDictionary *watchItems = (NSDictionary *)watchItemsValue;
-  if (!watchItems) {
-    return errors;
-  }
-
-  // Extract the top-level version to use as a fallback for rules that don't set their own.
-  NSString *fallbackVersion = nil;
-  if ([policy[kWatchItemConfigKeyVersion] isKindOfClass:[NSString class]]) {
-    fallbackVersion = policy[kWatchItemConfigKeyVersion];
-  }
-
-  // Validate each individual rule.
-  for (id key in watchItems) {
-    if (![key isKindOfClass:[NSString class]]) {
-      [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy rule name has bad type: %@",
-                                                   [key class]]];
-      continue;
-    }
-
-    if (![watchItems[key] isKindOfClass:[NSDictionary class]]) {
-      [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy rule '%@' has bad type: %@ "
-                                                   @"(expected dictionary)",
-                                                   key, [watchItems[key] class]]];
-      continue;
-    }
-
-    NSError *ruleError;
-    if (!santa::WatchItems::IsValidRule((NSString *)key, watchItems[key], &ruleError,
-                                        fallbackVersion)) {
-      [errors
-          addObject:[NSString stringWithFormat:@"FileAccessPolicy rule '%@' is invalid: %@", key,
-                                               ruleError.localizedDescription ?: @"Unknown"]];
-      continue;
-    }
+  NSError *error;
+  if (!santa::WatchItems::IsValidConfig(policy, &error)) {
+    [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy: %@",
+                                                 error.localizedDescription ?: @"Unknown error"]];
   }
 
   return errors;

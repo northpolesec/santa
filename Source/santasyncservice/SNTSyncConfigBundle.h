@@ -20,9 +20,9 @@
 
 __BEGIN_DECLS
 
-SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState);
-SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState);
-SNTConfigBundle *RuleSyncConfigBundle();
-SNTConfigBundle *SyncTypeConfigBundle(SNTSyncType syncType);
+SNTConfigBundle* PreflightConfigBundle(SNTSyncState* syncState);
+SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState);
+SNTConfigBundle* RuleSyncConfigBundle();
+SNTConfigBundle* SyncTypeConfigBundle(SNTSyncType syncType);
 
 __END_DECLS

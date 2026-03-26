@@ -22,31 +22,31 @@
 
 namespace santa {
 
-static inline pid_t Pid(const audit_token_t &tok) {
+static inline pid_t Pid(const audit_token_t& tok) {
   return audit_token_to_pid(tok);
 }
 
-static inline int Pidversion(const audit_token_t &tok) {
+static inline int Pidversion(const audit_token_t& tok) {
   return audit_token_to_pidversion(tok);
 }
 
-static inline uid_t RealUser(const audit_token_t &tok) {
+static inline uid_t RealUser(const audit_token_t& tok) {
   return audit_token_to_ruid(tok);
 }
 
-static inline gid_t RealGroup(const audit_token_t &tok) {
+static inline gid_t RealGroup(const audit_token_t& tok) {
   return audit_token_to_rgid(tok);
 }
 
-static inline uid_t EffectiveUser(const audit_token_t &tok) {
+static inline uid_t EffectiveUser(const audit_token_t& tok) {
   return audit_token_to_euid(tok);
 }
 
-static inline gid_t EffectiveGroup(const audit_token_t &tok) {
+static inline gid_t EffectiveGroup(const audit_token_t& tok) {
   return audit_token_to_egid(tok);
 }
 
-static inline std::pair<pid_t, int> PidPidversion(const audit_token_t &tok) {
+static inline std::pair<pid_t, int> PidPidversion(const audit_token_t& tok) {
   return {Pid(tok), Pidversion(tok)};
 }
 

@@ -30,7 +30,7 @@ class MockEnricher : public Enricher {
  public:
   virtual ~MockEnricher() {}
 
-  MOCK_METHOD(std::unique_ptr<EnrichedMessage>, Enrich, (Message &&));
+  MOCK_METHOD(std::unique_ptr<EnrichedMessage>, Enrich, (Message&&));
   MOCK_METHOD(std::optional<std::shared_ptr<std::string>>, UsernameForUID,
               (uid_t uid, EnrichOptions options));
 };
