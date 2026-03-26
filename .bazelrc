@@ -30,6 +30,7 @@ build --@rules_swift//swift:copt=-std=c++20
 # cel-cpp has lots of warnings that we don't need to see (and definitely don't
 # want to be treated as errors).
 build --per_file_copt=.*cel-cpp.*@-Wno-deprecated-declarations
+build --per_file_copt=.*cel-cpp.*@-Wno-nontrivial-memcall
 build --per_file_copt=.*cel-cpp.*@-Wno-nullability-completeness
 build --per_file_copt=.*cel-cpp.*@-Wno-unused-function
 
