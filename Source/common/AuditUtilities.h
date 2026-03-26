@@ -71,7 +71,7 @@ std::optional<audit_token_t> GetMyAuditToken();
 /// Look up the current audit token for a running process by pid.
 /// Uses mach task ports: task_name_for_pid + task_info(TASK_AUDIT_TOKEN).
 /// Returns false if the process doesn't exist or the lookup fails.
-bool AuditTokenForPid(pid_t pid, audit_token_t *token);
+bool AuditTokenForPid(pid_t pid, audit_token_t* token);
 
 }  // namespace santa
 
