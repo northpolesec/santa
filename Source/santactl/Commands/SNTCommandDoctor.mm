@@ -173,6 +173,7 @@ REGISTER_COMMAND_NAME(@"doctor")
     return;
   }
 
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   [proxy watchItemsState:^(BOOL enabled, uint64_t ruleCount, NSString *policyVersion,
                            santa::WatchItems::DataSource dataSource, NSString *configPath,
                            NSTimeInterval lastUpdateEpoch) {
@@ -181,8 +182,9 @@ REGISTER_COMMAND_NAME(@"doctor")
             @"rules (%llu rules active)",
             ruleCount);
     }
+    dispatch_semaphore_signal(sema);
   }];
-
+  dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
   [conn invalidate];
 }
 
