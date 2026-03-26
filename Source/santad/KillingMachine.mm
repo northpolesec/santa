@@ -16,7 +16,6 @@
 
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
-#include <bsm/libbsm.h>
 #include <libproc.h>
 #include <sys/signal.h>
 
@@ -25,6 +24,7 @@
 #include <optional>
 #include <vector>
 
+#include "Source/common/AuditUtilities.h"
 #include "Source/common/CSOpsHelper.h"
 #include "Source/common/CodeSigningIdentifierUtils.h"
 #import "Source/common/SNTKillCommand.h"
@@ -100,27 +100,6 @@ std::unique_ptr<ProcessMatcher> MakeStatusFlagsMatcher(uint32_t mask,
   return std::make_unique<FlagsMatcher>(mask, std::move(csops_func));
 }
 
-bool AuditTokenForPid(pid_t pid, audit_token_t *token) {
-  task_name_t task;
-  mach_msg_type_number_t size = TASK_AUDIT_TOKEN_COUNT;
-
-  if (task_name_for_pid(mach_task_self(), pid, &task) != KERN_SUCCESS) {
-    LOGD(@"Unable to get task name port for pid: %d", pid);
-    return false;
-  }
-
-  absl::Cleanup task_cleanup = ^{
-    mach_port_deallocate(mach_task_self(), task);
-  };
-
-  if (task_info(task, TASK_AUDIT_TOKEN, (task_info_t)token, &size) != KERN_SUCCESS) {
-    LOGD(@"Unable to get task info for pid: %d", pid);
-    return false;
-  }
-
-  return true;
-}
-
 SNTKilledProcessError LibprocSignalErrorToKilledProcessError(int error) {
   switch (error) {
     case 0: return SNTKilledProcessErrorNone;
@@ -133,8 +112,8 @@ SNTKilledProcessError LibprocSignalErrorToKilledProcessError(int error) {
 
 SNTKilledProcess *KillProcess(SNTKillRequest *request, audit_token_t *token) {
   static pid_t myPid = getpid();
-  pid_t targetPid = audit_token_to_pid(*token);
-  pid_t targetPidversion = audit_token_to_pidversion(*token);
+  pid_t targetPid = Pid(*token);
+  pid_t targetPidversion = Pidversion(*token);
 
   if (targetPid == myPid || targetPid == 1) {
     LOGW(@"Rejecting request to kill disallowed process");
@@ -166,11 +145,11 @@ SNTKilledProcess *KillByRunningProcess(SNTKillRequestRunningProcess *request) {
 
   audit_token_t token;
   if (AuditTokenForPid(request.pid, &token)) {
-    if (audit_token_to_pidversion(token) == request.pidversion) {
+    if (Pidversion(token) == request.pidversion) {
       return KillProcess(request, &token);
     } else {
       LOGW(@"Rejecting request to kill pid (%d) due to pidversion mismatch (got: %d, want: %d)",
-           request.pid, audit_token_to_pidversion(token), request.pidversion);
+           request.pid, Pidversion(token), request.pidversion);
       return [[SNTKilledProcess alloc] initWithPid:request.pid
                                         pidversion:request.pidversion
                                              error:SNTKilledProcessErrorNoSuchProcess];
@@ -201,9 +180,7 @@ SNTKilledProcess *KillByMatchers(SNTKillRequest *request, pid_t pid,
 
   // All matchers matched. Now verify the process didn't change and kill it.
   if (AuditTokenForPid(pid, &token_after)) {
-    if (audit_token_to_pidversion(token_before) == audit_token_to_pidversion(token_after)) {
-      LOGD(@"GOT TOK MATCH, DO KILL: %d, %d", audit_token_to_pid(token_after),
-           audit_token_to_pidversion(token_after));
+    if (Pidversion(token_before) == Pidversion(token_after)) {
       return KillProcess(request, &token_after);
     } else {
       LOGD(@"Audit token mismatch. Process exited.");
