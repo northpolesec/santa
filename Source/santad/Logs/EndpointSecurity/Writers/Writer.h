@@ -29,7 +29,7 @@ class Writer {
  public:
   virtual ~Writer() = default;
 
-  virtual void Write(std::vector<uint8_t>&& bytes) = 0;
+  virtual void Write(std::vector<uint8_t> &&bytes) = 0;
   virtual void Flush() = 0;
 
   virtual std::optional<absl::flat_hash_set<std::string>> GetFilesToExport(

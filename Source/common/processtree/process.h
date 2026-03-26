@@ -35,16 +35,16 @@ struct Pid {
   pid_t pid;
   uint64_t pidversion;
 
-  friend bool operator==(const struct Pid& lhs, const struct Pid& rhs) {
+  friend bool operator==(const struct Pid &lhs, const struct Pid &rhs) {
     return lhs.pid == rhs.pid && lhs.pidversion == rhs.pidversion;
   }
-  friend bool operator!=(const struct Pid& lhs, const struct Pid& rhs) {
+  friend bool operator!=(const struct Pid &lhs, const struct Pid &rhs) {
     return !(lhs == rhs);
   }
 };
 
 template <typename H>
-H AbslHashValue(H h, const struct Pid& p) {
+H AbslHashValue(H h, const struct Pid &p) {
   return H::combine(std::move(h), p.pid, p.pidversion);
 }
 
@@ -52,10 +52,10 @@ struct Cred {
   uid_t uid;
   gid_t gid;
 
-  friend bool operator==(const struct Cred& lhs, const struct Cred& rhs) {
+  friend bool operator==(const struct Cred &lhs, const struct Cred &rhs) {
     return lhs.uid == rhs.uid && lhs.gid == rhs.gid;
   }
-  friend bool operator!=(const struct Cred& lhs, const struct Cred& rhs) {
+  friend bool operator!=(const struct Cred &lhs, const struct Cred &rhs) {
     return !(lhs == rhs);
   }
 };
@@ -66,8 +66,8 @@ struct CodeSigningInfo {
   std::string cdhash;  // hex string
   bool is_platform_binary;
 
-  friend bool operator==(const struct CodeSigningInfo& lhs,
-                         const struct CodeSigningInfo& rhs) {
+  friend bool operator==(const struct CodeSigningInfo &lhs,
+                         const struct CodeSigningInfo &rhs) {
     return lhs.signing_id == rhs.signing_id && lhs.team_id == rhs.team_id &&
            lhs.cdhash == rhs.cdhash &&
            lhs.is_platform_binary == rhs.is_platform_binary;
@@ -79,7 +79,7 @@ struct Program {
   std::vector<std::string> arguments;
   std::optional<CodeSigningInfo> code_signing;
 
-  friend bool operator==(const struct Program& lhs, const struct Program& rhs) {
+  friend bool operator==(const struct Program &lhs, const struct Program &rhs) {
     return lhs.executable == rhs.executable && lhs.arguments == rhs.arguments &&
            lhs.code_signing == rhs.code_signing;
   }
@@ -108,10 +108,10 @@ class Process {
         parent_(parent),
         refcnt_(0),
         tombstoned_(false) {}
-  Process(const Process&) = delete;
-  Process& operator=(const Process&) = delete;
-  Process(Process&&) = delete;
-  Process& operator=(Process&&) = delete;
+  Process(const Process &) = delete;
+  Process &operator=(const Process &) = delete;
+  Process(Process &&) = delete;
+  Process &operator=(Process &&) = delete;
 
   // Const "attributes" are public
   const struct Pid pid_;

@@ -31,12 +31,12 @@ namespace cel {
 
 // Register TouchID cooldown functions at compile time (type checking).
 // These functions are only available in CELv2.
-absl::Status AddTouchIDCooldownCompilerLibrary(::cel::CompilerBuilder& builder);
+absl::Status AddTouchIDCooldownCompilerLibrary(::cel::CompilerBuilder &builder);
 
 // Register TouchID cooldown functions at runtime.
 absl::Status RegisterTouchIDCooldownFunctions(
-    ::google::api::expr::runtime::CelFunctionRegistry* registry,
-    const ::google::api::expr::runtime::InterpreterOptions& options);
+    ::google::api::expr::runtime::CelFunctionRegistry *registry,
+    const ::google::api::expr::runtime::InterpreterOptions &options);
 
 }  // namespace cel
 }  // namespace santa

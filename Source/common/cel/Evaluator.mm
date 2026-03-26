@@ -207,7 +207,7 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
     }
   }
 
-  if (const cel_runtime::CelError *value; result->GetValue(&value)) {
+  if (const cel_runtime::CelError * value; result->GetValue(&value)) {
     return absl::InvalidArgumentError(value->message());
   }
 

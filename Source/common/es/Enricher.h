@@ -39,17 +39,17 @@ class Enricher {
   Enricher(
       std::shared_ptr<santa::santad::process_tree::ProcessTree> pt = nullptr);
   virtual ~Enricher() = default;
-  virtual std::unique_ptr<EnrichedMessage> Enrich(Message&& msg);
+  virtual std::unique_ptr<EnrichedMessage> Enrich(Message &&msg);
   virtual EnrichedProcess Enrich(
-      const es_process_t& es_proc,
+      const es_process_t &es_proc,
       EnrichOptions options = EnrichOptions::kDefault);
   virtual std::optional<EnrichedProcess> Enrich(
-      const es_process_t* es_proc,
+      const es_process_t *es_proc,
       EnrichOptions options = EnrichOptions::kDefault);
-  virtual EnrichedFile Enrich(const es_file_t& es_file,
+  virtual EnrichedFile Enrich(const es_file_t &es_file,
                               EnrichOptions options = EnrichOptions::kDefault);
   virtual std::optional<EnrichedFile> Enrich(
-      const es_file_t* es_file,
+      const es_file_t *es_file,
       EnrichOptions options = EnrichOptions::kDefault);
 
   virtual std::optional<std::shared_ptr<std::string>> UsernameForUID(

@@ -68,29 +68,29 @@ class Evaluator {
       : compiler_(std::move(compiler)), compiler_arena_(std::move(arena)) {};
   ~Evaluator() = default;
 
-  Evaluator(Evaluator&& other) = default;
-  Evaluator& operator=(Evaluator&& rhs) = default;
+  Evaluator(Evaluator &&other) = default;
+  Evaluator &operator=(Evaluator &&rhs) = default;
 
   // Could be safe to implement these, but not currently needed
-  Evaluator(const Evaluator& other) = delete;
-  Evaluator& operator=(const Evaluator& other) = delete;
+  Evaluator(const Evaluator &other) = delete;
+  Evaluator &operator=(const Evaluator &other) = delete;
 
   // Compile a CEL expression from a string into an expression plan
   // ready for evaluation. The caller-provided arena is used for constant
   // folding and must outlive the returned expression plan.
   absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>>
-  Compile(absl::string_view cel_expr, google::protobuf::Arena* arena);
+  Compile(absl::string_view cel_expr, google::protobuf::Arena *arena);
 
   // Evaluate an expression plan with a SantaActivation object. The
   // caller-provided arena is used for evaluation temporaries.
   absl::StatusOr<EvaluationResultT> Evaluate(
-      ::google::api::expr::runtime::CelExpression const* expression_plan,
-      const ActivationT& activation, google::protobuf::Arena* arena);
+      ::google::api::expr::runtime::CelExpression const *expression_plan,
+      const ActivationT &activation, google::protobuf::Arena *arena);
 
   // Compile and evaluate a CEL expression in a single call. Uses a
   // stack-local arena internally so no allocations persist after return.
   absl::StatusOr<EvaluationResultT> CompileAndEvaluate(
-      absl::string_view cel_expr, const ActivationT& activation);
+      absl::string_view cel_expr, const ActivationT &activation);
 
  private:
   std::unique_ptr<::cel::Compiler> compiler_;

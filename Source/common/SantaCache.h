@@ -63,7 +63,7 @@ class SantaCache {
         (1 << (32 -
                __builtin_clz((((uint32_t)max_size_ / per_bucket) - 1) ?: 1)));
     if (unlikely(bucket_count_ > UINT32_MAX)) bucket_count_ = UINT32_MAX;
-    buckets_ = (struct bucket*)calloc(bucket_count_, sizeof(struct bucket));
+    buckets_ = (struct bucket *)calloc(bucket_count_, sizeof(struct bucket));
     for (uint32_t i = 0; i < bucket_count_; ++i) {
       buckets_[i].lock = OS_UNFAIR_LOCK_INIT;
     }
@@ -81,9 +81,9 @@ class SantaCache {
     Get an element from the cache. Returns zero_ if item doesn't exist.
   */
   ValueT get(KeyT key) const {
-    struct bucket* bucket = &buckets_[hash(key)];
+    struct bucket *bucket = &buckets_[hash(key)];
     lock(bucket);
-    struct entry* entry = bucket->head;
+    struct entry *entry = bucket->head;
     while (entry != nullptr) {
       if (entry->key == key) {
         ValueT val = entry->value;
@@ -107,7 +107,7 @@ class SantaCache {
 
     @return true if the value was set.
   */
-  bool set(const KeyT& key, const ValueT& value) {
+  bool set(const KeyT &key, const ValueT &value) {
     return set(key, value, nullptr, {}, false);
   }
 
@@ -125,7 +125,7 @@ class SantaCache {
 
     @return true if the value was set
   */
-  bool set(const KeyT& key, const ValueT& value, const ValueT& previous_value) {
+  bool set(const KeyT &key, const ValueT &value, const ValueT &previous_value) {
     return set(key, value, nullptr, previous_value, true);
   }
 
@@ -141,7 +141,7 @@ class SantaCache {
     @param update_block The block that will be called to give
         the caller the opportunity to update the value.
   */
-  bool update(const KeyT& key, std::function<void(ValueT&)> update_block) {
+  bool update(const KeyT &key, std::function<void(ValueT &)> update_block) {
     return set(key, zero_, update_block, {}, false);
   }
 
@@ -150,7 +150,7 @@ class SantaCache {
 
     @param foreach_block Called for all key and value pairs.
   */
-  void foreach(std::function<void(KeyT&, ValueT&)> foreach_block) {
+  void foreach(std::function<void(KeyT &, ValueT &)> foreach_block) {
     assert(foreach_block != nullptr);
 
     // Lock all buckets
@@ -162,7 +162,7 @@ class SantaCache {
 
     // Operate on all k/v pairs
     for (uint32_t i = 0; i < bucket_count_; ++i) {
-      struct entry* entry = buckets_[i].head;
+      struct entry *entry = buckets_[i].head;
       while (entry != nullptr) {
         foreach_block(entry->key, entry->value);
         entry = entry->next;
@@ -178,7 +178,7 @@ class SantaCache {
   /**
     An alias for `set(key, zero_)`
   */
-  inline void remove(const KeyT& key) { set(key, zero_); }
+  inline void remove(const KeyT &key) { set(key, zero_); }
 
   /**
     Check if a given key exists in the cache. If a contains_block
@@ -193,11 +193,11 @@ class SantaCache {
         is NOT provided, otherwise return the result of the call to
         the contains_block.
   */
-  bool contains(const KeyT& key,
-                std::function<bool(const ValueT&)> contains_block) const {
-    struct bucket* bucket = &buckets_[hash(key)];
+  bool contains(const KeyT &key,
+                std::function<bool(const ValueT &)> contains_block) const {
+    struct bucket *bucket = &buckets_[hash(key)];
     lock(bucket);
-    struct entry* entry = bucket->head;
+    struct entry *entry = bucket->head;
     while (entry != nullptr) {
       if (entry->key == key) {
         bool result = contains_block ? contains_block(entry->value) : true;
@@ -213,7 +213,7 @@ class SantaCache {
   /**
     An alias for `contains(key, nullptr)`
   */
-  bool contains(const KeyT& key) const { return contains(key, nullptr); }
+  bool contains(const KeyT &key) const { return contains(key, nullptr); }
 
   /**
     Remove entries matching a predicate. The predicate receives each key
@@ -232,19 +232,19 @@ class SantaCache {
 
     @return The number of entries removed.
   */
-  uint64_t remove_if(std::function<bool(const KeyT&, ValueT&)> predicate) {
+  uint64_t remove_if(std::function<bool(const KeyT &, ValueT &)> predicate) {
     assert(predicate != nullptr);
 
     uint64_t removed = 0;
 
     for (uint32_t i = 0; i < bucket_count_; ++i) {
-      struct bucket* bucket = &buckets_[i];
+      struct bucket *bucket = &buckets_[i];
       lock(bucket);
 
-      struct entry* entry = bucket->head;
-      struct entry* prev = nullptr;
+      struct entry *entry = bucket->head;
+      struct entry *prev = nullptr;
       while (entry != nullptr) {
-        struct entry* next = entry->next;
+        struct entry *next = entry->next;
         if (predicate(entry->key, entry->value)) {
           if (prev) {
             prev->next = next;
@@ -272,19 +272,19 @@ class SantaCache {
     @param clear_block If not NULL, will be called for all key
         and value pairs just prior to deletion.
   */
-  void clear(std::function<void(KeyT&, ValueT&)> clear_block) {
+  void clear(std::function<void(KeyT &, ValueT &)> clear_block) {
     for (uint32_t i = 0; i < bucket_count_; ++i) {
-      struct bucket* bucket = &buckets_[i];
+      struct bucket *bucket = &buckets_[i];
       // We grab the lock so nothing can use this bucket while we're erasing it.
       lock(bucket);
 
       // Free the bucket's entries, if there are any.
-      struct entry* entry = bucket->head;
+      struct entry *entry = bucket->head;
       while (entry != nullptr) {
         if (clear_block) {
           clear_block(entry->key, entry->value);
         }
-        struct entry* next_entry = entry->next;
+        struct entry *next_entry = entry->next;
         delete entry;
         entry = next_entry;
       }
@@ -322,8 +322,8 @@ class SantaCache {
     to start off with and upon return will contain either 0 if no buckets are
     remaining or the next bucket to begin with when called again.
   */
-  void bucket_counts(uint16_t* per_bucket_counts, uint16_t* array_size,
-                     uint64_t* start_bucket) {
+  void bucket_counts(uint16_t *per_bucket_counts, uint16_t *array_size,
+                     uint64_t *start_bucket) {
     if (per_bucket_counts == nullptr || array_size == nullptr ||
         start_bucket == nullptr)
       return;
@@ -339,9 +339,9 @@ class SantaCache {
 
     for (uint16_t i = 0; i < size; ++i) {
       uint16_t count = 0;
-      struct bucket* bucket = &buckets_[start++];
+      struct bucket *bucket = &buckets_[start++];
       lock(bucket);
-      struct entry* entry = bucket->head;
+      struct entry *entry = bucket->head;
       while (entry != nullptr) {
         if (entry->value != zero_) ++count;
         entry = entry->next;
@@ -360,11 +360,11 @@ class SantaCache {
 
     KeyT key;
     ValueT value = {};
-    struct entry* next = nullptr;
+    struct entry *next = nullptr;
   };
 
   struct bucket {
-    struct entry* head = nullptr;
+    struct entry *head = nullptr;
     os_unfair_lock lock = OS_UNFAIR_LOCK_INIT;
   };
 
@@ -385,19 +385,19 @@ class SantaCache {
 
     @return true if the entry was set, false if it was not
   */
-  bool set(const KeyT& key, const ValueT& value,
-           std::function<void(ValueT&)> update_block,
-           const ValueT& previous_value, bool has_prev_value) {
+  bool set(const KeyT &key, const ValueT &value,
+           std::function<void(ValueT &)> update_block,
+           const ValueT &previous_value, bool has_prev_value) {
     // Only either value or update block can be set
     assert(!(value != zero_ && update_block != nullptr));
     bool update_only = (update_block != nullptr);
 
-    struct bucket* bucket = &buckets_[hash(key)];
+    struct bucket *bucket = &buckets_[hash(key)];
 
     while (true) {
       lock(bucket);
-      struct entry* entry = bucket->head;
-      struct entry* previous_entry = nullptr;
+      struct entry *entry = bucket->head;
+      struct entry *previous_entry = nullptr;
       while (entry != nullptr) {
         if (entry->key == key) {
           if (update_only) {
@@ -455,7 +455,7 @@ class SantaCache {
       }
 
       // Key not found and cache has capacity. Insert at head.
-      struct entry* new_entry = new struct entry(key);
+      struct entry *new_entry = new struct entry(key);
       if (update_block) {
         update_block(new_entry->value);
       } else {
@@ -473,14 +473,14 @@ class SantaCache {
   /**
     Lock a bucket using os_unfair_lock for kernel-mediated priority inheritance.
   */
-  inline void lock(struct bucket* bucket) const {
+  inline void lock(struct bucket *bucket) const {
     os_unfair_lock_lock(&bucket->lock);
   }
 
   /**
     Unlock a bucket.
   */
-  inline void unlock(struct bucket* bucket) const {
+  inline void unlock(struct bucket *bucket) const {
     os_unfair_lock_unlock(&bucket->lock);
   }
 
@@ -489,7 +489,7 @@ class SantaCache {
   uint64_t max_size_;
   uint32_t bucket_count_;
 
-  struct bucket* buckets_;
+  struct bucket *buckets_;
 
   /**
     Holder for a 'zero' entry for the current type

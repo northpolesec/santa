@@ -207,7 +207,7 @@ CFStringRef __nullable DADissenterGetStatusString(DADissenterRef dissenter) {
   return CFSTR("Mock dissenter status");
 }
 
-int getmntinfo_r_np(struct statfs * __nullable * __nullable mntbufp, int flags) {
+int getmntinfo_r_np(struct statfs *__nullable *__nullable mntbufp, int flags) {
   MockMounts *mockMounts = [MockMounts mockMounts];
 
   struct statfs *sfs = (struct statfs *)calloc(mockMounts.mounts.count, sizeof(struct statfs));

@@ -29,10 +29,10 @@ class Annotator {
  public:
   virtual ~Annotator() = default;
 
-  virtual void AnnotateFork(ProcessTree& tree, const Process& parent,
-                            const Process& child) = 0;
-  virtual void AnnotateExec(ProcessTree& tree, const Process& orig_process,
-                            const Process& new_process) = 0;
+  virtual void AnnotateFork(ProcessTree &tree, const Process &parent,
+                            const Process &child) = 0;
+  virtual void AnnotateExec(ProcessTree &tree, const Process &orig_process,
+                            const Process &new_process) = 0;
   virtual std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
       const = 0;
 };

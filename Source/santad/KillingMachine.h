@@ -21,7 +21,7 @@
 
 namespace santa {
 
-SNTKillResponse* KillingMachine(SNTKillRequest* request);
+SNTKillResponse *KillingMachine(SNTKillRequest *request);
 
 }  // namespace santa
 

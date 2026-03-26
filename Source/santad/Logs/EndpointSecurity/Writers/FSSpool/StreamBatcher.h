@@ -34,7 +34,7 @@ template <typename T>
 class StreamBatcher {
  public:
   template <typename F>
-  StreamBatcher(F&& factory) : factory_(std::forward<F>(factory)) {}
+  StreamBatcher(F &&factory) : factory_(std::forward<F>(factory)) {}
 
   inline bool ShouldInitializeBeforeWrite() { return true; }
 
@@ -60,7 +60,7 @@ class StreamBatcher {
 
     santa::Xxhash64 hash;
     hash.Update(bytes.data(), bytes.size());
-    hash.Digest([&](const uint8_t* buf, size_t length) {
+    hash.Digest([&](const uint8_t *buf, size_t length) {
       assert(length == sizeof(uint64_t));
       coded_output_->WriteRaw(buf, (int)length);
     });
@@ -81,7 +81,8 @@ class StreamBatcher {
   }
 
  private:
-  std::function<std::shared_ptr<T>(google::protobuf::io::ZeroCopyOutputStream*)>
+  std::function<std::shared_ptr<T>(
+      google::protobuf::io::ZeroCopyOutputStream *)>
       factory_;
   std::shared_ptr<google::protobuf::io::ZeroCopyOutputStream> raw_output_;
   std::shared_ptr<T> compressed_output_;
@@ -119,7 +120,7 @@ class StreamBatcher<::santa::Unit> {
 
     santa::Xxhash64 hash;
     hash.Update(bytes.data(), bytes.size());
-    hash.Digest([&](const uint8_t* buf, size_t length) {
+    hash.Digest([&](const uint8_t *buf, size_t length) {
       assert(length == sizeof(uint64_t));
       coded_output_->WriteRaw(buf, (int)length);
     });

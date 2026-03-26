@@ -21,7 +21,7 @@
 namespace santa {
 
 // Create a config bundle for use by the blocked network share UI
-SNTConfigBundle* NetworkMountConfigBundle(SNTConfigurator* configurator);
+SNTConfigBundle *NetworkMountConfigBundle(SNTConfigurator *configurator);
 
 }  // namespace santa
 

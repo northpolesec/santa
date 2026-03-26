@@ -25,7 +25,7 @@
 #include <string>
 
 __BEGIN_DECLS
-int csops(pid_t pid, unsigned int ops, void* useraddr, size_t usersize);
+int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
 __END_DECLS
 
 namespace santa {
@@ -44,7 +44,7 @@ struct csops_blob {
 };
 
 // Injectable csops function signature for testing.
-using CSOpsFunc = std::function<int(pid_t, unsigned int, void*, size_t)>;
+using CSOpsFunc = std::function<int(pid_t, unsigned int, void *, size_t)>;
 
 // Retrieve the code signing status flags for a process.
 std::optional<uint32_t> CSOpsStatusFlags(pid_t pid,

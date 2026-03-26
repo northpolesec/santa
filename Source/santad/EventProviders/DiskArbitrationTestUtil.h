@@ -118,7 +118,7 @@ void DARegisterDiskMountApprovalCallback(DASessionRef session, CFDictionaryRef _
 DAReturn DADissenterGetStatus(DADissenterRef dissenter);
 CFStringRef __nullable DADissenterGetStatusString(DADissenterRef dissenter);
 
-int getmntinfo_r_np(struct statfs * __nullable * __nullable mntbufp, int flags);
+int getmntinfo_r_np(struct statfs *__nullable *__nullable mntbufp, int flags);
 
 CF_EXTERN_C_END
 NS_ASSUME_NONNULL_END

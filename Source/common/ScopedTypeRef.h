@@ -31,11 +31,11 @@ class ScopedTypeRef {
  public:
   ScopedTypeRef() : ScopedTypeRef(InvalidV) {}
 
-  ScopedTypeRef(ScopedTypeRef&& other) : object_(other.object_) {
+  ScopedTypeRef(ScopedTypeRef &&other) : object_(other.object_) {
     other.object_ = InvalidV;
   }
 
-  ScopedTypeRef& operator=(ScopedTypeRef&& rhs) {
+  ScopedTypeRef &operator=(ScopedTypeRef &&rhs) {
     if (this == &rhs) {
       return *this;
     }
@@ -50,13 +50,13 @@ class ScopedTypeRef {
     return *this;
   }
 
-  ScopedTypeRef(const ScopedTypeRef& other) : object_(other.object_) {
+  ScopedTypeRef(const ScopedTypeRef &other) : object_(other.object_) {
     if (object_ != InvalidV) {
       RetainFunc(object_);
     }
   }
 
-  ScopedTypeRef& operator=(const ScopedTypeRef& rhs) {
+  ScopedTypeRef &operator=(const ScopedTypeRef &rhs) {
     if (this == &rhs) {
       return *this;
     }
@@ -81,9 +81,9 @@ class ScopedTypeRef {
 
   // Take ownership of an out parameter
   template <typename Callable>
-  static std::pair<std::invoke_result_t<Callable, ElementT*>,
+  static std::pair<std::invoke_result_t<Callable, ElementT *>,
                    ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>>
-  AssumeFrom(Callable&& callable) {
+  AssumeFrom(Callable &&callable) {
     ElementT out = InvalidV;
     auto ret = callable(&out);
 
@@ -134,7 +134,7 @@ class ScopedTypeRef {
   // pass-by-pointer create functions. The object must not already be valid.
   // In non-opt builds, this is enforced by an assert that will terminate the
   // process.
-  ElementT* InitializeInto() {
+  ElementT *InitializeInto() {
     assert(object_ == InvalidV);
     return &object_;
   }
