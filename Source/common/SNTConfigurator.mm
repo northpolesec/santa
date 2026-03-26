@@ -31,6 +31,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/faa/WatchItems.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 // Trusted operators authorized to issue account JWTs for sync v2 features.
@@ -2258,6 +2259,21 @@ static SNTConfigurator *sharedConfigurator = nil;
       // We've already validated that `value` is an NSArray
       [errors addObjectsFromArray:[self validateStaticRules:(NSArray *)value]];
     }
+
+    // If the key is FileAccessPolicy, validate the FAA policy configuration.
+    if ([key isEqualToString:kFileAccessPolicy]) {
+      // We've already validated that `value` is an NSDictionary
+      [errors addObjectsFromArray:[self validateFileAccessPolicy:(NSDictionary *)value]];
+    }
+
+    // If the key is FileAccessPolicyPlist, load and validate the referenced file.
+    // Note: FileAccessPolicyPlist is ignored when FileAccessPolicy is set.
+    if ([key isEqualToString:kFileAccessPolicyPlist] &&
+        !CFPreferencesAppValueIsForced((__bridge CFStringRef)kFileAccessPolicy,
+                                       kMobileConfigDomain)) {
+      // We've already validated that `value` is an NSString
+      [errors addObjectsFromArray:[self validateFileAccessPolicyPlist:(NSString *)value]];
+    }
   }];
   return errors;
 }
@@ -2278,6 +2294,76 @@ static SNTConfigurator *sharedConfigurator = nil;
                                                    error.localizedDescription]];
     }
   }];
+  return errors;
+}
+
+- (NSArray *)validateFileAccessPolicy:(NSDictionary *)policy {
+  NSMutableArray *errors = [NSMutableArray array];
+
+  // Validate that the WatchItems key, if present, is a dictionary.
+  id watchItemsValue = policy[kWatchItemConfigKeyWatchItems];
+  if (watchItemsValue && ![watchItemsValue isKindOfClass:[NSDictionary class]]) {
+    [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy: '%@' must be a dictionary",
+                                                 kWatchItemConfigKeyWatchItems]];
+    return errors;
+  }
+
+  NSDictionary *watchItems = (NSDictionary *)watchItemsValue;
+  if (!watchItems) {
+    return errors;
+  }
+
+  // Extract the top-level version to use as a fallback for rules that don't set their own.
+  NSString *fallbackVersion = nil;
+  if ([policy[kWatchItemConfigKeyVersion] isKindOfClass:[NSString class]]) {
+    fallbackVersion = policy[kWatchItemConfigKeyVersion];
+  }
+
+  // Validate each individual rule.
+  for (id key in watchItems) {
+    if (![key isKindOfClass:[NSString class]]) {
+      [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy rule name has bad type: %@",
+                                                   [key class]]];
+      continue;
+    }
+
+    if (![watchItems[key] isKindOfClass:[NSDictionary class]]) {
+      [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy rule '%@' has bad type: %@ "
+                                                   @"(expected dictionary)",
+                                                   key, [watchItems[key] class]]];
+      continue;
+    }
+
+    NSError *ruleError;
+    if (!santa::WatchItems::IsValidRule((NSString *)key, watchItems[key], &ruleError,
+                                        fallbackVersion)) {
+      [errors
+          addObject:[NSString stringWithFormat:@"FileAccessPolicy rule '%@' is invalid: %@", key,
+                                               ruleError.localizedDescription ?: @"Unknown"]];
+      continue;
+    }
+  }
+
+  return errors;
+}
+
+- (NSArray *)validateFileAccessPolicyPlist:(NSString *)path {
+  NSMutableArray *errors = [NSMutableArray array];
+
+  if (!path.length) {
+    [errors addObject:@"FileAccessPolicyPlist: Path is empty"];
+    return errors;
+  }
+
+  NSDictionary *policy = [NSDictionary dictionaryWithContentsOfFile:path];
+  if (!policy) {
+    [errors addObject:[NSString stringWithFormat:@"FileAccessPolicyPlist: Unable to read plist "
+                                                 @"at path '%@'",
+                                                 path]];
+    return errors;
+  }
+
+  [errors addObjectsFromArray:[self validateFileAccessPolicy:policy]];
   return errors;
 }
 
