@@ -244,9 +244,8 @@ When writing the policy configuration the policy type is defined by the
 This example policy will protect the Chrome Cookies files across all users and
 all Chrome profiles. There are three exceptions defined: One for Chrome using a
 signing ID wildcard (`com.google.Chrome*`) to match Chrome itself and related
-processes like the Chrome helper, another for the macOS Spotlight feature which
-accesses most things on the file system and can create unnecessary noise, and
-a third for the `mds` process which also reads cookies on macOS 26.3.
+processes like the Chrome helper, and two for the macOS Spotlight feature which
+accesses most things on the file system and can create unnecessary noise.
 
 ```xml
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -291,7 +290,7 @@ a third for the `mds` process which also reads cookies on macOS 26.3.
 					<key>PlatformBinary</key>
 					<true/>
 				</dict>
-				<!-- On macOS 26.3 the mds process will also read cookies -->
+				<!-- On macOS 26.3+ the mds process will also read cookies -->
 				<dict>
 					<key>SigningID</key>
 					<string>com.apple.mds</string>
