@@ -19,12 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
-      - name: Get clang-format-19
-        run: sudo apt-get install --no-install-recommends -y clang-format-19
-      - name: Set clang-format-19 as default
+      - name: Get clang-format-21
+        run: sudo apt-get install --no-install-recommends -y clang-format-21
+      - name: Set clang-format-21 as default
         run: |
-          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100
-          sudo update-alternatives --set clang-format /usr/bin/clang-format-19
+          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-21 100
+          sudo update-alternatives --set clang-format /usr/bin/clang-format-21
           clang-format --version
       - name: Run linters
         run: ./Testing/lint.sh
