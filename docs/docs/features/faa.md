@@ -245,7 +245,7 @@ This example policy will protect the Chrome Cookies files across all users and
 all Chrome profiles. There are three exceptions defined: One for Chrome using a
 signing ID wildcard (`com.google.Chrome*`) to match Chrome itself and related
 processes like the Chrome helper, another for the macOS Spotlight feature which
-accesses most things on the files system and can create unnecessary noise, and
+accesses most things on the file system and can create unnecessary noise, and
 a third for the `mds` process which also reads cookies on macOS 26.3.
 
 ```xml
