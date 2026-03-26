@@ -870,10 +870,8 @@ objc_library(
     name = "KillingMachine",
     srcs = ["KillingMachine.mm"],
     hdrs = ["KillingMachine.h"],
-    sdk_dylibs = [
-        "bsm",
-    ],
     deps = [
+        "//Source/common:AuditUtilities",
         "//Source/common:CSOpsHelper",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",
