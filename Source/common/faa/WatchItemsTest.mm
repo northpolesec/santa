@@ -133,7 +133,7 @@ static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
 
 struct BlockGenResult {
   std::vector<std::optional<std::shared_ptr<WatchItemPolicyBase>>> &targetPolicies;
-  IterateTargetsBlock(^blockGen)(std::vector<std::string>);
+  IterateTargetsBlock (^blockGen)(std::vector<std::string>);
 };
 
 BlockGenResult CreatePolicyBlockGen() {

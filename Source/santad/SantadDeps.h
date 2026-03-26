@@ -46,7 +46,7 @@ namespace santa {
 class SantadDeps {
  public:
   static std::unique_ptr<SantadDeps> Create(
-      SNTConfigurator *configurator, SNTMetricSet *metric_set,
+      SNTConfigurator* configurator, SNTMetricSet* metric_set,
       santa::ProcessControlBlock processControlBlock);
 
   SantadDeps(
@@ -55,11 +55,11 @@ class SantadDeps {
       std::shared_ptr<santa::Metrics> metrics,
       std::shared_ptr<santa::WatchItems> watch_items,
       std::shared_ptr<santa::AuthResultCache> auth_result_cache,
-      MOLXPCConnection *control_connection,
-      SNTCompilerController *compiler_controller,
-      SNTNotificationQueue *notifier_queue, SNTSyncdQueue *syncd_queue,
-      SNTNetworkExtensionQueue *netext_queue,
-      SNTExecutionController *exec_controller,
+      MOLXPCConnection* control_connection,
+      SNTCompilerController* compiler_controller,
+      SNTNotificationQueue* notifier_queue, SNTSyncdQueue* syncd_queue,
+      SNTNetworkExtensionQueue* netext_queue,
+      SNTExecutionController* exec_controller,
       std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
       std::shared_ptr<santa::TTYWriter> tty_writer,
       std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
@@ -71,12 +71,12 @@ class SantadDeps {
   std::shared_ptr<santa::Logger> Logger();
   std::shared_ptr<santa::Metrics> Metrics();
   std::shared_ptr<santa::WatchItems> WatchItems();
-  MOLXPCConnection *ControlConnection();
-  SNTCompilerController *CompilerController();
-  SNTNotificationQueue *NotifierQueue();
-  SNTSyncdQueue *SyncdQueue();
-  SNTNetworkExtensionQueue *NetworkExtensionQueue();
-  SNTExecutionController *ExecController();
+  MOLXPCConnection* ControlConnection();
+  SNTCompilerController* CompilerController();
+  SNTNotificationQueue* NotifierQueue();
+  SNTSyncdQueue* SyncdQueue();
+  SNTNetworkExtensionQueue* NetworkExtensionQueue();
+  SNTExecutionController* ExecController();
   std::shared_ptr<santa::PrefixTree<santa::Unit>> PrefixTree();
   std::shared_ptr<santa::TTYWriter> TTYWriter();
   std::shared_ptr<santa::santad::process_tree::ProcessTree> ProcessTree();
@@ -89,12 +89,12 @@ class SantadDeps {
   std::shared_ptr<santa::WatchItems> watch_items_;
   std::shared_ptr<santa::Enricher> enricher_;
   std::shared_ptr<santa::AuthResultCache> auth_result_cache_;
-  MOLXPCConnection *control_connection_;
-  SNTCompilerController *compiler_controller_;
-  SNTNotificationQueue *notifier_queue_;
-  SNTSyncdQueue *syncd_queue_;
-  SNTNetworkExtensionQueue *netext_queue_;
-  SNTExecutionController *exec_controller_;
+  MOLXPCConnection* control_connection_;
+  SNTCompilerController* compiler_controller_;
+  SNTNotificationQueue* notifier_queue_;
+  SNTSyncdQueue* syncd_queue_;
+  SNTNetworkExtensionQueue* netext_queue_;
+  SNTExecutionController* exec_controller_;
   std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree_;
   std::shared_ptr<santa::TTYWriter> tty_writer_;
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree_;
