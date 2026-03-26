@@ -181,7 +181,6 @@ SNTKilledProcess *KillByMatchers(SNTKillRequest *request, pid_t pid,
   // All matchers matched. Now verify the process didn't change and kill it.
   if (AuditTokenForPid(pid, &token_after)) {
     if (Pidversion(token_before) == Pidversion(token_after)) {
-      LOGD(@"GOT TOK MATCH, DO KILL: %d, %d", Pid(token_after), Pidversion(token_after));
       return KillProcess(request, &token_after);
     } else {
       LOGD(@"Audit token mismatch. Process exited.");
