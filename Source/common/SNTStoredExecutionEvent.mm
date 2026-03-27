@@ -23,13 +23,13 @@
 
 @implementation SNTStoredExecutionEvent
 
-- (nullable instancetype)initWithFileInfo:(nullable SNTFileInfo *)fileInfo {
+- (nullable instancetype)initWithFileInfo:(nullable SNTFileInfo*)fileInfo {
   self = [super init];
   if (self) {
     _filePath = fileInfo.path;
     _fileSHA256 = fileInfo.SHA256;
-    NSError *csError;
-    MOLCodesignChecker *cs = [fileInfo codesignCheckerWithError:&csError];
+    NSError* csError;
+    MOLCodesignChecker* cs = [fileInfo codesignCheckerWithError:&csError];
     if (csError) {
       _signingStatus =
           (csError.code == errSecCSUnsigned) ? SNTSigningStatusUnsigned : SNTSigningStatusInvalid;
@@ -51,7 +51,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, fileSHA256);
   ENCODE(coder, filePath);
@@ -96,7 +96,7 @@
   ENCODE(coder, quarantineAgentBundleID);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, fileSHA256, NSString);
@@ -147,7 +147,7 @@
 - (BOOL)isEqual:(id)other {
   if (other == self) return YES;
   if (![other isKindOfClass:[SNTStoredExecutionEvent class]]) return NO;
-  SNTStoredExecutionEvent *o = other;
+  SNTStoredExecutionEvent* o = other;
   return ([self.fileSHA256 isEqual:o.fileSHA256] && [super isEqual:other]);
 }
 
@@ -160,20 +160,20 @@
   return result;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString
       stringWithFormat:@"SNTStoredExecutionEvent[%@] with SHA-256: %@", self.idx, self.fileSHA256];
 }
 
-- (NSString *)publisherInfo {
+- (NSString*)publisherInfo {
   return Publisher(self.signingChain, self.teamID);
 }
 
-- (NSArray *)signingChainCertRefs {
+- (NSArray*)signingChainCertRefs {
   return CertificateChain(self.signingChain);
 }
 
-- (NSString *)uniqueID {
+- (NSString*)uniqueID {
   return self.fileSHA256;
 }
 

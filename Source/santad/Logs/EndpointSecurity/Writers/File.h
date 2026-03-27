@@ -34,15 +34,15 @@ namespace santa {
 class File : public Writer, public std::enable_shared_from_this<File> {
  public:
   // Factory
-  static std::shared_ptr<File> Create(NSString *path, uint64_t flush_timeout_ms,
+  static std::shared_ptr<File> Create(NSString* path, uint64_t flush_timeout_ms,
                                       size_t batch_size_bytes,
                                       size_t max_expected_write_size_bytes);
 
-  File(NSString *path, size_t batch_size_bytes, size_t max_expected_write_size_bytes,
+  File(NSString* path, size_t batch_size_bytes, size_t max_expected_write_size_bytes,
        dispatch_queue_t q, dispatch_source_t timer_source);
   ~File();
 
-  void Write(std::vector<uint8_t> &&bytes) override;
+  void Write(std::vector<uint8_t>&& bytes) override;
   void Flush() override;
 
   friend class santa::FilePeer;
@@ -54,15 +54,15 @@ class File : public Writer, public std::enable_shared_from_this<File> {
   bool ShouldFlush();
 
   void EnsureCapacitySerialized(size_t additional_bytes);
-  void CopyDataSerialized(const std::vector<uint8_t> &bytes);
+  void CopyDataSerialized(const std::vector<uint8_t>& bytes);
 
   std::vector<uint8_t> buffer_;
   size_t batch_size_bytes_;
   dispatch_queue_t q_;
   dispatch_source_t timer_source_;
   dispatch_source_t watch_source_;
-  NSString *path_;
-  NSFileHandle *file_handle_;
+  NSString* path_;
+  NSFileHandle* file_handle_;
 
   // Used to manually track the size of valid data in the `buffer_`.
   // Benchmarking showed a large amount of time clearing the buffer after

@@ -40,16 +40,16 @@
 
 @interface SNTDecisionCache ()
 // Cache for sha256 -> date of last timestamp reset.
-@property NSCache<NSString *, NSDate *> *timestampResetMap;
+@property NSCache<NSString*, NSDate*>* timestampResetMap;
 @property dispatch_queue_t backfillQ;
 @end
 
 @implementation SNTDecisionCache {
-  SantaCache<SantaVnode, SNTCachedDecision *> _decisionCache;
+  SantaCache<SantaVnode, SNTCachedDecision*> _decisionCache;
 }
 
 + (instancetype)sharedCache {
-  static SNTDecisionCache *cache;
+  static SNTDecisionCache* cache;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     cache = [[SNTDecisionCache alloc] init];
@@ -72,19 +72,19 @@
   return self;
 }
 
-- (bool)cacheDecision:(SNTCachedDecision *)cd {
+- (bool)cacheDecision:(SNTCachedDecision*)cd {
   return self->_decisionCache.set(cd.vnodeId, cd);
 }
 
-- (bool)cacheDecisionIfNotSet:(SNTCachedDecision *)cd {
+- (bool)cacheDecisionIfNotSet:(SNTCachedDecision*)cd {
   return self->_decisionCache.set(cd.vnodeId, cd, nil);
 }
 
-- (SNTCachedDecision *)cachedDecisionForFile:(const struct stat &)statInfo {
+- (SNTCachedDecision*)cachedDecisionForFile:(const struct stat&)statInfo {
   return self->_decisionCache.get(SantaVnode::VnodeForFile(statInfo));
 }
 
-- (SNTCachedDecision *)cachedDecisionForVnode:(SantaVnode)vnode {
+- (SNTCachedDecision*)cachedDecisionForVnode:(SantaVnode)vnode {
   return self->_decisionCache.get(vnode);
 }
 
@@ -95,15 +95,15 @@
 // Whenever a cached decision resulting from a transitive allowlist rule is used to allow the
 // execution of a binary, we update the timestamp on the transitive rule in the rules database.
 // To prevent writing to the database too often, we space out consecutive writes by 3600 seconds.
-- (SNTCachedDecision *)resetTimestampForCachedDecision:(const struct stat &)statInfo {
-  SNTCachedDecision *cd = [self cachedDecisionForFile:statInfo];
+- (SNTCachedDecision*)resetTimestampForCachedDecision:(const struct stat&)statInfo {
+  SNTCachedDecision* cd = [self cachedDecisionForFile:statInfo];
   if (!cd || cd.decision != SNTEventStateAllowTransitive || !cd.sha256) {
     return cd;
   }
 
-  NSDate *lastUpdate = [self.timestampResetMap objectForKey:cd.sha256];
+  NSDate* lastUpdate = [self.timestampResetMap objectForKey:cd.sha256];
   if (!lastUpdate || -[lastUpdate timeIntervalSinceNow] > 3600) {
-    SNTRule *rule = [[SNTRule alloc] initWithIdentifier:cd.sha256
+    SNTRule* rule = [[SNTRule alloc] initWithIdentifier:cd.sha256
                                                   state:SNTRuleStateAllowTransitive
                                                    type:SNTRuleTypeBinary];
     [[SNTDatabaseController ruleTable] resetTimestampForExecutionRule:rule];
@@ -147,7 +147,7 @@
       continue;
     }
 
-    SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@(pathBuf)];
+    SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@(pathBuf)];
     if (!fi) {
       continue;
     }
@@ -158,7 +158,7 @@
       continue;
     }
 
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] initWithVnode:fi.vnode];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:fi.vnode];
 
     cd.decision = SNTEventStateUnknown;
     cd.decisionClientMode = SNTClientModeUnknown;
@@ -167,8 +167,8 @@
 
     cd.sha256 = fi.SHA256;
 
-    NSError *err;
-    MOLCodesignChecker *csc = [fi codesignCheckerWithError:&err];
+    NSError* err;
+    MOLCodesignChecker* csc = [fi codesignCheckerWithError:&err];
     if (csc && !err) {
       cd.certSHA256 = csc.leafCertificate.SHA256;
       cd.certCommonName = csc.leafCertificate.commonName;

@@ -20,8 +20,8 @@
 #import <XCTest/XCTest.h>
 
 @interface SNTModeTransition (Testing)
-@property(readwrite) NSNumber *maxMinutes;
-@property(readwrite) NSNumber *defaultDurationMinutes;
+@property(readwrite) NSNumber* maxMinutes;
+@property(readwrite) NSNumber* defaultDurationMinutes;
 @end
 
 @interface SNTModeTransitionTest : XCTestCase
@@ -31,7 +31,7 @@
 
 - (void)testInitializationType {
   // Ensure the initializers set the correct type
-  SNTModeTransition *mt = [[SNTModeTransition alloc] initRevocation];
+  SNTModeTransition* mt = [[SNTModeTransition alloc] initRevocation];
   XCTAssertEqual(mt.type, SNTModeTransitionTypeRevoke);
 
   mt = [[SNTModeTransition alloc] initOnDemandMinutes:10];
@@ -43,7 +43,7 @@
 
 - (void)testInitializationClamp {
   // Initializing with a max of 0 is invalid
-  SNTModeTransition *mt = [[SNTModeTransition alloc] initOnDemandMinutes:0];
+  SNTModeTransition* mt = [[SNTModeTransition alloc] initOnDemandMinutes:0];
   XCTAssertNil(mt);
 
   // Default minutes should be clamped to max minutes
@@ -68,7 +68,7 @@
 }
 
 - (void)testGetDurationMinutes {
-  SNTModeTransition *mt = [[SNTModeTransition alloc] initOnDemandMinutes:100 defaultDuration:10];
+  SNTModeTransition* mt = [[SNTModeTransition alloc] initOnDemandMinutes:100 defaultDuration:10];
 
   // A nil request returns the default
   XCTAssertEqual([mt getDurationMinutes:nil], [mt.defaultDurationMinutes unsignedIntValue]);
@@ -86,10 +86,10 @@
 }
 
 - (void)testEncodeDecodeSecureCoding {
-  SNTModeTransition *mt = [[SNTModeTransition alloc] initRevocation];
-  NSData *mtSerialized = [mt serialize];
+  SNTModeTransition* mt = [[SNTModeTransition alloc] initRevocation];
+  NSData* mtSerialized = [mt serialize];
 
-  SNTModeTransition *mtDeserialized = [SNTModeTransition deserialize:mtSerialized];
+  SNTModeTransition* mtDeserialized = [SNTModeTransition deserialize:mtSerialized];
   XCTAssertEqual(mtDeserialized.type, SNTModeTransitionTypeRevoke);
   XCTAssertEqual(mtDeserialized.type, mt.type);
 

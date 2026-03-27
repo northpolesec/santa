@@ -29,74 +29,74 @@
 @interface SNTSyncState : NSObject
 
 /// Configured session to use for requests.
-@property NSURLSession *session;
+@property NSURLSession* session;
 
 /// Connection to the daemon control interface.
-@property MOLXPCConnection *daemonConn;
+@property MOLXPCConnection* daemonConn;
 
 /// The base API URL.
-@property NSURL *syncBaseURL;
+@property NSURL* syncBaseURL;
 
 /// An XSRF token to send in the headers with each request.
-@property NSString *xsrfToken;
+@property NSString* xsrfToken;
 
 /// The header name to use when sending the XSRF token back to the server.
-@property NSString *xsrfTokenHeader;
+@property NSString* xsrfTokenHeader;
 
 /// Full sync interval in seconds. If push notifications are being used this interval will be
 /// ignored in favor of pushNotificationsFullSyncInterval. nil if the server did not set this field.
-@property NSNumber *fullSyncInterval;
+@property NSNumber* fullSyncInterval;
 
 /// An token to subscribe to push notifications.
-@property(copy) NSString *pushNotificationsToken;
+@property(copy) NSString* pushNotificationsToken;
 
 /// NATS push notification configuration
-@property(copy) NSString *pushServer;
-@property(copy) NSString *pushNKey;             // The nkey for authentication
-@property(copy) NSString *pushJWT;              // JWT for authentication
-@property(copy) NSString *pushIssuerJWT;        // Issuer JWT from chain validation
-@property(copy) NSString *pushDeviceID;         // Device ID for NATS subscription
-@property(copy) NSArray<NSString *> *pushTags;  // Tags to subscribe to
-@property(copy) NSData *pushHMACKey;            // HMAC key for validating push commands
+@property(copy) NSString* pushServer;
+@property(copy) NSString* pushNKey;            // The nkey for authentication
+@property(copy) NSString* pushJWT;             // JWT for authentication
+@property(copy) NSString* pushIssuerJWT;       // Issuer JWT from chain validation
+@property(copy) NSString* pushDeviceID;        // Device ID for NATS subscription
+@property(copy) NSArray<NSString*>* pushTags;  // Tags to subscribe to
+@property(copy) NSData* pushHMACKey;           // HMAC key for validating push commands
 
 /// Full sync interval in seconds while listening for push notifications. nil if the server did not
 /// set this field.
-@property NSNumber *pushNotificationsFullSyncInterval;
+@property NSNumber* pushNotificationsFullSyncInterval;
 
 /// Leeway time in seconds when receiving a global rule sync push notification, defaults to
 /// kDefaultPushNotificationsGlobalRuleSyncDeadline.
 @property NSUInteger pushNotificationsGlobalRuleSyncDeadline;
 
 /// Machine identifier and owner.
-@property(copy) NSString *machineID;
-@property(copy) NSString *machineOwner;
-@property(copy) NSArray<NSString *> *machineOwnerGroups;
+@property(copy) NSString* machineID;
+@property(copy) NSString* machineOwner;
+@property(copy) NSArray<NSString*>* machineOwnerGroups;
 
 /// Settings sent from server during preflight that are set during postflight.
 @property SNTClientMode clientMode;
-@property NSString *allowlistRegex;
-@property NSString *blocklistRegex;
-@property NSNumber *enableBundles;
-@property NSNumber *enableTransitiveRules;
-@property NSNumber *enableAllEventUpload;
-@property NSNumber *disableUnknownEventUpload;
-@property NSNumber *blockUSBMount;
-@property NSNumber *blockUnencryptedRemovableMediaMount;
+@property NSString* allowlistRegex;
+@property NSString* blocklistRegex;
+@property NSNumber* enableBundles;
+@property NSNumber* enableTransitiveRules;
+@property NSNumber* enableAllEventUpload;
+@property NSNumber* disableUnknownEventUpload;
+@property NSNumber* blockUSBMount;
+@property NSNumber* blockUnencryptedRemovableMediaMount;
 // Array of mount args for the forced remounting feature.
-@property NSArray *remountUSBMode;
-@property NSNumber *blockNetworkMount;
-@property NSString *bannedNetworkMountBlockMessage;
-@property NSArray<NSString *> *allowedNetworkMountHosts;
-@property NSString *overrideFileAccessAction;
-@property SNTExportConfiguration *exportConfig;
-@property SNTModeTransition *modeTransition;
-@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
-@property NSString *eventDetailURL;
-@property NSString *eventDetailText;
-@property NSString *fileAccessEventDetailURL;
-@property NSString *fileAccessEventDetailText;
-@property(copy) NSArray<NSString *> *telemetryFilterExpressions;
-@property(copy) NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property NSArray* remountUSBMode;
+@property NSNumber* blockNetworkMount;
+@property NSString* bannedNetworkMountBlockMessage;
+@property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* overrideFileAccessAction;
+@property SNTExportConfiguration* exportConfig;
+@property SNTModeTransition* modeTransition;
+@property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSString* eventDetailURL;
+@property NSString* eventDetailText;
+@property NSString* fileAccessEventDetailURL;
+@property NSString* fileAccessEventDetailText;
+@property(copy) NSArray<NSString*>* telemetryFilterExpressions;
+@property(copy) NSArray<SNTCELFallbackRule*>* celFallbackRules;
 
 /// Clean sync flag, if True, all existing rules should be deleted before inserting any new rules.
 @property SNTSyncType syncType;
@@ -105,7 +105,7 @@
 @property NSUInteger eventBatchSize;
 
 /// Array of bundle IDs to find binaries for.
-@property NSArray *bundleBinaryRequests;
+@property NSArray* bundleBinaryRequests;
 
 /// The content-encoding to use for the client uploads during the sync session.
 @property SNTSyncContentEncoding contentEncoding;

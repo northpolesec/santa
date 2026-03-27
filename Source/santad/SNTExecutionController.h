@@ -22,33 +22,33 @@
 #import "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/TTYWriter.h"
 
-const static NSString *kBlockBinary = @"BlockBinary";
-const static NSString *kAllowBinary = @"AllowBinary";
-const static NSString *kAllowLocalBinary = @"AllowLocalBinary";
-const static NSString *kBlockCertificate = @"BlockCertificate";
-const static NSString *kAllowCertificate = @"AllowCertificate";
-const static NSString *kBlockTeamID = @"BlockTeamID";
-const static NSString *kAllowTeamID = @"AllowTeamID";
-const static NSString *kBlockSigningID = @"BlockSigningID";
-const static NSString *kAllowSigningID = @"AllowSigningID";
-const static NSString *kAllowLocalSigningID = @"AllowLocalSigningID";
-const static NSString *kBlockCDHash = @"BlockCDHash";
-const static NSString *kAllowCDHash = @"AllowCDHash";
-const static NSString *kBlockScope = @"BlockScope";
-const static NSString *kAllowScope = @"AllowScope";
-const static NSString *kAllowUnknown = @"AllowUnknown";
-const static NSString *kBlockUnknown = @"BlockUnknown";
-const static NSString *kAllowCompilerBinary = @"AllowCompilerBinary";
-const static NSString *kAllowCompilerCDHash = @"AllowCompilerCDHash";
-const static NSString *kAllowCompilerSigningID = @"AllowCompilerSigningID";
-const static NSString *kAllowTransitive = @"AllowTransitive";
-const static NSString *kUnknownEventState = @"Unknown";
-const static NSString *kBlockPrinterWorkaround = @"BlockPrinterWorkaround";
-const static NSString *kAllowNoFileInfo = @"AllowNoFileInfo";
-const static NSString *kDenyNoFileInfo = @"DenyNoFileInfo";
-const static NSString *kBlockLongPath = @"BlockLongPath";
-const static NSString *kBlockCELFallback = @"BlockCELFallback";
-const static NSString *kAllowCELFallback = @"AllowCELFallback";
+const static NSString* kBlockBinary = @"BlockBinary";
+const static NSString* kAllowBinary = @"AllowBinary";
+const static NSString* kAllowLocalBinary = @"AllowLocalBinary";
+const static NSString* kBlockCertificate = @"BlockCertificate";
+const static NSString* kAllowCertificate = @"AllowCertificate";
+const static NSString* kBlockTeamID = @"BlockTeamID";
+const static NSString* kAllowTeamID = @"AllowTeamID";
+const static NSString* kBlockSigningID = @"BlockSigningID";
+const static NSString* kAllowSigningID = @"AllowSigningID";
+const static NSString* kAllowLocalSigningID = @"AllowLocalSigningID";
+const static NSString* kBlockCDHash = @"BlockCDHash";
+const static NSString* kAllowCDHash = @"AllowCDHash";
+const static NSString* kBlockScope = @"BlockScope";
+const static NSString* kAllowScope = @"AllowScope";
+const static NSString* kAllowUnknown = @"AllowUnknown";
+const static NSString* kBlockUnknown = @"BlockUnknown";
+const static NSString* kAllowCompilerBinary = @"AllowCompilerBinary";
+const static NSString* kAllowCompilerCDHash = @"AllowCompilerCDHash";
+const static NSString* kAllowCompilerSigningID = @"AllowCompilerSigningID";
+const static NSString* kAllowTransitive = @"AllowTransitive";
+const static NSString* kUnknownEventState = @"Unknown";
+const static NSString* kBlockPrinterWorkaround = @"BlockPrinterWorkaround";
+const static NSString* kAllowNoFileInfo = @"AllowNoFileInfo";
+const static NSString* kDenyNoFileInfo = @"DenyNoFileInfo";
+const static NSString* kBlockLongPath = @"BlockLongPath";
+const static NSString* kBlockCELFallback = @"BlockCELFallback";
+const static NSString* kAllowCELFallback = @"AllowCELFallback";
 
 @class SNTCachedDecision;
 @class SNTEventTable;
@@ -68,13 +68,13 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///
 @interface SNTExecutionController : NSObject
 
-- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable
-                       eventTable:(SNTEventTable *)eventTable
-                    notifierQueue:(SNTNotificationQueue *)notifierQueue
-                       syncdQueue:(SNTSyncdQueue *)syncdQueue
+- (instancetype)initWithRuleTable:(SNTRuleTable*)ruleTable
+                       eventTable:(SNTEventTable*)eventTable
+                    notifierQueue:(SNTNotificationQueue*)notifierQueue
+                       syncdQueue:(SNTSyncdQueue*)syncdQueue
                            logger:(LogExecutionBlock)logger
                         ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-                  policyProcessor:(SNTPolicyProcessor *)policyProcessor
+                  policyProcessor:(SNTPolicyProcessor*)policyProcessor
               processControlBlock:(santa::ProcessControlBlock)processControlBlock
                       processTree:
                           (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
@@ -92,9 +92,9 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///      used to make the decision. The caller uses these to update the auth result cache
 ///      and respond to EndpointSecurity. Returns whether the ES response succeeded.
 ///
-- (void)validateExecEvent:(const santa::Message &)esMsg
-           cachedDecision:(SNTCachedDecision *)existingDecision
-               postAction:(bool (^)(SNTAction, SNTCachedDecision *))postAction;
+- (void)validateExecEvent:(const santa::Message&)esMsg
+           cachedDecision:(SNTCachedDecision*)existingDecision
+               postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction;
 
 ///
 ///  Handles the logic of deciding whether to allow a pid_suspend/pid_resume through to a binary or
@@ -103,7 +103,7 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///  @param message The message reveived from the EndpointSecurity event provider.
 ///  @param postAction The block invoked with the desired response result.
 ///
-- (void)validateSuspendResumeEvent:(const santa::Message &)esMsg
+- (void)validateSuspendResumeEvent:(const santa::Message&)esMsg
                         postAction:(void (^)(bool))postAction;
 
 ///
@@ -115,9 +115,9 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///  @param message The message received from the EndpointSecurity event provider.
 ///  @return bool True if the event should be processed, otherwise false.
 ///
-- (bool)synchronousShouldProcessExecEvent:(const santa::Message &)esMsg;
+- (bool)synchronousShouldProcessExecEvent:(const santa::Message&)esMsg;
 
-@property(nonatomic, readonly) SNTRuleTable *ruleTable;
+@property(nonatomic, readonly) SNTRuleTable* ruleTable;
 
 ///
 ///  Flushes the TouchID approval cache. Should be called when rules change

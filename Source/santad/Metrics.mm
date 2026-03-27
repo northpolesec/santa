@@ -24,87 +24,87 @@
 #import "Source/common/SNTXPCMetricServiceInterface.h"
 #import "Source/santad/SNTApplicationCoreMetrics.h"
 
-static NSString *const kProcessorAuthorizer = @"Authorizer";
-static NSString *const kProcessorDeviceManager = @"DeviceManager";
-static NSString *const kProcessorRecorder = @"Recorder";
-static NSString *const kProcessorTamperResistance = @"TamperResistance";
-static NSString *const kProcessorDataFileAccessAuthorizer = @"DataFileAccessAuthorizer";
-static NSString *const kProcessorProcessFileAccessAuthorizer = @"ProcessFileAccessAuthorizer";
+static NSString* const kProcessorAuthorizer = @"Authorizer";
+static NSString* const kProcessorDeviceManager = @"DeviceManager";
+static NSString* const kProcessorRecorder = @"Recorder";
+static NSString* const kProcessorTamperResistance = @"TamperResistance";
+static NSString* const kProcessorDataFileAccessAuthorizer = @"DataFileAccessAuthorizer";
+static NSString* const kProcessorProcessFileAccessAuthorizer = @"ProcessFileAccessAuthorizer";
 
-static NSString *const kEventTypeAuthClone = @"AuthClone";
-static NSString *const kEventTypeAuthCopyfile = @"AuthCopyfile";
-static NSString *const kEventTypeAuthCreate = @"AuthCreate";
-static NSString *const kEventTypeAuthExchangedata = @"AuthExchangedata";
-static NSString *const kEventTypeAuthExec = @"AuthExec";
-static NSString *const kEventTypeAuthKextload = @"AuthKextload";
-static NSString *const kEventTypeAuthLink = @"AuthLink";
-static NSString *const kEventTypeAuthMount = @"AuthMount";
-static NSString *const kEventTypeAuthOpen = @"AuthOpen";
-static NSString *const kEventTypeAuthRemount = @"AuthRemount";
-static NSString *const kEventTypeAuthRename = @"AuthRename";
-static NSString *const kEventTypeAuthSignal = @"AuthSignal";
-static NSString *const kEventTypeAuthProcSuspendResume = @"AuthProcSuspendResume";
-static NSString *const kEventTypeAuthTruncate = @"AuthTruncate";
-static NSString *const kEventTypeAuthUnlink = @"AuthUnlink";
-static NSString *const kEventTypeNotifyClone = @"NotifyClone";
-static NSString *const kEventTypeNotifyClose = @"NotifyClose";
-static NSString *const kEventTypeNotifyCodesigningInvalidated = @"NotifyCodesigningInvalidated";
-static NSString *const kEventTypeNotifyCopyfile = @"NotifyCopyfile";
-static NSString *const kEventTypeNotifyExchangedata = @"NotifyExchangedata";
-static NSString *const kEventTypeNotifyExec = @"NotifyExec";
-static NSString *const kEventTypeNotifyExit = @"NotifyExit";
-static NSString *const kEventTypeNotifyFork = @"NotifyFork";
-static NSString *const kEventTypeNotifyLink = @"NotifyLink";
-static NSString *const kEventTypeNotifyRename = @"NotifyRename";
-static NSString *const kEventTypeNotifyUnlink = @"NotifyUnlink";
-static NSString *const kEventTypeNotifyUnmount = @"NotifyUnmount";
-static NSString *const kPseudoEventTypeGlobal = @"Global";
-static NSString *const kEventTypeNotifyAuthentication = @"NotifyAuthentication";
-static NSString *const kEventTypeNotifyLoginLogin = @"NotifyLoginLogin";
-static NSString *const kEventTypeNotifyLoginLogout = @"NotifyLoginLogout";
-static NSString *const kEventTypeNotifyLWSessionLogin = @"NotifyLWSessionLogin";
-static NSString *const kEventTypeNotifyLWSessionLogout = @"NotifyLWSessionLogout";
-static NSString *const kEventTypeNotifyLWSessionLock = @"NotifyLWSessionLock";
-static NSString *const kEventTypeNotifyLWSessionUnlock = @"NotifyLWSessionUnlock";
-static NSString *const kEventTypeNotifyScreensharingAttach = @"NotifyScreensharingAttach";
-static NSString *const kEventTypeNotifyScreensharingDetach = @"NotifyScreensharingDetach";
-static NSString *const kEventTypeNotifyOpenSSHLogin = @"NotifyOpenSSHLogin";
-static NSString *const kEventTypeNotifyOpenSSHLogout = @"NotifyOpenSSHLogout";
-static NSString *const kEventTypeNotifyLaunchItemAdd = @"NotifyLaunchItemAdd";
-static NSString *const kEventTypeNotifyLaunchItemRemove = @"NotifyLaunchItemRemove";
-static NSString *const kEventTypeNotifyXProtectDetected = @"NotifyXProtectDetected";
-static NSString *const kEventTypeNotifyXProtectRemediated = @"NotifyXProtectRemediated";
+static NSString* const kEventTypeAuthClone = @"AuthClone";
+static NSString* const kEventTypeAuthCopyfile = @"AuthCopyfile";
+static NSString* const kEventTypeAuthCreate = @"AuthCreate";
+static NSString* const kEventTypeAuthExchangedata = @"AuthExchangedata";
+static NSString* const kEventTypeAuthExec = @"AuthExec";
+static NSString* const kEventTypeAuthKextload = @"AuthKextload";
+static NSString* const kEventTypeAuthLink = @"AuthLink";
+static NSString* const kEventTypeAuthMount = @"AuthMount";
+static NSString* const kEventTypeAuthOpen = @"AuthOpen";
+static NSString* const kEventTypeAuthRemount = @"AuthRemount";
+static NSString* const kEventTypeAuthRename = @"AuthRename";
+static NSString* const kEventTypeAuthSignal = @"AuthSignal";
+static NSString* const kEventTypeAuthProcSuspendResume = @"AuthProcSuspendResume";
+static NSString* const kEventTypeAuthTruncate = @"AuthTruncate";
+static NSString* const kEventTypeAuthUnlink = @"AuthUnlink";
+static NSString* const kEventTypeNotifyClone = @"NotifyClone";
+static NSString* const kEventTypeNotifyClose = @"NotifyClose";
+static NSString* const kEventTypeNotifyCodesigningInvalidated = @"NotifyCodesigningInvalidated";
+static NSString* const kEventTypeNotifyCopyfile = @"NotifyCopyfile";
+static NSString* const kEventTypeNotifyExchangedata = @"NotifyExchangedata";
+static NSString* const kEventTypeNotifyExec = @"NotifyExec";
+static NSString* const kEventTypeNotifyExit = @"NotifyExit";
+static NSString* const kEventTypeNotifyFork = @"NotifyFork";
+static NSString* const kEventTypeNotifyLink = @"NotifyLink";
+static NSString* const kEventTypeNotifyRename = @"NotifyRename";
+static NSString* const kEventTypeNotifyUnlink = @"NotifyUnlink";
+static NSString* const kEventTypeNotifyUnmount = @"NotifyUnmount";
+static NSString* const kPseudoEventTypeGlobal = @"Global";
+static NSString* const kEventTypeNotifyAuthentication = @"NotifyAuthentication";
+static NSString* const kEventTypeNotifyLoginLogin = @"NotifyLoginLogin";
+static NSString* const kEventTypeNotifyLoginLogout = @"NotifyLoginLogout";
+static NSString* const kEventTypeNotifyLWSessionLogin = @"NotifyLWSessionLogin";
+static NSString* const kEventTypeNotifyLWSessionLogout = @"NotifyLWSessionLogout";
+static NSString* const kEventTypeNotifyLWSessionLock = @"NotifyLWSessionLock";
+static NSString* const kEventTypeNotifyLWSessionUnlock = @"NotifyLWSessionUnlock";
+static NSString* const kEventTypeNotifyScreensharingAttach = @"NotifyScreensharingAttach";
+static NSString* const kEventTypeNotifyScreensharingDetach = @"NotifyScreensharingDetach";
+static NSString* const kEventTypeNotifyOpenSSHLogin = @"NotifyOpenSSHLogin";
+static NSString* const kEventTypeNotifyOpenSSHLogout = @"NotifyOpenSSHLogout";
+static NSString* const kEventTypeNotifyLaunchItemAdd = @"NotifyLaunchItemAdd";
+static NSString* const kEventTypeNotifyLaunchItemRemove = @"NotifyLaunchItemRemove";
+static NSString* const kEventTypeNotifyXProtectDetected = @"NotifyXProtectDetected";
+static NSString* const kEventTypeNotifyXProtectRemediated = @"NotifyXProtectRemediated";
 #if HAVE_MACOS_15
-static NSString *const kEventTypeNotifyGatekeeperOverride = @"NotifyGatekeeperOverride";
+static NSString* const kEventTypeNotifyGatekeeperOverride = @"NotifyGatekeeperOverride";
 #endif  // HAVE_MACOS_15
 #if HAVE_MACOS_15_4
-static NSString *const kEventTypeNotifyTCCModification = @"NotifyTCCModification";
+static NSString* const kEventTypeNotifyTCCModification = @"NotifyTCCModification";
 #endif  // HAVE_MACOS_15_4
 
-static NSString *const kEventDispositionDropped = @"Dropped";
-static NSString *const kEventDispositionProcessed = @"Processed";
+static NSString* const kEventDispositionDropped = @"Dropped";
+static NSString* const kEventDispositionProcessed = @"Processed";
 
-static NSString *const kStatChangeStepNoChange = @"NoChange";
-static NSString *const kStatChangeStepMessageCreate = @"MessageCreate";
-static NSString *const kStatChangeStepCodesignValidation = @"CodesignValidation";
+static NSString* const kStatChangeStepNoChange = @"NoChange";
+static NSString* const kStatChangeStepMessageCreate = @"MessageCreate";
+static NSString* const kStatChangeStepCodesignValidation = @"CodesignValidation";
 
-static NSString *const kStatResultOK = @"OK";
-static NSString *const kStatResultStatError = @"StatError";
-static NSString *const kStatResultDevnoInodeMismatch = @"DevnoInodeMismatch";
+static NSString* const kStatResultOK = @"OK";
+static NSString* const kStatResultStatError = @"StatError";
+static NSString* const kStatResultDevnoInodeMismatch = @"DevnoInodeMismatch";
 
 // Compat values
-static NSString *const kFileAccessMetricStatusOK = @"OK";
-static NSString *const kFileAccessMetricStatusBlockedUser = @"BLOCKED_USER";
+static NSString* const kFileAccessMetricStatusOK = @"OK";
+static NSString* const kFileAccessMetricStatusBlockedUser = @"BLOCKED_USER";
 
-static NSString *const kFileAccessPolicyDecisionDenied = @"Denied";
-static NSString *const kFileAccessPolicyDecisionDeniedInvalidSignature = @"Denied";
-static NSString *const kFileAccessPolicyDecisionAllowedAuditOnly = @"AllowedAuditOnly";
+static NSString* const kFileAccessPolicyDecisionDenied = @"Denied";
+static NSString* const kFileAccessPolicyDecisionDeniedInvalidSignature = @"Denied";
+static NSString* const kFileAccessPolicyDecisionAllowedAuditOnly = @"AllowedAuditOnly";
 
-static NSString *const kFileAccessMetricsAccessType = @"access";
+static NSString* const kFileAccessMetricsAccessType = @"access";
 
 namespace santa {
 
-NSString *const ProcessorToString(Processor processor) {
+NSString* const ProcessorToString(Processor processor) {
   switch (processor) {
     case Processor::kAuthorizer: return kProcessorAuthorizer;
     case Processor::kDeviceManager: return kProcessorDeviceManager;
@@ -119,7 +119,7 @@ NSString *const ProcessorToString(Processor processor) {
   }
 }
 
-NSString *const EventTypeToString(es_event_type_t eventType) {
+NSString* const EventTypeToString(es_event_type_t eventType) {
   switch (eventType) {
     case ES_EVENT_TYPE_AUTH_CLONE: return kEventTypeAuthClone;
     case ES_EVENT_TYPE_AUTH_COPYFILE: return kEventTypeAuthCopyfile;
@@ -176,7 +176,7 @@ NSString *const EventTypeToString(es_event_type_t eventType) {
   }
 }
 
-NSString *const EventDispositionToString(EventDisposition d) {
+NSString* const EventDispositionToString(EventDisposition d) {
   switch (d) {
     case EventDisposition::kDropped: return kEventDispositionDropped;
     case EventDisposition::kProcessed: return kEventDispositionProcessed;
@@ -187,7 +187,7 @@ NSString *const EventDispositionToString(EventDisposition d) {
   }
 }
 
-NSString *const FileAccessMetricStatusToString(FileAccessMetricStatus status) {
+NSString* const FileAccessMetricStatusToString(FileAccessMetricStatus status) {
   switch (status) {
     case FileAccessMetricStatus::kOK: return kFileAccessMetricStatusOK;
     case FileAccessMetricStatus::kBlockedUser: return kFileAccessMetricStatusBlockedUser;
@@ -198,7 +198,7 @@ NSString *const FileAccessMetricStatusToString(FileAccessMetricStatus status) {
   }
 }
 
-NSString *const FileAccessPolicyDecisionToString(FileAccessPolicyDecision decision) {
+NSString* const FileAccessPolicyDecisionToString(FileAccessPolicyDecision decision) {
   switch (decision) {
     case FileAccessPolicyDecision::kDenied: return kFileAccessPolicyDecisionDenied;
     case FileAccessPolicyDecision::kDeniedInvalidSignature:
@@ -213,42 +213,42 @@ NSString *const FileAccessPolicyDecisionToString(FileAccessPolicyDecision decisi
   }
 }
 
-std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t interval) {
+std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet* metric_set, uint64_t interval) {
   dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.santametricsservice.q",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
 
   dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
 
-  SNTMetricInt64Gauge *event_processing_times =
+  SNTMetricInt64Gauge* event_processing_times =
       [metric_set int64GaugeWithName:@"/santa/event_processing_time"
                           fieldNames:@[ @"Processor", @"Event" ]
                             helpText:@"Time to process various event types by each processor"];
 
-  SNTMetricCounter *event_counts =
+  SNTMetricCounter* event_counts =
       [metric_set counterWithName:@"/santa/event_count"
                        fieldNames:@[ @"Processor", @"Event", @"Disposition" ]
                          helpText:@"Events received and processed by each processor"];
 
-  SNTMetricCounter *rate_limit_counts =
+  SNTMetricCounter* rate_limit_counts =
       [metric_set counterWithName:@"/santa/rate_limit_count"
                        fieldNames:@[]
                          helpText:@"Number of FAA events rate limited"];
 
-  SNTMetricCounter *faa_event_counts = [metric_set
+  SNTMetricCounter* faa_event_counts = [metric_set
       counterWithName:@"/santa/file_access_authorizer/log/count"
            fieldNames:@[
              @"config_version", @"access_type", @"rule_id", @"status", @"operation", @"decision"
            ]
              helpText:@"Count of times a log is emitted from the File Access Authorizer client"];
 
-  SNTMetricCounter *drop_counts =
+  SNTMetricCounter* drop_counts =
       [metric_set counterWithName:@"/santa/event_drop_count"
                        fieldNames:@[ @"Processor", @"Event" ]
                          helpText:@"Count of the number of drops for each event"];
 
   std::shared_ptr<Metrics> metrics = std::make_shared<Metrics>(
       q, timer_source, interval, event_processing_times, event_counts, rate_limit_counts,
-      faa_event_counts, drop_counts, metric_set, ^(Metrics *metrics) {
+      faa_event_counts, drop_counts, metric_set, ^(Metrics* metrics) {
         SNTRegisterCoreMetrics();
         metrics->EstablishConnection();
       });
@@ -267,10 +267,10 @@ std::shared_ptr<Metrics> Metrics::Create(SNTMetricSet *metric_set, uint64_t inte
 }
 
 Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t interval,
-                 SNTMetricInt64Gauge *event_processing_times, SNTMetricCounter *event_counts,
-                 SNTMetricCounter *rate_limit_counts, SNTMetricCounter *faa_event_counts,
-                 SNTMetricCounter *drop_counts, SNTMetricSet *metric_set,
-                 void (^run_on_first_start)(Metrics *))
+                 SNTMetricInt64Gauge* event_processing_times, SNTMetricCounter* event_counts,
+                 SNTMetricCounter* rate_limit_counts, SNTMetricCounter* faa_event_counts,
+                 SNTMetricCounter* drop_counts, SNTMetricSet* metric_set,
+                 void (^run_on_first_start)(Metrics*))
     : q_(q),
       timer_source_(timer_source),
       interval_(interval),
@@ -303,7 +303,7 @@ Metrics::~Metrics() {
 }
 
 void Metrics::EstablishConnection() {
-  MOLXPCConnection *metrics_connection = [SNTXPCMetricServiceInterface configuredConnection];
+  MOLXPCConnection* metrics_connection = [SNTXPCMetricServiceInterface configuredConnection];
   metrics_connection.invalidationHandler = ^{
     dispatch_sync(dispatch_get_main_queue(), ^{
       LOGW(@"Metrics service connection invalidated. Reconnecting...");
@@ -326,30 +326,30 @@ void Metrics::Export(void (^reply)(BOOL)) {
   });
 }
 
-void Metrics::ExportSerialized(SNTMetricSet *metric_set) {
+void Metrics::ExportSerialized(SNTMetricSet* metric_set) {
   FlushMetrics();
   [[metrics_connection_ remoteObjectProxy] exportForMonitoring:[metric_set export]];
 }
 
-void Metrics::ExportSerialized(SNTMetricSet *metric_set, void (^reply)(BOOL)) {
+void Metrics::ExportSerialized(SNTMetricSet* metric_set, void (^reply)(BOOL)) {
   FlushMetrics();
   [[metrics_connection_ remoteObjectProxy] exportForMonitoring:[metric_set export] reply:reply];
 }
 
 void Metrics::FlushMetrics() {
   dispatch_sync(events_q_, ^{
-    for (const auto &kv : event_counts_cache_) {
-      NSString *processorName = ProcessorToString(std::get<Processor>(kv.first));
-      NSString *eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
-      NSString *dispositionName = EventDispositionToString(std::get<EventDisposition>(kv.first));
+    for (const auto& kv : event_counts_cache_) {
+      NSString* processorName = ProcessorToString(std::get<Processor>(kv.first));
+      NSString* eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
+      NSString* dispositionName = EventDispositionToString(std::get<EventDisposition>(kv.first));
 
       [event_counts_ incrementBy:kv.second
                   forFieldValues:@[ processorName, eventName, dispositionName ]];
     }
 
-    for (const auto &kv : event_times_cache_) {
-      NSString *processorName = ProcessorToString(std::get<Processor>(kv.first));
-      NSString *eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
+    for (const auto& kv : event_times_cache_) {
+      NSString* processorName = ProcessorToString(std::get<Processor>(kv.first));
+      NSString* eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
 
       [event_processing_times_ set:kv.second forFieldValues:@[ processorName, eventName ]];
     }
@@ -359,12 +359,12 @@ void Metrics::FlushMetrics() {
     [rate_limit_counts_ incrementBy:rate_limit_counts_cache_.exchange(0, std::memory_order_relaxed)
                      forFieldValues:@[]];
 
-    for (const auto &kv : faa_event_counts_cache_) {
-      NSString *policyVersion = @(std::get<0>(kv.first).c_str());  // FileAccessMetricsPolicyVersion
-      NSString *policyName = @(std::get<1>(kv.first).c_str());     // FileAccessMetricsPolicyName
-      NSString *eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
-      NSString *status = FileAccessMetricStatusToString(std::get<FileAccessMetricStatus>(kv.first));
-      NSString *decision =
+    for (const auto& kv : faa_event_counts_cache_) {
+      NSString* policyVersion = @(std::get<0>(kv.first).c_str());  // FileAccessMetricsPolicyVersion
+      NSString* policyName = @(std::get<1>(kv.first).c_str());     // FileAccessMetricsPolicyName
+      NSString* eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
+      NSString* status = FileAccessMetricStatusToString(std::get<FileAccessMetricStatus>(kv.first));
+      NSString* decision =
           FileAccessPolicyDecisionToString(std::get<FileAccessPolicyDecision>(kv.first));
 
       [faa_event_counts_
@@ -374,10 +374,10 @@ void Metrics::FlushMetrics() {
           ]];
     }
 
-    for (auto &[key, stats] : drop_cache_) {
+    for (auto& [key, stats] : drop_cache_) {
       if (stats.drops > 0) {
-        NSString *processorName = ProcessorToString(std::get<Processor>(key));
-        NSString *eventName = EventTypeToString(std::get<es_event_type_t>(key));
+        NSString* processorName = ProcessorToString(std::get<Processor>(key));
+        NSString* eventName = EventTypeToString(std::get<es_event_type_t>(key));
 
         [drop_counts_ incrementBy:stats.drops forFieldValues:@[ processorName, eventName ]];
 

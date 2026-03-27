@@ -51,8 +51,8 @@ struct CELEvaluationResult {
   SNTRuleState resultState;  // If succeeded, the resulting state
 };
 
-struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
-  SNTRuleIdentifiers *ri =
+struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
+  SNTRuleIdentifiers* ri =
       [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:{
                                                               .cdhash = cd.cdhash,
                                                               .binarySHA256 = cd.sha256,
@@ -75,15 +75,15 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   std::shared_ptr<google::protobuf::Arena> celFallbackArena_;
   struct CompiledFallbackRule {
     std::shared_ptr<::google::api::expr::runtime::CelExpression> expression;
-    NSString *customMsg;
-    NSString *customURL;
+    NSString* customMsg;
+    NSString* customURL;
   };
   std::vector<CompiledFallbackRule> celFallbackRules_;
 }
-@property SNTRuleTable *ruleTable;
-@property SNTConfigurator *configurator;
+@property SNTRuleTable* ruleTable;
+@property SNTConfigurator* configurator;
 @property dispatch_queue_t celFallbackQueue;
-@property SNTKVOManager *celFallbackRulesObserver;
+@property SNTKVOManager* celFallbackRulesObserver;
 @end
 
 @implementation SNTPolicyProcessor
@@ -122,13 +122,13 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
                                      selector:@selector(celFallbackRules)
                                          type:[NSArray class]
                                      callback:^(id oldValue, id newValue) {
-                                       [weakSelf compileFallbackRules:(NSArray *)newValue];
+                                       [weakSelf compileFallbackRules:(NSArray*)newValue];
                                      }];
   }
   return self;
 }
 
-- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable
+- (instancetype)initWithRuleTable:(SNTRuleTable*)ruleTable
                entitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter {
   self = [self init];
   if (self) {
@@ -138,7 +138,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   return self;
 }
 
-- (void)compileFallbackRules:(NSArray<SNTCELFallbackRule *> *)rules {
+- (void)compileFallbackRules:(NSArray<SNTCELFallbackRule*>*)rules {
   if (!celEvaluatorV2_) {
     return;
   }
@@ -155,7 +155,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   __block std::vector<CompiledFallbackRule> compiled;
   compiled.reserve(rules.count);
   bool compileFailed = false;
-  for (SNTCELFallbackRule *rule in rules) {
+  for (SNTCELFallbackRule* rule in rules) {
     auto result =
         celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), arena.get());
     if (result.ok()) {
@@ -179,7 +179,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   });
 }
 
-- (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision *)cd
+- (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
                     activationCallback:(ActivationCallbackBlock)activationCallback {
   if (!celEvaluatorV2_ || !activationCallback) {
     return NO;
@@ -236,18 +236,18 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 }
 
 - (CELEvaluationResult)
-    evaluateCompiledCELExpression:(const ::google::api::expr::runtime::CelExpression *)expression
+    evaluateCompiledCELExpression:(const ::google::api::expr::runtime::CelExpression*)expression
                             useV2:(bool)useV2
-                   cachedDecision:(SNTCachedDecision *)cd
-                       activation:(const ::google::api::expr::runtime::BaseActivation &)activation
-                        evalArena:(google::protobuf::Arena *)evalArena {
+                   cachedDecision:(SNTCachedDecision*)cd
+                       activation:(const ::google::api::expr::runtime::BaseActivation&)activation
+                        evalArena:(google::protobuf::Arena*)evalArena {
   int returnValue = 0;
   bool cacheable = true;
   std::optional<uint64_t> touchIDCooldownMinutes;
 
   if (useV2) {
-    const auto &v2Activation = static_cast<const santa::cel::Activation<true> &>(activation);
-    assert(dynamic_cast<const santa::cel::Activation<true> *>(&activation) != nullptr);
+    const auto& v2Activation = static_cast<const santa::cel::Activation<true>&>(activation);
+    assert(dynamic_cast<const santa::cel::Activation<true>*>(&activation) != nullptr);
     auto evalResult = celEvaluatorV2_->Evaluate(expression, v2Activation, evalArena);
 
     if (!evalResult.ok()) {
@@ -264,8 +264,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
     cacheable = evalResult->cacheable;
     touchIDCooldownMinutes = evalResult->touchIDCooldownMinutes;
   } else {
-    const auto &v1Activation = static_cast<const santa::cel::Activation<false> &>(activation);
-    assert(dynamic_cast<const santa::cel::Activation<false> *>(&activation) != nullptr);
+    const auto& v1Activation = static_cast<const santa::cel::Activation<false>&>(activation);
+    assert(dynamic_cast<const santa::cel::Activation<false>*>(&activation) != nullptr);
     auto evalResult = celEvaluatorV1_->Evaluate(expression, v1Activation, evalArena);
 
     if (!evalResult.ok()) {
@@ -338,8 +338,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
   return {.succeeded = true, .decisionMade = false, .resultState = resultState};
 }
 
-- (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule *)rule
-                                     cachedDecision:(SNTCachedDecision *)cd
+- (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule*)rule
+                                     cachedDecision:(SNTCachedDecision*)cd
                                  activationCallback:(ActivationCallbackBlock)activationCallback {
   bool useV2 = (rule.state == SNTRuleStateCELv2);
   auto activation = activationCallback(useV2);
@@ -359,10 +359,10 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 
   absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> compileResult;
   if (useV2) {
-    assert(dynamic_cast<santa::cel::Activation<true> *>(activation.get()) != nullptr);
+    assert(dynamic_cast<santa::cel::Activation<true>*>(activation.get()) != nullptr);
     compileResult = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
   } else {
-    assert(dynamic_cast<santa::cel::Activation<false> *>(activation.get()) != nullptr);
+    assert(dynamic_cast<santa::cel::Activation<false>*>(activation.get()) != nullptr);
     compileResult = celEvaluatorV1_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
   }
 
@@ -386,8 +386,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 // This method applies the rules to the cached decision object.
 //
 // It returns YES if the decision was made, NO if the decision was not made.
-- (BOOL)decision:(SNTCachedDecision *)cd
-                     forRule:(SNTRule *)rule
+- (BOOL)decision:(SNTCachedDecision*)cd
+                     forRule:(SNTRule*)rule
          withTransitiveRules:(BOOL)enableTransitiveRules
     andCELActivationCallback:(ActivationCallbackBlock)activationCallback {
   SNTRuleState state = rule.state;
@@ -482,8 +482,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd) {
 }
 
 static void UpdateCachedDecisionSigningInfo(
-    SNTCachedDecision *cd, MOLCodesignChecker *csInfo, PlatformBinaryState platformBinaryState,
-    NSDictionary *_Nullable (^entitlementsFilterCallback)(NSDictionary *_Nullable entitlements)) {
+    SNTCachedDecision* cd, MOLCodesignChecker* csInfo, PlatformBinaryState platformBinaryState,
+    NSDictionary* _Nullable (^entitlementsFilterCallback)(NSDictionary* _Nullable entitlements)) {
   cd.certSHA256 = csInfo.leafCertificate.SHA256;
   cd.certCommonName = csInfo.leafCertificate.commonName;
   cd.certChain = csInfo.certificates;
@@ -513,7 +513,7 @@ static void UpdateCachedDecisionSigningInfo(
     }
   }
 
-  NSDictionary *entitlements = csInfo.entitlements;
+  NSDictionary* entitlements = csInfo.entitlements;
   cd.rawEntitlements = [entitlements sntDeepCopy];
 
   if (entitlementsFilterCallback) {
@@ -528,19 +528,19 @@ static void UpdateCachedDecisionSigningInfo(
   cd.signingTime = csInfo.signingTime;
 }
 
-- (nonnull SNTCachedDecision *)
-           decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                   configState:(nonnull SNTConfigState *)configState
-                cachedDecision:(nonnull SNTCachedDecision *)cd
+- (nonnull SNTCachedDecision*)
+           decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
+                   configState:(nonnull SNTConfigState*)configState
+                cachedDecision:(nonnull SNTCachedDecision*)cd
            platformBinaryState:(PlatformBinaryState)platformBinaryState
          signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
             activationCallback:(nullable ActivationCallbackBlock)activationCallback
     entitlementsFilterCallback:
-        (NSDictionary *_Nullable (^_Nullable)(NSDictionary *_Nullable entitlements))
+        (NSDictionary* _Nullable (^_Nullable)(NSDictionary* _Nullable entitlements))
             entitlementsFilterCallback {
   // If the binary is a critical system binary, don't check its signature.
   // The binary was validated at startup when the rule table was initialized.
-  SNTCachedDecision *systemCd = [self.ruleTable.criticalSystemBinaries[cd.signingID] copy];
+  SNTCachedDecision* systemCd = [self.ruleTable.criticalSystemBinaries[cd.signingID] copy];
   if (systemCd) {
     systemCd.decisionClientMode = configState.clientMode;
     return systemCd;
@@ -554,14 +554,14 @@ static void UpdateCachedDecisionSigningInfo(
   cd.decisionClientMode = configState.clientMode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
-  NSError *csInfoError;
+  NSError* csInfoError;
   if (!cd.certSHA256.length) {
     // Grab the code signature, if there's an error don't try to capture
     // any of the signature details.
     // TODO(mlw): MOLCodesignChecker should be updated to still grab signing information
     // even if validity check fails. Once that is done, this code can be updated to grab
     // cert information so that it can still be reported to the sync server.
-    MOLCodesignChecker *csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
+    MOLCodesignChecker* csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
     if (csInfoError) {
       csInfo = nil;
       cd.decisionExtra = [NSString
@@ -573,7 +573,7 @@ static void UpdateCachedDecisionSigningInfo(
     }
   }
 
-  SNTRule *rule = [self.ruleTable executionRuleForIdentifiers:CreateRuleIDs(cd)];
+  SNTRule* rule = [self.ruleTable executionRuleForIdentifiers:CreateRuleIDs(cd)];
   if (rule) {
     // If we have a rule match we don't need to process any further.
     if ([self decision:cd
@@ -596,7 +596,7 @@ static void UpdateCachedDecisionSigningInfo(
     return cd;
   }
 
-  NSString *msg = [self fileIsScopeBlocked:fileInfo];
+  NSString* msg = [self fileIsScopeBlocked:fileInfo];
   if (msg) {
     cd.decisionExtra = msg;
     cd.decision = SNTEventStateBlockScope;
@@ -618,17 +618,17 @@ static void UpdateCachedDecisionSigningInfo(
   }
 }
 
-- (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                                     targetProcess:(nonnull const es_process_t *)targetProc
-                                       configState:(nonnull SNTConfigState *)configState
-                                activationCallback:
-                                    (nullable ActivationCallbackBlock)activationCallback
-                                    cachedDecision:(nullable SNTCachedDecision *)existingDecision {
+- (nonnull SNTCachedDecision*)decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
+                                    targetProcess:(nonnull const es_process_t*)targetProc
+                                      configState:(nonnull SNTConfigState*)configState
+                               activationCallback:
+                                   (nullable ActivationCallbackBlock)activationCallback
+                                   cachedDecision:(nullable SNTCachedDecision*)existingDecision {
   PlatformBinaryState pbs = targetProc->is_platform_binary ? PlatformBinaryState::kRuntimeTrue
                                                            : PlatformBinaryState::kRuntimeFalse;
 
-  const char *entitlementsFilterTeamID = NULL;
-  SNTCachedDecision *cd;
+  const char* entitlementsFilterTeamID = NULL;
+  SNTCachedDecision* cd;
 
   if (existingDecision) {
     cd = [[SNTCachedDecision alloc] initWithCachedIdentity:existingDecision];
@@ -664,10 +664,10 @@ static void UpdateCachedDecisionSigningInfo(
       // This ensures that the OS will kill the process if the CDHash was tampered
       // with and code was loaded that didn't match a page hash.
       if (targetProc->codesigning_flags & CS_KILL || targetProc->codesigning_flags & CS_HARD) {
-        static NSString *const kCDHashFormatString = @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
+        static NSString* const kCDHashFormatString = @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
                                                       "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
 
-        const uint8_t *buf = targetProc->cdhash;
+        const uint8_t* buf = targetProc->cdhash;
         cd.cdhash = [[NSString alloc]
             initWithFormat:kCDHashFormatString, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5],
                            buf[6], buf[7], buf[8], buf[9], buf[10], buf[11], buf[12], buf[13],
@@ -695,7 +695,7 @@ static void UpdateCachedDecisionSigningInfo(
         }
       }
       activationCallback:activationCallback
-      entitlementsFilterCallback:^NSDictionary *(NSDictionary *entitlements) {
+      entitlementsFilterCallback:^NSDictionary*(NSDictionary* entitlements) {
         return entitlementsFilter_->Filter(entitlementsFilterTeamID, entitlements);
       }];
 }
@@ -709,11 +709,11 @@ static void UpdateCachedDecisionSigningInfo(
 ///
 ///  @return @c YES if file is in scope, @c NO otherwise.
 ///
-- (NSString *)fileIsScopeAllowed:(SNTFileInfo *)fi {
+- (NSString*)fileIsScopeAllowed:(SNTFileInfo*)fi {
   if (!fi) return nil;
 
   // Determine if file is within an allowed path
-  NSRegularExpression *re = [[SNTConfigurator configurator] allowedPathRegex];
+  NSRegularExpression* re = [[SNTConfigurator configurator] allowedPathRegex];
   if ([re numberOfMatchesInString:fi.path options:0 range:NSMakeRange(0, fi.path.length)]) {
     return @"Allowed Path Regex";
   }
@@ -726,10 +726,10 @@ static void UpdateCachedDecisionSigningInfo(
   return nil;
 }
 
-- (NSString *)fileIsScopeBlocked:(SNTFileInfo *)fi {
+- (NSString*)fileIsScopeBlocked:(SNTFileInfo*)fi {
   if (!fi) return nil;
 
-  NSRegularExpression *re = [[SNTConfigurator configurator] blockedPathRegex];
+  NSRegularExpression* re = [[SNTConfigurator configurator] blockedPathRegex];
   if ([re numberOfMatchesInString:fi.path options:0 range:NSMakeRange(0, fi.path.length)]) {
     return @"Blocked Path Regex";
   }

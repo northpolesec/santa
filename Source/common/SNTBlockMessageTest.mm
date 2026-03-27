@@ -41,13 +41,13 @@
 }
 
 - (void)testFormatMessage {
-  NSString *input = @"Testing with somé Ünicode çharacters";
-  NSAttributedString *got = [SNTBlockMessage formatMessage:input withFallback:@""];
+  NSString* input = @"Testing with somé Ünicode çharacters";
+  NSAttributedString* got = [SNTBlockMessage formatMessage:input withFallback:@""];
   XCTAssertEqualObjects([got string], input);
 }
 
 - (void)testEventDetailURLForEvent {
-  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"my_fi";
   se.executingUser = @"my_un";
@@ -56,16 +56,16 @@
   se.teamID = @"SNT";
   se.signingID = @"SNT:s.n.t";
 
-  NSString *url = @"http://"
+  NSString* url = @"http://"
                   @"localhost?fs=%file_sha%&fi=%file_identifier%&bfi=%bundle_or_file_identifier%&"
                   @"fbid=%file_bundle_id%&ti=%team_id%&si=%signing_id%&ch=%cdhash%&"
                   @"un=%username%&mid=%machine_id%&hn=%hostname%&u=%uuid%&s=%serial%";
-  NSString *wantUrl = @"http://"
+  NSString* wantUrl = @"http://"
                       @"localhost?fs=my_fi&fi=my_fi&bfi=my_fi&"
                       @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"
                       @"un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
 
   // Set fileBundleHash and test again for newly expected values
   se.fileBundleHash = @"my_fbh";
@@ -84,7 +84,7 @@
 }
 
 - (void)testEventDetailURLForFileAccessEvent {
-  SNTStoredFileAccessEvent *fae = [[SNTStoredFileAccessEvent alloc] init];
+  SNTStoredFileAccessEvent* fae = [[SNTStoredFileAccessEvent alloc] init];
 
   fae.ruleVersion = @"my_rv";
   fae.ruleName = @"my_rn";
@@ -95,17 +95,17 @@
   fae.accessedPath = @"my_ap";
   fae.process.executingUser = @"my_un";
 
-  NSString *url =
+  NSString* url =
       @"http://"
       @"localhost?rv=%rule_version%&rn=%rule_name%&fi=%file_identifier%&"
       @"ti=%team_id%&si=%signing_id%&ch=%cdhash%&"
       @"ap=%accessed_path%&un=%username%&mid=%machine_id%&hn=%hostname%&u=%uuid%&s=%serial%";
-  NSString *wantUrl = @"http://"
+  NSString* wantUrl = @"http://"
                       @"localhost?rv=my_rv&rn=my_rn&fi=my_fi&"
                       @"ti=SNT&si=SNT:s.n.t&ch=abc&"
                       @"ap=my_ap&un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:url];
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:url];
 
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 
@@ -114,45 +114,45 @@
 }
 
 - (void)testEventDetailURLForFileAccessEventFallback {
-  SNTStoredFileAccessEvent *fae = [[SNTStoredFileAccessEvent alloc] init];
+  SNTStoredFileAccessEvent* fae = [[SNTStoredFileAccessEvent alloc] init];
 
   fae.ruleVersion = @"my_rv";
   fae.ruleName = @"my_rn";
   fae.accessedPath = @"my_ap";
   fae.process.executingUser = @"my_un";
 
-  NSString *configURL = @"http://localhost?rv=%rule_version%&rn=%rule_name%&ap=%accessed_path%";
-  NSString *wantUrl = @"http://localhost?rv=my_rv&rn=my_rn&ap=my_ap";
+  NSString* configURL = @"http://localhost?rv=%rule_version%&rn=%rule_name%&ap=%accessed_path%";
+  NSString* wantUrl = @"http://localhost?rv=my_rv&rn=my_rn&ap=my_ap";
 
   OCMStub([self.mockConfigurator fileAccessEventDetailURL]).andReturn(configURL);
 
   // When customURL is nil, should fall back to fileAccessEventDetailURL
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:nil];
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:nil];
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 
   // When customURL is provided, it should be used instead
-  NSString *customURL = @"http://custom?rv=%rule_version%";
-  NSString *wantCustomUrl = @"http://custom?rv=my_rv";
+  NSString* customURL = @"http://custom?rv=%rule_version%";
+  NSString* wantCustomUrl = @"http://custom?rv=my_rv";
   gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:customURL];
   XCTAssertEqualObjects(gotUrl.absoluteString, wantCustomUrl);
 }
 
 - (void)testEventDetailURLMissingDetails {
-  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"my_fi";
 
-  NSString *url = @"http://localhost?fi=%file_identifier%";
-  NSString *wantUrl = @"http://localhost?fi=my_fi";
+  NSString* url = @"http://localhost?fi=%file_identifier%";
+  NSString* wantUrl = @"http://localhost?fi=my_fi";
 
-  NSURL *gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
 
   XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
 }
 
 - (void)testStringFromHTML {
-  NSString *html = @"<html><body>Hello, world!</body></html>";
-  NSString *got = [SNTBlockMessage stringFromHTML:html];
+  NSString* html = @"<html><body>Hello, world!</body></html>";
+  NSString* got = [SNTBlockMessage stringFromHTML:html];
   XCTAssertEqualObjects(got, @"Hello, world!");
 
   html = @"Entering Lockdown Mode";

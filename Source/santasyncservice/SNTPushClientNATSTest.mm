@@ -28,7 +28,7 @@ extern "C" {
 
 // Expose private methods for testing
 @interface SNTPushClientNATS (Testing)
-@property(nonatomic) natsConnection *conn;
+@property(nonatomic) natsConnection* conn;
 @property(nonatomic, readwrite) BOOL isConnected;
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
 @property(nonatomic) NSInteger retryAttempt;
@@ -37,19 +37,19 @@ extern "C" {
 - (void)disconnectWithCompletion:(void (^)(void))completion;
 - (void)subscribe;
 - (void)scheduleConnectionRetry;
-- (void)configureWithPushServer:(NSString *)server
-                      pushToken:(NSString *)token
-                            jwt:(NSString *)jwt
-                   pushDeviceID:(NSString *)deviceID
-                           tags:(NSArray<NSString *> *)tags;
-- (void)handlePushNotificationForSubject:(NSString *)subject;
+- (void)configureWithPushServer:(NSString*)server
+                      pushToken:(NSString*)token
+                            jwt:(NSString*)jwt
+                   pushDeviceID:(NSString*)deviceID
+                           tags:(NSArray<NSString*>*)tags;
+- (void)handlePushNotificationForSubject:(NSString*)subject;
 @end
 
 @interface SNTPushClientNATSTest : XCTestCase
 @property id mockConfigurator;
 @property id mockSystemInfo;
 @property id mockSyncDelegate;
-@property SNTPushClientNATS *client;
+@property SNTPushClientNATS* client;
 @end
 
 @implementation SNTPushClientNATSTest
@@ -119,7 +119,7 @@ extern "C" {
 
 - (void)testSubscribeWithValidMachineID {
   // Given: Valid machine ID is available
-  NSString *machineID = @"12345678-1234-1234-1234-123456789012";
+  NSString* machineID = @"12345678-1234-1234-1234-123456789012";
   OCMStub([self.mockConfigurator machineID]).andReturn(machineID);
 
   // When: Client is initialized and configured
@@ -165,13 +165,13 @@ extern "C" {
 
 - (void)testTokenReturnsMachineID {
   // Given: Machine ID is configured
-  NSString *machineID = @"test-machine-id";
+  NSString* machineID = @"test-machine-id";
   OCMStub([self.mockConfigurator machineID]).andReturn(machineID);
 
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // When: Token is requested
-  NSString *token = self.client.token;
+  NSString* token = self.client.token;
 
   // Then: Should return machine ID
   XCTAssertEqualObjects(token, machineID);
@@ -184,7 +184,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // When: Preflight sync state with push configuration is handled
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"workshop";
   syncState.pushNKey = @"test-nkey";
   syncState.pushJWT = @"test-jwt";
@@ -204,7 +204,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // When: Preflight sync state without push configuration is handled
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   // No push configuration fields set
 
   [self.client handlePreflightSyncState:syncState];
@@ -220,7 +220,7 @@ extern "C" {
   NSUInteger originalInterval = self.client.fullSyncInterval;
 
   // When: Preflight sync state with new interval is handled
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushNotificationsFullSyncInterval = @(7200);  // 2 hours
 
   [self.client handlePreflightSyncState:syncState];
@@ -314,7 +314,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // When: Preflight sync state includes santa.host.* in tags (which shouldn't happen)
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"workshop";
   syncState.pushNKey = @"test-nkey";
   syncState.pushJWT = @"test-jwt";
@@ -337,10 +337,10 @@ extern "C" {
   // Given: Client is initialized and configured with initial credentials
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  XCTestExpectation *initialConfigExpectation =
+  XCTestExpectation* initialConfigExpectation =
       [self expectationWithDescription:@"Initial configuration completed"];
 
-  SNTSyncState *initialState = [[SNTSyncState alloc] init];
+  SNTSyncState* initialState = [[SNTSyncState alloc] init];
   initialState.pushServer = @"workshop";
   initialState.pushNKey = @"old-nkey";
   initialState.pushJWT = @"old-jwt";
@@ -356,10 +356,10 @@ extern "C" {
   [self waitForExpectations:@[ initialConfigExpectation ] timeout:1.0];
 
   // When: New credentials arrive (JWT changed)
-  XCTestExpectation *rotationExpectation =
+  XCTestExpectation* rotationExpectation =
       [self expectationWithDescription:@"Credential rotation completed"];
 
-  SNTSyncState *updatedState = [[SNTSyncState alloc] init];
+  SNTSyncState* updatedState = [[SNTSyncState alloc] init];
   updatedState.pushServer = @"workshop";
   updatedState.pushNKey = @"old-nkey";  // NKey unchanged
   updatedState.pushJWT = @"new-jwt";    // JWT changed (rotated)
@@ -384,10 +384,10 @@ extern "C" {
   // Given: Client is initialized and configured with initial credentials
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  XCTestExpectation *initialConfigExpectation =
+  XCTestExpectation* initialConfigExpectation =
       [self expectationWithDescription:@"Initial configuration completed"];
 
-  SNTSyncState *initialState = [[SNTSyncState alloc] init];
+  SNTSyncState* initialState = [[SNTSyncState alloc] init];
   initialState.pushServer = @"workshop";
   initialState.pushNKey = @"old-nkey";
   initialState.pushJWT = @"test-jwt";
@@ -403,10 +403,10 @@ extern "C" {
   [self waitForExpectations:@[ initialConfigExpectation ] timeout:1.0];
 
   // When: New credentials arrive (NKey changed)
-  XCTestExpectation *rotationExpectation =
+  XCTestExpectation* rotationExpectation =
       [self expectationWithDescription:@"Credential rotation completed"];
 
-  SNTSyncState *updatedState = [[SNTSyncState alloc] init];
+  SNTSyncState* updatedState = [[SNTSyncState alloc] init];
   updatedState.pushServer = @"workshop";
   updatedState.pushNKey = @"new-nkey";  // NKey changed (rotated)
   updatedState.pushJWT = @"test-jwt";   // JWT unchanged
@@ -429,10 +429,10 @@ extern "C" {
   // Given: Client is initialized and configured with initial credentials
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  XCTestExpectation *initialConfigExpectation =
+  XCTestExpectation* initialConfigExpectation =
       [self expectationWithDescription:@"Initial configuration completed"];
 
-  SNTSyncState *initialState = [[SNTSyncState alloc] init];
+  SNTSyncState* initialState = [[SNTSyncState alloc] init];
   initialState.pushServer = @"workshop";
   initialState.pushNKey = @"old-nkey";
   initialState.pushJWT = @"old-jwt";
@@ -448,10 +448,10 @@ extern "C" {
   [self waitForExpectations:@[ initialConfigExpectation ] timeout:1.0];
 
   // When: Both credentials change simultaneously
-  XCTestExpectation *rotationExpectation =
+  XCTestExpectation* rotationExpectation =
       [self expectationWithDescription:@"Credential rotation completed"];
 
-  SNTSyncState *updatedState = [[SNTSyncState alloc] init];
+  SNTSyncState* updatedState = [[SNTSyncState alloc] init];
   updatedState.pushServer = @"workshop";
   updatedState.pushNKey = @"new-nkey";  // Both changed
   updatedState.pushJWT = @"new-jwt";    // Both changed
@@ -474,10 +474,10 @@ extern "C" {
   // Given: Client is initialized and configured
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  XCTestExpectation *initialConfigExpectation =
+  XCTestExpectation* initialConfigExpectation =
       [self expectationWithDescription:@"Initial configuration completed"];
 
-  SNTSyncState *initialState = [[SNTSyncState alloc] init];
+  SNTSyncState* initialState = [[SNTSyncState alloc] init];
   initialState.pushServer = @"workshop";
   initialState.pushNKey = @"test-nkey";
   initialState.pushJWT = @"test-jwt";
@@ -493,10 +493,10 @@ extern "C" {
   [self waitForExpectations:@[ initialConfigExpectation ] timeout:1.0];
 
   // When: Same credentials are provided again (only tags changed)
-  XCTestExpectation *reconfigExpectation =
+  XCTestExpectation* reconfigExpectation =
       [self expectationWithDescription:@"Reconfiguration completed"];
 
-  SNTSyncState *updatedState = [[SNTSyncState alloc] init];
+  SNTSyncState* updatedState = [[SNTSyncState alloc] init];
   updatedState.pushServer = @"workshop";
   updatedState.pushNKey = @"test-nkey";  // Same
   updatedState.pushJWT = @"test-jwt";    // Same
@@ -522,7 +522,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Test various device ID formats that need sanitization
-  NSArray<NSArray<NSString *> *> *testCases = @[
+  NSArray<NSArray<NSString*>*>* testCases = @[
     @[ @"12345678-1234-1234-1234-123456789012", @"santa.host.12345678123412341234123456789012" ],
     @[ @"device.id.with.dots", @"santa.host.deviceidwithdots" ],
     @[ @"device-id-with-hyphens", @"santa.host.deviceidwithhyphens" ],
@@ -531,8 +531,8 @@ extern "C" {
     @[ @"simple", @"santa.host.simple" ]
   ];
 
-  for (NSArray<NSString *> *testCase in testCases) {
-    NSString *input = testCase[0];
+  for (NSArray<NSString*>* testCase in testCases) {
+    NSString* input = testCase[0];
     // NSString *expected = testCase[1]; // Expected sanitized topic for verification in integration
     // tests
 
@@ -570,12 +570,12 @@ extern "C" {
   // Given: Client is initialized
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  XCTestExpectation *expectation =
+  XCTestExpectation* expectation =
       [self expectationWithDescription:@"syncSecondsFromNow called for tag message"];
 
   OCMStub([self.mockSyncDelegate syncSecondsFromNow:0])
       .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation *invocation) {
+      .andDo(^(NSInvocation* invocation) {
         uint64_t seconds;
         [invocation getArgument:&seconds atIndex:2];
         XCTAssertLessThanOrEqual(seconds, 180u);
@@ -593,12 +593,12 @@ extern "C" {
   // Given: Client is initialized
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  XCTestExpectation *expectation =
+  XCTestExpectation* expectation =
       [self expectationWithDescription:@"syncSecondsFromNow called with 0 for host message"];
 
   OCMStub([self.mockSyncDelegate syncSecondsFromNow:0])
       .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation *invocation) {
+      .andDo(^(NSInvocation* invocation) {
         uint64_t seconds;
         [invocation getArgument:&seconds atIndex:2];
         XCTAssertEqual(seconds, 0u);

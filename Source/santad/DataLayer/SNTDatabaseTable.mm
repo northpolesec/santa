@@ -21,19 +21,19 @@
 #import "Source/common/SNTLogging.h"
 
 @interface SNTDatabaseTable ()
-@property FMDatabaseQueue *dbQ;
+@property FMDatabaseQueue* dbQ;
 @end
 
 @implementation SNTDatabaseTable
 
-- (instancetype)initWithDatabaseQueue:(FMDatabaseQueue *)db {
+- (instancetype)initWithDatabaseQueue:(FMDatabaseQueue*)db {
   if (!db) return nil;
 
   self = [super init];
   if (self) {
     __block BOOL bail = NO;
 
-    [db inDatabase:^(FMDatabase *db) {
+    [db inDatabase:^(FMDatabase* db) {
       if (![db goodConnection]) {
         if ([db lastErrorCode] == SQLITE_LOCKED) {
           LOGW(@"The database '%@' is locked by another process. Aborting.", [db databasePath]);
@@ -73,12 +73,12 @@
   return nil;
 }
 
-- (BOOL)isDatabaseCorrupted:(FMDatabase *)db {
+- (BOOL)isDatabaseCorrupted:(FMDatabase*)db {
   BOOL corrupted = YES;
 
-  FMResultSet *rs = [db executeQuery:@"PRAGMA integrity_check"];
+  FMResultSet* rs = [db executeQuery:@"PRAGMA integrity_check"];
   if ([rs next]) {
-    NSString *result = [rs stringForColumnIndex:0];
+    NSString* result = [rs stringForColumnIndex:0];
     if ([result isEqualToString:@"ok"]) {
       corrupted = NO;
     }
@@ -88,13 +88,13 @@
   return corrupted;
 }
 
-- (void)closeDeleteReopenDatabase:(FMDatabase *)db {
+- (void)closeDeleteReopenDatabase:(FMDatabase*)db {
   [db close];
   [[NSFileManager defaultManager] removeItemAtPath:[db databasePath] error:NULL];
   [db open];
 }
 
-- (uint32_t)initializeDatabase:(FMDatabase *)db fromVersion:(uint32_t)version {
+- (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
   [self doesNotRecognizeSelector:_cmd];
   return 0;
 }
@@ -106,7 +106,7 @@
 
 - (uint32_t)currentVersion {
   __block uint32_t curVersion = 0;
-  [self.dbQ inDatabase:^(FMDatabase *db) {
+  [self.dbQ inDatabase:^(FMDatabase* db) {
     curVersion = [db userVersion];
   }];
 
@@ -116,7 +116,7 @@
 /// Called at the end of initialization to ensure the table in the
 /// database exists and uses the latest schema.
 - (void)updateTableSchema {
-  [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
+  [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
     uint32_t currentVersion = [db userVersion];
     uint32_t newVersion = [self initializeDatabase:db fromVersion:currentVersion];
     // For debug builds, assert that the returned new version matches what is expected.
@@ -133,16 +133,16 @@
   [self vacuum];
 }
 
-- (void)inDatabase:(void (^)(FMDatabase *db))block {
+- (void)inDatabase:(void (^)(FMDatabase* db))block {
   [self.dbQ inDatabase:block];
 }
 
-- (void)inTransaction:(void (^)(FMDatabase *db, BOOL *rollback))block {
+- (void)inTransaction:(void (^)(FMDatabase* db, BOOL* rollback))block {
   [self.dbQ inTransaction:block];
 }
 
 - (void)vacuum {
-  [self.dbQ inDatabase:^(FMDatabase *db) {
+  [self.dbQ inDatabase:^(FMDatabase* db) {
     [db executeUpdate:@"VACUUM"];
   }];
 }

@@ -28,14 +28,14 @@
 
 #include "cel/v1.pb.h"
 
-extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision *cd);
+extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd);
 
 @interface SNTPolicyProcessor (Testing)
-- (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision *)cd
+- (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
                     activationCallback:(ActivationCallbackBlock)activationCallback;
 @end
 
-BOOL CompareMaybeNilStrings(NSString *s1, NSString *s2) {
+BOOL CompareMaybeNilStrings(NSString* s1, NSString* s2) {
   return (!s1 && !s2) || [s1 isEqualToString:s2];
 }
 
@@ -60,7 +60,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 @interface SNTPolicyProcessorTest : XCTestCase
-@property SNTPolicyProcessor *processor;
+@property SNTPolicyProcessor* processor;
 @end
 
 @implementation SNTPolicyProcessorTest
@@ -72,13 +72,13 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[]];
 }
 
-- (void)testRule:(SNTRule *)rule
+- (void)testRule:(SNTRule*)rule
      transitiveRules:(BOOL)transitiveRules
                final:(BOOL)final
              matches:(BOOL)matches
               silent:(BOOL)silent
     expectedDecision:(SNTEventState)decision {
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   if (matches) {
     switch (rule.type) {
       case SNTRuleTypeBinary: cd.sha256 = rule.identifier; break;
@@ -108,7 +108,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForBlockByCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"BLOCKLIST"
@@ -131,7 +131,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForSilentBlockByCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -155,7 +155,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForAllowbyCDHashRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"ALLOWLIST"
@@ -179,7 +179,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForBlockBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"BLOCKLIST"
@@ -204,7 +204,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForSilenBlockBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -229,7 +229,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForAllowBySHA256RuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
@@ -253,7 +253,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForSigningIDBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"ABCDEFGHIJ:ABCDEFGHIJ",
     @"policy" : @"BLOCKLIST"
@@ -278,7 +278,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // Signing ID rules
 - (void)testDecisionForSigningIDSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -302,7 +302,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForSigningIDAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"ALLOWLIST"
@@ -327,7 +327,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 //  Certificate rules
 - (void)testDecisionForCertificateBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"BLOCKLIST"
@@ -351,7 +351,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForCertificateSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -375,7 +375,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForCertificateAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CERTIFICATE",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST"
@@ -400,7 +400,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // Team ID rules
 - (void)testDecisionForTeamIDBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"BLOCKLIST"
@@ -424,7 +424,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForTeamIDSilentBlockRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"SILENT_BLOCKLIST"
@@ -448,7 +448,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testDecisionForTeamIDAllowRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"TEAMID",
     @"identifier" : @"TEAMID1234",
     @"policy" : @"ALLOWLIST"
@@ -474,7 +474,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 // Compiler rules
 // CDHash
 - (void)testDecisionForCDHashCompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
     @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
     @"policy" : @"ALLOWLIST_COMPILER"
@@ -499,7 +499,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // SHA256
 - (void)testDecisionForSHA256CompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST_COMPILER"
@@ -524,7 +524,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // SigningID
 - (void)testDecisionForSigningIDCompilerRuleMatches {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"SIGNINGID",
     @"identifier" : @"TEAMID1234:ABCDEFGHIJ",
     @"policy" : @"ALLOWLIST_COMPILER"
@@ -549,7 +549,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 // Transitive allowlist rules
 - (void)testDecisionForTransitiveAllowlistRuleMatches {
-  SNTRule *rule = [[SNTRule alloc]
+  SNTRule* rule = [[SNTRule alloc]
       initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
                    state:SNTRuleStateAllowTransitive
                     type:SNTRuleTypeBinary];
@@ -572,7 +572,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 - (void)testEnsureANonMatchingRuleResultsInUnknown {
   // Set to an invalid state
-  SNTRule *rule = [[SNTRule alloc]
+  SNTRule* rule = [[SNTRule alloc]
       initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
                    state:static_cast<SNTRuleState>(88888)
                     type:SNTRuleTypeBinary];
@@ -593,7 +593,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testEnsureCustomURLAndMessageAreSet {
-  SNTRule *rule = [[SNTRule alloc] initWithDictionary:@{
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"BINARY",
     @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     @"policy" : @"ALLOWLIST",
@@ -604,7 +604,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   XCTAssertNotNil(rule, "invalid test rule dictionary");
 
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = rule.identifier;
 
   [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
@@ -614,7 +614,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCreateRuleIDs {
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
 
   cd.cdhash = @"mycdhash";
   cd.sha256 = @"myhash";
@@ -713,7 +713,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     }
   };
 
-  SNTRule * (^createCELRule)(NSString *, BOOL) = ^SNTRule *(NSString *celExpr, BOOL v2) {
+  SNTRule* (^createCELRule)(NSString*, BOOL) = ^SNTRule*(NSString* celExpr, BOOL v2) {
     return [[SNTRule alloc]
         initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
                      state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
@@ -726,8 +726,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                      error:NULL];
   };
   {
-    SNTRule *r = createCELRule(@"target.signing_time > timestamp(1717987100)", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"target.signing_time > timestamp(1717987100)", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -738,8 +738,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertTrue(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"target.signing_time < timestamp(1717987100)", false);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"target.signing_time < timestamp(1717987100)", false);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -750,8 +750,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertTrue(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"'arg1' in args", false);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"'arg1' in args", false);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -762,8 +762,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"has(envs.ENV_VARIABLE1)", false);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"has(envs.ENV_VARIABLE1)", false);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -774,8 +774,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"'--inspect' in args ? ALLOWLIST : SILENT_BLOCKLIST", false);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"'--inspect' in args ? ALLOWLIST : SILENT_BLOCKLIST", false);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -786,8 +786,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"euid != 0", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"euid != 0", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -798,8 +798,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"cwd != '/Users/foo'", false);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"cwd != '/Users/foo'", false);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -810,8 +810,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.cacheable);
   }
   {
-    SNTRule *r = createCELRule(@"euid == 0 ? REQUIRE_TOUCHID : ALLOWLIST", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"euid == 0 ? REQUIRE_TOUCHID : ALLOWLIST", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -896,7 +896,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     }
   };
 
-  SNTRule * (^createCELRule)(NSString *, BOOL) = ^SNTRule *(NSString *celExpr, BOOL v2) {
+  SNTRule* (^createCELRule)(NSString*, BOOL) = ^SNTRule*(NSString* celExpr, BOOL v2) {
     return [[SNTRule alloc]
         initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
                      state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
@@ -911,8 +911,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   // Test: Check that an ancestor with a specific path exists
   {
-    SNTRule *r = createCELRule(@"ancestors.exists(a, a.path == '/bin/zsh')", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"ancestors.exists(a, a.path == '/bin/zsh')", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -924,8 +924,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   // Test: Check that no ancestor matches a non-existent path
   {
-    SNTRule *r = createCELRule(@"ancestors.exists(a, a.path == '/usr/bin/python3')", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"ancestors.exists(a, a.path == '/usr/bin/python3')", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -937,10 +937,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   // Test: Block if any ancestor has a specific signing_id
   {
-    SNTRule *r = createCELRule(@"ancestors.exists(a, a.signing_id == 'platform:com.apple.curl') "
+    SNTRule* r = createCELRule(@"ancestors.exists(a, a.signing_id == 'platform:com.apple.curl') "
                                 "? BLOCKLIST : ALLOWLIST",
                                true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -953,8 +953,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   // Test: Verify all ancestors are platform binaries (signing_id starts with "platform:")
   {
-    SNTRule *r = createCELRule(@"ancestors.all(a, a.signing_id.startsWith('platform:'))", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"ancestors.all(a, a.signing_id.startsWith('platform:'))", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -966,8 +966,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   // Test: Check ancestor list size
   {
-    SNTRule *r = createCELRule(@"size(ancestors) == 4", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTRule* r = createCELRule(@"size(ancestors) == 4", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -979,9 +979,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   // Test: Block if launched from Terminal (checking ancestor path with endsWith)
   {
-    SNTRule *r = createCELRule(
+    SNTRule* r = createCELRule(
         @"ancestors.exists(a, a.path.endsWith('/Terminal')) ? BLOCKLIST : ALLOWLIST", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -994,9 +994,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   // Test: Match ancestor by cdhash
   {
-    SNTRule *r = createCELRule(
+    SNTRule* r = createCELRule(
         @"ancestors.exists(a, a.cdhash == 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef')", true);
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
                          forRule:r
@@ -1074,7 +1074,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   };
 }
 
-- (SNTCELFallbackRule *)ruleWithExpr:(NSString *)expr {
+- (SNTCELFallbackRule*)ruleWithExpr:(NSString*)expr {
   return [[SNTCELFallbackRule alloc] initWithCELExpr:expr customMsg:nil customURL:nil];
 }
 
@@ -1082,7 +1082,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
     [self ruleWithExpr:@"ALLOWLIST"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1096,7 +1096,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
     [self ruleWithExpr:@"BLOCKLIST"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1110,7 +1110,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
     [self ruleWithExpr:@"SILENT_BLOCKLIST"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1126,7 +1126,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self ruleWithExpr:@"UNSPECIFIED"],
     [self ruleWithExpr:@"ALLOWLIST"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1141,7 +1141,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self ruleWithExpr:@"UNSPECIFIED"],
     [self ruleWithExpr:@"UNSPECIFIED"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1155,7 +1155,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self ruleWithExpr:@"BLOCKLIST"],
     [self ruleWithExpr:@"ALLOWLIST"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1167,7 +1167,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
 - (void)testCELFallbackEmptyRulesReturnNO {
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1182,7 +1182,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         ruleWithExpr:
             @"target.signing_id == 'ZMCG7MLDV9:com.example.testbinary' ? ALLOWLIST : UNSPECIFIED"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1197,7 +1197,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
     [self ruleWithExpr:@"size(args) > 0 ? BLOCKLIST : UNSPECIFIED"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1213,7 +1213,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self ruleWithExpr:@"this is invalid !!!"],
     [self ruleWithExpr:@"ALLOWLIST"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =
@@ -1226,7 +1226,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
     [self ruleWithExpr:@"ALLOWLIST"],
   ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled = [self.processor evaluateCELFallbackExpressions:cd activationCallback:nil];
@@ -1234,12 +1234,12 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (void)testCELFallbackCustomMsgAndURL {
-  SNTCELFallbackRule *rule =
+  SNTCELFallbackRule* rule =
       [[SNTCELFallbackRule alloc] initWithCELExpr:@"BLOCKLIST"
                                         customMsg:@"Custom block message"
                                         customURL:@"https://example.com/details"];
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[ rule ]];
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
   BOOL handled =

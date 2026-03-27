@@ -17,7 +17,7 @@
 
 @implementation SNTXPCNotifierInterface
 
-+ (NSXPCInterface *)notifierInterface {
++ (NSXPCInterface*)notifierInterface {
   return [NSXPCInterface interfaceWithProtocol:@protocol(SNTNotifierXPC)];
 }
 

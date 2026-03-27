@@ -37,7 +37,7 @@
 
   std::vector<uint8_t> want = santa::HexStringToBuf(state.HexDigest());
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  state.Digest(^(const uint8_t *buf, size_t length) {
+  state.Digest(^(const uint8_t* buf, size_t length) {
     XCTAssertEqual(want.size(), length);
     XCTAssertEqual(0, memcmp(want.data(), buf, length));
     dispatch_semaphore_signal(sema);
@@ -68,7 +68,7 @@
 
   std::vector<uint8_t> want = santa::HexStringToBuf(state.HexDigest());
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  state.Digest(^(const uint8_t *buf, size_t length) {
+  state.Digest(^(const uint8_t* buf, size_t length) {
     XCTAssertEqual(want.size(), length);
     XCTAssertEqual(0, memcmp(want.data(), buf, length));
     dispatch_semaphore_signal(sema);
@@ -88,7 +88,7 @@
 
   std::vector<uint8_t> want = santa::HexStringToBuf(state.HexDigest());
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  state.Digest(^(const uint8_t *buf, size_t length) {
+  state.Digest(^(const uint8_t* buf, size_t length) {
     XCTAssertEqual(want.size(), length);
     XCTAssertEqual(0, memcmp(want.data(), buf, length));
     dispatch_semaphore_signal(sema);
@@ -119,7 +119,7 @@
 
   std::vector<uint8_t> want = santa::HexStringToBuf(state.HexDigest());
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  state.Digest(^(const uint8_t *buf, size_t length) {
+  state.Digest(^(const uint8_t* buf, size_t length) {
     XCTAssertEqual(want.size(), length);
     XCTAssertEqual(0, memcmp(want.data(), buf, length));
     dispatch_semaphore_signal(sema);

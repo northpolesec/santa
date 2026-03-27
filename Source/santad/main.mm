@@ -44,8 +44,8 @@ struct WatchdogState {
 
 ///  The watchdog thread function, used to monitor santad CPU/RAM usage and print a warning
 ///  if it goes over certain thresholds.
-static void SantaWatchdog(void *context) {
-  WatchdogState *state = (WatchdogState *)context;
+static void SantaWatchdog(void* context) {
+  WatchdogState* state = (WatchdogState*)context;
 
   // Amount of CPU usage to trigger warning, as a percentage averaged over kWatchdogTimeInterval
   // santad's usual CPU usage is 0-3% but can occasionally spike if lots of processes start at once.
@@ -88,25 +88,25 @@ static void SantaWatchdog(void *context) {
 }
 
 void InstallServices() {
-  NSString *install_services_script = [[NSBundle mainBundle] pathForResource:@"install_services"
+  NSString* install_services_script = [[NSBundle mainBundle] pathForResource:@"install_services"
                                                                       ofType:@"sh"];
-  NSTask *task = [[NSTask alloc] init];
+  NSTask* task = [[NSTask alloc] init];
   task.launchPath = @"/bin/bash";
   task.arguments = @[ install_services_script ];
   task.environment = @{@"CONF_DIR" : [[NSBundle mainBundle] resourcePath]};
-  NSError *error;
+  NSError* error;
   if (![task launchAndReturnError:&error]) {
     LOGE(@"install_services.sh error: %@", error);
   }
   [task waitUntilExit];
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   @autoreleasepool {
-    NSString *product_version = [SNTSystemInfo santaProductVersion];
-    NSString *build_version = [SNTSystemInfo santaBuildVersion];
+    NSString* product_version = [SNTSystemInfo santaProductVersion];
+    NSString* build_version = [SNTSystemInfo santaBuildVersion];
 
-    NSProcessInfo *pi = [NSProcessInfo processInfo];
+    NSProcessInfo* pi = [NSProcessInfo processInfo];
     if ([pi.arguments containsObject:@"-v"]) {
       printf("%s (build %s)\n", [product_version UTF8String], [build_version UTF8String]);
       return 0;

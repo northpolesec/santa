@@ -32,12 +32,12 @@
 ///
 ///  A small summary of the command, to be printed with the list of available commands
 ///
-+ (NSString *)shortHelpText;
++ (NSString*)shortHelpText;
 
 ///
 ///  A longer description of the command when the user runs <tt>santactl help x</tt>
 ///
-+ (NSString *)longHelpText;
++ (NSString*)longHelpText;
 
 @optional
 
@@ -49,7 +49,7 @@
 ///
 ///  Additional names that should resolve to the command.
 ///
-+ (NSSet<NSString *> *)aliases;
++ (NSSet<NSString*>*)aliases;
 
 @end
 
@@ -63,18 +63,18 @@
 ///
 ///  @note This method (or one of the methods it calls) is responsible for calling exit().
 ///
-+ (void)runWithArguments:(NSArray *)arguments daemonConnection:(MOLXPCConnection *)daemonConn;
++ (void)runWithArguments:(NSArray*)arguments daemonConnection:(MOLXPCConnection*)daemonConn;
 
 @end
 
 @interface SNTCommand : NSObject <SNTCommandRunProtocol>
 
-@property(nonatomic, readonly) MOLXPCConnection *daemonConn;
+@property(nonatomic, readonly) MOLXPCConnection* daemonConn;
 
 ///  Designated initializer
-- (instancetype)initWithDaemonConnection:(MOLXPCConnection *)daemonConn;
+- (instancetype)initWithDaemonConnection:(MOLXPCConnection*)daemonConn;
 
-- (void)runWithArguments:(NSArray *)arguments;
+- (void)runWithArguments:(NSArray*)arguments;
 
-- (void)printErrorUsageAndExit:(NSString *)error;
+- (void)printErrorUsageAndExit:(NSString*)error;
 @end

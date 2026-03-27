@@ -40,7 +40,7 @@
 - (void)testTimersAreCreatedOnInitialization {
   // Verify that both timers are created when SNTSyncManager is initialized
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
-  SNTSyncManager *syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
 
   XCTAssertNotNil(syncManager.fullSyncTimer, @"fullSyncTimer should be created on initialization");
   XCTAssertNotNil(syncManager.ruleSyncTimer, @"ruleSyncTimer should be created on initialization");
@@ -49,7 +49,7 @@
 - (void)testFullSyncTimerIsNotNil {
   // Verify fullSyncTimer is created and not nil
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
-  SNTSyncManager *syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
 
   dispatch_source_t fullTimer = syncManager.fullSyncTimer;
   XCTAssertNotNil(fullTimer, @"fullSyncTimer must not be nil");
@@ -58,7 +58,7 @@
 - (void)testRuleSyncTimerIsNotNil {
   // Verify ruleSyncTimer is created and not nil
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
-  SNTSyncManager *syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
 
   dispatch_source_t ruleTimer = syncManager.ruleSyncTimer;
   XCTAssertNotNil(ruleTimer, @"ruleSyncTimer must not be nil");
@@ -67,7 +67,7 @@
 - (void)testRescheduleTimerQueueWithValidInterval {
   // Test that rescheduleTimerQueue correctly sets timer intervals
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
-  SNTSyncManager *syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
 
   // Create a test timer
   dispatch_source_t testTimer = [syncManager createSyncTimerWithBlock:^{
@@ -89,7 +89,7 @@
 - (void)testRescheduleTimerQueueWithZeroInterval {
   // Test rescheduling with zero interval (immediate)
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
-  SNTSyncManager *syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
 
   dispatch_source_t testTimer = [syncManager createSyncTimerWithBlock:^{
   }];
@@ -107,7 +107,7 @@
 - (void)testRescheduleTimerQueueWithLargeInterval {
   // Test rescheduling with a large interval
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
-  SNTSyncManager *syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
 
   dispatch_source_t testTimer = [syncManager createSyncTimerWithBlock:^{
   }];
@@ -126,7 +126,7 @@
 - (void)testCreateSyncTimerWithBlock {
   // Test that createSyncTimerWithBlock creates a valid timer
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
-  SNTSyncManager *syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
 
   dispatch_source_t timer = [syncManager createSyncTimerWithBlock:^{
       // Timer block - would execute when timer fires
@@ -142,7 +142,7 @@
   // Test that timers are properly rescheduled when intervals change
   // This verifies the integration between interval updates and timer rescheduling
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
-  SNTSyncManager *syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
 
   // Verify initial timer state
   dispatch_source_t initialFullTimer = syncManager.fullSyncTimer;

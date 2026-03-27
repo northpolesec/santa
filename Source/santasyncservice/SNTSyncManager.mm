@@ -53,7 +53,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 @property(nonatomic, readonly) dispatch_queue_t syncQueue;
 @property(nonatomic, readonly) dispatch_semaphore_t syncLimiter;
 
-@property(nonatomic) MOLXPCConnection *daemonConn;
+@property(nonatomic) MOLXPCConnection* daemonConn;
 
 @property(nonatomic) BOOL reachable;
 @property nw_path_monitor_t pathMonitor;
@@ -63,8 +63,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 @property NSUInteger eventBatchSize;
 
-@property NSString *xsrfToken;
-@property NSString *xsrfTokenHeader;
+@property NSString* xsrfToken;
+@property NSString* xsrfTokenHeader;
 
 @property(nonatomic, readonly) dispatch_queue_t metricsQueue;
 
@@ -74,12 +74,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 #pragma mark init
 
-- (instancetype)initWithDaemonConnection:(MOLXPCConnection *)daemonConn {
+- (instancetype)initWithDaemonConnection:(MOLXPCConnection*)daemonConn {
   self = [super init];
   if (self) {
     _daemonConn = daemonConn;
 
-    SNTConfigurator *config = [SNTConfigurator configurator];
+    SNTConfigurator* config = [SNTConfigurator configurator];
 
     if (config.fcmEnabled) {
       LOGD(@"Using FCM push notifications");
@@ -115,16 +115,16 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 #pragma mark SNTSyncServiceXPC methods
 
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events reply:(void (^)(BOOL))reply {
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent*>*)events reply:(void (^)(BOOL))reply {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     LOGE(@"Events upload failed to create sync state: %ld", status);
     if (reply) reply(NO);
     return;
   }
   syncState.eventBatchSize = self.eventBatchSize;
-  SNTSyncEventUpload *p = [[SNTSyncEventUpload alloc] initWithState:syncState];
+  SNTSyncEventUpload* p = [[SNTSyncEventUpload alloc] initWithState:syncState];
   BOOL success;
   if (events && [p uploadEvents:events]) {
     LOGD(@"Events upload complete");
@@ -140,20 +140,20 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   if (reply) reply(success);
 }
 
-- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
                               reply:(void (^)(SNTBundleEventAction))reply {
   if (!event) {
     reply(SNTBundleEventActionDropEvents);
     return;
   }
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     LOGE(@"Bundle event upload failed to create sync state: %ld", status);
     reply(SNTBundleEventActionDropEvents);
     return;
   }
-  SNTSyncEventUpload *p = [[SNTSyncEventUpload alloc] initWithState:syncState];
+  SNTSyncEventUpload* p = [[SNTSyncEventUpload alloc] initWithState:syncState];
   if ([p uploadEvents:@[ event ]]) {
     if ([syncState.bundleBinaryRequests containsObject:event.fileBundleHash]) {
       reply(SNTBundleEventActionSendEvents);
@@ -191,12 +191,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   reply(SNTPushNotificationStatusConnected);
 }
 
-- (void)pushNotificationServerAddress:(void (^)(NSString *))reply {
+- (void)pushNotificationServerAddress:(void (^)(NSString*))reply {
   // Only return server address if using NATS and connected
   if ([self.pushNotifications isKindOfClass:[SNTPushClientNATS class]] &&
       self.pushNotifications.isConnected) {
-    SNTPushClientNATS *natsClient = (SNTPushClientNATS *)self.pushNotifications;
-    NSString *serverAddress = natsClient.pushServer;
+    SNTPushClientNATS* natsClient = (SNTPushClientNATS*)self.pushNotifications;
+    NSString* serverAddress = natsClient.pushServer;
     reply(serverAddress);
     return;
   }
@@ -222,7 +222,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   [self syncSecondsFromNow:2];
 }
 
-- (void)publishMetrics:(NSDictionary *)metrics reply:(void (^)(BOOL))reply {
+- (void)publishMetrics:(NSDictionary*)metrics reply:(void (^)(BOOL))reply {
   if (!metrics) {
     LOGE(@"Nil metrics dictionary");
     if (reply) reply(NO);
@@ -230,13 +230,13 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   }
   dispatch_async(self.metricsQueue, ^{
     SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-    SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+    SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
     if (!syncState) {
       LOGE(@"Publish metrics failed to create sync state: %ld", status);
       if (reply) reply(NO);
       return;
     }
-    SNTSyncPublishMetrics *p = [[SNTSyncPublishMetrics alloc] initWithState:syncState];
+    SNTSyncPublishMetrics* p = [[SNTSyncPublishMetrics alloc] initWithState:syncState];
     BOOL success = [p publishMetrics:metrics];
     if (success) {
       LOGD(@"Publish metrics complete");
@@ -249,27 +249,27 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   });
 }
 
-- (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString *description))reply {
+- (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString* description))reply {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     SLOGE(@"Failed to create sync state: %ld", (long)status);
     reply(0, [NSString stringWithFormat:@"Failed to create sync state: %ld", (long)status]);
     return;
   }
 
-  NSURL *url = [NSURL URLWithString:@"preflight/santactl-doctor-test"
+  NSURL* url = [NSURL URLWithString:@"preflight/santactl-doctor-test"
                       relativeToURL:syncState.syncBaseURL];
-  NSMutableURLRequest *req = [[NSMutableURLRequest alloc] initWithURL:url];
+  NSMutableURLRequest* req = [[NSMutableURLRequest alloc] initWithURL:url];
   req.HTTPMethod = @"POST";
 
   SLOGD(@"Sending preflight request to %@", url.absoluteString);
 
   __block BOOL timedOut = NO;
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  NSURLSessionDataTask *task = [syncState.session
+  NSURLSessionDataTask* task = [syncState.session
       dataTaskWithRequest:req
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
           if (timedOut) return;
           if (error) {
             SLOGE(@"Request error: %@", error.localizedDescription);
@@ -277,11 +277,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
             dispatch_semaphore_signal(sema);
             return;
           }
-          NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+          NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
           NSInteger code = httpResponse.statusCode;
-          NSString *desc;
+          NSString* desc;
           if (code == 301) {
-            NSString *location = [httpResponse valueForHTTPHeaderField:@"Location"];
+            NSString* location = [httpResponse valueForHTTPHeaderField:@"Location"];
             desc = [NSString stringWithFormat:@"HTTP 301, new location: %@", location];
           } else {
             desc = [NSHTTPURLResponse localizedStringForStatusCode:code];
@@ -355,12 +355,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   dispatch_async(self.syncQueue, ^() {
     if (![[SNTConfigurator configurator] syncBaseURL]) return;
     SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-    SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+    SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
     if (!syncState) {
       LOGE(@"Rule sync failed to create sync state: %ld", status);
       return;
     }
-    SNTSyncRuleDownload *p = [[SNTSyncRuleDownload alloc] initWithState:syncState];
+    SNTSyncRuleDownload* p = [[SNTSyncRuleDownload alloc] initWithState:syncState];
     BOOL ret = [p sync];
     LOGD(@"Rule download %@", ret ? @"complete" : @"failed");
     self.xsrfToken = syncState.xsrfToken;
@@ -370,7 +370,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 - (void)preflightSync {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     LOGE(@"Unable to create sync state: %lu", status);
     return;
@@ -386,7 +386,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   }
 
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     LOGE(@"Unable to create sync state: %lu", status);
     return;
@@ -395,11 +395,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   [self preflightWithSyncState:syncState];
 }
 
-- (MOLXPCConnection *)daemonConnection {
+- (MOLXPCConnection*)daemonConnection {
   return self.daemonConn;
 }
 
-- (void)eventUploadForPath:(NSString *)path reply:(void (^)(NSError *error))reply {
+- (void)eventUploadForPath:(NSString*)path reply:(void (^)(NSError* error))reply {
   if (path.length == 0) {
     reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
                               code:1
@@ -411,7 +411,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   // postEventsToSyncServer: is thread-safe and doesn't require syncQueue serialization.
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     auto replied = std::make_shared<std::atomic<bool>>(false);
-    void (^guardedReply)(NSError *) = ^(NSError *e) {
+    void (^guardedReply)(NSError*) = ^(NSError* e) {
       if (replied->exchange(true)) return;
       if (reply) reply(e);
     };
@@ -428,7 +428,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     }
 
     // Connect to bundle service
-    MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
+    MOLXPCConnection* bs = [SNTXPCBundleServiceInterface configuredConnection];
 
     dispatch_semaphore_t eventSema = dispatch_semaphore_create(0);
     __block BOOL expectedInvalidation = NO;
@@ -441,10 +441,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     [bs resume];
 
-    __block NSArray<SNTStoredExecutionEvent *> *resultEvents;
+    __block NSArray<SNTStoredExecutionEvent*>* resultEvents;
     [[bs remoteObjectProxy] generateEventsFromPath:path
                                      enableBundles:enableBundles
-                                             reply:^(NSArray<SNTStoredExecutionEvent *> *events) {
+                                             reply:^(NSArray<SNTStoredExecutionEvent*>* events) {
                                                resultEvents = events;
                                                dispatch_semaphore_signal(eventSema);
                                              }];
@@ -503,16 +503,16 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 - (SNTSyncStatusType)preflight {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+  SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     return status;
   }
   return [self preflightWithSyncState:syncState];
 }
 
-- (SNTSyncStatusType)preflightWithSyncState:(SNTSyncState *)syncState {
+- (SNTSyncStatusType)preflightWithSyncState:(SNTSyncState*)syncState {
   SLOGD(@"Preflight starting");
-  SNTSyncPreflight *p = [[SNTSyncPreflight alloc] initWithState:syncState];
+  SNTSyncPreflight* p = [[SNTSyncPreflight alloc] initWithState:syncState];
   if ([p sync]) {
     SLOGD(@"Preflight complete");
     self.xsrfToken = syncState.xsrfToken;
@@ -573,9 +573,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   return SNTSyncStatusTypePreflightFailed;
 }
 
-- (SNTSyncStatusType)eventUploadWithSyncState:(SNTSyncState *)syncState {
+- (SNTSyncStatusType)eventUploadWithSyncState:(SNTSyncState*)syncState {
   SLOGD(@"Event upload starting");
-  SNTSyncEventUpload *p = [[SNTSyncEventUpload alloc] initWithState:syncState];
+  SNTSyncEventUpload* p = [[SNTSyncEventUpload alloc] initWithState:syncState];
   if ([p sync]) {
     SLOGD(@"Event upload complete");
     return [self ruleDownloadWithSyncState:syncState];
@@ -585,9 +585,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   return SNTSyncStatusTypeEventUploadFailed;
 }
 
-- (SNTSyncStatusType)ruleDownloadWithSyncState:(SNTSyncState *)syncState {
+- (SNTSyncStatusType)ruleDownloadWithSyncState:(SNTSyncState*)syncState {
   SLOGD(@"Rule download starting");
-  SNTSyncRuleDownload *p = [[SNTSyncRuleDownload alloc] initWithState:syncState];
+  SNTSyncRuleDownload* p = [[SNTSyncRuleDownload alloc] initWithState:syncState];
   if ([p sync]) {
     SLOGD(@"Rule download complete");
     return [self postflightWithSyncState:syncState];
@@ -597,9 +597,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   return SNTSyncStatusTypeRuleDownloadFailed;
 }
 
-- (SNTSyncStatusType)postflightWithSyncState:(SNTSyncState *)syncState {
+- (SNTSyncStatusType)postflightWithSyncState:(SNTSyncState*)syncState {
   SLOGD(@"Postflight starting");
-  SNTSyncPostflight *p = [[SNTSyncPostflight alloc] initWithState:syncState];
+  SNTSyncPostflight* p = [[SNTSyncPostflight alloc] initWithState:syncState];
   if ([p sync]) {
     SLOGD(@"Postflight complete");
     SLOGI(@"Sync completed successfully");
@@ -625,10 +625,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   return timerQueue;
 }
 
-- (SNTSyncState *)createSyncStateWithStatus:(SNTSyncStatusType *)status {
+- (SNTSyncState*)createSyncStateWithStatus:(SNTSyncStatusType*)status {
   // Gather some data needed during some sync stages
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
+  SNTConfigurator* config = [SNTConfigurator configurator];
 
   syncState.syncBaseURL = config.syncBaseURL;
   if (syncState.syncBaseURL.absoluteString.length == 0) {
@@ -656,11 +656,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   syncState.xsrfToken = self.xsrfToken;
   syncState.xsrfTokenHeader = self.xsrfTokenHeader;
 
-  NSURLSessionConfiguration *sessConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
+  NSURLSessionConfiguration* sessConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
   sessConfig.connectionProxyDictionary = [[SNTConfigurator configurator] syncProxyConfig];
 
   // Apply extra headers at the session level so all requests (including doctor checks) get them.
-  NSSet<NSString *> *restrictedHeaders = [NSSet setWithArray:@[
+  NSSet<NSString*>* restrictedHeaders = [NSSet setWithArray:@[
     @"content-encoding",
     @"content-length",
     @"content-type",
@@ -670,12 +670,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     @"proxy-authorization",
     @"www-authenticate",
   ]];
-  NSDictionary *extraHeaders = [config syncExtraHeaders];
+  NSDictionary* extraHeaders = [config syncExtraHeaders];
   if (extraHeaders.count) {
-    NSMutableDictionary *filtered = [NSMutableDictionary dictionary];
-    [extraHeaders enumerateKeysAndObjectsUsingBlock:^(id key, id object, BOOL *stop) {
+    NSMutableDictionary* filtered = [NSMutableDictionary dictionary];
+    [extraHeaders enumerateKeysAndObjectsUsingBlock:^(id key, id object, BOOL* stop) {
       if (![key isKindOfClass:[NSString class]] || ![object isKindOfClass:[NSString class]]) return;
-      if ([restrictedHeaders containsObject:((NSString *)key).lowercaseString]) return;
+      if ([restrictedHeaders containsObject:((NSString*)key).lowercaseString]) return;
       filtered[key] = object;
     }];
     if (filtered.count) {
@@ -683,16 +683,16 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     }
   }
 
-  MOLAuthenticatingURLSession *authURLSession =
+  MOLAuthenticatingURLSession* authURLSession =
       [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:sessConfig];
   authURLSession.userAgent = @"santactl-sync/";
-  NSString *santactlVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
+  NSString* santactlVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
   if (santactlVersion) {
     authURLSession.userAgent = [authURLSession.userAgent stringByAppendingString:santactlVersion];
   }
   authURLSession.refusesRedirects = YES;
   authURLSession.serverHostname = syncState.syncBaseURL.host;
-  authURLSession.loggingBlock = ^(NSString *line) {
+  authURLSession.loggingBlock = ^(NSString* line) {
     SLOGD(@"%@", line);
   };
 

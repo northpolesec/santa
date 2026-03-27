@@ -19,37 +19,37 @@
 @interface SNTProcessChain : NSObject <NSSecureCoding>
 
 /// The full path of the process's executable file.
-@property(nullable) NSString *filePath;
+@property(nullable) NSString* filePath;
 
 /// The SHA-256 of the executed file.
-@property(nullable) NSString *fileSHA256;
+@property(nullable) NSString* fileSHA256;
 
 /// If the process was signed, this is the CDHash of the binary.
-@property(nullable) NSString *cdhash;
+@property(nullable) NSString* cdhash;
 
 /// If the process was signed, this is the Signing ID if present in the signature information.
-@property(nullable) NSString *signingID;
+@property(nullable) NSString* signingID;
 
 /// If the process was signed, this is the Team ID if present in the signature information.
-@property(nullable) NSString *teamID;
+@property(nullable) NSString* teamID;
 
 /// If the executed file was signed, this is an NSArray of MOLCertificate's
 /// representing the signing chain.
-@property(nullable) NSArray<MOLCertificate *> *signingChain;
+@property(nullable) NSArray<MOLCertificate*>* signingChain;
 
 /// The process ID
-@property(nullable) NSNumber *pid;
+@property(nullable) NSNumber* pid;
 
 /// The process ID version
-@property(nullable) NSNumber *pidversion;
+@property(nullable) NSNumber* pidversion;
 
 /// The ID of the user who executed the binary.
-@property(nullable) NSNumber *executingUserID;
+@property(nullable) NSNumber* executingUserID;
 
 /// The name of the user who executed the binary.
-@property(nullable) NSString *executingUser;
+@property(nullable) NSString* executingUser;
 
 /// Information about this process's parent
-@property(nullable) SNTProcessChain *parent;
+@property(nullable) SNTProcessChain* parent;
 
 @end

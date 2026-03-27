@@ -19,6 +19,6 @@
 @interface SNTSyncPublishMetrics : SNTSyncStage
 
 /// Build a PublishMetricsRequest from the metrics dictionary and POST to the sync server.
-- (BOOL)publishMetrics:(NSDictionary *)metrics;
+- (BOOL)publishMetrics:(NSDictionary*)metrics;
 
 @end

@@ -38,17 +38,17 @@ REGISTER_COMMAND_NAME(@"bundleinfo")
   return NO;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Searches a bundle for binaries.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return @"Searches a bundle for binaries.";
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
-  NSError *error;
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:arguments.firstObject error:&error];
+- (void)runWithArguments:(NSArray*)arguments {
+  NSError* error;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:arguments.firstObject error:&error];
   if (!fi) {
     TEE_LOGE(@"%@", error.description);
     exit(1);
@@ -57,22 +57,22 @@ REGISTER_COMMAND_NAME(@"bundleinfo")
     exit(2);
   }
 
-  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
   se.fileBundlePath = fi.bundlePath;
 
-  MOLXPCConnection *bc = [SNTXPCBundleServiceInterface configuredConnection];
+  MOLXPCConnection* bc = [SNTXPCBundleServiceInterface configuredConnection];
   [bc resume];
 
   [[bc remoteObjectProxy]
       hashBundleBinariesForEvent:se
                         listener:nil
-                           reply:^(NSString *hash, NSArray<SNTStoredExecutionEvent *> *events,
-                                   NSNumber *time) {
+                           reply:^(NSString* hash, NSArray<SNTStoredExecutionEvent*>* events,
+                                   NSNumber* time) {
                              printf("Hashing time: %llu ms\n", time.unsignedLongLongValue);
                              printf("%lu events found\n", events.count);
                              printf("BundleHash: %s\n", hash.UTF8String);
 
-                             for (SNTStoredExecutionEvent *event in events) {
+                             for (SNTStoredExecutionEvent* event in events) {
                                printf("BundleID: %s \n\tSHA-256: %s \n\tPath: %s\n",
                                       event.fileBundleID.UTF8String, event.fileSHA256.UTF8String,
                                       event.filePath.UTF8String);

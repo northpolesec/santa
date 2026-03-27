@@ -33,7 +33,7 @@ std::optional<std::string> CSOpsGetBlobString(pid_t pid, unsigned int op, size_t
   if (csops_func(pid, op, buf.data(), buf.size()) != 0) {
     return std::nullopt;
   }
-  auto *blob = reinterpret_cast<csops_blob *>(buf.data());
+  auto* blob = reinterpret_cast<csops_blob*>(buf.data());
   uint32_t data_len = ntohl(blob->len);
   if (data_len <= kBlobWrapperOverhead) {
     return std::nullopt;

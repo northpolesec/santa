@@ -53,62 +53,61 @@ struct RuleCounts {
 - (void)databaseRuleCounts:(void (^)(struct RuleCounts ruleCounts))reply;
 - (void)databaseEventCount:(void (^)(int64_t count))reply;
 - (void)staticRuleCount:(void (^)(int64_t count))reply;
-- (void)databaseRulesHash:(void (^)(NSString *executionRulesHash,
-                                    NSString *fileAccessRulesHash))reply;
-- (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
-                             reply:(void (^)(SNTRule *))reply;
-- (void)staticDecisionForFilePath:(NSString *)filePath
-                      identifiers:(SNTRuleIdentifiers *)identifiers
-                            reply:(void (^)(SNTRule *rule, NSString *decision))reply;
+- (void)databaseRulesHash:(void (^)(NSString* executionRulesHash,
+                                    NSString* fileAccessRulesHash))reply;
+- (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers*)identifiers reply:(void (^)(SNTRule*))reply;
+- (void)staticDecisionForFilePath:(NSString*)filePath
+                      identifiers:(SNTRuleIdentifiers*)identifiers
+                            reply:(void (^)(SNTRule* rule, NSString* decision))reply;
 
 ///
 ///  Config ops
 ///
 - (void)isSyncV2Enabled:(void (^)(BOOL))reply;
 - (void)watchdogInfo:(void (^)(uint64_t, uint64_t, double, double))reply;
-- (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString *,
-                                  santa::WatchItems::DataSource dataSource, NSString *,
+- (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString*,
+                                  santa::WatchItems::DataSource dataSource, NSString*,
                                   NSTimeInterval))reply;
 - (void)clientMode:(void (^)(SNTClientMode))reply;
-- (void)fullSyncLastSuccess:(void (^)(NSDate *))reply;
-- (void)ruleSyncLastSuccess:(void (^)(NSDate *))reply;
+- (void)fullSyncLastSuccess:(void (^)(NSDate*))reply;
+- (void)ruleSyncLastSuccess:(void (^)(NSDate*))reply;
 - (void)syncTypeRequired:(void (^)(SNTSyncType))reply;
 - (void)enableBundles:(void (^)(BOOL))reply;
 - (void)enableTransitiveRules:(void (^)(BOOL))reply;
 - (void)blockUSBMount:(void (^)(BOOL))reply;
 - (void)blockUnencryptedRemovableMediaMount:(void (^)(BOOL))reply;
-- (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply;
-- (void)blockNetworkMount:(void (^)(NSNumber *))reply;
+- (void)remountUSBMode:(void (^)(NSArray<NSString*>*))reply;
+- (void)blockNetworkMount:(void (^)(NSNumber*))reply;
 - (void)fullSyncInterval:(void (^)(NSUInteger))reply;
 - (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))reply;
 
 ///
 /// FAA Retrieval ops
 ///
-- (void)dataFileAccessRuleForTarget:(NSString *)path reply:(void (^)(NSString *, NSString *))reply;
+- (void)dataFileAccessRuleForTarget:(NSString*)path reply:(void (^)(NSString*, NSString*))reply;
 
 ///
 /// Metrics ops
 ///
-- (void)metrics:(void (^)(NSDictionary *))reply;
+- (void)metrics:(void (^)(NSDictionary*))reply;
 - (void)exportMetrics:(void (^)(BOOL))reply;
 
 ///
 ///  GUI Ops
 ///
-- (void)setNotificationListener:(NSXPCListenerEndpoint *)listener;
+- (void)setNotificationListener:(NSXPCListenerEndpoint*)listener;
 
 ///
 ///  Syncd Ops
 ///
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
-- (void)pushNotificationServerAddress:(void (^)(NSString *))reply;
+- (void)pushNotificationServerAddress:(void (^)(NSString*))reply;
 
 ///
 ///  Bundle Ops
 ///
-- (void)syncBundleEvent:(SNTStoredExecutionEvent *)event
-          relatedEvents:(NSArray<SNTStoredExecutionEvent *> *)events;
+- (void)syncBundleEvent:(SNTStoredExecutionEvent*)event
+          relatedEvents:(NSArray<SNTStoredExecutionEvent*>*)events;
 
 ///
 ///  Telemetry Ops
@@ -118,10 +117,10 @@ struct RuleCounts {
 ///
 /// Temporary Monitor Mode Ops
 ///
-- (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber *)requestedDuration
-                                                 reply:(void (^)(uint32_t, NSError *))reply;
-- (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply;
-- (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply;
+- (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber*)requestedDuration
+                                                 reply:(void (^)(uint32_t, NSError*))reply;
+- (void)cancelTemporaryMonitorMode:(void (^)(NSError*))reply;
+- (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber*))reply;
 - (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply;
 
 ///
@@ -133,7 +132,7 @@ struct RuleCounts {
 /// Returns NO if no settings have been synced yet.
 - (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply;
 /// Returns bundle version info from the loaded network extension, or nil if not connected.
-- (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
+- (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary* bundleInfo))reply;
 /// Returns whether the network extension is currently loaded and connected.
 - (void)networkExtensionLoaded:(void (^)(BOOL loaded))reply;
 
@@ -145,11 +144,11 @@ struct RuleCounts {
 ///  Returns an initialized NSXPCInterface for the SNTUnprivilegedDaemonControlXPC protocol.
 ///  Ensures any methods that accept custom classes as arguments are set-up before returning
 ///
-+ (NSXPCInterface *)controlInterface;
++ (NSXPCInterface*)controlInterface;
 
 ///
 ///  Internal method used to initialize the control interface
 ///
-+ (void)initializeControlInterface:(NSXPCInterface *)r;
++ (void)initializeControlInterface:(NSXPCInterface*)r;
 
 @end

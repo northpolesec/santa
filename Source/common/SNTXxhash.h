@@ -23,12 +23,12 @@
 
 namespace santa {
 
-using ResetFunc = XXH_errorcode (*)(XXH3_state_t *);
-using UpdateFunc = XXH_errorcode (*)(XXH3_state_t *, const void *, size_t);
-using DigestFunc64 = XXH64_hash_t (*)(const XXH3_state_t *);
-using DigestFunc128 = XXH128_hash_t (*)(const XXH3_state_t *);
-using CanonicalFunc64 = void (*)(XXH64_canonical_t *, XXH64_hash_t);
-using CanonicalFunc128 = void (*)(XXH128_canonical_t *, XXH128_hash_t);
+using ResetFunc = XXH_errorcode (*)(XXH3_state_t*);
+using UpdateFunc = XXH_errorcode (*)(XXH3_state_t*, const void*, size_t);
+using DigestFunc64 = XXH64_hash_t (*)(const XXH3_state_t*);
+using DigestFunc128 = XXH128_hash_t (*)(const XXH3_state_t*);
+using CanonicalFunc64 = void (*)(XXH64_canonical_t*, XXH64_hash_t);
+using CanonicalFunc128 = void (*)(XXH128_canonical_t*, XXH128_hash_t);
 
 struct XxhashFuncPtrs64 {
   static constexpr ResetFunc Reset = XXH3_64bits_reset;
@@ -57,20 +57,20 @@ class Xxhash {
 
   Xxhash() { XxhashFuncPtrs::Reset(&state_); }
 
-  Xxhash(const Xxhash &existingState) {
+  Xxhash(const Xxhash& existingState) {
     XXH3_copyState(&state_, &existingState.state_);
   }
 
-  void Update(const void *data, size_t size) {
+  void Update(const void* data, size_t size) {
     XxhashFuncPtrs::Update(&state_, data, size);
   }
 
-  void Digest(std::function<void(const uint8_t *, size_t)> callback) {
+  void Digest(std::function<void(const uint8_t*, size_t)> callback) {
     hash_type hash = XxhashFuncPtrs::Digest(&state_);
     canonical_type canonical_hash;
     XxhashFuncPtrs::CanonicalFromHash(&canonical_hash, hash);
 
-    callback(reinterpret_cast<const uint8_t *>(&canonical_hash),
+    callback(reinterpret_cast<const uint8_t*>(&canonical_hash),
              sizeof(canonical_hash));
   }
 
@@ -86,10 +86,10 @@ class Xxhash {
     return std::string(operation_id, sizeof(canonical_type) * 2);
   }
 
-  static inline void CanonicalHashToHex(const canonical_type *canonical,
-                                        char *output) {
+  static inline void CanonicalHashToHex(const canonical_type* canonical,
+                                        char* output) {
     static const char hex_digits[] = "0123456789abcdef";
-    const unsigned char *digest = canonical->digest;
+    const unsigned char* digest = canonical->digest;
 
     // Fully unrolled loop for better performance
     output[0] = hex_digits[digest[0] >> 4];

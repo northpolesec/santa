@@ -22,18 +22,18 @@
 
 @implementation SNTFileInfoTest
 
-- (NSString *)directoryBundle {
-  NSString *rp = [[NSBundle bundleForClass:[self class]] resourcePath];
+- (NSString*)directoryBundle {
+  NSString* rp = [[NSBundle bundleForClass:[self class]] resourcePath];
   return [rp stringByAppendingPathComponent:@"testdata/DirectoryBundle"];
 }
 
-- (NSString *)bundleExample {
-  NSString *rp = [[NSBundle bundleForClass:[self class]] resourcePath];
+- (NSString*)bundleExample {
+  NSString* rp = [[NSBundle bundleForClass:[self class]] resourcePath];
   return [rp stringByAppendingPathComponent:@"testdata/BundleExample.app"];
 }
 
 - (void)testPathStandardizing {
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:@"/Applications/Safari.app"];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:@"/Applications/Safari.app"];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.path, @"/System/Volumes/Preboot/Cryptexes/App/System/Applications/"
                                   @"Safari.app/Contents/MacOS/Safari");
@@ -46,9 +46,9 @@
 }
 
 - (void)testSHA1 {
-  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:@"missing_pagezero"
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"missing_pagezero"
                                                                     ofType:@""];
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
 
   XCTAssertNotNil(sut.SHA1);
   XCTAssertEqual(sut.SHA1.length, 40);
@@ -56,9 +56,9 @@
 }
 
 - (void)testSHA256 {
-  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:@"missing_pagezero"
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"missing_pagezero"
                                                                     ofType:@""];
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
 
   XCTAssertNotNil(sut.SHA256);
   XCTAssertEqual(sut.SHA256.length, 64);
@@ -67,7 +67,7 @@
 }
 
 - (void)testExecutable {
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:@"/sbin/launchd"];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:@"/sbin/launchd"];
 
   XCTAssertTrue(sut.isMachO);
   XCTAssertTrue(sut.isExecutable);
@@ -78,9 +78,9 @@
 }
 
 - (void)testPageZero {
-  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:@"missing_pagezero"
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"missing_pagezero"
                                                                     ofType:@""];
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
   XCTAssertTrue(sut.isMissingPageZero);
 
   path = [[NSBundle bundleForClass:[self class]] pathForResource:@"bad_pagezero" ofType:@""];
@@ -92,7 +92,7 @@
 }
 
 - (void)testDylibs {
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:@"/usr/lib/system/libsystem_platform.dylib"];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:@"/usr/lib/system/libsystem_platform.dylib"];
 
   XCTAssertTrue(sut.isMachO);
   XCTAssertTrue(sut.isDylib);
@@ -104,7 +104,7 @@
 }
 
 - (void)testScript {
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/h2ph"];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/h2ph"];
 
   XCTAssertTrue(sut.isScript);
 
@@ -116,8 +116,8 @@
 }
 
 - (void)testBundle {
-  NSString *path = [self bundleExample];
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  NSString* path = [self bundleExample];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
 
   XCTAssertNotNil([sut bundle]);
 
@@ -129,8 +129,8 @@
 }
 
 - (void)testAncestorBundle {
-  NSString *path = [self bundleExample];
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  NSString* path = [self bundleExample];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
   sut.useAncestorBundle = YES;
 
   XCTAssertNotNil([sut bundle]);
@@ -139,7 +139,7 @@
   XCTAssertNotNil([sut bundleVersion]);
   XCTAssertNotNil([sut bundleShortVersionString]);
 
-  NSString *ancestorBundlePath = path;
+  NSString* ancestorBundlePath = path;
   for (int i = 0; i < 4; i++) {
     ancestorBundlePath = [ancestorBundlePath stringByDeletingLastPathComponent];
   }
@@ -147,8 +147,8 @@
 }
 
 - (void)testBundleIsAncestor {
-  NSString *path = [NSBundle bundleForClass:[self class]].bundlePath;
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  NSString* path = [NSBundle bundleForClass:[self class]].bundlePath;
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
   sut.useAncestorBundle = YES;
 
   XCTAssertNotNil([sut bundle]);
@@ -160,13 +160,13 @@
 }
 
 - (void)testDirectoryBundleIsNotAncestor {
-  NSString *path = [self directoryBundle];
-  NSString *directoryBundle = @"/tmp/DirectoryBundle";
-  NSFileManager *fm = [NSFileManager defaultManager];
+  NSString* path = [self directoryBundle];
+  NSString* directoryBundle = @"/tmp/DirectoryBundle";
+  NSFileManager* fm = [NSFileManager defaultManager];
   [fm removeItemAtPath:directoryBundle error:NULL];
   [fm copyItemAtPath:path toPath:directoryBundle error:NULL];
   path = [directoryBundle stringByAppendingString:@"/Contents/Resources/BundleExample.app"];
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
   sut.useAncestorBundle = YES;
 
   XCTAssertNotNil([sut bundle]);
@@ -179,8 +179,8 @@
 }
 
 - (void)testBundleCacheReset {
-  NSString *path = [self bundleExample];
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  NSString* path = [self bundleExample];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
 
   XCTAssertNotNil([sut bundle]);
 
@@ -198,7 +198,7 @@
   XCTAssertNotNil([sut bundleVersion]);
   XCTAssertNotNil([sut bundleShortVersionString]);
 
-  NSString *ancestorBundlePath = path;
+  NSString* ancestorBundlePath = path;
   for (int i = 0; i < 4; i++) {
     ancestorBundlePath = [ancestorBundlePath stringByDeletingLastPathComponent];
   }
@@ -206,7 +206,7 @@
 }
 
 - (void)testNonBundle {
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes"];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes"];
 
   XCTAssertNil([sut bundle]);
 
@@ -216,9 +216,9 @@
 }
 
 - (void)testEmbeddedInfoPlist {
-  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:@"32bitplist"
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"32bitplist"
                                                                     ofType:@""];
-  SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
   XCTAssertNotNil([sut infoPlist]);
   XCTAssertEqualObjects([sut infoPlist][@"CFBundleShortVersionString"], @"1.0");
   XCTAssertEqualObjects([sut infoPlist][@"CFBundleIdentifier"], @"com.google.i386plist");
@@ -231,34 +231,34 @@
 
 - (void)testCodesignStatus {
   {
-    NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:@"cal-yikes-universal"
+    NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"cal-yikes-universal"
                                                                       ofType:@""];
-    SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+    SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects([sut codesignStatus],
                           @"Yes, but signing is not consistent for all architectures");
   }
 
   {
-    NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:@"32bitplist"
+    NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"32bitplist"
                                                                       ofType:@""];
-    SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+    SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects([sut codesignStatus], @"No");
   }
 
   {
-    NSString *path =
+    NSString* path =
         [[NSBundle bundleForClass:[self class]] pathForResource:@"yikes-universal_adhoc"
                                                          ofType:@""];
-    SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+    SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects([sut codesignStatus], @"Yes, but ad-hoc");
   }
 
   {
-    NSString *path = @"/sbin/launchd";
-    SNTFileInfo *sut = [[SNTFileInfo alloc] initWithPath:path];
+    NSString* path = @"/sbin/launchd";
+    SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects([sut codesignStatus], @"Yes, platform binary");
   }

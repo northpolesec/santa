@@ -65,12 +65,12 @@ using santa::Unit;
 static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account for null terminator
 
 @interface SNTExecutionController ()
-@property SNTEventTable *eventTable;
-@property SNTNotificationQueue *notifierQueue;
-@property SNTPolicyProcessor *policyProcessor;
-@property(readwrite) SNTRuleTable *ruleTable;
-@property SNTSyncdQueue *syncdQueue;
-@property SNTMetricCounter *events;
+@property SNTEventTable* eventTable;
+@property SNTNotificationQueue* notifierQueue;
+@property SNTPolicyProcessor* policyProcessor;
+@property(readwrite) SNTRuleTable* ruleTable;
+@property SNTSyncdQueue* syncdQueue;
+@property SNTMetricCounter* events;
 @property santa::ProcessControlBlock processControlBlock;
 
 @property dispatch_queue_t eventQueue;
@@ -105,19 +105,19 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   std::shared_ptr<santa::santad::process_tree::ProcessTree> _processTree;
 }
 
-static NSString *const kPrinterProxy =
+static NSString* const kPrinterProxy =
     (@"/System/Library/PrivateFrameworks/PrintingPrivate.framework/"
      @"Versions/Current/Plugins/PrinterProxy.app/Contents/MacOS/PrinterProxy");
 
 #pragma mark Initializers
 
-- (instancetype)initWithRuleTable:(SNTRuleTable *)ruleTable
-                       eventTable:(SNTEventTable *)eventTable
-                    notifierQueue:(SNTNotificationQueue *)notifierQueue
-                       syncdQueue:(SNTSyncdQueue *)syncdQueue
+- (instancetype)initWithRuleTable:(SNTRuleTable*)ruleTable
+                       eventTable:(SNTEventTable*)eventTable
+                    notifierQueue:(SNTNotificationQueue*)notifierQueue
+                       syncdQueue:(SNTSyncdQueue*)syncdQueue
                            logger:(LogExecutionBlock)logger
                         ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
-                  policyProcessor:(SNTPolicyProcessor *)policyProcessor
+                  policyProcessor:(SNTPolicyProcessor*)policyProcessor
               processControlBlock:(santa::ProcessControlBlock)processControlBlock
                       processTree:
                           (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
@@ -142,7 +142,7 @@ static NSString *const kPrinterProxy =
     // Not doing this causes a deadlock as establishing this link goes through xpcproxy.
     (void)[[MOLCodesignChecker alloc] initWithSelf];
 
-    SNTMetricSet *metricSet = [SNTMetricSet sharedInstance];
+    SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
     _events = [metricSet counterWithName:@"/santa/events"
                               fieldNames:@[ @"action_response" ]
                                 helpText:@"Events processed by Santa per response"];
@@ -151,7 +151,7 @@ static NSString *const kPrinterProxy =
 }
 
 - (void)incrementEventCounters:(SNTEventState)eventType {
-  const NSString *eventTypeStr;
+  const NSString* eventTypeStr;
 
   switch (eventType) {
     case SNTEventStateBlockBinary: eventTypeStr = kBlockBinary; break;
@@ -179,12 +179,12 @@ static NSString *const kPrinterProxy =
     default: eventTypeStr = kUnknownEventState; break;
   }
 
-  [_events incrementForFieldValues:@[ (NSString *)eventTypeStr ]];
+  [_events incrementForFieldValues:@[ (NSString*)eventTypeStr ]];
 }
 
 #pragma mark Binary Validation
 
-- (bool)synchronousShouldProcessExecEvent:(const Message &)esMsg {
+- (bool)synchronousShouldProcessExecEvent:(const Message&)esMsg {
   if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
     LOGE(@"Attempt to validate unhandled event. Event type: %d", esMsg->event_type);
     [NSException
@@ -192,12 +192,12 @@ static NSString *const kPrinterProxy =
         format:@"synchronousShouldProcessExecEvent: Unexpected event type: %d", esMsg->event_type];
   }
 
-  const es_process_t *targetProc = esMsg->event.exec.target;
+  const es_process_t* targetProc = esMsg->event.exec.target;
 
   if (targetProc->executable->path.length > kMaxAllowedPathLength ||
       targetProc->executable->path_truncated) {
     // Store a SNTCachedDecision so that this event gets properly logged
-    SNTCachedDecision *cd =
+    SNTCachedDecision* cd =
         [[SNTCachedDecision alloc] initWithEndpointSecurityFile:targetProc->executable];
     cd.decision = SNTEventStateBlockLongPath;
     cd.customMsg = [NSString stringWithFormat:@"Path exceeded max length for processing (%zu)",
@@ -219,9 +219,9 @@ static NSString *const kPrinterProxy =
   return YES;
 }
 
-- (void)validateExecEvent:(const Message &)esMsg
-           cachedDecision:(SNTCachedDecision *)existingDecision
-               postAction:(bool (^)(SNTAction, SNTCachedDecision *))postAction {
+- (void)validateExecEvent:(const Message&)esMsg
+           cachedDecision:(SNTCachedDecision*)existingDecision
+               postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
   if (unlikely(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)) {
     // Programming error. Bail.
     LOGE(@"Attempt to validate non-EXEC event. Event type: %d", esMsg->event_type);
@@ -230,26 +230,26 @@ static NSString *const kPrinterProxy =
         format:@"validateExecEvent:postAction: Unexpected event type: %d", esMsg->event_type];
   }
 
-  SNTConfigurator *config = [SNTConfigurator configurator];
-  SNTConfigState *configState = [[SNTConfigState alloc] initWithConfig:config];
+  SNTConfigurator* config = [SNTConfigurator configurator];
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:config];
 
-  const es_process_t *targetProc = esMsg->event.exec.target;
+  const es_process_t* targetProc = esMsg->event.exec.target;
 
   // Get info about the file. If we can't get this info, respond appropriately and log an error.
-  NSError *fileInfoError;
-  SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithEndpointSecurityFile:targetProc->executable
+  NSError* fileInfoError;
+  SNTFileInfo* binInfo = [[SNTFileInfo alloc] initWithEndpointSecurityFile:targetProc->executable
                                                                      error:&fileInfoError];
   if (unlikely(!binInfo)) {
     if (config.failClosed) {
       LOGE(@"Failed to read file %@: %@ and denying action", @(targetProc->executable->path.data),
            fileInfoError.localizedDescription);
       postAction(SNTActionRespondDeny, nil);
-      [self.events incrementForFieldValues:@[ (NSString *)kDenyNoFileInfo ]];
+      [self.events incrementForFieldValues:@[ (NSString*)kDenyNoFileInfo ]];
     } else {
       LOGE(@"Failed to read file %@: %@ but allowing action", @(targetProc->executable->path.data),
            fileInfoError.localizedDescription);
       postAction(SNTActionRespondAllow, nil);
-      [self.events incrementForFieldValues:@[ (NSString *)kAllowNoFileInfo ]];
+      [self.events incrementForFieldValues:@[ (NSString*)kAllowNoFileInfo ]];
     }
     return;
   }
@@ -257,7 +257,7 @@ static NSString *const kPrinterProxy =
   // PrinterProxy workaround, see description above the method for more details.
   if ([self printerProxyWorkaround:binInfo]) {
     postAction(SNTActionRespondDeny, nil);
-    [self.events incrementForFieldValues:@[ (NSString *)kBlockPrinterWorkaround ]];
+    [self.events incrementForFieldValues:@[ (NSString*)kBlockPrinterWorkaround ]];
     return;
   }
 
@@ -275,7 +275,7 @@ static NSString *const kPrinterProxy =
           : santa::CreateCELActivationBlock(esMsg, [binInfo codesignCheckerWithError:NULL],
                                             _processTree);
 
-  SNTCachedDecision *cd = [self.policyProcessor decisionForFileInfo:binInfo
+  SNTCachedDecision* cd = [self.policyProcessor decisionForFileInfo:binInfo
                                                       targetProcess:targetProc
                                                         configState:configState
                                                  activationCallback:activationBlock
@@ -350,7 +350,7 @@ static NSString *const kPrinterProxy =
   if (config.enableAllEventUpload ||
       (cd.decision == SNTEventStateAllowUnknown && !config.disableUnknownEventUpload) ||
       (cd.decision & SNTEventStateAllow) == 0) {
-    SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+    SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
     se.occurrenceDate = [[NSDate alloc] init];
     se.fileSHA256 = cd.sha256;
     se.filePath = binInfo.path;
@@ -385,7 +385,7 @@ static NSString *const kPrinterProxy =
     }
 
     // User data
-    struct passwd *user = getpwuid(audit_token_to_ruid(targetProc->audit_token));
+    struct passwd* user = getpwuid(audit_token_to_ruid(targetProc->audit_token));
     if (user) se.executingUser = @(user->pw_name);
     NSArray *loggedInUsers, *currentSessions;
     [self loggedInUsers:&loggedInUsers sessions:&currentSessions];
@@ -423,7 +423,7 @@ static NSString *const kPrinterProxy =
       }
 
       if (!cd.silentBlock) {
-        _ttyWriter->Write(targetProc, ^NSString * {
+        _ttyWriter->Write(targetProc, ^NSString* {
           if (cd.holdAndAsk) {
             if (stoppedProc) {
               return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
@@ -435,10 +435,10 @@ static NSString *const kPrinterProxy =
           }
 
           // Let the user know what happened on the terminal
-          NSAttributedString *s = [SNTBlockMessage attributedBlockMessageForEvent:se
+          NSAttributedString* s = [SNTBlockMessage attributedBlockMessageForEvent:se
                                                                     customMessage:cd.customMsg];
 
-          NSMutableString *msg = [NSMutableString stringWithCapacity:1024];
+          NSMutableString* msg = [NSMutableString stringWithCapacity:1024];
           // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
           [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
           [msg appendFormat:@"\033[1mReason:    \033[0m %@\n"
@@ -447,7 +447,7 @@ static NSString *const kPrinterProxy =
                             @"\033[1mParent:    \033[0m %@ (%@)\n\n",
                             [SNTBlockMessage blockReasonForEventState:cd.decision], se.filePath,
                             se.fileSHA256, se.parentName, se.ppid];
-          NSURL *detailURL =
+          NSURL* detailURL =
               [SNTBlockMessage eventDetailURLForEvent:se
                                             customURL:(cd.customURL ?: config.eventDetailURL)];
           if (detailURL) {
@@ -529,7 +529,7 @@ static NSString *const kPrinterProxy =
 
 #pragma mark Signal Validation
 
-- (void)validateSuspendResumeEvent:(const santa::Message &)esMsg
+- (void)validateSuspendResumeEvent:(const santa::Message&)esMsg
                         postAction:(void (^)(bool))postAction {
   audit_token_t at = esMsg->event.proc_suspend_resume.target->audit_token;
   pid_t pid = audit_token_to_pid(at);
@@ -559,10 +559,10 @@ static NSString *const kPrinterProxy =
   @param fi SNTFileInfo object for the binary being executed.
   @return YES if the workaround was applied, NO otherwise.
 */
-- (BOOL)printerProxyWorkaround:(SNTFileInfo *)fi {
+- (BOOL)printerProxyWorkaround:(SNTFileInfo*)fi {
   if ([fi.path hasSuffix:@"/Contents/MacOS/PrinterProxy"] &&
       [fi.path containsString:@"Library/Printers"]) {
-    SNTFileInfo *proxyFi = [self printerProxyFileInfo];
+    SNTFileInfo* proxyFi = [self printerProxyFileInfo];
     if ([proxyFi.SHA256 isEqual:fi.SHA256]) return NO;
 
     copyfile_flags_t copyflags = COPYFILE_ALL | COPYFILE_UNLINK;
@@ -580,21 +580,21 @@ static NSString *const kPrinterProxy =
 /**
   Returns an SNTFileInfo for the system PrinterProxy path on this system.
 */
-- (SNTFileInfo *)printerProxyFileInfo {
-  SNTFileInfo *proxyInfo = [[SNTFileInfo alloc] initWithPath:kPrinterProxy];
+- (SNTFileInfo*)printerProxyFileInfo {
+  SNTFileInfo* proxyInfo = [[SNTFileInfo alloc] initWithPath:kPrinterProxy];
   return proxyInfo;
 }
 
-- (void)loggedInUsers:(NSArray **)users sessions:(NSArray **)sessions {
-  NSMutableSet *loggedInUsers = [NSMutableSet set];
-  NSMutableArray *loggedInHosts = [NSMutableArray array];
+- (void)loggedInUsers:(NSArray**)users sessions:(NSArray**)sessions {
+  NSMutableSet* loggedInUsers = [NSMutableSet set];
+  NSMutableArray* loggedInHosts = [NSMutableArray array];
 
-  struct utmpx *nxt;
+  struct utmpx* nxt;
   while ((nxt = getutxent())) {
     if (nxt->ut_type != USER_PROCESS) continue;
 
-    NSString *userName = @(nxt->ut_user);
-    NSString *sessionName;
+    NSString* userName = @(nxt->ut_user);
+    NSString* sessionName;
     if (strnlen(nxt->ut_host, 1) > 0) {
       sessionName = [NSString stringWithFormat:@"%@@%s", userName, nxt->ut_host];
     } else {
@@ -611,9 +611,9 @@ static NSString *const kPrinterProxy =
 }
 
 // Creates a rule for the binary that was allowed by the user in standalone mode.
-- (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent *)se {
+- (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent*)se {
   SNTRuleType ruleType;
-  NSString *ruleIdentifier;
+  NSString* ruleIdentifier;
   SNTRuleState newRuleState;
 
   if (se.signingStatus == SNTSigningStatusProduction && se.signingID) {
@@ -630,11 +630,11 @@ static NSString *const kPrinterProxy =
     return;
   }
 
-  NSString *commentStr = [NSString stringWithFormat:@"%@", se.filePath];
+  NSString* commentStr = [NSString stringWithFormat:@"%@", se.filePath];
 
   // Add rule to allow binary same as santactl rule.
-  NSError *err;
-  SNTRule *newRule = [[SNTRule alloc] initWithIdentifier:ruleIdentifier
+  NSError* err;
+  SNTRule* newRule = [[SNTRule alloc] initWithIdentifier:ruleIdentifier
                                                    state:newRuleState
                                                     type:ruleType
                                                customMsg:nil
@@ -649,14 +649,14 @@ static NSString *const kPrinterProxy =
     return;
   }
 
-  NSArray<NSError *> *errors;
+  NSArray<NSError*>* errors;
   BOOL success = [self.ruleTable addExecutionRules:@[ newRule ]
                                        ruleCleanup:SNTRuleCleanupNone
                                             errors:&errors];
   if (errors.count > 0 || !success) {
     LOGW(@"%@ encountered while adding a rule in standalone mode for: %@:",
          success ? @"Issues" : @"Errors", se.filePath);
-    for (NSError *error in errors) {
+    for (NSError* error in errors) {
       LOGE(@"\t %@", error.localizedDescription);
     }
   }

@@ -17,13 +17,13 @@
 
 @interface SNTDeviceEvent : NSObject <NSSecureCoding>
 
-- (instancetype)initWithOnName:(NSString *)mntonname fromName:(NSString *)mntfromname;
+- (instancetype)initWithOnName:(NSString*)mntonname fromName:(NSString*)mntfromname;
 
-@property NSString *mntonname;
-@property NSString *mntfromname;
-@property NSArray<NSString *> *remountArgs;
+@property NSString* mntonname;
+@property NSString* mntfromname;
+@property NSArray<NSString*>* remountArgs;
 @property BOOL isEncrypted;
 
-- (NSString *)readableRemountArgs;
+- (NSString*)readableRemountArgs;
 
 @end

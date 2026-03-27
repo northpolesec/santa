@@ -37,54 +37,54 @@ REGISTER_COMMAND_NAME(@"metrics")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Show Santa metric information.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return (@"Provides metrics about Santa's operation while it's running.\n"
           @"Pass prefixes to filter list of metrics, if desired.\n"
           @"  Use --json to output in JSON format\n"
           @"  Use --export to trigger an immediate metric export");
 }
 
-- (void)prettyPrintRootLabels:(NSDictionary *)rootLabels {
-  for (NSString *label in rootLabels) {
-    const char *labelStr = [label cStringUsingEncoding:NSUTF8StringEncoding];
-    const char *valueStr = [rootLabels[label] cStringUsingEncoding:NSUTF8StringEncoding];
+- (void)prettyPrintRootLabels:(NSDictionary*)rootLabels {
+  for (NSString* label in rootLabels) {
+    const char* labelStr = [label cStringUsingEncoding:NSUTF8StringEncoding];
+    const char* valueStr = [rootLabels[label] cStringUsingEncoding:NSUTF8StringEncoding];
 
     printf("  %-25s | %s\n", labelStr, valueStr);
   }
 }
 
-- (void)prettyPrintMetricValues:(NSDictionary *)metrics {
-  for (NSString *metricName in metrics) {
-    NSDictionary *metric = metrics[metricName];
-    const char *metricNameStr = [metricName UTF8String];
-    const char *description = [metric[@"description"] UTF8String];
-    NSString *metricType = SNTMetricMakeStringFromMetricType(
+- (void)prettyPrintMetricValues:(NSDictionary*)metrics {
+  for (NSString* metricName in metrics) {
+    NSDictionary* metric = metrics[metricName];
+    const char* metricNameStr = [metricName UTF8String];
+    const char* description = [metric[@"description"] UTF8String];
+    NSString* metricType = SNTMetricMakeStringFromMetricType(
         static_cast<SNTMetricType>([metric[@"type"] integerValue]));
-    const char *metricTypeStr = [metricType UTF8String];
+    const char* metricTypeStr = [metricType UTF8String];
 
     printf("  %-25s | %s\n", "Metric Name", metricNameStr);
     printf("  %-25s | %s\n", "Description", description);
     printf("  %-25s | %s\n", "Type", metricTypeStr);
 
-    for (NSString *fieldName in metric[@"fields"]) {
-      for (NSDictionary *field in metric[@"fields"][fieldName]) {
-        const char *createdStr = [field[@"created"] UTF8String];
-        const char *lastUpdatedStr = [field[@"last_updated"] UTF8String];
-        const char *data = [[NSString stringWithFormat:@"%@", field[@"data"]] UTF8String];
+    for (NSString* fieldName in metric[@"fields"]) {
+      for (NSDictionary* field in metric[@"fields"][fieldName]) {
+        const char* createdStr = [field[@"created"] UTF8String];
+        const char* lastUpdatedStr = [field[@"last_updated"] UTF8String];
+        const char* data = [[NSString stringWithFormat:@"%@", field[@"data"]] UTF8String];
 
-        NSArray<NSString *> *fields = [fieldName componentsSeparatedByString:@","];
-        NSArray<NSString *> *fieldValues = [field[@"value"] componentsSeparatedByString:@","];
+        NSArray<NSString*>* fields = [fieldName componentsSeparatedByString:@","];
+        NSArray<NSString*>* fieldValues = [field[@"value"] componentsSeparatedByString:@","];
 
         if (fields.count != fieldValues.count) {
           TEE_LOGE(@"metric %@ has a different number of field names and field values", fieldName);
           continue;
         }
 
-        NSString *fieldDisplayString = @"";
+        NSString* fieldDisplayString = @"";
 
         if (fields.count >= 1 && fields[0].length) {
           for (int i = 0; i < fields.count; i++) {
@@ -110,20 +110,20 @@ REGISTER_COMMAND_NAME(@"metrics")
   }
 }
 
-- (void)prettyPrintMetrics:(NSDictionary *)metrics asJSON:(BOOL)exportJSON {
-  SNTConfigurator *config = [SNTConfigurator configurator];
+- (void)prettyPrintMetrics:(NSDictionary*)metrics asJSON:(BOOL)exportJSON {
+  SNTConfigurator* config = [SNTConfigurator configurator];
   BOOL exportMetrics = [config exportMetrics];
   SNTMetricFormatType metricFormat = [config metricFormat];
   NSUInteger metricExportInterval = [config metricExportInterval];
-  NSURL *metricsURL = [config metricURL];
-  NSDictionary *normalizedMetrics = SNTMetricConvertDatesToISO8601Strings(metrics);
+  NSURL* metricsURL = [config metricURL];
+  NSDictionary* normalizedMetrics = SNTMetricConvertDatesToISO8601Strings(metrics);
 
   if (exportJSON) {
     // Format
-    NSData *metricData = [NSJSONSerialization dataWithJSONObject:normalizedMetrics
+    NSData* metricData = [NSJSONSerialization dataWithJSONObject:normalizedMetrics
                                                          options:NSJSONWritingPrettyPrinted
                                                            error:nil];
-    NSString *metricStr = [[NSString alloc] initWithData:metricData encoding:NSUTF8StringEncoding];
+    NSString* metricStr = [[NSString alloc] initWithData:metricData encoding:NSUTF8StringEncoding];
     printf("%s\n", [metricStr UTF8String]);
     return;
   }
@@ -147,13 +147,13 @@ REGISTER_COMMAND_NAME(@"metrics")
   [self prettyPrintMetricValues:normalizedMetrics[@"metrics"]];
 }
 
-- (NSDictionary *)filterMetrics:(NSDictionary *)metrics withArguments:(NSArray *)args {
-  NSMutableDictionary *outer = [metrics mutableCopy];
-  NSMutableDictionary *inner = [NSMutableDictionary dictionary];
+- (NSDictionary*)filterMetrics:(NSDictionary*)metrics withArguments:(NSArray*)args {
+  NSMutableDictionary* outer = [metrics mutableCopy];
+  NSMutableDictionary* inner = [NSMutableDictionary dictionary];
   __block BOOL hadFilter = NO;
 
-  [metrics[@"metrics"] enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
-    for (NSString *arg in args) {
+  [metrics[@"metrics"] enumerateKeysAndObjectsUsingBlock:^(NSString* key, id value, BOOL* stop) {
+    for (NSString* arg in args) {
       if ([arg hasPrefix:@"-"]) continue;
 
       hadFilter = YES;
@@ -167,7 +167,7 @@ REGISTER_COMMAND_NAME(@"metrics")
   return hadFilter ? outer : metrics;
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   if ([arguments containsObject:@"--export"]) {
     __block BOOL success = NO;
     [[self.daemonConn synchronousRemoteObjectProxy] exportMetrics:^(BOOL result) {
@@ -181,9 +181,9 @@ REGISTER_COMMAND_NAME(@"metrics")
     exit(success ? 0 : 1);
   }
 
-  __block NSDictionary *metrics;
+  __block NSDictionary* metrics;
 
-  [[self.daemonConn synchronousRemoteObjectProxy] metrics:^(NSDictionary *exportedMetrics) {
+  [[self.daemonConn synchronousRemoteObjectProxy] metrics:^(NSDictionary* exportedMetrics) {
     metrics = exportedMetrics;
   }];
 

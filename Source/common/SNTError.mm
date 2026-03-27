@@ -20,10 +20,10 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
 
 @implementation SNTError
 
-+ (void)populateError:(NSError **)error
++ (void)populateError:(NSError**)error
              withCode:(SNTErrorCode)code
-              message:(nonnull NSString *)msg
-               detail:(nonnull NSString *)detail {
+              message:(nonnull NSString*)msg
+               detail:(nonnull NSString*)detail {
   if (!error) return;
   *error = [NSError errorWithDomain:SantaErrorDomain
                                code:code
@@ -33,22 +33,22 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
                            }];
 }
 
-+ (nullable NSError *)createErrorWithCode:(SNTErrorCode)code
-                                  message:(nonnull NSString *)msg
-                                   detail:(nonnull NSString *)detail {
-  NSError *err;
++ (nullable NSError*)createErrorWithCode:(SNTErrorCode)code
+                                 message:(nonnull NSString*)msg
+                                  detail:(nonnull NSString*)detail {
+  NSError* err;
   [self populateError:&err withCode:code message:msg detail:detail];
   return err;
 }
 
-+ (void)populateError:(NSError **)error
++ (void)populateError:(NSError**)error
              withCode:(SNTErrorCode)code
-               format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(3, 4) {
+               format:(nonnull NSString*)format, ... NS_FORMAT_FUNCTION(3, 4) {
   if (!error) return;
 
   va_list args;
   va_start(args, format);
-  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+  NSString* msg = [[NSString alloc] initWithFormat:format arguments:args];
   va_end(args);
 
   *error = [NSError errorWithDomain:SantaErrorDomain
@@ -56,13 +56,13 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
                            userInfo:@{NSLocalizedDescriptionKey : msg}];
 }
 
-+ (nullable NSError *)createErrorWithCode:(SNTErrorCode)code
-                                   format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(2, 3) {
-  NSError *error;
++ (nullable NSError*)createErrorWithCode:(SNTErrorCode)code
+                                  format:(nonnull NSString*)format, ... NS_FORMAT_FUNCTION(2, 3) {
+  NSError* error;
 
   va_list args;
   va_start(args, format);
-  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+  NSString* msg = [[NSString alloc] initWithFormat:format arguments:args];
   va_end(args);
 
   [self populateError:&error withCode:code format:@"%@", msg];
@@ -70,13 +70,13 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
   return error;
 }
 
-+ (void)populateError:(NSError **)error
-           withFormat:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(2, 3) {
++ (void)populateError:(NSError**)error
+           withFormat:(nonnull NSString*)format, ... NS_FORMAT_FUNCTION(2, 3) {
   if (!error) return;
 
   va_list args;
   va_start(args, format);
-  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+  NSString* msg = [[NSString alloc] initWithFormat:format arguments:args];
   va_end(args);
 
   *error = [NSError errorWithDomain:SantaErrorDomain
@@ -84,13 +84,12 @@ const NSErrorDomain SantaErrorDomain = @"com.northpolesec.santa.error";
                            userInfo:@{NSLocalizedDescriptionKey : msg}];
 }
 
-+ (nullable NSError *)createErrorWithFormat:(nonnull NSString *)format,
-                                            ... NS_FORMAT_FUNCTION(1, 2) {
-  NSError *error = nil;
++ (nullable NSError*)createErrorWithFormat:(nonnull NSString*)format, ... NS_FORMAT_FUNCTION(1, 2) {
+  NSError* error = nil;
 
   va_list args;
   va_start(args, format);
-  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+  NSString* msg = [[NSString alloc] initWithFormat:format arguments:args];
   va_end(args);
 
   [self populateError:&error withFormat:@"%@", msg];

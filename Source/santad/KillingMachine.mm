@@ -50,7 +50,7 @@ class StringMatcher : public ProcessMatcher {
  public:
   using GetterFunc = std::function<std::optional<std::string>(pid_t, CSOpsFunc)>;
 
-  StringMatcher(NSString *desired, GetterFunc getter, CSOpsFunc csops_func)
+  StringMatcher(NSString* desired, GetterFunc getter, CSOpsFunc csops_func)
       : desired_(NSStringToUTF8StringView(desired)),
         getter_(std::move(getter)),
         csops_func_(std::move(csops_func)) {}
@@ -82,15 +82,15 @@ class FlagsMatcher : public ProcessMatcher {
   CSOpsFunc csops_func_;
 };
 
-std::unique_ptr<ProcessMatcher> MakeCDHashMatcher(NSString *cdhash, CSOpsFunc csops_func = csops) {
+std::unique_ptr<ProcessMatcher> MakeCDHashMatcher(NSString* cdhash, CSOpsFunc csops_func = csops) {
   return std::make_unique<StringMatcher>(cdhash, CSOpsGetCDHash, std::move(csops_func));
 }
 
-std::unique_ptr<ProcessMatcher> MakeTeamIDMatcher(NSString *teamID, CSOpsFunc csops_func = csops) {
+std::unique_ptr<ProcessMatcher> MakeTeamIDMatcher(NSString* teamID, CSOpsFunc csops_func = csops) {
   return std::make_unique<StringMatcher>(teamID, CSOpsGetTeamID, std::move(csops_func));
 }
 
-std::unique_ptr<ProcessMatcher> MakeSigningIDMatcher(NSString *signingID,
+std::unique_ptr<ProcessMatcher> MakeSigningIDMatcher(NSString* signingID,
                                                      CSOpsFunc csops_func = csops) {
   return std::make_unique<StringMatcher>(signingID, CSOpsGetSigningID, std::move(csops_func));
 }
@@ -110,7 +110,7 @@ SNTKilledProcessError LibprocSignalErrorToKilledProcessError(int error) {
   }
 }
 
-SNTKilledProcess *KillProcess(SNTKillRequest *request, audit_token_t *token) {
+SNTKilledProcess* KillProcess(SNTKillRequest* request, audit_token_t* token) {
   static pid_t myPid = getpid();
   pid_t targetPid = Pid(*token);
   pid_t targetPidversion = Pidversion(*token);
@@ -135,7 +135,7 @@ SNTKilledProcess *KillProcess(SNTKillRequest *request, audit_token_t *token) {
                                          error:LibprocSignalErrorToKilledProcessError(error)];
 }
 
-SNTKilledProcess *KillByRunningProcess(SNTKillRequestRunningProcess *request) {
+SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request) {
   if (![[SNTSystemInfo bootSessionUUID] isEqualToString:request.bootSessionUUID]) {
     LOGW(@"Request to kill running process with non-matching boot session UUID");
     return [[SNTKilledProcess alloc] initWithPid:request.pid
@@ -158,8 +158,8 @@ SNTKilledProcess *KillByRunningProcess(SNTKillRequestRunningProcess *request) {
   return nil;
 }
 
-SNTKilledProcess *KillByMatchers(SNTKillRequest *request, pid_t pid,
-                                 const std::vector<std::unique_ptr<ProcessMatcher>> &matchers) {
+SNTKilledProcess* KillByMatchers(SNTKillRequest* request, pid_t pid,
+                                 const std::vector<std::unique_ptr<ProcessMatcher>>& matchers) {
   // To protect against pid wrap races, we must grab the audit token before
   // and after the matcher checks to ensure the process that info was looked
   // up for matches the process we will signal.
@@ -172,7 +172,7 @@ SNTKilledProcess *KillByMatchers(SNTKillRequest *request, pid_t pid,
   }
 
   // Check all matchers
-  for (const auto &matcher : matchers) {
+  for (const auto& matcher : matchers) {
     if (!matcher->Matches(pid)) {
       return nil;
     }
@@ -197,17 +197,17 @@ SNTKilledProcess *KillByMatchers(SNTKillRequest *request, pid_t pid,
 #ifdef DEBUG
 // These test-only functions expose hooks for testing matcher functionality
 // without having to expose the internal types.
-bool TestCDHashMatcher(pid_t pid, NSString *cdhash, CSOpsFunc csops_func) {
+bool TestCDHashMatcher(pid_t pid, NSString* cdhash, CSOpsFunc csops_func) {
   auto matcher = MakeCDHashMatcher(cdhash, csops_func);
   return matcher->Matches(pid);
 }
 
-bool TestTeamIDMatcher(pid_t pid, NSString *teamID, CSOpsFunc csops_func) {
+bool TestTeamIDMatcher(pid_t pid, NSString* teamID, CSOpsFunc csops_func) {
   auto matcher = MakeTeamIDMatcher(teamID, csops_func);
   return matcher->Matches(pid);
 }
 
-bool TestSigningIDMatcher(pid_t pid, NSString *signingID, CSOpsFunc csops_func) {
+bool TestSigningIDMatcher(pid_t pid, NSString* signingID, CSOpsFunc csops_func) {
   auto matcher = MakeSigningIDMatcher(signingID, csops_func);
   return matcher->Matches(pid);
 }
@@ -218,11 +218,11 @@ bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_func) {
 }
 #endif
 
-SNTKillResponse *KillingMachine(SNTKillRequest *request) {
-  NSMutableArray<SNTKilledProcess *> *killedProcs = [NSMutableArray array];
+SNTKillResponse* KillingMachine(SNTKillRequest* request) {
+  NSMutableArray<SNTKilledProcess*>* killedProcs = [NSMutableArray array];
 
   if ([request isKindOfClass:[SNTKillRequestRunningProcess class]]) {
-    SNTKilledProcess *killed = KillByRunningProcess((SNTKillRequestRunningProcess *)request);
+    SNTKilledProcess* killed = KillByRunningProcess((SNTKillRequestRunningProcess*)request);
     if (killed) {
       [killedProcs addObject:killed];
     }
@@ -237,9 +237,9 @@ SNTKillResponse *KillingMachine(SNTKillRequest *request) {
 
     // Populate the appropriate matchers for the request
     if ([request isKindOfClass:[SNTKillRequestCDHash class]]) {
-      matchers.push_back(MakeCDHashMatcher(((SNTKillRequestCDHash *)request).cdhash));
+      matchers.push_back(MakeCDHashMatcher(((SNTKillRequestCDHash*)request).cdhash));
     } else if ([request isKindOfClass:[SNTKillRequestSigningID class]]) {
-      SNTKillRequestSigningID *signingIDRequest = (SNTKillRequestSigningID *)request;
+      SNTKillRequestSigningID* signingIDRequest = (SNTKillRequestSigningID*)request;
       if ([signingIDRequest.teamID isEqualToString:kPlatformTeamID]) {
         matchers.push_back(MakeStatusFlagsMatcher(CS_PLATFORM_BINARY));
       } else {
@@ -249,11 +249,11 @@ SNTKillResponse *KillingMachine(SNTKillRequest *request) {
     } else if ([request isKindOfClass:[SNTKillRequestTeamID class]]) {
       // Don't allow `platform` here as killing all platform binaries is a bad
       // idea and isn't supported.
-      SNTKillRequestTeamID *teamIDRequest = (SNTKillRequestTeamID *)request;
+      SNTKillRequestTeamID* teamIDRequest = (SNTKillRequestTeamID*)request;
       if ([teamIDRequest.teamID isEqualToString:kPlatformTeamID]) {
         return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest];
       }
-      matchers.push_back(MakeTeamIDMatcher(((SNTKillRequestTeamID *)request).teamID));
+      matchers.push_back(MakeTeamIDMatcher(((SNTKillRequestTeamID*)request).teamID));
     } else {
       LOGE(@"Unexpected request type: %@", [request class]);
       return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest];
@@ -264,7 +264,7 @@ SNTKillResponse *KillingMachine(SNTKillRequest *request) {
         continue;
       }
 
-      SNTKilledProcess *killed = KillByMatchers(request, pid, matchers);
+      SNTKilledProcess* killed = KillByMatchers(request, pid, matchers);
       if (killed) {
         [killedProcs addObject:killed];
       }

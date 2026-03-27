@@ -18,8 +18,8 @@
 #import "Source/common/SNTLogging.h"
 
 @interface SNTModeTransition ()
-@property(readwrite) NSNumber *maxMinutes;
-@property(readwrite) NSNumber *defaultDurationMinutes;
+@property(readwrite) NSNumber* maxMinutes;
+@property(readwrite) NSNumber* defaultDurationMinutes;
 @end
 
 @implementation SNTModeTransition
@@ -50,7 +50,7 @@
   return self;
 }
 
-- (NSNumber *)clampMinutes:(uint64_t)minutesVal {
+- (NSNumber*)clampMinutes:(uint64_t)minutesVal {
   if (minutesVal < kMinTemporaryMonitorModeMinutes) {
     return @(kMinTemporaryMonitorModeMinutes);
   } else if (minutesVal > kMaxTemporaryMonitorModeMinutes) {
@@ -60,7 +60,7 @@
   }
 }
 
-- (NSNumber *)clampDefaultDuration:(uint64_t)durationVal {
+- (NSNumber*)clampDefaultDuration:(uint64_t)durationVal {
   if (durationVal == 0 || durationVal > [self.maxMinutes unsignedLongLongValue]) {
     return self.maxMinutes;
   } else {
@@ -68,7 +68,7 @@
   }
 }
 
-- (uint32_t)getDurationMinutes:(NSNumber *)requestedDuration {
+- (uint32_t)getDurationMinutes:(NSNumber*)requestedDuration {
   uint64_t durationVal = [requestedDuration unsignedLongLongValue];
   if (durationVal == 0) {
     return [self.defaultDurationMinutes unsignedIntValue];
@@ -83,13 +83,13 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, type);
   ENCODE(coder, maxMinutes);
   ENCODE(coder, defaultDurationMinutes);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [self init];
   if (self) {
     DECODE_SELECTOR(decoder, type, NSNumber, intValue);
@@ -103,9 +103,9 @@
   return self;
 }
 
-- (NSData *)serialize {
-  NSError *error;
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self
+- (NSData*)serialize {
+  NSError* error;
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:self
                                        requiringSecureCoding:YES
                                                        error:&error];
   if (error) {
@@ -116,12 +116,12 @@
   return data;
 }
 
-+ (instancetype)deserialize:(NSData *)data {
++ (instancetype)deserialize:(NSData*)data {
   if (!data) {
     return nil;
   }
 
-  NSError *error;
+  NSError* error;
   id object = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTModeTransition class]
                                                 fromData:data
                                                    error:&error];

@@ -35,7 +35,7 @@ namespace santa {
 class MockFAAPolicyProcessor : public FAAPolicyProcessor {
  public:
   MockFAAPolicyProcessor(
-      SNTDecisionCache *dc, std::shared_ptr<Enricher> enricher, std::shared_ptr<Logger> logger,
+      SNTDecisionCache* dc, std::shared_ptr<Enricher> enricher, std::shared_ptr<Logger> logger,
       std::shared_ptr<TTYWriter> tty_writer, std::shared_ptr<Metrics> metrics,
       uint32_t rate_limit_logs_per_sec, uint32_t rate_limit_window_size_sec,
       FAAPolicyProcessor::GenerateEventDetailLinkBlock generate_event_detail_link_block,
@@ -47,15 +47,15 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
   virtual ~MockFAAPolicyProcessor() {}
 
   MOCK_METHOD(bool, PolicyMatchesProcess,
-              (const WatchItemProcess &policy_proc, const es_process_t *es_proc), (override));
-  MOCK_METHOD(SNTCachedDecision *, GetCachedDecision, (const struct stat &stat_buf), (override));
-  MOCK_METHOD(NSString *, GetCertificateHash, (const es_file_t *es_file), (override));
+              (const WatchItemProcess& policy_proc, const es_process_t* es_proc), (override));
+  MOCK_METHOD(SNTCachedDecision*, GetCachedDecision, (const struct stat& stat_buf), (override));
+  MOCK_METHOD(NSString*, GetCertificateHash, (const es_file_t* es_file), (override));
   MOCK_METHOD(bool, PolicyAllowsReadsForTarget,
-              (const Message &msg, const Message::PathTarget &target,
+              (const Message& msg, const Message::PathTarget& target,
                std::shared_ptr<WatchItemPolicyBase> policy),
               (override));
   MOCK_METHOD(FileAccessPolicyDecision, ApplyPolicy,
-              (const Message &msg, const Message::PathTarget &target,
+              (const Message& msg, const Message::PathTarget& target,
                const std::optional<std::shared_ptr<santa::WatchItemPolicyBase>> optional_policy,
                FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock),
               (override));
@@ -63,17 +63,17 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
   //
   // Wrappers for calling into private methods
   //
-  NSString *GetCertificateHashWrapper(const es_file_t *es_file) {
+  NSString* GetCertificateHashWrapper(const es_file_t* es_file) {
     return FAAPolicyProcessor::GetCertificateHash(es_file);
   }
 
-  bool PolicyAllowsReadsForTargetWrapper(const Message &msg, const Message::PathTarget &target,
+  bool PolicyAllowsReadsForTargetWrapper(const Message& msg, const Message::PathTarget& target,
                                          std::shared_ptr<WatchItemPolicyBase> policy) {
     return FAAPolicyProcessor::PolicyAllowsReadsForTarget(msg, target, policy);
   }
 
   FileAccessPolicyDecision ApplyPolicyWrapper(
-      const Message &msg, const Message::PathTarget &target,
+      const Message& msg, const Message::PathTarget& target,
       const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock) {
     return FAAPolicyProcessor::ApplyPolicy(msg, target, optional_policy, checkIfPolicyMatchesBlock);

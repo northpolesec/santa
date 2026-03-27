@@ -22,7 +22,7 @@
 
 @implementation SNTXPCUnprivilegedControlInterface
 
-+ (void)initializeControlInterface:(NSXPCInterface *)r {
++ (void)initializeControlInterface:(NSXPCInterface*)r {
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
                                       [SNTStoredExecutionEvent class], nil]
         forSelector:@selector(syncBundleEvent:relatedEvents:)
@@ -30,8 +30,8 @@
             ofReply:NO];
 }
 
-+ (NSXPCInterface *)controlInterface {
-  NSXPCInterface *r =
++ (NSXPCInterface*)controlInterface {
+  NSXPCInterface* r =
       [NSXPCInterface interfaceWithProtocol:@protocol(SNTUnprivilegedDaemonControlXPC)];
   [self initializeControlInterface:r];
 

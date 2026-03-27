@@ -40,7 +40,7 @@
   @param certData DER-encoded certificate data.
   @return An initialized `MOLCertificate` or `nil` if the input is not a DER-encoded certificate.
 */
-- (instancetype)initWithCertificateDataDER:(NSData *)certData;
+- (instancetype)initWithCertificateDataDER:(NSData*)certData;
 
 /**
   Initialize a `MOLCertificate` object with certificate data in PEM format.
@@ -49,7 +49,7 @@
   @param certData PEM-encoded certificate data.
   @return An initialized `MOLCertifcate` or `nil` if the input is not a PEM-encoded certificate.
 */
-- (instancetype)initWithCertificateDataPEM:(NSString *)certData;
+- (instancetype)initWithCertificateDataPEM:(NSString*)certData;
 
 /**
   Returns an array of `MOLCertificate's` for all of the certificates in `pemData`.
@@ -57,7 +57,7 @@
   @param pemData PEM-encoded certificates.
   @return An array of `MOLCertificate` objects for each valid PEM in `pemData`.
 */
-+ (NSArray *)certificatesFromPEM:(NSString *)pemData;
++ (NSArray*)certificatesFromPEM:(NSString*)pemData;
 
 /**
   Returns an array of `MOLCertificate's` for each SecCertificateRef in `array`.
@@ -65,7 +65,7 @@
   @param array NSArray of SecCertificateRef's.
   @return An array of `MOLCertificate` objects for each SecCertificateRef in `array`.
 */
-+ (NSArray *)certificatesFromArray:(NSArray *)array;
++ (NSArray*)certificatesFromArray:(NSArray*)array;
 
 /**
   Access the underlying certificate ref.
@@ -76,63 +76,63 @@
 @property(readonly, nonatomic) SecCertificateRef certRef;
 
 /**  SHA-1 hash of the certificate data. */
-@property(readonly, nonatomic) NSString *SHA1;
+@property(readonly, nonatomic) NSString* SHA1;
 
 /**  SHA-256 hash of the certificate data. */
-@property(readonly, nonatomic) NSString *SHA256;
+@property(readonly, nonatomic) NSString* SHA256;
 
 /**  Certificate data in DER format. */
-@property(readonly, nonatomic) NSData *certData;
+@property(readonly, nonatomic) NSData* certData;
 
 /**  Common Name e.g: "Software Signing" */
-@property(readonly, nonatomic) NSString *commonName;
+@property(readonly, nonatomic) NSString* commonName;
 
 /**  Country Name e.g: "US" */
-@property(readonly, nonatomic) NSString *countryName;
+@property(readonly, nonatomic) NSString* countryName;
 
 /**  Organization Name e.g: "Apple Inc." */
-@property(readonly, nonatomic) NSString *orgName;
+@property(readonly, nonatomic) NSString* orgName;
 
 /**  Organizational Unit Name. Returns the first OU e.g: "Apple Software". */
-@property(readonly, nonatomic) NSString *orgUnit;
+@property(readonly, nonatomic) NSString* orgUnit;
 
 /**  Organizational Unit Names. Returns an array of all OUs e.g: ("Apple Software", "Apple"). */
-@property(readonly, nonatomic) NSArray *orgUnits;
+@property(readonly, nonatomic) NSArray* orgUnits;
 
 /**  Is this cert able to issue certs? */
 @property(readonly, nonatomic) BOOL isCA;
 
 /**  The cert serial number. */
-@property(readonly, nonatomic) NSString *serialNumber;
+@property(readonly, nonatomic) NSString* serialNumber;
 
 /**  Issuer common name. */
-@property(readonly, nonatomic) NSString *issuerCommonName;
+@property(readonly, nonatomic) NSString* issuerCommonName;
 
 /**  Issuer country name. */
-@property(readonly, nonatomic) NSString *issuerCountryName;
+@property(readonly, nonatomic) NSString* issuerCountryName;
 
 /**  Issuer organization name. */
-@property(readonly, nonatomic) NSString *issuerOrgName;
+@property(readonly, nonatomic) NSString* issuerOrgName;
 
 /**  Issuer organizational unit. Returns the first issuer OU. */
-@property(readonly, nonatomic) NSString *issuerOrgUnit;
+@property(readonly, nonatomic) NSString* issuerOrgUnit;
 
 /**  Issuer organizational units. Returns an array of all issuer OUs. */
-@property(readonly, nonatomic) NSArray *issuerOrgUnits;
+@property(readonly, nonatomic) NSArray* issuerOrgUnits;
 
 /**  Validity not before / valid from date. */
-@property(readonly, nonatomic) NSDate *validFrom;
+@property(readonly, nonatomic) NSDate* validFrom;
 
 /**  Validity not after / valid until date. */
-@property(readonly, nonatomic) NSDate *validUntil;
+@property(readonly, nonatomic) NSDate* validUntil;
 
 /**  NT Principal Name */
-@property(readonly, nonatomic) NSString *ntPrincipalName;
+@property(readonly, nonatomic) NSString* ntPrincipalName;
 
 /**  DNS Name. Returns the first DNS Name from the SAN */
-@property(readonly, nonatomic) NSString *dnsName;
+@property(readonly, nonatomic) NSString* dnsName;
 
 /**  DNS Names. Returns an array of all DNS Names from the SAN */
-@property(readonly, nonatomic) NSArray *dnsNames;
+@property(readonly, nonatomic) NSArray* dnsNames;
 
 @end

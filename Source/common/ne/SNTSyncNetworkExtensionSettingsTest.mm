@@ -28,7 +28,7 @@
 
 - (void)testInitialization {
   // Test initialization with enable=YES
-  SNTSyncNetworkExtensionSettings *settings =
+  SNTSyncNetworkExtensionSettings* settings =
       [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
   XCTAssertNotNil(settings);
   XCTAssertTrue(settings.enable);
@@ -41,12 +41,12 @@
 
 - (void)testEncodeDecodeSecureCoding {
   // Test with enable=YES
-  SNTSyncNetworkExtensionSettings *settings =
+  SNTSyncNetworkExtensionSettings* settings =
       [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
-  NSData *serialized = [settings serialize];
+  NSData* serialized = [settings serialize];
   XCTAssertNotNil(serialized);
 
-  SNTSyncNetworkExtensionSettings *deserialized =
+  SNTSyncNetworkExtensionSettings* deserialized =
       [SNTSyncNetworkExtensionSettings deserialize:serialized];
   XCTAssertNotNil(deserialized);
   XCTAssertTrue(deserialized.enable);
@@ -65,7 +65,7 @@
 
 - (void)testDeserializeNilData {
   // Test that deserializing nil data returns nil
-  SNTSyncNetworkExtensionSettings *deserialized = [SNTSyncNetworkExtensionSettings deserialize:nil];
+  SNTSyncNetworkExtensionSettings* deserialized = [SNTSyncNetworkExtensionSettings deserialize:nil];
   XCTAssertNil(deserialized);
 }
 

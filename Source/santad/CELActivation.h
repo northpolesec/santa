@@ -36,13 +36,13 @@ namespace santa {
 // use this in an asynchronous context outside of the evaluation of that
 // execution.
 ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
-    const Message &esMsg, NSString *_Nullable signingID, NSString *_Nullable teamID,
-    BOOL isPlatformBinary, NSDate *_Nullable signingTime, NSDate *_Nullable secureSigningTime,
-    NSDictionary *_Nullable entitlements,
+    const Message& esMsg, NSString* _Nullable signingID, NSString* _Nullable teamID,
+    BOOL isPlatformBinary, NSDate* _Nullable signingTime, NSDate* _Nullable secureSigningTime,
+    NSDictionary* _Nullable entitlements,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree);
 
 ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
-    const Message &esMsg, MOLCodesignChecker *_Nullable csInfo,
+    const Message& esMsg, MOLCodesignChecker* _Nullable csInfo,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree);
 
 }  // namespace santa

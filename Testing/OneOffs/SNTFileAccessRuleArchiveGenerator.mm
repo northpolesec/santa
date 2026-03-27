@@ -32,7 +32,7 @@
 #import "Source/common/SNTFileAccessRule.h"
 #include "Source/common/faa/WatchItems.h"
 
-static NSString *const kDefaultOutputPath = @"/tmp/file_access_rule_archive.plist";
+static NSString* const kDefaultOutputPath = @"/tmp/file_access_rule_archive.plist";
 
 void PrintUsage() {
   std::cout << "Usage: " << getprogname() << " [OPTIONS]\n"
@@ -44,8 +44,8 @@ void PrintUsage() {
             << "  -h         Show this help message\n";
 }
 
-NSArray<SNTFileAccessRule *> *GenerateFileAccessAddRules(long numRules) {
-  NSMutableArray<SNTFileAccessRule *> *rules = [[NSMutableArray alloc] init];
+NSArray<SNTFileAccessRule*>* GenerateFileAccessAddRules(long numRules) {
+  NSMutableArray<SNTFileAccessRule*>* rules = [[NSMutableArray alloc] init];
 
   for (long i = 0; i < numRules; i++) {
     [rules addObject:[[SNTFileAccessRule alloc]
@@ -73,8 +73,8 @@ NSArray<SNTFileAccessRule *> *GenerateFileAccessAddRules(long numRules) {
   return rules;
 }
 
-NSArray<SNTFileAccessRule *> *GenerateFileAccessRemoveRules(long numRules) {
-  NSMutableArray<SNTFileAccessRule *> *rules = [[NSMutableArray alloc] init];
+NSArray<SNTFileAccessRule*>* GenerateFileAccessRemoveRules(long numRules) {
+  NSMutableArray<SNTFileAccessRule*>* rules = [[NSMutableArray alloc] init];
 
   for (long i = 0; i < numRules; i++) {
     [rules addObject:[[SNTFileAccessRule alloc]
@@ -84,10 +84,10 @@ NSArray<SNTFileAccessRule *> *GenerateFileAccessRemoveRules(long numRules) {
   return rules;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   int opt;
   bool addRules = true;
-  NSString *outputPath = kDefaultOutputPath;
+  NSString* outputPath = kDefaultOutputPath;
   long numRules = 5;
 
   while ((opt = getopt(argc, argv, "arn:o:h")) != -1) {
@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
       case 'a': addRules = true; break;
       case 'r': addRules = false; break;
       case 'n': {
-        char *endptr;
+        char* endptr;
         numRules = strtol(optarg, &endptr, 10);
 
         if (*endptr != '\0' || numRules <= 0) {
@@ -115,11 +115,11 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  NSArray<SNTFileAccessRule *> *rules =
+  NSArray<SNTFileAccessRule*>* rules =
       addRules ? GenerateFileAccessAddRules(numRules) : GenerateFileAccessRemoveRules(numRules);
 
-  NSError *err;
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:rules
+  NSError* err;
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:rules
                                        requiringSecureCoding:YES
                                                        error:&err];
   if (!data) {

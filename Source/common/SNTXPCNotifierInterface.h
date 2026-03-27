@@ -27,23 +27,23 @@
 
 /// Protocol implemented by SantaGUI and utilized by santad
 @protocol SNTNotifierXPC
-- (void)postBlockNotification:(SNTStoredExecutionEvent *)event
-            withCustomMessage:(NSString *)message
-                    customURL:(NSString *)url
-                  configState:(SNTConfigState *)configState
+- (void)postBlockNotification:(SNTStoredExecutionEvent*)event
+            withCustomMessage:(NSString*)message
+                    customURL:(NSString*)url
+                  configState:(SNTConfigState*)configState
                      andReply:(void (^)(BOOL authenticated))reply;
-- (void)postUSBBlockNotification:(SNTDeviceEvent *)event;
-- (void)postNetworkMountNotification:(SNTStoredNetworkMountEvent *)event
-                        configBundle:(SNTConfigBundle *)configBundle;
-- (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent *)event
-                          customMessage:(NSString *)message
-                              customURL:(NSString *)url
-                             customText:(NSString *)text
-                            configState:(SNTConfigState *)configState;
+- (void)postUSBBlockNotification:(SNTDeviceEvent*)event;
+- (void)postNetworkMountNotification:(SNTStoredNetworkMountEvent*)event
+                        configBundle:(SNTConfigBundle*)configBundle;
+- (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent*)event
+                          customMessage:(NSString*)message
+                              customURL:(NSString*)url
+                             customText:(NSString*)text
+                            configState:(SNTConfigState*)configState;
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
-- (void)postRuleSyncNotificationForApplication:(NSString *)app;
+- (void)postRuleSyncNotificationForApplication:(NSString*)app;
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;
-- (void)enterTemporaryMonitorMode:(NSDate *)expiration;
+- (void)enterTemporaryMonitorMode:(NSDate*)expiration;
 - (void)leaveTemporaryMonitorMode;
 - (void)temporaryMonitorModePolicyAvailable:(BOOL)available;
 - (void)setNetworkExtensionFilterEnabled:(BOOL)enabled reply:(void (^)(BOOL success))reply;
@@ -55,6 +55,6 @@
 ///  @return an initialized NSXPCInterface for the SNTNotifierXPC protocol.
 ///  Ensures any methods that accept custom classes as arguments are set-up before returning
 ///
-+ (NSXPCInterface *)notifierInterface;
++ (NSXPCInterface*)notifierInterface;
 
 @end

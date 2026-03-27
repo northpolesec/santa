@@ -33,47 +33,47 @@ using santa::Client;
 
 class MockEndpointSecurityAPI : public santa::EndpointSecurityAPI {
  public:
-  MOCK_METHOD(santa::Client, NewClient, (void (^message_handler)(es_client_t *, santa::Message)));
+  MOCK_METHOD(santa::Client, NewClient, (void (^message_handler)(es_client_t*, santa::Message)));
 
-  MOCK_METHOD(bool, Subscribe, (const santa::Client &, const std::set<es_event_type_t> &));
-  MOCK_METHOD(bool, UnsubscribeAll, (const Client &client));
+  MOCK_METHOD(bool, Subscribe, (const santa::Client&, const std::set<es_event_type_t>&));
+  MOCK_METHOD(bool, UnsubscribeAll, (const Client& client));
 
-  MOCK_METHOD(bool, UnmuteAllPaths, (const Client &client));
-  MOCK_METHOD(bool, UnmuteAllTargetPaths, (const Client &client));
+  MOCK_METHOD(bool, UnmuteAllPaths, (const Client& client));
+  MOCK_METHOD(bool, UnmuteAllTargetPaths, (const Client& client));
 
-  MOCK_METHOD(bool, IsTargetPathMutingInverted, (const Client &client));
-  MOCK_METHOD(bool, InvertTargetPathMuting, (const Client &client));
+  MOCK_METHOD(bool, IsTargetPathMutingInverted, (const Client& client));
+  MOCK_METHOD(bool, InvertTargetPathMuting, (const Client& client));
 
-  MOCK_METHOD(bool, IsProcessMutingInverted, (const Client &client));
-  MOCK_METHOD(bool, InvertProcessMuting, (const Client &client));
+  MOCK_METHOD(bool, IsProcessMutingInverted, (const Client& client));
+  MOCK_METHOD(bool, InvertProcessMuting, (const Client& client));
 
   MOCK_METHOD(bool, MuteTargetPath,
-              (const Client &client, std::string_view path, santa::WatchItemPathType path_type));
+              (const Client& client, std::string_view path, santa::WatchItemPathType path_type));
   MOCK_METHOD(bool, UnmuteTargetPath,
-              (const Client &client, std::string_view path, santa::WatchItemPathType path_type));
+              (const Client& client, std::string_view path, santa::WatchItemPathType path_type));
 
-  MOCK_METHOD(void, RetainMessage, (const es_message_t *msg));
-  MOCK_METHOD(void, ReleaseMessage, (const es_message_t *msg));
+  MOCK_METHOD(void, RetainMessage, (const es_message_t* msg));
+  MOCK_METHOD(void, ReleaseMessage, (const es_message_t* msg));
 
   MOCK_METHOD(bool, RespondAuthResult,
-              (const santa::Client &, const santa::Message &msg, es_auth_result_t result,
+              (const santa::Client&, const santa::Message& msg, es_auth_result_t result,
                bool cache));
   MOCK_METHOD(bool, RespondFlagsResult,
-              (const santa::Client &client, const santa::Message &msg, uint32_t allowed_flags,
+              (const santa::Client& client, const santa::Message& msg, uint32_t allowed_flags,
                bool cache));
 
-  MOCK_METHOD(bool, MuteProcess, (const santa::Client &, const audit_token_t *tok));
+  MOCK_METHOD(bool, MuteProcess, (const santa::Client&, const audit_token_t* tok));
 
-  MOCK_METHOD(bool, ClearCache, (const santa::Client &));
+  MOCK_METHOD(bool, ClearCache, (const santa::Client&));
 
-  MOCK_METHOD(uint32_t, ExecArgCount, (const es_event_exec_t *event));
-  MOCK_METHOD(es_string_token_t, ExecArg, (const es_event_exec_t *event, uint32_t index));
+  MOCK_METHOD(uint32_t, ExecArgCount, (const es_event_exec_t* event));
+  MOCK_METHOD(es_string_token_t, ExecArg, (const es_event_exec_t* event, uint32_t index));
 
-  MOCK_METHOD(uint32_t, ExecEnvCount, (const es_event_exec_t *event));
-  MOCK_METHOD(es_string_token_t, ExecEnv, (const es_event_exec_t *event, uint32_t index));
+  MOCK_METHOD(uint32_t, ExecEnvCount, (const es_event_exec_t* event));
+  MOCK_METHOD(es_string_token_t, ExecEnv, (const es_event_exec_t* event, uint32_t index));
 
-  MOCK_METHOD(uint32_t, ExecFDCount, (const es_event_exec_t *event));
-  MOCK_METHOD(const es_fd_t *, ExecFD, (const es_event_exec_t *event, uint32_t index));
+  MOCK_METHOD(uint32_t, ExecFDCount, (const es_event_exec_t* event));
+  MOCK_METHOD(const es_fd_t*, ExecFD, (const es_event_exec_t* event, uint32_t index));
 
   void SetExpectationsESNewClient() {
     EXPECT_CALL(*this, NewClient)

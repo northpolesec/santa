@@ -33,7 +33,7 @@ namespace pbv1 = ::santa::stats::v1;
 
 namespace santa {
 
-const char *kPolarisSubmissionURL =
+const char* kPolarisSubmissionURL =
     "https://polaris.northpole.security/santa.stats.v1.StatsService/SubmitStats";
 const int kRequestTimeoutSeconds = 30;
 
@@ -43,7 +43,7 @@ std::string machineIdHash(std::string_view machineID) {
   return BufToHexString(md, CC_SHA256_DIGEST_LENGTH);
 }
 
-::pbv1::SubmitStatsRequest *createRequestProto(google::protobuf::Arena &arena, NSString *orgID) {
+::pbv1::SubmitStatsRequest* createRequestProto(google::protobuf::Arena& arena, NSString* orgID) {
   auto request = google::protobuf::Arena::Create<::pbv1::SubmitStatsRequest>(&arena);
 
   if ([SNTSystemInfo hardwareUUID].length) {
@@ -68,15 +68,15 @@ std::string machineIdHash(std::string_view machineID) {
   return request;
 }
 
-NSError *makeRequest(NSURLRequest *req) {
+NSError* makeRequest(NSURLRequest* req) {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  __block NSHTTPURLResponse *_response;
-  __block NSError *_error;
-  NSURLSessionDataTask *task = [[NSURLSession sharedSession]
+  __block NSHTTPURLResponse* _response;
+  __block NSError* _error;
+  NSURLSessionDataTask* task = [[NSURLSession sharedSession]
       dataTaskWithRequest:req
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
           if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-            _response = (NSHTTPURLResponse *)response;
+            _response = (NSHTTPURLResponse*)response;
           }
           _error = error;
           dispatch_semaphore_signal(sema);
@@ -97,7 +97,7 @@ NSError *makeRequest(NSURLRequest *req) {
   return nil;
 }
 
-void SubmitStats(NSString *orgID) {
+void SubmitStats(NSString* orgID) {
   google::protobuf::Arena arena;
   auto pb = createRequestProto(arena, orgID);
   std::string data;
@@ -106,8 +106,8 @@ void SubmitStats(NSString *orgID) {
     return;
   }
 
-  NSURL *u = [NSURL URLWithString:@(kPolarisSubmissionURL)];
-  NSMutableURLRequest *req = [[NSMutableURLRequest alloc] initWithURL:u];
+  NSURL* u = [NSURL URLWithString:@(kPolarisSubmissionURL)];
+  NSMutableURLRequest* req = [[NSMutableURLRequest alloc] initWithURL:u];
   [req setHTTPMethod:@"POST"];
   [req setValue:@"application/proto" forHTTPHeaderField:@"Content-Type"];
   [req setHTTPBody:[NSData dataWithBytes:data.data() length:data.size()]];
@@ -116,7 +116,7 @@ void SubmitStats(NSString *orgID) {
   LOGI(@"Stats submission is disabled in non-release builds");
   return;
 #else
-  NSError *error = makeRequest(req);
+  NSError* error = makeRequest(req);
   if (error) {
     LOGE(@"Failed to submit stats: %@", error);
     return;

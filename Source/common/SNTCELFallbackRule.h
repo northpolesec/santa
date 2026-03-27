@@ -20,20 +20,20 @@
 @interface SNTCELFallbackRule : NSObject <NSSecureCoding>
 
 /// The CEL expression to evaluate. Required.
-@property(readonly, copy) NSString *celExpr;
+@property(readonly, copy) NSString* celExpr;
 
 /// Optional custom message shown in the block notification modal.
-@property(readonly, copy) NSString *customMsg;
+@property(readonly, copy) NSString* customMsg;
 
 /// Optional custom URL for the "Open" button in the block notification.
 /// Supports the same format values as EventDetailURL.
-@property(readonly, copy) NSString *customURL;
+@property(readonly, copy) NSString* customURL;
 
-- (instancetype)initWithCELExpr:(NSString *)celExpr
-                      customMsg:(NSString *)customMsg
-                      customURL:(NSString *)customURL;
+- (instancetype)initWithCELExpr:(NSString*)celExpr
+                      customMsg:(NSString*)customMsg
+                      customURL:(NSString*)customURL;
 
-+ (NSData *)serializeArray:(NSArray<SNTCELFallbackRule *> *)rules;
-+ (NSArray<SNTCELFallbackRule *> *)deserializeArray:(NSData *)data;
++ (NSData*)serializeArray:(NSArray<SNTCELFallbackRule*>*)rules;
++ (NSArray<SNTCELFallbackRule*>*)deserializeArray:(NSData*)data;
 
 @end

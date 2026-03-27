@@ -20,5 +20,5 @@
  * monitoring system.
  * */
 @protocol SNTMetricWriter
-- (BOOL)write:(NSArray<NSData *> *)data toURL:(NSURL *)url error:(NSError **)error;
+- (BOOL)write:(NSArray<NSData*>*)data toURL:(NSURL*)url error:(NSError**)error;
 @end

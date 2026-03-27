@@ -31,13 +31,13 @@ using ScopedSecKeyRef = santa::ScopedCFTypeRef<SecKeyRef>;
 using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 
 @interface MOLAuthenticatingURLSession ()
-@property NSURLSessionConfiguration *sessionConfig;
-@property(copy, nonatomic) NSArray *anchors;
+@property NSURLSessionConfiguration* sessionConfig;
+@property(copy, nonatomic) NSArray* anchors;
 @end
 
 @implementation MOLAuthenticatingURLSession
 
-- (instancetype)initWithSessionConfiguration:(NSURLSessionConfiguration *)configuration {
+- (instancetype)initWithSessionConfiguration:(NSURLSessionConfiguration*)configuration {
   self = [super init];
   if (self) {
     _sessionConfig = configuration;
@@ -46,7 +46,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 }
 
 - (instancetype)init {
-  NSURLSessionConfiguration *config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+  NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
   config.TLSMinimumSupportedProtocolVersion = tls_protocol_version_TLSv12;
   config.HTTPShouldUsePipelining = YES;
   return [self initWithSessionConfiguration:config];
@@ -54,18 +54,18 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 
 #pragma mark Session Fetching
 
-- (NSURLSession *)session {
+- (NSURLSession*)session {
   return [NSURLSession sessionWithConfiguration:self.sessionConfig delegate:self delegateQueue:nil];
 }
 
 #pragma mark User Agent property
 
-- (NSString *)userAgent {
+- (NSString*)userAgent {
   return self.sessionConfig.HTTPAdditionalHeaders[@"User-Agent"];
 }
 
-- (void)setUserAgent:(NSString *)userAgent {
-  NSMutableDictionary *addlHeaders = [self.sessionConfig.HTTPAdditionalHeaders mutableCopy];
+- (void)setUserAgent:(NSString*)userAgent {
+  NSMutableDictionary* addlHeaders = [self.sessionConfig.HTTPAdditionalHeaders mutableCopy];
   if (!addlHeaders) addlHeaders = [NSMutableDictionary dictionary];
   addlHeaders[@"User-Agent"] = userAgent;
   self.sessionConfig.HTTPAdditionalHeaders = addlHeaders;
@@ -73,10 +73,10 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 
 #pragma mark Server Roots
 
-- (void)setServerRootsPemFile:(NSString *)serverRootsPemFile {
+- (void)setServerRootsPemFile:(NSString*)serverRootsPemFile {
   if (!serverRootsPemFile) return [self setServerRootsPemData:nil];
-  NSError *error;
-  NSData *rootsData = [NSData dataWithContentsOfFile:serverRootsPemFile options:0 error:&error];
+  NSError* error;
+  NSData* rootsData = [NSData dataWithContentsOfFile:serverRootsPemFile options:0 error:&error];
   if (!rootsData) {
     return [self log:@"Unable to read server root certificate file %@ with error: %@",
                      serverRootsPemFile, error.localizedDescription];
@@ -84,7 +84,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   [self setServerRootsPemData:rootsData];
 }
 
-- (void)setServerRootsPemData:(NSData *)serverRootsPemData {
+- (void)setServerRootsPemData:(NSData*)serverRootsPemData {
   if (!serverRootsPemData) {
     self.anchors = nil;
     return;
@@ -94,19 +94,19 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
                                                       encoding:NSASCIIStringEncoding]];
 }
 
-- (void)setServerRootsPemString:(NSString *)serverRootsPemString {
+- (void)setServerRootsPemString:(NSString*)serverRootsPemString {
   if (!serverRootsPemString) {
     self.anchors = nil;
     return;
   }
 
-  NSArray *certs = [MOLCertificate certificatesFromPEM:serverRootsPemString];
+  NSArray* certs = [MOLCertificate certificatesFromPEM:serverRootsPemString];
   if (!certs.count) {
     return [self log:@"Unable to read server root certificates from data %@", serverRootsPemString];
   }
   // Make a new array of the SecCertificateRef's from the MOLCertificate's.
-  NSMutableArray *certRefs = [[NSMutableArray alloc] initWithCapacity:certs.count];
-  for (MOLCertificate *cert in certs) {
+  NSMutableArray* certRefs = [[NSMutableArray alloc] initWithCapacity:certs.count];
+  for (MOLCertificate* cert in certs) {
     [certRefs addObject:(id)cert.certRef];
   }
   self.anchors = certRefs;
@@ -114,11 +114,11 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 
 #pragma mark NSURLSessionDelegate methods
 
-- (void)URLSession:(NSURLSession *)session
-    didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+- (void)URLSession:(NSURLSession*)session
+    didReceiveChallenge:(NSURLAuthenticationChallenge*)challenge
       completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition,
-                                  NSURLCredential *credential))completionHandler {
-  NSURLProtectionSpace *protectionSpace = challenge.protectionSpace;
+                                  NSURLCredential* credential))completionHandler {
+  NSURLProtectionSpace* protectionSpace = challenge.protectionSpace;
 
   if (challenge.previousFailureCount > 0) {
     completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, nil);
@@ -142,10 +142,10 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
     return;
   }
 
-  NSString *authMethod = [protectionSpace authenticationMethod];
+  NSString* authMethod = [protectionSpace authenticationMethod];
 
   if (authMethod == NSURLAuthenticationMethodClientCertificate) {
-    NSURLCredential *cred = [self clientCredentialForProtectionSpace:protectionSpace];
+    NSURLCredential* cred = [self clientCredentialForProtectionSpace:protectionSpace];
     if (cred) {
       completionHandler(NSURLSessionAuthChallengeUseCredential, cred);
       return;
@@ -155,7 +155,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
       return;
     }
   } else if (authMethod == NSURLAuthenticationMethodServerTrust) {
-    NSURLCredential *cred = [self serverCredentialForProtectionSpace:protectionSpace];
+    NSURLCredential* cred = [self serverCredentialForProtectionSpace:protectionSpace];
     if (cred) {
       completionHandler(NSURLSessionAuthChallengeUseCredential, cred);
       return;
@@ -169,11 +169,11 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
 }
 
-- (void)URLSession:(NSURLSession *)session
-                          task:(NSURLSessionTask *)task
-    willPerformHTTPRedirection:(NSHTTPURLResponse *)response
-                    newRequest:(NSURLRequest *)request
-             completionHandler:(void (^)(NSURLRequest *))completionHandler {
+- (void)URLSession:(NSURLSession*)session
+                          task:(NSURLSessionTask*)task
+    willPerformHTTPRedirection:(NSHTTPURLResponse*)response
+                    newRequest:(NSURLRequest*)request
+             completionHandler:(void (^)(NSURLRequest*))completionHandler {
   if (self.redirectHandlerBlock) {
     completionHandler(self.redirectHandlerBlock(task, response, request));
   } else if (self.refusesRedirects) {
@@ -183,9 +183,9 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   }
 }
 
-- (void)URLSession:(NSURLSession *)session
-                    task:(NSURLSessionTask *)task
-    didCompleteWithError:(NSError *)error {
+- (void)URLSession:(NSURLSession*)session
+                    task:(NSURLSessionTask*)task
+    didCompleteWithError:(NSError*)error {
   if (self.taskDidCompleteWithErrorBlock) {
     self.taskDidCompleteWithErrorBlock(session, task, error);
   }
@@ -193,9 +193,9 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 
 #pragma mark NSURLSessionDataDelegate methods
 
-- (void)URLSession:(NSURLSession *)session
-          dataTask:(NSURLSessionDataTask *)dataTask
-    didReceiveData:(NSData *)data {
+- (void)URLSession:(NSURLSession*)session
+          dataTask:(NSURLSessionDataTask*)dataTask
+    didReceiveData:(NSData*)data {
   if (self.dataTaskDidReceiveDataBlock) {
     self.dataTaskDidReceiveDataBlock(session, dataTask, data);
   }
@@ -217,10 +217,10 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 ///
 ///  If a valid identity cannot be found, returns nil.
 ///
-- (NSURLCredential *)clientCredentialForProtectionSpace:(NSURLProtectionSpace *)protectionSpace {
+- (NSURLCredential*)clientCredentialForProtectionSpace:(NSURLProtectionSpace*)protectionSpace {
   __block SecIdentityRef foundIdentity = NULL;
 
-  NSArray *allCerts;
+  NSArray* allCerts;
   if (self.clientCertFile) {
     [self log:@"[Client Trust] Using certificate from file: %@", self.clientCertFile];
     foundIdentity = [self identityFromFile:self.clientCertFile password:self.clientCertPassword];
@@ -231,8 +231,8 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
       (id)kSecReturnRef : @YES,
       (id)kSecMatchLimit : (id)kSecMatchLimitAll
     },
-                        (CFTypeRef *)&cfResults);
-    NSArray *results = CFBridgingRelease(cfResults);
+                        (CFTypeRef*)&cfResults);
+    NSArray* results = CFBridgingRelease(cfResults);
 
     allCerts = [MOLCertificate certificatesFromArray:results];
 
@@ -256,8 +256,8 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
                                        issuerOrgUnit:nil];
     } else {
       [self log:@"[Client Trust] Looking for certificate with server-provided CA names"];
-      for (NSData *allowedIssuer in protectionSpace.distinguishedNames) {
-        MOLDERDecoder *decoder = [[MOLDERDecoder alloc] initWithData:allowedIssuer];
+      for (NSData* allowedIssuer in protectionSpace.distinguishedNames) {
+        MOLDERDecoder* decoder = [[MOLDERDecoder alloc] initWithData:allowedIssuer];
 
         if (!decoder) {
           continue;
@@ -279,7 +279,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   if (foundIdentity) {
     SecCertificateRef certificate = NULL;
     SecIdentityCopyCertificate(foundIdentity, &certificate);
-    MOLCertificate *clientCert = [[MOLCertificate alloc] initWithSecCertificateRef:certificate];
+    MOLCertificate* clientCert = [[MOLCertificate alloc] initWithSecCertificateRef:certificate];
     if (certificate) CFRelease(certificate);
     if (clientCert) [self log:@"[Client Trust] Certificate: %@", clientCert];
 
@@ -287,7 +287,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
     // isn't the framework will not give us any useful feedback. So, pull the private key from the
     // identity and attempt to sign some random data with it. This is replicating what will happen
     // during the mTLS handshake.
-    auto [status, scopedPrivateKey] = ScopedSecKeyRef::AssumeFrom(^OSStatus(SecKeyRef *out) {
+    auto [status, scopedPrivateKey] = ScopedSecKeyRef::AssumeFrom(^OSStatus(SecKeyRef* out) {
       return SecIdentityCopyPrivateKey(foundIdentity, out);
     });
     if (status != errSecSuccess) {
@@ -295,8 +295,8 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
       [self log:@"[Client Trust] Failed to access private key, authentication will likely fail: %d",
                 status];
     } else {
-      NSData *dataToSign = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
-      auto [scopedDataRef, scopedErrorRef] = ScopedCFError::AssumeFrom([&](CFErrorRef *out) {
+      NSData* dataToSign = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
+      auto [scopedDataRef, scopedErrorRef] = ScopedCFError::AssumeFrom([&](CFErrorRef* out) {
         SecKeyAlgorithm algorithm = kSecKeyAlgorithmRSASignatureRaw;
         if (!SecKeyIsAlgorithmSupported(scopedPrivateKey.Unsafe(), kSecKeyOperationTypeSign,
                                         algorithm)) {
@@ -306,7 +306,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
                                                              (__bridge CFDataRef)dataToSign, out));
       });
 
-      NSError *err = scopedErrorRef.BridgeRelease<NSError *>();
+      NSError* err = scopedErrorRef.BridgeRelease<NSError*>();
       switch (err.code) {
         case errSecInteractionNotAllowed:
           [self log:@"[Client Trust] Private key is inaccessible, authentication will likely fail"];
@@ -323,9 +323,9 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
       }
     }
 
-    NSArray *intermediates = [self locateIntermediatesForCertificate:clientCert inArray:allCerts];
+    NSArray* intermediates = [self locateIntermediatesForCertificate:clientCert inArray:allCerts];
 
-    NSURLCredential *cred =
+    NSURLCredential* cred =
         [NSURLCredential credentialWithIdentity:foundIdentity
                                    certificates:(intermediates.count) ? intermediates : nil
                                     persistence:NSURLCredentialPersistenceForSession];
@@ -348,7 +348,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 ///
 ///  If the server's certificate chain does not evaluate for any reason, returns nil.
 ///
-- (NSURLCredential *)serverCredentialForProtectionSpace:(NSURLProtectionSpace *)protectionSpace {
+- (NSURLCredential*)serverCredentialForProtectionSpace:(NSURLProtectionSpace*)protectionSpace {
   if (protectionSpace.serverTrust == NULL) {
     [self log:@"[Server Trust] No trust information available"];
     return nil;
@@ -367,9 +367,9 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   }
 
   // Print details about the server's leaf certificate.
-  NSArray *certChain = CFBridgingRelease(SecTrustCopyCertificateChain(protectionSpace.serverTrust));
+  NSArray* certChain = CFBridgingRelease(SecTrustCopyCertificateChain(protectionSpace.serverTrust));
   if (certChain.firstObject) {
-    MOLCertificate *cert = [[MOLCertificate alloc]
+    MOLCertificate* cert = [[MOLCertificate alloc]
         initWithSecCertificateRef:(__bridge SecCertificateRef)certChain.firstObject];
     [self log:@"[Server Trust] Certificate: %@", cert];
   }
@@ -377,9 +377,9 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   // Evaluate the server's cert chain.
   CFErrorRef cfErrRef;
   if (!SecTrustEvaluateWithError(protectionSpace.serverTrust, &cfErrRef)) {
-    NSError *errRef = CFBridgingRelease(cfErrRef);
-    NSError *underlyingError = errRef.userInfo[NSUnderlyingErrorKey];
-    NSString *errMsg =
+    NSError* errRef = CFBridgingRelease(cfErrRef);
+    NSError* underlyingError = errRef.userInfo[NSUnderlyingErrorKey];
+    NSString* errMsg =
         CFBridgingRelease(SecCopyErrorMessageString((OSStatus)underlyingError.code, NULL));
     [self log:@"[Server Trust] Unable to evaluate certificate chain for server: %@ (%d)", errMsg,
               underlyingError.code];
@@ -394,19 +394,19 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   Given an array of MOLCertificate objects and some properties, filter the array
   repeatedly until an identity is found that fulfills the signing chain.
  */
-- (SecIdentityRef)identityByFilteringArray:(NSArray *)array
-                                commonName:(NSString *)commonName
-                          issuerCommonName:(NSString *)issuerCommonName
-                         issuerCountryName:(NSString *)issuerCountryName
-                             issuerOrgName:(NSString *)issuerOrgName
-                             issuerOrgUnit:(NSString *)issuerOrgUnit {
-  NSArray<MOLCertificate *> *sortedCerts = [self filterAndSortArray:array
-                                                         commonName:commonName
-                                                   issuerCommonName:issuerCommonName
-                                                  issuerCountryName:issuerCountryName
-                                                      issuerOrgName:issuerOrgName
-                                                      issuerOrgUnit:issuerOrgUnit];
-  for (MOLCertificate *cert in sortedCerts) {
+- (SecIdentityRef)identityByFilteringArray:(NSArray*)array
+                                commonName:(NSString*)commonName
+                          issuerCommonName:(NSString*)issuerCommonName
+                         issuerCountryName:(NSString*)issuerCountryName
+                             issuerOrgName:(NSString*)issuerOrgName
+                             issuerOrgUnit:(NSString*)issuerOrgUnit {
+  NSArray<MOLCertificate*>* sortedCerts = [self filterAndSortArray:array
+                                                        commonName:commonName
+                                                  issuerCommonName:issuerCommonName
+                                                 issuerCountryName:issuerCountryName
+                                                     issuerOrgName:issuerOrgName
+                                                     issuerOrgUnit:issuerOrgUnit];
+  for (MOLCertificate* cert in sortedCerts) {
     SecIdentityRef identityRef = NULL;
     OSStatus status = SecIdentityCreateWithCertificate(NULL, cert.certRef, &identityRef);
     if (status == errSecSuccess) {
@@ -432,13 +432,13 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   return NULL;
 }
 
-- (NSArray<MOLCertificate *> *)filterAndSortArray:(NSArray<MOLCertificate *> *)array
-                                       commonName:(NSString *)commonName
-                                 issuerCommonName:(NSString *)issuerCommonName
-                                issuerCountryName:(NSString *)issuerCountryName
-                                    issuerOrgName:(NSString *)issuerOrgName
-                                    issuerOrgUnit:(NSString *)issuerOrgUnit {
-  NSMutableArray *predicates = [NSMutableArray arrayWithCapacity:5];
+- (NSArray<MOLCertificate*>*)filterAndSortArray:(NSArray<MOLCertificate*>*)array
+                                     commonName:(NSString*)commonName
+                               issuerCommonName:(NSString*)issuerCommonName
+                              issuerCountryName:(NSString*)issuerCountryName
+                                  issuerOrgName:(NSString*)issuerOrgName
+                                  issuerOrgUnit:(NSString*)issuerOrgUnit {
+  NSMutableArray* predicates = [NSMutableArray arrayWithCapacity:5];
 
   if (commonName) {
     [predicates addObject:[NSPredicate predicateWithFormat:@"SELF.commonName == %@", commonName]];
@@ -460,30 +460,30 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
         addObject:[NSPredicate predicateWithFormat:@"SELF.issuerOrgUnit == %@", issuerOrgUnit]];
   }
 
-  NSCompoundPredicate *andPreds = [NSCompoundPredicate andPredicateWithSubpredicates:predicates];
+  NSCompoundPredicate* andPreds = [NSCompoundPredicate andPredicateWithSubpredicates:predicates];
 
-  NSArray<MOLCertificate *> *filteredCerts = [array filteredArrayUsingPredicate:andPreds];
+  NSArray<MOLCertificate*>* filteredCerts = [array filteredArrayUsingPredicate:andPreds];
   if (!filteredCerts.count) return nil;
 
-  return [filteredCerts sortedArrayUsingComparator:^(MOLCertificate *obj1, MOLCertificate *obj2) {
+  return [filteredCerts sortedArrayUsingComparator:^(MOLCertificate* obj1, MOLCertificate* obj2) {
     return [obj2.validFrom compare:obj1.validFrom];
   }];
 }
 
-- (SecIdentityRef)identityFromFile:(NSString *)file password:(NSString *)password {
-  NSError *error;
-  NSData *data = [NSData dataWithContentsOfFile:file options:0 error:&error];
+- (SecIdentityRef)identityFromFile:(NSString*)file password:(NSString*)password {
+  NSError* error;
+  NSData* data = [NSData dataWithContentsOfFile:file options:0 error:&error];
   if (error) {
     [self log:@"[Client Trust] Couldn't open client certificate %@: %@", self.clientCertFile,
               [error localizedDescription]];
     return nil;
   }
 
-  NSDictionary *options = (password ? @{(__bridge id)kSecImportExportPassphrase : password} : @{});
+  NSDictionary* options = (password ? @{(__bridge id)kSecImportExportPassphrase : password} : @{});
   CFArrayRef cfIdentities;
   OSStatus err =
       SecPKCS12Import((__bridge CFDataRef)data, (__bridge CFDictionaryRef)options, &cfIdentities);
-  NSArray *identities = CFBridgingRelease(cfIdentities);
+  NSArray* identities = CFBridgingRelease(cfIdentities);
 
   if (err != errSecSuccess) {
     [self log:@"[Client Trust] Couldn't load client certificate %@: %d", self.clientCertFile, err];
@@ -491,20 +491,20 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   }
 
   return (SecIdentityRef)CFBridgingRetain(
-      identities.firstObject[(__bridge NSString *)kSecImportItemIdentity]);
+      identities.firstObject[(__bridge NSString*)kSecImportItemIdentity]);
 }
 
 // For servers that require the intermediate certificate to be presented when
 // using a client certificate, this method will attempt to locate those
 // intermediates in the keychain. If the intermediate certificate is not in
 // the keychain an empty array will be presented instead.
-- (NSArray *)locateIntermediatesForCertificate:(MOLCertificate *)leafCert
-                                       inArray:(NSArray<MOLCertificate *> *)certs {
-  auto [res, scopedTrust] = ScopedSecTrustRef::AssumeFrom(^OSStatus(SecTrustRef *out) {
+- (NSArray*)locateIntermediatesForCertificate:(MOLCertificate*)leafCert
+                                      inArray:(NSArray<MOLCertificate*>*)certs {
+  auto [res, scopedTrust] = ScopedSecTrustRef::AssumeFrom(^OSStatus(SecTrustRef* out) {
     return SecTrustCreateWithCertificates(leafCert.certRef, NULL, out);
   });
   if (res != errSecSuccess) {
-    NSString *errMsg = CFBridgingRelease(SecCopyErrorMessageString(res, NULL));
+    NSString* errMsg = CFBridgingRelease(SecCopyErrorMessageString(res, NULL));
     [self log:@"[Client Trust] Failed to create trust for locating intermediate certs: %@", errMsg];
     return nil;
   }
@@ -516,16 +516,16 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   // SecTrustEvaluateWithError first.
   (void)SecTrustEvaluateWithError(scopedTrust.Unsafe(), NULL);
 
-  NSMutableArray *certChain = CFBridgingRelease(SecTrustCopyCertificateChain(scopedTrust.Unsafe()));
+  NSMutableArray* certChain = CFBridgingRelease(SecTrustCopyCertificateChain(scopedTrust.Unsafe()));
   if (certChain.count < 2) return nil;
   return [certChain subarrayWithRange:NSMakeRange(1, certChain.count - 1)];
 }
 
-- (void)log:(NSString *)format, ... {
+- (void)log:(NSString*)format, ... {
   if (self.loggingBlock) {
     va_list args;
     va_start(args, format);
-    NSString *line = [[NSString alloc] initWithFormat:format arguments:args];
+    NSString* line = [[NSString alloc] initWithFormat:format arguments:args];
     va_end(args);
     self.loggingBlock(line);
   }

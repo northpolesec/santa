@@ -27,7 +27,7 @@
   struct stat sb = MakeStat();
   es_file_t file = MakeESFile("foo", sb);
 
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] initWithEndpointSecurityFile:&file];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithEndpointSecurityFile:&file];
 
   XCTAssertEqual(sb.st_ino, cd.vnodeId.fileid);
   XCTAssertEqual(sb.st_dev, cd.vnodeId.fsid);

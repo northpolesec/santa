@@ -21,12 +21,12 @@
 // These events should never get dropped due to a conflict. E.g., if a session is refreshed
 // multiple times, each refresh should be reported. This property will be used to compute a
 // random UUID on each instatiation to prevent caching.
-@property(readonly) NSUUID *uniqueUuid;
+@property(readonly) NSUUID* uniqueUuid;
 @end
 
 @implementation SNTStoredTemporaryMonitorModeEnterAuditEvent
 
-- (instancetype)initWithUUID:(NSString *)uuid
+- (instancetype)initWithUUID:(NSString*)uuid
                      seconds:(uint32_t)seconds
                       reason:(SNTTemporaryMonitorModeEnterReason)reason {
   self = [super initWithUUID:uuid];
@@ -41,13 +41,13 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE_BOXABLE(coder, reason);
   ENCODE_BOXABLE(coder, seconds);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE_SELECTOR(decoder, reason, NSNumber, integerValue);
@@ -56,7 +56,7 @@
   return self;
 }
 
-- (NSString *)uniqueID {
+- (NSString*)uniqueID {
   return [self.uniqueUuid UUIDString];
 }
 
@@ -69,7 +69,7 @@
 
 @implementation SNTStoredTemporaryMonitorModeLeaveAuditEvent
 
-- (instancetype)initWithUUID:(NSString *)uuid reason:(SNTTemporaryMonitorModeLeaveReason)reason {
+- (instancetype)initWithUUID:(NSString*)uuid reason:(SNTTemporaryMonitorModeLeaveReason)reason {
   self = [super initWithUUID:uuid];
   if (self) {
     _reason = reason;
@@ -81,12 +81,12 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE_BOXABLE(coder, reason);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE_SELECTOR(decoder, reason, NSNumber, integerValue);
@@ -94,7 +94,7 @@
   return self;
 }
 
-- (NSString *)uniqueID {
+- (NSString*)uniqueID {
   return [self.uniqueUuid UUIDString];
 }
 
@@ -112,7 +112,7 @@
 // for these methods will throw, making it so attempting to instantiate this is not very useful.
 @implementation SNTStoredTemporaryMonitorModeAuditEvent
 
-- (instancetype)initWithUUID:(NSString *)uuid {
+- (instancetype)initWithUUID:(NSString*)uuid {
   self = [super init];
   if (self) {
     _uuid = uuid;
@@ -125,13 +125,13 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, uuid);
   ENCODE(coder, uniqueUuid);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, uuid, NSString);

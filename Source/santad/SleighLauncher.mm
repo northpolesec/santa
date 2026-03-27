@@ -43,7 +43,7 @@ std::unique_ptr<SleighLauncher> SleighLauncher::Create(std::string sleigh_path) 
 
 SleighLauncher::SleighLauncher(std::string sleigh_path) : sleigh_path_(std::move(sleigh_path)) {}
 
-absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
+absl::Status SleighLauncher::Launch(const std::vector<std::string>& input_files,
                                     uint32_t timeout_secs) {
   if (access(sleigh_path_.c_str(), X_OK) != 0) {
     return absl::NotFoundError("Sleigh binary not executable: " + sleigh_path_);
@@ -57,7 +57,7 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
     }
   };
 
-  for (const auto &file : input_files) {
+  for (const auto& file : input_files) {
     int fd = open(file.c_str(), O_RDONLY);
     if (fd < 0) {
       LOGD(@"SleighLauncher::Launch(): Failed to open input file: %s", file.c_str());
@@ -81,8 +81,8 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   }
 
   // Phase 4: Code signature check (ObjC, must happen before fork)
-  NSString *sleighNSPath = StringToNSString(sleigh_path_);
-  MOLCodesignChecker *csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleighNSPath];
+  NSString* sleighNSPath = StringToNSString(sleigh_path_);
+  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleighNSPath];
   if (!csc || ![csc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
       csc.signatureFlags & kSecCodeSignatureAdhoc) {
     LOGD(@"SleighLauncher::Launch(): Sleigh code signature is invalid");
@@ -94,8 +94,8 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   }
 
   // Phase 5: Prepare argv (before fork, no ObjC in child)
-  const char *sleigh_path_cstr = sleigh_path_.c_str();
-  const char *argv[] = {sleigh_path_cstr, nullptr};
+  const char* sleigh_path_cstr = sleigh_path_.c_str();
+  const char* argv[] = {sleigh_path_cstr, nullptr};
 
   // Phase 6: fork
   pid_t pid = fork();
@@ -120,7 +120,7 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
     }
 
     // exec sleigh
-    execv(sleigh_path_cstr, const_cast<char *const *>(argv));
+    execv(sleigh_path_cstr, const_cast<char* const*>(argv));
     _exit(127);
   }
 
@@ -130,7 +130,7 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   std::move(close_fds).Invoke();            // Close input FDs (child inherited copies)
 
   // Write serialized config to stdin pipe
-  const char *data = serialized->data();
+  const char* data = serialized->data();
   size_t remaining = serialized->size();
   bool write_failed = false;
   while (remaining > 0) {
@@ -186,12 +186,12 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string> &input_files,
   return absl::OkStatus();
 }
 
-absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<int> &input_fds) {
+absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<int>& input_fds) {
   // Build the SleighConfig protobuf
   ::santa::telemetry::v1::SleighConfig config;
-  NSString *machineID = [[SNTConfigurator configurator] machineID];
+  NSString* machineID = [[SNTConfigurator configurator] machineID];
   config.set_host_id(machineID ? [machineID UTF8String] : "");
-  NSString *hostName = [SNTSystemInfo longHostname];
+  NSString* hostName = [SNTSystemInfo longHostname];
   std::string host_name = hostName ? [hostName UTF8String] : "";
   config.set_host_name(host_name);
 
@@ -199,23 +199,23 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<in
     config.add_input_fds(fd);
   }
 
-  NSArray<NSString *> *filterExpressions =
+  NSArray<NSString*>* filterExpressions =
       [[SNTConfigurator configurator] telemetryFilterExpressions];
-  for (NSString *expr in filterExpressions) {
+  for (NSString* expr in filterExpressions) {
     config.add_filter_expressions([expr UTF8String]);
   }
 
   // Convert export config to parameters for sleigh
-  SNTExportConfiguration *exportConfig = [[SNTConfigurator configurator] exportConfig];
+  SNTExportConfiguration* exportConfig = [[SNTConfigurator configurator] exportConfig];
   if (!exportConfig) {
     return absl::InvalidArgumentError("Export configuration is nil");
   }
 
-  auto *export_config = config.mutable_export_config();
-  auto *signed_post = export_config->mutable_signed_post();
+  auto* export_config = config.mutable_export_config();
+  auto* signed_post = export_config->mutable_signed_post();
   signed_post->set_url([[exportConfig.url absoluteString] UTF8String]);
   [exportConfig.formValues
-      enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
+      enumerateKeysAndObjectsUsingBlock:^(NSString* key, id value, BOOL* stop) {
         if (![value isKindOfClass:[NSString class]]) return;
         (*signed_post->mutable_form_values())[[key UTF8String]] = [value UTF8String];
       }];

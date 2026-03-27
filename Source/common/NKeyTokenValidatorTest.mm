@@ -150,21 +150,21 @@ static NSString *const kUntrustedUserJWT =
 }
 
 - (void)testTamperedAccountSignature {
-  NSString *tampered = [NSString
+  NSString* tampered = [NSString
       stringWithFormat:@"%@X", [kValidAccountJWT substringToIndex:kValidAccountJWT.length - 1]];
   XCTAssertFalse(santa::NKeyTokenValidator(kTrustedNKeys, tampered, kValidUserJWT).Validate());
 }
 
 - (void)testUnknownAccountIssuer {
-  NSDictionary *fakePayload = @{@"iss" : @"OAUNKNOWNFAKEKEY1234567890ABCDEFGHIJKLMNOPQRST"};
-  NSData *payloadData = [NSJSONSerialization dataWithJSONObject:fakePayload options:0 error:nil];
+  NSDictionary* fakePayload = @{@"iss" : @"OAUNKNOWNFAKEKEY1234567890ABCDEFGHIJKLMNOPQRST"};
+  NSData* payloadData = [NSJSONSerialization dataWithJSONObject:fakePayload options:0 error:nil];
 
-  NSString *payloadB64 = [payloadData base64EncodedStringWithOptions:0];
+  NSString* payloadB64 = [payloadData base64EncodedStringWithOptions:0];
   payloadB64 = [payloadB64 stringByReplacingOccurrencesOfString:@"+" withString:@"-"];
   payloadB64 = [payloadB64 stringByReplacingOccurrencesOfString:@"/" withString:@"_"];
   payloadB64 = [payloadB64 stringByReplacingOccurrencesOfString:@"=" withString:@""];
 
-  NSString *fakeJWT = [NSString
+  NSString* fakeJWT = [NSString
       stringWithFormat:@"eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.%@.%@", payloadB64,
                        @"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                        @"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"];
@@ -184,7 +184,7 @@ static NSString *const kUntrustedUserJWT =
 }
 
 - (void)testUserJWTTamperedSignature {
-  NSString *tampered =
+  NSString* tampered =
       [NSString stringWithFormat:@"%@X", [kValidUserJWT substringToIndex:kValidUserJWT.length - 1]];
   XCTAssertFalse(santa::NKeyTokenValidator(kTrustedNKeys, kValidAccountJWT, tampered).Validate());
 }

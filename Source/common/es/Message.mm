@@ -24,30 +24,30 @@
 
 namespace santa {
 
-static inline std::string Path(const es_file_t *esFile) {
+static inline std::string Path(const es_file_t* esFile) {
   return std::string(esFile->path.data, esFile->path.length);
 }
 
-static inline std::string Path(const es_string_token_t &tok) {
+static inline std::string Path(const es_string_token_t& tok) {
   return std::string(tok.data, tok.length);
 }
 
-static inline void PushBackIfNotTruncated(std::vector<Message::PathTarget> &vec,
-                                          const es_file_t *esFile, bool isReadable = false) {
+static inline void PushBackIfNotTruncated(std::vector<Message::PathTarget>& vec,
+                                          const es_file_t* esFile, bool isReadable = false) {
   if (!esFile->path_truncated) {
     vec.push_back({Path(esFile), isReadable, esFile});
   }
 }
 
 // Note: This variant of PushBackIfNotTruncated can never be marked "is_readable"
-static inline void PushBackIfNotTruncated(std::vector<Message::PathTarget> &vec,
-                                          const es_file_t *dir, const es_string_token_t &name) {
+static inline void PushBackIfNotTruncated(std::vector<Message::PathTarget>& vec,
+                                          const es_file_t* dir, const es_string_token_t& name) {
   if (!dir->path_truncated) {
     vec.push_back({Path(dir) + "/" + Path(name), false, nullptr});
   }
 }
 
-Message::Message(std::shared_ptr<EndpointSecurityAPI> esapi, const es_message_t *es_msg)
+Message::Message(std::shared_ptr<EndpointSecurityAPI> esapi, const es_message_t* es_msg)
     : esapi_(std::move(esapi)), es_msg_(es_msg), process_token_(std::nullopt) {
   esapi_->RetainMessage(es_msg);
 }
@@ -58,7 +58,7 @@ Message::~Message() {
   }
 }
 
-Message::Message(Message &&other) {
+Message::Message(Message&& other) {
   esapi_ = std::move(other.esapi_);
   es_msg_ = other.es_msg_;
   path_targets_ = std::move(other.path_targets_);
@@ -67,7 +67,7 @@ Message::Message(Message &&other) {
   other.process_token_ = std::nullopt;
 }
 
-Message::Message(const Message &other) {
+Message::Message(const Message& other) {
   esapi_ = other.esapi_;
   es_msg_ = other.es_msg_;
   esapi_->RetainMessage(es_msg_);
@@ -98,7 +98,7 @@ std::string Message::GetProcessName(pid_t pid) const {
   }
 }
 
-std::string Message::GetProcessPath(audit_token_t *tok) const {
+std::string Message::GetProcessPath(audit_token_t* tok) const {
   char path_buf[MAXPATHLEN] = {};
   if (proc_pidpath_audittoken(tok, path_buf, sizeof(path_buf)) > 0) {
     return std::string(path_buf);

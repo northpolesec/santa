@@ -20,6 +20,6 @@
 
 @interface SNTSyncEventUpload : SNTSyncStage
 
-- (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events;
+- (BOOL)uploadEvents:(NSArray<SNTStoredEvent*>*)events;
 
 @end

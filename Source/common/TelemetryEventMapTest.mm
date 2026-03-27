@@ -66,7 +66,7 @@ using santa::TelemetryEvent;
       {"everything", TelemetryEvent::kEverything},
   };
 
-  for (const auto &[event_name, want] : eventNameToMask) {
+  for (const auto& [event_name, want] : eventNameToMask) {
     TelemetryEvent got =
         TelemetryConfigToBitmask(@[ [NSString stringWithUTF8String:event_name.data()] ]);
     XCTAssertEqual(got, want);

@@ -18,8 +18,8 @@
 
 @implementation SNTNetworkMountMessageWindowController
 
-- (instancetype)initWithEvent:(SNTStoredNetworkMountEvent *)event
-                 configBundle:(SNTConfigBundle *)configBundle {
+- (instancetype)initWithEvent:(SNTStoredNetworkMountEvent*)event
+                 configBundle:(SNTConfigBundle*)configBundle {
   self = [super init];
   if (self) {
     _event = event;
@@ -45,7 +45,7 @@
   [super showWindow:sender];
 }
 
-- (NSString *)messageHash {
+- (NSString*)messageHash {
   return self.event.mountFromName;
 }
 

@@ -19,7 +19,7 @@
 
 namespace santa {
 
-static NSArray<NSString *> *const kPinnedDomains = @[
+static NSArray<NSString*>* const kPinnedDomains = @[
   @".workshop.cloud",
   @".north-pole.tech",
 #ifdef DEBUG
@@ -27,15 +27,15 @@ static NSArray<NSString *> *const kPinnedDomains = @[
 #endif
 ];
 
-bool IsDomainPinned(NSURL *url) {
+bool IsDomainPinned(NSURL* url) {
   if (!url.host.length) {
     return false;
   }
 
-  NSString *host = url.host;
+  NSString* host = url.host;
 
   // Check if the given host or host suffix matches a pinned domain
-  for (NSString *domain in kPinnedDomains) {
+  for (NSString* domain in kPinnedDomains) {
     if ([host hasSuffix:domain]) {
       return true;
     }
@@ -44,7 +44,7 @@ bool IsDomainPinned(NSURL *url) {
   return false;
 }
 
-NSString *PinnedCertPEMs() {
+NSString* PinnedCertPEMs() {
   return
       // Issuer: C=US, O=Amazon, CN=Amazon Root CA 1
       // Fingerprint: 8ecde6884f3d87b1125ba31ac3fcb13d7016de7f57cc904fe1cb97c6ae98196e

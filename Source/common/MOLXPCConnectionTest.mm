@@ -41,8 +41,8 @@
 
 @implementation MOLXPCConnectionTest
 
-- (NSXPCInterface *)deepThoughtInterface {
-  static NSXPCInterface *interface;
+- (NSXPCInterface*)deepThoughtInterface {
+  static NSXPCInterface* interface;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     interface = [NSXPCInterface interfaceWithProtocol:@protocol(DeepThoughtProtocol)];
@@ -59,7 +59,7 @@
   OCMStub([mockConnection alloc]).andReturn(mockConnection);
   OCMExpect([mockConnection initWithMachServiceName:@"Client" options:0]).andReturn(mockConnection);
 
-  MOLXPCConnection *sut = [[MOLXPCConnection alloc] initClientWithName:@"Client" privileged:NO];
+  MOLXPCConnection* sut = [[MOLXPCConnection alloc] initClientWithName:@"Client" privileged:NO];
   XCTAssertNotNil(sut);
 
   OCMExpect([mockConnection initWithMachServiceName:@"Client" options:NSXPCConnectionPrivileged])
@@ -75,7 +75,7 @@
   id mockListener = OCMClassMock([NSXPCListener class]);
   OCMStub([mockListener alloc]).andReturn(mockListener);
   OCMExpect([mockListener initWithMachServiceName:@"TestServer"]).andReturn(mockListener);
-  MOLXPCConnection *sut = [[MOLXPCConnection alloc] initServerWithName:@"TestServer"];
+  MOLXPCConnection* sut = [[MOLXPCConnection alloc] initServerWithName:@"TestServer"];
   XCTAssertNotNil(sut);
   OCMVerifyAll(mockListener);
   [mockListener stopMocking];
@@ -88,15 +88,15 @@
   OCMExpect([mockCodesignChecker initWithPID:pid]).andReturn(mockCodesignChecker);
   OCMExpect([mockCodesignChecker signingInformationMatches:OCMOCK_ANY]).andReturn(NO);
 
-  NSXPCListener *listener = [NSXPCListener anonymousListener];
+  NSXPCListener* listener = [NSXPCListener anonymousListener];
 
-  MOLXPCConnection *sutServer = [[MOLXPCConnection alloc] initServerWithListener:listener];
+  MOLXPCConnection* sutServer = [[MOLXPCConnection alloc] initServerWithListener:listener];
   sutServer.unprivilegedInterface =
       [NSXPCInterface interfaceWithProtocol:@protocol(DummyXPCProtocol)];
   [sutServer resume];
 
-  __block XCTestExpectation *exp1 = [self expectationWithDescription:@"Client Invalidated"];
-  MOLXPCConnection *sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint];
+  __block XCTestExpectation* exp1 = [self expectationWithDescription:@"Client Invalidated"];
+  MOLXPCConnection* sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint];
   sutClient.invalidationHandler = ^{
     [exp1 fulfill];
     exp1 = nil;  // precent multiple fulfill violation
@@ -109,10 +109,10 @@
 }
 
 - (void)testConnectionAcceptance {
-  NSXPCListener *listener = [NSXPCListener anonymousListener];
+  NSXPCListener* listener = [NSXPCListener anonymousListener];
 
-  XCTestExpectation *exp1 = [self expectationWithDescription:@"Server Accepted"];
-  MOLXPCConnection *sutServer = [[MOLXPCConnection alloc] initServerWithListener:listener];
+  XCTestExpectation* exp1 = [self expectationWithDescription:@"Server Accepted"];
+  MOLXPCConnection* sutServer = [[MOLXPCConnection alloc] initServerWithListener:listener];
   sutServer.unprivilegedInterface =
       [NSXPCInterface interfaceWithProtocol:@protocol(DummyXPCProtocol)];
   sutServer.acceptedHandler = ^{
@@ -120,8 +120,8 @@
   };
   [sutServer resume];
 
-  XCTestExpectation *exp2 = [self expectationWithDescription:@"Client Accepted"];
-  MOLXPCConnection *sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint];
+  XCTestExpectation* exp2 = [self expectationWithDescription:@"Client Accepted"];
+  MOLXPCConnection* sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint];
   sutClient.acceptedHandler = ^{
     [exp2 fulfill];
   };
@@ -131,14 +131,14 @@
 }
 
 - (void)testConnectionInterruption {
-  NSXPCListener *listener = [NSXPCListener anonymousListener];
-  MOLXPCConnection *sutServer = [[MOLXPCConnection alloc] initServerWithListener:listener];
+  NSXPCListener* listener = [NSXPCListener anonymousListener];
+  MOLXPCConnection* sutServer = [[MOLXPCConnection alloc] initServerWithListener:listener];
   sutServer.unprivilegedInterface =
       [NSXPCInterface interfaceWithProtocol:@protocol(DummyXPCProtocol)];
   [sutServer resume];
 
-  __block XCTestExpectation *exp1 = [self expectationWithDescription:@"Client Invalidated"];
-  MOLXPCConnection *sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint];
+  __block XCTestExpectation* exp1 = [self expectationWithDescription:@"Client Invalidated"];
+  MOLXPCConnection* sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint];
   sutClient.invalidationHandler = ^{
     [exp1 fulfill];
     exp1 = nil;  // prevent multiple fulfill violation
@@ -152,14 +152,14 @@
 }
 
 - (void)testSynchronous {
-  NSXPCListener *listener = [NSXPCListener anonymousListener];
-  MOLXPCConnection *sutServer = [[MOLXPCConnection alloc] initServerWithListener:listener];
+  NSXPCListener* listener = [NSXPCListener anonymousListener];
+  MOLXPCConnection* sutServer = [[MOLXPCConnection alloc] initServerWithListener:listener];
   sutServer.unprivilegedInterface = [self deepThoughtInterface];
   sutServer.exportedObject = [[DeepThought alloc] init];
   [sutServer resume];
 
   __block int answer = 0;
-  MOLXPCConnection *sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint];
+  MOLXPCConnection* sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint];
   sutClient.remoteInterface = [self deepThoughtInterface];
   [sutClient resume];
   [[sutClient synchronousRemoteObjectProxy] theAnswerToLifeTheUniverseAndEverything:^(int reply) {

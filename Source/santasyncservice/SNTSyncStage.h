@@ -21,16 +21,16 @@
 
 @interface SNTSyncStage : NSObject
 
-@property(readonly, nonnull) NSURLSession *urlSession;
-@property(readonly, nonnull) SNTSyncState *syncState;
-@property(readonly, nonnull) MOLXPCConnection *daemonConn;
+@property(readonly, nonnull) NSURLSession* urlSession;
+@property(readonly, nonnull) SNTSyncState* syncState;
+@property(readonly, nonnull) MOLXPCConnection* daemonConn;
 
 /**
   Initialize this stage. Designated initializer.
 
   @param state A holder for state used across requests
 */
-- (nullable instancetype)initWithState:(nonnull SNTSyncState *)state NS_DESIGNATED_INITIALIZER;
+- (nullable instancetype)initWithState:(nonnull SNTSyncState*)state NS_DESIGNATED_INITIALIZER;
 
 - (nullable instancetype)init NS_UNAVAILABLE;
 
@@ -46,7 +46,7 @@
 
   @return The NSURL for this stage.
 */
-- (nonnull NSURL *)stageURL;
+- (nonnull NSURL*)stageURL;
 
 #pragma mark Internal Helpers
 
@@ -57,7 +57,7 @@
 
   @param dictionary The values to POST to the server.
 */
-- (nullable NSMutableURLRequest *)requestWithMessage:(nullable google::protobuf::Message *)message;
+- (nullable NSMutableURLRequest*)requestWithMessage:(nullable google::protobuf::Message*)message;
 
 /**
   Perform the passed in request and attempt to parse the response as JSON into the provided protobuf
@@ -69,9 +69,9 @@
 
   @return An error if performing the request failed.
 */
-- (nullable NSError *)performRequest:(nonnull NSURLRequest *)request
-                         intoMessage:(nullable google::protobuf::Message *)message
-                             timeout:(NSTimeInterval)timeout;
+- (nullable NSError*)performRequest:(nonnull NSURLRequest*)request
+                        intoMessage:(nullable google::protobuf::Message*)message
+                            timeout:(NSTimeInterval)timeout;
 #endif
 
 @end

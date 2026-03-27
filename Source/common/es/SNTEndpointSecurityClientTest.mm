@@ -48,10 +48,10 @@ using santa::WatchItemPathType;
 @interface SNTEndpointSecurityClient (Testing)
 - (void)establishClientOrDie;
 - (bool)muteSelf;
-- (NSString *)errorMessageForNewClientResult:(es_new_client_result_t)result;
-- (void)handleMessage:(Message &&)esMsg
+- (NSString*)errorMessageForNewClientResult:(es_new_client_result_t)result;
+- (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(santa::EventDisposition disposition))recordEventMetrics;
-- (BOOL)shouldHandleMessage:(const Message &)esMsg;
+- (BOOL)shouldHandleMessage:(const Message&)esMsg;
 - (int64_t)computeBudgetForDeadline:(uint64_t)deadline currentTime:(uint64_t)currentTime;
 
 @property(nonatomic) double defaultBudget;
@@ -73,7 +73,7 @@ using santa::WatchItemPathType;
       .WillOnce(testing::Return(Client()))
       .WillOnce(testing::Return(Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -98,13 +98,13 @@ using santa::WatchItemPathType;
       {(es_new_client_result_t)123, "Unknown error"},
   };
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:nullptr
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
 
-  for (const auto &kv : resultMessagePairs) {
-    NSString *message = [client errorMessageForNewClientResult:kv.first];
+  for (const auto& kv : resultMessagePairs) {
+    NSString* message = [client errorMessageForNewClientResult:kv.first];
     XCTAssertEqual(0, strcmp([(message ?: @"") UTF8String], kv.second.c_str()));
   }
 }
@@ -115,7 +115,7 @@ using santa::WatchItemPathType;
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -142,7 +142,7 @@ using santa::WatchItemPathType;
   id mockConfigurator = OCMStrictClassMock([SNTConfigurator class]);
   OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -191,7 +191,7 @@ using santa::WatchItemPathType;
 
 - (void)testMuteSelf {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -208,7 +208,7 @@ using santa::WatchItemPathType;
 
 - (void)testClearCache {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -226,7 +226,7 @@ using santa::WatchItemPathType;
 
 - (void)testSubscribe {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -249,7 +249,7 @@ using santa::WatchItemPathType;
 
 - (void)testSubscribeAndClearCache {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -269,7 +269,7 @@ using santa::WatchItemPathType;
 
 - (void)testUnsubscribeAll {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -287,7 +287,7 @@ using santa::WatchItemPathType;
 
 - (void)testUnmuteAllTargetPaths {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -305,7 +305,7 @@ using santa::WatchItemPathType;
 
 - (void)testEnableTargetPathWatching {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -326,7 +326,7 @@ using santa::WatchItemPathType;
 
 - (void)testMuteTargetPaths {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -356,7 +356,7 @@ using santa::WatchItemPathType;
 
 - (void)testUnmuteTargetPaths {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -402,7 +402,7 @@ using santa::WatchItemPathType;
   EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, result, cacheable))
       .WillOnce(testing::Return(true));
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -424,7 +424,7 @@ using santa::WatchItemPathType;
 
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -463,7 +463,7 @@ using santa::WatchItemPathType;
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -489,7 +489,7 @@ using santa::WatchItemPathType;
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -514,7 +514,7 @@ using santa::WatchItemPathType;
 - (void)testComputeBudgetForDeadlineCurrentTime {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];
@@ -590,7 +590,7 @@ using santa::WatchItemPathType;
 
   OCMExpect([mockConfigurator failClosed]).andReturn(shouldFailClosed);
 
-  SNTEndpointSecurityClient *client =
+  SNTEndpointSecurityClient* client =
       [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
                                                metrics:nullptr
                                              processor:Processor::kUnknown];

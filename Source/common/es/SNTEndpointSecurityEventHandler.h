@@ -28,7 +28,7 @@
 
 // Called Synchronously and serially for each message provided by the
 // EndpointSecurity framework.
-- (void)handleMessage:(santa::Message &&)esMsg
+- (void)handleMessage:(santa::Message&&)esMsg
     recordEventMetrics:(void (^)(santa::EventDisposition))recordEventMetrics;
 
 // Called after Santa has finished initializing itself.
@@ -40,8 +40,8 @@
 /// Base protocol for FAA-related clients
 @protocol SNTFileAccessAuthorizer <NSObject>
 
-typedef void (^SNTFileAccessDeniedBlock)(SNTStoredFileAccessEvent *event, NSString *customMsg,
-                                         NSString *customURL, NSString *customText);
+typedef void (^SNTFileAccessDeniedBlock)(SNTStoredFileAccessEvent* event, NSString* customMsg,
+                                         NSString* customURL, NSString* customText);
 
 @property SNTFileAccessDeniedBlock fileAccessDeniedBlock;
 
@@ -52,8 +52,8 @@ typedef void (^SNTFileAccessDeniedBlock)(SNTStoredFileAccessEvent *event, NSStri
 @protocol SNTDataFileAccessAuthorizer <SNTFileAccessAuthorizer>
 
 - (void)watchItemsCount:(size_t)count
-               newPaths:(const santa::SetPairPathAndType &)newPaths
-           removedPaths:(const santa::SetPairPathAndType &)removedPaths;
+               newPaths:(const santa::SetPairPathAndType&)newPaths
+           removedPaths:(const santa::SetPairPathAndType&)removedPaths;
 
 @end
 
@@ -76,6 +76,6 @@ enum class ProbeInterest {
 
 @protocol SNTEndpointSecurityProbe <NSObject>
 
-- (santa::ProbeInterest)probeInterest:(const santa::Message &)esMsg;
+- (santa::ProbeInterest)probeInterest:(const santa::Message&)esMsg;
 
 @end

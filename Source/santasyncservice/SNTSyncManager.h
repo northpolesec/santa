@@ -36,7 +36,7 @@
 ///
 ///  @param daemonConn A connection to santad.
 ///
-- (instancetype)initWithDaemonConnection:(MOLXPCConnection *)daemonConn NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithDaemonConnection:(MOLXPCConnection*)daemonConn NS_DESIGNATED_INITIALIZER;
 
 ///
 ///  Perform a sync immediately. Non-blocking.
@@ -68,13 +68,13 @@
 ///
 ///  Handle SNTSyncServiceXPC messages forwarded from SNTSyncService.
 ///
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events reply:(void (^)(BOOL))reply;
-- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent*>*)events reply:(void (^)(BOOL))reply;
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
-- (void)pushNotificationServerAddress:(void (^)(NSString *))reply;
+- (void)pushNotificationServerAddress:(void (^)(NSString*))reply;
 - (void)pushNotificationReconnect;
-- (void)publishMetrics:(NSDictionary *)metrics reply:(void (^)(BOOL))reply;
-- (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString *description))reply;
+- (void)publishMetrics:(NSDictionary*)metrics reply:(void (^)(BOOL))reply;
+- (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString* description))reply;
 
 @end

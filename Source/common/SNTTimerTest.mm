@@ -24,7 +24,7 @@
 @implementation SNTTimerTest
 
 - (void)testInitWithNoName {
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:nil
                                               fireOnStart:YES
@@ -62,7 +62,7 @@
 }
 
 - (void)testStartStopIsStarted {
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -82,7 +82,7 @@
 }
 
 - (void)testStopWhenNotStarted {
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -102,7 +102,7 @@
   // Start with a higher interval, and ensure it fires after one cycle.
   // Start again with s shorter interval, and ensure it fires as expected.
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -130,7 +130,7 @@
   // The sleep time should be slightly longer than the timer interval
   long sleepTime = 4000;
 
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -157,7 +157,7 @@
 
 - (void)testLeadingEdgeStopReschedule {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -187,7 +187,7 @@
   // The sleep time should be long enough to detect the trailling edge reschedule.
   long sleepTime = 3000;
 
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -216,7 +216,7 @@
 
 - (void)testTrailingEdgeStopReschedule {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -243,7 +243,7 @@
 
 - (void)testClampMinimum {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:3
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:3
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -266,7 +266,7 @@
 
 - (void)testClampMaximum {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:2
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -287,7 +287,7 @@
 - (void)testFireOnStart {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:YES
@@ -309,7 +309,7 @@
 - (void)testWaitOneCycle {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO
@@ -334,7 +334,7 @@
 - (void)testDoubleStartReturn {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  SNTTimer *timer = [[SNTTimer alloc] initWithMinInterval:1
+  SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
                                               maxInterval:60
                                                      name:@"TestTimer"
                                               fireOnStart:NO

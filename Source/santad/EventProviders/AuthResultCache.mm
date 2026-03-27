@@ -25,21 +25,21 @@
 using santa::Client;
 using santa::EndpointSecurityAPI;
 
-static NSString *const kFlushCacheReasonClientModeChanged = @"ClientModeChanged";
-static NSString *const kFlushCacheReasonPathRegexChanged = @"PathRegexChanged";
-static NSString *const kFlushCacheReasonRulesChanged = @"RulesChanged";
-static NSString *const kFlushCacheReasonStaticRulesChanged = @"StaticRulesChanged";
-static NSString *const kFlushCacheReasonExplicitCommand = @"ExplicitCommand";
-static NSString *const kFlushCacheReasonFilesystemUnmounted = @"FilesystemUnmounted";
-static NSString *const kFlushCacheReasonEntitlementsPrefixFilterChanged =
+static NSString* const kFlushCacheReasonClientModeChanged = @"ClientModeChanged";
+static NSString* const kFlushCacheReasonPathRegexChanged = @"PathRegexChanged";
+static NSString* const kFlushCacheReasonRulesChanged = @"RulesChanged";
+static NSString* const kFlushCacheReasonStaticRulesChanged = @"StaticRulesChanged";
+static NSString* const kFlushCacheReasonExplicitCommand = @"ExplicitCommand";
+static NSString* const kFlushCacheReasonFilesystemUnmounted = @"FilesystemUnmounted";
+static NSString* const kFlushCacheReasonEntitlementsPrefixFilterChanged =
     @"EntitlementsPrefixFilterChanged";
-static NSString *const kFlushCacheReasonEntitlementsTeamIDFilterChanged =
+static NSString* const kFlushCacheReasonEntitlementsTeamIDFilterChanged =
     @"EntitlementsTeamIDFilterChanged";
-static NSString *const kFlushCacheReasonCELFallbackRulesChanged = @"CELFallbackRulesChanged";
+static NSString* const kFlushCacheReasonCELFallbackRulesChanged = @"CELFallbackRulesChanged";
 
 namespace santa {
 
-NSString *const FlushCacheReasonToString(FlushCacheReason reason) {
+NSString* const FlushCacheReasonToString(FlushCacheReason reason) {
   switch (reason) {
     case FlushCacheReason::kClientModeChanged: return kFlushCacheReasonClientModeChanged;
     case FlushCacheReason::kPathRegexChanged: return kFlushCacheReasonPathRegexChanged;
@@ -61,9 +61,9 @@ NSString *const FlushCacheReasonToString(FlushCacheReason reason) {
 }
 
 std::unique_ptr<AuthResultCache> AuthResultCache::Create(std::shared_ptr<EndpointSecurityAPI> esapi,
-                                                         SNTMetricSet *metric_set,
+                                                         SNTMetricSet* metric_set,
                                                          uint64_t cache_deny_time_ms) {
-  SNTMetricCounter *flush_count =
+  SNTMetricCounter* flush_count =
       [metric_set counterWithName:@"/santa/flush_count"
                        fieldNames:@[ @"Reason" ]
                          helpText:@"Count of times the auth result cache is flushed by reason"];
@@ -72,7 +72,7 @@ std::unique_ptr<AuthResultCache> AuthResultCache::Create(std::shared_ptr<Endpoin
 }
 
 AuthResultCache::AuthResultCache(std::shared_ptr<EndpointSecurityAPI> esapi,
-                                 SNTMetricCounter *flush_count, uint64_t cache_deny_time_ms)
+                                 SNTMetricCounter* flush_count, uint64_t cache_deny_time_ms)
     : esapi_(esapi),
       flush_count_(flush_count),
       cache_deny_time_ns_(cache_deny_time_ms * NSEC_PER_MSEC) {
@@ -95,10 +95,10 @@ AuthResultCache::~AuthResultCache() {
   delete nonroot_cache_;
 }
 
-bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision,
-                                 SNTCachedDecision *cd) {
+bool AuthResultCache::AddToCache(const es_file_t* es_file, SNTAction decision,
+                                 SNTCachedDecision* cd) {
   SantaVnode vnode_id = SantaVnode::VnodeForFile(es_file);
-  SantaCache<SantaVnode, CachedAuthResult> *cache = CacheForVnodeID(vnode_id);
+  SantaCache<SantaVnode, CachedAuthResult>* cache = CacheForVnodeID(vnode_id);
   CachedAuthResult requestBinary = {SNTActionRequestBinary, 0, nil};
 
   switch (decision) {
@@ -132,17 +132,17 @@ bool AuthResultCache::AddToCache(const es_file_t *es_file, SNTAction decision,
   }
 }
 
-void AuthResultCache::RemoveFromCache(const es_file_t *es_file) {
+void AuthResultCache::RemoveFromCache(const es_file_t* es_file) {
   SantaVnode vnode_id = SantaVnode::VnodeForFile(es_file);
   CacheForVnodeID(vnode_id)->remove(vnode_id);
 }
 
-CachedAuthResult AuthResultCache::CheckCache(const es_file_t *es_file) {
+CachedAuthResult AuthResultCache::CheckCache(const es_file_t* es_file) {
   return CheckCache(SantaVnode::VnodeForFile(es_file));
 }
 
 CachedAuthResult AuthResultCache::CheckCache(SantaVnode vnode_id) {
-  SantaCache<SantaVnode, CachedAuthResult> *cache = CacheForVnodeID(vnode_id);
+  SantaCache<SantaVnode, CachedAuthResult>* cache = CacheForVnodeID(vnode_id);
 
   CachedAuthResult entry = cache->get(vnode_id);
   if (entry == CachedAuthResult{}) {
@@ -160,7 +160,7 @@ CachedAuthResult AuthResultCache::CheckCache(SantaVnode vnode_id) {
   return entry;
 }
 
-SantaCache<SantaVnode, CachedAuthResult> *AuthResultCache::CacheForVnodeID(SantaVnode vnode_id) {
+SantaCache<SantaVnode, CachedAuthResult>* AuthResultCache::CacheForVnodeID(SantaVnode vnode_id) {
   return (vnode_id.fsid == root_devno_ || root_devno_ == 0) ? root_cache_ : nonroot_cache_;
 }
 
@@ -186,7 +186,7 @@ void AuthResultCache::FlushCache(FlushCacheMode mode, FlushCacheReason reason) {
   [flush_count_ incrementForFieldValues:@[ FlushCacheReasonToString(reason) ]];
 }
 
-NSArray<NSNumber *> *AuthResultCache::CacheCounts() {
+NSArray<NSNumber*>* AuthResultCache::CacheCounts() {
   return @[ @(root_cache_->count()), @(nonroot_cache_->count()) ];
 }
 

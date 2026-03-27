@@ -31,8 +31,8 @@ __END_DECLS
 
 namespace santa {
 
-NKeyTokenValidator::NKeyTokenValidator(std::set<std::string> trustedNKeys, NSString *accountJWT,
-                                       NSString *userJWT)
+NKeyTokenValidator::NKeyTokenValidator(std::set<std::string> trustedNKeys, NSString* accountJWT,
+                                       NSString* userJWT)
     : trustedNKeys_(std::move(trustedNKeys)), accountJWT_(accountJWT), userJWT_(userJWT) {}
 
 namespace {
@@ -48,7 +48,7 @@ struct JWTParts {
 // Foundation's initWithBase64EncodedString only handles standard Base64, so we
 // convert back before decoding.
 std::vector<uint8_t> Base64URLDecode(std::string_view in) {
-  NSMutableString *b64 = [[NSMutableString alloc] initWithBytes:in.data()
+  NSMutableString* b64 = [[NSMutableString alloc] initWithBytes:in.data()
                                                          length:in.size()
                                                        encoding:NSUTF8StringEncoding];
   [b64 replaceOccurrencesOfString:@"-" withString:@"+" options:0 range:NSMakeRange(0, b64.length)];
@@ -59,11 +59,11 @@ std::vector<uint8_t> Base64URLDecode(std::string_view in) {
     [b64 appendString:@"="];
   }
 
-  NSData *data = [[NSData alloc] initWithBase64EncodedString:b64 options:0];
+  NSData* data = [[NSData alloc] initWithBase64EncodedString:b64 options:0];
   if (!data) {
     return {};
   }
-  const auto *bytes = static_cast<const uint8_t *>(data.bytes);
+  const auto* bytes = static_cast<const uint8_t*>(data.bytes);
   return {bytes, bytes + data.length};
 }
 
@@ -87,7 +87,7 @@ void EnsureBase32Initialized() {
 // rejects public key prefixes, so we implement public key decoding ourselves.
 // Based on the Go reference implementation:
 // https://github.com/nats-io/nkeys/blob/0f430772b63004155287d5f3c061d41995f74b15/strkey.go#L131
-std::optional<std::vector<uint8_t>> NKeyDecode(const std::string &nkey) {
+std::optional<std::vector<uint8_t>> NKeyDecode(const std::string& nkey) {
   EnsureBase32Initialized();
 
   char raw[64];
@@ -97,7 +97,7 @@ std::optional<std::vector<uint8_t>> NKeyDecode(const std::string &nkey) {
     return std::nullopt;
   }
 
-  auto *data = reinterpret_cast<unsigned char *>(raw);
+  auto* data = reinterpret_cast<unsigned char*>(raw);
 
   // CRC16 over first 33 bytes, stored little-endian in last 2
   uint16_t expected = static_cast<uint16_t>(data[33]) | (static_cast<uint16_t>(data[34]) << 8);
@@ -109,7 +109,7 @@ std::optional<std::vector<uint8_t>> NKeyDecode(const std::string &nkey) {
   return std::vector<uint8_t>(data + 1, data + 33);
 }
 
-bool SplitJWT(std::string_view jwt, JWTParts &parts) {
+bool SplitJWT(std::string_view jwt, JWTParts& parts) {
   auto p1 = jwt.find('.');
   if (p1 == std::string_view::npos) return false;
   auto p2 = jwt.find('.', p1 + 1);
@@ -123,7 +123,7 @@ bool SplitJWT(std::string_view jwt, JWTParts &parts) {
   return true;
 }
 
-bool VerifyJWTSignature(std::string_view jwt, const std::vector<uint8_t> &ed25519Pubkey) {
+bool VerifyJWTSignature(std::string_view jwt, const std::vector<uint8_t>& ed25519Pubkey) {
   if (ed25519Pubkey.size() != 32) {
     return false;
   }
@@ -144,11 +144,11 @@ bool VerifyJWTSignature(std::string_view jwt, const std::vector<uint8_t> &ed2551
   signed_data.append(parts.header);
   signed_data.push_back('.');
   signed_data.append(parts.payload);
-  return ED25519_verify(reinterpret_cast<const uint8_t *>(signed_data.data()), signed_data.size(),
+  return ED25519_verify(reinterpret_cast<const uint8_t*>(signed_data.data()), signed_data.size(),
                         sig.data(), ed25519Pubkey.data()) == 1;
 }
 
-NSDictionary *ParseJWTPayload(std::string_view jwt) {
+NSDictionary* ParseJWTPayload(std::string_view jwt) {
   JWTParts parts;
   if (!SplitJWT(jwt, parts)) {
     return nil;
@@ -159,11 +159,11 @@ NSDictionary *ParseJWTPayload(std::string_view jwt) {
     return nil;
   }
 
-  NSData *jsonData = [NSData dataWithBytesNoCopy:payload_bytes.data()
+  NSData* jsonData = [NSData dataWithBytesNoCopy:payload_bytes.data()
                                           length:payload_bytes.size()
                                     freeWhenDone:NO];
-  NSError *jsonError;
-  NSDictionary *payload = [NSJSONSerialization JSONObjectWithData:jsonData
+  NSError* jsonError;
+  NSDictionary* payload = [NSJSONSerialization JSONObjectWithData:jsonData
                                                           options:0
                                                             error:&jsonError];
   if (jsonError || ![payload isKindOfClass:[NSDictionary class]]) {
@@ -183,19 +183,19 @@ bool NKeyTokenValidator::Validate() {
   std::string accountJWTStr = santa::NSStringToUTF8String(accountJWT_);
 
   // 1. Parse account JWT payload -> extract iss and sub
-  NSDictionary *accountPayload = ParseJWTPayload(accountJWTStr);
+  NSDictionary* accountPayload = ParseJWTPayload(accountJWTStr);
   if (!accountPayload) {
     LOGW(@"NKeyTokenValidator: failed to parse account JWT payload");
     return false;
   }
 
-  NSString *accountIssuer = accountPayload[@"iss"];
+  NSString* accountIssuer = accountPayload[@"iss"];
   if (![accountIssuer isKindOfClass:[NSString class]] || !accountIssuer.length) {
     LOGW(@"NKeyTokenValidator: missing or invalid account 'iss' claim");
     return false;
   }
 
-  NSString *accountSubject = accountPayload[@"sub"];
+  NSString* accountSubject = accountPayload[@"sub"];
   if (![accountSubject isKindOfClass:[NSString class]] || !accountSubject.length) {
     LOGW(@"NKeyTokenValidator: missing or invalid account 'sub' claim");
     return false;
@@ -222,7 +222,7 @@ bool NKeyTokenValidator::Validate() {
   }
 
   // 5. Check account JWT expiration
-  NSNumber *accountExp = accountPayload[@"exp"];
+  NSNumber* accountExp = accountPayload[@"exp"];
   if ([accountExp isKindOfClass:[NSNumber class]]) {
     int64_t exp = [accountExp longLongValue];
     int64_t now = static_cast<int64_t>(std::time(nullptr));
@@ -242,13 +242,13 @@ bool NKeyTokenValidator::Validate() {
 
   // 7. Parse user JWT payload -> extract iss
   std::string userJWTStr = santa::NSStringToUTF8String(userJWT_);
-  NSDictionary *userPayload = ParseJWTPayload(userJWTStr);
+  NSDictionary* userPayload = ParseJWTPayload(userJWTStr);
   if (!userPayload) {
     LOGW(@"NKeyTokenValidator: failed to parse user JWT payload");
     return false;
   }
 
-  NSString *userIssuer = userPayload[@"iss"];
+  NSString* userIssuer = userPayload[@"iss"];
   if (![userIssuer isKindOfClass:[NSString class]] || !userIssuer.length) {
     LOGW(@"NKeyTokenValidator: missing or invalid user 'iss' claim");
     return false;
@@ -268,7 +268,7 @@ bool NKeyTokenValidator::Validate() {
   }
 
   // 10. Check user JWT expiration
-  NSNumber *userExp = userPayload[@"exp"];
+  NSNumber* userExp = userPayload[@"exp"];
   if ([userExp isKindOfClass:[NSNumber class]]) {
     int64_t exp = [userExp longLongValue];
     int64_t now = static_cast<int64_t>(std::time(nullptr));

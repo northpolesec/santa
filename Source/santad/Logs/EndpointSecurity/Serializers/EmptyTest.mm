@@ -34,17 +34,17 @@ using santa::Empty;
   // instead of constructing real ones since the Empty class never touches the
   // input parameter.
   int fake;
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedClose *)&fake).size(), 0);
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedExchange *)&fake).size(), 0);
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedExec *)&fake, nil).size(), 0);
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedExit *)&fake).size(), 0);
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedFork *)&fake).size(), 0);
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedLink *)&fake).size(), 0);
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedRename *)&fake).size(), 0);
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedUnlink *)&fake).size(), 0);
-  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedCSInvalidated *)&fake).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedClose*)&fake).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedExchange*)&fake).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedExec*)&fake, nil).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedExit*)&fake).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedFork*)&fake).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedLink*)&fake).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedRename*)&fake).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedUnlink*)&fake).size(), 0);
+  XCTAssertEqual(e->SerializeMessage(*(santa::EnrichedCSInvalidated*)&fake).size(), 0);
 
-  XCTAssertEqual(e->SerializeAllowlist(*(santa::Message *)&fake, "", "").size(), 0);
+  XCTAssertEqual(e->SerializeAllowlist(*(santa::Message*)&fake, "", "").size(), 0);
   XCTAssertEqual(e->SerializeBundleHashingEvent(nil).size(), 0);
   XCTAssertEqual(e->SerializeDiskAppeared(nil, true).size(), 0);
   XCTAssertEqual(e->SerializeDiskDisappeared(nil).size(), 0);

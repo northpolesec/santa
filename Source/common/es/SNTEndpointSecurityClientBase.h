@@ -38,24 +38,24 @@
 /// that should terminate the program.
 - (void)establishClientOrDie;
 
-- (bool)subscribe:(const std::set<es_event_type_t> &)events;
+- (bool)subscribe:(const std::set<es_event_type_t>&)events;
 
 /// Clears the ES cache after setting subscriptions.
 /// There's a gap between creating a client and subscribing to events. Creating
 /// the client triggers a cache flush automatically but any events that happen
 /// prior to subscribing could've been cached by another client. Clearing after
 /// subscribing mitigates this posibility.
-- (bool)subscribeAndClearCache:(const std::set<es_event_type_t> &)events;
+- (bool)subscribeAndClearCache:(const std::set<es_event_type_t>&)events;
 
 - (bool)unsubscribeAll;
 - (bool)unmuteAllTargetPaths;
 - (bool)enableTargetPathWatching;
-- (bool)muteTargetPaths:(const santa::SetPairPathAndType &)paths;
-- (bool)unmuteTargetPaths:(const santa::SetPairPathAndType &)paths;
+- (bool)muteTargetPaths:(const santa::SetPairPathAndType&)paths;
+- (bool)unmuteTargetPaths:(const santa::SetPairPathAndType&)paths;
 
 - (bool)enableProcessWatching;
-- (bool)muteProcess:(const audit_token_t *)tok;
-- (bool)unmuteProcess:(const audit_token_t *)tok;
+- (bool)muteProcess:(const audit_token_t*)tok;
+- (bool)unmuteProcess:(const audit_token_t*)tok;
 
 /// Responds to the Message with the given auth result
 ///
@@ -67,7 +67,7 @@
 /// @note If the msg event type requires a flags response, the correct ES API will automatically
 /// be called. ALLOWED results will be translated to having all flags set, and DENIED results
 /// will be translated to having all flags cleared.
-- (bool)respondToMessage:(const santa::Message &)msg
+- (bool)respondToMessage:(const santa::Message&)msg
           withAuthResult:(es_auth_result_t)result
                cacheable:(bool)cacheable;
 
@@ -75,12 +75,12 @@
                        handler:(void (^)(std::unique_ptr<santa::EnrichedMessage>))messageHandler;
 
 - (void)asynchronouslyProcess:(santa::Message)msg
-                      handler:(void (^)(santa::Message &&))messageHandler;
+                      handler:(void (^)(santa::Message&&))messageHandler;
 
-- (void)processMessage:(santa::Message &&)msg handler:(void (^)(santa::Message))messageHandler;
+- (void)processMessage:(santa::Message&&)msg handler:(void (^)(santa::Message))messageHandler;
 
 - (bool)clearCache;
 
-- (bool)handleContextMessage:(santa::Message &)esMsg;
+- (bool)handleContextMessage:(santa::Message&)esMsg;
 
 @end

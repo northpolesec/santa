@@ -26,8 +26,8 @@
 @class SNTNotificationMessage;
 
 @interface SNTRuleTableRulesHash : NSObject
-@property(readonly) NSString *executionRulesHash;
-@property(readonly) NSString *fileAccessRulesHash;
+@property(readonly) NSString* executionRulesHash;
+@property(readonly) NSString* fileAccessRulesHash;
 @end
 
 ///
@@ -85,7 +85,7 @@
 ///          Currently: binary, signingID, certificate or teamID (in that order).
 ///          The first matching rule found is returned.
 ///
-- (SNTRule *)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers;
+- (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers;
 
 ///
 ///  Add an array of execution rules and file access rules to the database. The rules will be added
@@ -97,18 +97,18 @@
 ///  @param errors When returning NO, will be filled with an array of errors.
 ///  @return YES if adding all rules passed, NO if any were rejected.
 ///
-- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
-          fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+- (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
+          fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
               ruleCleanup:(SNTRuleCleanup)cleanupType
-                   errors:(NSArray<NSError *> **)errors;
+                   errors:(NSArray<NSError*>**)errors;
 
 ///
 /// Wrapper for `addExecutionRules:fileAccessRules:ruleCleanup:errors:` when there are no
 /// file access rules to add.
 ///
-- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)rules
+- (BOOL)addExecutionRules:(NSArray<SNTRule*>*)rules
               ruleCleanup:(SNTRuleCleanup)cleanupType
-                   errors:(NSArray<NSError *> **)errors;
+                   errors:(NSArray<NSError*>**)errors;
 
 ///
 ///  Checks the given array of rules to see if adding any of them to the rules database would
@@ -118,12 +118,12 @@
 ///
 ///  @param rules Array of SNTRule that may be added to database.
 ///  @return YES if kernel cache should be flushed after adding the new rules.
-- (BOOL)addedRulesShouldFlushDecisionCache:(NSArray *)rules;
+- (BOOL)addedRulesShouldFlushDecisionCache:(NSArray*)rules;
 
 ///
 ///  Update timestamp for given rule to the current time.
 ///
-- (void)resetTimestampForExecutionRule:(SNTRule *)rule;
+- (void)resetTimestampForExecutionRule:(SNTRule*)rule;
 
 ///
 ///  Remove transitive rules that haven't been used in a long time.
@@ -133,34 +133,33 @@
 ///
 ///  Retrieve all execution rules from the database for export.
 ///
-- (NSArray<SNTRule *> *)retrieveAllExecutionRules;
+- (NSArray<SNTRule*>*)retrieveAllExecutionRules;
 
 ///
 ///  Retrieve all file access rules from the database for export.
 ///
-- (NSDictionary<NSString *, NSDictionary *> *)retrieveAllFileAccessRules;
+- (NSDictionary<NSString*, NSDictionary*>*)retrieveAllFileAccessRules;
 
 ///
 ///  Update the static rules from the configuration.
 ///
-- (void)updateStaticRules:(NSArray<NSDictionary *> *)staticRules;
+- (void)updateStaticRules:(NSArray<NSDictionary*>*)staticRules;
 
 ///
 ///  Cached static rules.
 ///
-@property(readonly) NSDictionary<NSString *, SNTRule *> *cachedStaticRules;
+@property(readonly) NSDictionary<NSString*, SNTRule*>* cachedStaticRules;
 
 ///
 ///  Retrieve a hash of all the non-transitive rules in the database.
 ///
-- (SNTRuleTableRulesHash *)hashOfHashes;
+- (SNTRuleTableRulesHash*)hashOfHashes;
 
 ///
 ///  A map of a file hashes to cached decisions. This is used to pre-validate and allowlist
 ///  certain critical system binaries that are integral to Santa's functionality.
 ///
-@property(readonly, nonatomic)
-    NSDictionary<NSString *, SNTCachedDecision *> *criticalSystemBinaries;
+@property(readonly, nonatomic) NSDictionary<NSString*, SNTCachedDecision*>* criticalSystemBinaries;
 
 ///
 /// If set, this callback is called when file access rule content is changed via

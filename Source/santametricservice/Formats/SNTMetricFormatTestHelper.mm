@@ -19,20 +19,20 @@
 #import "Source/santametricservice/Formats/SNTMetricFormatTestHelper.h"
 
 @implementation SNTMetricFormatTestHelper
-+ (NSDictionary *)convertDatesToFixedDateWithExportDict:(NSMutableDictionary *)exportDict {
-  NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
++ (NSDictionary*)convertDatesToFixedDateWithExportDict:(NSMutableDictionary*)exportDict {
+  NSISO8601DateFormatter* formatter = [[NSISO8601DateFormatter alloc] init];
   formatter.formatOptions =
       NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
 
-  NSDate *fixedDate = [formatter dateFromString:@"2021-09-16T21:07:34.826Z"];
+  NSDate* fixedDate = [formatter dateFromString:@"2021-09-16T21:07:34.826Z"];
 
-  for (NSString *metricName in exportDict[@"metrics"]) {
-    NSMutableDictionary *metric = exportDict[@"metrics"][metricName];
+  for (NSString* metricName in exportDict[@"metrics"]) {
+    NSMutableDictionary* metric = exportDict[@"metrics"][metricName];
 
-    for (NSString *field in metric[@"fields"]) {
-      NSMutableArray<NSMutableDictionary *> *values = metric[@"fields"][field];
+    for (NSString* field in metric[@"fields"]) {
+      NSMutableArray<NSMutableDictionary*>* values = metric[@"fields"][field];
 
-      [values enumerateObjectsUsingBlock:^(id object, NSUInteger index, BOOL *stop) {
+      [values enumerateObjectsUsingBlock:^(id object, NSUInteger index, BOOL* stop) {
         values[index][@"created"] = fixedDate;
         values[index][@"last_updated"] = fixedDate;
       }];
@@ -42,8 +42,8 @@
   return exportDict;
 }
 
-+ (NSDictionary *)createValidMetricsDictionary {
-  SNTMetricSet *metricSet = [[SNTMetricSet alloc] initWithHostname:@"testHost"
++ (NSDictionary*)createValidMetricsDictionary {
+  SNTMetricSet* metricSet = [[SNTMetricSet alloc] initWithHostname:@"testHost"
                                                           username:@"testUser"];
 
   // Add constants
@@ -58,14 +58,14 @@
                         helpText:@"Start time of this santad instance, in microseconds since epoch"
                            value:(long long)(0x12345668910)];
   // Add Metrics
-  SNTMetricCounter *c = [metricSet counterWithName:@"/santa/events"
+  SNTMetricCounter* c = [metricSet counterWithName:@"/santa/events"
                                         fieldNames:@[ @"rule_type", @"client" ]
                                           helpText:@"Count of process exec events on the host"];
 
   [c incrementForFieldValues:@[ @"binary", @"authorizer" ]];
   [c incrementBy:2 forFieldValues:@[ @"certificate", @"authorizer" ]];
 
-  SNTMetricInt64Gauge *g = [metricSet int64GaugeWithName:@"/santa/rules"
+  SNTMetricInt64Gauge* g = [metricSet int64GaugeWithName:@"/santa/rules"
                                               fieldNames:@[ @"rule_type" ]
                                                 helpText:@"Number of rules"];
 
@@ -73,12 +73,12 @@
   [g set:3 forFieldValues:@[ @"certificate" ]];
 
   // Add Metrics with callback
-  SNTMetricInt64Gauge *virtualMemoryGauge =
+  SNTMetricInt64Gauge* virtualMemoryGauge =
       [metricSet int64GaugeWithName:@"/proc/memory/virtual_size"
                          fieldNames:@[]
                            helpText:@"The virtual memory size of this process"];
 
-  SNTMetricInt64Gauge *residentMemoryGauge =
+  SNTMetricInt64Gauge* residentMemoryGauge =
       [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
                          fieldNames:@[]
                            helpText:@"The resident set size of this process"];
@@ -88,7 +88,7 @@
     [residentMemoryGauge set:123456789 forFieldValues:@[]];
   }];
 
-  NSMutableDictionary *exportDict = [[metricSet export] mutableCopy];
+  NSMutableDictionary* exportDict = [[metricSet export] mutableCopy];
 
   return [SNTMetricFormatTestHelper convertDatesToFixedDateWithExportDict:exportDict];
 }

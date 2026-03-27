@@ -55,7 +55,7 @@ using santa::Processor;
 // all clients includes the minimal required set of events for process tree (NOTIFY_FORK, some EXEC
 // variant, and NOTIFY_EXIT) but also filters out any events that were subscribed to solely for the
 // purpose of updating the tree from being processed downstream, where they would be unexpected.
-- (bool)subscribe:(const std::set<es_event_type_t> &)events {
+- (bool)subscribe:(const std::set<es_event_type_t>&)events {
   std::set<es_event_type_t> eventsWithLifecycle = events;
   if (events.find(ES_EVENT_TYPE_NOTIFY_FORK) == events.end()) {
     eventsWithLifecycle.insert(ES_EVENT_TYPE_NOTIFY_FORK);
@@ -78,7 +78,7 @@ using santa::Processor;
   return _addedEvents[eventType];
 }
 
-- (bool)handleContextMessage:(Message &)esMsg {
+- (bool)handleContextMessage:(Message&)esMsg {
   if (!_processTree) {
     return [self eventWasAdded:esMsg->event_type];
   }

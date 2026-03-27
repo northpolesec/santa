@@ -37,17 +37,17 @@
 #import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 
-static NSString *const kOutputPath = @"/tmp/stored_event_archive.plist";
+static NSString* const kOutputPath = @"/tmp/stored_event_archive.plist";
 
-void AddStoredExecutionEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
-  NSError *err;
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes" error:&err];
+void AddStoredExecutionEvents(NSMutableArray<SNTStoredEvent*>* storedEvents) {
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes" error:&err];
   if (!fi) {
     NSLog(@"Failed to grab file info for \"yes\": %@", err);
     exit(EXIT_FAILURE);
   }
 
-  SNTStoredExecutionEvent *event = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
+  SNTStoredExecutionEvent* event = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
   event.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1751111111];
   event.needsBundleHash = NO;
   event.codesigningFlags = CS_PLATFORM_BINARY | CS_SIGNED | CS_HARD | CS_KILL | CS_VALID;
@@ -90,21 +90,21 @@ void AddStoredExecutionEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
   [storedEvents addObject:event];
 }
 
-void AddStoredFileAccessEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
-  NSError *err;
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/bin/mkdir" error:&err];
+void AddStoredFileAccessEvents(NSMutableArray<SNTStoredEvent*>* storedEvents) {
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/bin/mkdir" error:&err];
   if (!fi) {
     NSLog(@"Failed to grab file info for \"mkdir\": %@", err);
     exit(EXIT_FAILURE);
   }
 
-  MOLCodesignChecker *csc = [fi codesignCheckerWithError:&err];
+  MOLCodesignChecker* csc = [fi codesignCheckerWithError:&err];
   if (!csc) {
     NSLog(@"Failed to grab codesign info for \"mkdir\": %@", err);
     exit(EXIT_FAILURE);
   }
 
-  SNTStoredFileAccessEvent *faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  SNTStoredFileAccessEvent* faaEvent = [[SNTStoredFileAccessEvent alloc] init];
   faaEvent.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1753333333];
   faaEvent.ruleName = @"MyRule";
   faaEvent.ruleVersion = @"MyRuleVersion";
@@ -124,7 +124,7 @@ void AddStoredFileAccessEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
   [storedEvents addObject:faaEvent];
 }
 
-void AddStoredTemporaryMonitorModeAuditEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
+void AddStoredTemporaryMonitorModeAuditEvents(NSMutableArray<SNTStoredEvent*>* storedEvents) {
   // Audit event for "enter"
   [storedEvents addObject:[[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
                               initWithUUID:@"my_test_enter_uuid"
@@ -137,22 +137,22 @@ void AddStoredTemporaryMonitorModeAuditEvents(NSMutableArray<SNTStoredEvent *> *
                                     reason:SNTTemporaryMonitorModeLeaveReasonRevoked]];
 }
 
-void AddStoredNetworkMountEvents(NSMutableArray<SNTStoredEvent *> *storedEvents) {
-  NSError *err;
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/sbin/mount" error:&err];
+void AddStoredNetworkMountEvents(NSMutableArray<SNTStoredEvent*>* storedEvents) {
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/sbin/mount" error:&err];
   if (!fi) {
     NSLog(@"Failed to grab file info for \"mount\": %@", err);
     exit(EXIT_FAILURE);
   }
 
-  MOLCodesignChecker *csc = [fi codesignCheckerWithError:&err];
+  MOLCodesignChecker* csc = [fi codesignCheckerWithError:&err];
   if (!csc) {
     NSLog(@"Failed to grab codesign info for \"mount\": %@", err);
     exit(EXIT_FAILURE);
   }
 
   // First network mount event - SMB share
-  SNTStoredNetworkMountEvent *event1 = [[SNTStoredNetworkMountEvent alloc] init];
+  SNTStoredNetworkMountEvent* event1 = [[SNTStoredNetworkMountEvent alloc] init];
   event1.mountFromName = @"//server.example.com/share";
   event1.mountOnName = @"/Volumes/share";
   event1.fsType = @"smbfs";
@@ -168,7 +168,7 @@ void AddStoredNetworkMountEvents(NSMutableArray<SNTStoredEvent *> *storedEvents)
   event1.process.executingUser = @"testuser";
 
   // Second network mount event - NFS share
-  SNTStoredNetworkMountEvent *event2 = [[SNTStoredNetworkMountEvent alloc] init];
+  SNTStoredNetworkMountEvent* event2 = [[SNTStoredNetworkMountEvent alloc] init];
   event2.mountFromName = @"nfs-server.example.com:/export/data";
   event2.mountOnName = @"/Volumes/nfs-data";
   event2.fsType = @"nfs";
@@ -187,16 +187,16 @@ void AddStoredNetworkMountEvents(NSMutableArray<SNTStoredEvent *> *storedEvents)
   [storedEvents addObject:event2];
 }
 
-int main(int argc, const char *argv[]) {
-  NSMutableArray<SNTStoredEvent *> *storedEvents = [[NSMutableArray alloc] init];
+int main(int argc, const char* argv[]) {
+  NSMutableArray<SNTStoredEvent*>* storedEvents = [[NSMutableArray alloc] init];
 
   AddStoredExecutionEvents(storedEvents);
   AddStoredFileAccessEvents(storedEvents);
   AddStoredTemporaryMonitorModeAuditEvents(storedEvents);
   AddStoredNetworkMountEvents(storedEvents);
 
-  NSError *err;
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:storedEvents
+  NSError* err;
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:storedEvents
                                        requiringSecureCoding:YES
                                                        error:&err];
   if (!data) {

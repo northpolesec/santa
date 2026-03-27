@@ -24,11 +24,11 @@
 @implementation DaemonConfigBundleTest
 
 - (void)testNetworkMountConfigBundle {
-  __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
+  __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Blocks"];
   exp.expectedFulfillmentCount = 2;
-  SNTConfigBundle *bundle;
+  SNTConfigBundle* bundle;
 
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  SNTConfigurator* configurator = [SNTConfigurator configurator];
   id mockConfigurator = OCMPartialMock(configurator);
 
   OCMExpect([mockConfigurator enableNotificationSilences]).andReturn(YES);
@@ -36,7 +36,7 @@
 
   bundle = santa::NetworkMountConfigBundle(mockConfigurator);
 
-  [bundle bannedNetworkMountBlockMessage:^(NSString *val) {
+  [bundle bannedNetworkMountBlockMessage:^(NSString* val) {
     XCTAssertEqualObjects(val, @"this has been banned");
     [exp fulfill];
   }];

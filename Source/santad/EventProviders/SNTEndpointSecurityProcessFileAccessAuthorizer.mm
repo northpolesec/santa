@@ -39,7 +39,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
 @property bool isSubscribed;
 @property(copy) IterateProcessPoliciesBlock iterateProcessPoliciesBlock;
-@property SNTConfigurator *configurator;
+@property SNTConfigurator* configurator;
 @end
 
 @implementation SNTEndpointSecurityProcessFileAccessAuthorizer {
@@ -68,7 +68,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return @"ProcessFileAccessAuthorizer";
 }
 
@@ -87,10 +87,10 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
-      ^bool(const santa::WatchItemPolicyBase &base_policy, const Message::PathTarget &target,
-            const Message &msg) {
-        const ProcessWatchItemPolicy *policy =
-            dynamic_cast<const ProcessWatchItemPolicy *>(&base_policy);
+      ^bool(const santa::WatchItemPolicyBase& base_policy, const Message::PathTarget& target,
+            const Message& msg) {
+        const ProcessWatchItemPolicy* policy =
+            dynamic_cast<const ProcessWatchItemPolicy*>(&base_policy);
         if (!policy) {
           LOGW(@"Failed to cast process policy");
           return false;
@@ -107,7 +107,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   [self respondToMessage:msg withAuthResult:result.auth_result cacheable:result.cacheable];
 }
 
-- (void)handleMessage:(Message &&)esMsg
+- (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(santa::EventDisposition))recordEventMetrics {
   SNTOverrideFileAccessAction overrideAction = [self.configurator overrideFileAccessAction];
 
@@ -186,10 +186,10 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
                }];
 }
 
-- (std::shared_ptr<ProcessWatchItemPolicy>)findPolicyForProcess:(const es_process_t *)esProc {
+- (std::shared_ptr<ProcessWatchItemPolicy>)findPolicyForProcess:(const es_process_t*)esProc {
   __block std::shared_ptr<ProcessWatchItemPolicy> foundPolicy;
   self.iterateProcessPoliciesBlock(^bool(std::shared_ptr<ProcessWatchItemPolicy> policy) {
-    for (const santa::WatchItemProcess &policyProcess : policy->processes) {
+    for (const santa::WatchItemProcess& policyProcess : policy->processes) {
       if ((*_faaPolicyProcessorProxy)->PolicyMatchesProcess(policyProcess, esProc)) {
         // Map the new process to the matched policy and begin
         // watching the new process
@@ -206,7 +206,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   return foundPolicy;
 }
 
-- (santa::ProbeInterest)probeInterest:(const santa::Message &)esMsg {
+- (santa::ProbeInterest)probeInterest:(const santa::Message&)esMsg {
   if (!self.isSubscribed) {
     return santa::ProbeInterest::kUninterested;
   }
@@ -235,7 +235,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   [self muteProcess:&tok];
 }
 
-- (void)stopWatching:(const std::pair<pid_t, int> &)pidPidver {
+- (void)stopWatching:(const std::pair<pid_t, int>&)pidPidver {
   audit_token_t stubToken = santa::MakeStubAuditToken(pidPidver.first, pidPidver.second);
   // Note: Process muting is inverted, unmuting here means to stop watching.
   [self unmuteProcess:&stubToken];
@@ -263,7 +263,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   // be reevaluated against the latest config. However we still notify the FAAPolicyProcessor
   // as if the process exited so that caches may be cleaned up.
   _procRuleCache->clear(
-      ^(std::pair<pid_t, int> &pidPidver, std::shared_ptr<ProcessWatchItemPolicy> &) {
+      ^(std::pair<pid_t, int>& pidPidver, std::shared_ptr<ProcessWatchItemPolicy>&) {
         _faaPolicyProcessorProxy->NotifyExit(
             santa::MakeStubAuditToken(pidPidver.first, pidPidver.second));
       });
@@ -280,7 +280,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
     }
 
     _procRuleCache->clear(
-        ^(std::pair<pid_t, int> &pidPidver, std::shared_ptr<ProcessWatchItemPolicy> &) {
+        ^(std::pair<pid_t, int>& pidPidver, std::shared_ptr<ProcessWatchItemPolicy>&) {
           [self stopWatching:pidPidver];
         });
   }

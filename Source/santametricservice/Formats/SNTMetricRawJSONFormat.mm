@@ -18,7 +18,7 @@
 #import "Source/santametricservice/Formats/SNTMetricRawJSONFormat.h"
 
 @implementation SNTMetricRawJSONFormat {
-  NSDateFormatter *_dateFormatter;
+  NSDateFormatter* _dateFormatter;
 }
 
 - (instancetype)init {
@@ -32,16 +32,16 @@
   return self;
 }
 
-- (NSArray *)normalizeArray:(NSArray *)arr {
-  NSMutableArray *normalized = [NSMutableArray arrayWithArray:arr];
+- (NSArray*)normalizeArray:(NSArray*)arr {
+  NSMutableArray* normalized = [NSMutableArray arrayWithArray:arr];
 
-  [normalized enumerateObjectsUsingBlock:^(id value, NSUInteger index, BOOL *stop) {
+  [normalized enumerateObjectsUsingBlock:^(id value, NSUInteger index, BOOL* stop) {
     if ([value isKindOfClass:[NSDate class]]) {
-      normalized[index] = [self->_dateFormatter stringFromDate:(NSDate *)value];
+      normalized[index] = [self->_dateFormatter stringFromDate:(NSDate*)value];
     } else if ([value isKindOfClass:[NSArray class]]) {
-      normalized[index] = [self normalizeArray:(NSArray *)value];
+      normalized[index] = [self normalizeArray:(NSArray*)value];
     } else if ([value isKindOfClass:[NSDictionary class]]) {
-      normalized[index] = [self normalize:(NSDictionary *)value];
+      normalized[index] = [self normalize:(NSDictionary*)value];
     }
   }];
 
@@ -51,22 +51,22 @@
 /**
  * Normalizes the metrics dictionary for exporting to JSON
  **/
-- (NSDictionary *)normalize:(NSDictionary *)metrics {
+- (NSDictionary*)normalize:(NSDictionary*)metrics {
   // Convert NSDate's to RFC3339 in strings as NSDate's cannot be serialized
   // to JSON.
-  NSMutableDictionary *normalizedMetrics = [NSMutableDictionary dictionaryWithDictionary:metrics];
+  NSMutableDictionary* normalizedMetrics = [NSMutableDictionary dictionaryWithDictionary:metrics];
 
-  [metrics enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL *stop) {
+  [metrics enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL* stop) {
     if ([value isKindOfClass:[NSDate class]]) {
-      normalizedMetrics[key] = [self->_dateFormatter stringFromDate:(NSDate *)value];
+      normalizedMetrics[key] = [self->_dateFormatter stringFromDate:(NSDate*)value];
     } else if ([value isKindOfClass:[NSDictionary class]]) {
-      normalizedMetrics[key] = [self normalize:(NSDictionary *)value];
+      normalizedMetrics[key] = [self normalize:(NSDictionary*)value];
     } else if ([value isKindOfClass:[NSArray class]]) {
-      normalizedMetrics[key] = [self normalizeArray:(NSArray *)value];
+      normalizedMetrics[key] = [self normalizeArray:(NSArray*)value];
     }
   }];
 
-  return (NSDictionary *)normalizedMetrics;
+  return (NSDictionary*)normalizedMetrics;
 }
 
 /*
@@ -79,10 +79,10 @@
  * Returns an NSArray containing one entry of all metrics serialized to JSON or
  * nil on error.
  */
-- (NSArray<NSData *> *)convert:(NSDictionary *)metrics
-                  endTimestamp:(NSDate *)endTimestamp
-                         error:(NSError **)err {
-  NSDictionary *normalizedMetrics = [self normalize:metrics];
+- (NSArray<NSData*>*)convert:(NSDictionary*)metrics
+                endTimestamp:(NSDate*)endTimestamp
+                       error:(NSError**)err {
+  NSDictionary* normalizedMetrics = [self normalize:metrics];
 
   if (![NSJSONSerialization isValidJSONObject:normalizedMetrics]) {
     if (err != nil) {
@@ -96,7 +96,7 @@
     return nil;
   }
 
-  NSData *json = [NSJSONSerialization dataWithJSONObject:normalizedMetrics
+  NSData* json = [NSJSONSerialization dataWithJSONObject:normalizedMetrics
                                                  options:NSJSONWritingPrettyPrinted
                                                    error:err];
   if (json == nil || (err != nil && *err != nil)) {

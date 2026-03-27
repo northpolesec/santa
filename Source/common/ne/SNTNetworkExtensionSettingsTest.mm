@@ -27,7 +27,7 @@
 @end
 
 @implementation SNTNetworkExtensionSettingsFuture
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   [coder encodeObject:@"futureValue" forKey:@"futureProperty"];
 }
@@ -40,7 +40,7 @@
 @end
 
 @implementation SNTNetworkExtensionSettingsLegacy
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
 }
 @end
 
@@ -50,7 +50,7 @@
 @implementation SNTNetworkExtensionSettingsTest
 
 - (void)testInitialization {
-  SNTNetworkExtensionSettings *settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  SNTNetworkExtensionSettings* settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
   XCTAssertNotNil(settings);
   XCTAssertTrue(settings.enable);
 
@@ -60,13 +60,13 @@
 }
 
 - (void)testRoundtripEncodeDecode {
-  SNTNetworkExtensionSettings *settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:settings
+  SNTNetworkExtensionSettings* settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:settings
                                        requiringSecureCoding:YES
                                                        error:nil];
   XCTAssertNotNil(data);
 
-  SNTNetworkExtensionSettings *deserialized =
+  SNTNetworkExtensionSettings* deserialized =
       [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTNetworkExtensionSettings class]
                                         fromData:data
                                            error:nil];
@@ -92,20 +92,20 @@
   // SNTNetworkExtensionSettings that adds an extra property. We archive it, then remap the
   // class name back to SNTNetworkExtensionSettings during decode to simulate an old receiver
   // processing data produced by a new sender.
-  SNTNetworkExtensionSettingsFuture *future =
+  SNTNetworkExtensionSettingsFuture* future =
       [[SNTNetworkExtensionSettingsFuture alloc] initWithEnable:YES];
 
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:future
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:future
                                        requiringSecureCoding:YES
                                                        error:nil];
   XCTAssertNotNil(data);
 
-  NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data error:nil];
+  NSKeyedUnarchiver* unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data error:nil];
   unarchiver.requiresSecureCoding = YES;
   [unarchiver setClass:[SNTNetworkExtensionSettings class]
           forClassName:NSStringFromClass([SNTNetworkExtensionSettingsFuture class])];
 
-  SNTNetworkExtensionSettings *deserialized =
+  SNTNetworkExtensionSettings* deserialized =
       [unarchiver decodeObjectOfClass:[SNTNetworkExtensionSettings class]
                                forKey:NSKeyedArchiveRootObjectKey];
   [unarchiver finishDecoding];
@@ -121,18 +121,18 @@
   // SNTNetworkExtensionSettingsLegacy encodes nothing, so the archive completely
   // omits the 'enable' key. We remap the class name to SNTNetworkExtensionSettings
   // during decode to simulate a new receiver processing data from a legacy sender.
-  SNTNetworkExtensionSettingsLegacy *legacy = [[SNTNetworkExtensionSettingsLegacy alloc] init];
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:legacy
+  SNTNetworkExtensionSettingsLegacy* legacy = [[SNTNetworkExtensionSettingsLegacy alloc] init];
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:legacy
                                        requiringSecureCoding:YES
                                                        error:nil];
   XCTAssertNotNil(data);
 
-  NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data error:nil];
+  NSKeyedUnarchiver* unarchiver = [[NSKeyedUnarchiver alloc] initForReadingFromData:data error:nil];
   unarchiver.requiresSecureCoding = YES;
   [unarchiver setClass:[SNTNetworkExtensionSettings class]
           forClassName:NSStringFromClass([SNTNetworkExtensionSettingsLegacy class])];
 
-  SNTNetworkExtensionSettings *deserialized =
+  SNTNetworkExtensionSettings* deserialized =
       [unarchiver decodeObjectOfClass:[SNTNetworkExtensionSettings class]
                                forKey:NSKeyedArchiveRootObjectKey];
   [unarchiver finishDecoding];

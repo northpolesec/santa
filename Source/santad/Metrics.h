@@ -49,17 +49,17 @@ using FileAccessEventCountTuple =
     std::tuple<FileAccessMetricsPolicyVersion, FileAccessMetricsPolicyName, FileAccessMetricStatus,
                es_event_type_t, FileAccessPolicyDecision>;
 
-NSString *const EventTypeToString(es_event_type_t eventType);
+NSString* const EventTypeToString(es_event_type_t eventType);
 
 class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Metrics> {
  public:
-  static std::shared_ptr<Metrics> Create(SNTMetricSet *metric_set, uint64_t interval);
+  static std::shared_ptr<Metrics> Create(SNTMetricSet* metric_set, uint64_t interval);
 
   Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t interval,
-          SNTMetricInt64Gauge *event_processing_times, SNTMetricCounter *event_counts,
-          SNTMetricCounter *rate_limit_counts, SNTMetricCounter *drop_counts,
-          SNTMetricCounter *faa_event_counts, SNTMetricSet *metric_set,
-          void (^run_on_first_start)(Metrics *));
+          SNTMetricInt64Gauge* event_processing_times, SNTMetricCounter* event_counts,
+          SNTMetricCounter* rate_limit_counts, SNTMetricCounter* drop_counts,
+          SNTMetricCounter* faa_event_counts, SNTMetricSet* metric_set,
+          void (^run_on_first_start)(Metrics*));
 
   ~Metrics();
 
@@ -94,24 +94,24 @@ class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Me
   };
 
   void FlushMetrics();
-  void ExportSerialized(SNTMetricSet *metric_set);
-  void ExportSerialized(SNTMetricSet *metric_set, void (^reply)(BOOL));
+  void ExportSerialized(SNTMetricSet* metric_set);
+  void ExportSerialized(SNTMetricSet* metric_set, void (^reply)(BOOL));
 
-  MOLXPCConnection *metrics_connection_;
+  MOLXPCConnection* metrics_connection_;
   dispatch_queue_t q_;
   dispatch_source_t timer_source_;
   uint64_t interval_;
-  SNTMetricInt64Gauge *event_processing_times_;
-  SNTMetricCounter *event_counts_;
-  SNTMetricCounter *rate_limit_counts_;
-  SNTMetricCounter *faa_event_counts_;
-  SNTMetricCounter *drop_counts_;
-  SNTMetricSet *metric_set_;
+  SNTMetricInt64Gauge* event_processing_times_;
+  SNTMetricCounter* event_counts_;
+  SNTMetricCounter* rate_limit_counts_;
+  SNTMetricCounter* faa_event_counts_;
+  SNTMetricCounter* drop_counts_;
+  SNTMetricSet* metric_set_;
   // Tracks whether or not the timer_source should be running.
   // This helps manage dispatch source state to ensure the source is not
   // suspended, resumed, or cancelled while in an improper state.
   bool running_ = false;
-  void (^run_on_first_start_)(Metrics *);
+  void (^run_on_first_start_)(Metrics*);
 
   // Separate queue used for setting event metrics
   // Mitigate issues where capturing metrics could be blocked on exporting

@@ -31,27 +31,27 @@
 ///  Register a new command with the specified name. Do not use this directly, use the
 ///  @c REGISTER_COMMAND_NAME macro instead.
 ///
-+ (void)registerCommand:(Class<SNTCommandProtocol>)command named:(NSString *)name;
++ (void)registerCommand:(Class<SNTCommandProtocol>)command named:(NSString*)name;
 
 ///
 ///  @return a usage string listing all of the available commands
 ///
-+ (NSString *)usage;
++ (NSString*)usage;
 
 ///
 ///  @return the descriptive text for the given command, if it exists
 ///
-+ (NSString *)helpForCommandWithName:(NSString *)command;
++ (NSString*)helpForCommandWithName:(NSString*)command;
 
 ///
 ///  @return YES if @c commandName exists.
 ///
-+ (BOOL)hasCommandWithName:(NSString *)commandName;
++ (BOOL)hasCommandWithName:(NSString*)commandName;
 
 ///
 /// Strips hyphens and underscores. If the given name is an alias, returns the real command.
 ///
-+ (NSString *)resolveCommandName:(NSString *)name;
++ (NSString*)resolveCommandName:(NSString*)name;
 
 ///
 ///  Runs the given command with the given arguments.
@@ -59,7 +59,7 @@
 ///  @param commandName the name of a previously-registered command
 ///  @param arguments an array of arguments to pass to the command
 ///
-+ (void)runCommandWithName:(NSString *)commandName arguments:(NSArray *)arguments;
++ (void)runCommandWithName:(NSString*)commandName arguments:(NSArray*)arguments;
 
 @end
 

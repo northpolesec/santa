@@ -88,7 +88,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
     }
   }
 
-  void Write(std::vector<uint8_t> &&bytes) override {
+  void Write(std::vector<uint8_t>&& bytes) override {
     auto shared_this = this->shared_from_this();
 
     // Workaround to move `bytes` into the block without a copy
@@ -152,7 +152,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
 
   void FilesExported(absl::flat_hash_map<std::string, bool> files_exported) override {
     dispatch_async(q_, ^{
-      for (const auto &file_exported : files_exported) {
+      for (const auto& file_exported : files_exported) {
         if (!spool_reader_.AckMessage(file_exported.first, file_exported.second).ok()) {
           LOGW(@"Unable to delete exported file.");
         }

@@ -47,23 +47,23 @@
 @interface SNTNotificationManager ()
 
 ///  The currently displayed notification
-@property SNTMessageWindowController *currentWindowController;
+@property SNTMessageWindowController* currentWindowController;
 
 ///  The queue of pending notifications
-@property(readonly) NSMutableArray *pendingNotifications;
+@property(readonly) NSMutableArray* pendingNotifications;
 
 // A serial queue for holding hashBundleBinaries requests
 @property dispatch_queue_t hashBundleBinariesQueue;
 
 // Timer for temporary monitor mode countdown
-@property(atomic, strong) NSTimer *temporaryMonitorModeTimer;
-@property(atomic, strong) NSDate *temporaryMonitorModeExpiration;
+@property(atomic, strong) NSTimer* temporaryMonitorModeTimer;
+@property(atomic, strong) NSDate* temporaryMonitorModeExpiration;
 
 @end
 
 @implementation SNTNotificationManager
 
-static NSString *const silencedNotificationsKey = @"SilencedNotifications";
+static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 
 - (instancetype)init {
   self = [super init];
@@ -75,9 +75,9 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   return self;
 }
 
-- (void)windowDidCloseSilenceHash:(NSString *)hash withInterval:(NSTimeInterval)interval {
+- (void)windowDidCloseSilenceHash:(NSString*)hash withInterval:(NSTimeInterval)interval {
   if (hash) {
-    NSDate *d = [[NSDate date] dateByAddingTimeInterval:interval];
+    NSDate* d = [[NSDate date] dateByAddingTimeInterval:interval];
     [self updateSilenceDate:d forHash:hash];
   }
 
@@ -87,9 +87,9 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   if (self.pendingNotifications.count) [self showQueuedWindow];
 }
 
-- (void)updateSilenceDate:(NSDate *)date forHash:(NSString *)hash {
-  NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-  NSMutableDictionary *d = [[ud objectForKey:silencedNotificationsKey] mutableCopy];
+- (void)updateSilenceDate:(NSDate*)date forHash:(NSString*)hash {
+  NSUserDefaults* ud = [NSUserDefaults standardUserDefaults];
+  NSMutableDictionary* d = [[ud objectForKey:silencedNotificationsKey] mutableCopy];
   if (!d) d = [NSMutableDictionary dictionary];
   if (date) {
     d[hash] = date;
@@ -99,14 +99,14 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [ud setObject:d forKey:silencedNotificationsKey];
 }
 
-- (BOOL)notificationAlreadyQueued:(SNTMessageWindowController *)pendingMsg {
-  for (SNTMessageWindowController *msg in self.pendingNotifications) {
+- (BOOL)notificationAlreadyQueued:(SNTMessageWindowController*)pendingMsg {
+  for (SNTMessageWindowController* msg in self.pendingNotifications) {
     if ([[msg messageHash] isEqual:[pendingMsg messageHash]]) return YES;
   }
   return NO;
 }
 
-- (void)queueMessage:(SNTMessageWindowController *)pendingMsg enableSilences:(BOOL)enableSilences {
+- (void)queueMessage:(SNTMessageWindowController*)pendingMsg enableSilences:(BOOL)enableSilences {
   // Post a distributed notification, regardless of queue state.
   [self postDistributedNotification:pendingMsg];
 
@@ -118,7 +118,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     if ([self notificationAlreadyQueued:pendingMsg]) {
       // Make sure we clear the reply block so we don't leak memory.
       if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
-        SNTBinaryMessageWindowController *bmwc = (SNTBinaryMessageWindowController *)pendingMsg;
+        SNTBinaryMessageWindowController* bmwc = (SNTBinaryMessageWindowController*)pendingMsg;
         bmwc.replyBlock(NO);
       }
       return;
@@ -126,9 +126,9 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
     // See if this message has been user-silenced.
     if (enableSilences) {
-      NSString *messageHash = [pendingMsg messageHash];
-      NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-      NSDate *silenceDate = [ud objectForKey:silencedNotificationsKey][messageHash];
+      NSString* messageHash = [pendingMsg messageHash];
+      NSUserDefaults* ud = [NSUserDefaults standardUserDefaults];
+      NSDate* silenceDate = [ud objectForKey:silencedNotificationsKey][messageHash];
       if ([silenceDate isKindOfClass:[NSDate class]]) {
         switch ([silenceDate compare:[NSDate date]]) {
           case NSOrderedDescending:
@@ -160,20 +160,20 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 // management tools or display an enterprise-specific UI (which is particularly
 // useful when combined with the EnableSilentMode configuration option, to
 // disable Santa's standard UI).
-- (void)postDistributedNotification:(SNTMessageWindowController *)pendingMsg {
+- (void)postDistributedNotification:(SNTMessageWindowController*)pendingMsg {
   if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
-    return [self postBinaryDistributedNotification:(SNTBinaryMessageWindowController *)pendingMsg];
+    return [self postBinaryDistributedNotification:(SNTBinaryMessageWindowController*)pendingMsg];
   } else if ([pendingMsg isKindOfClass:[SNTFileAccessMessageWindowController class]]) {
     return [self
-        postFileAccessDistributedNotification:(SNTFileAccessMessageWindowController *)pendingMsg];
+        postFileAccessDistributedNotification:(SNTFileAccessMessageWindowController*)pendingMsg];
   }
   return;
 }
 
-- (void)postBinaryDistributedNotification:(SNTBinaryMessageWindowController *)wc {
-  NSMutableArray<NSDictionary *> *signingChain =
+- (void)postBinaryDistributedNotification:(SNTBinaryMessageWindowController*)wc {
+  NSMutableArray<NSDictionary*>* signingChain =
       [NSMutableArray arrayWithCapacity:wc.event.signingChain.count];
-  for (MOLCertificate *cert in wc.event.signingChain) {
+  for (MOLCertificate* cert in wc.event.signingChain) {
     [signingChain addObject:@{
       kCertSHA256 : cert.SHA256 ?: @"",
       kCertCN : cert.commonName ?: @"",
@@ -183,7 +183,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
       kCertValidUntil : @([cert.validUntil timeIntervalSince1970]) ?: @0,
     }];
   }
-  NSDictionary *userInfo = @{
+  NSDictionary* userInfo = @{
     kFileSHA256 : wc.event.fileSHA256 ?: @"",
     kFilePath : wc.event.filePath ?: @"",
     kFileBundleName : wc.event.fileBundleName ?: @"",
@@ -199,15 +199,15 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     kSigningChain : signingChain,
   };
 
-  NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
+  NSDistributedNotificationCenter* dc = [NSDistributedNotificationCenter defaultCenter];
   [dc postNotificationName:@"com.northpolesec.santa.notification.blockedeexecution"
                     object:@"com.northpolesec.santa"
                   userInfo:userInfo
         deliverImmediately:YES];
 }
 
-- (void)postFileAccessDistributedNotification:(SNTFileAccessMessageWindowController *)wc {
-  NSDictionary *userInfo = @{
+- (void)postFileAccessDistributedNotification:(SNTFileAccessMessageWindowController*)wc {
+  NSDictionary* userInfo = @{
     kFileSHA256 : wc.event.process.fileSHA256 ?: @"",
     kFilePath : wc.event.process.filePath ?: @"",
     kTeamID : wc.event.process.teamID ?: @"",
@@ -222,7 +222,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     @"rule_version" : wc.event.ruleVersion ?: @"",
   };
 
-  NSDistributedNotificationCenter *dc = [NSDistributedNotificationCenter defaultCenter];
+  NSDistributedNotificationCenter* dc = [NSDistributedNotificationCenter defaultCenter];
   [dc postNotificationName:@"com.northpolesec.santa.notification.blockedfileaccess"
                     object:@"com.northpolesec.santa"
                   userInfo:userInfo
@@ -241,8 +241,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
       [self.currentWindowController showWindow:self];
 
       if ([self.currentWindowController isKindOfClass:[SNTBinaryMessageWindowController class]]) {
-        SNTBinaryMessageWindowController *controller =
-            (SNTBinaryMessageWindowController *)self.currentWindowController;
+        SNTBinaryMessageWindowController* controller =
+            (SNTBinaryMessageWindowController*)self.currentWindowController;
         if (controller.event.needsBundleHash) {
           dispatch_async(self.hashBundleBinariesQueue, ^{
             [self hashBundleBinariesForEvent:controller.event withController:controller];
@@ -253,12 +253,12 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   });
 }
 
-- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent *)event
-                    withController:(SNTBinaryMessageWindowController *)withController {
+- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent*)event
+                    withController:(SNTBinaryMessageWindowController*)withController {
   withController.bundleProgress.label = @"Searching for files...";
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  MOLXPCConnection *bc = [SNTXPCBundleServiceInterface configuredConnection];
+  MOLXPCConnection* bc = [SNTXPCBundleServiceInterface configuredConnection];
   bc.acceptedHandler = ^{
     dispatch_semaphore_signal(sema);
   };
@@ -272,8 +272,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     return;
   }
 
-  NSXPCListener *al = [NSXPCListener anonymousListener];
-  MOLXPCConnection *pl = [[MOLXPCConnection alloc] initServerWithListener:al];
+  NSXPCListener* al = [NSXPCListener anonymousListener];
+  MOLXPCConnection* pl = [[MOLXPCConnection alloc] initServerWithListener:al];
   pl.exportedObject = self;
   pl.privilegedInterface =
       [NSXPCInterface interfaceWithProtocol:@protocol(SNTBundleServiceProgressXPC)];
@@ -288,8 +288,8 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [[bc remoteObjectProxy]
       hashBundleBinariesForEvent:event
                         listener:al.endpoint
-                           reply:^(NSString *bh, NSArray<SNTStoredExecutionEvent *> *events,
-                                   NSNumber *ms) {
+                           reply:^(NSString* bh, NSArray<SNTStoredExecutionEvent*>* events,
+                                   NSNumber* ms) {
                              // Revert to displaying the blockable event if we fail to calculate the
                              // bundle hash
                              if (!bh)
@@ -301,7 +301,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
                              event.fileBundleHashMilliseconds = ms;
                              event.fileBundleExecutableRelPath =
                                  [events.firstObject fileBundleExecutableRelPath];
-                             for (SNTStoredExecutionEvent *se in events) {
+                             for (SNTStoredExecutionEvent* se in events) {
                                se.fileBundleHash = bh;
                                se.fileBundleBinaryCount = @(events.count);
                                se.fileBundleHashMilliseconds = ms;
@@ -309,7 +309,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
                              // Send the results to santad. It will decide if they need to be
                              // synced.
-                             MOLXPCConnection *daemonConn =
+                             MOLXPCConnection* daemonConn =
                                  [SNTXPCControlInterface configuredConnection];
                              [daemonConn resume];
                              [[daemonConn remoteObjectProxy] syncBundleEvent:event
@@ -331,16 +331,16 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 - (void)postClientModeNotification:(SNTClientMode)clientmode {
   if ([SNTConfigurator configurator].enableSilentMode) return;
 
-  UNUserNotificationCenter *un = [UNUserNotificationCenter currentNotificationCenter];
+  UNUserNotificationCenter* un = [UNUserNotificationCenter currentNotificationCenter];
 
-  UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
+  UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
   content.title = @"Santa";
 
   switch (clientmode) {
     case SNTClientModeMonitor: {
       content.body =
           NSLocalizedString(@"Switching into Monitor mode", @"Client mode change: MONITOR");
-      NSString *customMsg = [[SNTConfigurator configurator] modeNotificationMonitor];
+      NSString* customMsg = [[SNTConfigurator configurator] modeNotificationMonitor];
       if (!customMsg) break;
       // If a custom message is added but as an empty string, disable notifications.
       if (!customMsg.length) return;
@@ -351,7 +351,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     case SNTClientModeLockdown: {
       content.body =
           NSLocalizedString(@"Switching into Lockdown mode", @"Client mode change: LOCKDOWN");
-      NSString *customMsg = [[SNTConfigurator configurator] modeNotificationLockdown];
+      NSString* customMsg = [[SNTConfigurator configurator] modeNotificationLockdown];
       if (!customMsg) break;
       // If a custom message is added but as an empty string, disable notifications.
       if (!customMsg.length) return;
@@ -362,7 +362,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     case SNTClientModeStandalone: {
       content.body =
           NSLocalizedString(@"Switching into Standalone mode", @"Client mode change: STANDALONE");
-      NSString *customMsg = [[SNTConfigurator configurator] modeNotificationStandalone];
+      NSString* customMsg = [[SNTConfigurator configurator] modeNotificationStandalone];
       if (!customMsg) break;
       // If a custom message is added but as an empty string, disable notifications.
       if (!customMsg.length) return;
@@ -373,7 +373,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
     default: return;
   }
 
-  UNNotificationRequest *req =
+  UNNotificationRequest* req =
       [UNNotificationRequest requestWithIdentifier:@"clientModeNotification"
                                            content:content
                                            trigger:nil];
@@ -381,12 +381,12 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [un addNotificationRequest:req withCompletionHandler:nil];
 }
 
-- (void)postRuleSyncNotificationForApplication:(NSString *)app {
+- (void)postRuleSyncNotificationForApplication:(NSString*)app {
   if ([SNTConfigurator configurator].enableSilentMode) return;
 
-  UNUserNotificationCenter *un = [UNUserNotificationCenter currentNotificationCenter];
+  UNUserNotificationCenter* un = [UNUserNotificationCenter currentNotificationCenter];
 
-  UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
+  UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
   content.title = @"Santa";
   content.body =
       app ? [NSString stringWithFormat:
@@ -397,26 +397,26 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
           : NSLocalizedString(@"Requested application can now be run",
                               @"Notification message shown when an unknown app has been unblocked");
 
-  NSString *identifier = [NSString stringWithFormat:@"ruleSyncNotification_%@", content.body];
+  NSString* identifier = [NSString stringWithFormat:@"ruleSyncNotification_%@", content.body];
 
-  UNNotificationRequest *req = [UNNotificationRequest requestWithIdentifier:identifier
+  UNNotificationRequest* req = [UNNotificationRequest requestWithIdentifier:identifier
                                                                     content:content
                                                                     trigger:nil];
 
   [un addNotificationRequest:req withCompletionHandler:nil];
 }
 
-- (void)postBlockNotification:(SNTStoredExecutionEvent *)event
-            withCustomMessage:(NSString *)message
-                    customURL:(NSString *)url
-                  configState:(SNTConfigState *)configState
+- (void)postBlockNotification:(SNTStoredExecutionEvent*)event
+            withCustomMessage:(NSString*)message
+                    customURL:(NSString*)url
+                  configState:(SNTConfigState*)configState
                      andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
   }
 
-  SNTBinaryMessageWindowController *pendingMsg =
+  SNTBinaryMessageWindowController* pendingMsg =
       [[SNTBinaryMessageWindowController alloc] initWithEvent:event
                                                     customMsg:message
                                                     customURL:url
@@ -426,42 +426,42 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   [self queueMessage:pendingMsg enableSilences:configState.enableNotificationSilences];
 }
 
-- (void)postUSBBlockNotification:(SNTDeviceEvent *)event {
+- (void)postUSBBlockNotification:(SNTDeviceEvent*)event {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
   }
-  SNTDeviceMessageWindowController *pendingMsg =
+  SNTDeviceMessageWindowController* pendingMsg =
       [[SNTDeviceMessageWindowController alloc] initWithEvent:event];
 
   [self queueMessage:pendingMsg enableSilences:YES];
 }
 
-- (void)postNetworkMountNotification:(SNTStoredNetworkMountEvent *)event
-                        configBundle:(SNTConfigBundle *)configBundle {
+- (void)postNetworkMountNotification:(SNTStoredNetworkMountEvent*)event
+                        configBundle:(SNTConfigBundle*)configBundle {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
   }
 
-  SNTNetworkMountMessageWindowController *pendingMsg =
+  SNTNetworkMountMessageWindowController* pendingMsg =
       [[SNTNetworkMountMessageWindowController alloc] initWithEvent:event
                                                        configBundle:configBundle];
 
   [self queueMessage:pendingMsg enableSilences:YES];
 }
 
-- (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent *)event
-                          customMessage:(NSString *)message
-                              customURL:(NSString *)url
-                             customText:(NSString *)text
-                            configState:(SNTConfigState *)configState {
+- (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent*)event
+                          customMessage:(NSString*)message
+                              customURL:(NSString*)url
+                             customText:(NSString*)text
+                            configState:(SNTConfigState*)configState {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
   }
 
-  SNTFileAccessMessageWindowController *pendingMsg =
+  SNTFileAccessMessageWindowController* pendingMsg =
       [[SNTFileAccessMessageWindowController alloc] initWithEvent:event
                                                     customMessage:message
                                                         customURL:url
@@ -477,7 +477,7 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
   }];
 }
 
-- (void)enterTemporaryMonitorMode:(NSDate *)expiration {
+- (void)enterTemporaryMonitorMode:(NSDate*)expiration {
   [self.statusItemManager enterMonitorModeWithExpiration:expiration];
 }
 
@@ -498,13 +498,13 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
 
 #pragma mark SNTBundleServiceProgressXPC protocol methods
 
-- (void)updateCountsForEvent:(SNTStoredExecutionEvent *)event
+- (void)updateCountsForEvent:(SNTStoredExecutionEvent*)event
                  binaryCount:(uint64_t)binaryCount
                    fileCount:(uint64_t)fileCount
                  hashedCount:(uint64_t)hashedCount {
   if ([self.currentWindowController isKindOfClass:[SNTBinaryMessageWindowController class]]) {
-    SNTBinaryMessageWindowController *controller =
-        (SNTBinaryMessageWindowController *)self.currentWindowController;
+    SNTBinaryMessageWindowController* controller =
+        (SNTBinaryMessageWindowController*)self.currentWindowController;
 
     __block uint64_t guiFileCount = fileCount;
     if ([controller.event.idx isEqual:event.idx]) {
@@ -515,9 +515,9 @@ static NSString *const silencedNotificationsKey = @"SilencedNotifications";
           guiFileCount = binaryCount;
         }
 
-        NSString *fileLabel =
+        NSString* fileLabel =
             [NSString stringWithFormat:@"%llu binaries / %llu files", binaryCount, guiFileCount];
-        NSString *hashedLabel =
+        NSString* hashedLabel =
             [NSString stringWithFormat:@"%llu hashed / %llu binaries", hashedCount, binaryCount];
         controller.bundleProgress.label = hashedCount ? hashedLabel : fileLabel;
       });

@@ -17,6 +17,6 @@
 
 #import "Source/santasyncservice/SNTSyncBroadcaster.h"
 
-void LogSyncMessage(os_log_type_t logType, NSString *message) {
+void LogSyncMessage(os_log_type_t logType, NSString* message) {
   [[SNTSyncBroadcaster broadcaster] broadcastToLogListeners:message logType:logType];
 }

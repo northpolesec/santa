@@ -45,16 +45,16 @@ class SantaSetCache {
       : cache_(capacity), per_entry_capacity_(per_entry_capacity) {}
 
   // Not copyable
-  SantaSetCache(const SantaSetCache &other) = delete;
-  SantaSetCache &operator=(const SantaSetCache &other) = delete;
+  SantaSetCache(const SantaSetCache& other) = delete;
+  SantaSetCache& operator=(const SantaSetCache& other) = delete;
 
   // Moves could be safe to implement, but not currently needed.
-  SantaSetCache(SantaSetCache &&other) = delete;
-  SantaSetCache &operator=(SantaSetCache &&rhs) = delete;
+  SantaSetCache(SantaSetCache&& other) = delete;
+  SantaSetCache& operator=(SantaSetCache&& rhs) = delete;
 
   /// Check if the set at the given key contained the given value.
-  bool Contains(const KeyT &key, const ValueT &val) const {
-    return cache_.contains(key, ^bool(const SharedValueSet &set) {
+  bool Contains(const KeyT& key, const ValueT& val) const {
+    return cache_.contains(key, ^bool(const SharedValueSet& set) {
       return set && set->count(val) > 0;
     });
   }
@@ -67,11 +67,11 @@ class SantaSetCache {
   /// Return true if the new value was inserted into the inner
   /// set. Otherwise returns false if the inner set already
   /// contained the value.
-  bool Set(const KeyT &key, ValueT val) {
+  bool Set(const KeyT& key, ValueT val) {
     __block bool did_set = false;
     __block ValueT tmp_val = std::move(val);
 
-    cache_.update(key, ^(SharedValueSet &set) {
+    cache_.update(key, ^(SharedValueSet& set) {
       ValueT moved_val = std::move(tmp_val);
       if (!set) {
         set = std::make_shared<ValueSet>();
@@ -98,7 +98,7 @@ class SantaSetCache {
   }
 
   /// Remove the outer cache entry.
-  void Remove(const KeyT &key) { cache_.remove(key); }
+  void Remove(const KeyT& key) { cache_.remove(key); }
 
   /// Clear the whole cache.
   void Clear() { cache_.clear(); }
@@ -106,13 +106,13 @@ class SantaSetCache {
   /// Return a shared_ptr of the const set contained at the given key
   /// IMPORTANT: This method should never be called from multithreaded
   /// environments. The returned value can be mutated by other threads.
-  SharedConstValueSet UnsafeGet(const KeyT &key) const { return cache_.get(key); }
+  SharedConstValueSet UnsafeGet(const KeyT& key) const { return cache_.get(key); }
 
   /// Size of the cache
   size_t Size() const { return cache_.count(); }
 
   /// Size of the underlying set in the cache at the given key
-  size_t Size(const KeyT &key) const {
+  size_t Size(const KeyT& key) const {
     SharedValueSet set = cache_.get(key);
     if (set) {
       return set->size();

@@ -51,7 +51,7 @@ using santa::Processor;
 @property(nonatomic) double defaultBudget;
 @property(nonatomic) int64_t minAllowedHeadroom;
 @property(nonatomic) int64_t maxAllowedHeadroom;
-@property SNTConfigurator *configurator;
+@property SNTConfigurator* configurator;
 @end
 
 @implementation SNTEndpointSecurityClient {
@@ -95,7 +95,7 @@ using santa::Processor;
   return self;
 }
 
-- (NSString *)errorMessageForNewClientResult:(es_new_client_result_t)result {
+- (NSString*)errorMessageForNewClientResult:(es_new_client_result_t)result {
   switch (result) {
     case ES_NEW_CLIENT_RESULT_SUCCESS: return nil;
     case ES_NEW_CLIENT_RESULT_ERR_NOT_PERMITTED: return @"Full-disk access not granted";
@@ -108,14 +108,14 @@ using santa::Processor;
   }
 }
 
-- (void)handleMessage:(Message &&)esMsg
+- (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(EventDisposition disposition))recordEventMetrics {
   // This method should only be used by classes derived
   // from SNTEndpointSecurityClient.
   [self doesNotRecognizeSelector:_cmd];
 }
 
-- (BOOL)shouldHandleMessage:(const Message &)esMsg {
+- (BOOL)shouldHandleMessage:(const Message&)esMsg {
   if (esMsg->process->is_es_client && [self.configurator ignoreOtherEndpointSecurityClients]) {
     if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
       [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
@@ -126,7 +126,7 @@ using santa::Processor;
   return YES;
 }
 
-- (bool)handleContextMessage:(Message &)esMsg {
+- (bool)handleContextMessage:(Message&)esMsg {
   return false;
 }
 
@@ -137,7 +137,7 @@ using santa::Processor;
     [NSException raise:@"Client already established" format:@"IsConnected already true"];
   }
 
-  self->_esClient = self->_esApi->NewClient(^(es_client_t *c, Message esMsg) {
+  self->_esClient = self->_esApi->NewClient(^(es_client_t* c, Message esMsg) {
     int64_t processingStart = clock_gettime_nsec_np(CLOCK_MONOTONIC);
 
     // Update event stats BEFORE calling into the processor class to ensure
@@ -168,7 +168,7 @@ using santa::Processor;
   });
 
   if (!self->_esClient.IsConnected()) {
-    NSString *errMsg = [self errorMessageForNewClientResult:_esClient.NewClientResult()];
+    NSString* errMsg = [self errorMessageForNewClientResult:_esClient.NewClientResult()];
     LOGE(@"Unable to create EndpointSecurity client: %@", errMsg);
     [NSException raise:@"Failed to create ES client" format:@"%@", errMsg];
   } else {
@@ -199,11 +199,11 @@ using santa::Processor;
   return _esApi->ClearCache(self->_esClient);
 }
 
-- (bool)subscribe:(const std::set<es_event_type_t> &)events {
+- (bool)subscribe:(const std::set<es_event_type_t>&)events {
   return _esApi->Subscribe(_esClient, events);
 }
 
-- (bool)subscribeAndClearCache:(const std::set<es_event_type_t> &)events {
+- (bool)subscribeAndClearCache:(const std::set<es_event_type_t>&)events {
   return [self subscribe:events] && [self clearCache];
 }
 
@@ -218,7 +218,7 @@ using santa::Processor;
   return _esApi->UnmuteAllTargetPaths(_esClient);
 }
 
-- (bool)unmuteProcess:(const audit_token_t *)tok {
+- (bool)unmuteProcess:(const audit_token_t*)tok {
   return _esApi->UnmuteProcess(_esClient, tok);
 }
 
@@ -233,29 +233,29 @@ using santa::Processor;
   return _esApi->InvertProcessMuting(_esClient);
 }
 
-- (bool)muteProcess:(const audit_token_t *)tok {
+- (bool)muteProcess:(const audit_token_t*)tok {
   return _esApi->MuteProcess(_esClient, tok);
 }
 
-- (bool)muteTargetPaths:(const santa::SetPairPathAndType &)paths {
+- (bool)muteTargetPaths:(const santa::SetPairPathAndType&)paths {
   bool result = true;
-  for (const auto &PairPathAndType : paths) {
+  for (const auto& PairPathAndType : paths) {
     result =
         _esApi->MuteTargetPath(_esClient, PairPathAndType.first, PairPathAndType.second) && result;
   }
   return result;
 }
 
-- (bool)unmuteTargetPaths:(const santa::SetPairPathAndType &)paths {
+- (bool)unmuteTargetPaths:(const santa::SetPairPathAndType&)paths {
   bool result = true;
-  for (const auto &PairPathAndType : paths) {
+  for (const auto& PairPathAndType : paths) {
     result = _esApi->UnmuteTargetPath(_esClient, PairPathAndType.first, PairPathAndType.second) &&
              result;
   }
   return result;
 }
 
-- (bool)respondToMessage:(const Message &)msg
+- (bool)respondToMessage:(const Message&)msg
           withAuthResult:(es_auth_result_t)result
                cacheable:(bool)cacheable {
   if (msg->event_type == ES_EVENT_TYPE_AUTH_OPEN) {
@@ -278,7 +278,7 @@ using santa::Processor;
   });
 }
 
-- (void)asynchronouslyProcess:(Message)msg handler:(void (^)(Message &&))messageHandler {
+- (void)asynchronouslyProcess:(Message)msg handler:(void (^)(Message&&))messageHandler {
   __block Message msgTmp = std::move(msg);
   dispatch_async(_notifyQueue, ^{
     messageHandler(std::move(msgTmp));
@@ -303,7 +303,7 @@ using santa::Processor;
   return nanosUntilDeadline - headroom;
 }
 
-- (void)processMessage:(Message &&)msg handler:(void (^)(Message))messageHandler {
+- (void)processMessage:(Message&&)msg handler:(void (^)(Message))messageHandler {
   if (unlikely(msg->action_type != ES_ACTION_TYPE_AUTH)) {
     // This is a programming error
     LOGE(@"Attempting to process non-AUTH message");

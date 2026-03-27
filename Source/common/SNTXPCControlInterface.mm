@@ -27,32 +27,32 @@
 #import "src/santanetd/SNDProcessFlows.h"
 #import "src/santanetd/SNDProcessInfo.h"
 
-static NSString *const kSantaExtensionBundleID = @"com.northpolesec.santa.daemon";
-static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.netd";
+static NSString* const kSantaExtensionBundleID = @"com.northpolesec.santa.daemon";
+static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.netd";
 
 @implementation SNTXPCControlInterface
 
-+ (NSString *)serviceID {
++ (NSString*)serviceID {
 #ifdef SANTAADHOC
   // The mach service for an adhoc signed ES sysx uses the "endpoint-security" prefix instead of
   // the teamid. In Santa's case it will be endpoint-security.com.northpolesec.santa.daemon.xpc.
   return [NSString stringWithFormat:@"endpoint-security.%@.xpc", kSantaExtensionBundleID];
 #else
-  MOLCodesignChecker *cs = [[MOLCodesignChecker alloc] initWithSelf];
+  MOLCodesignChecker* cs = [[MOLCodesignChecker alloc] initWithSelf];
   // "teamid.com.northpolesec.santa.daemon.xpc"
   return [NSString stringWithFormat:@"%@.%@.xpc", cs.teamID, kSantaExtensionBundleID];
 #endif
 }
 
-+ (NSString *)santaExtensionBundleID {
++ (NSString*)santaExtensionBundleID {
   return kSantaExtensionBundleID;
 }
 
-+ (NSString *)santanetdExtensionBundleID {
++ (NSString*)santanetdExtensionBundleID {
   return kSantanetdExtensionBundleID;
 }
 
-+ (void)initializeControlInterface:(NSXPCInterface *)r {
++ (void)initializeControlInterface:(NSXPCInterface*)r {
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil]
         forSelector:@selector(databaseEventsPending:)
       argumentIndex:0
@@ -99,15 +99,15 @@ static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
             ofReply:YES];
 }
 
-+ (NSXPCInterface *)controlInterface {
-  NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTDaemonControlXPC)];
++ (NSXPCInterface*)controlInterface {
+  NSXPCInterface* r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTDaemonControlXPC)];
   [self initializeControlInterface:r];
 
   return r;
 }
 
-+ (MOLXPCConnection *)configuredConnection {
-  MOLXPCConnection *c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
++ (MOLXPCConnection*)configuredConnection {
+  MOLXPCConnection* c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
                                                           privileged:YES];
   c.remoteInterface = [self controlInterface];
   return c;

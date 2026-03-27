@@ -25,7 +25,7 @@
 namespace keychain = ::santa::keychain;
 
 @interface KeychainTest : XCTestCase
-@property NSString *testKeychainPath;
+@property NSString* testKeychainPath;
 @end
 
 @implementation KeychainTest
@@ -69,7 +69,7 @@ namespace keychain = ::santa::keychain;
 
 - (void)testKeychainItem {
   SecKeychainRef keychain;
-  NSString *password = @"TestPassword";
+  NSString* password = @"TestPassword";
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -87,11 +87,11 @@ namespace keychain = ::santa::keychain;
   std::unique_ptr<keychain::Item> item1 = mgr.CreateItem(@"TestAccount1", @"Test keychain item");
   std::unique_ptr<keychain::Item> item2 = mgr.CreateItem(@"TestAccount2", @"Test keychain item");
 
-  NSData *testData1 = [@"hello1" dataUsingEncoding:NSUTF8StringEncoding];
-  NSData *testData2 = [@"hello2" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* testData1 = [@"hello1" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* testData2 = [@"hello2" dataUsingEncoding:NSUTF8StringEncoding];
 
   // Getting a non-existent item is a failure
-  absl::StatusOr<NSData *> maybeItem = item1->Get();
+  absl::StatusOr<NSData*> maybeItem = item1->Get();
   XCTAssertEqual(maybeItem.status().code(), absl::StatusCode::kNotFound);
 
   // Deleting a non-existent item is successful

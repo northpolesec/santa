@@ -34,17 +34,17 @@ class SleighLauncher {
 
   virtual ~SleighLauncher() = default;
 
-  SleighLauncher(SleighLauncher &) = delete;
-  SleighLauncher &operator=(SleighLauncher &rhs) = delete;
+  SleighLauncher(SleighLauncher&) = delete;
+  SleighLauncher& operator=(SleighLauncher& rhs) = delete;
 
-  virtual absl::Status Launch(const std::vector<std::string> &input_files,
+  virtual absl::Status Launch(const std::vector<std::string>& input_files,
                               uint32_t timeout_seconds);
 
  private:
   std::string sleigh_path_;
 
   absl::StatusOr<std::string> SerializeConfig(
-      const std::vector<int> &input_fds);
+      const std::vector<int>& input_fds);
 };
 
 }  // namespace santa

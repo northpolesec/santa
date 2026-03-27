@@ -18,10 +18,10 @@
 /// Category on NSData providing the option of getting zlib or gzip compressed data.
 @interface NSData (Zlib)
 
-- (NSData *)zlibCompressed;
-- (NSData *)gzipCompressed;
+- (NSData*)zlibCompressed;
+- (NSData*)gzipCompressed;
 
-- (NSData *)zlibDecompressed;
-- (NSData *)gzipDecompressed;
+- (NSData*)zlibDecompressed;
+- (NSData*)gzipDecompressed;
 
 @end

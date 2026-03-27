@@ -26,22 +26,22 @@ typedef NS_ENUM(NSInteger, SNTStoredUSBMountEventDecision) {
 @interface SNTStoredUSBMountEvent : SNTStoredEvent <NSSecureCoding>
 
 /// The UUID of the event
-@property(readonly) NSString *uuid;
+@property(readonly) NSString* uuid;
 
 /// The Device Model string as reported by DiskArbitration framework
-@property(readonly) NSString *deviceModel;
+@property(readonly) NSString* deviceModel;
 
 /// The Device Vendor string as reported by DiskArbitration framework
-@property(readonly) NSString *deviceVendor;
+@property(readonly) NSString* deviceVendor;
 
 /// The mount on path
-@property(readonly) NSString *mountOnName;
+@property(readonly) NSString* mountOnName;
 
 /// The protocol string as reported by DiskArbitration framework
-@property(readonly) NSString *protocol;
+@property(readonly) NSString* protocol;
 
 /// The remount flags
-@property(readonly) NSArray<NSString *> *remountArgs;
+@property(readonly) NSArray<NSString*>* remountArgs;
 
 /// The decision on whether the mount was blocked, or allowed with remount
 @property(readonly) SNTStoredUSBMountEventDecision decision;
@@ -49,12 +49,12 @@ typedef NS_ENUM(NSInteger, SNTStoredUSBMountEventDecision) {
 /// Whether the device is encrypted
 @property(readonly) BOOL isEncrypted;
 
-- (instancetype)initWithDeviceModel:(NSString *)deviceModel
-                       deviceVendor:(NSString *)deviceVendor
-                        mountOnName:(NSString *)mountOnName
-                           protocol:(NSString *)protocol
+- (instancetype)initWithDeviceModel:(NSString*)deviceModel
+                       deviceVendor:(NSString*)deviceVendor
+                        mountOnName:(NSString*)mountOnName
+                           protocol:(NSString*)protocol
                            decision:(SNTStoredUSBMountEventDecision)decision
-                        remountArgs:(NSArray<NSString *> *)remountArgs
+                        remountArgs:(NSArray<NSString*>*)remountArgs
                         isEncrypted:(BOOL)isEncrypted;
 
 @end

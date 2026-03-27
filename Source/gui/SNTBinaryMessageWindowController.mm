@@ -30,19 +30,19 @@
 @interface SNTBinaryMessageWindowController ()
 
 ///  The custom message to display for this event
-@property(copy) NSString *customMessage;
+@property(copy) NSString* customMessage;
 
 ///  The custom URL to use for this event
-@property(copy) NSString *customURL;
+@property(copy) NSString* customURL;
 
 @end
 
 @implementation SNTBinaryMessageWindowController
 
-- (instancetype)initWithEvent:(SNTStoredExecutionEvent *)event
-                    customMsg:(NSString *)message
-                    customURL:(NSString *)url
-                  configState:(SNTConfigState *)configState
+- (instancetype)initWithEvent:(SNTStoredExecutionEvent*)event
+                    customMsg:(NSString*)message
+                    customURL:(NSString*)url
+                  configState:(SNTConfigState*)configState
                         reply:(void (^)(BOOL))replyBlock {
   self = [super init];
   if (self) {
@@ -65,13 +65,13 @@
   [_progress removeObserver:self forKeyPath:@"fractionCompleted"];
 }
 
-- (void)observeValueForKeyPath:(NSString *)keyPath
+- (void)observeValueForKeyPath:(NSString*)keyPath
                       ofObject:(id)object
-                        change:(NSDictionary *)change
-                       context:(void *)context {
+                        change:(NSDictionary*)change
+                       context:(void*)context {
   if ([keyPath isEqualToString:@"fractionCompleted"]) {
     dispatch_async(dispatch_get_main_queue(), ^{
-      NSProgress *progress = object;
+      NSProgress* progress = object;
       self.bundleProgress.fractionCompleted = progress.fractionCompleted;
     });
   }
@@ -105,7 +105,7 @@
   [super showWindow:sender];
 }
 
-- (NSString *)messageHash {
+- (NSString*)messageHash {
   return self.event.fileSHA256;
 }
 
@@ -124,8 +124,8 @@
 
 #pragma mark Generated properties
 
-- (void)updateBlockNotification:(SNTStoredExecutionEvent *)event
-                 withBundleHash:(NSString *)bundleHash {
+- (void)updateBlockNotification:(SNTStoredExecutionEvent*)event
+                 withBundleHash:(NSString*)bundleHash {
   // UI updates must happen on the main thread.
   dispatch_async(dispatch_get_main_queue(), ^{
     if ([self.event.idx isEqual:event.idx]) {

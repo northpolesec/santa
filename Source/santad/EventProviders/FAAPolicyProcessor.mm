@@ -26,7 +26,7 @@
 #include "Source/common/es/EnrichedTypes.h"
 
 // Terminal value that will never match a valid cert hash.
-NSString *const kBadCertHash = @"BAD_CERT_HASH";
+NSString* const kBadCertHash = @"BAD_CERT_HASH";
 
 namespace santa {
 
@@ -81,12 +81,12 @@ bool ShouldLogDecision(FileAccessPolicyDecision decision) {
   }
 }
 
-static inline bool ShouldShowUIForPolicy(const std::shared_ptr<WatchItemPolicyBase> &policy) {
+static inline bool ShouldShowUIForPolicy(const std::shared_ptr<WatchItemPolicyBase>& policy) {
   return !policy->silent;
 }
 
-static inline bool ShouldMessageTTYForPolicy(const std::shared_ptr<WatchItemPolicyBase> &policy,
-                                             const Message &msg) {
+static inline bool ShouldMessageTTYForPolicy(const std::shared_ptr<WatchItemPolicyBase>& policy,
+                                             const Message& msg) {
   if (policy->silent_tty || !TTYWriter::CanWrite(msg->process)) {
     return false;
   }
@@ -118,7 +118,7 @@ es_auth_result_t CombinePolicyResults(es_auth_result_t result1, es_auth_result_t
 }
 
 FAAPolicyProcessor::FAAPolicyProcessor(
-    SNTDecisionCache *decision_cache, std::shared_ptr<Enricher> enricher,
+    SNTDecisionCache* decision_cache, std::shared_ptr<Enricher> enricher,
     std::shared_ptr<Logger> logger, std::shared_ptr<TTYWriter> tty_writer,
     std::shared_ptr<Metrics> metrics, uint32_t rate_limit_logs_per_sec,
     uint32_t rate_limit_window_size_sec,
@@ -144,22 +144,22 @@ void FAAPolicyProcessor::ModifyRateLimiterSettings(uint32_t logs_per_sec,
   rate_limiter_.ModifySettings(logs_per_sec, window_size_sec);
 }
 
-NSString *FAAPolicyProcessor::GetCertificateHash(const es_file_t *es_file) {
+NSString* FAAPolicyProcessor::GetCertificateHash(const es_file_t* es_file) {
   // First see if we've already cached this value
   SantaVnode vnodeID = SantaVnode::VnodeForFile(es_file);
-  NSString *result = cert_hash_cache_.get(vnodeID);
+  NSString* result = cert_hash_cache_.get(vnodeID);
   if (result) {
     return result;
   }
 
   // If this wasn't already cached, try finding a cached SNTCachedDecision
-  SNTCachedDecision *cd = [decision_cache_ cachedDecisionForFile:es_file->stat];
+  SNTCachedDecision* cd = [decision_cache_ cachedDecisionForFile:es_file->stat];
   if (cd) {
     // There was an existing cached decision, use its cert hash
     result = cd.certSHA256;
   } else {
     // If the cached decision didn't exist, try a manual lookup
-    MOLCodesignChecker *csInfo =
+    MOLCodesignChecker* csInfo =
         [[MOLCodesignChecker alloc] initWithBinaryPath:@(es_file->path.data)];
     result = csInfo.leafCertificate.SHA256;
   }
@@ -177,8 +177,8 @@ NSString *FAAPolicyProcessor::GetCertificateHash(const es_file_t *es_file) {
 
 /// An `es_process_t` must match all criteria within the given
 /// WatchItemProcess to be considered a match.
-bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_proc,
-                                              const es_process_t *es_proc) {
+bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess& policy_proc,
+                                              const es_process_t* es_proc) {
   // Note: Intentionally not checking `CS_VALID` here - this check must happen
   // outside of this method. This method is used to individually check each
   // configured process exception while the check for a valid code signature
@@ -241,7 +241,7 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
 
     // Check if the instigating process has an allowed certificate hash
     if (!policy_proc.certificate_sha256.empty()) {
-      NSString *result = GetCertificateHash(es_proc->executable);
+      NSString* result = GetCertificateHash(es_proc->executable);
       if (!result || policy_proc.certificate_sha256 != [result UTF8String]) {
         return false;
       }
@@ -264,12 +264,12 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess &policy_pro
   return true;
 }
 
-SNTCachedDecision *FAAPolicyProcessor::GetCachedDecision(const struct stat &stat_buf) {
+SNTCachedDecision* FAAPolicyProcessor::GetCachedDecision(const struct stat& stat_buf) {
   return [decision_cache_ cachedDecisionForFile:stat_buf];
 }
 
 bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
-    const Message &msg, const Message::PathTarget &target,
+    const Message& msg, const Message::PathTarget& target,
     const std::shared_ptr<WatchItemPolicyBase> policy) {
   // All special cases currently require the option "allow_read_access" is set
   if (!policy->allow_read_access) {
@@ -309,7 +309,7 @@ bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
 }
 
 FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
-    const Message &msg, const Message::PathTarget &target,
+    const Message& msg, const Message::PathTarget& target,
     const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block) {
   if (!optional_policy.has_value()) {
@@ -362,7 +362,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
   return decision;
 }
 
-void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const Message &msg,
+void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase& policy, const Message& msg,
                                       size_t target_index, FileAccessPolicyDecision decision) {
   RateLimiter::Decision rate_limit_decision = rate_limiter_.Decide(msg->mach_time);
   metrics_->SetFileAccessEventMetrics(policy.version, policy.name,
@@ -383,7 +383,7 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const M
 
   dispatch_async(queue_, ^{
     Message moved_in_msg = std::move(msg_copy);
-    const Message::PathTarget &target = moved_in_msg.PathTargetAtIndex(target_index);
+    const Message::PathTarget& target = moved_in_msg.PathTargetAtIndex(target_index);
     EnrichedProcess enriched_proc =
         enricher_->Enrich(*moved_in_msg->process, EnrichOptions::kLocalOnly);
     std::optional<santa::EnrichedFile> enriched_event_target =
@@ -393,23 +393,23 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase &policy, const M
   });
 }
 
-bool FAAPolicyProcessor::HaveMessagedTTYForPolicy(const WatchItemPolicyBase &policy,
-                                                  const Message &msg) {
+bool FAAPolicyProcessor::HaveMessagedTTYForPolicy(const WatchItemPolicyBase& policy,
+                                                  const Message& msg) {
   return !tty_message_cache_.Set(PidPidversion(msg->process->audit_token),
                                  {policy.version, policy.name});
 }
 
-void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent *event, URLTextPair link_info,
-                                const Message &msg, const WatchItemPolicyBase &policy) {
+void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent* event, URLTextPair link_info,
+                                const Message& msg, const WatchItemPolicyBase& policy) {
   if (HaveMessagedTTYForPolicy(policy, msg)) {
     return;
   }
 
-  NSAttributedString *attrStr = [SNTBlockMessage
+  NSAttributedString* attrStr = [SNTBlockMessage
       attributedBlockMessageForFileAccessEvent:event
                                  customMessage:OptionalStringToNSString(policy.custom_message)];
 
-  NSMutableString *blockMsg = [NSMutableString stringWithCapacity:1024];
+  NSMutableString* blockMsg = [NSMutableString stringWithCapacity:1024];
   // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
   [blockMsg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", attrStr.string];
   [blockMsg appendFormat:@"\033[1mAccessed Path:\033[0m %@\n"
@@ -423,7 +423,7 @@ void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent *event, URLTextPair lin
                          event.process.filePath, event.process.fileSHA256,
                          StringToNSString(msg.ParentProcessName())];
 
-  NSURL *detailURL = [SNTBlockMessage eventDetailURLForFileAccessEvent:event
+  NSURL* detailURL = [SNTBlockMessage eventDetailURLForFileAccessEvent:event
                                                              customURL:link_info.first];
   if (detailURL) {
     [blockMsg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
@@ -433,11 +433,11 @@ void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent *event, URLTextPair lin
 }
 
 FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
-    const Message &msg, const TargetPolicyPair &target_policy_pair,
+    const Message& msg, const TargetPolicyPair& target_policy_pair,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
     SNTFileAccessDeniedBlock file_access_denied_block,
     SNTOverrideFileAccessAction override_action) {
-  const Message::PathTarget &target = msg.PathTargetAtIndex(target_policy_pair.first);
+  const Message::PathTarget& target = msg.PathTargetAtIndex(target_policy_pair.first);
   const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy =
       target_policy_pair.second;
   FileAccessPolicyDecision decision = ApplyOverrideToDecision(
@@ -450,8 +450,8 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
 
     LogTelemetry(*policy, msg, target_policy_pair.first, decision);
 
-    SNTCachedDecision *cd = GetCachedDecision(msg->process->executable->stat);
-    SNTStoredFileAccessEvent *event = [[SNTStoredFileAccessEvent alloc] init];
+    SNTCachedDecision* cd = GetCachedDecision(msg->process->executable->stat);
+    SNTStoredFileAccessEvent* event = [[SNTStoredFileAccessEvent alloc] init];
 
     event.accessedPath = StringToNSString(target.path);
     event.ruleVersion = StringToNSString(policy->version);
@@ -464,7 +464,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     event.process.cdhash = cd.cdhash ?: @"<unknown CDHash>";
     event.process.pid = @(audit_token_to_pid(msg->process->audit_token));
     event.process.signingChain = cd.certChain;
-    struct passwd *user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
+    struct passwd* user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
     if (user) event.process.executingUser = @(user->pw_name);
     event.process.parent = [[SNTStoredFileAccessProcess alloc] init];
     event.process.parent.pid = @(audit_token_to_pid(msg->process->parent_audit_token));
@@ -494,21 +494,21 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
   return decision;
 }
 
-static inline FAAPolicyProcessor::ReadsCacheKey MakeReadsCacheKey(const audit_token_t &tok,
+static inline FAAPolicyProcessor::ReadsCacheKey MakeReadsCacheKey(const audit_token_t& tok,
                                                                   FAAClientType client_type) {
   return {Pid(tok), Pidversion(tok), client_type};
 }
 
 FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
-    const Message &msg, std::vector<TargetPolicyPair> target_policy_pairs,
+    const Message& msg, std::vector<TargetPolicyPair> target_policy_pairs,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
     SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction,
     FAAClientType client_type) {
   es_auth_result_t policy_result = ES_AUTH_RESULT_ALLOW;
   bool cacheable = true;
 
-  for (const TargetPolicyPair &target_policy_pair : target_policy_pairs) {
-    const Message::PathTarget &path_target = msg.PathTargetAtIndex(target_policy_pair.first);
+  for (const TargetPolicyPair& target_policy_pair : target_policy_pairs) {
+    const Message::PathTarget& path_target = msg.PathTargetAtIndex(target_policy_pair.first);
     FileAccessPolicyDecision decision =
         ProcessTargetAndPolicy(msg, target_policy_pair, check_if_policy_matches_block,
                                file_access_denied_block, overrideAction);
@@ -544,7 +544,7 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
 }
 
 std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateResponse(
-    const Message &msg, FAAClientType client_type) {
+    const Message& msg, FAAClientType client_type) {
   // Note: Some other events have readable targets, but only events where all
   // targets can be determined to be readable can be considered. E.g., for
   // clone, the destination must still be evaluated so the reads_cache_ is not
@@ -559,7 +559,7 @@ std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateRespons
   return std::nullopt;
 }
 
-void FAAPolicyProcessor::NotifyExit(const audit_token_t &tok, FAAClientType client_type) {
+void FAAPolicyProcessor::NotifyExit(const audit_token_t& tok, FAAClientType client_type) {
   reads_cache_.Remove(MakeReadsCacheKey(tok, client_type));
   tty_message_cache_.Remove(PidPidversion(tok));
 }

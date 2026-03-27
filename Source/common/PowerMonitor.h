@@ -54,16 +54,16 @@ class PowerMonitor : public PassKey<PowerMonitor> {
   ~PowerMonitor();
 
   // Non-copyable and non-movable because `this` is used as the IOKit refcon.
-  PowerMonitor(const PowerMonitor &) = delete;
-  PowerMonitor &operator=(const PowerMonitor &) = delete;
-  PowerMonitor(PowerMonitor &&) = delete;
-  PowerMonitor &operator=(PowerMonitor &&) = delete;
+  PowerMonitor(const PowerMonitor&) = delete;
+  PowerMonitor& operator=(const PowerMonitor&) = delete;
+  PowerMonitor(PowerMonitor&&) = delete;
+  PowerMonitor& operator=(PowerMonitor&&) = delete;
 
  private:
-  static void PowerCallback(void *refcon, io_service_t service, natural_t message_type,
-                            void *message_argument);
+  static void PowerCallback(void* refcon, io_service_t service, natural_t message_type,
+                            void* message_argument);
 
-  void HandlePowerEvent(natural_t message_type, void *message_argument);
+  void HandlePowerEvent(natural_t message_type, void* message_argument);
 
   PowerEventBlock callback_;
   io_connect_t connect_;

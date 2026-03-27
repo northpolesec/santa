@@ -23,10 +23,10 @@
 @implementation SNTExportConfigurationTest
 
 - (void)testInitialization {
-  NSURL *url = [NSURL URLWithString:@"https://example.com/upload"];
-  NSDictionary *formValues = @{@"key1" : @"value1", @"key2" : @"value2"};
+  NSURL* url = [NSURL URLWithString:@"https://example.com/upload"];
+  NSDictionary* formValues = @{@"key1" : @"value1", @"key2" : @"value2"};
 
-  SNTExportConfiguration *cfg = [[SNTExportConfiguration alloc] initWithURL:url
+  SNTExportConfiguration* cfg = [[SNTExportConfiguration alloc] initWithURL:url
                                                                  formValues:formValues];
 
   XCTAssertEqualObjects(cfg.url, url);
@@ -35,21 +35,21 @@
 }
 
 - (void)testEncodeDecodeSecureCoding {
-  NSURL *url = [NSURL URLWithString:@"https://example.com/upload"];
-  NSDictionary *formValues = @{@"key1" : @"value1", @"key2" : @"value2"};
+  NSURL* url = [NSURL URLWithString:@"https://example.com/upload"];
+  NSDictionary* formValues = @{@"key1" : @"value1", @"key2" : @"value2"};
 
-  SNTExportConfiguration *cfg = [[SNTExportConfiguration alloc] initWithURL:url
+  SNTExportConfiguration* cfg = [[SNTExportConfiguration alloc] initWithURL:url
                                                                  formValues:formValues];
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:cfg
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:cfg
                                        requiringSecureCoding:YES
                                                        error:nil];
   XCTAssertNotNil(data);
 
-  NSSet *allowedClasses = [NSSet setWithObjects:[SNTExportConfiguration class], nil];
+  NSSet* allowedClasses = [NSSet setWithObjects:[SNTExportConfiguration class], nil];
   id obj = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses fromData:data error:nil];
   XCTAssertTrue([obj isKindOfClass:[SNTExportConfiguration class]]);
 
-  SNTExportConfiguration *decodedConfig = (SNTExportConfiguration *)obj;
+  SNTExportConfiguration* decodedConfig = (SNTExportConfiguration*)obj;
   XCTAssertEqualObjects(decodedConfig.url, url);
   XCTAssertEqualObjects(decodedConfig.formValues[@"key1"], @"value1");
   XCTAssertEqualObjects(decodedConfig.formValues[@"key2"], @"value2");

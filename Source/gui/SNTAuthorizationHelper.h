@@ -23,13 +23,13 @@
 + (void)authorizeTemporaryMonitorModeWithReplyBlock:(void (^)(BOOL success))replyBlock;
 
 /// Authorize execution of a binary via TouchID.
-+ (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent *)event
++ (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent*)event
                         replyBlock:(void (^)(BOOL success))replyBlock;
 
 /// Build the localized reason string for an execution authorization prompt.
-+ (NSString *)executionAuthorizationReasonForEvent:(SNTStoredExecutionEvent *)event;
++ (NSString*)executionAuthorizationReasonForEvent:(SNTStoredExecutionEvent*)event;
 
 /// Check if TouchID authorization is available on this device.
-+ (BOOL)canAuthorizeWithTouchID:(NSError **)error;
++ (BOOL)canAuthorizeWithTouchID:(NSError**)error;
 
 @end

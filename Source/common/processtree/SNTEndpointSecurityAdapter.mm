@@ -32,7 +32,7 @@ using santa::Message;
 
 namespace santa::santad::process_tree {
 
-void InformFromESEvent(ProcessTree &tree, const Message &msg) {
+void InformFromESEvent(ProcessTree& tree, const Message& msg) {
   struct Pid event_pid = PidFromAuditToken(msg->process->audit_token);
   auto proc = tree.Get(event_pid);
 
@@ -52,7 +52,7 @@ void InformFromESEvent(ProcessTree &tree, const Message &msg) {
         args.push_back(StringTokenToString(arg));
       }
 
-      const es_process_t *target = msg->event.exec.target;
+      const es_process_t* target = msg->event.exec.target;
       es_string_token_t executable = target->executable->path;
 
       // Extract code signing info from the target process

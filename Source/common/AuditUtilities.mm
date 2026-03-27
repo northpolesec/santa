@@ -28,7 +28,7 @@ std::optional<audit_token_t> GetMyAuditToken() {
   return std::make_optional(tok);
 }
 
-bool AuditTokenForPid(pid_t pid, audit_token_t *token) {
+bool AuditTokenForPid(pid_t pid, audit_token_t* token) {
   assert(token);
   task_name_t task;
   mach_msg_type_number_t size = TASK_AUDIT_TOKEN_COUNT;

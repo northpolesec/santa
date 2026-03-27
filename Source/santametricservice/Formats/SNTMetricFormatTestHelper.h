@@ -15,6 +15,6 @@
 #import <Foundation/Foundation.h>
 
 @interface SNTMetricFormatTestHelper : NSObject
-+ (NSDictionary *)convertDatesToFixedDateWithExportDict:(NSDictionary *)exportDict;
-+ (NSDictionary *)createValidMetricsDictionary;
++ (NSDictionary*)convertDatesToFixedDateWithExportDict:(NSDictionary*)exportDict;
++ (NSDictionary*)createValidMetricsDictionary;
 @end

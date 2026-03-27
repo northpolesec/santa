@@ -36,11 +36,11 @@ REGISTER_COMMAND_NAME(@"flushcache")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Flush the authorization caches";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return @"Flushes the authorization caches.\n"
          @"\n"
          @"IMPORTANT: This command is intended for development purposes only.\n";
@@ -50,7 +50,7 @@ REGISTER_COMMAND_NAME(@"flushcache")
   return YES;
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   [[self.daemonConn remoteObjectProxy] flushCache:^(BOOL success) {
     if (success) {
       TEE_LOGI(@"Cache flush requested");

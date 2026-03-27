@@ -21,11 +21,11 @@
 // access to the Network Extension repo.
 @interface SNDProcessFlows : NSObject <NSSecureCoding>
 
-@property(nonatomic, readonly) SNDProcessInfo *processInfo;
+@property(nonatomic, readonly) SNDProcessInfo* processInfo;
 @property(nonatomic, readonly) NSUInteger flowCount;
 
-- (instancetype)initWithProcessInfo:(SNDProcessInfo *)processInfo;
-- (void)addFlow:(SNDFlowInfo *)flow;
-- (void)enumerateFlowsUsingBlock:(void(NS_NOESCAPE ^)(SNDFlowInfo *flow))block;
+- (instancetype)initWithProcessInfo:(SNDProcessInfo*)processInfo;
+- (void)addFlow:(SNDFlowInfo*)flow;
+- (void)enumerateFlowsUsingBlock:(void(NS_NOESCAPE ^)(SNDFlowInfo* flow))block;
 
 @end

@@ -22,39 +22,39 @@
 
 // Expose necessary setters for SNTConfigBundle properties related to Postflight
 @interface SNTConfigBundle (ConfigBundleCreator)
-@property NSNumber *clientMode;
-@property NSNumber *syncType;
-@property NSString *allowlistRegex;
-@property NSString *blocklistRegex;
-@property NSNumber *blockUSBMount;
-@property NSNumber *blockUnencryptedRemovableMediaMount;
-@property NSArray *remountUSBMode;
-@property NSNumber *blockNetworkMount;
-@property NSString *bannedNetworkMountBlockMessage;
-@property NSArray<NSString *> *allowedNetworkMountHosts;
-@property NSNumber *enableBundles;
-@property NSNumber *enableTransitiveRules;
-@property NSNumber *enableAllEventUpload;
-@property NSNumber *disableUnknownEventUpload;
-@property NSString *overrideFileAccessAction;
-@property SNTExportConfiguration *exportConfiguration;
-@property NSDate *fullSyncLastSuccess;
-@property NSDate *ruleSyncLastSuccess;
-@property SNTModeTransition *modeTransition;
-@property NSString *eventDetailURL;
-@property NSString *eventDetailText;
-@property NSString *fileAccessEventDetailURL;
-@property NSString *fileAccessEventDetailText;
-@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
-@property NSArray<NSString *> *pushTokenChain;
-@property NSArray<NSString *> *telemetryFilterExpressions;
-@property NSArray<SNTCELFallbackRule *> *celFallbackRules;
-@property NSNumber *fullSyncInterval;
-@property NSNumber *pushNotificationsFullSyncInterval;
+@property NSNumber* clientMode;
+@property NSNumber* syncType;
+@property NSString* allowlistRegex;
+@property NSString* blocklistRegex;
+@property NSNumber* blockUSBMount;
+@property NSNumber* blockUnencryptedRemovableMediaMount;
+@property NSArray* remountUSBMode;
+@property NSNumber* blockNetworkMount;
+@property NSString* bannedNetworkMountBlockMessage;
+@property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSNumber* enableBundles;
+@property NSNumber* enableTransitiveRules;
+@property NSNumber* enableAllEventUpload;
+@property NSNumber* disableUnknownEventUpload;
+@property NSString* overrideFileAccessAction;
+@property SNTExportConfiguration* exportConfiguration;
+@property NSDate* fullSyncLastSuccess;
+@property NSDate* ruleSyncLastSuccess;
+@property SNTModeTransition* modeTransition;
+@property NSString* eventDetailURL;
+@property NSString* eventDetailText;
+@property NSString* fileAccessEventDetailURL;
+@property NSString* fileAccessEventDetailText;
+@property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSArray<NSString*>* pushTokenChain;
+@property NSArray<NSString*>* telemetryFilterExpressions;
+@property NSArray<SNTCELFallbackRule*>* celFallbackRules;
+@property NSNumber* fullSyncInterval;
+@property NSNumber* pushNotificationsFullSyncInterval;
 @end
 
-SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState) {
-  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+SNTConfigBundle* PreflightConfigBundle(SNTSyncState* syncState) {
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   if (syncState.pushIssuerJWT.length && syncState.pushJWT.length) {
     bundle.pushTokenChain = @[ syncState.pushIssuerJWT, syncState.pushJWT ];
@@ -63,8 +63,8 @@ SNTConfigBundle *PreflightConfigBundle(SNTSyncState *syncState) {
   return bundle;
 }
 
-SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
-  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.clientMode = syncState.clientMode ? @(syncState.clientMode) : nil;
   bundle.syncType = syncState.syncType != SNTSyncTypeNormal ? @(SNTSyncTypeNormal) : nil;
@@ -98,16 +98,16 @@ SNTConfigBundle *PostflightConfigBundle(SNTSyncState *syncState) {
   return bundle;
 }
 
-SNTConfigBundle *RuleSyncConfigBundle() {
-  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+SNTConfigBundle* RuleSyncConfigBundle() {
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.ruleSyncLastSuccess = [NSDate now];
 
   return bundle;
 }
 
-SNTConfigBundle *SyncTypeConfigBundle(SNTSyncType syncType) {
-  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+SNTConfigBundle* SyncTypeConfigBundle(SNTSyncType syncType) {
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.syncType = @(syncType);
 

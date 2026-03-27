@@ -26,42 +26,42 @@
   [super setUp];
 }
 
-- (NSData *)dataFromFixture:(NSString *)file {
-  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
+- (NSData*)dataFromFixture:(NSString*)file {
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
   XCTAssertNotNil(path, @"failed to load testdata: %@", file);
   return [NSData dataWithContentsOfFile:path];
 }
 
 - (void)testZlibCompressed {
-  NSData *sut = [self dataFromFixture:@"compression_test_uncompressed.json"];
-  NSData *want = [self dataFromFixture:@"compression_test_zlib.z"];
+  NSData* sut = [self dataFromFixture:@"compression_test_uncompressed.json"];
+  NSData* want = [self dataFromFixture:@"compression_test_zlib.z"];
 
   XCTAssertEqualObjects([sut zlibCompressed], want);
 }
 
 - (void)testGzipCompressed {
-  NSData *sut = [self dataFromFixture:@"compression_test_uncompressed.json"];
-  NSData *want = [self dataFromFixture:@"compression_test_gzip.gz"];
+  NSData* sut = [self dataFromFixture:@"compression_test_uncompressed.json"];
+  NSData* want = [self dataFromFixture:@"compression_test_gzip.gz"];
 
   XCTAssertEqualObjects([sut gzipCompressed], want);
 }
 
 - (void)testZlibDecompressed {
-  NSData *sut = [self dataFromFixture:@"compression_test_zlib.z"];
-  NSData *want = [self dataFromFixture:@"compression_test_uncompressed.json"];
+  NSData* sut = [self dataFromFixture:@"compression_test_zlib.z"];
+  NSData* want = [self dataFromFixture:@"compression_test_uncompressed.json"];
 
   XCTAssertEqualObjects([sut zlibDecompressed], want);
 }
 
 - (void)testGzipDecompressed {
-  NSData *sut = [self dataFromFixture:@"compression_test_gzip.gz"];
-  NSData *want = [self dataFromFixture:@"compression_test_uncompressed.json"];
+  NSData* sut = [self dataFromFixture:@"compression_test_gzip.gz"];
+  NSData* want = [self dataFromFixture:@"compression_test_uncompressed.json"];
 
   XCTAssertEqualObjects([sut gzipDecompressed], want);
 }
 
 - (void)testCompressEmpty {
-  NSData *sut = [NSData data];
+  NSData* sut = [NSData data];
   XCTAssertNil([sut zlibCompressed]);
   XCTAssertNil([sut gzipCompressed]);
 };

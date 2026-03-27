@@ -21,8 +21,8 @@
 namespace fsspool {
 
 std::unique_ptr<ZstdOutputStream> ZstdOutputStream::Create(
-    google::protobuf::io::ZeroCopyOutputStream *output, int compression_level, size_t buffer_size) {
-  ZSTD_CStream *cstream = ZSTD_createCStream();
+    google::protobuf::io::ZeroCopyOutputStream* output, int compression_level, size_t buffer_size) {
+  ZSTD_CStream* cstream = ZSTD_createCStream();
   if (!cstream) {
     return nullptr;
   }
@@ -36,8 +36,8 @@ std::unique_ptr<ZstdOutputStream> ZstdOutputStream::Create(
   return std::make_unique<ZstdOutputStream>(output, cstream, buffer_size);
 }
 
-ZstdOutputStream::ZstdOutputStream(google::protobuf::io::ZeroCopyOutputStream *output,
-                                   ZSTD_CStream *cstream, size_t buffer_size)
+ZstdOutputStream::ZstdOutputStream(google::protobuf::io::ZeroCopyOutputStream* output,
+                                   ZSTD_CStream* cstream, size_t buffer_size)
     : output_(output),
       cstream_(cstream),
       input_buffer_(buffer_size),
@@ -51,7 +51,7 @@ ZstdOutputStream::~ZstdOutputStream() {
   ZSTD_freeCStream(cstream_);
 }
 
-bool ZstdOutputStream::Next(void **data, int *size) {
+bool ZstdOutputStream::Next(void** data, int* size) {
   // If we have pending compressed data, flush it first
   if (input_available_ > 0) {
     if (!CompressAndFlush(ZSTD_e_continue)) {
@@ -124,10 +124,10 @@ bool ZstdOutputStream::FlushOutput(size_t bytes_to_write) {
   }
 
   size_t remaining = bytes_to_write;
-  const uint8_t *data = output_buffer_.data();
+  const uint8_t* data = output_buffer_.data();
 
   while (remaining > 0) {
-    void *buffer;
+    void* buffer;
     int size;
 
     if (!output_->Next(&buffer, &size)) {

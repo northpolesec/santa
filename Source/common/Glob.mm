@@ -21,17 +21,17 @@
 
 namespace santa {
 
-void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NSUInteger idx,
-                 std::vector<std::string> &matches) {
+void FindMatches(NSString* base, NSMutableArray<NSString*>* path_components, NSUInteger idx,
+                 std::vector<std::string>& matches) {
   if (path_components.count == idx) {
     // Nothing left to match, add the current full base path
     matches.push_back(base.UTF8String);
     return;
   }
 
-  NSString *path = [NSString stringWithFormat:@"%@%@", base, path_components[idx]];
+  NSString* path = [NSString stringWithFormat:@"%@%@", base, path_components[idx]];
 
-  glob_t *g = (glob_t *)alloca(sizeof(glob_t));
+  glob_t* g = (glob_t*)alloca(sizeof(glob_t));
   // Ensure gl_pathv is NULL so globfree can always safely be called
   g->gl_pathv = NULL;
 
@@ -51,12 +51,12 @@ void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NS
     if ((g->gl_flags & GLOB_MAGCHAR) == 0) {
       // As long as there are no remaining magic chars in any of the path
       // components, we can add a watch item
-      NSArray<NSString *> *remaining_components =
+      NSArray<NSString*>* remaining_components =
           (idx == path_components.count - 1)
               ? @[]
               : [path_components
                     subarrayWithRange:NSMakeRange(idx + 1, path_components.count - idx - 1)];
-      NSString *remaining_path = [remaining_components componentsJoinedByString:@""];
+      NSString* remaining_path = [remaining_components componentsJoinedByString:@""];
 
       // Need to manually globfree here since we're about to re-glob
       globfree(g);
@@ -75,7 +75,7 @@ void FindMatches(NSString *base, NSMutableArray<NSString *> *path_components, NS
   }
 }
 
-std::vector<std::string> FindMatches(NSString *path) {
+std::vector<std::string> FindMatches(NSString* path) {
   if (!path) {
     return {};
   }
@@ -84,7 +84,7 @@ std::vector<std::string> FindMatches(NSString *path) {
     path = [NSString stringWithFormat:@"/%@", path];
   }
 
-  glob_t *g = (glob_t *)alloca(sizeof(glob_t));
+  glob_t* g = (glob_t*)alloca(sizeof(glob_t));
   // Ensure gl_pathv is NULL so globfree can always safely be called
   g->gl_pathv = NULL;
 
@@ -104,7 +104,7 @@ std::vector<std::string> FindMatches(NSString *path) {
     return {path.UTF8String};
   }
 
-  NSArray<NSString *> *path_components = [path pathComponents];
+  NSArray<NSString*>* path_components = [path pathComponents];
   // Code above enforces the given path starts with a /, so must be at least two entries
   assert(path_components.count > 1);
 
@@ -117,7 +117,7 @@ std::vector<std::string> FindMatches(NSString *path) {
 
   // Modify each path component to have a trailing slash. This is to ensure that when path
   // components are appended for recursive glob searches, only directory results will be returned.
-  NSMutableArray<NSString *> *modified_path_components = [NSMutableArray array];
+  NSMutableArray<NSString*>* modified_path_components = [NSMutableArray array];
   NSUInteger limit = [path hasSuffix:@"/"] ? path_components.count - 1 : path_components.count;
   for (NSUInteger i = 1; i < limit; i++) {
     // If adding the last component and the input doesn't end with a slash, don't append the slash

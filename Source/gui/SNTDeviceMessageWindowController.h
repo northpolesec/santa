@@ -26,9 +26,9 @@ NS_ASSUME_NONNULL_BEGIN
 @interface SNTDeviceMessageWindowController : SNTMessageWindowController <NSWindowDelegate>
 
 // The device event this window is for.
-@property(readonly) SNTDeviceEvent *event;
+@property(readonly) SNTDeviceEvent* event;
 
-- (instancetype)initWithEvent:(SNTDeviceEvent *)event;
+- (instancetype)initWithEvent:(SNTDeviceEvent*)event;
 
 @end
 

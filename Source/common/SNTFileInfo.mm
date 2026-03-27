@@ -34,12 +34,12 @@
 // Simple class to hold the data of a mach_header and the offset within the file
 // in which that header was found.
 @interface MachHeaderWithOffset : NSObject
-@property NSData *data;
+@property NSData* data;
 @property uint32_t offset;
-- (instancetype)initWithData:(NSData *)data offset:(uint32_t)offset;
+- (instancetype)initWithData:(NSData*)data offset:(uint32_t)offset;
 @end
 @implementation MachHeaderWithOffset
-- (instancetype)initWithData:(NSData *)data offset:(uint32_t)offset {
+- (instancetype)initWithData:(NSData*)data offset:(uint32_t)offset {
   self = [super init];
   if (self) {
     _data = data;
@@ -50,25 +50,25 @@
 @end
 
 @interface SNTFileInfo ()
-@property NSString *path;
-@property NSFileHandle *fileHandle;
+@property NSString* path;
+@property NSFileHandle* fileHandle;
 @property NSUInteger fileSize;
 @property SantaVnode vnode;
-@property NSString *fileOwnerHomeDir;
-@property NSString *sha256Storage;
+@property NSString* fileOwnerHomeDir;
+@property NSString* sha256Storage;
 
 // Cached properties
-@property NSBundle *bundleRef;
-@property NSDictionary *infoDict;
-@property NSDictionary *quarantineDict;
-@property NSDictionary *cachedHeaders;
-@property MOLCodesignChecker *cachedCodesignChecker;
-@property(nonatomic) NSError *codesignCheckerError;
+@property NSBundle* bundleRef;
+@property NSDictionary* infoDict;
+@property NSDictionary* quarantineDict;
+@property NSDictionary* cachedHeaders;
+@property MOLCodesignChecker* cachedCodesignChecker;
+@property(nonatomic) NSError* codesignCheckerError;
 @end
 
 @implementation SNTFileInfo
 
-- (instancetype)initWithResolvedPath:(NSString *)path error:(NSError **)error {
+- (instancetype)initWithResolvedPath:(NSString*)path error:(NSError**)error {
   struct stat fileStat;
   if (path.length) {
     lstat(path.UTF8String, &fileStat);
@@ -76,13 +76,13 @@
   return [self initWithResolvedPath:path stat:&fileStat error:error];
 }
 
-- (instancetype)initWithEndpointSecurityFile:(const es_file_t *)esFile error:(NSError **)error {
+- (instancetype)initWithEndpointSecurityFile:(const es_file_t*)esFile error:(NSError**)error {
   return [self initWithResolvedPath:@(esFile->path.data) stat:&esFile->stat error:error];
 }
 
-- (instancetype)initWithResolvedPath:(NSString *)path
-                                stat:(const struct stat *)fileStat
-                               error:(NSError **)error {
+- (instancetype)initWithResolvedPath:(NSString*)path
+                                stat:(const struct stat*)fileStat
+                               error:(NSError**)error {
   if (!fileStat) {
     // This is a programming error. Bail.
     LOGE(@"NULL stat buffer unsupported");
@@ -112,7 +112,7 @@
     if (_fileSize == 0) return nil;
 
     if (fileStat->st_uid != 0) {
-      struct passwd *pwd = getpwuid(fileStat->st_uid);
+      struct passwd* pwd = getpwuid(fileStat->st_uid);
       if (pwd) {
         _fileOwnerHomeDir = @(pwd->pw_dir);
       }
@@ -131,12 +131,12 @@
   return self;
 }
 
-- (instancetype)initWithPath:(NSString *)path error:(NSError **)error {
-  NSBundle *bndl;
-  NSString *resolvedPath = [self resolvePath:path bundle:&bndl];
+- (instancetype)initWithPath:(NSString*)path error:(NSError**)error {
+  NSBundle* bndl;
+  NSString* resolvedPath = [self resolvePath:path bundle:&bndl];
   if (!resolvedPath.length) {
     if (error) {
-      NSString *errStr = @"Unable to resolve empty path";
+      NSString* errStr = @"Unable to resolve empty path";
       if (path) errStr = [@"Unable to resolve path: " stringByAppendingString:path];
       [SNTError populateError:error withCode:SNTErrorCodeFailedToResolvePath format:@"%@", errStr];
     }
@@ -147,16 +147,16 @@
   return self;
 }
 
-- (instancetype)initWithPath:(NSString *)path {
+- (instancetype)initWithPath:(NSString*)path {
   return [self initWithPath:path error:NULL];
 }
 
 #pragma mark Hashing
 
-- (void)hashSHA1:(NSString **)sha1 SHA256:(NSString **)sha256 {
+- (void)hashSHA1:(NSString**)sha1 SHA256:(NSString**)sha256 {
   const int MAX_CHUNK_SIZE = 256 * 1024;  // 256 KB
   const size_t chunkSize = _fileSize > MAX_CHUNK_SIZE ? MAX_CHUNK_SIZE : _fileSize;
-  char *chunk = static_cast<char *>(malloc(chunkSize));
+  char* chunk = static_cast<char*>(malloc(chunkSize));
 
   @try {
     CC_SHA1_CTX c1;
@@ -193,7 +193,7 @@
     if (sha1) {
       unsigned char digest[CC_SHA1_DIGEST_LENGTH];
       CC_SHA1_Final(digest, &c1);
-      NSString *const SHA1FormatString =
+      NSString* const SHA1FormatString =
           @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
       *sha1 = [[NSString alloc]
           initWithFormat:SHA1FormatString, digest[0], digest[1], digest[2], digest[3], digest[4],
@@ -204,7 +204,7 @@
     if (sha256) {
       unsigned char digest[CC_SHA256_DIGEST_LENGTH];
       CC_SHA256_Final(digest, &c256);
-      NSString *const SHA256FormatString =
+      NSString* const SHA256FormatString =
           @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
            "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
 
@@ -221,16 +221,16 @@
   }
 }
 
-- (NSString *)SHA1 {
-  NSString *sha1;
+- (NSString*)SHA1 {
+  NSString* sha1;
   [self hashSHA1:&sha1 SHA256:NULL];
   return sha1;
 }
 
-- (NSString *)SHA256 {
+- (NSString*)SHA256 {
   // Memoize the value
   if (!self.sha256Storage) {
-    NSString *sha256;
+    NSString* sha256;
     [self hashSHA1:NULL SHA256:&sha256];
     self.sha256Storage = sha256;
   }
@@ -239,12 +239,12 @@
 
 #pragma mark File Type Info
 
-- (NSArray *)architectures {
+- (NSArray*)architectures {
   return [self.machHeaders allKeys];
 }
 
 - (uint32_t)machFileType {
-  struct mach_header *mach_header = [self firstMachHeader];
+  struct mach_header* mach_header = [self firstMachHeader];
   if (mach_header) return mach_header->filetype;
   return -1;
 }
@@ -274,23 +274,23 @@
 }
 
 - (BOOL)isScript {
-  const char *magic = (const char *)[[self safeSubdataWithRange:NSMakeRange(0, 2)] bytes];
+  const char* magic = (const char*)[[self safeSubdataWithRange:NSMakeRange(0, 2)] bytes];
   return (magic && memcmp("#!", magic, 2) == 0);
 }
 
 - (BOOL)isXARArchive {
-  const char *magic = (const char *)[[self safeSubdataWithRange:NSMakeRange(0, 4)] bytes];
+  const char* magic = (const char*)[[self safeSubdataWithRange:NSMakeRange(0, 4)] bytes];
   return (magic && memcmp("xar!", magic, 4) == 0);
 }
 
 - (BOOL)isDMG {
   if (self.fileSize < 512) return NO;
   NSUInteger last512 = self.fileSize - 512;
-  const char *magic = (const char *)[[self safeSubdataWithRange:NSMakeRange(last512, 4)] bytes];
+  const char* magic = (const char*)[[self safeSubdataWithRange:NSMakeRange(last512, 4)] bytes];
   return (magic && memcmp("koly", magic, 4) == 0);
 }
 
-- (NSString *)humanReadableFileType {
+- (NSString*)humanReadableFileType {
   if ([self isExecutable]) return @"Executable";
   if ([self isDylib]) return @"Dynamic Library";
   if ([self isBundle]) return @"Bundle/Plugin";
@@ -306,24 +306,24 @@
 - (BOOL)isMissingPageZero {
   // This method only checks i386 arch because the kernel enforces this for other archs
   // See bsd/kern/mach_loader.c, search for enforce_hard_pagezero.
-  MachHeaderWithOffset *x86Header =
+  MachHeaderWithOffset* x86Header =
       self.machHeaders[[self nameForCPUType:CPU_TYPE_X86 cpuSubType:CPU_SUBTYPE_I386_ALL]];
   if (!x86Header) return NO;
 
-  struct mach_header *mh = (struct mach_header *)[x86Header.data bytes];
+  struct mach_header* mh = (struct mach_header*)[x86Header.data bytes];
   if (mh->filetype != MH_EXECUTE) return NO;
 
   NSRange range =
       NSMakeRange(x86Header.offset + sizeof(struct mach_header), sizeof(struct segment_command));
-  NSData *lcData = [self safeSubdataWithRange:range];
+  NSData* lcData = [self safeSubdataWithRange:range];
   if (!lcData) return NO;
 
   // This code assumes the __PAGEZERO is always the first load-command in the file.
   // Given that the macOS ABI says "the static linker creates a __PAGEZERO segment
   // as the first segment of an executable file." this should be OK.
-  struct load_command *lc = (struct load_command *)[lcData bytes];
+  struct load_command* lc = (struct load_command*)[lcData bytes];
   if (lc->cmd == LC_SEGMENT) {
-    struct segment_command *segment = (struct segment_command *)lc;
+    struct segment_command* segment = (struct segment_command*)lc;
     if (segment->vmaddr == 0 && segment->vmsize != 0 && segment->initprot == 0 &&
         segment->maxprot == 0 && strcmp("__PAGEZERO", segment->segname) == 0) {
       return NO;
@@ -338,8 +338,8 @@
 ///  Directories with a "Contents/Info.plist" entry can be mistaken as a bundle. To be considered an
 ///  ancestor, the bundle must have a valid extension.
 ///
-- (NSSet *)allowedAncestorExtensions {
-  static NSSet *set;
+- (NSSet*)allowedAncestorExtensions {
+  static NSSet* set;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     set = [NSSet setWithArray:@[
@@ -367,13 +367,13 @@
 ///  @param ancestor YES this will return the highest NSBundle, with a valid extension, found in the
 ///                  tree. NO will return the the lowest NSBundle, without validating the extension.
 ///
-- (NSBundle *)findBundleWithAncestor:(BOOL)ancestor {
-  NSBundle *bundle;
-  NSMutableArray *pathComponents = [[self.path pathComponents] mutableCopy];
+- (NSBundle*)findBundleWithAncestor:(BOOL)ancestor {
+  NSBundle* bundle;
+  NSMutableArray* pathComponents = [[self.path pathComponents] mutableCopy];
 
   // Ignore the root path "/", for some reason this is considered a bundle.
   while (pathComponents.count > 1) {
-    NSBundle *bndl = [NSBundle bundleWithPath:[NSString pathWithComponents:pathComponents]];
+    NSBundle* bndl = [NSBundle bundleWithPath:[NSString pathWithComponents:pathComponents]];
     if ([bndl objectForInfoDictionaryKey:@"CFBundleIdentifier"]) {
       if ((!ancestor && bndl.bundlePath.pathExtension.length) ||
           [[self allowedAncestorExtensions] containsObject:bndl.bundlePath.pathExtension]) {
@@ -386,15 +386,15 @@
   return bundle;
 }
 
-- (NSBundle *)bundle {
+- (NSBundle*)bundle {
   if (!self.bundleRef) {
     self.bundleRef =
-        [self findBundleWithAncestor:self.useAncestorBundle] ?: (NSBundle *)[NSNull null];
+        [self findBundleWithAncestor:self.useAncestorBundle] ?: (NSBundle*)[NSNull null];
   }
-  return self.bundleRef == (NSBundle *)[NSNull null] ? nil : self.bundleRef;
+  return self.bundleRef == (NSBundle*)[NSNull null] ? nil : self.bundleRef;
 }
 
-- (NSString *)bundlePath {
+- (NSString*)bundlePath {
   return [self.bundle bundlePath];
 }
 
@@ -406,9 +406,9 @@
   _useAncestorBundle = useAncestorBundle;
 }
 
-- (NSDictionary *)infoPlist {
+- (NSDictionary*)infoPlist {
   if (!self.infoDict) {
-    NSDictionary *d = [self embeddedPlist];
+    NSDictionary* d = [self embeddedPlist];
     if (d) {
       self.infoDict = d;
       return self.infoDict;
@@ -416,7 +416,7 @@
 
     // `-[NSBundle infoDictionary]` is heavily cached, changes to the Info.plist are not realized.
     // Use `CFBundleCopyInfoDictionaryInDirectory` instead, which does not appear to cache.
-    NSString *bundlePath = [self bundlePath];
+    NSString* bundlePath = [self bundlePath];
     if (bundlePath.length) {
       d = CFBridgingRelease(CFBundleCopyInfoDictionaryInDirectory(
           (__bridge CFURLRef)[NSURL fileURLWithPath:bundlePath]));
@@ -426,12 +426,12 @@
       return self.infoDict;
     }
 
-    self.infoDict = (NSDictionary *)[NSNull null];
+    self.infoDict = (NSDictionary*)[NSNull null];
   }
-  return self.infoDict == (NSDictionary *)[NSNull null] ? nil : self.infoDict;
+  return self.infoDict == (NSDictionary*)[NSNull null] ? nil : self.infoDict;
 }
 
-- (NSString *)bundleIdentifier {
+- (NSString*)bundleIdentifier {
   return [[self.infoPlist objectForKey:@"CFBundleIdentifier"] description];
 }
 
@@ -439,8 +439,8 @@
 ///  Return either CFBundleDisplayName or CFBundleName, or nil if those
 ///  keys are not set or are empty strings.
 ///
-- (NSString *)bundleName {
-  NSString *name = [[self.infoPlist objectForKey:@"CFBundleDisplayName"] description];
+- (NSString*)bundleName {
+  NSString* name = [[self.infoPlist objectForKey:@"CFBundleDisplayName"] description];
   if (name.length == 0) {
     name = [[self.infoPlist objectForKey:@"CFBundleName"] description];
     if (name.length == 0) {
@@ -451,42 +451,42 @@
   return name;
 }
 
-- (NSString *)bundleVersion {
+- (NSString*)bundleVersion {
   return [[self.infoPlist objectForKey:@"CFBundleVersion"] description];
 }
 
-- (NSString *)bundleShortVersionString {
+- (NSString*)bundleShortVersionString {
   return [[self.infoPlist objectForKey:@"CFBundleShortVersionString"] description];
 }
 
 #pragma mark Quarantine Data
 
-- (NSString *)quarantineDataURL {
-  NSURL *dataURL = [self quarantineData][@"LSQuarantineDataURL"];
-  if (dataURL == (NSURL *)[NSNull null]) dataURL = nil;
+- (NSString*)quarantineDataURL {
+  NSURL* dataURL = [self quarantineData][@"LSQuarantineDataURL"];
+  if (dataURL == (NSURL*)[NSNull null]) dataURL = nil;
   return [dataURL absoluteString];
 }
 
-- (NSString *)quarantineRefererURL {
-  NSURL *originURL = [self quarantineData][@"LSQuarantineOriginURL"];
-  if (originURL == (NSURL *)[NSNull null]) originURL = nil;
+- (NSString*)quarantineRefererURL {
+  NSURL* originURL = [self quarantineData][@"LSQuarantineOriginURL"];
+  if (originURL == (NSURL*)[NSNull null]) originURL = nil;
   return [originURL absoluteString];
 }
 
-- (NSString *)quarantineAgentBundleID {
-  NSString *agentBundle = [self quarantineData][@"LSQuarantineAgentBundleIdentifier"];
-  if (agentBundle == (NSString *)[NSNull null]) agentBundle = nil;
+- (NSString*)quarantineAgentBundleID {
+  NSString* agentBundle = [self quarantineData][@"LSQuarantineAgentBundleIdentifier"];
+  if (agentBundle == (NSString*)[NSNull null]) agentBundle = nil;
   return agentBundle;
 }
 
-- (NSDate *)quarantineTimestamp {
-  NSDate *timeStamp = [self quarantineData][@"LSQuarantineTimeStamp"];
+- (NSDate*)quarantineTimestamp {
+  NSDate* timeStamp = [self quarantineData][@"LSQuarantineTimeStamp"];
   return timeStamp;
 }
 
 #pragma mark Internal Methods
 
-- (NSDictionary *)machHeaders {
+- (NSDictionary*)machHeaders {
   if (self.cachedHeaders) return self.cachedHeaders;
 
   // Sanity check file length
@@ -495,25 +495,25 @@
     return self.cachedHeaders;
   }
 
-  NSMutableDictionary *machHeaders = [NSMutableDictionary dictionary];
+  NSMutableDictionary* machHeaders = [NSMutableDictionary dictionary];
 
-  NSData *machHeader =
+  NSData* machHeader =
       [self parseSingleMachHeader:[self safeSubdataWithRange:NSMakeRange(0, 4096)]];
   if (machHeader) {
-    struct mach_header *mh = (struct mach_header *)[machHeader bytes];
-    MachHeaderWithOffset *mhwo = [[MachHeaderWithOffset alloc] initWithData:machHeader offset:0];
+    struct mach_header* mh = (struct mach_header*)[machHeader bytes];
+    MachHeaderWithOffset* mhwo = [[MachHeaderWithOffset alloc] initWithData:machHeader offset:0];
     machHeaders[[self nameForCPUType:mh->cputype cpuSubType:mh->cpusubtype]] = mhwo;
   } else {
     NSRange range = NSMakeRange(0, sizeof(struct fat_header));
-    NSData *fatHeader = [self safeSubdataWithRange:range];
-    struct fat_header *fh = (struct fat_header *)[fatHeader bytes];
+    NSData* fatHeader = [self safeSubdataWithRange:range];
+    struct fat_header* fh = (struct fat_header*)[fatHeader bytes];
 
     if (fatHeader && (fh->magic == FAT_CIGAM || fh->magic == FAT_MAGIC)) {
       int nfat_arch = OSSwapBigToHostInt32(fh->nfat_arch);
       range = NSMakeRange(sizeof(struct fat_header), sizeof(struct fat_arch) * nfat_arch);
-      NSMutableData *fatArchs = [[self safeSubdataWithRange:range] mutableCopy];
+      NSMutableData* fatArchs = [[self safeSubdataWithRange:range] mutableCopy];
       if (fatArchs) {
-        struct fat_arch *fat_arch = (struct fat_arch *)[fatArchs mutableBytes];
+        struct fat_arch* fat_arch = (struct fat_arch*)[fatArchs mutableBytes];
         for (int i = 0; i < nfat_arch; ++i) {
           int offset = OSSwapBigToHostInt32(fat_arch[i].offset);
           int size = OSSwapBigToHostInt32(fat_arch[i].size);
@@ -521,10 +521,10 @@
           int cpusubtype = OSSwapBigToHostInt(fat_arch[i].cpusubtype);
 
           range = NSMakeRange(offset, size);
-          NSData *machHeader = [self parseSingleMachHeader:[self safeSubdataWithRange:range]];
+          NSData* machHeader = [self parseSingleMachHeader:[self safeSubdataWithRange:range]];
           if (machHeader) {
-            NSString *key = [self nameForCPUType:cputype cpuSubType:cpusubtype];
-            MachHeaderWithOffset *mhwo = [[MachHeaderWithOffset alloc] initWithData:machHeader
+            NSString* key = [self nameForCPUType:cputype cpuSubType:cpusubtype];
+            MachHeaderWithOffset* mhwo = [[MachHeaderWithOffset alloc] initWithData:machHeader
                                                                              offset:offset];
             machHeaders[key] = mhwo;
           }
@@ -537,13 +537,13 @@
   return self.cachedHeaders;
 }
 
-- (NSData *)parseSingleMachHeader:(NSData *)inputData {
+- (NSData*)parseSingleMachHeader:(NSData*)inputData {
   if (inputData.length < sizeof(struct mach_header)) return nil;
-  struct mach_header *mh = (struct mach_header *)[inputData bytes];
+  struct mach_header* mh = (struct mach_header*)[inputData bytes];
 
   if (mh->magic == MH_CIGAM || mh->magic == MH_CIGAM_64) {
-    NSMutableData *mutableInput = [inputData mutableCopy];
-    mh = (struct mach_header *)[mutableInput mutableBytes];
+    NSMutableData* mutableInput = [inputData mutableCopy];
+    mh = (struct mach_header*)[mutableInput mutableBytes];
 
     // swap_mach_header() was deprecated in macOS 13 and there is no replacement.
     // This is probably because both Intel and Apple Silicon are little-endian and
@@ -568,14 +568,14 @@
 ///
 ///  Locate an embedded plist in the file
 ///
-- (NSDictionary *)embeddedPlist {
+- (NSDictionary*)embeddedPlist {
   // Look for an embedded Info.plist if there is one.
   // This could (and used to) use CFBundleCopyInfoDictionaryForURL but that uses mmap to read
   // the file and so can cause SIGBUS if the file is deleted/truncated while it's working.
-  MachHeaderWithOffset *mhwo = [[self.machHeaders allValues] firstObject];
+  MachHeaderWithOffset* mhwo = [[self.machHeaders allValues] firstObject];
   if (!mhwo) return nil;
 
-  struct mach_header *mh = (struct mach_header *)mhwo.data.bytes;
+  struct mach_header* mh = (struct mach_header*)mhwo.data.bytes;
   if (mh->filetype != MH_EXECUTE) return self.infoDict;
   BOOL is64 = (mh->magic == MH_MAGIC_64 || mh->magic == MH_CIGAM_64);
   uint32_t ncmds = mh->ncmds;
@@ -590,15 +590,15 @@
 
   // Loop through the load commands looking for the segment named __TEXT
   for (uint32_t i = 0; i < ncmds; ++i) {
-    NSData *cmdData = [self safeSubdataWithRange:NSMakeRange(offset, sz_segment)];
+    NSData* cmdData = [self safeSubdataWithRange:NSMakeRange(offset, sz_segment)];
     if (!cmdData) return nil;
 
-    if (((struct load_command *)[cmdData bytes])->cmdsize < sizeof(struct load_command)) {
+    if (((struct load_command*)[cmdData bytes])->cmdsize < sizeof(struct load_command)) {
       return nil;
     }
 
     if (is64) {
-      struct segment_command_64 *lc = (struct segment_command_64 *)[cmdData bytes];
+      struct segment_command_64* lc = (struct segment_command_64*)[cmdData bytes];
       if (lc->cmd == LC_SEGMENT_64 && memcmp(lc->segname, "__TEXT", 6) == 0) {
         nsects = lc->nsects;
         offset += sz_segment;
@@ -606,7 +606,7 @@
       }
       offset += lc->cmdsize;
     } else {
-      struct segment_command *lc = (struct segment_command *)[cmdData bytes];
+      struct segment_command* lc = (struct segment_command*)[cmdData bytes];
       if (lc->cmd == LC_SEGMENT && memcmp(lc->segname, "__TEXT", 6) == 0) {
         nsects = lc->nsects;
         offset += sz_segment;
@@ -618,19 +618,19 @@
 
   // Loop through the sections in the __TEXT segment looking for an __info_plist section.
   for (uint32_t i = 0; i < nsects; ++i) {
-    NSData *sectData = [self safeSubdataWithRange:NSMakeRange(offset, sz_section)];
+    NSData* sectData = [self safeSubdataWithRange:NSMakeRange(offset, sz_section)];
     if (!sectData) return nil;
     uint64_t sectoffset, sectsize = 0;
     BOOL found = NO;
     if (is64) {
-      struct section_64 *sect = (struct section_64 *)[sectData bytes];
+      struct section_64* sect = (struct section_64*)[sectData bytes];
       if (sect && memcmp(sect->sectname, "__info_plist", 12) == 0 && sect->size < 2000000) {
         sectoffset = sect->offset;
         sectsize = sect->size;
         found = YES;
       }
     } else {
-      struct section *sect = (struct section *)[sectData bytes];
+      struct section* sect = (struct section*)[sectData bytes];
       if (sect && memcmp(sect->sectname, "__info_plist", 12) == 0 && sect->size < 2000000) {
         sectoffset = sect->offset;
         sectsize = sect->size;
@@ -639,10 +639,10 @@
     }
 
     if (found) {
-      NSData *plistData =
+      NSData* plistData =
           [self safeSubdataWithRange:NSMakeRange(mhwo.offset + sectoffset, sectsize)];
       if (!plistData) return nil;
-      NSDictionary *plist;
+      NSDictionary* plist;
       plist = [NSPropertyListSerialization propertyListWithData:plistData
                                                         options:NSPropertyListImmutable
                                                          format:NULL
@@ -657,25 +657,25 @@
 ///
 ///  Return the first mach_header in this file.
 ///
-- (struct mach_header *)firstMachHeader {
-  return (struct mach_header *)([[[[self.machHeaders allValues] firstObject] data] bytes]);
+- (struct mach_header*)firstMachHeader {
+  return (struct mach_header*)([[[[self.machHeaders allValues] firstObject] data] bytes]);
 }
 
 ///
 ///  Extract a range of the file as an NSData, handling any exceptions.
 ///  Returns nil if the requested range is outside of the range of the file.
 ///
-- (NSData *)safeSubdataWithRange:(NSRange)range {
+- (NSData*)safeSubdataWithRange:(NSRange)range {
   @try {
     NSUInteger size;
     if (__builtin_add_overflow(range.location, range.length, &size) || size > self.fileSize) {
       return nil;
     }
     [self.fileHandle seekToFileOffset:range.location];
-    NSData *d = [self.fileHandle readDataOfLength:range.length];
+    NSData* d = [self.fileHandle readDataOfLength:range.length];
     if (d.length != range.length) return nil;
     return d;
-  } @catch (NSException *e) {
+  } @catch (NSException* e) {
     return nil;
   }
 }
@@ -685,12 +685,12 @@
 ///  This method attempts to handle fetching the quarantine data even if the running user
 ///  is not the one who downloaded the file.
 ///
-- (NSDictionary *)quarantineData {
+- (NSDictionary*)quarantineData {
   if (!self.quarantineDict && self.fileOwnerHomeDir && NSURLQuarantinePropertiesKey) {
-    self.quarantineDict = (NSDictionary *)[NSNull null];
+    self.quarantineDict = (NSDictionary*)[NSNull null];
 
-    NSURL *url = [NSURL fileURLWithPath:self.path];
-    NSDictionary *d = [url resourceValuesForKeys:@[ NSURLQuarantinePropertiesKey ] error:NULL];
+    NSURL* url = [NSURL fileURLWithPath:self.path];
+    NSDictionary* d = [url resourceValuesForKeys:@[ NSURLQuarantinePropertiesKey ] error:NULL];
 
     if (d[NSURLQuarantinePropertiesKey]) {
       d = d[NSURLQuarantinePropertiesKey];
@@ -698,36 +698,36 @@
       if (d[@"LSQuarantineIsOwnedByCurrentUser"]) {
         self.quarantineDict = d;
       } else if (d[@"LSQuarantineEventIdentifier"]) {
-        NSMutableDictionary *quarantineDict = [d mutableCopy];
+        NSMutableDictionary* quarantineDict = [d mutableCopy];
 
         // If self.path is on a quarantine disk image, LSQuarantineDiskImageURL will point to the
         // disk image and self.fileOwnerHomeDir will be incorrect (probably root).
-        NSString *fileOwnerHomeDir = self.fileOwnerHomeDir;
+        NSString* fileOwnerHomeDir = self.fileOwnerHomeDir;
         if (d[@"LSQuarantineDiskImageURL"]) {
           struct stat fileStat;
           stat([d[@"LSQuarantineDiskImageURL"] fileSystemRepresentation], &fileStat);
           if (fileStat.st_uid != 0) {
-            struct passwd *pwd = getpwuid(fileStat.st_uid);
+            struct passwd* pwd = getpwuid(fileStat.st_uid);
             if (pwd) {
               fileOwnerHomeDir = @(pwd->pw_dir);
             }
           }
         }
 
-        NSURL *dbPath = [NSURL fileURLWithPathComponents:@[
+        NSURL* dbPath = [NSURL fileURLWithPathComponents:@[
           fileOwnerHomeDir, @"Library", @"Preferences",
           @"com.apple.LaunchServices.QuarantineEventsV2"
         ]];
-        FMDatabase *db = [FMDatabase databaseWithPath:[dbPath absoluteString]];
+        FMDatabase* db = [FMDatabase databaseWithPath:[dbPath absoluteString]];
         db.logsErrors = NO;
         if ([db open]) {
-          FMResultSet *rs = [db executeQuery:@"SELECT * FROM LSQuarantineEvent "
+          FMResultSet* rs = [db executeQuery:@"SELECT * FROM LSQuarantineEvent "
                                              @"WHERE LSQuarantineEventIdentifier=?",
                                              d[@"LSQuarantineEventIdentifier"]];
           if ([rs next]) {
-            NSString *agentBundleID = [rs stringForColumn:@"LSQuarantineAgentBundleIdentifier"];
-            NSString *dataURLString = [rs stringForColumn:@"LSQuarantineDataURLString"];
-            NSString *originURLString = [rs stringForColumn:@"LSQuarantineOriginURLString"];
+            NSString* agentBundleID = [rs stringForColumn:@"LSQuarantineAgentBundleIdentifier"];
+            NSString* dataURLString = [rs stringForColumn:@"LSQuarantineDataURLString"];
+            NSString* originURLString = [rs stringForColumn:@"LSQuarantineOriginURLString"];
             double timeStamp = [rs doubleForColumn:@"LSQuarantineTimeStamp"];
 
             quarantineDict[@"LSQuarantineAgentBundleIdentifier"] = agentBundleID;
@@ -744,14 +744,14 @@
       }
     }
   }
-  return (self.quarantineDict == (NSDictionary *)[NSNull null]) ? nil : self.quarantineDict;
+  return (self.quarantineDict == (NSDictionary*)[NSNull null]) ? nil : self.quarantineDict;
 }
 
 ///
 ///  Return a human-readable string for a cpu_type_t.
 ///
-- (NSString *)nameForCPUType:(cpu_type_t)cpuType cpuSubType:(cpu_subtype_t)cpuSubType {
-  const char *name = macho_arch_name_for_cpu_type(cpuType, cpuSubType);
+- (NSString*)nameForCPUType:(cpu_type_t)cpuType cpuSubType:(cpu_subtype_t)cpuSubType {
+  const char* name = macho_arch_name_for_cpu_type(cpuType, cpuSubType);
   if (name) {
     return @(name);
   }
@@ -766,11 +766,11 @@
 ///      returns the path to that bundles CFBundleExecutable and stores a reference to the
 ///      bundle in the bundle out-param.
 ///
-- (NSString *)resolvePath:(NSString *)path bundle:(NSBundle **)bundle {
+- (NSString*)resolvePath:(NSString*)path bundle:(NSBundle**)bundle {
   // Convert to absolute, standardized path
   path = [path stringByResolvingSymlinksInPath];
   if (![path isAbsolutePath]) {
-    NSString *cwd = [[NSFileManager defaultManager] currentDirectoryPath];
+    NSString* cwd = [[NSFileManager defaultManager] currentDirectoryPath];
     path = [cwd stringByAppendingPathComponent:path];
   }
   path = [path stringByStandardizingPath];
@@ -781,7 +781,7 @@
   if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&directory]) {
     return nil;
   } else if (directory && ![path isEqualToString:@"/"]) {
-    NSBundle *bndl = [NSBundle bundleWithPath:path];
+    NSBundle* bndl = [NSBundle bundleWithPath:path];
     if (bundle) *bundle = bndl;
     return [bndl executablePath];
   } else {
@@ -793,9 +793,9 @@
 ///  Cache and return a MOLCodeSignChecker for the given file.  If there was an error creating the
 ///  code sign checker it will be returned in the passed-in error parameter.
 ///
-- (MOLCodesignChecker *)codesignCheckerWithError:(NSError **)error {
+- (MOLCodesignChecker*)codesignCheckerWithError:(NSError**)error {
   if (!self.cachedCodesignChecker && !self.codesignCheckerError) {
-    NSError *e;
+    NSError* e;
     self.cachedCodesignChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:self.path error:&e];
     self.codesignCheckerError = e;
   }
@@ -803,9 +803,9 @@
   return self.cachedCodesignChecker;
 }
 
-- (NSString *)codesignStatus {
-  NSError *error;
-  MOLCodesignChecker *csc = [self codesignCheckerWithError:&error];
+- (NSString*)codesignStatus {
+  NSError* error;
+  MOLCodesignChecker* csc = [self codesignCheckerWithError:&error];
   if (error) {
     switch (error.code) {
       case errSecCSUnsigned: return @"No";

@@ -24,25 +24,25 @@
 
 @implementation SNTDatabaseController
 
-static NSString *const kDatabasePath = @"/var/db/santa";
-static NSString *const kRulesDatabaseName = @"rules.db";
-static NSString *const kEventsDatabaseName = @"events.db";
+static NSString* const kDatabasePath = @"/var/db/santa";
+static NSString* const kRulesDatabaseName = @"rules.db";
+static NSString* const kEventsDatabaseName = @"events.db";
 
-+ (NSString *const)databasePath {
++ (NSString* const)databasePath {
   return kDatabasePath;
 }
 
-+ (SNTEventTable *)eventTable {
-  static SNTEventTable *eventDatabase;
++ (SNTEventTable*)eventTable {
+  static SNTEventTable* eventDatabase;
   static dispatch_once_t eventDatabaseToken;
   dispatch_once(&eventDatabaseToken, ^{
     [self createDatabasePath];
-    NSString *fullPath =
+    NSString* fullPath =
         [[SNTDatabaseController databasePath] stringByAppendingPathComponent:kEventsDatabaseName];
-    FMDatabaseQueue *dbq = [[FMDatabaseQueue alloc] initWithPath:fullPath];
+    FMDatabaseQueue* dbq = [[FMDatabaseQueue alloc] initWithPath:fullPath];
 
 #ifndef DEBUG
-    [dbq inDatabase:^(FMDatabase *db) {
+    [dbq inDatabase:^(FMDatabase* db) {
       db.logsErrors = NO;
     }];
 #endif
@@ -56,17 +56,17 @@ static NSString *const kEventsDatabaseName = @"events.db";
   return eventDatabase;
 }
 
-+ (SNTRuleTable *)ruleTable {
-  static SNTRuleTable *ruleDatabase;
++ (SNTRuleTable*)ruleTable {
+  static SNTRuleTable* ruleDatabase;
   static dispatch_once_t ruleDatabaseToken;
   dispatch_once(&ruleDatabaseToken, ^{
     [self createDatabasePath];
-    NSString *fullPath =
+    NSString* fullPath =
         [[SNTDatabaseController databasePath] stringByAppendingPathComponent:kRulesDatabaseName];
-    FMDatabaseQueue *dbq = [[FMDatabaseQueue alloc] initWithPath:fullPath];
+    FMDatabaseQueue* dbq = [[FMDatabaseQueue alloc] initWithPath:fullPath];
 
 #ifndef DEBUG
-    [dbq inDatabase:^(FMDatabase *db) {
+    [dbq inDatabase:^(FMDatabase* db) {
       db.logsErrors = NO;
     }];
 #endif
@@ -83,9 +83,9 @@ static NSString *const kEventsDatabaseName = @"events.db";
 
 /// Create the folder that contains the databases
 + (void)createDatabasePath {
-  NSFileManager *fm = [NSFileManager defaultManager];
+  NSFileManager* fm = [NSFileManager defaultManager];
 
-  NSDictionary *attrs = @{
+  NSDictionary* attrs = @{
     NSFileOwnerAccountName : @"root",
     NSFileGroupOwnerAccountName : @"wheel",
     NSFilePosixPermissions : @0755

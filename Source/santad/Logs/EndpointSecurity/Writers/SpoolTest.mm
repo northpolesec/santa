@@ -41,10 +41,10 @@ using santa::SpoolPeer;
 @interface SpoolTest : XCTestCase
 @property dispatch_queue_t q;
 @property dispatch_source_t timer;
-@property NSFileManager *fileMgr;
-@property NSString *testDir;
-@property NSString *baseDir;
-@property NSString *spoolDir;
+@property NSFileManager* fileMgr;
+@property NSString* testDir;
+@property NSString* baseDir;
+@property NSString* spoolDir;
 @end
 
 @implementation SpoolTest
@@ -84,7 +84,7 @@ using santa::SpoolPeer;
 - (void)testWriteAnyBatcher {
   const size_t writeSize = 50;
   const uint64 periodicFlushMS = 400;
-  NSError *err = nil;
+  NSError* err = nil;
 
   dispatch_semaphore_t semaWrite = dispatch_semaphore_create(0);
   dispatch_semaphore_t semaFlush = dispatch_semaphore_create(0);
@@ -147,7 +147,7 @@ using santa::SpoolPeer;
 - (void)testWriteStreamBatcher {
   const size_t writeSize = 50;
   const uint64 periodicFlushMS = 400;
-  NSError *err = nil;
+  NSError* err = nil;
 
   dispatch_semaphore_t semaWrite = dispatch_semaphore_create(0);
   dispatch_semaphore_t semaFlush = dispatch_semaphore_create(0);

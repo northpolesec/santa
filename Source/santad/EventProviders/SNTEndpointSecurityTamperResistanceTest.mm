@@ -85,7 +85,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kPrefix))
       .WillRepeatedly(testing::Return(true));
 
-  SNTEndpointSecurityTamperResistance *tamperClient =
+  SNTEndpointSecurityTamperResistance* tamperClient =
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
                                                           logger:nullptr];
@@ -93,7 +93,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
   [mockTamperClient enable];
 
-  for (const auto &event : expectedEventSubs) {
+  for (const auto& event : expectedEventSubs) {
     XCTAssertNoThrow(santa::EventTypeToString(event));
   }
 
@@ -111,7 +111,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   es_file_t fileSantaAppPrefix = MakeESFile(kSantaAppPrefixPath.data());
   es_file_t fileBenign = MakeESFile(kBenignPath.data());
 
-  std::map<es_file_t *, es_auth_result_t> pathToResult{
+  std::map<es_file_t*, es_auth_result_t> pathToResult{
       {&fileEventsDB, ES_AUTH_RESULT_DENY},
       {&fileRulesDB, ES_AUTH_RESULT_DENY},
       {&fileSantaAppPrefix, ES_AUTH_RESULT_DENY},
@@ -138,7 +138,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   mockESApi->SetExpectationsESNewClient();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  SNTEndpointSecurityTamperResistance *tamperClient =
+  SNTEndpointSecurityTamperResistance* tamperClient =
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
                                                           logger:nullptr];
@@ -155,7 +155,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
                               withAuthResult:(es_auth_result_t)0
                                    cacheable:false])
       .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation *inv) {
+      .andDo(^(NSInvocation* inv) {
         [inv getArgument:&gotAuthResult atIndex:3];
         [inv getArgument:&gotCachable atIndex:4];
       });
@@ -172,7 +172,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   // Check UNLINK tamper events
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_UNLINK;
-    for (const auto &kv : pathToResult) {
+    for (const auto& kv : pathToResult) {
       Message msg(mockESApi, &esMsg);
       esMsg.event.unlink.target = kv.first;
 
@@ -194,7 +194,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   // Check RENAME `source` tamper events
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
-    for (const auto &kv : pathToResult) {
+    for (const auto& kv : pathToResult) {
       Message msg(mockESApi, &esMsg);
       esMsg.event.rename.source = kv.first;
       esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
@@ -217,7 +217,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
     esMsg.event.rename.source = &fileBenign;
-    for (const auto &kv : pathToResult) {
+    for (const auto& kv : pathToResult) {
       Message msg(mockESApi, &esMsg);
       esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
       esMsg.event.rename.destination.existing_file = kv.first;
@@ -240,7 +240,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_SIGNAL;
 
-    for (const auto &kv : pidsToResultSignal) {
+    for (const auto& kv : pidsToResultSignal) {
       Message msg(mockESApi, &esMsg);
       es_process_t target_proc = MakeESProcess(&file);
       target_proc.audit_token = MakeAuditToken(kv.first.first, 42);
@@ -265,7 +265,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
 
-    for (const auto &kv : pidsToResultProcSuspendResume) {
+    for (const auto& kv : pidsToResultProcSuspendResume) {
       OCMExpect([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(NO);
       Message msg(mockESApi, &esMsg);
       es_process_t target_proc = MakeESProcess(&file);
@@ -289,7 +289,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
 
-    for (const auto &kv : pidsToResultProcSuspendResume) {
+    for (const auto& kv : pidsToResultProcSuspendResume) {
       OCMExpect([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(YES);
       Message msg(mockESApi, &esMsg);
       es_process_t target_proc = MakeESProcess(&file);
@@ -314,7 +314,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   // Check OPEN tamper events
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
-    for (const auto &kv : pathToResult) {
+    for (const auto& kv : pathToResult) {
       Message msg(mockESApi, &esMsg);
       esMsg.event.open.file = kv.first;
       esMsg.event.open.fflag = FWRITE;

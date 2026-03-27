@@ -24,7 +24,7 @@
 ///
 @interface SNTSystemExtensionDelegate : NSObject <OSSystemExtensionRequestDelegate>
 
-@property(readonly) OSSystemExtensionRequest *request;
+@property(readonly) OSSystemExtensionRequest* request;
 @property(readonly) BOOL isNetworkExtension;
 @property(readonly) BOOL isActivation;
 

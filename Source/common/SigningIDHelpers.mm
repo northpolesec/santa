@@ -17,7 +17,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTLogging.h"
 
-NSString *FormatSigningID(NSString *signingID, NSString *teamID, BOOL isPlatformBinary) {
+NSString* FormatSigningID(NSString* signingID, NSString* teamID, BOOL isPlatformBinary) {
   if (!signingID.length) {
     return nil;
   }
@@ -33,6 +33,6 @@ NSString *FormatSigningID(NSString *signingID, NSString *teamID, BOOL isPlatform
   return [NSString stringWithFormat:@"%@:%@", teamID, signingID];
 }
 
-NSString *FormatSigningID(MOLCodesignChecker *csc) {
+NSString* FormatSigningID(MOLCodesignChecker* csc) {
   return FormatSigningID(csc.signingID, csc.teamID, csc.platformBinary);
 }

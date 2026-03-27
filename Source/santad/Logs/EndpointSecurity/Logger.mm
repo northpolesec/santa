@@ -63,8 +63,8 @@ std::unique_ptr<Logger> Logger::Create(
     std::shared_ptr<EndpointSecurityAPI> esapi,
     std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
     GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
-    SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
-    NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
+    SNTEventLogType log_type, SNTDecisionCache* decision_cache, NSString* event_log_path,
+    NSString* spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
     uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds,
     uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
     uint32_t telemetry_export_max_files_per_batch) {
@@ -100,7 +100,7 @@ std::unique_ptr<Logger> Logger::Create(
     case SNTEventLogTypeProtobufStreamGzip:
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
       writer = Spool<::fsspool::GzipStreamBatcher>::Create(
-          ::fsspool::GzipStreamBatcher(^(google::protobuf::io::ZeroCopyOutputStream *raw_stream) {
+          ::fsspool::GzipStreamBatcher(^(google::protobuf::io::ZeroCopyOutputStream* raw_stream) {
             return std::make_shared<google::protobuf::io::GzipOutputStream>(raw_stream);
           }),
           [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
@@ -109,7 +109,7 @@ std::unique_ptr<Logger> Logger::Create(
     case SNTEventLogTypeProtobufStreamZstd:
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
       writer = Spool<::fsspool::ZstdStreamBatcher>::Create(
-          ::fsspool::ZstdStreamBatcher(^(google::protobuf::io::ZeroCopyOutputStream *raw_stream) {
+          ::fsspool::ZstdStreamBatcher(^(google::protobuf::io::ZeroCopyOutputStream* raw_stream) {
             return ::fsspool::ZstdOutputStream::Create(raw_stream);
           }),
           [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
@@ -153,7 +153,7 @@ Logger::Logger(std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
       export_timeout_secs_(std::make_unique<std::atomic_uint32_t>()) {
   // Provide a default block instead of leaving nil
   if (get_export_config_block_ == nil) {
-    get_export_config_block_ = ^SNTExportConfiguration *() {
+    get_export_config_block_ = ^SNTExportConfiguration*() {
       return nil;
     };
   }
@@ -234,7 +234,7 @@ void Logger::ExportTelemetrySerialized() {
   }
 
   // Get a copy of the current export config to be used for the entire export
-  SNTExportConfiguration *export_config = get_export_config_block_();
+  SNTExportConfiguration* export_config = get_export_config_block_();
   if (!export_config) {
     LOGW(@"Telemetry export enabled, but no export configuration is set.");
     return;
@@ -252,7 +252,7 @@ void Logger::ExportTelemetrySerialized() {
     continue_processing = false;
 
     while (std::optional<std::string> file_to_export = writer_->NextFileToExport()) {
-      NSString *path = @((*file_to_export).c_str());
+      NSString* path = @((*file_to_export).c_str());
 
       struct stat sb;
       if (stat(path.fileSystemRepresentation, &sb) != 0) {
@@ -294,7 +294,7 @@ void Logger::ExportTelemetrySerialized() {
 
     if (result.ok()) {
       LOGD(@"Successfully exported %zu telemetry files via sleigh", files_to_export.size());
-      for (const auto &file : files_to_export) {
+      for (const auto& file : files_to_export) {
         tracker_.AckCompleted(file);
       }
     } else {
@@ -313,41 +313,41 @@ void Logger::Log(std::unique_ptr<EnrichedMessage> msg) {
   }
 }
 
-void Logger::LogAllowlist(const Message &msg, const std::string_view hash,
+void Logger::LogAllowlist(const Message& msg, const std::string_view hash,
                           const std::string_view target_path) {
   if (ShouldLog(TelemetryEvent::kAllowlist)) {
     writer_->Write(serializer_->SerializeAllowlist(msg, hash, target_path));
   }
 }
 
-void Logger::LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events) {
+void Logger::LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent*>* events) {
   if (ShouldLog(TelemetryEvent::kBundle)) {
-    for (SNTStoredExecutionEvent *se in events) {
+    for (SNTStoredExecutionEvent* se in events) {
       writer_->Write(serializer_->SerializeBundleHashingEvent(se));
     }
   }
 }
 
-void Logger::LogDiskAppeared(NSDictionary *props, bool allowed) {
+void Logger::LogDiskAppeared(NSDictionary* props, bool allowed) {
   if (ShouldLog(TelemetryEvent::kDisk)) {
     writer_->Write(serializer_->SerializeDiskAppeared(props, allowed));
   }
 }
 
-void Logger::LogDiskDisappeared(NSDictionary *props) {
+void Logger::LogDiskDisappeared(NSDictionary* props) {
   if (ShouldLog(TelemetryEvent::kDisk)) {
     writer_->Write(serializer_->SerializeDiskDisappeared(props));
   }
 }
 
-void Logger::LogNetworkFlows(SNDProcessFlows *processFlows, struct timespec window_start,
+void Logger::LogNetworkFlows(SNDProcessFlows* processFlows, struct timespec window_start,
                              struct timespec window_end) {
   writer_->Write(serializer_->SerializeNetworkFlows(processFlows, window_start, window_end));
 }
 
-void Logger::LogFileAccess(const std::string &policy_version, const std::string &policy_name,
-                           const santa::Message &msg,
-                           const santa::EnrichedProcess &enriched_process, size_t target_index,
+void Logger::LogFileAccess(const std::string& policy_version, const std::string& policy_name,
+                           const santa::Message& msg,
+                           const santa::EnrichedProcess& enriched_process, size_t target_index,
                            std::optional<santa::EnrichedFile> enriched_event_target,
                            FileAccessPolicyDecision decision) {
   if (ShouldLog(TelemetryEvent::kFileAccess)) {

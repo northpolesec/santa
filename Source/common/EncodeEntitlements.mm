@@ -33,13 +33,13 @@ id StandardizedNestedObjects(id obj, int level) {
   if ([obj isKindOfClass:[NSNumber class]] || [obj isKindOfClass:[NSString class]]) {
     return obj;
   } else if ([obj isKindOfClass:[NSArray class]]) {
-    NSMutableArray *arr = [NSMutableArray array];
+    NSMutableArray* arr = [NSMutableArray array];
     for (id item in obj) {
       [arr addObject:StandardizedNestedObjects(item, level)];
     }
     return arr;
   } else if ([obj isKindOfClass:[NSDictionary class]]) {
-    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+    NSMutableDictionary* dict = [NSMutableDictionary dictionary];
     for (id key in obj) {
       [dict setObject:StandardizedNestedObjects(obj[key], level) forKey:key];
     }
@@ -58,11 +58,11 @@ id StandardizedNestedObjects(id obj, int level) {
   }
 }
 
-void EncodeEntitlementsCommon(NSDictionary *entitlements, BOOL entitlements_filtered,
+void EncodeEntitlementsCommon(NSDictionary* entitlements, BOOL entitlements_filtered,
                               void (^EncodeInitBlock)(NSUInteger count, bool is_filtered),
-                              void (^EncodeEntitlementBlock)(NSString *entitlement,
-                                                             NSString *value)) {
-  NSDictionary *standardized_entitlements =
+                              void (^EncodeEntitlementBlock)(NSString* entitlement,
+                                                             NSString* value)) {
+  NSDictionary* standardized_entitlements =
       StandardizedNestedObjects(entitlements, kMaxEncodeObjectLevels);
   __block int num_objects_to_encode =
       (int)std::min(kMaxEncodeObjectEntries, standardized_entitlements.count);
@@ -71,7 +71,7 @@ void EncodeEntitlementsCommon(NSDictionary *entitlements, BOOL entitlements_filt
       num_objects_to_encode,
       entitlements_filtered != NO || num_objects_to_encode != standardized_entitlements.count);
 
-  [standardized_entitlements enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+  [standardized_entitlements enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL* stop) {
     if (num_objects_to_encode-- == 0) {
       *stop = YES;
       return;
@@ -82,13 +82,13 @@ void EncodeEntitlementsCommon(NSDictionary *entitlements, BOOL entitlements_filt
       return;
     }
 
-    NSError *err;
-    NSData *json_data;
+    NSError* err;
+    NSData* json_data;
     @try {
       json_data = [NSJSONSerialization dataWithJSONObject:obj
                                                   options:NSJSONWritingFragmentsAllowed
                                                     error:&err];
-    } @catch (NSException *e) {
+    } @catch (NSException* e) {
       LOGW(@"Encountered entitlement that cannot directly convert to JSON: %@: %@", key, obj);
     }
 
@@ -101,7 +101,7 @@ void EncodeEntitlementsCommon(NSDictionary *entitlements, BOOL entitlements_filt
         json_data = [NSJSONSerialization dataWithJSONObject:[obj description]
                                                     options:NSJSONWritingFragmentsAllowed
                                                       error:&err];
-      } @catch (NSException *e) {
+      } @catch (NSException* e) {
         LOGW(@"Unable to create fallback string: %@: %@", key, obj);
       }
 

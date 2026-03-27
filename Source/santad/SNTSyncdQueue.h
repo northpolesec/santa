@@ -29,10 +29,10 @@
 - (void)reassessSyncServiceConnection;
 - (void)reassessSyncServiceConnectionImmediately;
 
-- (void)addStoredEvent:(SNTStoredEvent *)event;
-- (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent *> *)events
-         withBundleHash:(NSString *)bundleHash;
-- (void)addBundleEvent:(SNTStoredExecutionEvent *)event reply:(void (^)(SNTBundleEventAction))reply;
+- (void)addStoredEvent:(SNTStoredEvent*)event;
+- (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent*>*)events
+         withBundleHash:(NSString*)bundleHash;
+- (void)addBundleEvent:(SNTStoredExecutionEvent*)event reply:(void (^)(SNTBundleEventAction))reply;
 
 /// Force the push notification client to reconnect immediately.
 /// Use this when external conditions have changed (e.g., network interface reset by content filter)

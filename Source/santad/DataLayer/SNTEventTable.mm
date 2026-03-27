@@ -36,15 +36,15 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 @end
 
 @implementation SNTEventTable {
-  std::unique_ptr<SantaCache<std::string, NSDate *>> _storeBackoff;
+  std::unique_ptr<SantaCache<std::string, NSDate*>> _storeBackoff;
 }
 
 - (uint32_t)currentSupportedVersion {
   return kEventTableCurrentVersion;
 }
 
-- (uint32_t)initializeDatabase:(FMDatabase *)db fromVersion:(uint32_t)version {
-  _storeBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(2048);
+- (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
+  _storeBackoff = std::make_unique<SantaCache<std::string, NSDate*>>(2048);
   self.unactionableEventCacheTimeSeconds = kUnactionableEventCacheTimeSeconds;
 
   int newVersion = 0;
@@ -104,30 +104,30 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
 #pragma mark Loading / Storing
 
-- (BOOL)addStoredEvent:(SNTStoredEvent *)event {
+- (BOOL)addStoredEvent:(SNTStoredEvent*)event {
   return [self addStoredEvents:@[ event ]];
 }
 
-- (BOOL)isValidStoredEvent:(SNTStoredEvent *)event {
+- (BOOL)isValidStoredEvent:(SNTStoredEvent*)event {
   if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
-    SNTStoredExecutionEvent *se = (SNTStoredExecutionEvent *)event;
+    SNTStoredExecutionEvent* se = (SNTStoredExecutionEvent*)event;
     return se.idx && [[se uniqueID] length] && se.filePath.length && se.occurrenceDate &&
            se.decision;
   } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
-    SNTStoredFileAccessEvent *se = (SNTStoredFileAccessEvent *)event;
+    SNTStoredFileAccessEvent* se = (SNTStoredFileAccessEvent*)event;
     return se.idx && se.ruleVersion.length && se.ruleName.length && se.accessedPath.length &&
            se.process.filePath.length && [[se uniqueID] length];
   } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]) {
-    SNTStoredTemporaryMonitorModeAuditEvent *se = (SNTStoredTemporaryMonitorModeAuditEvent *)event;
+    SNTStoredTemporaryMonitorModeAuditEvent* se = (SNTStoredTemporaryMonitorModeAuditEvent*)event;
     return se.uuid != nil;
   } else {
     return NO;
   }
 }
 
-- (BOOL)addStoredEvents:(NSArray<SNTStoredEvent *> *)events {
-  NSMutableDictionary *eventsData = [NSMutableDictionary dictionaryWithCapacity:events.count];
-  for (SNTStoredEvent *event in events) {
+- (BOOL)addStoredEvents:(NSArray<SNTStoredEvent*>*)events {
+  NSMutableDictionary* eventsData = [NSMutableDictionary dictionaryWithCapacity:events.count];
+  for (SNTStoredEvent* event in events) {
     if (![self isValidStoredEvent:event]) {
       continue;
     }
@@ -136,7 +136,7 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
       continue;
     }
 
-    NSData *eventData = [NSKeyedArchiver archivedDataWithRootObject:event
+    NSData* eventData = [NSKeyedArchiver archivedDataWithRootObject:event
                                               requiringSecureCoding:YES
                                                               error:nil];
     if (eventData) {
@@ -145,9 +145,9 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
   }
 
   __block BOOL success = NO;
-  [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
+  [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
     [eventsData
-        enumerateKeysAndObjectsUsingBlock:^(NSData *eventData, SNTStoredEvent *event, BOOL *stop) {
+        enumerateKeysAndObjectsUsingBlock:^(NSData* eventData, SNTStoredEvent* event, BOOL* stop) {
           success = [db executeUpdate:@"INSERT INTO 'events' (idx, uniqueid, eventdata) "
                                       @"VALUES (?, ?, ?) "
                                       @"ON CONFLICT(uniqueid) DO NOTHING",
@@ -159,9 +159,9 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
   return success;
 }
 
-- (BOOL)backoffForPrimaryHash:(NSString *)hash {
-  NSDate *backoff = _storeBackoff->get(santa::NSStringToUTF8String(hash));
-  NSDate *now = [NSDate date];
+- (BOOL)backoffForPrimaryHash:(NSString*)hash {
+  NSDate* backoff = _storeBackoff->get(santa::NSStringToUTF8String(hash));
+  NSDate* now = [NSDate date];
   if (([now timeIntervalSince1970] - [backoff timeIntervalSince1970]) <
       self.unactionableEventCacheTimeSeconds) {
     return YES;
@@ -175,17 +175,17 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
 - (NSUInteger)pendingEventsCount {
   __block NSUInteger eventsPending = 0;
-  [self inDatabase:^(FMDatabase *db) {
+  [self inDatabase:^(FMDatabase* db) {
     eventsPending = [db intForQuery:@"SELECT COUNT(*) FROM events"];
   }];
   return eventsPending;
 }
 
-- (NSArray *)pendingEvents {
-  NSMutableArray *pendingEvents = [[NSMutableArray alloc] init];
+- (NSArray*)pendingEvents {
+  NSMutableArray* pendingEvents = [[NSMutableArray alloc] init];
 
-  [self inDatabase:^(FMDatabase *db) {
-    FMResultSet *rs = [db executeQuery:@"SELECT * FROM events"];
+  [self inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs = [db executeQuery:@"SELECT * FROM events"];
 
     while ([rs next]) {
       id obj = [self eventFromResultSet:rs];
@@ -202,17 +202,17 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
   return pendingEvents;
 }
 
-- (SNTStoredEvent *)eventFromResultSet:(FMResultSet *)rs {
-  NSData *eventData = [rs dataNoCopyForColumn:@"eventdata"];
+- (SNTStoredEvent*)eventFromResultSet:(FMResultSet*)rs {
+  NSData* eventData = [rs dataNoCopyForColumn:@"eventdata"];
   if (!eventData) return nil;
 
-  static NSSet *allowedClasses =
+  static NSSet* allowedClasses =
       [NSSet setWithObjects:[SNTStoredExecutionEvent class], [SNTStoredFileAccessEvent class],
                             [SNTStoredTemporaryMonitorModeAuditEvent class],
                             [SNTStoredTemporaryMonitorModeEnterAuditEvent class],
                             [SNTStoredTemporaryMonitorModeLeaveAuditEvent class], nil];
-  NSError *err;
-  SNTStoredEvent *event = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSError* err;
+  SNTStoredEvent* event = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                               fromData:eventData
                                                                  error:&err];
 
@@ -226,15 +226,15 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
 #pragma mark Deleting
 
-- (void)deleteEventWithId:(NSNumber *)index {
-  [self inDatabase:^(FMDatabase *db) {
+- (void)deleteEventWithId:(NSNumber*)index {
+  [self inDatabase:^(FMDatabase* db) {
     [db executeUpdate:@"DELETE FROM events WHERE idx=?", index];
   }];
 }
 
-- (void)deleteEventsWithIds:(NSArray *)indexes {
-  [self inDatabase:^(FMDatabase *db) {
-    for (NSNumber *index in indexes) {
+- (void)deleteEventsWithIds:(NSArray*)indexes {
+  [self inDatabase:^(FMDatabase* db) {
+    for (NSNumber* index in indexes) {
       [db executeUpdate:@"DELETE FROM events WHERE idx=?", index];
     }
   }];

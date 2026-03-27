@@ -25,11 +25,11 @@
 
 + (instancetype)sharedCache;
 
-- (bool)cacheDecision:(SNTCachedDecision *)cd;
-- (SNTCachedDecision *)cachedDecisionForFile:(const struct stat &)statInfo;
-- (SNTCachedDecision *)cachedDecisionForVnode:(SantaVnode)vnode;
+- (bool)cacheDecision:(SNTCachedDecision*)cd;
+- (SNTCachedDecision*)cachedDecisionForFile:(const struct stat&)statInfo;
+- (SNTCachedDecision*)cachedDecisionForVnode:(SantaVnode)vnode;
 - (void)forgetCachedDecisionForVnode:(SantaVnode)vnode;
-- (SNTCachedDecision *)resetTimestampForCachedDecision:(const struct stat &)statInfo;
+- (SNTCachedDecision*)resetTimestampForCachedDecision:(const struct stat&)statInfo;
 - (void)backfillDecisionCacheAsyncWithEntitlementsFilter:
     (std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter;
 

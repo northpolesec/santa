@@ -16,6 +16,6 @@
 
 namespace santa {
 
-void SubmitStats(NSString *orgID);
+void SubmitStats(NSString* orgID);
 
 };

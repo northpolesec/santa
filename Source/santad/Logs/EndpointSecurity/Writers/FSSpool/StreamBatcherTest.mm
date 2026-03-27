@@ -27,8 +27,8 @@
 #include "zstd.h"
 
 @interface StreamBatcherTest : XCTestCase
-@property NSFileManager *fileMgr;
-@property NSString *testDir;
+@property NSFileManager* fileMgr;
+@property NSString* testDir;
 @end
 
 @implementation StreamBatcherTest
@@ -70,11 +70,11 @@
 
   ::fsspool::UncompressedStreamBatcher uncompressedStream;
   ::fsspool::GzipStreamBatcher gzipStream(
-      ^(google::protobuf::io::ZeroCopyOutputStream *raw_stream) {
+      ^(google::protobuf::io::ZeroCopyOutputStream* raw_stream) {
         return std::make_shared<google::protobuf::io::GzipOutputStream>(raw_stream);
       });
   ::fsspool::ZstdStreamBatcher zstdStream(
-      ^(google::protobuf::io::ZeroCopyOutputStream *raw_stream) {
+      ^(google::protobuf::io::ZeroCopyOutputStream* raw_stream) {
         return ::fsspool::ZstdOutputStream::Create(raw_stream);
       });
 
@@ -82,18 +82,18 @@
   static constexpr int kRounds = 10;
   for (int i = 0; i < kRounds; i++) {
     // Create and open the test files
-    NSString *uncompressedFile =
+    NSString* uncompressedFile =
         [NSString stringWithFormat:@"%@/%@-%d", self.testDir, @"uncomp.bin", i];
-    NSString *gzipFile = [NSString stringWithFormat:@"%@/%@-%d", self.testDir, @"gzip.bin", i];
-    NSString *zstdFile = [NSString stringWithFormat:@"%@/%@-%d", self.testDir, @"zstd.bin", i];
+    NSString* gzipFile = [NSString stringWithFormat:@"%@/%@-%d", self.testDir, @"gzip.bin", i];
+    NSString* zstdFile = [NSString stringWithFormat:@"%@/%@-%d", self.testDir, @"zstd.bin", i];
 
     XCTAssertTrue([self.fileMgr createFileAtPath:uncompressedFile contents:nil attributes:nil]);
     XCTAssertTrue([self.fileMgr createFileAtPath:gzipFile contents:nil attributes:nil]);
     XCTAssertTrue([self.fileMgr createFileAtPath:zstdFile contents:nil attributes:nil]);
 
-    NSFileHandle *uncompressedHandle = [NSFileHandle fileHandleForWritingAtPath:uncompressedFile];
-    NSFileHandle *gzipHandle = [NSFileHandle fileHandleForWritingAtPath:gzipFile];
-    NSFileHandle *zstdHandle = [NSFileHandle fileHandleForWritingAtPath:zstdFile];
+    NSFileHandle* uncompressedHandle = [NSFileHandle fileHandleForWritingAtPath:uncompressedFile];
+    NSFileHandle* gzipHandle = [NSFileHandle fileHandleForWritingAtPath:gzipFile];
+    NSFileHandle* zstdHandle = [NSFileHandle fileHandleForWritingAtPath:zstdFile];
 
     XCTAssertNotNil(uncompressedHandle);
     XCTAssertNotNil(gzipHandle);
@@ -149,7 +149,7 @@
     XCTAssertLessThan(sbGzip.st_size, sbUncompressed.st_size);
     XCTAssertLessThan(sbZstd.st_size, sbUncompressed.st_size);
 
-    NSData *zstdData = [NSData dataWithContentsOfFile:zstdFile];
+    NSData* zstdData = [NSData dataWithContentsOfFile:zstdFile];
     std::vector<uint8_t> zstdDecompressed(kDstBuffSize);
     size_t bytesDecompressed = ZSTD_decompress(zstdDecompressed.data(), zstdDecompressed.size(),
                                                zstdData.bytes, zstdData.length);
@@ -160,14 +160,14 @@
     XCTAssertEqual(bytesDecompressed, sbUncompressed.st_size);
 
     // Compare the decompressed zstd data with the uncompressed data
-    NSData *uncompressedData = [NSData dataWithContentsOfFile:uncompressedFile];
+    NSData* uncompressedData = [NSData dataWithContentsOfFile:uncompressedFile];
     XCTAssertEqual(uncompressedData.length, sbUncompressed.st_size);  // sanity check
     XCTAssertEqual(
         0, memcmp(zstdDecompressed.data(), uncompressedData.bytes, uncompressedData.length));
 
     // Decompress the
-    NSData *gzipData = [NSData dataWithContentsOfFile:gzipFile];
-    NSData *gzipDecompressed = [gzipData gzipDecompressed];
+    NSData* gzipData = [NSData dataWithContentsOfFile:gzipFile];
+    NSData* gzipDecompressed = [gzipData gzipDecompressed];
     // Uncompressed file size should match number of decompressed bytes
     XCTAssertEqual(gzipDecompressed.length, sbUncompressed.st_size);
 

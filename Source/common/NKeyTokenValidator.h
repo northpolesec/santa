@@ -31,18 +31,18 @@ namespace santa {
 //   4. Neither JWT is expired
 class NKeyTokenValidator {
  public:
-  NKeyTokenValidator(std::set<std::string> trustedNKeys, NSString *accountJWT, NSString *userJWT);
-  NKeyTokenValidator(const NKeyTokenValidator &) = delete;
-  NKeyTokenValidator(NKeyTokenValidator &&) = delete;
-  NKeyTokenValidator &operator=(const NKeyTokenValidator &) = delete;
-  NKeyTokenValidator &operator=(NKeyTokenValidator &&) = delete;
+  NKeyTokenValidator(std::set<std::string> trustedNKeys, NSString* accountJWT, NSString* userJWT);
+  NKeyTokenValidator(const NKeyTokenValidator&) = delete;
+  NKeyTokenValidator(NKeyTokenValidator&&) = delete;
+  NKeyTokenValidator& operator=(const NKeyTokenValidator&) = delete;
+  NKeyTokenValidator& operator=(NKeyTokenValidator&&) = delete;
 
   bool Validate();
 
  private:
   std::set<std::string> trustedNKeys_;
-  NSString *accountJWT_;
-  NSString *userJWT_;
+  NSString* accountJWT_;
+  NSString* userJWT_;
 };
 
 }  // namespace santa

@@ -30,11 +30,11 @@ using santa::SanitizableString;
 @implementation SanitizableStringTest
 
 - (void)testSanitizeString {
-  const char *empty = "";
+  const char* empty = "";
   size_t emptyLen = strlen(empty);
-  const char *noSanitize = "nothing_to_sanitize";
+  const char* noSanitize = "nothing_to_sanitize";
   size_t noSanitizeLen = strlen(noSanitize);
-  const char *sanitizable = "sani|tizable";
+  const char* sanitizable = "sani|tizable";
   size_t sanitizableLen = strlen(sanitizable);
 
   // NULL pointers are handled
@@ -64,11 +64,11 @@ using santa::SanitizableString;
   XCTAssertCStringEqual(SanitizableString(@"a|trail").Sanitized().data(), "a<pipe>trail");
 
   // Handle some long strings
-  NSString *base = [NSString stringWithFormat:@"%@|abc", [@"" stringByPaddingToLength:66 * 1024
+  NSString* base = [NSString stringWithFormat:@"%@|abc", [@"" stringByPaddingToLength:66 * 1024
                                                                            withString:@"A"
                                                                       startingAtIndex:0]];
 
-  NSString *want = [NSString stringWithFormat:@"%@<pipe>abc", [@"" stringByPaddingToLength:66 * 1024
+  NSString* want = [NSString stringWithFormat:@"%@<pipe>abc", [@"" stringByPaddingToLength:66 * 1024
                                                                                 withString:@"A"
                                                                            startingAtIndex:0]];
 
@@ -78,8 +78,8 @@ using santa::SanitizableString;
 - (void)testStream {
   // Test that using the `<<` operator will sanitize the string
   std::ostringstream ss;
-  const char *sanitizable = "sani|tizable";
-  const char *sanitized = "sani<pipe>tizable";
+  const char* sanitizable = "sani|tizable";
+  const char* sanitized = "sani<pipe>tizable";
   es_string_token_t tok = {.length = strlen(sanitizable), .data = sanitizable};
 
   ss << SanitizableString(tok);

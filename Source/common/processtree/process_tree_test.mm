@@ -35,21 +35,21 @@ static constexpr std::string_view kAnnotatedExecutable = "/usr/bin/login";
 class TestAnnotator : public Annotator {
  public:
   TestAnnotator() {}
-  void AnnotateFork(ProcessTree &tree, const Process &parent, const Process &child) override;
-  void AnnotateExec(ProcessTree &tree, const Process &orig_process,
-                    const Process &new_process) override;
+  void AnnotateFork(ProcessTree& tree, const Process& parent, const Process& child) override;
+  void AnnotateExec(ProcessTree& tree, const Process& orig_process,
+                    const Process& new_process) override;
   std::optional<::ptpb::Annotations> Proto() const override;
 };
 
-void TestAnnotator::AnnotateFork(ProcessTree &tree, const Process &parent, const Process &child) {
+void TestAnnotator::AnnotateFork(ProcessTree& tree, const Process& parent, const Process& child) {
   // "Base case". Propagate existing annotations down to descendants.
   if (auto annotation = tree.GetAnnotation<TestAnnotator>(parent)) {
     tree.AnnotateProcess(child, std::move(*annotation));
   }
 }
 
-void TestAnnotator::AnnotateExec(ProcessTree &tree, const Process &orig_process,
-                                 const Process &new_process) {
+void TestAnnotator::AnnotateExec(ProcessTree& tree, const Process& orig_process,
+                                 const Process& new_process) {
   if (auto annotation = tree.GetAnnotation<TestAnnotator>(orig_process)) {
     tree.AnnotateProcess(new_process, std::move(*annotation));
     return;
@@ -128,7 +128,7 @@ using namespace santa::santad::process_tree;
 
   auto program = proc.program;
   [[[NSProcessInfo processInfo] arguments]
-      enumerateObjectsUsingBlock:^(NSString *_Nonnull obj, NSUInteger idx, BOOL *_Nonnull stop) {
+      enumerateObjectsUsingBlock:^(NSString* _Nonnull obj, NSUInteger idx, BOOL* _Nonnull stop) {
         XCTAssertEqualObjects(@(program->arguments[idx].c_str()), obj);
         if (idx == 0) {
           XCTAssertEqualObjects(@(program->executable.c_str()), obj);

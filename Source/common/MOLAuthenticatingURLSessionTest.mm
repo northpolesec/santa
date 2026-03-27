@@ -19,12 +19,12 @@
 #import "Source/common/MOLCertificate.h"
 
 @interface MOLAuthenticatingURLSession (Testing)
-- (NSArray<MOLCertificate *> *)filterAndSortArray:(NSArray<MOLCertificate *> *)array
-                                       commonName:(NSString *)commonName
-                                 issuerCommonName:(NSString *)issuerCommonName
-                                issuerCountryName:(NSString *)issuerCountryName
-                                    issuerOrgName:(NSString *)issuerOrgName
-                                    issuerOrgUnit:(NSString *)issuerOrgUnit;
+- (NSArray<MOLCertificate*>*)filterAndSortArray:(NSArray<MOLCertificate*>*)array
+                                     commonName:(NSString*)commonName
+                               issuerCommonName:(NSString*)issuerCommonName
+                              issuerCountryName:(NSString*)issuerCountryName
+                                  issuerOrgName:(NSString*)issuerOrgName
+                                  issuerOrgUnit:(NSString*)issuerOrgUnit;
 @end
 
 @interface MOLAuthenticatingURLSessionTest : XCTestCase
@@ -32,29 +32,29 @@
 
 @implementation MOLAuthenticatingURLSessionTest
 
-- (MOLCertificate *)certFromFilename:(NSString *)filename {
-  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:filename ofType:@"pem"];
-  NSString *data = [NSString stringWithContentsOfFile:path
+- (MOLCertificate*)certFromFilename:(NSString*)filename {
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:filename ofType:@"pem"];
+  NSString* data = [NSString stringWithContentsOfFile:path
                                              encoding:NSUTF8StringEncoding
                                                 error:NULL];
   return [[MOLCertificate alloc] initWithCertificateDataPEM:data];
 }
 
 - (void)testFilterAndSortArray {
-  MOLCertificate *c1 = [self certFromFilename:@"example_org_client_cert_old"];
-  MOLCertificate *c2 = [self certFromFilename:@"internet_widgits_client_cert"];
-  MOLCertificate *c3 = [self certFromFilename:@"example_org_client_cert"];
+  MOLCertificate* c1 = [self certFromFilename:@"example_org_client_cert_old"];
+  MOLCertificate* c2 = [self certFromFilename:@"internet_widgits_client_cert"];
+  MOLCertificate* c3 = [self certFromFilename:@"example_org_client_cert"];
 
-  MOLAuthenticatingURLSession *s = [[MOLAuthenticatingURLSession alloc] init];
+  MOLAuthenticatingURLSession* s = [[MOLAuthenticatingURLSession alloc] init];
 
-  NSArray *got = [s filterAndSortArray:@[ c1, c2, c3 ]
+  NSArray* got = [s filterAndSortArray:@[ c1, c2, c3 ]
                             commonName:@"Example Organization Client Certificate"
                       issuerCommonName:nil
                      issuerCountryName:nil
                          issuerOrgName:nil
                          issuerOrgUnit:nil];
 
-  NSArray *want = @[ c3, c1 ];
+  NSArray* want = @[ c3, c1 ];
   XCTAssertEqualObjects(got, want, @"");
 }
 

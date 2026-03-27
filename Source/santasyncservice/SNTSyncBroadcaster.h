@@ -25,9 +25,9 @@
 // Use this instead of init.
 + (instancetype)broadcaster;
 
-- (void)addLogListener:(MOLXPCConnection *)logListener;
-- (void)removeLogListener:(MOLXPCConnection *)logListener;
-- (void)broadcastToLogListeners:(NSString *)log logType:(os_log_type_t)logType;
+- (void)addLogListener:(MOLXPCConnection*)logListener;
+- (void)removeLogListener:(MOLXPCConnection*)logListener;
+- (void)broadcastToLogListeners:(NSString*)log logType:(os_log_type_t)logType;
 
 // Blocks until all the currently enqueued (up to this point) logs from -[broadcastToLogListeners:]
 // are sent.

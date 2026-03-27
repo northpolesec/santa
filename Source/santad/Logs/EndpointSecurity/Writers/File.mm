@@ -21,7 +21,7 @@
 
 namespace santa {
 
-std::shared_ptr<File> File::Create(NSString *path, uint64_t flush_timeout_ms,
+std::shared_ptr<File> File::Create(NSString* path, uint64_t flush_timeout_ms,
                                    size_t batch_size_bytes, size_t max_expected_write_size_bytes) {
   dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.file_event_log",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
@@ -48,7 +48,7 @@ std::shared_ptr<File> File::Create(NSString *path, uint64_t flush_timeout_ms,
   return ret_writer;
 }
 
-File::File(NSString *path, size_t batch_size_bytes, size_t max_expected_write_size_bytes,
+File::File(NSString* path, size_t batch_size_bytes, size_t max_expected_write_size_bytes,
            dispatch_queue_t q, dispatch_source_t timer_source)
     : buffer_(batch_size_bytes + max_expected_write_size_bytes),
       batch_size_bytes_(batch_size_bytes),
@@ -85,7 +85,7 @@ File::~File() {
 
 // IMPORTANT: Not thread safe.
 void File::OpenFileHandleSerialized() {
-  NSFileManager *fm = [NSFileManager defaultManager];
+  NSFileManager* fm = [NSFileManager defaultManager];
   if (![fm fileExistsAtPath:path_]) {
     [fm createFileAtPath:path_ contents:nil attributes:nil];
   }
@@ -93,7 +93,7 @@ void File::OpenFileHandleSerialized() {
   [file_handle_ seekToEndOfFile];
 }
 
-void File::Write(std::vector<uint8_t> &&bytes) {
+void File::Write(std::vector<uint8_t>&& bytes) {
   auto shared_this = shared_from_this();
 
   // Workaround to move `bytes` into the block without a copy
@@ -128,7 +128,7 @@ void File::EnsureCapacitySerialized(size_t additional_bytes) {
 }
 
 // IMPORTANT: Not thread safe.
-void File::CopyDataSerialized(const std::vector<uint8_t> &bytes) {
+void File::CopyDataSerialized(const std::vector<uint8_t>& bytes) {
   EnsureCapacitySerialized(bytes.size());
   std::copy(bytes.begin(), bytes.end(), buffer_.begin() + buffer_offset_);
   buffer_offset_ += bytes.size();

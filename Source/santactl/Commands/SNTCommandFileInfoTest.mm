@@ -22,25 +22,25 @@
 
 @interface SNTCommandFileInfo : NSObject
 
-typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
+typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 @property(nonatomic) BOOL recursive;
 @property(nonatomic) BOOL jsonOutput;
 @property(nonatomic) BOOL filterInclusive;
-@property(nonatomic) NSNumber *certIndex;
-@property(nonatomic, copy) NSArray<NSString *> *outputKeyList;
-@property(nonatomic) NSDictionary<NSString *, SNTAttributeBlock> *propertyMap;
-+ (NSArray *)fileInfoKeys;
-+ (NSArray *)signingChainKeys;
+@property(nonatomic) NSNumber* certIndex;
+@property(nonatomic, copy) NSArray<NSString*>* outputKeyList;
+@property(nonatomic) NSDictionary<NSString*, SNTAttributeBlock>* propertyMap;
++ (NSArray*)fileInfoKeys;
++ (NSArray*)signingChainKeys;
 - (SNTAttributeBlock)codeSigned;
-- (instancetype)initWithDaemonConnection:(MOLXPCConnection *)daemonConn;
-- (NSArray *)parseArguments:(NSArray *)arguments;
+- (instancetype)initWithDaemonConnection:(MOLXPCConnection*)daemonConn;
+- (NSArray*)parseArguments:(NSArray*)arguments;
 
 @end
 
 @interface SNTCommandFileInfoTest : XCTestCase
 
-@property SNTCommandFileInfo *cfi;
-@property SNTFileInfo *fileInfo;
+@property SNTCommandFileInfo* cfi;
+@property SNTFileInfo* fileInfo;
 @property id cscMock;
 
 @end
@@ -66,41 +66,41 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 }
 
 - (void)testParseArgumentsKey {
-  NSArray *filePaths = [self.cfi parseArguments:@[ @"--key", @"SHA-256", @"/usr/bin/yes" ]];
+  NSArray* filePaths = [self.cfi parseArguments:@[ @"--key", @"SHA-256", @"/usr/bin/yes" ]];
   XCTAssertTrue([self.cfi.outputKeyList containsObject:@"SHA-256"]);
   XCTAssertTrue([filePaths containsObject:@"/usr/bin/yes"]);
 }
 
 - (void)testParseArgumentsCertIndex {
-  NSArray *filePaths = [self.cfi parseArguments:@[ @"--cert-index", @"1", @"/usr/bin/yes" ]];
+  NSArray* filePaths = [self.cfi parseArguments:@[ @"--cert-index", @"1", @"/usr/bin/yes" ]];
   XCTAssertEqual([self.cfi.certIndex intValue], 1);
   XCTAssertTrue([filePaths containsObject:@"/usr/bin/yes"]);
 }
 
 - (void)testParseArgumentsJSONFalse {
-  NSArray *filePaths = [self.cfi parseArguments:@[ @"/usr/bin/yes" ]];
+  NSArray* filePaths = [self.cfi parseArguments:@[ @"/usr/bin/yes" ]];
   XCTAssertFalse(self.cfi.jsonOutput);
   XCTAssertTrue([filePaths containsObject:@"/usr/bin/yes"]);
 }
 
 - (void)testParseArgumentsJSONFalseWithPath {
-  NSArray *filePaths = [self.cfi parseArguments:@[ @"/usr/bin/yes", @"json" ]];
+  NSArray* filePaths = [self.cfi parseArguments:@[ @"/usr/bin/yes", @"json" ]];
   XCTAssertFalse(self.cfi.jsonOutput);
   XCTAssertTrue([filePaths containsObject:@"json"]);
 }
 
 - (void)testParseArgumentsJSONTrue {
-  NSArray *filePaths = [self.cfi parseArguments:@[ @"--json", @"/usr/bin/yes" ]];
+  NSArray* filePaths = [self.cfi parseArguments:@[ @"--json", @"/usr/bin/yes" ]];
   XCTAssertTrue(self.cfi.jsonOutput);
   XCTAssertTrue([filePaths containsObject:@"/usr/bin/yes"]);
 }
 
 - (void)testParseArgumentsFilePaths {
-  NSArray *args = @[
+  NSArray* args = @[
     @"/usr/bin/yes", @"/bin/mv", @"--key", @"SHA-256", @"/bin/ls", @"--json", @"/bin/rm",
     @"--cert-index", @"1", @"/bin/cp"
   ];
-  NSArray *filePaths = [self.cfi parseArguments:args];
+  NSArray* filePaths = [self.cfi parseArguments:args];
   XCTAssertEqual(filePaths.count, 5);
   XCTAssertTrue([filePaths containsObject:@"/usr/bin/yes"]);
   XCTAssertTrue([filePaths containsObject:@"/bin/mv"]);
@@ -110,150 +110,150 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 }
 
 - (void)testParseArgumentsFilePathSameAsKey {
-  NSArray *filePaths = [self.cfi parseArguments:@[ @"--key", @"Rule", @"Rule" ]];
+  NSArray* filePaths = [self.cfi parseArguments:@[ @"--key", @"Rule", @"Rule" ]];
   XCTAssertTrue([self.cfi.outputKeyList containsObject:@"Rule"]);
   XCTAssertEqual(filePaths.count, 1);
   XCTAssertTrue([filePaths containsObject:@"Rule"]);
 }
 
 - (void)testKeysAlignWithPropertyMap {
-  NSArray *mapKeys = self.cfi.propertyMap.allKeys;
-  NSArray *fileInfokeys = [SNTCommandFileInfo fileInfoKeys];
-  for (NSString *key in fileInfokeys)
+  NSArray* mapKeys = self.cfi.propertyMap.allKeys;
+  NSArray* fileInfokeys = [SNTCommandFileInfo fileInfoKeys];
+  for (NSString* key in fileInfokeys)
     XCTAssertTrue([mapKeys containsObject:key]);
-  for (NSString *key in mapKeys)
+  for (NSString* key in mapKeys)
     XCTAssertTrue([fileInfokeys containsObject:key]);
 }
 
 - (void)testCodeSignedNo {
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSUnsigned userInfo:nil];
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSUnsigned userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), @"No");
 }
 
 - (void)testCodeSignedSignatureFailed {
-  NSString *expected = @"Yes, but code/signature changed/unverifiable";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSSignatureFailed userInfo:nil];
+  NSString* expected = @"Yes, but code/signature changed/unverifiable";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSSignatureFailed userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedStaticCodeChanged {
-  NSString *expected = @"Yes, but code/signature changed/unverifiable";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSStaticCodeChanged userInfo:nil];
+  NSString* expected = @"Yes, but code/signature changed/unverifiable";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSStaticCodeChanged userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedSignatureNotVerifiable {
-  NSString *expected = @"Yes, but code/signature changed/unverifiable";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSSignatureNotVerifiable userInfo:nil];
+  NSString* expected = @"Yes, but code/signature changed/unverifiable";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSSignatureNotVerifiable userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedSignatureUnsupported {
-  NSString *expected = @"Yes, but code/signature changed/unverifiable";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSSignatureUnsupported userInfo:nil];
+  NSString* expected = @"Yes, but code/signature changed/unverifiable";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSSignatureUnsupported userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedResourceDirectoryFailed {
-  NSString *expected = @"Yes, but resources invalid";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSResourceDirectoryFailed userInfo:nil];
+  NSString* expected = @"Yes, but resources invalid";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourceDirectoryFailed userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedResourceNotSupported {
-  NSString *expected = @"Yes, but resources invalid";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSResourceNotSupported userInfo:nil];
+  NSString* expected = @"Yes, but resources invalid";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourceNotSupported userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedResourceRulesInvalid {
-  NSString *expected = @"Yes, but resources invalid";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSResourceRulesInvalid userInfo:nil];
+  NSString* expected = @"Yes, but resources invalid";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourceRulesInvalid userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedResourcesInvalid {
-  NSString *expected = @"Yes, but resources invalid";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSResourcesInvalid userInfo:nil];
+  NSString* expected = @"Yes, but resources invalid";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourcesInvalid userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedResourcesNotFound {
-  NSString *expected = @"Yes, but resources invalid";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSResourcesNotFound userInfo:nil];
+  NSString* expected = @"Yes, but resources invalid";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourcesNotFound userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedResourcesNotSealed {
-  NSString *expected = @"Yes, but resources invalid";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSResourcesNotSealed userInfo:nil];
+  NSString* expected = @"Yes, but resources invalid";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourcesNotSealed userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedReqFailed {
-  NSString *expected = @"Yes, but failed requirement validation";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSReqFailed userInfo:nil];
+  NSString* expected = @"Yes, but failed requirement validation";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSReqFailed userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedReqInvalid {
-  NSString *expected = @"Yes, but failed requirement validation";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSReqInvalid userInfo:nil];
+  NSString* expected = @"Yes, but failed requirement validation";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSReqInvalid userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedReqUnsupported {
-  NSString *expected = @"Yes, but failed requirement validation";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSReqUnsupported userInfo:nil];
+  NSString* expected = @"Yes, but failed requirement validation";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSReqUnsupported userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedInfoPlistFailed {
-  NSString *expected = @"Yes, but can't validate as the Info.plist has been modified";
-  NSError *err = [NSError errorWithDomain:@"" code:errSecCSInfoPlistFailed userInfo:nil];
+  NSString* expected = @"Yes, but can't validate as the Info.plist has been modified";
+  NSError* err = [NSError errorWithDomain:@"" code:errSecCSInfoPlistFailed userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testCodeSignedDefault {
-  NSString *expected = @"Yes, but failed to validate (999)";
-  NSError *err = [NSError errorWithDomain:@"" code:999 userInfo:nil];
+  NSString* expected = @"Yes, but failed to validate (999)";
+  NSError* err = [NSError errorWithDomain:@"" code:999 userInfo:nil];
   OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
 
 - (void)testParseArgumentsFilterInclusiveTrue {
-  NSArray *filePaths = [self.cfi parseArguments:@[ @"--filter-inclusive", @"/usr/bin/yes" ]];
+  NSArray* filePaths = [self.cfi parseArguments:@[ @"--filter-inclusive", @"/usr/bin/yes" ]];
   XCTAssertTrue(self.cfi.filterInclusive);
   XCTAssertTrue([filePaths containsObject:@"/usr/bin/yes"]);
 }

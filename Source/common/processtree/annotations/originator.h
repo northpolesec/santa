@@ -36,10 +36,10 @@ class OriginatorAnnotator : public Annotator {
       : originator_(originator) {};
   // clang-format on
 
-  void AnnotateFork(ProcessTree &tree, const Process &parent,
-                    const Process &child) override;
-  void AnnotateExec(ProcessTree &tree, const Process &orig_process,
-                    const Process &new_process) override;
+  void AnnotateFork(ProcessTree& tree, const Process& parent,
+                    const Process& child) override;
+  void AnnotateExec(ProcessTree& tree, const Process& orig_process,
+                    const Process& new_process) override;
 
   std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
       const override;

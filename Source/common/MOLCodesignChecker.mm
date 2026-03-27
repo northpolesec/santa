@@ -64,14 +64,14 @@ static const SecCSFlags kStaticSigningFlags =
 */
 static const SecCSFlags kSigningFlags = kSecCSDefaultFlags;
 
-NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcodesignchecker";
+NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcodesignchecker";
 
 @interface MOLCodesignChecker ()
 /// Cached designated requirement
 @property SecRequirementRef requirement;
 
 // Cached on-disk binary path
-@property NSString *binaryPath;
+@property NSString* binaryPath;
 
 // Cached on-disk binary file descriptor
 @property int binaryFileDescriptor;
@@ -81,11 +81,11 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
 #pragma mark Init/dealloc
 
-- (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef error:(NSError **)error {
+- (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef error:(NSError**)error {
   self = [super init];
 
   if (self) {
-    auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef *out) {
+    auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef* out) {
       if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
         return SecStaticCodeCheckValidityWithErrors(codeRef, kStaticSigningFlags, NULL, out);
       } else if (CFGetTypeID(codeRef) == SecCodeGetTypeID()) {
@@ -103,7 +103,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       // Ensure signing is consistent for all architectures.
       // Any issues found here take precedence over already found issues.
       if (!_binaryPath) _binaryPath = [self binaryPathForCodeRef:self.codeRef];
-      NSArray *infos = [self universalSigningInformationForBinaryPath:_binaryPath
+      NSArray* infos = [self universalSigningInformationForBinaryPath:_binaryPath
                                                        fileDescriptor:_binaryFileDescriptor];
       if (infos) _universalSigningInformation = infos;
       if (infos && ![self allSigningInformationMatches:infos]) {
@@ -115,7 +115,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
     }
 
     // Do not set _signingInformation or _certificates for universal binaries with signing issues.
-    NSError *err = scopedError.BridgeRelease<NSError *>();
+    NSError* err = scopedError.BridgeRelease<NSError*>();
     if (!([err.domain isEqualToString:kMOLCodesignCheckerErrorDomain] &&
           status == errSecCSSignatureInvalid)) {
       // Get CFDictionary of signing information for binary
@@ -124,7 +124,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       _signingInformation = CFBridgingRelease(signingDict);
 
       // Get array of certificates.
-      NSArray *certs = _signingInformation[(__bridge id)kSecCodeInfoCertificates];
+      NSArray* certs = _signingInformation[(__bridge id)kSecCodeInfoCertificates];
       _certificates = [MOLCertificate certificatesFromArray:certs];
     }
     if (status != errSecSuccess)
@@ -136,24 +136,24 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef {
-  NSError *error;
+  NSError* error;
   self = [self initWithSecStaticCodeRef:codeRef error:&error];
   return (error) ? nil : self;
 }
 
-- (instancetype)initWithBinaryPath:(NSString *)binaryPath error:(NSError **)error {
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath error:(NSError**)error {
   return [self initWithBinaryPath:binaryPath fileDescriptor:-1 error:error];
 }
 
-- (instancetype)initWithBinaryPath:(NSString *)binaryPath {
-  NSError *error;
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath {
+  NSError* error;
   self = [self initWithBinaryPath:binaryPath error:&error];
   return (error) ? nil : self;
 }
 
-- (instancetype)initWithBinaryPath:(NSString *)binaryPath
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
                     fileDescriptor:(int)fileDescriptor
-                             error:(NSError **)error {
+                             error:(NSError**)error {
   OSStatus status = errSecSuccess;
   SecStaticCodeRef codeRef = NULL;
 
@@ -175,16 +175,16 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return self;
 }
 
-- (instancetype)initWithBinaryPath:(NSString *)binaryPath fileDescriptor:(int)fileDescriptor {
-  NSError *error;
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath fileDescriptor:(int)fileDescriptor {
+  NSError* error;
   self = [self initWithBinaryPath:binaryPath fileDescriptor:fileDescriptor error:&error];
   return (error) ? nil : self;
 }
 
-- (instancetype)initWithPID:(pid_t)pid error:(NSError **)error {
+- (instancetype)initWithPID:(pid_t)pid error:(NSError**)error {
   OSStatus status = errSecSuccess;
   SecCodeRef codeRef = NULL;
-  NSDictionary *attributes = @{(__bridge NSString *)kSecGuestAttributePid : @(pid)};
+  NSDictionary* attributes = @{(__bridge NSString*)kSecGuestAttributePid : @(pid)};
 
   status = SecCodeCopyGuestWithAttributes(NULL, (__bridge CFDictionaryRef)attributes,
                                           kSecCSDefaultFlags, &codeRef);
@@ -201,12 +201,12 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (instancetype)initWithPID:(pid_t)pid {
-  NSError *error;
+  NSError* error;
   self = [self initWithPID:pid error:&error];
   return (error) ? nil : self;
 }
 
-- (instancetype)initWithSelfError:(NSError **)error {
+- (instancetype)initWithSelfError:(NSError**)error {
   SecCodeRef codeSelf = NULL;
   OSStatus status = SecCodeCopySelf(kSecCSDefaultFlags, &codeSelf);
 
@@ -223,7 +223,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (instancetype)initWithSelf {
-  NSError *error;
+  NSError* error;
   self = [self initWithSelfError:&error];
   return (error) ? nil : self;
 }
@@ -246,8 +246,8 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
 #pragma mark Description
 
-- (NSString *)description {
-  NSString *binarySource;
+- (NSString*)description {
+  NSString* binarySource;
   if (CFGetTypeID(self.codeRef) == SecStaticCodeGetTypeID()) {
     binarySource = @"On-disk";
   } else {
@@ -267,19 +267,19 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return _requirement;
 }
 
-- (MOLCertificate *)leafCertificate {
+- (MOLCertificate*)leafCertificate {
   return [self.certificates firstObject];
 }
 
-- (NSString *)binaryPath {
+- (NSString*)binaryPath {
   if (!_binaryPath) _binaryPath = [self binaryPathForCodeRef:self.codeRef];
   return _binaryPath;
 }
 
-- (NSString *)binaryPathForCodeRef:(SecStaticCodeRef)codeRef {
+- (NSString*)binaryPathForCodeRef:(SecStaticCodeRef)codeRef {
   CFURLRef path;
   OSStatus status = SecCodeCopyPath(codeRef, kSecCSDefaultFlags, &path);
-  NSURL *pathURL = CFBridgingRelease(path);
+  NSURL* pathURL = CFBridgingRelease(path);
   if (status != errSecSuccess) return nil;
   return [pathURL path];
 }
@@ -288,16 +288,16 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return [self.signingInformation[(__bridge id)kSecCodeInfoFlags] intValue];
 }
 
-- (NSString *)cdhash {
+- (NSString*)cdhash {
   return santa::StringToNSString(
-      santa::BufToHexString((NSData *)self.signingInformation[(__bridge id)kSecCodeInfoUnique]));
+      santa::BufToHexString((NSData*)self.signingInformation[(__bridge id)kSecCodeInfoUnique]));
 }
 
-- (NSString *)teamID {
+- (NSString*)teamID {
   return self.signingInformation[(__bridge id)kSecCodeInfoTeamIdentifier];
 }
 
-- (NSString *)signingID {
+- (NSString*)signingID {
   return self.signingInformation[(__bridge id)kSecCodeInfoIdentifier];
 }
 
@@ -307,19 +307,19 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return YES;
 }
 
-- (NSDictionary *)entitlements {
-  return self.signingInformation[(__bridge NSString *)kSecCodeInfoEntitlementsDict];
+- (NSDictionary*)entitlements {
+  return self.signingInformation[(__bridge NSString*)kSecCodeInfoEntitlementsDict];
 }
 
-- (NSDate *)secureSigningTime {
-  return self.signingInformation[(__bridge NSString *)kSecCodeInfoTimestamp];
+- (NSDate*)secureSigningTime {
+  return self.signingInformation[(__bridge NSString*)kSecCodeInfoTimestamp];
 }
 
-- (NSDate *)signingTime {
-  return self.signingInformation[(__bridge NSString *)kSecCodeInfoTime];
+- (NSDate*)signingTime {
+  return self.signingInformation[(__bridge NSString*)kSecCodeInfoTime];
 }
 
-- (BOOL)signingInformationMatches:(MOLCodesignChecker *)otherChecker {
+- (BOOL)signingInformationMatches:(MOLCodesignChecker*)otherChecker {
   return [self.certificates isEqual:otherChecker.certificates];
 }
 
@@ -329,8 +329,8 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
           errSecSuccess);
 }
 
-- (NSString *)validationStatusForArchitecture:(NSString *)architecture {
-  NSDictionary *offsets;
+- (NSString*)validationStatusForArchitecture:(NSString*)architecture {
+  NSDictionary* offsets;
   if (_binaryFileDescriptor == -1) {
     offsets = [self architectureAndOffsetsForUniversalBinaryPath:self.binaryPath];
   } else {
@@ -341,11 +341,10 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   SecStaticCodeRef codeRef = NULL;
 
   if (offsets) {
-    NSNumber *offset = offsets[architecture];
+    NSNumber* offset = offsets[architecture];
     if (!offset) return nil;
 
-    NSDictionary *attributes =
-        @{(__bridge NSString *)kSecCodeAttributeUniversalFileOffset : offset};
+    NSDictionary* attributes = @{(__bridge NSString*)kSecCodeAttributeUniversalFileOffset : offset};
     SecStaticCodeRef newCodeRef = NULL;
     OSStatus createStatus = SecStaticCodeCreateWithPathAndAttributes(
         (__bridge CFURLRef)[NSURL fileURLWithPath:self.binaryPath], kSecCSDefaultFlags,
@@ -361,7 +360,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
     codeRef = self.codeRef;
   }
 
-  auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef *out) {
+  auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef* out) {
     return SecStaticCodeCheckValidityWithErrors(codeRef, kStaticSigningFlags, NULL, out);
   });
 
@@ -369,7 +368,7 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
     // Check if it's ad-hoc signed
     CFDictionaryRef signingDict = NULL;
     SecCodeCopySigningInformation(codeRef, kSecCSSigningInformation, &signingDict);
-    NSDictionary *info = CFBridgingRelease(signingDict);
+    NSDictionary* info = CFBridgingRelease(signingDict);
     int flags = [info[(__bridge id)kSecCodeInfoFlags] intValue];
     if (flags & kSecCodeSignatureAdhoc) {
       return @"Ad-hoc signed";
@@ -385,38 +384,38 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   if (scopedError) {
     return [NSString
         stringWithFormat:@"Invalid (%@)",
-                         scopedError.Bridge<NSError *>().localizedDescription ?: @"unknown"];
+                         scopedError.Bridge<NSError*>().localizedDescription ?: @"unknown"];
   }
   ScopedCFString errorMessage = ScopedCFString::Assume(SecCopyErrorMessageString(status, NULL));
   return
-      [NSString stringWithFormat:@"Invalid (%@)", errorMessage.Bridge<NSString *>() ?: @"unknown"];
+      [NSString stringWithFormat:@"Invalid (%@)", errorMessage.Bridge<NSString*>() ?: @"unknown"];
 }
 
 #pragma mark Private
 
-- (NSError *)errorWithCode:(OSStatus)code description:(NSString *)description {
+- (NSError*)errorWithCode:(OSStatus)code description:(NSString*)description {
   if (!description) {
     CFStringRef cfErrorString = SecCopyErrorMessageString(code, NULL);
     description = CFBridgingRelease(cfErrorString);
   }
 
-  NSDictionary *userInfo = @{NSLocalizedDescriptionKey : description ?: @""};
+  NSDictionary* userInfo = @{NSLocalizedDescriptionKey : description ?: @""};
   return [NSError errorWithDomain:kMOLCodesignCheckerErrorDomain code:code userInfo:userInfo];
 }
 
-- (NSError *)errorWithCode:(OSStatus)code {
+- (NSError*)errorWithCode:(OSStatus)code {
   return [self errorWithCode:code description:nil];
 }
 
-- (BOOL)allSigningInformationMatches:(NSArray *)signingInformation {
-  NSMutableSet *chains = [NSMutableSet set];
-  for (NSDictionary *arch in signingInformation) {
-    NSDictionary *info = arch.allValues.firstObject;
+- (BOOL)allSigningInformationMatches:(NSArray*)signingInformation {
+  NSMutableSet* chains = [NSMutableSet set];
+  for (NSDictionary* arch in signingInformation) {
+    NSDictionary* info = arch.allValues.firstObject;
     int flags = [info[(__bridge id)kSecCodeInfoFlags] intValue];
     if (flags & kSecCodeSignatureAdhoc) {
       [chains addObject:@"-"];
     } else {
-      NSArray *certs = info[(__bridge id)kSecCodeInfoCertificates];
+      NSArray* certs = info[(__bridge id)kSecCodeInfoCertificates];
       [chains addObject:[MOLCertificate certificatesFromArray:certs]];
     }
     if (chains.count > 1) return NO;
@@ -424,8 +423,8 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return YES;
 }
 
-- (NSArray *)universalSigningInformationForBinaryPath:(NSString *)path fileDescriptor:(int)fd {
-  NSDictionary *offsets;
+- (NSArray*)universalSigningInformationForBinaryPath:(NSString*)path fileDescriptor:(int)fd {
+  NSDictionary* offsets;
   if (fd == -1) {
     offsets = [self architectureAndOffsetsForUniversalBinaryPath:path];
   } else {
@@ -433,10 +432,10 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   }
 
   if (!offsets) return nil;
-  NSMutableArray *infos = [NSMutableArray arrayWithCapacity:offsets.count];
-  for (NSString *arch in offsets) {
-    NSDictionary *attributes =
-        @{(__bridge NSString *)kSecCodeAttributeUniversalFileOffset : offsets[arch]};
+  NSMutableArray* infos = [NSMutableArray arrayWithCapacity:offsets.count];
+  for (NSString* arch in offsets) {
+    NSDictionary* attributes =
+        @{(__bridge NSString*)kSecCodeAttributeUniversalFileOffset : offsets[arch]};
     SecStaticCodeRef codeRef = NULL;
     SecStaticCodeCreateWithPathAndAttributes((__bridge CFURLRef)[NSURL fileURLWithPath:path],
                                              kSecCSDefaultFlags,
@@ -449,22 +448,22 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return infos.count ? infos : nil;
 }
 
-- (NSString *)architectureString:(struct fat_arch *)fatArch bigEndian:(BOOL)bigEndian {
+- (NSString*)architectureString:(struct fat_arch*)fatArch bigEndian:(BOOL)bigEndian {
   cpu_type_t cpu = bigEndian ? OSSwapBigToHostInt(fatArch->cputype) : fatArch->cputype;
   cpu_subtype_t cpuSub = bigEndian ? OSSwapBigToHostInt(fatArch->cpusubtype) : fatArch->cpusubtype;
-  const char *name = macho_arch_name_for_cpu_type(cpu, cpuSub);
+  const char* name = macho_arch_name_for_cpu_type(cpu, cpuSub);
   if (name) {
     return @(name);
   }
   return [NSString stringWithFormat:@"%i:%i", cpu, cpuSub];
 }
 
-- (NSDictionary *)architectureAndOffsetsForFileDescriptor:(int)fd {
+- (NSDictionary*)architectureAndOffsetsForFileDescriptor:(int)fd {
   size_t len = sizeof(struct fat_header);
-  const uint8 *headerBytes = (const uint8 *)alloca(len);
+  const uint8* headerBytes = (const uint8*)alloca(len);
   lseek(fd, 0, SEEK_SET);
-  if (read(fd, (void *)headerBytes, len) != len) return nil;
-  struct fat_header *fh = (struct fat_header *)headerBytes;
+  if (read(fd, (void*)headerBytes, len) != len) return nil;
+  struct fat_header* fh = (struct fat_header*)headerBytes;
   uint32_t m = fh->magic;
   if (!(m == FAT_MAGIC || m == FAT_CIGAM || m == FAT_MAGIC_64 || m == FAT_CIGAM_64)) return nil;
 
@@ -475,30 +474,30 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   if (archCount < 1 || archCount > 128) return nil;  // Upper bound of 4k
 
   len = use64 ? sizeof(struct fat_arch_64) * archCount : sizeof(struct fat_arch) * archCount;
-  const uint8 *archBytes = (const uint8 *)alloca(len);
-  if (read(fd, (void *)archBytes, len) != len) return nil;
+  const uint8* archBytes = (const uint8*)alloca(len);
+  if (read(fd, (void*)archBytes, len) != len) return nil;
 
-  NSMutableDictionary *offsets = [NSMutableDictionary dictionaryWithCapacity:archCount];
+  NSMutableDictionary* offsets = [NSMutableDictionary dictionaryWithCapacity:archCount];
   if (use64) {
-    struct fat_arch_64 *fat_arch = (struct fat_arch_64 *)archBytes;
+    struct fat_arch_64* fat_arch = (struct fat_arch_64*)archBytes;
     for (int i = 0; i < archCount; ++i) {
       uint64_t offset = bigEndian ? OSSwapBigToHostInt64(fat_arch[i].offset) : fat_arch[i].offset;
       // Passing an offset of 0 to SecStaticCodeCreateWithPathAndAttributes() will create a code ref
       // for the whole universal binary.
       if (offset > 0) {
-        NSString *arch = [self architectureString:(struct fat_arch *)&fat_arch[i]
+        NSString* arch = [self architectureString:(struct fat_arch*)&fat_arch[i]
                                         bigEndian:bigEndian];
         offsets[arch] = @(offset);
       }
     }
   } else {
-    struct fat_arch *fat_arch = (struct fat_arch *)archBytes;
+    struct fat_arch* fat_arch = (struct fat_arch*)archBytes;
     for (int i = 0; i < archCount; ++i) {
       uint32_t offset = bigEndian ? OSSwapBigToHostInt32(fat_arch[i].offset) : fat_arch[i].offset;
       // Passing an offset of 0 to SecStaticCodeCreateWithPathAndAttributes() will create a code ref
       // for the whole universal binary.
       if (offset > 0) {
-        NSString *arch = [self architectureString:&fat_arch[i] bigEndian:bigEndian];
+        NSString* arch = [self architectureString:&fat_arch[i] bigEndian:bigEndian];
         offsets[arch] = @(offset);
       }
     }
@@ -507,10 +506,10 @@ NSString *const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return offsets.count ? offsets : nil;
 }
 
-- (NSDictionary *)architectureAndOffsetsForUniversalBinaryPath:(NSString *)path {
+- (NSDictionary*)architectureAndOffsetsForUniversalBinaryPath:(NSString*)path {
   int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
   if (fd == -1) return nil;
-  NSDictionary *offsets = [self architectureAndOffsetsForFileDescriptor:fd];
+  NSDictionary* offsets = [self architectureAndOffsetsForFileDescriptor:fd];
   close(fd);
   return offsets;
 }

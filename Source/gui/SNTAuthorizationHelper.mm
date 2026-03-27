@@ -27,30 +27,30 @@
              : LAPolicyDeviceOwnerAuthenticationWithBiometrics;
 }
 
-+ (void)authorizeWithReason:(NSString *)reason replyBlock:(void (^)(BOOL success))replyBlock {
-  LAContext *context = [[LAContext alloc] init];
++ (void)authorizeWithReason:(NSString*)reason replyBlock:(void (^)(BOOL success))replyBlock {
+  LAContext* context = [[LAContext alloc] init];
   [context evaluatePolicy:[self authorizationPolicy]
           localizedReason:reason
-                    reply:^(BOOL success, NSError *_Nullable error) {
+                    reply:^(BOOL success, NSError* _Nullable error) {
                       replyBlock(success);
                     }];
 }
 
 + (void)authorizeTemporaryMonitorModeWithReplyBlock:(void (^)(BOOL success))replyBlock {
-  NSString *reason = NSLocalizedString(@"authorize temporary Monitor Mode",
+  NSString* reason = NSLocalizedString(@"authorize temporary Monitor Mode",
                                        @"Authorize temporary Monitor Mode exception");
   [self authorizeWithReason:reason replyBlock:replyBlock];
 }
 
-+ (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent *)event
++ (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent*)event
                         replyBlock:(void (^)(BOOL success))replyBlock {
-  NSString *reason = [self executionAuthorizationReasonForEvent:event];
+  NSString* reason = [self executionAuthorizationReasonForEvent:event];
   [self authorizeWithReason:reason replyBlock:replyBlock];
 }
 
-+ (NSString *)executionAuthorizationReasonForEvent:(SNTStoredExecutionEvent *)event {
-  NSString *bundleName = event.fileBundleName ?: @"";
-  NSString *filePath = event.filePath ?: @"";
++ (NSString*)executionAuthorizationReasonForEvent:(SNTStoredExecutionEvent*)event {
+  NSString* bundleName = event.fileBundleName ?: @"";
+  NSString* filePath = event.filePath ?: @"";
 
   if (bundleName.length > 0) {
     return
@@ -69,8 +69,8 @@
   }
 }
 
-+ (BOOL)canAuthorizeWithTouchID:(NSError **)error {
-  LAContext *context = [[LAContext alloc] init];
++ (BOOL)canAuthorizeWithTouchID:(NSError**)error {
+  LAContext* context = [[LAContext alloc] init];
   return [context canEvaluatePolicy:[self authorizationPolicy] error:error];
 }
 

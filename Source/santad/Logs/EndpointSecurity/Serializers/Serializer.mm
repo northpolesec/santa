@@ -28,7 +28,7 @@
 
 namespace santa {
 
-Serializer::Serializer(SNTDecisionCache *decision_cache) : decision_cache_(decision_cache) {
+Serializer::Serializer(SNTDecisionCache* decision_cache) : decision_cache_(decision_cache) {
   machine_id_ = std::make_shared<std::string>("");
   saved_machine_id_ = machine_id_;
 
@@ -43,7 +43,7 @@ void Serializer::UpdateMachineID() {
   bool should_enable = [[SNTConfigurator configurator] enableMachineIDDecoration];
 
   if (should_enable) {
-    NSString *configured_machine_id = [[SNTConfigurator configurator] machineID] ?: @"";
+    NSString* configured_machine_id = [[SNTConfigurator configurator] machineID] ?: @"";
     auto new_machine_id = std::make_shared<std::string>([configured_machine_id UTF8String]);
 
     // Atomically update the shared_ptr - relaxed ordering is sufficient
@@ -68,8 +68,8 @@ std::shared_ptr<std::string> Serializer::MachineID() const {
   return std::atomic_load_explicit(&machine_id_, std::memory_order_relaxed);
 }
 
-std::vector<uint8_t> Serializer::SerializeMessageTemplate(const santa::EnrichedExec &msg) {
-  SNTCachedDecision *cd;
+std::vector<uint8_t> Serializer::SerializeMessageTemplate(const santa::EnrichedExec& msg) {
+  SNTCachedDecision* cd;
   if (msg->action_type == ES_ACTION_TYPE_NOTIFY &&
       msg->action.notify.result.auth == ES_AUTH_RESULT_ALLOW) {
     // For allowed execs, cached decision timestamps must be updated
@@ -82,8 +82,8 @@ std::vector<uint8_t> Serializer::SerializeMessageTemplate(const santa::EnrichedE
 }
 
 std::vector<uint8_t> Serializer::SerializeFileAccess(
-    const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
-    const santa::EnrichedProcess &enriched_process, size_t target_index,
+    const std::string& policy_version, const std::string& policy_name, const santa::Message& msg,
+    const santa::EnrichedProcess& enriched_process, size_t target_index,
     std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision) {
   // Operations are identified by:
   //   Boot Session UUID + Pid + Pidversion + Mach Time + Thread Id
@@ -111,7 +111,7 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(
                              std::move(enriched_event_target), decision, state.HexDigest());
 }
 
-std::vector<uint8_t> Serializer::SerializeNetworkFlows(SNDProcessFlows *processFlows,
+std::vector<uint8_t> Serializer::SerializeNetworkFlows(SNDProcessFlows* processFlows,
                                                        struct timespec window_start,
                                                        struct timespec window_end) {
   return SerializeNetworkFlows(

@@ -45,7 +45,7 @@ using santa::MountFromName;
   {
     esMsg.event.close.target = &closeTargetFile;
     Message msg(mockESApi, &esMsg);
-    es_file_t *target = GetAllowListTargetFile(msg);
+    es_file_t* target = GetAllowListTargetFile(msg);
     XCTAssertEqual(target, &closeTargetFile);
   }
 
@@ -53,7 +53,7 @@ using santa::MountFromName;
     esMsg.event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
     esMsg.event.rename.source = &renameSourceFile;
     Message msg(mockESApi, &esMsg);
-    es_file_t *target = GetAllowListTargetFile(msg);
+    es_file_t* target = GetAllowListTargetFile(msg);
     XCTAssertEqual(target, &renameSourceFile);
   }
 
@@ -62,7 +62,7 @@ using santa::MountFromName;
     esMsg.event_type = ES_EVENT_TYPE_NOTIFY_CLONE;
     esMsg.event.clone.source = &cloneSourceFile;
     Message msg(mockESApi, &esMsg);
-    es_file_t *target = GetAllowListTargetFile(msg);
+    es_file_t* target = GetAllowListTargetFile(msg);
     XCTAssertEqual(target, &cloneSourceFile);
   }
 

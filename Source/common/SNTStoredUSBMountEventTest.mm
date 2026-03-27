@@ -22,7 +22,7 @@
 @implementation SNTStoredUSBMountEventTest
 
 - (void)testUUID {
-  SNTStoredUSBMountEvent *event =
+  SNTStoredUSBMountEvent* event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
                                               mountOnName:@"/Volumes/USB_DRIVE"
@@ -34,7 +34,7 @@
   XCTAssertNotNil(event.uuid);
   XCTAssertGreaterThan(event.uuid.length, 0);
 
-  SNTStoredUSBMountEvent *event2 =
+  SNTStoredUSBMountEvent* event2 =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
                                               mountOnName:@"/Volumes/USB_DRIVE"
@@ -47,7 +47,7 @@
 }
 
 - (void)testUniqueID {
-  SNTStoredUSBMountEvent *event =
+  SNTStoredUSBMountEvent* event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
                                               mountOnName:@"/Volumes/USB_DRIVE"
@@ -61,12 +61,12 @@
 
 - (void)testUnactionableEvent {
   // USB mount events should be unactionable (OK to be part of backoff cache)
-  SNTStoredUSBMountEvent *event = [[SNTStoredUSBMountEvent alloc] init];
+  SNTStoredUSBMountEvent* event = [[SNTStoredUSBMountEvent alloc] init];
   XCTAssertTrue([event unactionableEvent]);
 }
 
 - (void)testEncodeDecode {
-  SNTStoredUSBMountEvent *event = [[SNTStoredUSBMountEvent alloc]
+  SNTStoredUSBMountEvent* event = [[SNTStoredUSBMountEvent alloc]
       initWithDeviceModel:@"USB Flash Drive"
              deviceVendor:@"SanDisk"
               mountOnName:@"/Volumes/USB_DRIVE"
@@ -74,25 +74,25 @@
                  decision:SNTStoredUSBMountEventDecisionAllowedWithRemount
               remountArgs:@[ @"noexec", @"rdonly" ]
               isEncrypted:YES];
-  NSString *originalUUID = event.uuid;
+  NSString* originalUUID = event.uuid;
 
   // Archive the event
-  NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
+  NSData* archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
                                                 requiringSecureCoding:YES
                                                                 error:nil];
 
   XCTAssertNotNil(archivedEvent);
 
   // Unarchive the event
-  NSSet *allowedClasses = [NSSet setWithObject:[SNTStoredUSBMountEvent class]];
-  SNTStoredEvent *unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSSet* allowedClasses = [NSSet setWithObject:[SNTStoredUSBMountEvent class]];
+  SNTStoredEvent* unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                         fromData:archivedEvent
                                                                            error:nil];
 
   XCTAssertNotNil(unarchivedEvent);
   XCTAssertTrue([unarchivedEvent isKindOfClass:[SNTStoredUSBMountEvent class]]);
 
-  SNTStoredUSBMountEvent *decodedEvent = (SNTStoredUSBMountEvent *)unarchivedEvent;
+  SNTStoredUSBMountEvent* decodedEvent = (SNTStoredUSBMountEvent*)unarchivedEvent;
 
   // Verify all properties survived encode/decode
   XCTAssertEqualObjects(decodedEvent.uuid, originalUUID);
@@ -106,7 +106,7 @@
 }
 
 - (void)testEncodeDecodeWithNilValues {
-  SNTStoredUSBMountEvent *event =
+  SNTStoredUSBMountEvent* event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:nil
                                              deviceVendor:nil
                                               mountOnName:@"/Volumes/USB_DRIVE"
@@ -115,21 +115,21 @@
                                               remountArgs:nil
                                               isEncrypted:NO];
 
-  NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
+  NSData* archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
                                                 requiringSecureCoding:YES
                                                                 error:nil];
 
   XCTAssertNotNil(archivedEvent);
 
-  NSSet *allowedClasses = [NSSet setWithObject:[SNTStoredUSBMountEvent class]];
-  SNTStoredEvent *unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSSet* allowedClasses = [NSSet setWithObject:[SNTStoredUSBMountEvent class]];
+  SNTStoredEvent* unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                         fromData:archivedEvent
                                                                            error:nil];
 
   XCTAssertNotNil(unarchivedEvent);
   XCTAssertTrue([unarchivedEvent isKindOfClass:[SNTStoredUSBMountEvent class]]);
 
-  SNTStoredUSBMountEvent *decodedEvent = (SNTStoredUSBMountEvent *)unarchivedEvent;
+  SNTStoredUSBMountEvent* decodedEvent = (SNTStoredUSBMountEvent*)unarchivedEvent;
 
   XCTAssertEqualObjects(decodedEvent.mountOnName, @"/Volumes/USB_DRIVE");
   XCTAssertNil(decodedEvent.deviceModel);
@@ -138,7 +138,7 @@
 }
 
 - (void)testDescription {
-  SNTStoredUSBMountEvent *event =
+  SNTStoredUSBMountEvent* event =
       [[SNTStoredUSBMountEvent alloc] initWithDeviceModel:@"USB Flash Drive"
                                              deviceVendor:@"SanDisk"
                                               mountOnName:@"/Volumes/USB_DRIVE"
@@ -147,7 +147,7 @@
                                               remountArgs:nil
                                               isEncrypted:NO];
 
-  NSString *description = [event description];
+  NSString* description = [event description];
 
   XCTAssertTrue([description containsString:@"SNTStoredUSBMountEvent"]);
   XCTAssertTrue([description containsString:@"USB Flash Drive"]);

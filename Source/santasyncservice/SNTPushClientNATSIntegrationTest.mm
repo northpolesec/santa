@@ -60,10 +60,10 @@ extern "C" {
 @interface SNTPushClientNATSIntegrationTest : XCTestCase
 @property id mockConfigurator;
 @property id mockSyncDelegate;
-@property SNTPushClientNATS *client;
-@property natsConnection *testPublisher;
-@property XCTestExpectation *syncExpectation;
-@property NSString *machineID;
+@property SNTPushClientNATS* client;
+@property natsConnection* testPublisher;
+@property XCTestExpectation* syncExpectation;
+@property NSString* machineID;
 @end
 
 @implementation SNTPushClientNATSIntegrationTest
@@ -90,7 +90,7 @@ extern "C" {
   OCMStub([self.mockConfigurator machineID]).andReturn(self.machineID);
 
   // Setup sync URL
-  NSURL *syncURL = [NSURL URLWithString:@"https://sync.example.com"];
+  NSURL* syncURL = [NSURL URLWithString:@"https://sync.example.com"];
   OCMStub([self.mockConfigurator syncBaseURL]).andReturn(syncURL);
 
   // Mock sync delegate
@@ -100,7 +100,7 @@ extern "C" {
 - (void)tearDown {
   if (self.client) {
     // Use expectation to wait for disconnect completion
-    XCTestExpectation *disconnectExpectation =
+    XCTestExpectation* disconnectExpectation =
         [self expectationWithDescription:@"Client disconnect"];
     [self.client disconnectWithCompletion:^{
       [disconnectExpectation fulfill];
@@ -126,7 +126,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Configure with test credentials
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -146,14 +146,14 @@ extern "C" {
   // Given: Client is initialized and connected
   self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered"];
 
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     [self.syncExpectation fulfill];
   });
 
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Configure with test credentials
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -167,7 +167,7 @@ extern "C" {
 
   // When: Message is published to device topic
   [self setupTestPublisher];
-  NSString *deviceTopic = [NSString stringWithFormat:@"santa.host.%@", self.machineID];
+  NSString* deviceTopic = [NSString stringWithFormat:@"santa.host.%@", self.machineID];
   natsConnection_PublishString(self.testPublisher, [deviceTopic UTF8String], "test message");
   natsConnection_Flush(self.testPublisher);
 
@@ -179,14 +179,14 @@ extern "C" {
   // Given: Client is initialized and connected
   self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered"];
 
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     [self.syncExpectation fulfill];
   });
 
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Configure with test credentials
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -211,14 +211,14 @@ extern "C" {
   // Given: Client is initialized and connected
   self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered"];
 
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     [self.syncExpectation fulfill];
   });
 
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Configure with test credentials (no specific tags needed, global is always subscribed)
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -243,7 +243,7 @@ extern "C" {
   __block NSInteger syncCallCount = 0;
   self.syncExpectation = [self expectationWithDescription:@"All syncs should complete"];
 
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     syncCallCount++;
     if (syncCallCount == 5) {
       [self.syncExpectation fulfill];
@@ -253,7 +253,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Configure with test credentials
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -284,7 +284,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Configure with test credentials
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -311,7 +311,7 @@ extern "C" {
   self.syncExpectation = [self expectationWithDescription:@"First sync should be triggered"];
   __block NSInteger syncCallCount = 0;
 
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     syncCallCount++;
     if (syncCallCount == 1) {
       [self.syncExpectation fulfill];
@@ -321,7 +321,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Configure with test credentials
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -357,13 +357,13 @@ extern "C" {
 - (void)setupTestPublisher {
   if (!self.testPublisher) {
     // Configure with proper credentials for the test publisher
-    natsOptions *opts = NULL;
+    natsOptions* opts = NULL;
     natsStatus status = natsOptions_Create(&opts);
     XCTAssertEqual(status, NATS_OK, @"Failed to create NATS options");
 
     // Create credentials string in NATS format - use test publisher credentials with pub
     // permissions
-    NSString *creds = [NSString
+    NSString* creds = [NSString
         stringWithFormat:
             @"-----BEGIN NATS USER JWT-----\n%@\n------END NATS USER JWT------\n\n-----BEGIN USER "
             @"NKEY SEED-----\n%@\n------END USER NKEY SEED------\n",
@@ -392,7 +392,7 @@ extern "C" {
   // When: Client is configured with a remote server (not localhost)
   // Note: This will fail to connect since we don't have a real TLS server
   // but we can verify it attempts TLS connection on port 443
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"workshop";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -413,7 +413,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // When: Client is configured with device ID containing periods
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -430,7 +430,7 @@ extern "C" {
 
   // Verify no sync is triggered from device topic
   [self setupTestPublisher];
-  NSString *deviceTopic = [NSString stringWithFormat:@"santa.host.%@", @"invalid.device.id"];
+  NSString* deviceTopic = [NSString stringWithFormat:@"santa.host.%@", @"invalid.device.id"];
   natsConnection_PublishString(self.testPublisher, [deviceTopic UTF8String], "test message");
   natsConnection_Flush(self.testPublisher);
 
@@ -439,7 +439,7 @@ extern "C" {
 
   // Verify client responds to valid tag topics
   self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered from tag"];
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     [self.syncExpectation fulfill];
   });
 
@@ -454,7 +454,7 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // When: Client is configured with device ID containing hyphens
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -471,7 +471,7 @@ extern "C" {
 
   // Verify client responds to valid tag topics
   self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered from tag"];
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     [self.syncExpectation fulfill];
   });
 
@@ -485,14 +485,14 @@ extern "C" {
   // Given: Client is initialized
   self.syncExpectation = [self expectationWithDescription:@"Sync should be triggered"];
 
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     [self.syncExpectation fulfill];
   });
 
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Configure with valid alphanumeric device ID and tags
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -506,7 +506,7 @@ extern "C" {
 
   // When: Message is published to valid device topic
   [self setupTestPublisher];
-  NSString *deviceTopic = @"santa.host.ABC123xyz789";
+  NSString* deviceTopic = @"santa.host.ABC123xyz789";
   natsConnection_PublishString(self.testPublisher, [deviceTopic UTF8String], "test message");
   natsConnection_Flush(self.testPublisher);
 
@@ -525,7 +525,7 @@ extern "C" {
   self.syncExpectation = [self expectationWithDescription:@"Initial sync after message"];
   __block NSInteger syncCallCount = 0;
 
-  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation *invocation) {
+  OCMStub([self.mockSyncDelegate sync]).andDo(^(NSInvocation* invocation) {
     syncCallCount++;
     if (self.syncExpectation) {
       [self.syncExpectation fulfill];
@@ -535,7 +535,7 @@ extern "C" {
 
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushServer = @"localhost";
   syncState.pushNKey = TEST_NKEY;
   syncState.pushJWT = TEST_JWT;
@@ -564,7 +564,7 @@ extern "C" {
 
   // Wait for reconnection sync (max jitter is 30s + some buffer)
   [self waitForExpectationsWithTimeout:35.0
-                               handler:^(NSError *error) {
+                               handler:^(NSError* error) {
                                  if (error) {
                                    XCTFail(@"Sync was not triggered after reconnection within "
                                            @"jitter window: %@",

@@ -15,16 +15,16 @@
 #import <Foundation/Foundation.h>
 
 /**  A block that takes a NSString object as an argument. */
-typedef void (^SNTSyncFCMTokenHandler)(NSString *);
+typedef void (^SNTSyncFCMTokenHandler)(NSString*);
 
 /**  A block that takes a NSDictionary object as an argument. */
-typedef void (^SNTSyncFCMMessageHandler)(NSDictionary *);
+typedef void (^SNTSyncFCMMessageHandler)(NSDictionary*);
 
 /**  A block that takes a NSHTTPURLResponse and NSError object as an argument. */
-typedef void (^SNTSyncFCMConnectionErrorHandler)(NSHTTPURLResponse *, NSError *);
+typedef void (^SNTSyncFCMConnectionErrorHandler)(NSHTTPURLResponse*, NSError*);
 
 /**  A block that takes a NSDictionary and NSError object as arguments. */
-typedef void (^SNTSyncFCMAcknowledgeErrorHandler)(NSDictionary *, NSError *);
+typedef void (^SNTSyncFCMAcknowledgeErrorHandler)(NSDictionary*, NSError*);
 
 @interface SNTSyncFCM : NSObject
 
@@ -62,26 +62,26 @@ typedef void (^SNTSyncFCMAcknowledgeErrorHandler)(NSDictionary *, NSError *);
  *
  *  @return An initialized SNTSyncFCM object
  */
-- (instancetype)initWithProject:(NSString *)project
-                         entity:(NSString *)entity
-                         apiKey:(NSString *)apiKey
+- (instancetype)initWithProject:(NSString*)project
+                         entity:(NSString*)entity
+                         apiKey:(NSString*)apiKey
                 connectDelayMax:(uint32_t)connectDelayMax
                      backoffMax:(uint32_t)backoffMax
-                     fatalCodes:(NSArray<NSNumber *> *)fatalCodes
-           sessionConfiguration:(NSURLSessionConfiguration *)sessionConfiguration
+                     fatalCodes:(NSArray<NSNumber*>*)fatalCodes
+           sessionConfiguration:(NSURLSessionConfiguration*)sessionConfiguration
                  messageHandler:(SNTSyncFCMMessageHandler)messageHandler NS_DESIGNATED_INITIALIZER;
 
 /**  A convenience initializer. Optional args will use their zero values. */
-- (instancetype)initWithProject:(NSString *)project
-                         entity:(NSString *)entity
-                         apiKey:(NSString *)apiKey
-           sessionConfiguration:(NSURLSessionConfiguration *)sessionConfiguration
+- (instancetype)initWithProject:(NSString*)project
+                         entity:(NSString*)entity
+                         apiKey:(NSString*)apiKey
+           sessionConfiguration:(NSURLSessionConfiguration*)sessionConfiguration
                  messageHandler:(SNTSyncFCMMessageHandler)messageHandler;
 
 /**  A convenience initializer. Optional args will use their zero values. */
-- (instancetype)initWithProject:(NSString *)project
-                         entity:(NSString *)entity
-                         apiKey:(NSString *)apiKey
+- (instancetype)initWithProject:(NSString*)project
+                         entity:(NSString*)entity
+                         apiKey:(NSString*)apiKey
                  messageHandler:(SNTSyncFCMMessageHandler)messageHandler;
 
 /**
@@ -100,7 +100,7 @@ typedef void (^SNTSyncFCMAcknowledgeErrorHandler)(NSDictionary *, NSError *);
  *
  *  @note Calls the acknowledgeErrorHandler block property when an acknowledge error occurs.
  */
-- (void)acknowledgeMessage:(NSDictionary *)message;
+- (void)acknowledgeMessage:(NSDictionary*)message;
 
 /**
  *  Closes all FCM connections. Stops Reachability. Outstanding tasks will be canceled.

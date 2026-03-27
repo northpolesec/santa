@@ -21,15 +21,15 @@
 namespace santa {
 namespace keychain {
 
-bool IsValidServiceName(NSString *service) {
+bool IsValidServiceName(NSString* service) {
   return service.length > 0 && service.length <= 128;
 }
 
-bool IsValidAccountName(NSString *account) {
+bool IsValidAccountName(NSString* account) {
   return account.length > 0 && account.length <= 128;
 }
 
-bool IsValidDescription(NSString *description) {
+bool IsValidDescription(NSString* description) {
   return description.length > 0 && description.length <= 255;
 }
 
@@ -54,11 +54,11 @@ absl::Status SecurityOSStatusToAbslStatus(OSStatus status) {
     return absl::OkStatus();
   }
 
-  NSString *msg = CFBridgingRelease(SecCopyErrorMessageString(status, NULL));
+  NSString* msg = CFBridgingRelease(SecCopyErrorMessageString(status, NULL));
   return absl::Status(OSStatusToAbslStatusCode(status), msg.UTF8String);
 }
 
-std::unique_ptr<Manager> Manager::Create(NSString *service, SecPreferencesDomain domain) {
+std::unique_ptr<Manager> Manager::Create(NSString* service, SecPreferencesDomain domain) {
   if (!IsValidServiceName(service)) {
     return nullptr;
   }
@@ -76,7 +76,7 @@ std::unique_ptr<Manager> Manager::Create(NSString *service, SecPreferencesDomain
   return std::make_unique<Manager>(service, keychain);
 }
 
-Manager::Manager(NSString *service, SecKeychainRef keychain)
+Manager::Manager(NSString* service, SecKeychainRef keychain)
     : service_(service), keychain_(keychain) {
   assert(keychain_ != nullptr);
 }
@@ -87,13 +87,13 @@ Manager::~Manager() {
   }
 }
 
-Manager::Manager(Manager &&other)
+Manager::Manager(Manager&& other)
     : service_(std::move(other.service_)), keychain_(other.keychain_) {
   other.service_ = nil;
   other.keychain_ = nullptr;
 }
 
-Manager &Manager::operator=(Manager &&other) {
+Manager& Manager::operator=(Manager&& other) {
   if (this != &other) {
     if (keychain_ != nullptr) {
       CFRelease(keychain_);
@@ -108,7 +108,7 @@ Manager &Manager::operator=(Manager &&other) {
   return *this;
 }
 
-std::unique_ptr<Item> Manager::CreateItem(NSString *account, NSString *description) {
+std::unique_ptr<Item> Manager::CreateItem(NSString* account, NSString* description) {
   if (!IsValidAccountName(account)) {
     LOGE(@"Invalid account name for keychain item: %@", account);
     return nullptr;
@@ -122,7 +122,7 @@ std::unique_ptr<Item> Manager::CreateItem(NSString *account, NSString *descripti
   return std::make_unique<Item>(service_, account, description, keychain_);
 }
 
-Item::Item(NSString *service, NSString *account, NSString *description, SecKeychainRef keychain)
+Item::Item(NSString* service, NSString* account, NSString* description, SecKeychainRef keychain)
     : service_(service), account_(account), description_(description), keychain_(keychain) {
   assert(keychain_ != nullptr);
   // Retain the keychain reference for ourselves
@@ -135,7 +135,7 @@ Item::~Item() {
   }
 }
 
-absl::Status Item::Store(NSData *data) {
+absl::Status Item::Store(NSData* data) {
   if (data.length == 0) {
     return absl::ErrnoToStatus(EINVAL, "No data to store");
   }
@@ -145,7 +145,7 @@ absl::Status Item::Store(NSData *data) {
     return status;
   }
 
-  NSDictionary *attributes = @{
+  NSDictionary* attributes = @{
     (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword,
     (__bridge id)kSecAttrService : service_,
     (__bridge id)kSecAttrAccount : account_,
@@ -169,7 +169,7 @@ absl::Status Item::Store(NSData *data) {
 }
 
 absl::Status Item::Delete() {
-  NSDictionary *query = @{
+  NSDictionary* query = @{
     (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword,
     (__bridge id)kSecAttrService : service_,
     (__bridge id)kSecAttrAccount : account_,
@@ -187,8 +187,8 @@ absl::Status Item::Delete() {
   return absl::OkStatus();
 }
 
-absl::StatusOr<NSData *> Item::Get() {
-  NSDictionary *query = @{
+absl::StatusOr<NSData*> Item::Get() {
+  NSDictionary* query = @{
     (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword,
     (__bridge id)kSecAttrService : service_,
     (__bridge id)kSecAttrAccount : account_,

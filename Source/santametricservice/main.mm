@@ -21,16 +21,16 @@
 #import "Source/common/SNTXPCMetricServiceInterface.h"
 #import "Source/santametricservice/SNTMetricService.h"
 
-int main(int argc, const char *argv[]) {
+int main(int argc, const char* argv[]) {
   if (!DropRootPrivileges()) {
     LOGE(@"unable to drop root privileges, exiting.");
     exit(1);
   };
 
   @autoreleasepool {
-    NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
+    NSDictionary* infoDict = [[NSBundle mainBundle] infoDictionary];
     LOGI(@"Started, version %@", infoDict[@"CFBundleVersion"]);
-    MOLXPCConnection *c =
+    MOLXPCConnection* c =
         [[MOLXPCConnection alloc] initServerWithName:[SNTXPCMetricServiceInterface serviceID]];
     c.privilegedInterface = c.unprivilegedInterface =
         [SNTXPCMetricServiceInterface metricServiceInterface];

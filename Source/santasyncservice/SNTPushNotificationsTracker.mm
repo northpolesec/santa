@@ -22,7 +22,7 @@
 @interface SNTPushNotificationsTracker ()
 
 @property dispatch_queue_t notificationsQueue;
-@property NSMutableDictionary *notifications;
+@property NSMutableDictionary* notifications;
 @end
 
 @implementation SNTPushNotificationsTracker
@@ -38,7 +38,7 @@
 }
 
 + (instancetype)tracker {
-  static SNTPushNotificationsTracker *tracker;
+  static SNTPushNotificationsTracker* tracker;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     tracker = [[SNTPushNotificationsTracker alloc] init];
@@ -46,7 +46,7 @@
   return tracker;
 }
 
-- (void)addNotification:(NSDictionary *)notification forHash:(NSString *)hash {
+- (void)addNotification:(NSDictionary*)notification forHash:(NSString*)hash {
   dispatch_async(self.notificationsQueue, ^() {
     // Don't let notifications pile up. In most cases there will only be a single entry pending. It
     // is possible for notifications to make it here but not be displayed. The TODO below is to
@@ -61,17 +61,17 @@
   });
 }
 
-- (void)removeNotificationsForHashes:(NSArray<NSString *> *)hashes {
+- (void)removeNotificationsForHashes:(NSArray<NSString*>*)hashes {
   dispatch_async(self.notificationsQueue, ^() {
     [self.notifications removeObjectsForKeys:hashes];
   });
 }
 
-- (void)decrementPendingRulesForHash:(NSString *)hash totalRuleCount:(NSNumber *)totalRuleCount {
+- (void)decrementPendingRulesForHash:(NSString*)hash totalRuleCount:(NSNumber*)totalRuleCount {
   dispatch_async(self.notificationsQueue, ^() {
-    NSMutableDictionary *notifier = self.notifications[hash];
+    NSMutableDictionary* notifier = self.notifications[hash];
     if (notifier) {
-      NSNumber *remaining = notifier[kFileBundleBinaryCount];
+      NSNumber* remaining = notifier[kFileBundleBinaryCount];
       if (remaining) {  // bundle rule with existing count
         // If the primary hash already has an associated count field, just decrement it.
         notifier[kFileBundleBinaryCount] = @([remaining intValue] - 1);
@@ -90,8 +90,8 @@
   });
 }
 
-- (NSDictionary *)all {
-  __block NSDictionary *d;
+- (NSDictionary*)all {
+  __block NSDictionary* d;
   dispatch_sync(self.notificationsQueue, ^() {
     d = [self.notifications sntDeepCopy];
   });

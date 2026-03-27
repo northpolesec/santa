@@ -19,10 +19,10 @@
 
 namespace santa {
 
-void EncodeEntitlementsCommon(NSDictionary *entitlements, BOOL entitlements_filtered,
+void EncodeEntitlementsCommon(NSDictionary* entitlements, BOOL entitlements_filtered,
                               void (^EncodeInitBlock)(NSUInteger count, bool is_filtered),
-                              void (^EncodeEntitlementBlock)(NSString *entitlement,
-                                                             NSString *value));
+                              void (^EncodeEntitlementBlock)(NSString* entitlement,
+                                                             NSString* value));
 
 }
 

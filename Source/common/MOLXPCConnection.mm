@@ -44,13 +44,13 @@
 @end
 
 @interface MOLXPCConnection ()
-@property NSXPCInterface *validationInterface;
+@property NSXPCInterface* validationInterface;
 
 /// The XPC listener (server only).
-@property NSXPCListener *listenerObject;
+@property NSXPCListener* listenerObject;
 
 /// The current connection object (client only).
-@property NSXPCConnection *currentConnection;
+@property NSXPCConnection* currentConnection;
 @end
 
 @implementation MOLXPCConnection
@@ -65,7 +65,7 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
 
 #pragma mark Initializers
 
-- (instancetype)initServerWithListener:(NSXPCListener *)listener {
+- (instancetype)initServerWithListener:(NSXPCListener*)listener {
   self = [super init];
   if (self) {
     _listenerObject = listener;
@@ -75,11 +75,11 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
   return self;
 }
 
-- (instancetype)initServerWithName:(NSString *)name {
+- (instancetype)initServerWithName:(NSString*)name {
   return [self initServerWithListener:[[NSXPCListener alloc] initWithMachServiceName:name]];
 }
 
-- (instancetype)initClientWithListener:(NSXPCListenerEndpoint *)listener {
+- (instancetype)initClientWithListener:(NSXPCListenerEndpoint*)listener {
   self = [super init];
   if (self) {
     _currentConnection = [[NSXPCConnection alloc] initWithListenerEndpoint:listener];
@@ -90,7 +90,7 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
   return self;
 }
 
-- (instancetype)initClientWithName:(NSString *)name privileged:(BOOL)privileged {
+- (instancetype)initClientWithName:(NSString*)name privileged:(BOOL)privileged {
   self = [super init];
   if (self) {
     NSXPCConnectionOptions options = (privileged ? NSXPCConnectionPrivileged : 0);
@@ -102,7 +102,7 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
   return self;
 }
 
-- (instancetype)initClientWithServiceName:(NSString *)name {
+- (instancetype)initClientWithServiceName:(NSString*)name {
   self = [super init];
   if (self) {
     _currentConnection = [[NSXPCConnection alloc] initWithServiceName:name];
@@ -165,10 +165,10 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
   }
 }
 
-- (BOOL)listener:(NSXPCListener *)listener shouldAcceptNewConnection:(NSXPCConnection *)connection {
+- (BOOL)listener:(NSXPCListener*)listener shouldAcceptNewConnection:(NSXPCConnection*)connection {
   // Fail this connection if it's from an unprivileged user and we have been
   // configured to only allow root/admins
-  NSXPCInterface *interface;
+  NSXPCInterface* interface;
   if (connection.effectiveUserIdentifier == 0) {
     interface = self.privilegedInterface;
   } else {
@@ -178,7 +178,7 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
   if (!interface) return NO;
 
   pid_t pid = connection.processIdentifier;
-  MOLCodesignChecker *otherCS = [[MOLCodesignChecker alloc] initWithPID:pid];
+  MOLCodesignChecker* otherCS = [[MOLCodesignChecker alloc] initWithPID:pid];
   if (![otherCS signingInformationMatches:[[MOLCodesignChecker alloc] initWithSelf]]) {
     return NO;
   }
@@ -186,7 +186,7 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
   // The client passed the code signature check, now we need to resume the listener and
   // return YES so that the client can send the connectWithReply message. Once the client does
   // we reset the connection's exportedInterface and exportedObject.
-  MOLXPCConnectionInterface *ci = [[MOLXPCConnectionInterface alloc] init];
+  MOLXPCConnectionInterface* ci = [[MOLXPCConnectionInterface alloc] init];
   WEAKIFY(self);
   WEAKIFY(connection);
   ci.block = ^{
@@ -212,7 +212,7 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
 
 - (id)remoteObjectProxy {
   if (self.isConnected) {
-    return [self.currentConnection remoteObjectProxyWithErrorHandler:^(NSError *error) {
+    return [self.currentConnection remoteObjectProxyWithErrorHandler:^(NSError* error) {
       [self.currentConnection invalidate];
     }];
   }
@@ -221,7 +221,7 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
 
 - (id)synchronousRemoteObjectProxy {
   if (self.isConnected) {
-    return [self.currentConnection synchronousRemoteObjectProxyWithErrorHandler:^(NSError *error) {
+    return [self.currentConnection synchronousRemoteObjectProxyWithErrorHandler:^(NSError* error) {
       [self.currentConnection invalidate];
     }];
   }

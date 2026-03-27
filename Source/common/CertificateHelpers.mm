@@ -20,8 +20,8 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 
-NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID) {
-  MOLCertificate *leafCert = [certs firstObject];
+NSString* Publisher(NSArray<MOLCertificate*>* certs, NSString* teamID) {
+  MOLCertificate* leafCert = [certs firstObject];
 
   if ([leafCert.commonName isEqualToString:@"Apple Mac OS Application Signing"]) {
     return [NSString stringWithFormat:@"App Store (Team ID: %@)", teamID];
@@ -38,9 +38,9 @@ NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID) {
   }
 }
 
-NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs) {
-  NSMutableArray *certArray = [NSMutableArray arrayWithCapacity:certs.count];
-  for (MOLCertificate *cert in certs) {
+NSArray<id>* CertificateChain(NSArray<MOLCertificate*>* certs) {
+  NSMutableArray* certArray = [NSMutableArray arrayWithCapacity:certs.count];
+  for (MOLCertificate* cert in certs) {
     [certArray addObject:(id)cert.certRef];
   }
 
@@ -58,10 +58,10 @@ NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs) {
 // runtime or security-critical checks. Runtime checks are handled by ES and the
 // status handed to us but the Security framework does not provide a way to
 // do the same checks statically.
-BOOL IsProductionSigningCert(MOLCertificate *cert) {
+BOOL IsProductionSigningCert(MOLCertificate* cert) {
   // Production OID values defined by Apple and used by the Security Framework
   // https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements#Xcode-designated-requirement-for-Developer-ID-code
-  static NSArray *const keys = @[
+  static NSArray* const keys = @[
     // Mac App Store Application
     @"1.2.840.113635.100.6.1.9",
 
@@ -79,13 +79,13 @@ BOOL IsProductionSigningCert(MOLCertificate *cert) {
     return NO;
   }
 
-  NSDictionary *vals =
+  NSDictionary* vals =
       CFBridgingRelease(SecCertificateCopyValues(cert.certRef, (__bridge CFArrayRef)keys, NULL));
 
   return vals.count > 0;
 }
 
-SNTSigningStatus SigningStatus(MOLCodesignChecker *csc, NSError *error) {
+SNTSigningStatus SigningStatus(MOLCodesignChecker* csc, NSError* error) {
   if (error) {
     if (error.code == errSecCSUnsigned) {
       return SNTSigningStatusUnsigned;

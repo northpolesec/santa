@@ -19,14 +19,14 @@
 @interface SNTStoredEvent : NSObject <NSSecureCoding>
 
 /// The date and time the execution request was received by santad.
-@property(nonnull) NSDate *occurrenceDate;
+@property(nonnull) NSDate* occurrenceDate;
 
 /// An index for this event, randomly generated during initialization.
-@property(nonnull) NSNumber *idx;
+@property(nonnull) NSNumber* idx;
 
 // Subclasses are required to define: `uniqueID`.
 // The base class implementation will throw an exception.
-- (nullable NSString *)uniqueID;
+- (nullable NSString*)uniqueID;
 
 // Subclasses are required to define: `unactionableEvent`.
 // The base class implementation will throw an exception.

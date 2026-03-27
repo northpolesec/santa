@@ -31,16 +31,16 @@
 #import "Source/gui/SNTStatusItemManager.h"
 
 @interface SNTAppDelegate ()
-@property SNTAboutWindowController *aboutWindowController;
-@property SNTNotificationManager *notificationManager;
-@property MOLXPCConnection *daemonListener;
+@property SNTAboutWindowController* aboutWindowController;
+@property SNTNotificationManager* notificationManager;
+@property MOLXPCConnection* daemonListener;
 @end
 
 @implementation SNTAppDelegate
 
 #pragma mark App Delegate methods
 
-- (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+- (void)applicationDidFinishLaunching:(NSNotification*)aNotification {
   self.notificationManager = [[SNTNotificationManager alloc] init];
   self.statusItemManager = [[SNTStatusItemManager alloc] init];
   self.notificationManager.statusItemManager = self.statusItemManager;
@@ -48,12 +48,12 @@
   [self setupMenu];
   [self setupNativeNotifications];
 
-  NSNotificationCenter *workspaceNotifications = [[NSWorkspace sharedWorkspace] notificationCenter];
+  NSNotificationCenter* workspaceNotifications = [[NSWorkspace sharedWorkspace] notificationCenter];
 
   [workspaceNotifications addObserverForName:NSWorkspaceSessionDidResignActiveNotification
                                       object:nil
                                        queue:[NSOperationQueue currentQueue]
-                                  usingBlock:^(NSNotification *note) {
+                                  usingBlock:^(NSNotification* note) {
                                     self.daemonListener.invalidationHandler = nil;
                                     [self.daemonListener invalidate];
                                     self.daemonListener = nil;
@@ -61,7 +61,7 @@
   [workspaceNotifications addObserverForName:NSWorkspaceSessionDidBecomeActiveNotification
                                       object:nil
                                        queue:[NSOperationQueue currentQueue]
-                                  usingBlock:^(NSNotification *note) {
+                                  usingBlock:^(NSNotification* note) {
                                     [self attemptDaemonReconnection];
                                   }];
 
@@ -74,13 +74,13 @@
   [self createDaemonConnection];
 }
 
-- (void)applicationDidBecomeActive:(NSNotification *)notification {
+- (void)applicationDidBecomeActive:(NSNotification*)notification {
   // Only show the dock icon if the app has visible windows (excluding status bar windows).
   // Without this guard, events such as virtual desktop switches can reactivate the app and
   // cause the dock icon to reappear when there are no windows to display.
   __block BOOL hasVisibleWindows = NO;
   [NSApp enumerateWindowsWithOptions:0
-                          usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
+                          usingBlock:^(NSWindow* _Nonnull window, BOOL* _Nonnull stop) {
                             if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")]) {
                               return;
                             }
@@ -91,11 +91,11 @@
   }
 }
 
-- (void)aWindowWillClose:(NSNotification *)notification {
-  NSWindow *closingWindow = notification.object;
+- (void)aWindowWillClose:(NSNotification*)notification {
+  NSWindow* closingWindow = notification.object;
   __block BOOL hasVisibleWindows = NO;
   [NSApp enumerateWindowsWithOptions:0
-                          usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
+                          usingBlock:^(NSWindow* _Nonnull window, BOOL* _Nonnull stop) {
                             if (window == closingWindow) return;
                             // There are windows associated with the status bar item, these should
                             // not prevent hiding the dock icon.
@@ -108,7 +108,7 @@
   }
 }
 
-- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
+- (BOOL)applicationShouldHandleReopen:(NSApplication*)sender hasVisibleWindows:(BOOL)flag {
   if (!self.aboutWindowController) {
     self.aboutWindowController = [[SNTAboutWindowController alloc] init];
   }
@@ -117,16 +117,16 @@
   return NO;
 }
 
-- (void)application:(NSApplication *)sender openURLs:(NSArray<NSURL *> *)urls {
+- (void)application:(NSApplication*)sender openURLs:(NSArray<NSURL*>*)urls {
   // Handle requests to open other applications, either by being dropped onto
   // the app's dock icon or dropped onto the About window. Unfortunately,
   // dropping onto the app icon doesn't work.
-  for (NSURL *url in urls) {
-    SNTFileInfo *fileInfo = [[SNTFileInfo alloc] initWithPath:url.path];
+  for (NSURL* url in urls) {
+    SNTFileInfo* fileInfo = [[SNTFileInfo alloc] initWithPath:url.path];
     if (fileInfo) {
-      NSViewController *vc = [SNTFileInfoViewFactory createWithFileInfo:fileInfo];
+      NSViewController* vc = [SNTFileInfoViewFactory createWithFileInfo:fileInfo];
 
-      NSWindow *window = [[NSWindow alloc]
+      NSWindow* window = [[NSWindow alloc]
           initWithContentRect:NSMakeRect(0, 0, 0, 0)
                     styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskTitled |
                               NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
@@ -151,7 +151,7 @@
   WEAKIFY(self);
 
   // Create listener for return connection from daemon.
-  NSXPCListener *listener = [NSXPCListener anonymousListener];
+  NSXPCListener* listener = [NSXPCListener anonymousListener];
   self.daemonListener = [[MOLXPCConnection alloc] initServerWithListener:listener];
   self.daemonListener.privilegedInterface = [SNTXPCNotifierInterface notifierInterface];
   self.daemonListener.exportedObject = self.notificationManager;
@@ -170,7 +170,7 @@
   self.notificationManager.notificationListener = listener.endpoint;
 
   // Tell daemon to connect back to the above listener.
-  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
   [[daemonConn remoteObjectProxy] setNotificationListener:listener.endpoint];
   [daemonConn invalidate];
@@ -193,11 +193,11 @@
   // Whilst the user will never see the menu, having one with the Copy and Select All options
   // allows the shortcuts for these items to work, which is useful for being able to copy
   // information from notifications. The mainMenu must have a nested menu for this to work properly.
-  NSMenu *mainMenu = [[NSMenu alloc] init];
-  NSMenu *editMenu = [[NSMenu alloc] init];
+  NSMenu* mainMenu = [[NSMenu alloc] init];
+  NSMenu* editMenu = [[NSMenu alloc] init];
   [editMenu addItemWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"c"];
   [editMenu addItemWithTitle:@"Select All" action:@selector(selectAll:) keyEquivalent:@"a"];
-  NSMenuItem *editMenuItem = [[NSMenuItem alloc] init];
+  NSMenuItem* editMenuItem = [[NSMenuItem alloc] init];
   [editMenuItem setSubmenu:editMenu];
   [mainMenu addItem:editMenuItem];
   [NSApp setMainMenu:mainMenu];
@@ -208,7 +208,7 @@
 - (void)setupNativeNotifications {
   [[UNUserNotificationCenter currentNotificationCenter]
       requestAuthorizationWithOptions:0
-                    completionHandler:^(BOOL granted, NSError *error) {
+                    completionHandler:^(BOOL granted, NSError* error) {
                       if (error) {
                         LOGE(@"Failed to request notification authorization: %@", error);
                       }

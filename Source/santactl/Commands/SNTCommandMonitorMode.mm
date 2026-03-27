@@ -35,11 +35,11 @@ REGISTER_COMMAND_NAME(@"monitormode")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Temporarily switch to Monitor Mode if eligible.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return (@"Usage: santactl monitormode [options]\n"
           @"  Options:\n"
           @"    --duration {minutes}: An optional number of minutes of temporary Monitor Mode\n"
@@ -49,16 +49,16 @@ REGISTER_COMMAND_NAME(@"monitormode")
           @"\n");
 }
 
-+ (NSSet<NSString *> *)aliases {
++ (NSSet<NSString*>*)aliases {
   return [NSSet setWithArray:@[ @"mm" ]];
 }
 
 // Parse a time interval string into a number of minutes.
 // e.g. "10m" -> 10, "2h" -> 120, "3d" -> 3600
-- (NSTimeInterval)parseTimeInterval:(NSString *)duration {
-  NSScanner *scanner = [NSScanner scannerWithString:duration];
+- (NSTimeInterval)parseTimeInterval:(NSString*)duration {
+  NSScanner* scanner = [NSScanner scannerWithString:duration];
   scanner.charactersToBeSkipped = nil;
-  NSString *unit = nil;
+  NSString* unit = nil;
 
   NSInteger intValue = 0;
   if ([scanner scanInteger:&intValue]) {
@@ -68,7 +68,7 @@ REGISTER_COMMAND_NAME(@"monitormode")
     }
 
     // Scan exactly one character from the unit set
-    NSString *scannedUnit = nil;
+    NSString* scannedUnit = nil;
     if ([scanner scanCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@"smhd"]
                             intoString:&scannedUnit]) {
       // Ensure unit is exactly one character and we're at the end
@@ -94,13 +94,13 @@ REGISTER_COMMAND_NAME(@"monitormode")
   return 0;
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   NSTimeInterval requestedDuration;
   bool shouldCancel = false;
 
   // Parse arguments
   for (NSUInteger i = 0; i < arguments.count; ++i) {
-    NSString *arg = arguments[i];
+    NSString* arg = arguments[i];
 
     if ([arg caseInsensitiveCompare:@"--duration"] == NSOrderedSame) {
       if (++i > arguments.count - 1) {
@@ -126,7 +126,7 @@ REGISTER_COMMAND_NAME(@"monitormode")
   __block BOOL success;
 
   if (shouldCancel) {
-    [[self.daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError *err) {
+    [[self.daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError* err) {
       success = (err == nil);
       if (err) {
         TEE_LOGE(@"Unable cancel Monitor Mode: %@", err.localizedDescription);
@@ -136,7 +136,7 @@ REGISTER_COMMAND_NAME(@"monitormode")
   } else {
     [[self.daemonConn synchronousRemoteObjectProxy]
         requestTemporaryMonitorModeWithDurationMinutes:@(requestedDuration)
-                                                 reply:^(uint32_t minutes, NSError *err) {
+                                                 reply:^(uint32_t minutes, NSError* err) {
                                                    success = (err == nil);
                                                    if (err) {
                                                      TEE_LOGE(@"Unable to enter Monitor Mode: %@",

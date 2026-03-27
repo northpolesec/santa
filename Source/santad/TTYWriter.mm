@@ -43,23 +43,23 @@ std::unique_ptr<TTYWriter> TTYWriter::Create(bool silent_tty_mode) {
 TTYWriter::TTYWriter(dispatch_queue_t q, bool silent_tty_mode)
     : q_(q), silent_tty_mode_(silent_tty_mode) {}
 
-bool TTYWriter::CanWrite(const es_process_t *proc) {
+bool TTYWriter::CanWrite(const es_process_t* proc) {
   return proc && proc->tty && proc->tty->path.length > 0;
 }
 
-void TTYWriter::Write(const es_process_t *proc, bool send_signal,
-                      NSString * (^messageCreator)(void)) {
+void TTYWriter::Write(const es_process_t* proc, bool send_signal,
+                      NSString* (^messageCreator)(void)) {
   if (silent_tty_mode_.load(std::memory_order_relaxed) || !CanWrite(proc)) {
     return;
   }
 
   // Copy the data from the es_process_t so the ES message doesn't
   // need to be retained
-  NSString *tty = santa::StringToNSString(proc->tty->path.data);
+  NSString* tty = santa::StringToNSString(proc->tty->path.data);
   // Realize the message string before going async so as not to need to worry about
   // lifetimes of objects in the provided block.
-  NSString *msg = messageCreator();
-  NSString *companyName = [[SNTConfigurator configurator] brandingCompanyName];
+  NSString* msg = messageCreator();
+  NSString* companyName = [[SNTConfigurator configurator] brandingCompanyName];
   if (companyName) {
     msg = [msg stringByAppendingFormat:@"\nManaged by: %@\n", companyName];
   }
@@ -92,18 +92,18 @@ void TTYWriter::Write(const es_process_t *proc, bool send_signal,
   });
 }
 
-void TTYWriter::Write(const es_process_t *proc, NSString * (^messageCreator)(void)) {
+void TTYWriter::Write(const es_process_t* proc, NSString* (^messageCreator)(void)) {
   Write(proc, true, messageCreator);
 }
 
-void TTYWriter::Write(const es_process_t *proc, NSString *msg) {
-  Write(proc, true, ^NSString * {
+void TTYWriter::Write(const es_process_t* proc, NSString* msg) {
+  Write(proc, true, ^NSString* {
     return msg;
   });
 }
 
-void TTYWriter::WriteWithoutSignal(const es_process_t *proc, NSString *msg) {
-  Write(proc, false, ^NSString * {
+void TTYWriter::WriteWithoutSignal(const es_process_t* proc, NSString* msg) {
+  Write(proc, false, ^NSString* {
     return msg;
   });
 }

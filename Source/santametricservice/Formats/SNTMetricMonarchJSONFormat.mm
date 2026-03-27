@@ -18,29 +18,29 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 
-const NSString *kMetricsCollection = @"metricsCollection";
-const NSString *kMetricsDataSet = @"metricsDataSet";
-const NSString *kMetricName = @"metricName";
-const NSString *kStreamKind = @"streamKind";
-const NSString *kValueType = @"valueType";
-const NSString *kDescription = @"description";
-const NSString *kData = @"data";
-const NSString *kField = @"field";
-const NSString *kFieldDescriptor = @"fieldDescriptor";
-const NSString *kBoolValue = @"boolValue";
-const NSString *kBoolValueType = @"BOOL";
-const NSString *kInt64Value = @"int64Value";
-const NSString *kInt64ValueType = @"INT64";
-const NSString *kStringValue = @"stringValue";
-const NSString *kStringValueType = @"STRING";
-const NSString *kName = @"name";
-const NSString *kStartTimestamp = @"startTimestamp";
-const NSString *kEndTimestamp = @"endTimestamp";
-const NSString *kRootLabels = @"rootLabels";
-const NSString *kKey = @"key";
+const NSString* kMetricsCollection = @"metricsCollection";
+const NSString* kMetricsDataSet = @"metricsDataSet";
+const NSString* kMetricName = @"metricName";
+const NSString* kStreamKind = @"streamKind";
+const NSString* kValueType = @"valueType";
+const NSString* kDescription = @"description";
+const NSString* kData = @"data";
+const NSString* kField = @"field";
+const NSString* kFieldDescriptor = @"fieldDescriptor";
+const NSString* kBoolValue = @"boolValue";
+const NSString* kBoolValueType = @"BOOL";
+const NSString* kInt64Value = @"int64Value";
+const NSString* kInt64ValueType = @"INT64";
+const NSString* kStringValue = @"stringValue";
+const NSString* kStringValueType = @"STRING";
+const NSString* kName = @"name";
+const NSString* kStartTimestamp = @"startTimestamp";
+const NSString* kEndTimestamp = @"endTimestamp";
+const NSString* kRootLabels = @"rootLabels";
+const NSString* kKey = @"key";
 
 @implementation SNTMetricMonarchJSONFormat {
-  NSISO8601DateFormatter *_dateFormatter;
+  NSISO8601DateFormatter* _dateFormatter;
 }
 
 - (instancetype)init {
@@ -53,15 +53,15 @@ const NSString *kKey = @"key";
   return self;
 }
 
-- (void)encodeValueTypeAndStreamKindFor:(NSString *)metricName
-                             withMetric:(NSDictionary *)metric
-                                   into:(NSMutableDictionary *)monarchMetric {
+- (void)encodeValueTypeAndStreamKindFor:(NSString*)metricName
+                             withMetric:(NSDictionary*)metric
+                                   into:(NSMutableDictionary*)monarchMetric {
   if (!metric[@"type"]) {
     LOGE(@"metric type not supposed to be nil for %@", metricName);
     return;
   }
 
-  NSNumber *type = metric[@"type"];
+  NSNumber* type = metric[@"type"];
   if (![type isKindOfClass:[NSNumber class]]) {
     LOGE(@"%@ [@\"type\"] is not a number", metricName);
     return;
@@ -99,18 +99,18 @@ const NSString *kKey = @"key";
   }
 }
 
-- (NSArray<NSDictionary *> *)encodeDataForMetric:(NSDictionary *)metric
-                                withEndTimestamp:(NSDate *)endTimestamp {
-  NSMutableArray<NSDictionary *> *monarchMetricData = [[NSMutableArray alloc] init];
+- (NSArray<NSDictionary*>*)encodeDataForMetric:(NSDictionary*)metric
+                              withEndTimestamp:(NSDate*)endTimestamp {
+  NSMutableArray<NSDictionary*>* monarchMetricData = [[NSMutableArray alloc] init];
 
-  for (NSString *fieldName in metric[@"fields"]) {
-    for (NSDictionary *entry in metric[@"fields"][fieldName]) {
-      NSMutableDictionary *monarchDataEntry = [[NSMutableDictionary alloc] init];
+  for (NSString* fieldName in metric[@"fields"]) {
+    for (NSDictionary* entry in metric[@"fields"][fieldName]) {
+      NSMutableDictionary* monarchDataEntry = [[NSMutableDictionary alloc] init];
 
       if (![fieldName isEqualToString:@""]) {
         // We encode multiple fields as a single comma separated string.
-        NSArray<NSString *> *fieldNames = [fieldName componentsSeparatedByString:@","];
-        NSArray<NSString *> *fieldValues = [entry[@"value"] componentsSeparatedByString:@","];
+        NSArray<NSString*>* fieldNames = [fieldName componentsSeparatedByString:@","];
+        NSArray<NSString*>* fieldValues = [entry[@"value"] componentsSeparatedByString:@","];
 
         if (fieldNames.count != fieldValues.count) {
           LOGE(@"malformed metric data encountered: %@", fieldName);
@@ -133,7 +133,7 @@ const NSString *kKey = @"key";
         continue;
       }
 
-      NSNumber *type = metric[@"type"];
+      NSNumber* type = metric[@"type"];
 
       switch ((SNTMetricType)[type intValue]) {
         case SNTMetricTypeConstantBool:
@@ -158,14 +158,14 @@ const NSString *kKey = @"key";
  * Translates SNTMetricSet fields to monarch's expected format. In this implementation only string
  * type fields are supported.
  */
-- (NSArray<NSDictionary *> *)encodeFieldDescriptorsFor:(NSDictionary *)metric {
-  NSMutableArray<NSDictionary *> *monarchFields = [[NSMutableArray alloc] init];
+- (NSArray<NSDictionary*>*)encodeFieldDescriptorsFor:(NSDictionary*)metric {
+  NSMutableArray<NSDictionary*>* monarchFields = [[NSMutableArray alloc] init];
 
-  for (NSString *field in metric[@"fields"]) {
+  for (NSString* field in metric[@"fields"]) {
     if (![field isEqualToString:@""]) {
       // we encode multiple field names as comma separated strings.
-      NSArray<NSString *> *fieldNames = [field componentsSeparatedByString:@","];
-      for (NSString *fieldName in fieldNames) {
+      NSArray<NSString*>* fieldNames = [field componentsSeparatedByString:@","];
+      for (NSString* fieldName in fieldNames) {
         [monarchFields addObject:@{kName : fieldName, @"fieldType" : kStringValueType}];
       }
     }
@@ -178,10 +178,10 @@ const NSString *kKey = @"key";
  * by Monarch.
  **/
 
-- (NSDictionary *)formatMetric:(NSString *)name
-                     withValue:(NSDictionary *)metric
-               andEndtimestamp:(NSDate *)endTimestamp {
-  NSMutableDictionary *monarchMetric = [[NSMutableDictionary alloc] init];
+- (NSDictionary*)formatMetric:(NSString*)name
+                    withValue:(NSDictionary*)metric
+              andEndtimestamp:(NSDate*)endTimestamp {
+  NSMutableDictionary* monarchMetric = [[NSMutableDictionary alloc] init];
 
   monarchMetric[kMetricName] = name;
 
@@ -189,7 +189,7 @@ const NSString *kKey = @"key";
     monarchMetric[kDescription] = metric[kDescription];
   }
 
-  NSArray<NSDictionary *> *fieldDescriptorEntries = [self encodeFieldDescriptorsFor:metric];
+  NSArray<NSDictionary*>* fieldDescriptorEntries = [self encodeFieldDescriptorsFor:metric];
   if (fieldDescriptorEntries.count > 0) {
     monarchMetric[kFieldDescriptor] = fieldDescriptorEntries;
   }
@@ -203,18 +203,18 @@ const NSString *kKey = @"key";
 /**
  * Normalizes the metrics dictionary for exporting to JSON
  **/
-- (NSDictionary *)normalize:(NSDictionary *)metrics endTimestamp:(NSDate *)endTimestamp {
-  NSMutableArray<NSDictionary *> *monarchMetrics = [[NSMutableArray alloc] init];
+- (NSDictionary*)normalize:(NSDictionary*)metrics endTimestamp:(NSDate*)endTimestamp {
+  NSMutableArray<NSDictionary*>* monarchMetrics = [[NSMutableArray alloc] init];
 
-  for (NSString *metricName in metrics[@"metrics"]) {
+  for (NSString* metricName in metrics[@"metrics"]) {
     [monarchMetrics addObject:[self formatMetric:metricName
                                         withValue:metrics[@"metrics"][metricName]
                                   andEndtimestamp:endTimestamp]];
   }
 
-  NSMutableArray<NSDictionary *> *rootLabels = [[NSMutableArray alloc] init];
+  NSMutableArray<NSDictionary*>* rootLabels = [[NSMutableArray alloc] init];
 
-  for (NSString *keyName in metrics[@"root_labels"]) {
+  for (NSString* keyName in metrics[@"root_labels"]) {
     [rootLabels addObject:@{kKey : keyName, kStringValue : metrics[@"root_labels"][keyName]}];
   }
 
@@ -231,12 +231,12 @@ const NSString *kKey = @"key";
  * Returns an NSArray containing one entry of all metrics serialized to JSON or
  * nil on error.
  */
-- (NSArray<NSData *> *)convert:(NSDictionary *)metrics
-                  endTimestamp:(NSDate *)endTimestamp
-                         error:(NSError **)err {
-  NSDictionary *normalizedMetrics = [self normalize:metrics endTimestamp:endTimestamp];
+- (NSArray<NSData*>*)convert:(NSDictionary*)metrics
+                endTimestamp:(NSDate*)endTimestamp
+                       error:(NSError**)err {
+  NSDictionary* normalizedMetrics = [self normalize:metrics endTimestamp:endTimestamp];
 
-  NSData *json = [NSJSONSerialization dataWithJSONObject:normalizedMetrics
+  NSData* json = [NSJSONSerialization dataWithJSONObject:normalizedMetrics
                                                  options:NSJSONWritingPrettyPrinted
                                                    error:err];
 

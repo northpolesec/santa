@@ -35,18 +35,18 @@ class RingBuffer {
     }
   }
 
-  RingBuffer(RingBuffer &&other) = default;
-  RingBuffer &operator=(RingBuffer &&rhs) = default;
+  RingBuffer(RingBuffer&& other) = default;
+  RingBuffer& operator=(RingBuffer&& rhs) = default;
 
   // Could be safe to implement these, but not currently needed
-  RingBuffer(const RingBuffer &other) = delete;
-  RingBuffer &operator=(const RingBuffer &other) = delete;
+  RingBuffer(const RingBuffer& other) = delete;
+  RingBuffer& operator=(const RingBuffer& other) = delete;
 
   inline size_t Capacity() const { return capacity_; }
   inline bool Empty() const { return buffer_.size() == 0; };
   inline bool Full() const { return buffer_.size() == capacity_; };
 
-  std::optional<T> Enqueue(const T &val) {
+  std::optional<T> Enqueue(const T& val) {
     std::optional<T> removed_value;
     if (Full()) {
       removed_value = std::move(buffer_.front());
@@ -56,7 +56,7 @@ class RingBuffer {
     return removed_value;
   }
 
-  std::optional<T> Enqueue(T &&val) {
+  std::optional<T> Enqueue(T&& val) {
     std::optional<T> removed_value;
     if (Full()) {
       removed_value = std::move(buffer_.front());

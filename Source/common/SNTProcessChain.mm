@@ -23,7 +23,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, filePath);
   ENCODE(coder, cdhash);
   ENCODE(coder, fileSHA256);
@@ -37,7 +37,7 @@
   ENCODE(coder, parent);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, filePath, NSString);
@@ -55,7 +55,7 @@
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString stringWithFormat:@"SNTProcessChain (pid: %@): %@", self.pid, self.filePath];
 }
 
