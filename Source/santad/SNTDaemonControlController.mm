@@ -92,6 +92,8 @@ double watchdogRAMPeak = 0;
 ///
 @property(copy) SNTAction (^checkCacheBlock)(SantaVnode);
 
+@property(copy) void (^metricsExportBlock)(void (^reply)(BOOL));
+
 @end
 
 @implementation SNTDaemonControlController {
@@ -120,7 +122,7 @@ double watchdogRAMPeak = 0;
     _flushCacheBlock = flushCacheBlock;
     _cacheCountsBlock = cacheCountBlock;
     _checkCacheBlock = checkCacheBlock;
-    _metricsExportBlock = [metricsExportBlock copy];
+    _metricsExportBlock = metricsExportBlock;
 
     _generalQ = dispatch_queue_create_with_target(
         "com.northpolesec.santa.generalXPCq", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
