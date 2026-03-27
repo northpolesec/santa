@@ -41,7 +41,19 @@ configuration keys. Per-policy `EventDetailURL` and `EventDetailText` values
 
 Each entry in the `WatchItems` dictionary represents a single rule. The key for
 each entry is the rule name, which will be used in logs and in the block
-notification UI. Each rule contains three main components:
+notification UI.
+
+:::info
+
+Rule names (the `WatchItems` dictionary keys) must be valid C identifiers,
+matching the regular expression `^[A-Za-z_][A-Za-z0-9_]*$`. Names must start
+with a letter or underscore and contain only letters, digits, and underscores.
+For example, `ChromeCookies` and `my_rule_1` are valid, but `my-rule` and
+`My Rule` are not. Invalid names will be rejected and an error will be logged.
+
+:::
+
+Each rule contains three main components:
 
 - `Paths`: Array of path patterns to monitor
 - `Processes`: List of allowed/denied processes with specific identifiers
