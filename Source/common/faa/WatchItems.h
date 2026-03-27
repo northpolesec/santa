@@ -188,8 +188,7 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
   std::pair<NSString *, NSString *> EventDetailLinkInfo(
       const std::shared_ptr<WatchItemPolicyBase> &watch_item);
 
-  static bool IsValidRule(NSString *name, NSDictionary *rule, NSError **error,
-                          NSString *fallbackVersion = nil);
+  static bool IsValidRule(NSString *name, NSDictionary *rule, NSError **error);
   static bool IsValidConfig(NSDictionary *config, NSError **error);
 
   static NSString *DataSourceName(DataSource data_source);
