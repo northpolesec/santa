@@ -521,6 +521,7 @@ objc_library(
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
+        "//Source/common/faa:WatchItems",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )

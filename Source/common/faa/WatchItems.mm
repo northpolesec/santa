@@ -790,6 +790,24 @@ bool WatchItems::IsValidRule(NSString *name, NSDictionary *rule, NSError **error
          ParseConfigSingleWatchItem(name, "", rule, nullptr, nullptr, error);
 }
 
+bool WatchItems::IsValidConfig(NSDictionary *config, NSError **error) {
+  uint64_t rules_loaded = 0;
+  if (!ParseConfig(config, nullptr, nullptr, &rules_loaded, error)) {
+    return false;
+  }
+
+  NSDictionary *watch_items = config[kWatchItemConfigKeyWatchItems];
+  if ([watch_items isKindOfClass:[NSDictionary class]] && rules_loaded != watch_items.count) {
+    [SNTError populateError:error
+                 withFormat:@"%llu of %lu rules failed validation",
+                            (unsigned long long)(watch_items.count - rules_loaded),
+                            (unsigned long)watch_items.count];
+    return false;
+  }
+
+  return true;
+}
+
 NSString *WatchItems::DataSourceName(DataSource data_source) {
   switch (data_source) {
     case DataSource::kUnknown: return @"Unknown";
