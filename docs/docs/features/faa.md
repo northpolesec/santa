@@ -115,8 +115,19 @@ configuration](/configuration/faa.md) and then a dictionary of individual
 rules under the `WatchItems` key.
 
 The key for each entry in the `WatchItems` dictionary is a name for that rule,
-which will be used in logs and in the block UI. The rule then contains `Paths`,
-`Processes` and `Options` fields.
+which will be used in logs and in the block UI.
+
+:::info
+
+Rule names (the `WatchItems` dictionary keys) must be valid C identifiers,
+matching the regular expression `^[A-Za-z_][A-Za-z0-9_]*$`. Names must start
+with a letter or underscore and contain only letters, digits, and underscores.
+For example, `ChromeCookies` and `my_rule_1` are valid, but `my-rule` and
+`My Rule` are not. Invalid names will be rejected and an error will be logged.
+
+:::
+
+The rule then contains `Paths`, `Processes` and `Options` fields.
 
 ### Path Patterns
 
