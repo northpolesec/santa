@@ -191,6 +191,12 @@
 @property(readonly, nonatomic) BOOL enableAntiTamperProcessSuspendResume;
 
 ///
+///  Array of signing IDs (in teamID:signingID format) whose processes should be
+///  protected from suspension via pid_suspend. Defaults to nil.
+///
+@property(readonly, nonatomic, nullable) NSArray<NSString*>* antiSuspendSigningIDs;
+
+///
 ///  Defines how event logs are stored. Options are:
 ///    SNTEventLogTypeSyslog "syslog": Sent to ASL or ULS (if built with the 10.12 SDK or later).
 ///    SNTEventLogTypeFilelog "file": Sent to a file on disk. Use eventLogPath to specify a path.

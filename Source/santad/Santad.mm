@@ -164,10 +164,11 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   // authorizer client as it is most concerned with the state of ES caches.
   auth_result_cache->SetESClient(authorizer_client);
 
-  SNTEndpointSecurityTamperResistance* tamper_client =
-      [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:esapi
-                                                         metrics:metrics
-                                                          logger:logger];
+  SNTEndpointSecurityTamperResistance* tamper_client = [[SNTEndpointSecurityTamperResistance alloc]
+              initWithESAPI:esapi
+                    metrics:metrics
+                     logger:logger
+      antiSuspendSigningIDs:[configurator antiSuspendSigningIDs]];
 
   auto faaPolicyProcessor = std::make_shared<santa::FAAPolicyProcessor>(
       [SNTDecisionCache sharedCache], enricher, logger, tty_writer, metrics,
@@ -462,6 +463,18 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                         [oldValue componentsJoinedByString:@","],
                                         [newValue componentsJoinedByString:@","]);
                                    device_client.encryptedRemovableMediaRemountFlags = newValue;
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(antiSuspendSigningIDs)
+                                     type:[NSArray class]
+                                 callback:^(NSArray* oldValue, NSArray* newValue) {
+                                   if ((!oldValue && !newValue) ||
+                                       [oldValue isEqualToArray:newValue]) {
+                                     return;
+                                   }
+
+                                   LOGI(@"AntiSuspendSigningIDs changed");
+                                   [tamper_client setAntiSuspendSigningIDs:newValue];
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(staticRules)

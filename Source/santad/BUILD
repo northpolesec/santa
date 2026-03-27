@@ -486,13 +486,18 @@ objc_library(
     hdrs = ["EventProviders/SNTEndpointSecurityTamperResistance.h"],
     deps = [
         ":EndpointSecurityLogger",
+        "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
+        "//Source/common:SigningIDHelpers",
+        "//Source/common:String",
         "//Source/common/es:ESMetricsObserver",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:SNTEndpointSecurityClient",
         "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/common/faa:WatchItemPolicy",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 

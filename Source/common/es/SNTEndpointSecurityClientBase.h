@@ -51,6 +51,8 @@
 - (bool)unmuteAllTargetPaths;
 - (bool)enableTargetPathWatching;
 - (bool)muteTargetPaths:(const santa::SetPairPathAndType&)paths;
+- (bool)muteTargetPaths:(const santa::SetPairPathAndType&)paths
+              forEvents:(const std::set<es_event_type_t>&)events;
 - (bool)unmuteTargetPaths:(const santa::SetPairPathAndType&)paths;
 
 - (bool)enableProcessWatching;

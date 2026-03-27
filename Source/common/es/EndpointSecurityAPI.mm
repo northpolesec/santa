@@ -102,6 +102,17 @@ bool EndpointSecurityAPI::MuteTargetPath(const Client& client, std::string_view 
                           : ES_MUTE_PATH_TYPE_TARGET_LITERAL) == ES_RETURN_SUCCESS;
 }
 
+bool EndpointSecurityAPI::MuteTargetPathEvents(const Client& client, std::string_view path,
+                                               WatchItemPathType path_type,
+                                               const std::set<es_event_type_t>& events) {
+  std::vector<es_event_type_t> event_vec(events.begin(), events.end());
+  return es_mute_path_events(client.Get(), path.data(),
+                             path_type == WatchItemPathType::kPrefix
+                                 ? ES_MUTE_PATH_TYPE_TARGET_PREFIX
+                                 : ES_MUTE_PATH_TYPE_TARGET_LITERAL,
+                             event_vec.data(), event_vec.size()) == ES_RETURN_SUCCESS;
+}
+
 bool EndpointSecurityAPI::UnmuteTargetPath(const Client& client, std::string_view path,
                                            WatchItemPathType path_type) {
   return es_unmute_path(client.Get(), path.data(),

@@ -246,6 +246,17 @@ using santa::Processor;
   return result;
 }
 
+- (bool)muteTargetPaths:(const santa::SetPairPathAndType&)paths
+              forEvents:(const std::set<es_event_type_t>&)events {
+  bool result = true;
+  for (const auto& PairPathAndType : paths) {
+    result = _esApi->MuteTargetPathEvents(_esClient, PairPathAndType.first, PairPathAndType.second,
+                                          events) &&
+             result;
+  }
+  return result;
+}
+
 - (bool)unmuteTargetPaths:(const santa::SetPairPathAndType&)paths {
   bool result = true;
   for (const auto& PairPathAndType : paths) {
