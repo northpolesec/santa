@@ -40,7 +40,7 @@ namespace cel {
 
 template <bool IsV2>
 static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
-    google::protobuf::Arena *arena) {
+    google::protobuf::Arena* arena) {
   // Create a compiler builder with the generated descriptor pool for protos.
   absl::StatusOr<std::unique_ptr<::cel::CompilerBuilder>> builderStatus =
       ::cel::NewCompilerBuilder(google::protobuf::DescriptorPool::generated_pool());
@@ -78,8 +78,8 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
   }
 
   // Add all the possible variables to the type checker.
-  ::cel::TypeCheckerBuilder &checker_builder = builder->GetCheckerBuilder();
-  for (const auto &variable : Activation<IsV2>::GetVariables(arena)) {
+  ::cel::TypeCheckerBuilder& checker_builder = builder->GetCheckerBuilder();
+  for (const auto& variable : Activation<IsV2>::GetVariables(arena)) {
     if (auto result =
             checker_builder.AddVariable(::cel::MakeVariableDecl(variable.first, variable.second));
         !result.ok()) {
@@ -104,7 +104,7 @@ absl::StatusOr<std::unique_ptr<Evaluator<IsV2>>> Evaluator<IsV2>::Create() {
 
 template <bool IsV2>
 absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::Compile(
-    absl::string_view expr, google::protobuf::Arena *arena) {
+    absl::string_view expr, google::protobuf::Arena* arena) {
   if (!compiler_) {
     return absl::InvalidArgumentError("Evaluator not properly initialized");
   }
@@ -162,8 +162,8 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
 
 template <bool IsV2>
 absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
-    const ::cel_runtime::CelExpression *expression_plan, const ActivationT &activation,
-    google::protobuf::Arena *arena) {
+    const ::cel_runtime::CelExpression* expression_plan, const ActivationT& activation,
+    google::protobuf::Arena* arena) {
   absl::StatusOr<cel_runtime::CelValue> result = expression_plan->Evaluate(activation, arena);
 
   if (!result.ok()) {
@@ -183,9 +183,9 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
   } else if constexpr (IsV2) {
     // V2: Handle Result message
     if (result->IsMessage()) {
-      const auto *msg = result->MessageOrDie();
+      const auto* msg = result->MessageOrDie();
       if (msg->GetDescriptor()->full_name() == "santa.cel.Result") {
-        const auto *cel_result = dynamic_cast<const ::santa::cel::Result *>(msg);
+        const auto* cel_result = dynamic_cast<const ::santa::cel::Result*>(msg);
         if (cel_result) {
           auto rv = static_cast<ReturnValue>(cel_result->value());
           // Check if cooldown was explicitly set (distinguishes constants from functions)
@@ -207,9 +207,11 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
     }
   }
 
-  if (const cel_runtime::CelError * value; result->GetValue(&value)) {
+  // clang-format off
+  if (const cel_runtime::CelError* value; result->GetValue(&value)) {
     return absl::InvalidArgumentError(value->message());
   }
+  // clang-format on
 
   return absl::InvalidArgumentError(
       absl::StrCat("expected 'ReturnValue' result got '", result->DebugString(), "'"));
@@ -217,7 +219,7 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
 
 template <bool IsV2>
 absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::CompileAndEvaluate(
-    absl::string_view cel_expr, const ActivationT &activation) {
+    absl::string_view cel_expr, const ActivationT& activation) {
   google::protobuf::Arena arena;
   auto expr = Compile(cel_expr, &arena);
   if (!expr.ok()) {

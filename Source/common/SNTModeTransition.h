@@ -28,19 +28,19 @@ typedef NS_ENUM(NSInteger, SNTModeTransitionType) {
 @interface SNTModeTransition : NSObject <NSSecureCoding>
 
 @property(readonly) SNTModeTransitionType type;
-@property(readonly) NSNumber *maxMinutes;
-@property(readonly) NSNumber *defaultDurationMinutes;
+@property(readonly) NSNumber* maxMinutes;
+@property(readonly) NSNumber* defaultDurationMinutes;
 
 - (instancetype)initRevocation;
 - (instancetype)initOnDemandMinutes:(uint32_t)minutes;
 - (instancetype)initOnDemandMinutes:(uint32_t)minutes defaultDuration:(uint32_t)defaultDuration;
 - (instancetype)init NS_UNAVAILABLE;
 
-- (NSData *)serialize;
-+ (instancetype)deserialize:(NSData *)data;
+- (NSData*)serialize;
++ (instancetype)deserialize:(NSData*)data;
 
 // Given a requested duration, return a valid duration properly clamped by
 // the `minutes` and `defaultDurationMinutes`.
-- (uint32_t)getDurationMinutes:(NSNumber *)requestedDuration;
+- (uint32_t)getDurationMinutes:(NSNumber*)requestedDuration;
 
 @end

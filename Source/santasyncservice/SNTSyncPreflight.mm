@@ -82,10 +82,10 @@ The following table expands upon the above logic to list most of the permutation
 
 namespace {
 
-void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *syncState);
+void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* syncState);
 
 template <bool IsV2>
-BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
+BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
                SNTSyncType requestSyncType) {
   using Traits = santa::ProtoTraits<IsV2>;
 
@@ -101,8 +101,8 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
   req->set_santa_version(NSStringToUTF8String([SNTSystemInfo santaFullVersion]));
   req->set_primary_user(NSStringToUTF8String(self.syncState.machineOwner));
   if (self.syncState.machineOwnerGroups.count) {
-    google::protobuf::RepeatedPtrField<std::string> *groups = req->mutable_primary_user_groups();
-    for (NSString *group in self.syncState.machineOwnerGroups) {
+    google::protobuf::RepeatedPtrField<std::string>* groups = req->mutable_primary_user_groups();
+    for (NSString* group in self.syncState.machineOwnerGroups) {
       groups->Add(NSStringToUTF8String(group));
     }
   }
@@ -128,7 +128,7 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
     }
   }];
 
-  [rop databaseRulesHash:^(NSString *execRulesHash, NSString *faaRulesHash) {
+  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash) {
     req->set_rules_hash(NSStringToUTF8String(execRulesHash));
     if constexpr (IsV2) {
       req->set_file_access_rules_hash(NSStringToUTF8String(faaRulesHash));
@@ -152,7 +152,7 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
   }
 
   typename Traits::PreflightResponseT resp;
-  NSError *err = [self performRequest:[self requestWithMessage:req] intoMessage:&resp timeout:30];
+  NSError* err = [self performRequest:[self requestWithMessage:req] intoMessage:&resp timeout:30];
 
   if (err) {
     SLOGE(@"Failed preflight request: %@", err);
@@ -234,8 +234,8 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
   // block_unencrypted_removable_media (which are mutually exclusive).
   if (resp.has_block_usb_mount() || resp.has_block_unencrypted_removable_media()) {
     self.syncState.remountUSBMode = [NSMutableArray array];
-    for (const std::string &mode : resp.remount_usb_mode()) {
-      [(NSMutableArray *)self.syncState.remountUSBMode addObject:StringToNSString(mode)];
+    for (const std::string& mode : resp.remount_usb_mode()) {
+      [(NSMutableArray*)self.syncState.remountUSBMode addObject:StringToNSString(mode)];
     }
   }
 
@@ -345,7 +345,7 @@ BOOL Preflight(SNTSyncPreflight *self, google::protobuf::Arena *arena,
   return YES;
 }
 
-void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *syncState) {
+void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* syncState) {
   // Extract NATS push notification configuration
   SLOGD(@"Preflight: Processing push notification configuration");
   if (!resp.push_server().empty()) {
@@ -369,8 +369,8 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
   }
 
   if (resp.push_tags_size() > 0) {
-    NSMutableArray *tags = [NSMutableArray arrayWithCapacity:resp.push_tags_size()];
-    for (const auto &tag : resp.push_tags()) {
+    NSMutableArray* tags = [NSMutableArray arrayWithCapacity:resp.push_tags_size()];
+    for (const auto& tag : resp.push_tags()) {
       [tags addObject:StringToNSString(tag)];
     }
     syncState.pushTags = [tags copy];
@@ -389,7 +389,7 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
         break;
 
       case ::pbv2::ModeTransition::kOnDemandMonitorMode: {
-        auto &odmm = resp.mode_transition().on_demand_monitor_mode();
+        auto& odmm = resp.mode_transition().on_demand_monitor_mode();
         if (odmm.has_default_duration_minutes()) {
           syncState.modeTransition =
               [[SNTModeTransition alloc] initOnDemandMinutes:odmm.max_minutes()
@@ -411,8 +411,8 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
   if (resp.has_block_network_mount()) {
     syncState.blockNetworkMount = @(resp.block_network_mount());
 
-    NSMutableArray<NSString *> *hosts = [NSMutableArray array];
-    for (const std::string &host : resp.allowed_network_mount_hosts()) {
+    NSMutableArray<NSString*>* hosts = [NSMutableArray array];
+    for (const std::string& host : resp.allowed_network_mount_hosts()) {
       [hosts addObject:StringToNSString(host)];
     }
     syncState.allowedNetworkMountHosts = [hosts copy];
@@ -438,9 +438,9 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
 
   // Always set telemetry filter expressions (even if empty) to allow the server to clear them.
   {
-    NSMutableArray<NSString *> *expressions =
+    NSMutableArray<NSString*>* expressions =
         [NSMutableArray arrayWithCapacity:resp.telemetry_filter_expressions_size()];
-    for (const auto &expr : resp.telemetry_filter_expressions()) {
+    for (const auto& expr : resp.telemetry_filter_expressions()) {
       [expressions addObject:StringToNSString(expr)];
     }
     syncState.telemetryFilterExpressions = [expressions copy];
@@ -455,12 +455,12 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
       count = 10;
     }
     SLOGD(@"Received %d CEL fallback rule(s)", count);
-    NSMutableArray<SNTCELFallbackRule *> *rules = [NSMutableArray arrayWithCapacity:count];
+    NSMutableArray<SNTCELFallbackRule*>* rules = [NSMutableArray arrayWithCapacity:count];
     for (int i = 0; i < count; i++) {
-      const auto &rule = resp.cel_fallback_rules(i);
-      NSString *celExpr = StringToNSString(rule.cel_expr());
-      NSString *customMsg = !rule.custom_msg().empty() ? StringToNSString(rule.custom_msg()) : nil;
-      NSString *customURL = !rule.custom_url().empty() ? StringToNSString(rule.custom_url()) : nil;
+      const auto& rule = resp.cel_fallback_rules(i);
+      NSString* celExpr = StringToNSString(rule.cel_expr());
+      NSString* customMsg = !rule.custom_msg().empty() ? StringToNSString(rule.custom_msg()) : nil;
+      NSString* customURL = !rule.custom_url().empty() ? StringToNSString(rule.custom_url()) : nil;
       SLOGD(@"CEL fallback rule %d: expr='%@' customMsg='%@' customURL='%@'", i, celExpr, customMsg,
             customURL);
       [rules addObject:[[SNTCELFallbackRule alloc] initWithCELExpr:celExpr
@@ -473,12 +473,12 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
   if (resp.has_export_configuration()) {
     auto exportConfig = resp.export_configuration().signed_post();
     if (!exportConfig.url().empty() && !exportConfig.form_values().empty()) {
-      NSMutableDictionary *formValues =
+      NSMutableDictionary* formValues =
           [NSMutableDictionary dictionaryWithCapacity:exportConfig.form_values().size()];
-      for (const auto &pair : exportConfig.form_values()) {
+      for (const auto& pair : exportConfig.form_values()) {
         formValues[StringToNSString(pair.first)] = StringToNSString(pair.second);
       }
-      NSURL *url = [NSURL URLWithString:StringToNSString(exportConfig.url())];
+      NSURL* url = [NSURL URLWithString:StringToNSString(exportConfig.url())];
       if (url) {
         syncState.exportConfig = [[SNTExportConfiguration alloc] initWithURL:url
                                                                   formValues:formValues];
@@ -493,8 +493,8 @@ void HandleV2Responses(const ::pbv2::PreflightResponse &resp, SNTSyncState *sync
 
 @implementation SNTSyncPreflight
 
-- (NSURL *)stageURL {
-  NSString *stageName = [@"preflight" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+- (NSURL*)stageURL {
+  NSString* stageName = [@"preflight" stringByAppendingFormat:@"/%@", self.syncState.machineID];
   return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 }
 

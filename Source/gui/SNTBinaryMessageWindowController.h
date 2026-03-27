@@ -26,37 +26,37 @@
 ///
 @interface SNTBinaryMessageWindowController : SNTMessageWindowController
 
-- (instancetype)initWithEvent:(SNTStoredExecutionEvent *)event
-                    customMsg:(NSString *)message
-                    customURL:(NSString *)url
-                  configState:(SNTConfigState *)configState
+- (instancetype)initWithEvent:(SNTStoredExecutionEvent*)event
+                    customMsg:(NSString*)message
+                    customURL:(NSString*)url
+                  configState:(SNTConfigState*)configState
                         reply:(void (^)(BOOL authenticated))replyBlock;
 
-- (void)updateBlockNotification:(SNTStoredExecutionEvent *)event
-                 withBundleHash:(NSString *)bundleHash;
+- (void)updateBlockNotification:(SNTStoredExecutionEvent*)event
+                 withBundleHash:(NSString*)bundleHash;
 
 ///  Reference to the "Bundle Hash" label in the XIB. Used to remove if application
 ///  doesn't have a bundle hash.
-@property(weak) IBOutlet NSTextField *bundleHashLabel;
+@property(weak) IBOutlet NSTextField* bundleHashLabel;
 
 ///  Reference to the "Bundle Identifier" label in the XIB. Used to remove if application
 ///  doesn't have a bundle hash.
-@property(weak) IBOutlet NSTextField *bundleHashTitle;
+@property(weak) IBOutlet NSTextField* bundleHashTitle;
 
 ///
 /// Is displayed if calculating the bundle hash is taking a bit.
 ///
-@property(readonly) SNTBundleProgress *bundleProgress;
+@property(readonly) SNTBundleProgress* bundleProgress;
 
 ///
 /// Snapshot of configuration used for processing the event.
 ///
-@property(readonly) SNTConfigState *configState;
+@property(readonly) SNTConfigState* configState;
 
 ///
 ///  The execution event that this window is for
 ///
-@property(readonly) SNTStoredExecutionEvent *event;
+@property(readonly) SNTStoredExecutionEvent* event;
 
 ///
 ///  The reply block to call when the user has made a decision in standalone
@@ -66,6 +66,6 @@
 ///
 ///  The root progress object. Child nodes are vended to santad to report on work being done.
 ///
-@property NSProgress *progress;
+@property NSProgress* progress;
 
 @end

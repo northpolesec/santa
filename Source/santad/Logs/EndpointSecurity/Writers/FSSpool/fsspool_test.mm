@@ -59,11 +59,11 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 @interface FSSpoolTest : XCTestCase
-@property NSString *testDir;
-@property NSString *baseDir;
-@property NSString *spoolDir;
-@property NSString *tmpDir;
-@property NSFileManager *fileMgr;
+@property NSString* testDir;
+@property NSString* baseDir;
+@property NSString* spoolDir;
+@property NSString* tmpDir;
+@property NSFileManager* fileMgr;
 @end
 
 @implementation FSSpoolTest
@@ -98,10 +98,10 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
                                               error:nil]);
 
   // Create a few different types of files
-  NSString *aaaFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"aaa.txt"];
-  NSString *bbbFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"bbb.txt"];
-  NSString *lnkFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"ccc.lnk"];
-  NSString *fifoFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"ddd.fifo"];
+  NSString* aaaFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"aaa.txt"];
+  NSString* bbbFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"bbb.txt"];
+  NSString* lnkFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"ccc.lnk"];
+  NSString* fifoFile = [NSString stringWithFormat:@"%@/%@", self.tmpDir, @"ddd.fifo"];
   XCTAssertTrue([@"foo" writeToFile:aaaFile
                          atomically:YES
                            encoding:NSUTF8StringEncoding
@@ -115,7 +115,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
                                                  error:nil]);
   XCTAssertEqual(mkfifo(fifoFile.UTF8String, 0400), 0);
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 4);
   XCTAssertNil(err);
 
@@ -130,10 +130,10 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testEstimateSpoolDirSizeAnyBatcher {
-  NSString *testData = @"What a day for some testing!";
-  NSString *largeTestData = RepeatedString(@"A", 10240);
-  NSString *path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
-  NSString *emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
+  NSString* testData = @"What a day for some testing!";
+  NSString* largeTestData = RepeatedString(@"A", 10240);
+  NSString* path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
+  NSString* emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
   auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
       fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
@@ -162,7 +162,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertGreaterThanOrEqual(writer->spool_size_estimate_, testData.length);
 
   // Modify file contents without modifying spool directory mtime
-  NSFileHandle *fileHandle = [NSFileHandle fileHandleForWritingAtPath:path];
+  NSFileHandle* fileHandle = [NSFileHandle fileHandleForWritingAtPath:path];
   [fileHandle seekToEndOfFile];
   [fileHandle writeData:[largeTestData dataUsingEncoding:NSUTF8StringEncoding]];
   [fileHandle closeFile];
@@ -188,10 +188,10 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 }
 
 - (void)testEstimateSpoolDirSizeStreamBatcher {
-  NSString *testData = @"What a day for some testing!";
-  NSString *largeTestData = RepeatedString(@"A", 10240);
-  NSString *path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
-  NSString *emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
+  NSString* testData = @"What a day for some testing!";
+  NSString* largeTestData = RepeatedString(@"A", 10240);
+  NSString* path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
+  NSString* emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
   auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::UncompressedStreamBatcher>>(
       fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
@@ -220,7 +220,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertGreaterThanOrEqual(writer->spool_size_estimate_, testData.length);
 
   // Modify file contents without modifying spool directory mtime
-  NSFileHandle *fileHandle = [NSFileHandle fileHandleForWritingAtPath:path];
+  NSFileHandle* fileHandle = [NSFileHandle fileHandleForWritingAtPath:path];
   [fileHandle seekToEndOfFile];
   [fileHandle writeData:[largeTestData dataUsingEncoding:NSUTF8StringEncoding]];
   [fileHandle closeFile];
@@ -257,7 +257,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertStatusOk(writer->Write({123}));
   XCTAssertStatusOk(writer->Flush());
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
@@ -276,7 +276,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertStatusOk(writer->Write({123}));
   XCTAssertStatusOk(writer->Flush());
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
@@ -301,7 +301,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertTrue([self.fileMgr fileExistsAtPath:self.spoolDir]);
   XCTAssertTrue([self.fileMgr fileExistsAtPath:self.tmpDir]);
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
@@ -335,7 +335,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertTrue([self.fileMgr fileExistsAtPath:self.spoolDir]);
   XCTAssertTrue([self.fileMgr fileExistsAtPath:self.tmpDir]);
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
@@ -391,7 +391,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
   XCTAssertStatusOk(writer->Flush());
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
@@ -410,7 +410,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
 
   XCTAssertStatusOk(writer->Flush());
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
@@ -428,7 +428,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
     XCTAssertStatusOk(writer->Flush());
   }
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count],
@@ -447,7 +447,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
     XCTAssertStatusOk(writer->Flush());
   }
 
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count],
@@ -473,7 +473,7 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   }
 
   // Ensure the write happens when FsSpoolLogBatchWriter destructed
-  NSError *err = nil;
+  NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);

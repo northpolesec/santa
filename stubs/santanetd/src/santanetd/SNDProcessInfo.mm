@@ -33,10 +33,10 @@ struct SantaVnode {
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
 }
 
-- (instancetype)initWithCoder:(NSCoder *)coder {
+- (instancetype)initWithCoder:(NSCoder*)coder {
   return [self init];
 }
 

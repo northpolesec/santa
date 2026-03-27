@@ -37,7 +37,7 @@ namespace santa {
 Enricher::Enricher(std::shared_ptr<::santa::santad::process_tree::ProcessTree> pt)
     : username_cache_(256), groupname_cache_(256), process_tree_(std::move(pt)) {}
 
-std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
+std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message&& es_msg) {
   // TODO(mlw): Consider potential design patterns that could help reduce memory usage under load
   // (such as maybe the flyweight pattern)
   switch (es_msg->event_type) {
@@ -195,12 +195,12 @@ std::unique_ptr<EnrichedMessage> Enricher::Enrich(Message &&es_msg) {
   }
 }
 
-std::optional<EnrichedProcess> Enricher::Enrich(const es_process_t *es_proc,
+std::optional<EnrichedProcess> Enricher::Enrich(const es_process_t* es_proc,
                                                 EnrichOptions options) {
   return es_proc ? std::make_optional<EnrichedProcess>(Enrich(*es_proc, options)) : std::nullopt;
 }
 
-EnrichedProcess Enricher::Enrich(const es_process_t &es_proc, EnrichOptions options) {
+EnrichedProcess Enricher::Enrich(const es_process_t& es_proc, EnrichOptions options) {
   return EnrichedProcess(
       UsernameForUID(audit_token_to_euid(es_proc.audit_token), options),
       UsernameForGID(audit_token_to_egid(es_proc.audit_token), options),
@@ -212,11 +212,11 @@ EnrichedProcess Enricher::Enrich(const es_process_t &es_proc, EnrichOptions opti
                     : std::nullopt);
 }
 
-std::optional<EnrichedFile> Enricher::Enrich(const es_file_t *es_file, EnrichOptions options) {
+std::optional<EnrichedFile> Enricher::Enrich(const es_file_t* es_file, EnrichOptions options) {
   return es_file ? std::make_optional<EnrichedFile>(Enrich(*es_file, options)) : std::nullopt;
 }
 
-EnrichedFile Enricher::Enrich(const es_file_t &es_file, EnrichOptions options) {
+EnrichedFile Enricher::Enrich(const es_file_t& es_file, EnrichOptions options) {
   // TODO(mlw): Consider having the enricher perform file hashing. This will
   // make more sense if we start including hashes in more event types.
   return EnrichedFile(UsernameForUID(es_file.stat.st_uid, options),
@@ -233,7 +233,7 @@ std::optional<std::shared_ptr<std::string>> Enricher::UsernameForUID(uid_t uid,
     // If `kLocalOnly` option is set, do not attempt a lookup
     return std::nullopt;
   } else {
-    struct passwd *pw = getpwuid(uid);
+    struct passwd* pw = getpwuid(uid);
     if (pw) {
       username = std::make_shared<std::string>(pw->pw_name);
     } else {
@@ -256,7 +256,7 @@ std::optional<std::shared_ptr<std::string>> Enricher::UsernameForGID(gid_t gid,
     // If `kLocalOnly` option is set, do not attempt a lookup
     return std::nullopt;
   } else {
-    struct group *gr = getgrgid(gid);
+    struct group* gr = getgrgid(gid);
     if (gr) {
       groupname = std::make_shared<std::string>(gr->gr_name);
     } else {
@@ -275,7 +275,7 @@ std::optional<uid_t> Enricher::UIDForUsername(std::string_view username, EnrichO
     return std::nullopt;
   }
 
-  struct passwd *pw = getpwnam(username.data());
+  struct passwd* pw = getpwnam(username.data());
   return pw ? std::make_optional(pw->pw_uid) : std::nullopt;
 }
 

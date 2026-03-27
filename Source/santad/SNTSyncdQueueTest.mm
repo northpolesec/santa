@@ -25,9 +25,9 @@
 
 @interface SNTSyncdQueue (Testing)
 @property dispatch_queue_t syncdQueue;
-@property MOLXPCConnection *syncConnection;
+@property MOLXPCConnection* syncConnection;
 
-- (BOOL)backoffForPrimaryHash:(NSString *)hash;
+- (BOOL)backoffForPrimaryHash:(NSString*)hash;
 - (void)dispatchBlockOnSyncdQueue:(void (^)(void))block;
 @end
 
@@ -37,7 +37,7 @@
 @implementation SNTSyncdQueueTest
 
 - (void)testBackoffForPrimaryHash {
-  SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] initWithCacheSize:256];
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:256];
 
   // Fill up the cache.
   for (int i = 0; i < 256; ++i) {
@@ -77,12 +77,12 @@
 }
 
 - (void)testAddEvents {
-  SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
   sut = OCMPartialMock(sut);
   OCMStub([sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 
   // Add an event, it should be dispatched to the sync service for upload.
-  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
   se.fileSHA256 = @"123";
   [sut addStoredEvent:se];
   OCMVerify(times(1), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
@@ -94,7 +94,7 @@
   OCMVerify(times(1), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 
   // Do it all again for SNTStoredFileAccessEvent
-  SNTStoredFileAccessEvent *fe = [[SNTStoredFileAccessEvent alloc] init];
+  SNTStoredFileAccessEvent* fe = [[SNTStoredFileAccessEvent alloc] init];
   fe.ruleName = @"MyRule";
   fe.ruleVersion = @"MyVersion";
   fe.process.fileSHA256 = @"123";
@@ -110,7 +110,7 @@
 }
 
 - (void)testAddEventsRemovesBackoffOnFailure {
-  SNTSyncdQueue *sut = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
 
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
   id mockProxy = OCMProtocolMock(@protocol(SNTSyncServiceXPC));
@@ -118,7 +118,7 @@
   OCMStub([mockConnection isConnected]).andReturn(YES);
   sut.syncConnection = mockConnection;
 
-  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
   se.fileSHA256 = @"abc123";
 
   // First attempt: Post event, capture the reply block but don't invoke it yet

@@ -20,7 +20,7 @@
 
 - (instancetype)initWithEnable:(BOOL)enable;
 
-- (NSData *)serialize;
-+ (instancetype)deserialize:(NSData *)data;
+- (NSData*)serialize;
++ (instancetype)deserialize:(NSData*)data;
 
 @end

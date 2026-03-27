@@ -36,7 +36,7 @@
 @implementation SNTRuleTest
 
 - (void)testInitWithDictionaryValid {
-  SNTRule *sut;
+  SNTRule* sut;
 
   sut = [[SNTRule alloc] initWithDictionary:@{
     @"identifier" : @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
@@ -63,7 +63,7 @@
   XCTAssertEqual(sut.state, SNTRuleStateBlock);
 
   // Ensure a Binary and Certificate rules properly convert identifiers to lowercase.
-  for (NSString *ruleType in @[ @"BINARY", @"CERTIFICATE" ]) {
+  for (NSString* ruleType in @[ @"BINARY", @"CERTIFICATE" ]) {
     sut = [[SNTRule alloc] initWithDictionary:@{
       @"identifier" : @"B7C1E3FD640C5F211C89B02C2C6122F78CE322AA5C56EB0BB54BC422A8F8B670",
       @"policy" : @"BLOCKLIST",
@@ -165,14 +165,14 @@
   XCTAssertEqual(sut.state, SNTRuleStateRemove);
 
   // Invalid SingingID tests:
-  for (NSString *ident in @[
+  for (NSString* ident in @[
          @":com.example",     // missing team ID
          @"ABCDEFGHIJ:",      // missing signing ID
          @"ABC:com.example",  // Invalid team id
          @":",                // missing team and signing IDs
          @"",                 // empty string
        ]) {
-    NSError *error;
+    NSError* error;
     sut = [[SNTRule alloc] initWithDictionary:@{
       @"identifier" : ident,
       @"policy" : @"REMOVE",
@@ -204,7 +204,7 @@
   XCTAssertEqualObjects(sut.identifier, @"platform:com.example");
 
   // Signing ID can contain the TID:SID delimiter character (":")
-  for (NSString *ident in @[
+  for (NSString* ident in @[
          @"ABCDEFGHIJ:com:",
          @"ABCDEFGHIJ:com:example",
          @"ABCDEFGHIJ::",
@@ -234,8 +234,8 @@
 }
 
 - (void)testInitWithDictionaryInvalid {
-  NSError *error;
-  SNTRule *sut;
+  NSError* error;
+  SNTRule* sut;
 
   sut = [[SNTRule alloc] initWithDictionary:@{} error:&error];
   XCTAssertNil(sut);
@@ -282,7 +282,7 @@
 }
 
 - (void)testRuleDictionaryRepresentation {
-  NSDictionary *expectedTeamID = @{
+  NSDictionary* expectedTeamID = @{
     @"identifier" : @"ABCDEFGHIJ",
     @"policy" : @"ALLOWLIST",
     @"rule_type" : @"TEAMID",
@@ -292,11 +292,11 @@
     @"cel_expr" : @"",
   };
 
-  SNTRule *sut = [[SNTRule alloc] initWithDictionary:expectedTeamID error:nil];
-  NSDictionary *dict = [sut dictionaryRepresentation];
+  SNTRule* sut = [[SNTRule alloc] initWithDictionary:expectedTeamID error:nil];
+  NSDictionary* dict = [sut dictionaryRepresentation];
   XCTAssertEqualObjects(expectedTeamID, dict);
 
-  NSDictionary *expectedBinary = @{
+  NSDictionary* expectedBinary = @{
     @"identifier" : @"84de9c61777ca36b13228e2446d53e966096e78db7a72c632b5c185b2ffe68a6",
     @"policy" : @"BLOCKLIST",
     @"rule_type" : @"BINARY",
@@ -313,7 +313,7 @@
 }
 
 - (void)testRuleStateToPolicyString {
-  NSDictionary *expected = @{
+  NSDictionary* expected = @{
     @"identifier" : @"84de9c61777ca36b13228e2446d53e966096e78db7a72c632b5c185b2ffe68a6",
     @"policy" : @"ALLOWLIST",
     @"rule_type" : @"BINARY",
@@ -322,7 +322,7 @@
     @"cel_expr" : @"",
   };
 
-  SNTRule *sut = [[SNTRule alloc] initWithDictionary:expected error:nil];
+  SNTRule* sut = [[SNTRule alloc] initWithDictionary:expected error:nil];
   sut.state = SNTRuleStateBlock;
   XCTAssertEqualObjects(kRulePolicyBlocklist, [sut dictionaryRepresentation][kRulePolicy]);
   sut.state = SNTRuleStateSilentBlock;
@@ -337,9 +337,9 @@
 }
 
 - (void)testKeyCaseForInitWithDictionary {
-  for (NSString *key in
+  for (NSString* key in
        @[ kRulePolicy, kRuleIdentifier, kRuleType, kRuleCustomMsg, kRuleCustomURL, kRuleComment ]) {
-    NSDictionary *expected = @{
+    NSDictionary* expected = @{
       @"cel_expr" : @"",
       @"identifier" : @"84de9c61777ca36b13228e2446d53e966096e78db7a72c632b5c185b2ffe68a6",
       @"policy" : @"ALLOWLIST",
@@ -349,20 +349,20 @@
       @"comment" : @"",
     };
 
-    NSMutableDictionary *dict = [expected mutableCopy];
-    NSString *value = dict[key];
+    NSMutableDictionary* dict = [expected mutableCopy];
+    NSString* value = dict[key];
     XCTAssertNotNil(value);
     dict[[key uppercaseString]] = dict[key];
     [dict removeObjectForKey:key];
 
-    SNTRule *rule = [[SNTRule alloc] initWithDictionary:dict error:nil];
-    NSDictionary *final = [rule dictionaryRepresentation];
+    SNTRule* rule = [[SNTRule alloc] initWithDictionary:dict error:nil];
+    NSDictionary* final = [rule dictionaryRepresentation];
     XCTAssertEqualObjects(expected, final);
   }
 }
 
 - (void)testStringifyWithColor {
-  std::map<std::pair<SNTRuleType, SNTRuleState>, NSString *> ruleCheckToString = {
+  std::map<std::pair<SNTRuleType, SNTRuleState>, NSString*> ruleCheckToString = {
       {{SNTRuleTypeUnknown, SNTRuleStateUnknown}, @"None"},
       {{SNTRuleTypeUnknown, SNTRuleStateAllow}, @"Allowed (Unknown)"},
       {{SNTRuleTypeUnknown, SNTRuleStateBlock}, @"Blocked (Unknown)"},
@@ -409,14 +409,14 @@
        @"Allowed (TeamID, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
   };
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.timestamp = 700000000;  // time interval since reference date
 
-  for (const auto &[typeAndState, want] : ruleCheckToString) {
+  for (const auto& [typeAndState, want] : ruleCheckToString) {
     rule.type = typeAndState.first;
     rule.state = typeAndState.second;
 
-    NSString *got = [rule stringifyWithColor:NO];
+    NSString* got = [rule stringifyWithColor:NO];
     XCTAssertEqualObjects(got, want);
   }
 }

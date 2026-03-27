@@ -25,7 +25,7 @@
 
   @return An NSString formated as teamID:signingID or nil if there isn't a valid signing ID.
 */
-NSString *_Nullable FormatSigningID(MOLCodesignChecker *_Nullable csc);
+NSString* _Nullable FormatSigningID(MOLCodesignChecker* _Nullable csc);
 
 /**
   Return a string representing normalized SigningID (prefixed with TeamID and a
@@ -37,5 +37,5 @@ NSString *_Nullable FormatSigningID(MOLCodesignChecker *_Nullable csc);
 
   @return An NSString formated as teamID:signingID or nil if there isn't a valid signing ID.
 */
-NSString *_Nullable FormatSigningID(NSString *_Nullable signingID, NSString *_Nullable teamID,
+NSString* _Nullable FormatSigningID(NSString* _Nullable signingID, NSString* _Nullable teamID,
                                     BOOL isPlatformBinary);

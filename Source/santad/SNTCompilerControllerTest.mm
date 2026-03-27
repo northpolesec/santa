@@ -38,11 +38,11 @@ using santa::Message;
 static const pid_t PID_MAX = 99999;
 
 @interface SNTCompilerController (Testing)
-- (BOOL)isCompiler:(const audit_token_t &)tok;
-- (void)saveFakeDecision:(SNTFileInfo *)esFile;
-- (void)removeFakeDecision:(SNTFileInfo *)esFile;
-- (void)createTransitiveRule:(const Message &)esMsg
-                      target:(SNTFileInfo *)targetFile
+- (BOOL)isCompiler:(const audit_token_t&)tok;
+- (void)saveFakeDecision:(SNTFileInfo*)esFile;
+- (void)removeFakeDecision:(SNTFileInfo*)esFile;
+- (void)createTransitiveRule:(const Message&)esMsg
+                      target:(SNTFileInfo*)targetFile
                       logger:(std::shared_ptr<Logger>)logger;
 @end
 
@@ -71,7 +71,7 @@ static const pid_t PID_MAX = 99999;
 }
 
 - (void)testIsCompiler {
-  SNTCompilerController *cc = [[SNTCompilerController alloc] init];
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
 
   // Ensure invalid PIDs are handled
   XCTAssertFalse([cc isCompiler:self.tokNegativePid]);
@@ -90,7 +90,7 @@ static const pid_t PID_MAX = 99999;
 }
 
 - (void)testSetProcessIsCompiler {
-  SNTCompilerController *cc = [[SNTCompilerController alloc] init];
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
 
   // Ensure invalid PIDs are handled
   XCTAssertNoThrow([cc setProcess:self.tokNegativePid isCompiler:true]);
@@ -123,7 +123,7 @@ static const pid_t PID_MAX = 99999;
   };
 
   OCMExpect([self.mockDecisionCache
-      cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
+      cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision* cd) {
         return cd.vnodeId == vnode && cd.decision == SNTEventStateAllowPendingTransitive &&
                [cd.sha256 isEqualToString:@"pending"];
       }]]);
@@ -131,7 +131,7 @@ static const pid_t PID_MAX = 99999;
   id mockFileInfo = OCMClassMock([SNTFileInfo class]);
   OCMExpect([mockFileInfo vnode]).andReturn(vnode);
 
-  SNTCompilerController *cc = [[SNTCompilerController alloc] init];
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
   [cc saveFakeDecision:mockFileInfo];
 
   XCTAssertTrue(OCMVerifyAll(self.mockDecisionCache), "Unable to verify all expectations");
@@ -148,7 +148,7 @@ static const pid_t PID_MAX = 99999;
 
   OCMExpect([self.mockDecisionCache forgetCachedDecisionForVnode:vnode]);
 
-  SNTCompilerController *cc = [[SNTCompilerController alloc] init];
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
   [cc removeFakeDecision:mockFileInfo];
 
   XCTAssertTrue(OCMVerifyAll(self.mockDecisionCache), "Unable to verify all expectations");
@@ -168,7 +168,7 @@ static const pid_t PID_MAX = 99999;
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  SNTCompilerController *cc = [[SNTCompilerController alloc] init];
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
 
   // Mark a process as a compiler for use with these tests.
   [cc setProcess:compilerTok isCompiler:true];
@@ -247,7 +247,7 @@ static const pid_t PID_MAX = 99999;
 
     OCMExpect([mockCompilerController
                   createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
                                   return fi.vnode.fsid == normalFile.stat.st_dev &&
                                          fi.vnode.fileid == normalFile.stat.st_ino;
                                 }]
@@ -276,7 +276,7 @@ static const pid_t PID_MAX = 99999;
 
     OCMExpect([mockCompilerController
                   createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
                                   return fi.vnode.fsid == normalFile.stat.st_dev &&
                                          fi.vnode.fileid == normalFile.stat.st_ino;
                                 }]
@@ -314,7 +314,7 @@ static const pid_t PID_MAX = 99999;
 
     OCMExpect([mockCompilerController
                   createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
                                   return fi.vnode.fsid == destFile.stat.st_dev &&
                                          fi.vnode.fileid == destFile.stat.st_ino;
                                 }]
@@ -338,7 +338,7 @@ static const pid_t PID_MAX = 99999;
     esMsg.event.rename.destination.new_path.dir = &destDir;
     esMsg.event.rename.destination.new_path.filename = destFilename;
     Message msg(mockESApi, &esMsg);
-    NSString *expectedTarget =
+    NSString* expectedTarget =
         [NSString stringWithFormat:@"%s/%s", destDir.path.data, destFilename.data];
 
     struct stat sbNewFile;
@@ -360,7 +360,7 @@ static const pid_t PID_MAX = 99999;
 
     OCMExpect([mockCompilerController
                   createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
                                   return fi.vnode.fsid == sbNewFile.st_dev &&
                                          fi.vnode.fileid == sbNewFile.st_ino;
                                 }]
@@ -389,7 +389,7 @@ static const pid_t PID_MAX = 99999;
 
     OCMExpect([mockCompilerController
                   createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
                                   return fi.vnode.fsid == normalFile.stat.st_dev &&
                                          fi.vnode.fileid == normalFile.stat.st_ino;
                                 }]
@@ -411,7 +411,7 @@ static const pid_t PID_MAX = 99999;
     esMsg.event.clone.target_dir = &targetDir;
     esMsg.event.clone.target_name = targetName;
     Message msg(mockESApi, &esMsg);
-    NSString *expectedTarget =
+    NSString* expectedTarget =
         [NSString stringWithFormat:@"%s/%s", targetDir.path.data, targetName.data];
 
     struct stat sbNewFile;
@@ -433,7 +433,7 @@ static const pid_t PID_MAX = 99999;
 
     OCMExpect([mockCompilerController
                   createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo *fi) {
+                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
                                   return fi.vnode.fsid == sbNewFile.st_dev &&
                                          fi.vnode.fileid == sbNewFile.st_ino;
                                 }]

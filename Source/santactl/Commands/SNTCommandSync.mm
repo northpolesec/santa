@@ -42,11 +42,11 @@ REGISTER_COMMAND_NAME(@"sync")
   return NO;  // We talk directly with the syncservice.
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Synchronizes Santa with a configured server.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return (@"If Santa is configured to synchronize with a server, "
           @"this is the command used for syncing.\n\n"
           @"Options:\n"
@@ -57,7 +57,7 @@ REGISTER_COMMAND_NAME(@"sync")
           @"  --debug: Enable verbose output.\n");
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   // Ensure we have no privileges
   if (!DropRootPrivileges()) {
     TEE_LOGE(@"Failed to drop root privileges. Exiting.");
@@ -68,15 +68,15 @@ REGISTER_COMMAND_NAME(@"sync")
     TEE_LOGE(@"Missing SyncBaseURL. Exiting.");
     exit(1);
   }
-  MOLXPCConnection *ss = [SNTXPCSyncServiceInterface configuredConnection];
+  MOLXPCConnection* ss = [SNTXPCSyncServiceInterface configuredConnection];
   ss.invalidationHandler = ^(void) {
     TEE_LOGE(@"Failed to connect to the sync service.");
     exit(1);
   };
   [ss resume];
 
-  NSXPCListener *logListener = [NSXPCListener anonymousListener];
-  MOLXPCConnection *lr = [[MOLXPCConnection alloc] initServerWithListener:logListener];
+  NSXPCListener* logListener = [NSXPCListener anonymousListener];
+  MOLXPCConnection* lr = [[MOLXPCConnection alloc] initServerWithListener:logListener];
   lr.exportedObject = self;
   lr.unprivilegedInterface =
       [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
@@ -107,7 +107,7 @@ REGISTER_COMMAND_NAME(@"sync")
 }
 
 /// Implement the SNTSyncServiceLogReceiverXPC protocol.
-- (void)didReceiveLog:(NSString *)log withType:(os_log_type_t)logType {
+- (void)didReceiveLog:(NSString*)log withType:(os_log_type_t)logType {
   if (logType == OS_LOG_TYPE_DEBUG && !self.enableDebugLogging) {
     return;
   }

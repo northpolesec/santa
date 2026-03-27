@@ -19,7 +19,7 @@
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 
 @interface SNTSyncBroadcaster ()
-@property NSMutableArray *logListeners;
+@property NSMutableArray* logListeners;
 @property dispatch_queue_t broadcastQueue;
 @end
 
@@ -36,7 +36,7 @@
 }
 
 + (instancetype)broadcaster {
-  static SNTSyncBroadcaster *sharedBroadcaster;
+  static SNTSyncBroadcaster* sharedBroadcaster;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     sharedBroadcaster = [[SNTSyncBroadcaster alloc] init];
@@ -44,21 +44,21 @@
   return sharedBroadcaster;
 }
 
-- (void)addLogListener:(MOLXPCConnection *)logListener {
+- (void)addLogListener:(MOLXPCConnection*)logListener {
   dispatch_async(self.broadcastQueue, ^() {
     [self.logListeners addObject:logListener];
   });
 }
 
-- (void)removeLogListener:(MOLXPCConnection *)logListener {
+- (void)removeLogListener:(MOLXPCConnection*)logListener {
   dispatch_async(self.broadcastQueue, ^() {
     [self.logListeners removeObject:logListener];
   });
 }
 
-- (void)broadcastToLogListeners:(NSString *)log logType:(os_log_type_t)logType {
+- (void)broadcastToLogListeners:(NSString*)log logType:(os_log_type_t)logType {
   dispatch_async(self.broadcastQueue, ^() {
-    for (MOLXPCConnection *ll in self.logListeners) {
+    for (MOLXPCConnection* ll in self.logListeners) {
       [[ll remoteObjectProxy] didReceiveLog:log withType:logType];
     }
   });

@@ -57,14 +57,14 @@
 /**
  Initialize a new server with a given listener, provided by `[NSXPCListener anonymousListener]`.
  */
-- (nullable instancetype)initServerWithListener:(nonnull NSXPCListener *)listener;
+- (nullable instancetype)initServerWithListener:(nonnull NSXPCListener*)listener;
 
 /**
  Initializer for the 'server' side of the connection, started by launchd.
 
  @param name MachService name, must match the MachServices key in the launchd.plist
  */
-- (nullable instancetype)initServerWithName:(nonnull NSString *)name;
+- (nullable instancetype)initServerWithName:(nonnull NSString*)name;
 
 /**
  Initialize a new client to a service exported by a LaunchDaemon.
@@ -72,21 +72,21 @@
  @param name MachService name
  @param privileged Use YES if the server is running as root.
  */
-- (nullable instancetype)initClientWithName:(nonnull NSString *)name privileged:(BOOL)privileged;
+- (nullable instancetype)initClientWithName:(nonnull NSString*)name privileged:(BOOL)privileged;
 
 /**
  Initialize a new client to a service within a bundle.
 
  @param name service name
  */
-- (nullable instancetype)initClientWithServiceName:(nonnull NSString *)name;
+- (nullable instancetype)initClientWithServiceName:(nonnull NSString*)name;
 
 /**
  Initialize a new client with a listener endpoint sent from another process.
 
  @param listener An NSXPCListenerEndpoint to connect to.
  */
-- (nullable instancetype)initClientWithListener:(nonnull NSXPCListenerEndpoint *)listener;
+- (nullable instancetype)initClientWithListener:(nonnull NSXPCListenerEndpoint*)listener;
 
 /**
  Call when the properties of the object have been set-up and you're ready for connections.
@@ -104,7 +104,7 @@
 /**
  The interface the remote object should conform to. (client)
  */
-@property(retain, nullable) NSXPCInterface *remoteInterface;
+@property(retain, nullable) NSXPCInterface* remoteInterface;
 
 /**
  A proxy to the object at the other end of the connection. (client)
@@ -125,12 +125,12 @@
 /**
  The privileged interface this object exports. (server)
  */
-@property(retain, nullable) NSXPCInterface *privilegedInterface;
+@property(retain, nullable) NSXPCInterface* privilegedInterface;
 
 /**
   The unprivileged interface this object exports. (server)
  */
-@property(retain, nullable) NSXPCInterface *unprivilegedInterface;
+@property(retain, nullable) NSXPCInterface* unprivilegedInterface;
 
 /**
  The object that responds to messages from the other end. (server)

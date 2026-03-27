@@ -20,18 +20,18 @@
 
 namespace santa {
 
-std::unique_ptr<EntitlementsFilter> EntitlementsFilter::Create(NSArray<NSString *> *teamid_filter,
-                                                               NSArray<NSString *> *prefix_filter) {
+std::unique_ptr<EntitlementsFilter> EntitlementsFilter::Create(NSArray<NSString*>* teamid_filter,
+                                                               NSArray<NSString*>* prefix_filter) {
   return std::make_unique<EntitlementsFilter>(teamid_filter, prefix_filter);
 }
 
-EntitlementsFilter::EntitlementsFilter(NSArray<NSString *> *teamid_filter,
-                                       NSArray<NSString *> *prefix_filter) {
+EntitlementsFilter::EntitlementsFilter(NSArray<NSString*>* teamid_filter,
+                                       NSArray<NSString*>* prefix_filter) {
   UpdateTeamIDFilterLocked(teamid_filter);
   UpdatePrefixFilterLocked(prefix_filter);
 }
 
-NSDictionary *EntitlementsFilter::Filter(const char *teamID, NSDictionary *entitlements) {
+NSDictionary* EntitlementsFilter::Filter(const char* teamID, NSDictionary* entitlements) {
   if (!entitlements) {
     return nil;
   }
@@ -48,9 +48,9 @@ NSDictionary *EntitlementsFilter::Filter(const char *teamID, NSDictionary *entit
     return [entitlements sntDeepCopy];
   } else {
     // Filtering entitlements based on prefixes
-    NSMutableDictionary *filtered = [NSMutableDictionary dictionary];
+    NSMutableDictionary* filtered = [NSMutableDictionary dictionary];
 
-    [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
+    [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString* key, id obj, BOOL* stop) {
       if (!prefix_filter_.HasPrefix(key.UTF8String)) {
         if ([obj isKindOfClass:[NSArray class]] || [obj isKindOfClass:[NSDictionary class]]) {
           [filtered setObject:[obj sntDeepCopy] forKey:key];
@@ -64,28 +64,28 @@ NSDictionary *EntitlementsFilter::Filter(const char *teamID, NSDictionary *entit
   }
 }
 
-void EntitlementsFilter::UpdateTeamIDFilter(NSArray<NSString *> *filter) {
+void EntitlementsFilter::UpdateTeamIDFilter(NSArray<NSString*>* filter) {
   absl::MutexLock lock(lock_);
   UpdateTeamIDFilterLocked(filter);
 }
 
-void EntitlementsFilter::UpdateTeamIDFilterLocked(NSArray<NSString *> *filter) {
+void EntitlementsFilter::UpdateTeamIDFilterLocked(NSArray<NSString*>* filter) {
   teamid_filter_.clear();
 
-  for (NSString *prefix in filter) {
+  for (NSString* prefix in filter) {
     teamid_filter_.insert(NSStringToUTF8String(prefix));
   }
 }
 
-void EntitlementsFilter::UpdatePrefixFilter(NSArray<NSString *> *filter) {
+void EntitlementsFilter::UpdatePrefixFilter(NSArray<NSString*>* filter) {
   absl::MutexLock lock(lock_);
   UpdatePrefixFilterLocked(filter);
 }
 
-void EntitlementsFilter::UpdatePrefixFilterLocked(NSArray<NSString *> *filter) {
+void EntitlementsFilter::UpdatePrefixFilterLocked(NSArray<NSString*>* filter) {
   prefix_filter_.Reset();
 
-  for (NSString *item in filter) {
+  for (NSString* item in filter) {
     prefix_filter_.InsertPrefix(item.UTF8String, Unit{});
   }
 }

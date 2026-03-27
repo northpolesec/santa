@@ -26,14 +26,14 @@
 - (void)testUniqueID {
   // Ensure some UUID-length string is returned.It should be random and not match
   // what the object was initialized with.
-  SNTStoredTemporaryMonitorModeEnterAuditEvent *tmmAuditEnter =
+  SNTStoredTemporaryMonitorModeEnterAuditEvent* tmmAuditEnter =
       [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
           initWithUUID:@"abc"
                seconds:123
                 reason:SNTTemporaryMonitorModeEnterReasonRestart];
   XCTAssertEqual([[tmmAuditEnter uniqueID] length], [[NSUUID UUID] UUIDString].length);
 
-  SNTStoredTemporaryMonitorModeLeaveAuditEvent *tmmAuditLeave =
+  SNTStoredTemporaryMonitorModeLeaveAuditEvent* tmmAuditLeave =
       [[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
           initWithUUID:@"xyz"
                 reason:SNTTemporaryMonitorModeLeaveReasonSessionExpired];
@@ -42,14 +42,14 @@
 
 - (void)testUnactionableEvent {
   // Spot check temporary Monitor Mode audit events
-  SNTStoredTemporaryMonitorModeEnterAuditEvent *tmmAuditEnter =
+  SNTStoredTemporaryMonitorModeEnterAuditEvent* tmmAuditEnter =
       [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
           initWithUUID:@"abc"
                seconds:123
                 reason:SNTTemporaryMonitorModeEnterReasonOnDemand];
   XCTAssertFalse([tmmAuditEnter unactionableEvent]);
 
-  SNTStoredTemporaryMonitorModeLeaveAuditEvent *tmmAuditLeave =
+  SNTStoredTemporaryMonitorModeLeaveAuditEvent* tmmAuditLeave =
       [[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
           initWithUUID:@"xyz"
                 reason:SNTTemporaryMonitorModeLeaveReasonCancelled];
@@ -57,55 +57,55 @@
 }
 
 - (void)testEncodeDecode {
-  SNTStoredTemporaryMonitorModeEnterAuditEvent *tmmAuditEnter =
+  SNTStoredTemporaryMonitorModeEnterAuditEvent* tmmAuditEnter =
       [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
           initWithUUID:@"abc"
                seconds:123
                 reason:SNTTemporaryMonitorModeEnterReasonOnDemandRefresh];
 
-  SNTStoredTemporaryMonitorModeLeaveAuditEvent *tmmAuditLeave =
+  SNTStoredTemporaryMonitorModeLeaveAuditEvent* tmmAuditLeave =
       [[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
           initWithUUID:@"xyz"
                 reason:SNTTemporaryMonitorModeLeaveReasonSyncServerChanged];
 
-  NSData *archivedTmmEnterEvent = [NSKeyedArchiver archivedDataWithRootObject:tmmAuditEnter
+  NSData* archivedTmmEnterEvent = [NSKeyedArchiver archivedDataWithRootObject:tmmAuditEnter
                                                         requiringSecureCoding:YES
                                                                         error:nil];
 
-  NSData *archivedTmmLeaveEvent = [NSKeyedArchiver archivedDataWithRootObject:tmmAuditLeave
+  NSData* archivedTmmLeaveEvent = [NSKeyedArchiver archivedDataWithRootObject:tmmAuditLeave
                                                         requiringSecureCoding:YES
                                                                         error:nil];
 
   XCTAssertNotNil(archivedTmmEnterEvent);
   XCTAssertNotNil(archivedTmmLeaveEvent);
 
-  NSSet *allowedClasses =
+  NSSet* allowedClasses =
       [NSSet setWithObjects:[SNTStoredTemporaryMonitorModeAuditEvent class],
                             [SNTStoredTemporaryMonitorModeEnterAuditEvent class],
                             [SNTStoredTemporaryMonitorModeLeaveAuditEvent class], nil];
 
-  SNTStoredEvent *unarchivedTmmEnterEvent =
+  SNTStoredEvent* unarchivedTmmEnterEvent =
       [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                           fromData:archivedTmmEnterEvent
                                              error:nil];
   XCTAssertNotNil(unarchivedTmmEnterEvent);
   XCTAssertTrue(
       [unarchivedTmmEnterEvent isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]);
-  SNTStoredTemporaryMonitorModeEnterAuditEvent *tmmEnterAuditEvent =
-      (SNTStoredTemporaryMonitorModeEnterAuditEvent *)unarchivedTmmEnterEvent;
+  SNTStoredTemporaryMonitorModeEnterAuditEvent* tmmEnterAuditEvent =
+      (SNTStoredTemporaryMonitorModeEnterAuditEvent*)unarchivedTmmEnterEvent;
   XCTAssertEqualObjects([tmmEnterAuditEvent uniqueID], [tmmAuditEnter uniqueID]);
   XCTAssertEqual(tmmEnterAuditEvent.seconds, 123);
   XCTAssertEqual(tmmEnterAuditEvent.reason, SNTTemporaryMonitorModeEnterReasonOnDemandRefresh);
 
-  SNTStoredEvent *unarchivedTmmLeaveEvent =
+  SNTStoredEvent* unarchivedTmmLeaveEvent =
       [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                           fromData:archivedTmmLeaveEvent
                                              error:nil];
   XCTAssertNotNil(unarchivedTmmLeaveEvent);
   XCTAssertTrue(
       [unarchivedTmmLeaveEvent isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]);
-  SNTStoredTemporaryMonitorModeLeaveAuditEvent *tmmLeaveAuditEvent =
-      (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)unarchivedTmmLeaveEvent;
+  SNTStoredTemporaryMonitorModeLeaveAuditEvent* tmmLeaveAuditEvent =
+      (SNTStoredTemporaryMonitorModeLeaveAuditEvent*)unarchivedTmmLeaveEvent;
   XCTAssertEqualObjects([tmmLeaveAuditEvent uniqueID], [tmmAuditLeave uniqueID]);
   XCTAssertEqual(tmmLeaveAuditEvent.reason, SNTTemporaryMonitorModeLeaveReasonSyncServerChanged);
 }

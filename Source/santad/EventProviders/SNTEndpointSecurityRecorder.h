@@ -34,7 +34,7 @@
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                        logger:(std::shared_ptr<santa::Logger>)logger
                      enricher:(std::shared_ptr<santa::Enricher>)enricher
-           compilerController:(SNTCompilerController *)compilerController
+           compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                    prefixTree:(std::shared_ptr<santa::PrefixTree<santa::Unit>>)prefixTree
                   processTree:

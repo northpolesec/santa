@@ -40,32 +40,32 @@ using santa::NSStringToUTF8String;
 using santa::StringToNSString;
 
 template <bool IsV2>
-SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT &rule);
+SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule);
 template <bool IsV2>
-void ProcessBundleNotificationsForRule(SNTSyncRuleDownload *self, SNTRule *rule,
-                                       const typename santa::ProtoTraits<IsV2>::RuleT *protoRule);
+void ProcessBundleNotificationsForRule(SNTSyncRuleDownload* self, SNTRule* rule,
+                                       const typename santa::ProtoTraits<IsV2>::RuleT* protoRule);
 template <bool IsV2>
 void ProcessDeprecatedBundleNotificationsForRule(
-    SNTRule *rule, const typename santa::ProtoTraits<IsV2>::RuleT *protoRule);
-SNTFileAccessRule *FAARuleFromProtoFAARuleRemove(
-    const ::pbv2::FileAccessRule::Remove &pbRemoveRule);
-SNTFileAccessRule *FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi);
-SNTFileAccessRule *FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule);
-NSArray *PathsFromProtoFAARulePaths(
-    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Path> &pbPaths);
-NSDictionary *OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule);
-NSArray *ProcessesFromProtoFAARuleProcesses(
-    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process> &pbProcesses);
+    SNTRule* rule, const typename santa::ProtoTraits<IsV2>::RuleT* protoRule);
+SNTFileAccessRule* FAARuleFromProtoFAARuleRemove(
+    const ::pbv2::FileAccessRule::Remove& pbRemoveRule);
+SNTFileAccessRule* FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule& wi);
+SNTFileAccessRule* FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAddRule);
+NSArray* PathsFromProtoFAARulePaths(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Path>& pbPaths);
+NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAddRule);
+NSArray* ProcessesFromProtoFAARuleProcesses(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process>& pbProcesses);
 
 // Small local object to more easily return the different sets of downloaded rules.
 @interface SNTDownloadedRuleSets : NSObject
-@property(readonly) NSArray<SNTRule *> *executionRules;
-@property(readonly) NSArray<SNTFileAccessRule *> *fileAccessRules;
+@property(readonly) NSArray<SNTRule*>* executionRules;
+@property(readonly) NSArray<SNTFileAccessRule*>* fileAccessRules;
 @end
 
 @implementation SNTDownloadedRuleSets
-- (instancetype)initWithExecutionRules:(NSArray<SNTRule *> *)executionRules
-                       fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules {
+- (instancetype)initWithExecutionRules:(NSArray<SNTRule*>*)executionRules
+                       fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules {
   self = [super init];
   if (self) {
     _executionRules = executionRules;
@@ -88,14 +88,14 @@ SNTRuleCleanup SyncTypeToRuleCleanup(SNTSyncType syncType) {
 // Returns an array of all converted rules, or nil if there was a server problem.
 // Note that rules from the server are filtered.
 template <bool IsV2>
-SNTDownloadedRuleSets *DownloadNewRulesFromServer(SNTSyncRuleDownload *self) {
+SNTDownloadedRuleSets* DownloadNewRulesFromServer(SNTSyncRuleDownload* self) {
   using Traits = santa::ProtoTraits<IsV2>;
   google::protobuf::Arena arena;
 
   self.syncState.rulesReceived = 0;
   self.syncState.fileAccessRulesReceived = 0;
-  NSMutableArray<SNTRule *> *newRules = [NSMutableArray array];
-  NSMutableArray<SNTFileAccessRule *> *newFileAccessRules = [NSMutableArray array];
+  NSMutableArray<SNTRule*>* newRules = [NSMutableArray array];
+  NSMutableArray<SNTFileAccessRule*>* newFileAccessRules = [NSMutableArray array];
   std::string cursor;
 
   do {
@@ -107,7 +107,7 @@ SNTDownloadedRuleSets *DownloadNewRulesFromServer(SNTSyncRuleDownload *self) {
         req->set_cursor(cursor);
       }
       typename Traits::RuleDownloadResponseT response;
-      NSError *err = [self performRequest:[self requestWithMessage:req]
+      NSError* err = [self performRequest:[self requestWithMessage:req]
                               intoMessage:&response
                                   timeout:30];
 
@@ -116,8 +116,8 @@ SNTDownloadedRuleSets *DownloadNewRulesFromServer(SNTSyncRuleDownload *self) {
         return nil;
       }
 
-      for (const typename Traits::RuleT &rule : response.rules()) {
-        SNTRule *r = RuleFromProtoRule<IsV2>(rule);
+      for (const typename Traits::RuleT& rule : response.rules()) {
+        SNTRule* r = RuleFromProtoRule<IsV2>(rule);
         if (!r) {
           SLOGD(@"Ignoring bad rule: %s", rule.Utf8DebugString().c_str());
           continue;
@@ -127,8 +127,8 @@ SNTDownloadedRuleSets *DownloadNewRulesFromServer(SNTSyncRuleDownload *self) {
       }
 
       if constexpr (IsV2) {
-        for (const typename Traits::FileAccessRuleT &faaRule : response.file_access_rules()) {
-          SNTFileAccessRule *rule = FAARuleFromProtoFileAccessRule(faaRule);
+        for (const typename Traits::FileAccessRuleT& faaRule : response.file_access_rules()) {
+          SNTFileAccessRule* rule = FAARuleFromProtoFileAccessRule(faaRule);
           if (!rule) {
             SLOGD(@"Ignoring bad file access rule: %s", faaRule.Utf8DebugString().c_str());
             continue;
@@ -153,12 +153,12 @@ SNTDownloadedRuleSets *DownloadNewRulesFromServer(SNTSyncRuleDownload *self) {
                                                fileAccessRules:newFileAccessRules];
 }
 
-NSArray *PathsFromProtoFAARulePaths(
-    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Path> &pbPaths) {
-  NSMutableArray *watchPaths = [NSMutableArray array];
+NSArray* PathsFromProtoFAARulePaths(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Path>& pbPaths) {
+  NSMutableArray* watchPaths = [NSMutableArray array];
 
-  for (const ::pbv2::FileAccessRule::Path &path : pbPaths) {
-    NSMutableDictionary *pathDict = [NSMutableDictionary dictionary];
+  for (const ::pbv2::FileAccessRule::Path& path : pbPaths) {
+    NSMutableDictionary* pathDict = [NSMutableDictionary dictionary];
     pathDict[kWatchItemConfigKeyPathsPath] = StringToNSString(path.path());
 
     switch (path.path_type()) {
@@ -179,8 +179,8 @@ NSArray *PathsFromProtoFAARulePaths(
   return watchPaths;
 }
 
-NSDictionary *OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule) {
-  NSMutableDictionary *optionsDict = [NSMutableDictionary dictionary];
+NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAddRule) {
+  NSMutableDictionary* optionsDict = [NSMutableDictionary dictionary];
 
   switch (pbAddRule.rule_type()) {
     case ::pbv2::FileAccessRule::RULE_TYPE_UNSPECIFIED:
@@ -217,12 +217,12 @@ NSDictionary *OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAd
   return optionsDict;
 }
 
-NSArray *ProcessesFromProtoFAARuleProcesses(
-    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process> &pbProcesses) {
-  NSMutableArray *processes = [NSMutableArray array];
+NSArray* ProcessesFromProtoFAARuleProcesses(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process>& pbProcesses) {
+  NSMutableArray* processes = [NSMutableArray array];
 
-  for (const ::pbv2::FileAccessRule::Process &process : pbProcesses) {
-    NSMutableDictionary *processDict = [NSMutableDictionary dictionary];
+  for (const ::pbv2::FileAccessRule::Process& process : pbProcesses) {
+    NSMutableDictionary* processDict = [NSMutableDictionary dictionary];
 
     switch (process.identifier_case()) {
       case ::pbv2::FileAccessRule::Process::kBinaryPath:
@@ -251,30 +251,30 @@ NSArray *ProcessesFromProtoFAARuleProcesses(
   return processes;
 }
 
-SNTFileAccessRule *FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add &pbAddRule) {
-  NSMutableDictionary *details = [NSMutableDictionary dictionary];
+SNTFileAccessRule* FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAddRule) {
+  NSMutableDictionary* details = [NSMutableDictionary dictionary];
 
-  NSArray *paths = PathsFromProtoFAARulePaths(pbAddRule.paths());
+  NSArray* paths = PathsFromProtoFAARulePaths(pbAddRule.paths());
   if (!paths) {
     return nil;
   }
   details[kWatchItemConfigKeyPaths] = paths;
 
-  NSDictionary *optionsDict = OptionsFromProtoFAARuleAdd(pbAddRule);
+  NSDictionary* optionsDict = OptionsFromProtoFAARuleAdd(pbAddRule);
   if (!optionsDict) {
     return nil;
   }
   details[kWatchItemConfigKeyOptions] = optionsDict;
 
-  NSArray *processes = ProcessesFromProtoFAARuleProcesses(pbAddRule.processes());
+  NSArray* processes = ProcessesFromProtoFAARuleProcesses(pbAddRule.processes());
   if (!processes) {
     return nil;
   }
   details[kWatchItemConfigKeyProcesses] = processes;
 
-  NSString *name = StringToNSString(pbAddRule.name());
+  NSString* name = StringToNSString(pbAddRule.name());
 
-  NSError *err;
+  NSError* err;
   if (santa::WatchItems::IsValidRule(name, details, &err)) {
     return [[SNTFileAccessRule alloc] initAddRuleWithName:name details:details];
   } else {
@@ -282,12 +282,12 @@ SNTFileAccessRule *FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add 
   }
 }
 
-SNTFileAccessRule *FAARuleFromProtoFAARuleRemove(
-    const ::pbv2::FileAccessRule::Remove &pbRemoveRule) {
+SNTFileAccessRule* FAARuleFromProtoFAARuleRemove(
+    const ::pbv2::FileAccessRule::Remove& pbRemoveRule) {
   return [[SNTFileAccessRule alloc] initRemoveRuleWithName:StringToNSString(pbRemoveRule.name())];
 }
 
-SNTFileAccessRule *FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &wi) {
+SNTFileAccessRule* FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule& wi) {
   switch (wi.action_case()) {
     case ::pbv2::FileAccessRule::kAdd: return FAARuleFromProtoFAARuleAdd(wi.add());
     case ::pbv2::FileAccessRule::kRemove: return FAARuleFromProtoFAARuleRemove(wi.remove());
@@ -296,9 +296,9 @@ SNTFileAccessRule *FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule &
 }
 
 template <bool IsV2>
-SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT &rule) {
+SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule) {
   using Traits = santa::ProtoTraits<IsV2>;
-  NSString *identifier = StringToNSString(rule.identifier());
+  NSString* identifier = StringToNSString(rule.identifier());
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (!identifier.length) identifier = StringToNSString(rule.deprecated_sha256());
@@ -329,14 +329,14 @@ SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT &rule)
     default: LOGE(@"Failed to process rule with unknown type: %d", rule.rule_type()); return nil;
   }
 
-  const std::string &custom_msg = rule.custom_msg();
-  NSString *customMsg = (!custom_msg.empty()) ? StringToNSString(custom_msg) : nil;
+  const std::string& custom_msg = rule.custom_msg();
+  NSString* customMsg = (!custom_msg.empty()) ? StringToNSString(custom_msg) : nil;
 
-  const std::string &custom_url = rule.custom_url();
-  NSString *customURL = (!custom_url.empty()) ? StringToNSString(custom_url) : nil;
+  const std::string& custom_url = rule.custom_url();
+  NSString* customURL = (!custom_url.empty()) ? StringToNSString(custom_url) : nil;
 
-  const std::string &cel_expr = rule.cel_expr();
-  NSString *celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
+  const std::string& cel_expr = rule.cel_expr();
+  NSString* celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
 
   return [[SNTRule alloc] initWithIdentifier:identifier
                                        state:state
@@ -347,10 +347,10 @@ SNTRule *RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT &rule)
 }
 
 template <bool IsV2>
-void ProcessBundleNotificationsForRule(SNTSyncRuleDownload *self, SNTRule *rule,
-                                       const typename santa::ProtoTraits<IsV2>::RuleT *protoRule) {
+void ProcessBundleNotificationsForRule(SNTSyncRuleDownload* self, SNTRule* rule,
+                                       const typename santa::ProtoTraits<IsV2>::RuleT* protoRule) {
   // Display a system notification if notification_app_name is set and this is not a clean sync.
-  NSString *appName = StringToNSString(protoRule->notification_app_name());
+  NSString* appName = StringToNSString(protoRule->notification_app_name());
   if (appName.length) {
     // If notification_app_name is set but this is a clean sync, return early. We don't want to
     // spam users with notifications for many apps that might be included in a clean sync, and
@@ -371,14 +371,14 @@ void ProcessBundleNotificationsForRule(SNTSyncRuleDownload *self, SNTRule *rule,
 
 template <bool IsV2>
 void ProcessDeprecatedBundleNotificationsForRule(
-    SNTRule *rule, const typename santa::ProtoTraits<IsV2>::RuleT *protoRule) {
+    SNTRule* rule, const typename santa::ProtoTraits<IsV2>::RuleT* protoRule) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   // Check rule for extra notification related info.
   if (rule.state == SNTRuleStateAllow || rule.state == SNTRuleStateAllowCompiler) {
     // primaryHash is the bundle hash if there was a bundle hash included in the rule, otherwise
     // it is simply the binary hash.
-    NSString *primaryHash = StringToNSString(protoRule->file_bundle_hash());
+    NSString* primaryHash = StringToNSString(protoRule->file_bundle_hash());
     if (primaryHash.length != 64) {
       primaryHash = rule.identifier;
     }
@@ -394,14 +394,14 @@ void ProcessDeprecatedBundleNotificationsForRule(
 
 @implementation SNTSyncRuleDownload
 
-- (NSURL *)stageURL {
-  NSString *stageName = [@"ruledownload" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+- (NSURL*)stageURL {
+  NSString* stageName = [@"ruledownload" stringByAppendingFormat:@"/%@", self.syncState.machineID];
   return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 }
 
 - (BOOL)sync {
   // Grab the new rules from server
-  SNTDownloadedRuleSets *newRules;
+  SNTDownloadedRuleSets* newRules;
   if (self.syncState.isSyncV2) {
     newRules = DownloadNewRulesFromServer<true>(self);
   } else {
@@ -419,14 +419,14 @@ void ProcessDeprecatedBundleNotificationsForRule(
   // Tell santad to add the new rules to the database.
   // Wait until finished or until 5 minutes pass.
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  __block NSArray<NSError *> *errors;
+  __block NSArray<NSError*>* errors;
   __block BOOL success;
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddExecutionRules:newRules.executionRules
                     fileAccessRules:newRules.fileAccessRules
                         ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
                              source:SNTRuleAddSourceSyncService
-                              reply:^(BOOL didSucceed, NSArray<NSError *> *e) {
+                              reply:^(BOOL didSucceed, NSArray<NSError*>* e) {
                                 errors = e;
                                 success = didSucceed;
                                 dispatch_semaphore_signal(sema);
@@ -438,13 +438,13 @@ void ProcessDeprecatedBundleNotificationsForRule(
 
   if (!success) {
     SLOGE(@"Failed to add rule(s) to database:");
-    for (NSError *e in errors) {
+    for (NSError* e in errors) {
       SLOGE(@"\t%@. Reason: %@", e.localizedDescription, e.localizedFailureReason);
     }
     return NO;
   } else if (errors.count > 0) {
     SLOGW(@"Added rule(s) to database but with the following reported issues:");
-    for (NSError *e in errors) {
+    for (NSError* e in errors) {
       SLOGW(@"\t%@. Reason: %@", e.localizedDescription, e.localizedFailureReason);
     }
   }
@@ -473,24 +473,24 @@ void ProcessDeprecatedBundleNotificationsForRule(
 
 // Send out push notifications for allowed bundles/binaries whose rule download was preceded by
 // an associated announcing FCM message.
-- (void)announceUnblockingRules:(NSArray<SNTRule *> *)newRules {
+- (void)announceUnblockingRules:(NSArray<SNTRule*>*)newRules {
   if (newRules.count == 0) {
     // No new execution rules received
     return;
   }
 
-  NSMutableArray *processed = [NSMutableArray array];
-  SNTPushNotificationsTracker *tracker = [SNTPushNotificationsTracker tracker];
+  NSMutableArray* processed = [NSMutableArray array];
+  SNTPushNotificationsTracker* tracker = [SNTPushNotificationsTracker tracker];
   [[tracker all]
-      enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSDictionary *notifier, BOOL *stop) {
+      enumerateKeysAndObjectsUsingBlock:^(NSString* key, NSDictionary* notifier, BOOL* stop) {
         // Each notifier object is a dictionary with name and count keys. If the count has been
         // decremented to zero, then this means that we have downloaded all of the rules associated
         // with this SHA256 hash (which might be a bundle hash or a binary hash), in which case we
         // are OK to show a notification that the named bundle/binary can be run.
-        NSNumber *remaining = notifier[kFileBundleBinaryCount];
+        NSNumber* remaining = notifier[kFileBundleBinaryCount];
         if (remaining && [remaining intValue] == 0) {
           [processed addObject:key];
-          NSString *app = notifier[kFileName];
+          NSString* app = notifier[kFileName];
           [[self.daemonConn remoteObjectProxy] postRuleSyncNotificationForApplication:app
                                                                                 reply:^{
                                                                                 }];

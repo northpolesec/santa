@@ -23,121 +23,121 @@ std::shared_ptr<Empty> Empty::Create() {
 
 Empty::Empty() : Serializer(nil) {}
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedClose &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedClose& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExchange &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExchange& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExec &msg, SNTCachedDecision *cd) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExec& msg, SNTCachedDecision* cd) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExit &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedExit& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedFork &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedFork& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLink &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLink& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedRename &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedRename& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedUnlink &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedUnlink& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedCSInvalidated &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedCSInvalidated& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedClone &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedClone& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedCopyfile &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedCopyfile& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLogin &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLogin& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLogout &msg) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLogout& msg) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLock &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionLock&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionUnlock &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginWindowSessionUnlock&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedScreenSharingAttach &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedScreenSharingAttach&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedScreenSharingDetach &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedScreenSharingDetach&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedOpenSSHLogin &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedOpenSSHLogin&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedOpenSSHLogout &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedOpenSSHLogout&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginLogin &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginLogin&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginLogout &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLoginLogout&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationOD &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationOD&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationTouchID &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationTouchID&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationToken &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationToken&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationAutoUnlock &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedAuthenticationAutoUnlock&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLaunchItem &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedLaunchItem&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedXProtectDetected &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedXProtectDetected&) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedXProtectRemediated &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedXProtectRemediated&) {
   return {};
 }
 
 #if HAVE_MACOS_15
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedGatekeeperOverride &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedGatekeeperOverride&) {
   return {};
 }
 
@@ -145,39 +145,39 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedGatekeeperOverride &)
 
 #if HAVE_MACOS_15_4
 
-std::vector<uint8_t> Empty::SerializeMessage(const EnrichedTCCModification &) {
+std::vector<uint8_t> Empty::SerializeMessage(const EnrichedTCCModification&) {
   return {};
 }
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> Empty::SerializeNetworkFlows(SNDProcessFlows *, struct timespec,
-                                                  struct timespec, SNTCachedDecision *) {
+std::vector<uint8_t> Empty::SerializeNetworkFlows(SNDProcessFlows*, struct timespec,
+                                                  struct timespec, SNTCachedDecision*) {
   return {};
 }
 
 std::vector<uint8_t> Empty::SerializeFileAccess(
-    const std::string &policy_version, const std::string &policy_name, const Message &msg,
-    const EnrichedProcess &enriched_process, size_t target_index,
+    const std::string& policy_version, const std::string& policy_name, const Message& msg,
+    const EnrichedProcess& enriched_process, size_t target_index,
     std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
     std::string_view operation_id) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeAllowlist(const Message &msg, const std::string_view hash,
+std::vector<uint8_t> Empty::SerializeAllowlist(const Message& msg, const std::string_view hash,
                                                const std::string_view target_path) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeBundleHashingEvent(SNTStoredExecutionEvent *event) {
+std::vector<uint8_t> Empty::SerializeBundleHashingEvent(SNTStoredExecutionEvent* event) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeDiskAppeared(NSDictionary *props, bool) {
+std::vector<uint8_t> Empty::SerializeDiskAppeared(NSDictionary* props, bool) {
   return {};
 }
 
-std::vector<uint8_t> Empty::SerializeDiskDisappeared(NSDictionary *props) {
+std::vector<uint8_t> Empty::SerializeDiskDisappeared(NSDictionary* props) {
   return {};
 }
 

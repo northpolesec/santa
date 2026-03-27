@@ -30,7 +30,7 @@ dispatch_semaphore_t gSema;
 // to circular dependency issues. It is a special case that uses the underlying
 // ES API `es_delete_client` directly. This test override will signal the
 // `gSema` semaphore to indicate it has been called.
-es_return_t es_delete_client(es_client_t *_Nullable client) {
+es_return_t es_delete_client(es_client_t* _Nullable client) {
   dispatch_semaphore_signal(gSema);
   return ES_RETURN_SUCCESS;
 };
@@ -61,7 +61,7 @@ es_return_t es_delete_client(es_client_t *_Nullable client) {
   // Nonnull `es_client_t*` *should* trigger `es_delete_client`
   {
     int fake;
-    es_client_t *fakeClient = (es_client_t *)&fake;
+    es_client_t* fakeClient = (es_client_t*)&fake;
     Client c(fakeClient, ES_NEW_CLIENT_RESULT_SUCCESS);
     XCTAssertEqual(c.Get(), fakeClient);
     XCTAssertEqual(c.NewClientResult(), ES_NEW_CLIENT_RESULT_SUCCESS);
@@ -73,7 +73,7 @@ es_return_t es_delete_client(es_client_t *_Nullable client) {
   // Test move constructor
   {
     int fake;
-    es_client_t *fakeClient = (es_client_t *)&fake;
+    es_client_t* fakeClient = (es_client_t*)&fake;
     Client c1(fakeClient, ES_NEW_CLIENT_RESULT_SUCCESS);
 
     Client c2(std::move(c1));
@@ -93,7 +93,7 @@ es_return_t es_delete_client(es_client_t *_Nullable client) {
   // Test move assignment
   {
     int fake;
-    es_client_t *fakeClient = (es_client_t *)&fake;
+    es_client_t* fakeClient = (es_client_t*)&fake;
     Client c1(fakeClient, ES_NEW_CLIENT_RESULT_SUCCESS);
     Client c2;
 

@@ -23,7 +23,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, idx);
   ENCODE(coder, occurrenceDate);
 }
@@ -37,7 +37,7 @@
   return self;
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, idx, NSNumber);
@@ -49,7 +49,7 @@
 - (BOOL)isEqual:(id)other {
   if (other == self) return YES;
   if (![other isKindOfClass:[SNTStoredEvent class]]) return NO;
-  SNTStoredEvent *o = other;
+  SNTStoredEvent* o = other;
   return [self.idx isEqual:o.idx];
 }
 
@@ -60,7 +60,7 @@
   return result;
 }
 
-- (NSString *)uniqueID {
+- (NSString*)uniqueID {
   [self doesNotRecognizeSelector:_cmd];
   return nil;
 }

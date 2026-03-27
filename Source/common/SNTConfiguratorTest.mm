@@ -22,19 +22,19 @@
 typedef BOOL (^StateFileAccessAuthorizer)(void);
 
 @interface SNTConfigurator (Testing)
-- (instancetype)initWithSyncStateFile:(NSString *)syncStateFilePath
-                            stateFile:(NSString *)stateFilePath
-                         oldStateFile:(NSString *)oldStateFilePath
+- (instancetype)initWithSyncStateFile:(NSString*)syncStateFilePath
+                            stateFile:(NSString*)stateFilePath
+                         oldStateFile:(NSString*)oldStateFilePath
             syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
                 stateAccessAuthorizer:(StateFileAccessAuthorizer)stateAccessAuthorizer;
 
-@property NSMutableDictionary *configState;
-@property NSMutableDictionary *syncState;
+@property NSMutableDictionary* configState;
+@property NSMutableDictionary* syncState;
 @end
 
 @interface SNTConfiguratorTest : XCTestCase
-@property NSFileManager *fileMgr;
-@property NSString *testDir;
+@property NSFileManager* fileMgr;
+@property NSString* testDir;
 @end
 
 @implementation SNTConfiguratorTest
@@ -54,14 +54,14 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:nil]);
 }
 
-- (void)runMigrationTestsWithSyncState:(NSDictionary *)syncStatePlist
-                              verifier:(void (^)(SNTConfigurator *))verifierBlock {
-  NSString *syncStatePlistPath =
+- (void)runMigrationTestsWithSyncState:(NSDictionary*)syncStatePlist
+                              verifier:(void (^)(SNTConfigurator*))verifierBlock {
+  NSString* syncStatePlistPath =
       [NSString stringWithFormat:@"%@/test-sync-state.plist", self.testDir];
 
   XCTAssertTrue([syncStatePlist writeToFile:syncStatePlistPath atomically:YES]);
 
-  SNTConfigurator *cfg = [[SNTConfigurator alloc] initWithSyncStateFile:syncStatePlistPath
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] initWithSyncStateFile:syncStatePlistPath
       stateFile:@"/does/not/need/to/exist"
       oldStateFile:@"/does/not/need/to/exist"
       syncStateAccessAuthorizer:^{
@@ -80,7 +80,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 - (void)testInitMigratesSyncStateKeys {
   // SyncCleanRequired = YES
   [self runMigrationTestsWithSyncState:@{@"SyncCleanRequired" : [NSNumber numberWithBool:YES]}
-                              verifier:^(SNTConfigurator *cfg) {
+                              verifier:^(SNTConfigurator* cfg) {
                                 XCTAssertEqual(cfg.syncState.count, 1);
                                 XCTAssertNil(cfg.syncState[@"SyncCleanRequired"]);
                                 XCTAssertNotNil(cfg.syncState[@"SyncTypeRequired"]);
@@ -91,7 +91,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
   // SyncCleanRequired = NO
   [self runMigrationTestsWithSyncState:@{@"SyncCleanRequired" : [NSNumber numberWithBool:NO]}
-                              verifier:^(SNTConfigurator *cfg) {
+                              verifier:^(SNTConfigurator* cfg) {
                                 XCTAssertEqual(cfg.syncState.count, 1);
                                 XCTAssertNil(cfg.syncState[@"SyncCleanRequired"]);
                                 XCTAssertNotNil(cfg.syncState[@"SyncTypeRequired"]);
@@ -102,7 +102,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
   // Empty state
   [self runMigrationTestsWithSyncState:@{}
-                              verifier:^(SNTConfigurator *cfg) {
+                              verifier:^(SNTConfigurator* cfg) {
                                 XCTAssertEqual(cfg.syncState.count, 0);
                                 XCTAssertNil(cfg.syncState[@"SyncCleanRequired"]);
                                 XCTAssertNil(cfg.syncState[@"SyncTypeRequired"]);
@@ -110,7 +110,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 }
 
 - (void)testTelemetryFilterExpressions {
-  SNTConfigurator *sut = [[SNTConfigurator alloc] init];
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
 
   {
     // No keys set, returns nil

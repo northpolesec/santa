@@ -19,11 +19,11 @@
 
 namespace santanetd {
 
-void PopulateNetworkActivityProcess(google::protobuf::Arena *,
-                                    ::santa::pb::v1::NetworkActivity_Process *, SNDProcessFlows *,
-                                    SNTCachedDecision *) {}
+void PopulateNetworkActivityProcess(google::protobuf::Arena*,
+                                    ::santa::pb::v1::NetworkActivity_Process*, SNDProcessFlows*,
+                                    SNTCachedDecision*) {}
 
-std::string FormatNetworkFlowsBasicString(SNDProcessFlows *, SNTCachedDecision *) {
+std::string FormatNetworkFlowsBasicString(SNDProcessFlows*, SNTCachedDecision*) {
   return {};
 }
 

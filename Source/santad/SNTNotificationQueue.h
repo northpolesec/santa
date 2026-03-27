@@ -27,18 +27,18 @@ using NotificationReplyBlock = void (^)(BOOL);
 
 @interface SNTNotificationQueue : NSObject
 
-@property(nonatomic) MOLXPCConnection *notifierConnection;
+@property(nonatomic) MOLXPCConnection* notifierConnection;
 
 - (instancetype)initWithRingBuffer:
-    (std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>>)pendingNotifications
+    (std::unique_ptr<santa::RingBuffer<NSMutableDictionary*>>)pendingNotifications
     NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 
-- (void)addEvent:(SNTStoredExecutionEvent *)event
-    withCustomMessage:(NSString *)message
-            customURL:(NSString *)url
-          configState:(SNTConfigState *)configState
+- (void)addEvent:(SNTStoredExecutionEvent*)event
+    withCustomMessage:(NSString*)message
+            customURL:(NSString*)url
+          configState:(SNTConfigState*)configState
              andReply:(void (^)(BOOL authenticated))reply;
 
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;

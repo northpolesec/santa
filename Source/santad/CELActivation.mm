@@ -34,13 +34,13 @@ namespace {
 
 template <bool IsV2>
 std::vector<typename santa::cel::CELProtoTraits<IsV2>::AncestorT> Ancestors(
-    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
-    const santa::Message &esMsg);
+    const std::shared_ptr<santa::santad::process_tree::ProcessTree>& processTree,
+    const santa::Message& esMsg);
 
 template <>
 std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
-    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
-    const santa::Message &esMsg) {
+    const std::shared_ptr<santa::santad::process_tree::ProcessTree>& processTree,
+    const santa::Message& esMsg) {
   if (!processTree) return {};
 
   using Traits = santa::cel::CELProtoTraits<true>;
@@ -53,19 +53,19 @@ std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
   }
 
   std::vector<santa::cel::CELProtoTraits<true>::AncestorT> ancestors;
-  for (const auto &p : processTree->RootSlice(*proc)) {
+  for (const auto& p : processTree->RootSlice(*proc)) {
     if (!p->program_) {
       continue;
     }
 
     AncestorT ancestor;
     ancestor.set_path(p->program_->executable);
-    for (const auto &arg : p->program_->arguments) {
+    for (const auto& arg : p->program_->arguments) {
       ancestor.add_args(arg);
     }
 
     if (p->program_->code_signing) {
-      const auto &cs = *p->program_->code_signing;
+      const auto& cs = *p->program_->code_signing;
       if (cs.is_platform_binary) {
         ancestor.set_signing_id("platform:" + cs.signing_id);
       } else {
@@ -82,8 +82,8 @@ std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
 
 template <>
 std::vector<santa::cel::CELProtoTraits<false>::AncestorT> Ancestors<false>(
-    const std::shared_ptr<santa::santad::process_tree::ProcessTree> &processTree,
-    const santa::Message &esMsg) {
+    const std::shared_ptr<santa::santad::process_tree::ProcessTree>& processTree,
+    const santa::Message& esMsg) {
   return {};
 }
 
@@ -111,11 +111,11 @@ FD::FDType FDTypeFromES(uint32_t fdtype) {
 namespace santa {
 
 ActivationCallbackBlock CreateCELActivationBlock(
-    const Message &esMsg, NSString *signingID, NSString *teamID, BOOL isPlatformBinary,
-    NSDate *signingTime, NSDate *secureSigningTime, NSDictionary *entitlementsDict,
+    const Message& esMsg, NSString* signingID, NSString* teamID, BOOL isPlatformBinary,
+    NSDate* signingTime, NSDate* secureSigningTime, NSDictionary* entitlementsDict,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
   std::shared_ptr<EndpointSecurityAPI> esApi = esMsg.ESAPI();
-  NSString *formattedSigningID = FormatSigningID(signingID, teamID, isPlatformBinary);
+  NSString* formattedSigningID = FormatSigningID(signingID, teamID, isPlatformBinary);
 
   return ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
     auto makeActivation =
@@ -145,22 +145,22 @@ ActivationCallbackBlock CreateCELActivationBlock(
 
       if constexpr (IsV2) {
         if (entitlementsDict) {
-          auto *entitlements = f->mutable_entitlements();
+          auto* entitlements = f->mutable_entitlements();
           [entitlementsDict
-              enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
-                NSError *err;
-                NSData *jsonData;
+              enumerateKeysAndObjectsUsingBlock:^(NSString* key, id value, BOOL* stop) {
+                NSError* err;
+                NSData* jsonData;
                 @try {
                   jsonData = [NSJSONSerialization dataWithJSONObject:value
                                                              options:NSJSONWritingFragmentsAllowed
                                                                error:&err];
-                } @catch (NSException *) {
+                } @catch (NSException*) {
                 }
                 if (!jsonData) {
                   // Skip entitlements that can't be serialized to JSON.
                   return;
                 }
-                NSString *jsonStr = [[NSString alloc] initWithData:jsonData
+                NSString* jsonStr = [[NSString alloc] initWithData:jsonData
                                                           encoding:NSUTF8StringEncoding];
                 (*entitlements)[santa::NSStringToUTF8String(key)] =
                     santa::NSStringToUTF8String(jsonStr);
@@ -180,12 +180,12 @@ ActivationCallbackBlock CreateCELActivationBlock(
             return audit_token_to_euid(esMsg->event.exec.target->audit_token);
           },
           ^std::string() {
-            es_file_t *f = esMsg->event.exec.cwd;
+            es_file_t* f = esMsg->event.exec.cwd;
             if (!f) return std::string();
             return std::string(f->path.data, f->path.length);
           },
           ^std::string() {
-            es_file_t *f = esMsg->event.exec.target->executable;
+            es_file_t* f = esMsg->event.exec.target->executable;
             if (!f) return std::string();
             return std::string(f->path.data, f->path.length);
           },
@@ -198,7 +198,7 @@ ActivationCallbackBlock CreateCELActivationBlock(
               uint32_t fdCount = esApi->ExecFDCount(&esMsg->event.exec);
               fds.reserve(fdCount);
               for (uint32_t i = 0; i < fdCount; i++) {
-                const es_fd_t *esFD = esApi->ExecFD(&esMsg->event.exec, i);
+                const es_fd_t* esFD = esApi->ExecFD(&esMsg->event.exec, i);
                 FileDescriptorT fd;
                 fd.set_fd(esFD->fd);
                 fd.set_type(FDTypeFromES(esFD->fdtype));
@@ -220,7 +220,7 @@ ActivationCallbackBlock CreateCELActivationBlock(
 }
 
 ActivationCallbackBlock CreateCELActivationBlock(
-    const Message &esMsg, MOLCodesignChecker *csInfo,
+    const Message& esMsg, MOLCodesignChecker* csInfo,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
   return CreateCELActivationBlock(esMsg, csInfo.signingID, csInfo.teamID, csInfo.platformBinary,
                                   csInfo.signingTime, csInfo.secureSigningTime, csInfo.entitlements,

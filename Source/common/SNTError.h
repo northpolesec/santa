@@ -67,38 +67,37 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
 // Generate a new error using the provided code, message, and details and populate into the provided
 // NSError. `msg` will populate the NSLocalizedErrorDescription key. `detail` will populate the
 // NSLocalizedFailureReasonErrorKey key.
-+ (void)populateError:(NSError *_Nullable *_Nullable)error
++ (void)populateError:(NSError* _Nullable* _Nullable)error
              withCode:(SNTErrorCode)code
-              message:(nonnull NSString *)msg
-               detail:(nonnull NSString *)detail;
+              message:(nonnull NSString*)msg
+               detail:(nonnull NSString*)detail;
 
 // Return a new error using the provided code, message, and details. `msg` will populate the
 // NSLocalizedErrorDescription key. `detail` will populate the NSLocalizedFailureReasonErrorKey key.
-+ (nullable NSError *)createErrorWithCode:(SNTErrorCode)code
-                                  message:(nonnull NSString *)msg
-                                   detail:(nonnull NSString *)detail;
++ (nullable NSError*)createErrorWithCode:(SNTErrorCode)code
+                                 message:(nonnull NSString*)msg
+                                  detail:(nonnull NSString*)detail;
 
 // Generate a new error with the provided code and format-string message, and populate into the
 // provided NSError; `msg` will populate the NSLocalizedErrorDescription key.
-+ (void)populateError:(NSError *_Nullable *_Nullable)error
++ (void)populateError:(NSError* _Nullable* _Nullable)error
              withCode:(SNTErrorCode)code
-               format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(3, 4);
+               format:(nonnull NSString*)format, ... NS_FORMAT_FUNCTION(3, 4);
 
 // Return a new NSError with the provided format string message and error code.
 // `msg` will populate the NSLocalizedErrorDescription key.
-+ (nullable NSError *)createErrorWithCode:(SNTErrorCode)code
-                                   format:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(2, 3);
++ (nullable NSError*)createErrorWithCode:(SNTErrorCode)code
+                                  format:(nonnull NSString*)format, ... NS_FORMAT_FUNCTION(2, 3);
 
 // Generate a new error with the provided format-string message, and populate into the provided
 // NSError; `msg` will populate the NSLocalizedErrorDescription key. The error code will be
 // SNTErrorCodeUnknown.
-+ (void)populateError:(NSError *_Nullable *_Nullable)error
-           withFormat:(nonnull NSString *)format, ... NS_FORMAT_FUNCTION(2, 3);
++ (void)populateError:(NSError* _Nullable* _Nullable)error
+           withFormat:(nonnull NSString*)format, ... NS_FORMAT_FUNCTION(2, 3);
 
 // Return a new SNTError with the provided format string message.
 // `msg` will populate the NSLocalizedErrorDescription key. The error code
 // will be SNTErrorCodeUnknown.
-+ (nullable NSError *)createErrorWithFormat:(nonnull NSString *)format,
-                                            ... NS_FORMAT_FUNCTION(1, 2);
++ (nullable NSError*)createErrorWithFormat:(nonnull NSString*)format, ... NS_FORMAT_FUNCTION(1, 2);
 
 @end

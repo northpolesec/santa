@@ -25,8 +25,8 @@
 @property id mockSession;
 @property id mockSessionDataTask;
 @property id mockMOLAuthenticatingURLSession;
-@property NSMutableArray<NSDictionary *> *mockResponses;
-@property SNTMetricHTTPWriter *httpWriter;
+@property NSMutableArray<NSDictionary*>* mockResponses;
+@property SNTMetricHTTPWriter* httpWriter;
 @property id mockConfigurator;
 @end
 
@@ -54,20 +54,20 @@
   // to populate. If we don't mark the variable __unsafe_unretained it will
   // default to __strong and ARC will attempt to release the block when it goes
   // out of scope, not knowing that it wasn't ours to release in the first place.
-  __unsafe_unretained __block void (^completionHandler)(NSData *, NSURLResponse *, NSError *);
+  __unsafe_unretained __block void (^completionHandler)(NSData*, NSURLResponse*, NSError*);
 
-  void (^getCompletionHandler)(NSInvocation *) = ^(NSInvocation *invocation) {
+  void (^getCompletionHandler)(NSInvocation*) = ^(NSInvocation* invocation) {
     [invocation getArgument:&completionHandler atIndex:3];
   };
 
-  void (^callCompletionHandler)(NSInvocation *) = ^(NSInvocation *invocation) {
-    NSDictionary *responseValue = self.mockResponses[0];
+  void (^callCompletionHandler)(NSInvocation*) = ^(NSInvocation* invocation) {
+    NSDictionary* responseValue = self.mockResponses[0];
 
     if (responseValue[@"error"] != nil) {
-      OCMExpect([(NSURLSessionDataTask *)self.mockSessionDataTask error])
+      OCMExpect([(NSURLSessionDataTask*)self.mockSessionDataTask error])
           .andReturn(responseValue[@"error"]);
-    } else if (((NSHTTPURLResponse *)responseValue[@"response"]).statusCode != 200) {
-      OCMExpect([(NSURLSessionDataTask *)self.mockSessionDataTask response])
+    } else if (((NSHTTPURLResponse*)responseValue[@"response"]).statusCode != 200) {
+      OCMExpect([(NSURLSessionDataTask*)self.mockSessionDataTask response])
           .andReturn(responseValue[@"response"]);
     }
 
@@ -80,7 +80,7 @@
     }
   };
 
-  OCMStub([(NSURLSessionDataTask *)self.mockSessionDataTask resume]).andDo(callCompletionHandler);
+  OCMStub([(NSURLSessionDataTask*)self.mockSessionDataTask resume]).andDo(callCompletionHandler);
 
   OCMStub([self.mockSession dataTaskWithRequest:[OCMArg any] completionHandler:[OCMArg any]])
       .andDo(getCompletionHandler)
@@ -88,17 +88,17 @@
 }
 
 /// enqueues a mock HTTP response for testing.
-- (void)createMockResponseWithURL:(NSURL *)url
+- (void)createMockResponseWithURL:(NSURL*)url
                          withCode:(NSInteger)code
-                         withData:(NSData *)data
-                        withError:(NSError *)err {
-  NSHTTPURLResponse *response =
+                         withData:(NSData*)data
+                        withError:(NSError*)err {
+  NSHTTPURLResponse* response =
       [[NSHTTPURLResponse alloc] initWithURL:url
                                   statusCode:code
                                  HTTPVersion:@"HTTP/1.1"
                                 headerFields:@{@"content-type" : @"application/json"}];
 
-  NSMutableDictionary *responseValue = [[NSMutableDictionary alloc] init];
+  NSMutableDictionary* responseValue = [[NSMutableDictionary alloc] init];
 
   responseValue[@"data"] = data;
   responseValue[@"response"] = response;
@@ -108,25 +108,25 @@
 }
 
 - (void)testValidPostOfData {
-  NSURL *url = [[NSURL alloc] initWithString:@"http://localhost:8444/submit"];
+  NSURL* url = [[NSURL alloc] initWithString:@"http://localhost:8444/submit"];
 
   [self createMockResponseWithURL:url withCode:200 withData:nil withError:nil];
 
-  SNTMetricHTTPWriter *httpWriter = [[SNTMetricHTTPWriter alloc] init];
+  SNTMetricHTTPWriter* httpWriter = [[SNTMetricHTTPWriter alloc] init];
 
-  NSData *JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
 
-  NSError *err;
+  NSError* err;
   BOOL result = [httpWriter write:@[ JSONdata ] toURL:url error:&err];
   XCTAssertEqual(YES, result);
   XCTAssertNil(err);
 }
 
 - (void)testEnsureHTTPErrorCodesResultInErrors {
-  NSURL *url = [NSURL URLWithString:@"http://localhost:10444"];
+  NSURL* url = [NSURL URLWithString:@"http://localhost:10444"];
 
-  NSData *JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
-  NSError *err;
+  NSData* JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
+  NSError* err;
 
   for (NSInteger code = 400; code < 600; code += 100) {
     [self createMockResponseWithURL:url withCode:code withData:nil withError:nil];
@@ -138,7 +138,7 @@
     XCTAssertEqual(code, err.code);
     XCTAssertEqualObjects(@"com.northpolesec.santa.metricservice.writers.http", err.domain);
 
-    NSString *expectedErrMsg = [NSString
+    NSString* expectedErrMsg = [NSString
         stringWithFormat:@"received http status code %ld from %@", code, url.absoluteString];
     XCTAssertEqualObjects(expectedErrMsg, err.localizedDescription);
     err = nil;
@@ -146,16 +146,16 @@
 }
 
 - (void)testEnsureErrorsFromTransportAreHandled {
-  NSURL *url = [NSURL URLWithString:@"http://localhost:9444"];
-  NSError *mockErr =
+  NSURL* url = [NSURL URLWithString:@"http://localhost:9444"];
+  NSError* mockErr =
       [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"
                                  code:505
                              userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
-  NSError *err;
+  NSError* err;
 
   [self createMockResponseWithURL:url withCode:505 withData:nil withError:mockErr];
 
-  NSData *JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
 
   BOOL result = [self.httpWriter write:@[ JSONdata ] toURL:url error:&err];
 
@@ -166,14 +166,14 @@
 }
 
 - (void)testEnsureMutlipleEntriesWriteMultipleTimes {
-  NSURL *url = [NSURL URLWithString:@"http://localhost:9444"];
+  NSURL* url = [NSURL URLWithString:@"http://localhost:9444"];
 
   // Ensure that non-200 status codes codes do not crash
   [self createMockResponseWithURL:url withCode:200 withData:nil withError:nil];
   [self createMockResponseWithURL:url withCode:200 withData:nil withError:nil];
 
-  NSData *JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
-  NSError *err;
+  NSData* JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
+  NSError* err;
   BOOL result = [self.httpWriter write:@[ JSONdata, JSONdata ] toURL:url error:&err];
 
   XCTAssertEqual(YES, result);
@@ -182,13 +182,13 @@
 }
 
 - (void)testEnsurePassingNilOrNullErrorDoesNotCrash {
-  NSURL *url = [NSURL URLWithString:@"http://localhost:9444"];
+  NSURL* url = [NSURL URLWithString:@"http://localhost:9444"];
 
   // Queue up two responses for nil and NULL.
   [self createMockResponseWithURL:url withCode:400 withData:nil withError:nil];
   [self createMockResponseWithURL:url withCode:400 withData:nil withError:nil];
 
-  NSData *JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
 
   BOOL result = [self.httpWriter write:@[ JSONdata ] toURL:url error:nil];
   XCTAssertEqual(NO, result);
@@ -196,7 +196,7 @@
   result = [self.httpWriter write:@[ JSONdata ] toURL:url error:NULL];
   XCTAssertEqual(NO, result);
 
-  NSError *mockErr =
+  NSError* mockErr =
       [[NSError alloc] initWithDomain:@"com.northpolesec.santa.metricservice.writers.http.test"
                                  code:505
                              userInfo:@{NSLocalizedDescriptionKey : @"test error"}];
@@ -214,14 +214,14 @@
 }
 
 - (void)testEnsureTimeoutsDoNotCrashWriter {
-  NSURL *url = [NSURL URLWithString:@"http://localhost:11444"];
+  NSURL* url = [NSURL URLWithString:@"http://localhost:11444"];
 
   // Queue up two responses for nil and NULL.
   [self createMockResponseWithURL:url withCode:400 withData:nil withError:nil];
   // Set the timeout to 0 second
   OCMStub([self.mockConfigurator metricExportTimeout]).andReturn(0);
 
-  NSData *JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* JSONdata = [@"{\"foo\": \"bar\"}\r\n" dataUsingEncoding:NSUTF8StringEncoding];
 
   BOOL result = [self.httpWriter write:@[ JSONdata ] toURL:url error:nil];
   XCTAssertEqual(NO, result);

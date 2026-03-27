@@ -20,7 +20,7 @@
 #include "Source/common/CodeSigningIdentifierUtils.h"
 
 @interface SNTKillRequest (Testing)
-- (instancetype)initWithUUID:(NSString *)uuid;
+- (instancetype)initWithUUID:(NSString*)uuid;
 @end
 
 @interface SNTKillCommandTest : XCTestCase
@@ -29,17 +29,17 @@
 @implementation SNTKillCommandTest
 
 - (void)testSNTKillRequestEncodeDecode {
-  NSString *uuid = [[NSUUID UUID] UUIDString];
-  SNTKillRequest *request = [[SNTKillRequest alloc] initWithUUID:uuid];
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+  SNTKillRequest* request = [[SNTKillRequest alloc] initWithUUID:uuid];
   XCTAssertNotNil(request);
   XCTAssertEqualObjects(request.uuid, uuid);
 
-  NSData *archived = [NSKeyedArchiver archivedDataWithRootObject:request
+  NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:request
                                            requiringSecureCoding:YES
                                                            error:nil];
   XCTAssertNotNil(archived);
 
-  SNTKillRequest *decoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTKillRequest class]
+  SNTKillRequest* decoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTKillRequest class]
                                                               fromData:archived
                                                                  error:nil];
   XCTAssertNotNil(decoded);
@@ -47,14 +47,14 @@
 }
 
 - (void)testSNTKillRequestRunningProcessValidInit {
-  NSString *uuid = [[NSUUID UUID] UUIDString];
-  NSString *bootUUID = @"2470862D-9913-4B95-A2BB-556EDC163069";
-  NSString *bootUUIDWant = [[bootUUID stringByReplacingOccurrencesOfString:@"-"
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+  NSString* bootUUID = @"2470862D-9913-4B95-A2BB-556EDC163069";
+  NSString* bootUUIDWant = [[bootUUID stringByReplacingOccurrencesOfString:@"-"
                                                                 withString:@""] lowercaseString];
   int pid = 1234;
   int pidversion = 5678;
 
-  SNTKillRequestRunningProcess *request =
+  SNTKillRequestRunningProcess* request =
       [[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
                                                      pid:pid
                                               pidversion:pidversion
@@ -100,12 +100,12 @@
                                                     pidversion:pidversion
                                                bootSessionUUID:bootUUID];
 
-  NSData *archived = [NSKeyedArchiver archivedDataWithRootObject:request
+  NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:request
                                            requiringSecureCoding:YES
                                                            error:nil];
   XCTAssertNotNil(archived);
 
-  SNTKillRequestRunningProcess *decoded =
+  SNTKillRequestRunningProcess* decoded =
       [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTKillRequestRunningProcess class]
                                         fromData:archived
                                            error:nil];
@@ -117,24 +117,24 @@
 }
 
 - (void)testSNTKillRequestCDHashValidInit {
-  NSString *uuid = [[NSUUID UUID] UUIDString];
-  NSString *cdhash = @"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0";
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+  NSString* cdhash = @"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0";
 
-  SNTKillRequestCDHash *request = [[SNTKillRequestCDHash alloc] initWithUUID:uuid cdHash:cdhash];
+  SNTKillRequestCDHash* request = [[SNTKillRequestCDHash alloc] initWithUUID:uuid cdHash:cdhash];
   XCTAssertNotNil(request);
   XCTAssertEqualObjects(request.uuid, uuid);
   XCTAssertEqualObjects(request.cdhash, cdhash);
 
   // Test various invalid CDHashes
-  NSArray *invalidCDHashes = @[
+  NSArray* invalidCDHashes = @[
     @"",
     @"not-a-cdhash",
     @"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
     @"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0xxyyzz",
   ];
 
-  for (NSString *invalidCDHash in invalidCDHashes) {
-    SNTKillRequestCDHash *request = [[SNTKillRequestCDHash alloc] initWithUUID:uuid
+  for (NSString* invalidCDHash in invalidCDHashes) {
+    SNTKillRequestCDHash* request = [[SNTKillRequestCDHash alloc] initWithUUID:uuid
                                                                         cdHash:invalidCDHash];
     XCTAssertNil(request);
   }
@@ -142,12 +142,12 @@
   // Encode / Decode {
   request = [[SNTKillRequestCDHash alloc] initWithUUID:uuid cdHash:cdhash];
 
-  NSData *archived = [NSKeyedArchiver archivedDataWithRootObject:request
+  NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:request
                                            requiringSecureCoding:YES
                                                            error:nil];
   XCTAssertNotNil(archived);
 
-  SNTKillRequestCDHash *decoded =
+  SNTKillRequestCDHash* decoded =
       [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTKillRequestCDHash class]
                                         fromData:archived
                                            error:nil];
@@ -157,15 +157,15 @@
 }
 
 - (void)testSNTKillRequestSigningID {
-  NSString *uuid = [[NSUUID UUID] UUIDString];
-  NSString *teamIDsigningID = @"ABCDEFGHIJ:com.example.app";
-  NSString *platformSigningID = @"platform:com.example.app";
-  NSString *expectedTIDComponent = @"ABCDEFGHIJ";
-  NSString *expectedPlatformTIDComponent = @"platform";
-  NSString *expectedSIDComponent = @"com.example.app";
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+  NSString* teamIDsigningID = @"ABCDEFGHIJ:com.example.app";
+  NSString* platformSigningID = @"platform:com.example.app";
+  NSString* expectedTIDComponent = @"ABCDEFGHIJ";
+  NSString* expectedPlatformTIDComponent = @"platform";
+  NSString* expectedSIDComponent = @"com.example.app";
 
   // TeamID
-  SNTKillRequestSigningID *request = [[SNTKillRequestSigningID alloc] initWithUUID:uuid
+  SNTKillRequestSigningID* request = [[SNTKillRequestSigningID alloc] initWithUUID:uuid
                                                                          signingID:teamIDsigningID];
   XCTAssertNotNil(request);
   XCTAssertEqualObjects(request.uuid, uuid);
@@ -179,7 +179,7 @@
   XCTAssertEqualObjects(request.teamID, expectedPlatformTIDComponent);
 
   // Weird but valid ones
-  NSArray *validSigningIDs = @[
+  NSArray* validSigningIDs = @[
     @"ABCDEFGHIJ:com:",
     @"ABCDEFGHIJ:com:example",
     @"ABCDEFGHIJ::",
@@ -187,15 +187,15 @@
     @"platform:com:example:with:more:components:",
   ];
 
-  for (NSString *tidSid in validSigningIDs) {
-    SNTKillRequestSigningID *request = [[SNTKillRequestSigningID alloc] initWithUUID:uuid
+  for (NSString* tidSid in validSigningIDs) {
+    SNTKillRequestSigningID* request = [[SNTKillRequestSigningID alloc] initWithUUID:uuid
                                                                            signingID:tidSid];
     XCTAssertNotNil(request);
     XCTAssertEqualObjects(request.signingID, santa::SplitSigningID(tidSid).second);
   }
 
   // Invalid SIDs
-  NSArray *invalidSigningIDs = @[
+  NSArray* invalidSigningIDs = @[
     @"",
     @":",
     @":com.example",
@@ -203,8 +203,8 @@
     @"ABC:com.example",
   ];
 
-  for (NSString *invalidSigningID in invalidSigningIDs) {
-    SNTKillRequestSigningID *request =
+  for (NSString* invalidSigningID in invalidSigningIDs) {
+    SNTKillRequestSigningID* request =
         [[SNTKillRequestSigningID alloc] initWithUUID:uuid signingID:invalidSigningID];
     XCTAssertNil(request);
   }
@@ -212,12 +212,12 @@
   // Encode / Decode
   request = [[SNTKillRequestSigningID alloc] initWithUUID:uuid signingID:teamIDsigningID];
 
-  NSData *archived = [NSKeyedArchiver archivedDataWithRootObject:request
+  NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:request
                                            requiringSecureCoding:YES
                                                            error:nil];
   XCTAssertNotNil(archived);
 
-  SNTKillRequestSigningID *decoded =
+  SNTKillRequestSigningID* decoded =
       [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTKillRequestSigningID class]
                                         fromData:archived
                                            error:nil];
@@ -229,23 +229,23 @@
 }
 
 - (void)testSNTKillRequestTeamID {
-  NSString *uuid = [[NSUUID UUID] UUIDString];
-  NSString *teamID = @"ABCDEFGHIJ";
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+  NSString* teamID = @"ABCDEFGHIJ";
 
-  SNTKillRequestTeamID *request = [[SNTKillRequestTeamID alloc] initWithUUID:uuid teamID:teamID];
+  SNTKillRequestTeamID* request = [[SNTKillRequestTeamID alloc] initWithUUID:uuid teamID:teamID];
   XCTAssertNotNil(request);
   XCTAssertEqualObjects(request.uuid, uuid);
   XCTAssertEqualObjects(request.teamID, teamID);
 
   // Uppercase values
-  NSString *lowercaseTeamID = @"abcdefghij";
+  NSString* lowercaseTeamID = @"abcdefghij";
 
   request = [[SNTKillRequestTeamID alloc] initWithUUID:uuid teamID:lowercaseTeamID];
   XCTAssertNotNil(request);
   XCTAssertEqualObjects(request.teamID, teamID);
 
   // Invalid TIDs
-  NSArray *invalidTeamIDs = @[
+  NSArray* invalidTeamIDs = @[
     @"",
     @"ABCDE",
     @"ABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -253,20 +253,20 @@
     @"ABCD-FGHIJ",
   ];
 
-  for (NSString *invalidTeamID in invalidTeamIDs) {
-    SNTKillRequestTeamID *request = [[SNTKillRequestTeamID alloc] initWithUUID:uuid
+  for (NSString* invalidTeamID in invalidTeamIDs) {
+    SNTKillRequestTeamID* request = [[SNTKillRequestTeamID alloc] initWithUUID:uuid
                                                                         teamID:invalidTeamID];
     XCTAssertNil(request, @"Should return nil for invalid team ID: %@", invalidTeamID);
   }
 
   // Encode / Decode
   request = [[SNTKillRequestTeamID alloc] initWithUUID:uuid teamID:teamID];
-  NSData *archived = [NSKeyedArchiver archivedDataWithRootObject:request
+  NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:request
                                            requiringSecureCoding:YES
                                                            error:nil];
   XCTAssertNotNil(archived);
 
-  SNTKillRequestTeamID *decoded =
+  SNTKillRequestTeamID* decoded =
       [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTKillRequestTeamID class]
                                         fromData:archived
                                            error:nil];
@@ -279,7 +279,7 @@
   int pid = 1234;
   int pidversion = 5678;
   SNTKilledProcessError error = SNTKilledProcessErrorNone;
-  SNTKilledProcess *killedProcess = [[SNTKilledProcess alloc] initWithPid:pid
+  SNTKilledProcess* killedProcess = [[SNTKilledProcess alloc] initWithPid:pid
                                                                pidversion:pidversion
                                                                     error:error];
   XCTAssertNotNil(killedProcess);
@@ -291,12 +291,12 @@
   error = SNTKilledProcessErrorNotPermitted;
 
   killedProcess = [[SNTKilledProcess alloc] initWithPid:pid pidversion:pidversion error:error];
-  NSData *archived = [NSKeyedArchiver archivedDataWithRootObject:killedProcess
+  NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:killedProcess
                                            requiringSecureCoding:YES
                                                            error:nil];
   XCTAssertNotNil(archived);
 
-  SNTKilledProcess *decoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTKilledProcess class]
+  SNTKilledProcess* decoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTKilledProcess class]
                                                                 fromData:archived
                                                                    error:nil];
   XCTAssertNotNil(decoded);
@@ -306,15 +306,15 @@
 }
 
 - (void)testSNTKillResponseInitWithKilledProcesses {
-  SNTKilledProcess *p1 = [[SNTKilledProcess alloc] initWithPid:1234
+  SNTKilledProcess* p1 = [[SNTKilledProcess alloc] initWithPid:1234
                                                     pidversion:5678
                                                          error:SNTKilledProcessErrorNone];
-  SNTKilledProcess *p2 = [[SNTKilledProcess alloc] initWithPid:9999
+  SNTKilledProcess* p2 = [[SNTKilledProcess alloc] initWithPid:9999
                                                     pidversion:1111
                                                          error:SNTKilledProcessErrorNotPermitted];
-  NSArray *killedProcesses = @[ p1, p2 ];
+  NSArray* killedProcesses = @[ p1, p2 ];
 
-  SNTKillResponse *response = [[SNTKillResponse alloc] initWithKilledProcesses:killedProcesses];
+  SNTKillResponse* response = [[SNTKillResponse alloc] initWithKilledProcesses:killedProcesses];
   XCTAssertNotNil(response);
   XCTAssertEqual(response.error, SNTKillResponseErrorNone);
   XCTAssertEqual(response.killedProcesses.count, 2);
@@ -336,12 +336,12 @@
   // Encode / Decode
   response = [[SNTKillResponse alloc] initWithError:error killedProcesses:killedProcesses];
 
-  NSData *archived = [NSKeyedArchiver archivedDataWithRootObject:response
+  NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:response
                                            requiringSecureCoding:YES
                                                            error:nil];
   XCTAssertNotNil(archived);
 
-  SNTKillResponse *decoded = [NSKeyedUnarchiver
+  SNTKillResponse* decoded = [NSKeyedUnarchiver
       unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTKillResponse class], nil]
                        fromData:archived
                           error:nil];

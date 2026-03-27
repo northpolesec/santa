@@ -25,23 +25,23 @@
 namespace santa {
 
 // Key constant for when the MountFromName is manually supplied
-extern NSString *const kMountFromNameKey;
+extern NSString* const kMountFromNameKey;
 
-static inline NSString *NonNull(NSString *str) {
+static inline NSString* NonNull(NSString* str) {
   return str ?: @"";
 }
 
-NSString *OriginalPathForTranslocation(const es_process_t *es_proc);
-NSString *SerialForDevice(NSString *devPath);
-NSString *DiskImageForDevice(NSString *devPath);
-NSString *MountFromName(NSString *path);
+NSString* OriginalPathForTranslocation(const es_process_t* es_proc);
+NSString* SerialForDevice(NSString* devPath);
+NSString* DiskImageForDevice(NSString* devPath);
+NSString* MountFromName(NSString* path);
 
-es_file_t *GetAllowListTargetFile(const santa::Message &msg);
+es_file_t* GetAllowListTargetFile(const santa::Message& msg);
 
 /// Convert the given string token, which might be a URL, to a path
-NSString *NormalizePath(es_string_token_t path);
+NSString* NormalizePath(es_string_token_t path);
 /// Concat `path` onto `prefix` if `path` is relative
-NSString *ConcatPrefixIfRelativePath(es_string_token_t path, es_string_token_t prefix);
+NSString* ConcatPrefixIfRelativePath(es_string_token_t path, es_string_token_t prefix);
 
 }  // namespace santa
 

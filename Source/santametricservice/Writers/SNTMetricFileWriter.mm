@@ -21,7 +21,7 @@
 /*
  * Open a file for appending.
  */
-- (NSFileHandle *)fileHandleForNewFileAtPath:(NSString *)path createMode:(mode_t)mode {
+- (NSFileHandle*)fileHandleForNewFileAtPath:(NSString*)path createMode:(mode_t)mode {
   int fd;
   if (!path) {
     return nil;
@@ -37,7 +37,7 @@
 /**
  * Write serialzied metrics to the file one JSON object per line.
  **/
-- (BOOL)write:(NSArray<NSData *> *)metrics toURL:(NSURL *)url error:(NSError **)error {
+- (BOOL)write:(NSArray<NSData*>*)metrics toURL:(NSURL*)url error:(NSError**)error {
   // open the file and write it.
   @autoreleasepool {
     if (![url isFileURL]) {
@@ -45,7 +45,7 @@
       return NO;
     }
 
-    NSFileHandle *file = [self fileHandleForNewFileAtPath:url.path createMode:0600];
+    NSFileHandle* file = [self fileHandleForNewFileAtPath:url.path createMode:0600];
     const char newline[1] = {'\n'};
 
     if (file == nil) {
@@ -53,7 +53,7 @@
       return NO;
     }
 
-    NSMutableData *entryData;
+    NSMutableData* entryData;
 
     for (id formattedMetricData in metrics) {
       entryData = [NSMutableData dataWithData:formattedMetricData];

@@ -21,17 +21,17 @@
 ///
 ///  Returns an initialized NSXPCInterface for the SNDNetworkExtensionXPC protocol.
 ///
-+ (NSXPCInterface *)networkExtensionInterface;
++ (NSXPCInterface*)networkExtensionInterface;
 
 ///
 ///  Returns the MachService ID for this service.
 ///
-+ (NSString *)serviceID;
++ (NSString*)serviceID;
 
 ///
 ///  Retrieve a pre-configured MOLXPCConnection for communicating with the network extension.
 ///  Connection just needs any handlers set and then can be resumed and used.
 ///
-+ (MOLXPCConnection *)configuredConnection;
++ (MOLXPCConnection*)configuredConnection;
 
 @end

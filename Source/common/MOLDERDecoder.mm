@@ -19,14 +19,14 @@
 #import <Security/SecAsn1Templates.h>
 
 @interface MOLDERDecoder ()
-@property NSDictionary *decodedObjects;
+@property NSDictionary* decodedObjects;
 @end
 
 @implementation MOLDERDecoder
 
 #pragma mark Init
 
-- (instancetype)initWithData:(NSData *)data {
+- (instancetype)initWithData:(NSData*)data {
   self = [super init];
   if (self) {
     if (!data) return nil;
@@ -42,7 +42,7 @@
   return nil;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return
       [NSString stringWithFormat:@"/C=%@/O=%@/OU=%@/CN=%@", self.countryName, self.organizationName,
                                  self.organizationalUnit, self.commonName];
@@ -50,19 +50,19 @@
 
 #pragma mark Accessors
 
-- (NSString *)commonName {
+- (NSString*)commonName {
   return self.decodedObjects[(__bridge id)kSecOIDCommonName];
 }
 
-- (NSString *)organizationName {
+- (NSString*)organizationName {
   return self.decodedObjects[(__bridge id)kSecOIDOrganizationName];
 }
 
-- (NSString *)organizationalUnit {
+- (NSString*)organizationalUnit {
   return self.decodedObjects[(__bridge id)kSecOIDOrganizationalUnitName];
 }
 
-- (NSString *)countryName {
+- (NSString*)countryName {
   return self.decodedObjects[(__bridge id)kSecOIDCountryName];
 }
 
@@ -90,7 +90,7 @@
  * This method assumes the passed in data will be in that format. If it isn't,
  * the DER decoding will fail and this method will return nil.
  **/
-- (NSDictionary *)decodeData:(NSData *)data {
+- (NSDictionary*)decodeData:(NSData*)data {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   typedef struct {
@@ -105,14 +105,14 @@
       {0, 0, NULL, 0}};
 
   typedef struct {
-    OIDKeyValue **vals;
+    OIDKeyValue** vals;
   } OIDKeyValueList;
 
   static const SecAsn1Template kSetOfOIDValueTemplate[] = {
       {SEC_ASN1_SET_OF, 0, kOIDValueTemplate, sizeof(OIDKeyValueList)}, {0, 0, NULL, 0}};
 
   typedef struct {
-    OIDKeyValueList **lists;
+    OIDKeyValueList** lists;
   } OIDKeyValueListSeq;
 
   static const SecAsn1Template kSequenceOfSetOfOIDValueTemplate[] = {
@@ -134,10 +134,10 @@
 
   // The data is decoded but now it's in a number of embedded structs.
   // Massage that into a nice dictionary of OID->String pairs.
-  NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-  OIDKeyValueList *anAttr;
+  NSMutableDictionary* dict = [NSMutableDictionary dictionary];
+  OIDKeyValueList* anAttr;
   for (NSUInteger i = 0; (anAttr = a.lists[i]); ++i) {
-    OIDKeyValue *keyValue = anAttr->vals[0];
+    OIDKeyValue* keyValue = anAttr->vals[0];
 
     // Sanity check
     if (keyValue->value.Length > data.length) {
@@ -148,7 +148,7 @@
     // Get the string value. First try creating as a UTF-8 string. If that fails,
     // fallback to trying as an ASCII string. If it still doesn't work, continue on
     // to the next value.
-    NSString *valueString;
+    NSString* valueString;
     valueString = [[NSString alloc] initWithBytes:keyValue->value.Data
                                            length:keyValue->value.Length
                                          encoding:NSUTF8StringEncoding];
@@ -160,7 +160,7 @@
     if (!valueString) continue;
 
     // The OID is still encoded, so we need to decode it.
-    NSString *objectId = [MOLDERDecoder decodeOIDWithBytes:keyValue->oid.Data
+    NSString* objectId = [MOLDERDecoder decodeOIDWithBytes:keyValue->oid.Data
                                                     length:keyValue->oid.Length];
 
     // Add to the dictionary
@@ -177,8 +177,8 @@
  * See http://msdn.microsoft.com/en-us/library/bb540809(v=vs.85).aspx for
  * details of the encoding.
  **/
-+ (NSString *)decodeOIDWithBytes:(unsigned char *)bytes length:(NSUInteger)length {
-  NSMutableArray *objectId = [NSMutableArray array];
++ (NSString*)decodeOIDWithBytes:(unsigned char*)bytes length:(NSUInteger)length {
+  NSMutableArray* objectId = [NSMutableArray array];
   BOOL inVariableLengthByte = NO;
   NSUInteger variableLength = 0;
   for (NSUInteger i = 0; i < length; ++i) {

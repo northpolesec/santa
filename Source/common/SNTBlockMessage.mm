@@ -28,30 +28,30 @@ static id ValueOrNull(id value) {
 
 @implementation SNTBlockMessage
 
-+ (NSAttributedString *)formatMessage:(NSString *)message withFallback:(NSString *)fallback {
++ (NSAttributedString*)formatMessage:(NSString*)message withFallback:(NSString*)fallback {
   if (!message.length) {
     message = fallback;
   }
 
-  NSString *htmlHeader = @"<html><head><style>"
+  NSString* htmlHeader = @"<html><head><style>"
                          @"body {"
                          @"  font-family: 'Lucida Grande', 'Helvetica', sans-serif;"
                          @"  font-size: 13px;"
                          @"  text-align: center;"
                          @"}"
                          @"</style></head><body>";
-  NSString *htmlFooter = @"</body></html>";
-  NSString *fullHTML = [NSString stringWithFormat:@"%@%@%@", htmlHeader, message, htmlFooter];
+  NSString* htmlFooter = @"</body></html>";
+  NSString* fullHTML = [NSString stringWithFormat:@"%@%@%@", htmlHeader, message, htmlFooter];
 
 #ifdef SANTAGUI
-  NSData *htmlData = [fullHTML dataUsingEncoding:NSUTF8StringEncoding];
-  NSDictionary *options = @{
+  NSData* htmlData = [fullHTML dataUsingEncoding:NSUTF8StringEncoding];
+  NSDictionary* options = @{
     NSDocumentTypeDocumentAttribute : NSHTMLTextDocumentType,
     NSCharacterEncodingDocumentAttribute : @(NSUTF8StringEncoding),
   };
   return [[NSAttributedString alloc] initWithHTML:htmlData options:options documentAttributes:NULL];
 #else
-  NSString *strippedHTML = [self stringFromHTML:fullHTML];
+  NSString* strippedHTML = [self stringFromHTML:fullHTML];
   if (!strippedHTML) {
     fallback = [fallback stringByReplacingOccurrencesOfString:@"<br />" withString:@"\n"];
     return [[NSAttributedString alloc] initWithString:fallback];
@@ -60,17 +60,17 @@ static id ValueOrNull(id value) {
 #endif
 }
 
-+ (NSAttributedString *)attributedBlockMessageForEvent:(SNTStoredExecutionEvent *)event
-                                         customMessage:(NSString *)customMessage {
-  NSString *defaultBlockedMessage = NSLocalizedString(
++ (NSAttributedString*)attributedBlockMessageForEvent:(SNTStoredExecutionEvent*)event
+                                        customMessage:(NSString*)customMessage {
+  NSString* defaultBlockedMessage = NSLocalizedString(
       @"The following application has been blocked from executing<br />because its trustworthiness "
       @"cannot be determined",
       @"The default message to show the user when an unknown application is blocked");
-  NSString *defaultBannedMessage = NSLocalizedString(
+  NSString* defaultBannedMessage = NSLocalizedString(
       @"The following application has been blocked from<br />executing because it has "
       @"been deemed malicious or against policy",
       @"The default message to show the user when a banned application is blocked");
-  NSString *defaultStandaloneMessage = NSLocalizedString(
+  NSString* defaultStandaloneMessage = NSLocalizedString(
       @"The following application requires authorization before it can be used",
       @"The default message to show the user when a program requires TouchID/password");
 
@@ -88,9 +88,9 @@ static id ValueOrNull(id value) {
                 withFallback:defaultBannedMessage];
 }
 
-+ (NSAttributedString *)attributedBlockMessageForFileAccessEvent:(SNTStoredFileAccessEvent *)event
-                                                   customMessage:(NSString *)customMessage {
-  NSString *defaultBlockedMesage =
++ (NSAttributedString*)attributedBlockMessageForFileAccessEvent:(SNTStoredFileAccessEvent*)event
+                                                  customMessage:(NSString*)customMessage {
+  NSString* defaultBlockedMesage =
       NSLocalizedString(@"Access to a file has been denied",
                         @"The default message to show the user when access to a file is blocked");
 
@@ -99,13 +99,13 @@ static id ValueOrNull(id value) {
        withFallback:defaultBlockedMesage];
 }
 
-+ (NSAttributedString *)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent *)event {
-  NSString *defaultRemountMessage =
++ (NSAttributedString*)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent*)event {
+  NSString* defaultRemountMessage =
       NSLocalizedString(@"The following device has been remounted with reduced permissions",
                         @"The default message to show the user when a Removable Media "
                         @"(e.g. USB device) is remounted with "
                         @"reduced permissions");
-  NSString *defaultBannedMessage =
+  NSString* defaultBannedMessage =
       NSLocalizedString(@"The following device has been blocked from mounting",
                         @"The default message to show the user when a Removable Media "
                         @"(e.g. USB device) is blocked from mounting");
@@ -120,16 +120,16 @@ static id ValueOrNull(id value) {
                            withFallback:defaultBannedMessage];
 }
 
-+ (NSAttributedString *)attributedBlockMessageForNetworkMountEventWithCustomMessage:
-    (NSString *)customMsg {
-  NSString *defaultBannedMessage =
++ (NSAttributedString*)attributedBlockMessageForNetworkMountEventWithCustomMessage:
+    (NSString*)customMsg {
+  NSString* defaultBannedMessage =
       NSLocalizedString(@"The following network share has been blocked from mounting",
                         @"The default message to show the user when a network mount is blocked");
 
   return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBannedMessage];
 }
 
-+ (NSString *)blockReasonForEventState:(SNTEventState)decision {
++ (NSString*)blockReasonForEventState:(SNTEventState)decision {
   switch (decision) {
     case SNTEventStateBlockBinary:
       return NSLocalizedString(@"Binary rule", @"Block reason for binary rule match");
@@ -156,12 +156,12 @@ static id ValueOrNull(id value) {
   }
 }
 
-+ (NSString *)stringFromHTML:(NSString *)html {
-  NSError *error;
++ (NSString*)stringFromHTML:(NSString*)html {
+  NSError* error;
   NSXMLNodeOptions options = NSXMLDocumentIncludeContentTypeDeclaration |
                              NSXMLNodeCompactEmptyElement | NSXMLNodeLoadExternalEntitiesNever |
                              NSXMLNodeNeverEscapeContents;
-  NSXMLDocument *xml = [[NSXMLDocument alloc] initWithXMLString:html options:options error:&error];
+  NSXMLDocument* xml = [[NSXMLDocument alloc] initWithXMLString:html options:options error:&error];
 
   if (error) {
     if (error.code != NSXMLParserEmptyDocumentError) {
@@ -181,7 +181,7 @@ static id ValueOrNull(id value) {
 
   // Strip any HTML tags out of the message. Also remove any content inside <style> tags and
   // replace <br> elements with a newline.
-  NSString *stripXslt =
+  NSString* stripXslt =
       @"<?xml version='1.0' encoding='utf-8'?>"
       @"<xsl:stylesheet version='1.0' xmlns:xsl='http://www.w3.org/1999/XSL/Transform'"
       @"                              xmlns:xhtml='http://www.w3.org/1999/xhtml'>"
@@ -189,7 +189,7 @@ static id ValueOrNull(id value) {
       @"<xsl:template match='br'><xsl:text>\n</xsl:text></xsl:template>"
       @"<xsl:template match='style'/>"
       @"</xsl:stylesheet>";
-  NSData *data = [xml objectByApplyingXSLTString:stripXslt arguments:NULL error:&error];
+  NSData* data = [xml objectByApplyingXSLTString:stripXslt arguments:NULL error:&error];
   if (error || ![data isKindOfClass:[NSData class]]) {
     LOGW(@"Failed to strip HTML message: %@", error);
     return nil;
@@ -197,11 +197,11 @@ static id ValueOrNull(id value) {
   return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
 
-+ (NSString *)replaceFormatString:(NSString *)str
-                         withDict:(NSDictionary<NSString *, NSString *> *)replacements {
-  __block NSString *formatStr = str;
++ (NSString*)replaceFormatString:(NSString*)str
+                        withDict:(NSDictionary<NSString*, NSString*>*)replacements {
+  __block NSString* formatStr = str;
 
-  [replacements enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSString *value, BOOL *stop) {
+  [replacements enumerateKeysAndObjectsUsingBlock:^(NSString* key, NSString* value, BOOL* stop) {
     if ((id)value != [NSNull null]) {
       formatStr = [formatStr stringByReplacingOccurrencesOfString:key withString:value];
     }
@@ -228,8 +228,8 @@ static id ValueOrNull(id value) {
 //   %serial%                    - The machine's serial number.
 //   %file_sha%                  - Deprecated. Acts like %bundle_or_file_identifier%.
 //
-+ (NSDictionary *)eventDetailTemplateMappingForEvent:(SNTStoredExecutionEvent *)event {
-  SNTConfigurator *config = [SNTConfigurator configurator];
++ (NSDictionary*)eventDetailTemplateMappingForEvent:(SNTStoredExecutionEvent*)event {
+  SNTConfigurator* config = [SNTConfigurator configurator];
   return @{
     @"%file_sha%" : ValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
     @"%file_identifier%" : ValueOrNull(event.fileSHA256),
@@ -264,7 +264,7 @@ static id ValueOrNull(id value) {
 //   %uuid%            - The machine's UUID.
 //   %serial%          - The machine's serial number.
 //
-+ (NSDictionary *)fileAccessEventDetailTemplateMappingForEvent:(SNTStoredFileAccessEvent *)event {
++ (NSDictionary*)fileAccessEventDetailTemplateMappingForEvent:(SNTStoredFileAccessEvent*)event {
   return @{
     @"%rule_version%" : ValueOrNull(event.ruleVersion),
     @"%rule_name%" : ValueOrNull(event.ruleName),
@@ -285,10 +285,10 @@ static id ValueOrNull(id value) {
 // URL string. If the custom URL string is the string "null", nil will be returned. If no custom
 // URL is passed and there is no configured EventDetailURL template, nil will be returned.
 // The "format strings" in `templateMapping` will be replaced in the URL, if they are present.
-+ (NSURL *)eventDetailURLForEvent:(SNTStoredEvent *)event
-                        customURL:(NSString *)url
-                  templateMapping:(NSDictionary *)templateMapping {
-  NSString *formatStr = url;
++ (NSURL*)eventDetailURLForEvent:(SNTStoredEvent*)event
+                       customURL:(NSString*)url
+                 templateMapping:(NSDictionary*)templateMapping {
+  NSString* formatStr = url;
   if (!formatStr.length) {
     return nil;
   }
@@ -298,7 +298,7 @@ static id ValueOrNull(id value) {
   }
 
   formatStr = [SNTBlockMessage replaceFormatString:formatStr withDict:templateMapping];
-  NSURL *u = [NSURL URLWithString:formatStr];
+  NSURL* u = [NSURL URLWithString:formatStr];
   if (!u) {
     LOGW(@"Unable to generate event detail URL for string '%@'", formatStr);
   }
@@ -306,14 +306,14 @@ static id ValueOrNull(id value) {
   return u;
 }
 
-+ (NSURL *)eventDetailURLForEvent:(SNTStoredExecutionEvent *)event customURL:(NSString *)url {
++ (NSURL*)eventDetailURLForEvent:(SNTStoredExecutionEvent*)event customURL:(NSString*)url {
   return [self eventDetailURLForEvent:event
                             customURL:url
                       templateMapping:[self eventDetailTemplateMappingForEvent:event]];
 }
 
-+ (NSURL *)eventDetailURLForFileAccessEvent:(SNTStoredFileAccessEvent *)event
-                                  customURL:(NSString *)url {
++ (NSURL*)eventDetailURLForFileAccessEvent:(SNTStoredFileAccessEvent*)event
+                                 customURL:(NSString*)url {
   return
       [self eventDetailURLForEvent:event
                          customURL:url ?: [[SNTConfigurator configurator] fileAccessEventDetailURL]

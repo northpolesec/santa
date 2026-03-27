@@ -32,14 +32,14 @@
 ///
 @interface SNTDaemonControlController : NSObject <SNTDaemonControlXPC>
 
-- (instancetype)initWithNotificationQueue:(SNTNotificationQueue *)notQueue
-                               syncdQueue:(SNTSyncdQueue *)syncdQueue
-                        netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
+- (instancetype)initWithNotificationQueue:(SNTNotificationQueue*)notQueue
+                               syncdQueue:(SNTSyncdQueue*)syncdQueue
+                        netExtensionQueue:(SNTNetworkExtensionQueue*)netExtQueue
                                    logger:(std::shared_ptr<santa::Logger>)logger
                                watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
                           flushCacheBlock:(void (^)(santa::FlushCacheMode,
                                                     santa::FlushCacheReason))flushCacheBlock
-                          cacheCountBlock:(NSArray<NSNumber *> * (^)(void))cacheCountBlock
+                          cacheCountBlock:(NSArray<NSNumber*>* (^)(void))cacheCountBlock
                           checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
                        metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock;
 

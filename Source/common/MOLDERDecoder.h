@@ -21,10 +21,10 @@
 ///
 @interface MOLDERDecoder : NSObject
 
-@property(readonly) NSString *commonName;
-@property(readonly) NSString *organizationName;
-@property(readonly) NSString *organizationalUnit;
-@property(readonly) NSString *countryName;
+@property(readonly) NSString* commonName;
+@property(readonly) NSString* organizationName;
+@property(readonly) NSString* organizationalUnit;
+@property(readonly) NSString* countryName;
 
 ///
 ///  Designated initializer.
@@ -33,6 +33,6 @@
 ///      NSURLProtectionSpace.distinguishedNames array
 ///  @return nil if decoding fails to find any expected objects
 ///
-- (instancetype)initWithData:(NSData *)data;
+- (instancetype)initWithData:(NSData*)data;
 
 @end

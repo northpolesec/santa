@@ -25,12 +25,12 @@
 #import "Source/santametricservice/Formats/SNTMetricFormatTestHelper.h"
 #import "Source/santametricservice/SNTMetricService.h"
 
-NSDictionary *validMetricsDict = nil;
+NSDictionary* validMetricsDict = nil;
 
 @interface SNTMetricServiceTest : XCTestCase
 @property id mockConfigurator;
-@property NSString *tempDir;
-@property NSURL *jsonURL;
+@property NSString* tempDir;
+@property NSURL* jsonURL;
 @property id mockSession;
 @property id mockSessionDataTask;
 @property id mockMOLAuthenticatingURLSession;
@@ -45,7 +45,7 @@ NSDictionary *validMetricsDict = nil;
 
   // create a temp dir
   char dirTemplate[] = "/tmp/sntmetricsservicetestdata.XXXXXXX";
-  char *tempPath = mkdtemp(dirTemplate);
+  char* tempPath = mkdtemp(dirTemplate);
 
   XCTAssertNotEqual(tempPath, nullptr, @"Unable to make temp dir");
 
@@ -62,8 +62,8 @@ NSDictionary *validMetricsDict = nil;
   [[NSFileManager defaultManager] removeItemAtPath:self.tempDir error:NULL];
 }
 
-- (NSDate *)createNSDateFromDateString:(NSString *)dateString {
-  NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+- (NSDate*)createNSDateFromDateString:(NSString*)dateString {
+  NSDateFormatter* formatter = [[NSDateFormatter alloc] init];
   formatter.dateFormat = @"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
   formatter.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierISO8601];
   formatter.timeZone = [NSTimeZone timeZoneWithName:@"UTC"];
@@ -71,14 +71,14 @@ NSDictionary *validMetricsDict = nil;
   return [formatter dateFromString:dateString];
 }
 
-- (NSDictionary *)convertJSONDateStringsToNSDateWithJson:(NSDictionary *)jsonData {
-  NSMutableDictionary *jsonDict = [jsonData mutableCopy];
+- (NSDictionary*)convertJSONDateStringsToNSDateWithJson:(NSDictionary*)jsonData {
+  NSMutableDictionary* jsonDict = [jsonData mutableCopy];
 
-  for (NSString *metricName in jsonDict[@"metrics"]) {
-    NSMutableDictionary *metric = jsonDict[@"metrics"][metricName];
+  for (NSString* metricName in jsonDict[@"metrics"]) {
+    NSMutableDictionary* metric = jsonDict[@"metrics"][metricName];
 
-    for (NSString *field in metric[@"fields"]) {
-      NSMutableArray<NSMutableDictionary *> *values = metric[@"fields"][field];
+    for (NSString* field in metric[@"fields"]) {
+      NSMutableArray<NSMutableDictionary*>* values = metric[@"fields"][field];
 
       for (int i = 0; i < values.count; ++i) {
         values[i][@"created"] = [self createNSDateFromDateString:values[i][@"created"]];
@@ -91,12 +91,12 @@ NSDictionary *validMetricsDict = nil;
 }
 
 - (void)testDefaultConfigOptionsDoNotExport {
-  SNTMetricService *ms = [[SNTMetricService alloc] init];
+  SNTMetricService* ms = [[SNTMetricService alloc] init];
 
   [ms exportForMonitoring:validMetricsDict];
 
   // Check the temp dir
-  NSArray *items = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:self.tempDir
+  NSArray* items = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:self.tempDir
                                                                        error:NULL];
   XCTAssertEqual(0, items.count, @"found unexpected files in %@", self.tempDir);
 }
@@ -106,21 +106,21 @@ NSDictionary *validMetricsDict = nil;
   OCMStub([self.mockConfigurator metricFormat]).andReturn(SNTMetricFormatTypeRawJSON);
   OCMStub([self.mockConfigurator metricURL]).andReturn(self.jsonURL);
 
-  SNTMetricService *ms = [[SNTMetricService alloc] init];
-  NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
+  SNTMetricService* ms = [[SNTMetricService alloc] init];
+  NSDictionary* validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
 
   [ms exportForMonitoring:validMetricsDict];
 
   // Ensure that this has written 1 file that is well formed.
-  NSArray *items = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:self.tempDir
+  NSArray* items = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:self.tempDir
                                                                        error:NULL];
   XCTAssertEqual(1, items.count, @"failed to create JSON metrics file");
 
-  NSData *jsonData = [NSData dataWithContentsOfFile:self.jsonURL.path
+  NSData* jsonData = [NSData dataWithContentsOfFile:self.jsonURL.path
                                             options:NSDataReadingUncached
                                               error:nil];
 
-  NSDictionary *parsedJSONData =
+  NSDictionary* parsedJSONData =
       [NSJSONSerialization JSONObjectWithData:jsonData
                                       options:NSJSONReadingMutableContainers
                                         error:nil];
@@ -132,7 +132,7 @@ NSDictionary *validMetricsDict = nil;
 }
 
 - (void)testWritingJSONOverHTTP {
-  NSURL *url = [NSURL URLWithString:@"http://localhost:9444"];
+  NSURL* url = [NSURL URLWithString:@"http://localhost:9444"];
   OCMStub([self.mockConfigurator exportMetrics]).andReturn(YES);
   OCMStub([self.mockConfigurator metricFormat]).andReturn(SNTMetricFormatTypeRawJSON);
   OCMStub([self.mockConfigurator metricURL]).andReturn(url);
@@ -147,19 +147,19 @@ NSDictionary *validMetricsDict = nil;
       .andReturn(self.mockMOLAuthenticatingURLSession);
   OCMStub([self.mockMOLAuthenticatingURLSession session]).andReturn(self.mockSession);
 
-  NSHTTPURLResponse *response =
+  NSHTTPURLResponse* response =
       [[NSHTTPURLResponse alloc] initWithURL:url
                                   statusCode:200
                                  HTTPVersion:@"HTTP/1.1"
                                 headerFields:@{@"content-type" : @"application/json"}];
 
-  __unsafe_unretained __block void (^passedBlock)(NSData *, NSURLResponse *, NSError *);
+  __unsafe_unretained __block void (^passedBlock)(NSData*, NSURLResponse*, NSError*);
 
-  XCTestExpectation *responseCallback =
+  XCTestExpectation* responseCallback =
       [[XCTestExpectation alloc] initWithDescription:@"ensure writer passed JSON"];
 
   // stub out session to call completion handler immediately.
-  OCMStub([(NSURLSessionDataTask *)self.mockSessionDataTask resume]).andDo(^(NSInvocation *inv) {
+  OCMStub([(NSURLSessionDataTask*)self.mockSessionDataTask resume]).andDo(^(NSInvocation* inv) {
     if (passedBlock) {
       passedBlock(nil, response, nil);
     }
@@ -168,13 +168,13 @@ NSDictionary *validMetricsDict = nil;
 
   // stub out NSURLSession to assign our completion handler and return our mock
   OCMStub([self.mockSession dataTaskWithRequest:[OCMArg any] completionHandler:[OCMArg any]])
-      .andDo(^(NSInvocation *inv) {
+      .andDo(^(NSInvocation* inv) {
         [inv retainArguments];
         [inv getArgument:&passedBlock atIndex:3];
       })
       .andReturn(self.mockSessionDataTask);
 
-  SNTMetricService *service = [[SNTMetricService alloc] init];
+  SNTMetricService* service = [[SNTMetricService alloc] init];
   [service exportForMonitoring:[SNTMetricFormatTestHelper createValidMetricsDictionary]];
   [self waitForExpectations:@[ responseCallback ] timeout:10.0];
 }
@@ -188,41 +188,41 @@ NSDictionary *validMetricsDict = nil;
   OCMStub([self.mockConfigurator metricFormat]).andReturn(SNTMetricFormatTypeMonarchJSON);
   OCMStub([self.mockConfigurator metricURL]).andReturn(self.jsonURL);
 
-  SNTMetricService *ms = [[SNTMetricService alloc] init];
-  NSDictionary *validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
+  SNTMetricService* ms = [[SNTMetricService alloc] init];
+  NSDictionary* validMetricsDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
 
   [ms exportForMonitoring:validMetricsDict];
 
-  NSError *err;
+  NSError* err;
 
   // Ensure that this has written 1 file that is well formed.
-  NSArray *items = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:self.tempDir
+  NSArray* items = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:self.tempDir
                                                                        error:&err];
   XCTAssertNil(err);
   XCTAssertEqual(1, items.count, @"failed to create JSON metrics file");
 
-  NSData *jsonData = [NSData dataWithContentsOfFile:self.jsonURL.path
+  NSData* jsonData = [NSData dataWithContentsOfFile:self.jsonURL.path
                                             options:NSDataReadingUncached
                                               error:&err];
   XCTAssertNil(err);
 
   // Read expected result from a golden file.
-  NSString *path = [[NSBundle bundleForClass:[self class]] resourcePath];
+  NSString* path = [[NSBundle bundleForClass:[self class]] resourcePath];
   path = [path stringByAppendingPathComponent:@"testdata/json/monarch.json"];
 
-  NSData *goldenFileData = [NSData dataWithContentsOfFile:path
+  NSData* goldenFileData = [NSData dataWithContentsOfFile:path
                                                   options:NSDataReadingUncached
                                                     error:&err];
   XCTAssertNil(err);
   XCTAssertNotNil(goldenFileData, @"unable to open / read golden file");
 
-  NSDictionary *parsedJSONAsDict =
+  NSDictionary* parsedJSONAsDict =
       [NSJSONSerialization JSONObjectWithData:jsonData
                                       options:NSJSONReadingMutableContainers
                                         error:&err];
   XCTAssertNil(err);
 
-  NSDictionary *expectedJSONAsDict =
+  NSDictionary* expectedJSONAsDict =
       [NSJSONSerialization JSONObjectWithData:goldenFileData
                                       options:NSJSONReadingMutableContainers
                                         error:&err];

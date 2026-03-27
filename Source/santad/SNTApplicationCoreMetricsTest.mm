@@ -25,7 +25,7 @@
 
 @interface SNTApplicationCoreMetricsTest : XCTestCase
 @property id mockConfigurator;
-@property NSDictionary *extraMetricLabels;
+@property NSDictionary* extraMetricLabels;
 @end
 
 @implementation SNTApplicationCoreMetricsTest
@@ -41,13 +41,13 @@
   [self.mockConfigurator stopMocking];
 }
 
-- (NSDictionary *)fixUpDatesAndDataValuesOf:(NSDictionary *)exportedMetrics {
-  NSMutableDictionary *mutableMetrics = [[SNTMetricFormatTestHelper
+- (NSDictionary*)fixUpDatesAndDataValuesOf:(NSDictionary*)exportedMetrics {
+  NSMutableDictionary* mutableMetrics = [[SNTMetricFormatTestHelper
       convertDatesToFixedDateWithExportDict:exportedMetrics] mutableCopy];
 
   // Ensure that we got data of the correct type but do not check the values as they'll change per
   // call. Instead we stub out the values for testing.
-  NSMutableDictionary *metric = mutableMetrics[@"metrics"][@"/proc/birth_timestamp"];
+  NSMutableDictionary* metric = mutableMetrics[@"metrics"][@"/proc/birth_timestamp"];
   XCTAssertTrue([metric[@"fields"][@""][0][@"data"] isKindOfClass:[NSNumber class]],
                 @"/proc/birth_timestamp data is not a number");
   metric[@"fields"][@""][0][@"data"] = @1634148013203157;
@@ -85,18 +85,18 @@
 
   SNTRegisterCoreMetrics();
 
-  NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
+  NSString* version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
 
-  NSString *shortOSVersion = [SNTSystemInfo osVersion];
+  NSString* shortOSVersion = [SNTSystemInfo osVersion];
 
-  NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
+  NSISO8601DateFormatter* formatter = [[NSISO8601DateFormatter alloc] init];
   formatter.formatOptions =
       NSISO8601DateFormatWithFractionalSeconds | NSISO8601DateFormatWithInternetDateTime;
 
-  NSDate *fixedDate = [formatter dateFromString:@"2021-09-16T21:07:34.826Z"];
-  NSString *hostname = [NSProcessInfo processInfo].hostName;
+  NSDate* fixedDate = [formatter dateFromString:@"2021-09-16T21:07:34.826Z"];
+  NSString* hostname = [NSProcessInfo processInfo].hostName;
 
-  NSDictionary *expected = @{
+  NSDictionary* expected = @{
     @"metrics" : @{
       @"/build/label" : @{
         @"description" : @"Version of the binary",
@@ -212,16 +212,16 @@
     },
   };
 
-  SNTMetricSet *metricSet = [SNTMetricSet sharedInstance];
+  SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
 
-  NSDictionary *exportedMetrics = [self fixUpDatesAndDataValuesOf:[metricSet export]];
+  NSDictionary* exportedMetrics = [self fixUpDatesAndDataValuesOf:[metricSet export]];
   XCTAssertNotNil(exportedMetrics);
 
   XCTAssertEqualObjects(expected[@"root_labels"], exportedMetrics[@"root_labels"],
                         @"root_labels are different");
 
-  for (NSString *metricName in expected[@"metrics"]) {
-    NSDictionary *other = exportedMetrics[@"metrics"][metricName];
+  for (NSString* metricName in expected[@"metrics"]) {
+    NSDictionary* other = exportedMetrics[@"metrics"][metricName];
     XCTAssertNotNil(other, @"exported Metrics Missing %@", metricName);
     XCTAssertEqualObjects(expected[@"metrics"][metricName], other,
                           @"%@ does not match expected values", metricName);
@@ -238,10 +238,10 @@
 
   SNTRegisterCoreMetrics();
 
-  SNTMetricSet *metricSet = [SNTMetricSet sharedInstance];
-  NSDictionary *output = [metricSet export];
+  SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
+  NSDictionary* output = [metricSet export];
 
-  NSDictionary *expectedRootLabels = @{
+  NSDictionary* expectedRootLabels = @{
     @"host_name" : @"santa-host",
     @"job_name" : @"santad",
     @"service_name" : @"santa",
@@ -263,10 +263,10 @@
 
   SNTRegisterCoreMetrics();
 
-  SNTMetricSet *metricSet = [SNTMetricSet sharedInstance];
-  NSDictionary *output = [metricSet export];
+  SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
+  NSDictionary* output = [metricSet export];
 
-  NSDictionary *expectedRootLabels = @{
+  NSDictionary* expectedRootLabels = @{
     @"job_name" : @"santad",
     @"service_name" : @"santa",
     @"corp_site" : @"roam",

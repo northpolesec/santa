@@ -56,7 +56,7 @@ class MockAuthResultCache : public AuthResultCache {
  public:
   using AuthResultCache::AuthResultCache;
 
-  MOCK_METHOD(void, RemoveFromCache, (const es_file_t *));
+  MOCK_METHOD(void, RemoveFromCache, (const es_file_t*));
 };
 
 @interface SNTEndpointSecurityRecorderTest : XCTestCase
@@ -68,8 +68,8 @@ class MockAuthResultCache : public AuthResultCache {
 - (void)setUp {
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
-  NSString *testPattern = @"^/foo/match.*";
-  NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:testPattern
+  NSString* testPattern = @"^/foo/match.*";
+  NSRegularExpression* re = [NSRegularExpression regularExpressionWithPattern:testPattern
                                                                       options:0
                                                                         error:NULL];
   OCMStub([self.mockConfigurator fileChangesRegex]).andReturn(re);
@@ -132,7 +132,7 @@ class MockAuthResultCache : public AuthResultCache {
 
   [recorderClient enable];
 
-  for (const auto &event : expectedEventSubs) {
+  for (const auto& event : expectedEventSubs) {
     XCTAssertNoThrow(santa::EventTypeToString(event));
   }
 
@@ -142,18 +142,18 @@ class MockAuthResultCache : public AuthResultCache {
 - (void)testTelemetryMappings {
   std::set<es_event_type_t> expectedEventSubs = [self expectedSubscriptions];
   // Make sure a TelemetryEvent exists for each subscription
-  for (const auto &event : expectedEventSubs) {
+  for (const auto& event : expectedEventSubs) {
     XCTAssertNotEqual(santa::ESEventToTelemetryEvent(event), TelemetryEvent::kNone,
                       "Unexpected TelemetryEvent for ES event: %d", event);
     ;
   }
 }
 
-typedef void (^TestHelperBlock)(es_message_t *message,
+typedef void (^TestHelperBlock)(es_message_t* message,
                                 std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-                                SNTEndpointSecurityRecorder *recorderClient,
+                                SNTEndpointSecurityRecorder* recorderClient,
                                 std::shared_ptr<PrefixTree<Unit>> prefixTree,
-                                dispatch_semaphore_t *sema, dispatch_semaphore_t *semaMetrics);
+                                dispatch_semaphore_t* sema, dispatch_semaphore_t* semaMetrics);
 
 es_file_t targetFileMatchesRegex = MakeESFile("/foo/matches");
 es_file_t targetFileMatchesAlsoRegex = MakeESFile("/foo/matches_also");
@@ -210,7 +210,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   id mockCC = OCMStrictClassMock([SNTCompilerController class]);
 
-  SNTEndpointSecurityRecorder *recorderClient =
+  SNTEndpointSecurityRecorder* recorderClient =
       [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
                                                  metrics:nullptr
                                                   logger:mockLogger
@@ -250,10 +250,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   // CLOSE not modified, but was_mapped_writable, should remove from cache,
   // and matches fileChangesRegex
   TestHelperBlock testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
         esMsg->event.close.modified = false;
         esMsg->event.close.was_mapped_writable = true;
@@ -278,10 +278,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   // CLOSE not modified, but was_mapped_writable, remove from cache, and does not match
   // fileChangesRegex
   TestHelperBlock testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
         esMsg->event.close.modified = false;
         esMsg->event.close.was_mapped_writable = true;
@@ -302,10 +302,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 - (void)testHandleMessage {
   // CLOSE not modified, bail early
   TestHelperBlock testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
         esMsg->event.close.modified = false;
         esMsg->event.close.target = NULL;
@@ -320,10 +320,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // CLOSE modified, remove from cache, and matches fileChangesRegex
   testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
         esMsg->event.close.modified = true;
         esMsg->event.close.target = &targetFileMatchesRegex;
@@ -345,10 +345,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // CLOSE modified, remove from cache, but doesn't match fileChangesRegex
   testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
         esMsg->event.close.modified = true;
         esMsg->event.close.target = &targetFileMissesRegex;
@@ -364,10 +364,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // CLONE Prefix match, bail early
   testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLONE;
         esMsg->event.clone.source = &targetFileMatchesRegex;
         esMsg->event.clone.target_dir = &targetFileMissesRegex;
@@ -387,10 +387,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // COPYFILE Matches regex, not prefix, handle message
   testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_COPYFILE;
         esMsg->event.copyfile.source = &targetFileMatchesAlsoRegex;
         esMsg->event.copyfile.target_file = &targetFileMissesRegex;
@@ -409,10 +409,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // UNLINK, remove from cache, but doesn't match fileChangesRegex
   testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_UNLINK;
         esMsg->event.unlink.target = &targetFileMissesRegex;
         Message msg(mockESApi, esMsg);
@@ -427,10 +427,10 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // EXCHANGEDATA, Prefix match, bail early
   testBlock =
-      ^(es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-        SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-        __autoreleasing dispatch_semaphore_t *sema,
-        __autoreleasing dispatch_semaphore_t *semaMetrics) {
+      ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+        SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+        __autoreleasing dispatch_semaphore_t* sema,
+        __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA;
         esMsg->event.exchangedata.file1 = &targetFileMatchesRegex;
         prefixTree->InsertPrefix(esMsg->event.exchangedata.file1->path.data, Unit{});
@@ -449,9 +449,9 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // LINK, Prefix match, bail early
   testBlock = ^(
-      es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-      SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-      __autoreleasing dispatch_semaphore_t *sema, __autoreleasing dispatch_semaphore_t *semaMetrics)
+      es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+      SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+      __autoreleasing dispatch_semaphore_t* sema, __autoreleasing dispatch_semaphore_t* semaMetrics)
 
   {
     esMsg->event_type = ES_EVENT_TYPE_NOTIFY_LINK;
@@ -474,9 +474,9 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // EXIT, message handled
   testBlock = ^(
-      es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-      SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-      __autoreleasing dispatch_semaphore_t *sema, __autoreleasing dispatch_semaphore_t *semaMetrics)
+      es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+      SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+      __autoreleasing dispatch_semaphore_t* sema, __autoreleasing dispatch_semaphore_t* semaMetrics)
 
   {
     esMsg->event_type = ES_EVENT_TYPE_NOTIFY_EXIT;
@@ -501,9 +501,9 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // FORK, message handled
   testBlock = ^(
-      es_message_t *esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
-      SNTEndpointSecurityRecorder *recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
-      __autoreleasing dispatch_semaphore_t *sema, __autoreleasing dispatch_semaphore_t *semaMetrics)
+      es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+      SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+      __autoreleasing dispatch_semaphore_t* sema, __autoreleasing dispatch_semaphore_t* semaMetrics)
 
   {
     esMsg->event_type = ES_EVENT_TYPE_NOTIFY_FORK;
@@ -528,7 +528,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 - (void)testGetTargetFileForPrefixTree {
   // Ensure `GetTargetFileForPrefixTree` returns expected field for each
   // subscribed event type in the `SNTEndpointSecurityRecorder`.
-  extern es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg);
+  extern es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg);
 
   es_file_t cloneFile = MakeESFile("clone");
   es_file_t closeFile = MakeESFile("close");
@@ -604,7 +604,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   // Mock decision cache to return a decision with holdAndAsk=YES
   id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.holdAndAsk = YES;
   OCMStub([mockDecisionCache cachedDecisionForFile:esMsg.event.exec.target->executable->stat])
       .ignoringNonObjectArgs()
@@ -614,7 +614,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   Message msg(mockESApi, &esMsg);
   OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
 
-  SNTEndpointSecurityRecorder *recorderClient =
+  SNTEndpointSecurityRecorder* recorderClient =
       [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
                                                  metrics:nullptr
                                                   logger:mockLogger
@@ -677,7 +677,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   // Mock decision cache to return a decision with holdAndAsk=NO
   id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.holdAndAsk = NO;
   OCMStub([mockDecisionCache cachedDecisionForFile:esMsg.event.exec.target->executable->stat])
       .ignoringNonObjectArgs()
@@ -687,7 +687,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   Message msg(mockESApi, &esMsg);
   OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
 
-  SNTEndpointSecurityRecorder *recorderClient =
+  SNTEndpointSecurityRecorder* recorderClient =
       [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
                                                  metrics:nullptr
                                                   logger:mockLogger
@@ -759,7 +759,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   Message msg(mockESApi, &esMsg);
   OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
 
-  SNTEndpointSecurityRecorder *recorderClient =
+  SNTEndpointSecurityRecorder* recorderClient =
       [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
                                                  metrics:nullptr
                                                   logger:mockLogger

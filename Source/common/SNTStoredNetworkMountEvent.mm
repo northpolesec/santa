@@ -31,7 +31,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, uuid);
   ENCODE(coder, mountFromName);
@@ -40,7 +40,7 @@
   ENCODE(coder, process);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, uuid, NSString);
@@ -52,7 +52,7 @@
   return self;
 }
 
-- (NSString *)uniqueID {
+- (NSString*)uniqueID {
   // Dedupe on URL / mountFromName
   return [NSString stringWithFormat:@"%@", self.mountFromName];
 }
@@ -62,21 +62,21 @@
   return YES;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString stringWithFormat:@"SNTStoredNetworkMountEvent[%@]: %@, By: %@", self.idx,
                                     self.mountFromName, self.process];
 }
 
-- (NSString *)sanitizedMountFromRemovingCredentials {
+- (NSString*)sanitizedMountFromRemovingCredentials {
   if (!self.mountFromName) {
     return self.mountFromName;
   }
 
-  NSURLComponents *components = [NSURLComponents componentsWithString:self.mountFromName];
+  NSURLComponents* components = [NSURLComponents componentsWithString:self.mountFromName];
   if (components && (components.URL || components.password)) {
     components.user = nil;
     components.password = nil;
-    NSURL *sanitizedURL = [components URL];
+    NSURL* sanitizedURL = [components URL];
     if (sanitizedURL) {
       return [sanitizedURL absoluteString];
     }
@@ -85,17 +85,17 @@
   return self.mountFromName;
 }
 
-- (NSString *)sanitizedMountFromRemovingPassword {
+- (NSString*)sanitizedMountFromRemovingPassword {
   if (!self.mountFromName) {
     return self.mountFromName;
   }
 
-  NSURL *url = [NSURL URLWithString:self.mountFromName];
+  NSURL* url = [NSURL URLWithString:self.mountFromName];
   if (url && url.password) {
-    NSURLComponents *components = [NSURLComponents componentsWithURL:url
+    NSURLComponents* components = [NSURLComponents componentsWithURL:url
                                              resolvingAgainstBaseURL:NO];
     components.password = nil;
-    NSURL *sanitizedURL = [components URL];
+    NSURL* sanitizedURL = [components URL];
     if (sanitizedURL) {
       return [sanitizedURL absoluteString];
     }

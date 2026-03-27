@@ -54,9 +54,9 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
 // This class is not meant to be directly instantiated. Use derived classes instead.
 @interface SNTStoredTemporaryMonitorModeAuditEvent : SNTStoredEvent <NSSecureCoding>
 
-@property(readonly) NSString *uuid;
+@property(readonly) NSString* uuid;
 
-- (instancetype)initWithUUID:(NSString *)uuid;
+- (instancetype)initWithUUID:(NSString*)uuid;
 - (instancetype)init NS_UNAVAILABLE;
 
 @end
@@ -70,7 +70,7 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
 @property(readonly) uint32_t seconds;
 @property(readonly) SNTTemporaryMonitorModeEnterReason reason;
 
-- (instancetype)initWithUUID:(NSString *)uuid
+- (instancetype)initWithUUID:(NSString*)uuid
                      seconds:(uint32_t)seconds
                       reason:(SNTTemporaryMonitorModeEnterReason)reason;
 - (instancetype)init NS_UNAVAILABLE;
@@ -85,7 +85,7 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
 
 @property(readonly) SNTTemporaryMonitorModeLeaveReason reason;
 
-- (instancetype)initWithUUID:(NSString *)uuid reason:(SNTTemporaryMonitorModeLeaveReason)reason;
+- (instancetype)initWithUUID:(NSString*)uuid reason:(SNTTemporaryMonitorModeLeaveReason)reason;
 - (instancetype)init NS_UNAVAILABLE;
 
 @end

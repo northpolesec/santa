@@ -23,7 +23,7 @@
 @implementation SNTStoredNetworkMountEventTest
 
 - (void)testUniqueID {
-  SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
+  SNTStoredNetworkMountEvent* event = [[SNTStoredNetworkMountEvent alloc] init];
   event.mountFromName = @"//server/share";
   event.mountOnName = @"/Volumes/share";
   event.fsType = @"smbfs";
@@ -37,12 +37,12 @@
 
 - (void)testUnactionableEvent {
   // Network mount events should be unactionable (OK to be part of backoff cache)
-  SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
+  SNTStoredNetworkMountEvent* event = [[SNTStoredNetworkMountEvent alloc] init];
   XCTAssertTrue([event unactionableEvent]);
 }
 
 - (void)testEncodeDecode {
-  SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
+  SNTStoredNetworkMountEvent* event = [[SNTStoredNetworkMountEvent alloc] init];
   event.mountFromName = @"//server/share";
   event.mountOnName = @"/Volumes/share";
   event.fsType = @"smbfs";
@@ -63,23 +63,23 @@
   event.process.parent.pid = @(100);
 
   // Archive the event
-  NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
+  NSData* archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
                                                 requiringSecureCoding:YES
                                                                 error:nil];
 
   XCTAssertNotNil(archivedEvent);
 
   // Unarchive the event
-  NSSet *allowedClasses =
+  NSSet* allowedClasses =
       [NSSet setWithObjects:[SNTStoredNetworkMountEvent class], [SNTProcessChain class], nil];
-  SNTStoredEvent *unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  SNTStoredEvent* unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                         fromData:archivedEvent
                                                                            error:nil];
 
   XCTAssertNotNil(unarchivedEvent);
   XCTAssertTrue([unarchivedEvent isKindOfClass:[SNTStoredNetworkMountEvent class]]);
 
-  SNTStoredNetworkMountEvent *decodedEvent = (SNTStoredNetworkMountEvent *)unarchivedEvent;
+  SNTStoredNetworkMountEvent* decodedEvent = (SNTStoredNetworkMountEvent*)unarchivedEvent;
 
   // Verify mount properties
   XCTAssertEqualObjects(decodedEvent.mountFromName, @"//server/share");
@@ -107,28 +107,28 @@
 
 - (void)testEncodeDecodeWithNilValues {
   // Test that encoding/decoding works with nil process
-  SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
+  SNTStoredNetworkMountEvent* event = [[SNTStoredNetworkMountEvent alloc] init];
   event.mountFromName = @"//server/share";
   event.mountOnName = nil;  // Test nil value
   event.fsType = @"nfs";
   event.process = nil;  // Test nil process
 
-  NSData *archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
+  NSData* archivedEvent = [NSKeyedArchiver archivedDataWithRootObject:event
                                                 requiringSecureCoding:YES
                                                                 error:nil];
 
   XCTAssertNotNil(archivedEvent);
 
-  NSSet *allowedClasses =
+  NSSet* allowedClasses =
       [NSSet setWithObjects:[SNTStoredNetworkMountEvent class], [SNTProcessChain class], nil];
-  SNTStoredEvent *unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  SNTStoredEvent* unarchivedEvent = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                         fromData:archivedEvent
                                                                            error:nil];
 
   XCTAssertNotNil(unarchivedEvent);
   XCTAssertTrue([unarchivedEvent isKindOfClass:[SNTStoredNetworkMountEvent class]]);
 
-  SNTStoredNetworkMountEvent *decodedEvent = (SNTStoredNetworkMountEvent *)unarchivedEvent;
+  SNTStoredNetworkMountEvent* decodedEvent = (SNTStoredNetworkMountEvent*)unarchivedEvent;
 
   XCTAssertEqualObjects(decodedEvent.mountFromName, @"//server/share");
   XCTAssertNil(decodedEvent.mountOnName);
@@ -137,7 +137,7 @@
 }
 
 - (void)testSanitizedMountFrom {
-  SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
+  SNTStoredNetworkMountEvent* event = [[SNTStoredNetworkMountEvent alloc] init];
 
   // Test with both username and password
   event.mountFromName = @"//admin:password@192.168.64.2:445/share";

@@ -216,7 +216,7 @@ using santa::Unit;
   uint32_t count = 4096;
   auto t = new PrefixTree<int>(count * (uint32_t)[NSUUID UUID].UUIDString.length);
 
-  __block NSMutableArray *UUIDs = [NSMutableArray arrayWithCapacity:count];
+  __block NSMutableArray* UUIDs = [NSMutableArray arrayWithCapacity:count];
   for (int i = 0; i < count; ++i) {
     [UUIDs addObject:[NSUUID UUID].UUIDString];
   }

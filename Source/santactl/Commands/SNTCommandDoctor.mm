@@ -34,7 +34,7 @@
 @interface SNTCommandDoctor : SNTCommand <SNTCommandProtocol, SNTSyncServiceLogReceiverXPC>
 @end
 
-void print(NSString *format, ...) {
+void print(NSString* format, ...) {
   va_list args;
   va_start(args, format);
 
@@ -73,11 +73,11 @@ REGISTER_COMMAND_NAME(@"doctor")
   return NO;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Check your system for potential problems.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return @"Doctor checks your system for potential problems and prints out details of any problems "
          @"that it finds.\n"
          @"\n"
@@ -87,7 +87,7 @@ REGISTER_COMMAND_NAME(@"doctor")
          @"to resolve itself.";
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   BOOL err = NO;
   err |= [self validateProcesses];
   err |= [self validateConfiguration];
@@ -112,7 +112,7 @@ REGISTER_COMMAND_NAME(@"doctor")
     char name[2 * MAXCOMLEN];
     proc_name(pid, name, sizeof(name));
 
-    NSString *nsName = @(name);
+    NSString* nsName = @(name);
     if ([nsName isEqualToString:@"Santa"]) foundSanta = YES;
     if ([nsName isEqualToString:@"com.northpolesec.santa.daemon"]) foundSantad = YES;
     if ([nsName isEqualToString:@"santasyncservice"]) foundSantaSyncService = YES;
@@ -142,14 +142,14 @@ REGISTER_COMMAND_NAME(@"doctor")
 
   [self checkFileAccessPolicyOverride];
 
-  NSArray *errors = [[SNTConfigurator configurator] validateConfiguration];
+  NSArray* errors = [[SNTConfigurator configurator] validateConfiguration];
   if (!errors.count) {
     print(@"[+] No configuration errors detected");
     print(@"");
     return NO;
   }
 
-  for (NSString *e in errors) {
+  for (NSString* e in errors) {
     print(@"[-] %s", [e UTF8String]);
   }
 
@@ -158,14 +158,14 @@ REGISTER_COMMAND_NAME(@"doctor")
 }
 
 - (void)checkFileAccessPolicyOverride {
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTConfigurator* config = [SNTConfigurator configurator];
 
   // Only relevant if MDM has an FAA config set.
   if (!config.fileAccessPolicy && !config.fileAccessPolicyPlist) {
     return;
   }
 
-  MOLXPCConnection *conn = [SNTXPCControlInterface configuredConnection];
+  MOLXPCConnection* conn = [SNTXPCControlInterface configuredConnection];
   [conn resume];
 
   id<SNTDaemonControlXPC> proxy = [conn synchronousRemoteObjectProxy];
@@ -174,8 +174,8 @@ REGISTER_COMMAND_NAME(@"doctor")
   }
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  [proxy watchItemsState:^(BOOL enabled, uint64_t ruleCount, NSString *policyVersion,
-                           santa::WatchItems::DataSource dataSource, NSString *configPath,
+  [proxy watchItemsState:^(BOOL enabled, uint64_t ruleCount, NSString* policyVersion,
+                           santa::WatchItems::DataSource dataSource, NSString* configPath,
                            NSTimeInterval lastUpdateEpoch) {
     if (enabled && dataSource == santa::WatchItems::DataSource::kDatabase) {
       print(@"[?] File access policy from MDM configuration is being overridden by sync server "
@@ -188,16 +188,16 @@ REGISTER_COMMAND_NAME(@"doctor")
   [conn invalidate];
 }
 
-- (void)didReceiveLog:(NSString *)log withType:(os_log_type_t)logType {
+- (void)didReceiveLog:(NSString*)log withType:(os_log_type_t)logType {
   print(@"    %s", log.UTF8String);
 }
 
 - (BOOL)validateSync {
   print(@"=> Validating sync...");
 
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTConfigurator* config = [SNTConfigurator configurator];
 
-  NSURL *syncBaseURL = config.syncBaseURL;
+  NSURL* syncBaseURL = config.syncBaseURL;
   if (!syncBaseURL) {
     print(@"[+] Sync is disabled");
     print(@"");
@@ -214,11 +214,11 @@ REGISTER_COMMAND_NAME(@"doctor")
     print(@"[+] Sync is using HTTPS");
   }
 
-  MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
+  MOLXPCConnection* conn = [SNTXPCSyncServiceInterface configuredConnection];
   [conn resume];
 
-  NSXPCListener *logListener = [NSXPCListener anonymousListener];
-  MOLXPCConnection *lr = [[MOLXPCConnection alloc] initServerWithListener:logListener];
+  NSXPCListener* logListener = [NSXPCListener anonymousListener];
+  MOLXPCConnection* lr = [[MOLXPCConnection alloc] initServerWithListener:logListener];
   lr.exportedObject = self;
   lr.unprivilegedInterface =
       [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
@@ -235,7 +235,7 @@ REGISTER_COMMAND_NAME(@"doctor")
   }
 
   [proxy checkSyncServerStatus:logListener.endpoint
-                         reply:^(NSInteger statusCode, NSString *description) {
+                         reply:^(NSInteger statusCode, NSString* description) {
                            if (statusCode == 0) {
                              print(@"[-] Failed to retrieve preflight data: %s",
                                    description.UTF8String);

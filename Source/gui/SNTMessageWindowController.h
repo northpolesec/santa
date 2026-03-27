@@ -17,18 +17,18 @@
 @class MOLXPCConnection;
 
 @protocol SNTMessageWindowControllerDelegate
-- (void)windowDidCloseSilenceHash:(NSString *)hash withInterval:(NSTimeInterval)interval;
+- (void)windowDidCloseSilenceHash:(NSString*)hash withInterval:(NSTimeInterval)interval;
 @end
 
 @interface SNTMessageWindowController : NSWindowController <NSWindowDelegate>
 
-+ (NSWindow *)defaultWindow;
++ (NSWindow*)defaultWindow;
 - (IBAction)showWindow:(id)sender;
 - (IBAction)closeWindow:(id)sender;
 
 /// Generate a distinct key for a given displayed event. This key is used for silencing future
 /// notifications.
-- (NSString *)messageHash;
+- (NSString*)messageHash;
 
 ///  Linked to checkbox in UI to prevent future notifications for the given event for a given period
 @property NSTimeInterval silenceFutureNotificationsPeriod;
@@ -37,6 +37,6 @@
 
 // Keep track of the current bundle listener, allowing us to cancel hashing if the window is
 // dismissed.
-@property MOLXPCConnection *bundleListener;
+@property MOLXPCConnection* bundleListener;
 
 @end

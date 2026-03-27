@@ -23,11 +23,11 @@
 /// A dictionary to hold all of the available commands.
 /// Key is the name of the command
 /// Value is the Class
-static NSMutableDictionary *registeredCommands;
-static NSMutableDictionary *registeredAliases;
+static NSMutableDictionary* registeredCommands;
+static NSMutableDictionary* registeredAliases;
 
 + (void)registerCommand:(Class<SNTCommandProtocol, SNTCommandRunProtocol>)command
-                  named:(NSString *)name {
+                  named:(NSString*)name {
   if (!registeredCommands) {
     registeredCommands = [NSMutableDictionary dictionary];
   }
@@ -38,12 +38,12 @@ static NSMutableDictionary *registeredAliases;
       registeredAliases = [NSMutableDictionary dictionary];
     }
 
-    NSSet<NSString *> *aliases = [command aliases];
+    NSSet<NSString*>* aliases = [command aliases];
     if (!aliases) {
       return;
     }
 
-    for (NSString *alias in aliases) {
+    for (NSString* alias in aliases) {
       if (registeredAliases[alias]) {
         TEE_LOGE(@"Duplicate alias registered: %@", alias);
         exit(EXIT_FAILURE);
@@ -54,17 +54,17 @@ static NSMutableDictionary *registeredAliases;
   }
 }
 
-+ (NSString *)usage {
-  NSMutableString *helpText = [[NSMutableString alloc] init];
++ (NSString*)usage {
+  NSMutableString* helpText = [[NSMutableString alloc] init];
 
   int longestCommandName = 0;
-  for (NSString *cmdName in registeredCommands) {
+  for (NSString* cmdName in registeredCommands) {
     if ((int)[cmdName length] > longestCommandName) {
       longestCommandName = (int)[cmdName length];
     }
   }
 
-  for (NSString *cmdName in
+  for (NSString* cmdName in
        [[registeredCommands allKeys] sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)]) {
     Class<SNTCommandProtocol> command = registeredCommands[cmdName];
 
@@ -80,11 +80,11 @@ static NSMutableDictionary *registeredAliases;
   return helpText;
 }
 
-+ (NSString *)helpForCommandWithName:(NSString *)commandName {
++ (NSString*)helpForCommandWithName:(NSString*)commandName {
   Class<SNTCommandProtocol> command = registeredCommands[commandName];
   if (command) {
-    NSString *shortHelp = [command shortHelpText];
-    NSString *longHelp = [command longHelpText];
+    NSString* shortHelp = [command shortHelpText];
+    NSString* longHelp = [command longHelpText];
     if (longHelp || shortHelp) {
       longHelp =
           [NSString stringWithFormat:@"Help for '%@':\n%@", commandName, longHelp ?: shortHelp];
@@ -98,7 +98,7 @@ static NSMutableDictionary *registeredAliases;
     longHelp = [longHelp stringByAppendingString:@"\n"];
 
     if ([command respondsToSelector:@selector(aliases)]) {
-      NSSet<NSString *> *aliases = [command aliases];
+      NSSet<NSString*>* aliases = [command aliases];
       if (aliases.count > 0) {
         longHelp =
             [NSString stringWithFormat:@"%@\nAliases: %@\n", longHelp,
@@ -111,8 +111,8 @@ static NSMutableDictionary *registeredAliases;
   return nil;
 }
 
-+ (MOLXPCConnection *)connectToDaemonRequired:(BOOL)required {
-  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
++ (MOLXPCConnection*)connectToDaemonRequired:(BOOL)required {
+  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
 
   if (required) {
     daemonConn.invalidationHandler = ^{
@@ -127,20 +127,20 @@ static NSMutableDictionary *registeredAliases;
   return daemonConn;
 }
 
-+ (BOOL)hasCommandWithName:(NSString *)commandName {
++ (BOOL)hasCommandWithName:(NSString*)commandName {
   return ([registeredCommands objectForKey:commandName] != nil);
 }
 
-+ (NSString *)resolveCommandName:(NSString *)name {
++ (NSString*)resolveCommandName:(NSString*)name {
   // Remove hyphens and underscores
-  NSString *normalized = [[name stringByReplacingOccurrencesOfString:@"-" withString:@""]
+  NSString* normalized = [[name stringByReplacingOccurrencesOfString:@"-" withString:@""]
       stringByReplacingOccurrencesOfString:@"_"
                                 withString:@""];
 
   return registeredAliases[normalized] ?: normalized;
 }
 
-+ (void)runCommandWithName:(NSString *)commandName arguments:(NSArray *)arguments {
++ (void)runCommandWithName:(NSString*)commandName arguments:(NSArray*)arguments {
   Class<SNTCommandProtocol, SNTCommandRunProtocol> command = registeredCommands[commandName];
 
   if ([command requiresRoot] && getuid() != 0) {
@@ -148,7 +148,7 @@ static NSMutableDictionary *registeredAliases;
     exit(2);
   }
 
-  MOLXPCConnection *daemonConn = [self connectToDaemonRequired:[command requiresDaemonConn]];
+  MOLXPCConnection* daemonConn = [self connectToDaemonRequired:[command requiresDaemonConn]];
   [command runWithArguments:arguments daemonConnection:daemonConn];
 
   // The command is responsible for quitting.

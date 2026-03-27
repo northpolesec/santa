@@ -141,7 +141,7 @@ using santa::ScopedCFTypeRef;
 - (void)testBridge {
   ScopedCFTypeRef<CFStringRef> scopedString = ScopedCFTypeRef<CFStringRef>::Retain(CFSTR("foo"));
 
-  NSString *s = scopedString.Bridge<NSString *>();
+  NSString* s = scopedString.Bridge<NSString*>();
   XCTAssertEqualObjects(s, @"foo");
 
   // Force s to nil to ensure no issues with overrelase.
@@ -154,7 +154,7 @@ using santa::ScopedCFTypeRef;
 - (void)testBridgeRelease {
   ScopedCFTypeRef<CFStringRef> scopedString = ScopedCFTypeRef<CFStringRef>::Retain(CFSTR("foo"));
 
-  NSString *s = scopedString.BridgeRelease<NSString *>();
+  NSString* s = scopedString.BridgeRelease<NSString*>();
   XCTAssertEqualObjects(s, @"foo");
 
   // The scoped object should no longer be valid as it was moved into ARC
@@ -162,7 +162,7 @@ using santa::ScopedCFTypeRef;
 }
 
 - (void)testBridgeRetain {
-  NSString *s = @"foo";
+  NSString* s = @"foo";
 
   auto scopedString = ScopedCFTypeRef<CFStringRef>::BridgeRetain(s);
   XCTAssertTrue(scopedString);
@@ -179,20 +179,20 @@ using santa::ScopedCFTypeRef;
   ScopedCFTypeRef<CFStringRef> s2;
   XCTAssertTrue(s1);
   XCTAssertFalse(s2);
-  XCTAssertEqualObjects(s1.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s1.Bridge<NSString*>(), @"foo");
 
   // Move assignment from s1 to s2, verify contents and that s1 was moved out of
   s2 = std::move(s1);
   XCTAssertFalse(s1);
   XCTAssertTrue(s2);
-  XCTAssertEqualObjects(s2.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s2.Bridge<NSString*>(), @"foo");
 
   // Move ctor from s2 into s3
   ScopedCFTypeRef<CFStringRef> s3(std::move(s2));
   XCTAssertFalse(s1);
   XCTAssertFalse(s2);
   XCTAssertTrue(s3);
-  XCTAssertEqualObjects(s3.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s3.Bridge<NSString*>(), @"foo");
 }
 
 - (void)testCopies {
@@ -200,30 +200,30 @@ using santa::ScopedCFTypeRef;
   ScopedCFTypeRef<CFStringRef> s2;
   XCTAssertTrue(s1);
   XCTAssertFalse(s2);
-  XCTAssertEqualObjects(s1.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s1.Bridge<NSString*>(), @"foo");
 
   // Copy assignment from s1 to s2
   s2 = s1;
   XCTAssertTrue(s1);
   XCTAssertTrue(s2);
-  XCTAssertEqualObjects(s1.Bridge<NSString *>(), @"foo");
-  XCTAssertEqualObjects(s2.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s1.Bridge<NSString*>(), @"foo");
+  XCTAssertEqualObjects(s2.Bridge<NSString*>(), @"foo");
 
   // Copy ctor from s2 to s3
   ScopedCFTypeRef<CFStringRef> s3(s2);
   XCTAssertTrue(s1);
   XCTAssertTrue(s2);
   XCTAssertTrue(s3);
-  XCTAssertEqualObjects(s1.Bridge<NSString *>(), @"foo");
-  XCTAssertEqualObjects(s2.Bridge<NSString *>(), @"foo");
-  XCTAssertEqualObjects(s3.Bridge<NSString *>(), @"foo");
+  XCTAssertEqualObjects(s1.Bridge<NSString*>(), @"foo");
+  XCTAssertEqualObjects(s2.Bridge<NSString*>(), @"foo");
+  XCTAssertEqualObjects(s3.Bridge<NSString*>(), @"foo");
 }
 
 - (void)testAssumeFrom {
   {
-    auto [ret, scopedStr] = ScopedCFTypeRef<CFStringRef>::AssumeFrom(^bool(CFStringRef *out) {
+    auto [ret, scopedStr] = ScopedCFTypeRef<CFStringRef>::AssumeFrom(^bool(CFStringRef* out) {
       // Check expected memory of the out param
-      XCTAssertNotEqual(out, (CFStringRef *)NULL);
+      XCTAssertNotEqual(out, (CFStringRef*)NULL);
       XCTAssertEqual(*out, (CFStringRef)NULL);
 
       *out = CFStringCreateWithCString(kCFAllocatorDefault, "foo", kCFStringEncodingUTF8);
@@ -232,13 +232,13 @@ using santa::ScopedCFTypeRef;
     });
 
     XCTAssertTrue(ret);
-    XCTAssertEqualObjects(scopedStr.Bridge<NSString *>(), @"foo");
+    XCTAssertEqualObjects(scopedStr.Bridge<NSString*>(), @"foo");
   }
 
   {
-    auto [ret, scopedStr] = ScopedCFTypeRef<CFStringRef>::AssumeFrom(^int(CFStringRef *out) {
+    auto [ret, scopedStr] = ScopedCFTypeRef<CFStringRef>::AssumeFrom(^int(CFStringRef* out) {
       // Check expected memory of the out param
-      XCTAssertNotEqual(out, (CFStringRef *)NULL);
+      XCTAssertNotEqual(out, (CFStringRef*)NULL);
       XCTAssertEqual(*out, (CFStringRef)NULL);
 
       *out = CFStringCreateWithCString(kCFAllocatorDefault, "bar", kCFStringEncodingUTF8);
@@ -247,7 +247,7 @@ using santa::ScopedCFTypeRef;
     });
 
     XCTAssertEqual(ret, 123);
-    XCTAssertEqualObjects(scopedStr.Bridge<NSString *>(), @"bar");
+    XCTAssertEqualObjects(scopedStr.Bridge<NSString*>(), @"bar");
   }
 }
 

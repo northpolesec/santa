@@ -34,11 +34,11 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, enable);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [self init];
   if (self) {
     DECODE_SELECTOR(decoder, enable, NSNumber, boolValue);

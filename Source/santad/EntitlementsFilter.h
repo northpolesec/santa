@@ -29,29 +29,29 @@ namespace santa {
 
 class EntitlementsFilter {
  public:
-  static std::unique_ptr<EntitlementsFilter> Create(NSArray<NSString *> *teamid_filter,
-                                                    NSArray<NSString *> *prefix_filter);
+  static std::unique_ptr<EntitlementsFilter> Create(NSArray<NSString*>* teamid_filter,
+                                                    NSArray<NSString*>* prefix_filter);
 
-  EntitlementsFilter(NSArray<NSString *> *teamid_filter, NSArray<NSString *> *prefix_filter);
+  EntitlementsFilter(NSArray<NSString*>* teamid_filter, NSArray<NSString*>* prefix_filter);
 
   ~EntitlementsFilter() = default;
 
   // No copies, no moves
-  EntitlementsFilter(const EntitlementsFilter &other) = delete;
-  EntitlementsFilter &operator=(const EntitlementsFilter &other) = delete;
-  EntitlementsFilter(EntitlementsFilter &&other) = delete;
-  EntitlementsFilter &operator=(EntitlementsFilter &&rhs) = delete;
+  EntitlementsFilter(const EntitlementsFilter& other) = delete;
+  EntitlementsFilter& operator=(const EntitlementsFilter& other) = delete;
+  EntitlementsFilter(EntitlementsFilter&& other) = delete;
+  EntitlementsFilter& operator=(EntitlementsFilter&& rhs) = delete;
 
   // Filter out given information based on current state of the filter configuration.
-  NSDictionary *Filter(const char *teamID, NSDictionary *entitlements);
+  NSDictionary* Filter(const char* teamID, NSDictionary* entitlements);
 
   // Update TeamID/Prefix filters based on configuration changes.
-  void UpdateTeamIDFilter(NSArray<NSString *> *filter);
-  void UpdatePrefixFilter(NSArray<NSString *> *filter);
+  void UpdateTeamIDFilter(NSArray<NSString*>* filter);
+  void UpdatePrefixFilter(NSArray<NSString*>* filter);
 
  private:
-  void UpdateTeamIDFilterLocked(NSArray<NSString *> *filter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  void UpdatePrefixFilterLocked(NSArray<NSString *> *filter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void UpdateTeamIDFilterLocked(NSArray<NSString*>* filter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void UpdatePrefixFilterLocked(NSArray<NSString*>* filter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   std::set<std::string> teamid_filter_ ABSL_GUARDED_BY(lock_);
   santa::PrefixTree<santa::Unit> prefix_filter_ ABSL_GUARDED_BY(lock_);

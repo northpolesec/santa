@@ -20,6 +20,6 @@ namespace santa {
 BOOL SNTIsLiteInstall(void);
 
 /// Returns YES if the app bundle at the given path would be a Lite installation.
-BOOL SNTIsLiteAppBundle(NSString *appPath);
+BOOL SNTIsLiteAppBundle(NSString* appPath);
 
 }  // namespace santa

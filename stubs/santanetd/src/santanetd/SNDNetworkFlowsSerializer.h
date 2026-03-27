@@ -29,11 +29,11 @@ class NetworkActivity_Process;
 
 namespace santanetd {
 
-void PopulateNetworkActivityProcess(google::protobuf::Arena *arena,
-                                    ::santa::pb::v1::NetworkActivity_Process *process,
-                                    SNDProcessFlows *processFlows, SNTCachedDecision *cd);
+void PopulateNetworkActivityProcess(google::protobuf::Arena* arena,
+                                    ::santa::pb::v1::NetworkActivity_Process* process,
+                                    SNDProcessFlows* processFlows, SNTCachedDecision* cd);
 
-std::string FormatNetworkFlowsBasicString(SNDProcessFlows *processFlows, SNTCachedDecision *cd);
+std::string FormatNetworkFlowsBasicString(SNDProcessFlows* processFlows, SNTCachedDecision* cd);
 
 }  // namespace santanetd
 

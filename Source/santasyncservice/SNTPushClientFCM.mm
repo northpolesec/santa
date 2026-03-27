@@ -23,19 +23,19 @@
 #import "Source/santasyncservice/SNTSyncFCM.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
-static NSString *const kFCMActionKey = @"action";
-static NSString *const kFCMFileHashKey = @"file_hash";
-static NSString *const kFCMFileNameKey = @"file_name";
-static NSString *const kFCMTargetHostIDKey = @"target_host_id";
+static NSString* const kFCMActionKey = @"action";
+static NSString* const kFCMFileHashKey = @"file_hash";
+static NSString* const kFCMFileNameKey = @"file_name";
+static NSString* const kFCMTargetHostIDKey = @"target_host_id";
 
 @interface SNTPushClientFCM ()
 
 @property(weak) id<SNTPushNotificationsSyncDelegate> delegate;
 
-@property SNTSyncFCM *FCMClient;
+@property SNTSyncFCM* FCMClient;
 @property NSUInteger globalRuleSyncDeadline;
 
-@property NSString *token;
+@property NSString* token;
 @property NSUInteger fullSyncInterval;
 
 @end
@@ -58,11 +58,11 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
   return self.FCMClient.isConnected;
 }
 
-- (void)handlePreflightSyncState:(SNTSyncState *)syncState {
+- (void)handlePreflightSyncState:(SNTSyncState*)syncState {
   [self listenWithSyncState:syncState];
 }
 
-- (void)listenWithSyncState:(SNTSyncState *)syncState {
+- (void)listenWithSyncState:(SNTSyncState*)syncState {
   if (syncState.pushNotificationsFullSyncInterval) {
     self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval.unsignedIntegerValue;
   }
@@ -77,13 +77,13 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
   WEAKIFY(self);
 
   [self.FCMClient disconnect];
-  NSString *machineID = syncState.machineID;
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  NSString* machineID = syncState.machineID;
+  SNTConfigurator* config = [SNTConfigurator configurator];
   self.FCMClient = [[SNTSyncFCM alloc] initWithProject:config.fcmProject
                                                 entity:config.fcmEntity
                                                 apiKey:config.fcmAPIKey
                                   sessionConfiguration:syncState.session.configuration.copy
-                                        messageHandler:^(NSDictionary *message) {
+                                        messageHandler:^(NSDictionary* message) {
                                           if (!message || message[@"noOp"]) return;
                                           STRONGIFY(self);
                                           LOGD(@"%@", message);
@@ -91,14 +91,14 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
                                           [self processFCMMessage:message withMachineID:machineID];
                                         }];
 
-  self.FCMClient.tokenHandler = ^(NSString *t) {
+  self.FCMClient.tokenHandler = ^(NSString* t) {
     STRONGIFY(self);
     LOGD(@"tokenHandler: %@", t);
     self.token = t;
     [self.delegate preflightSync];
   };
 
-  self.FCMClient.connectionErrorHandler = ^(NSHTTPURLResponse *response, NSError *error) {
+  self.FCMClient.connectionErrorHandler = ^(NSHTTPURLResponse* response, NSError* error) {
     STRONGIFY(self);
     if (response) LOGE(@"FCM fatal response: %@", response);
     if (error) LOGE(@"FCM fatal error: %@", error);
@@ -116,15 +116,15 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
   self.FCMClient = nil;
 }
 
-- (void)processFCMMessage:(NSDictionary *)FCMmessage withMachineID:(NSString *)machineID {
-  NSDictionary *message = [self messageFromMessageData:[self messageDataFromFCMmessage:FCMmessage]];
+- (void)processFCMMessage:(NSDictionary*)FCMmessage withMachineID:(NSString*)machineID {
+  NSDictionary* message = [self messageFromMessageData:[self messageDataFromFCMmessage:FCMmessage]];
 
   if (!message) {
     LOGD(@"Push notification message is not in the expected format...dropping message");
     return;
   }
 
-  NSString *action = message[kFCMActionKey];
+  NSString* action = message[kFCMActionKey];
   if (!action) {
     LOGD(@"Push notification message contains no action");
     return;
@@ -137,8 +137,8 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
   // binary/bundle name so we can send out relevant notifications once the rules are actually
   // downloaded & added to local database.  We use a dictionary value so that we can later add a
   // count field when we start downloading the rules and receive the count information.
-  NSString *fileHash = message[kFCMFileHashKey];
-  NSString *fileName = message[kFCMFileNameKey];
+  NSString* fileHash = message[kFCMFileHashKey];
+  NSString* fileName = message[kFCMFileNameKey];
   if (fileName && fileHash) {
     [[SNTPushNotificationsTracker tracker] addNotification:[@{kFileName : fileName} mutableCopy]
                                                    forHash:fileHash];
@@ -150,7 +150,7 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
       [action isEqualToString:kLogSync]) {
     [self.delegate sync];
   } else if ([action isEqualToString:kRuleSync]) {
-    NSString *targetHostID = message[kFCMTargetHostIDKey];
+    NSString* targetHostID = message[kFCMTargetHostIDKey];
     if (targetHostID && [targetHostID caseInsensitiveCompare:machineID] == NSOrderedSame) {
       LOGD(@"Targeted rule_sync for host_id: %@", targetHostID);
       [self.delegate ruleSync];
@@ -164,19 +164,19 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
   }
 }
 
-- (NSData *)messageDataFromFCMmessage:(NSDictionary *)FCMmessage {
+- (NSData*)messageDataFromFCMmessage:(NSDictionary*)FCMmessage {
   if (![FCMmessage[@"data"] isKindOfClass:[NSDictionary class]]) return nil;
   if (![FCMmessage[@"data"][@"blob"] isKindOfClass:[NSString class]]) return nil;
   return [FCMmessage[@"data"][@"blob"] dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-- (NSDictionary *)messageFromMessageData:(NSData *)messageData {
+- (NSDictionary*)messageFromMessageData:(NSData*)messageData {
   if (!messageData) {
     LOGD(@"Unable to parse push notification message data");
     return nil;
   }
-  NSError *error;
-  NSDictionary *rawMessage = [NSJSONSerialization JSONObjectWithData:messageData
+  NSError* error;
+  NSDictionary* rawMessage = [NSJSONSerialization JSONObjectWithData:messageData
                                                              options:0
                                                                error:&error];
   if (!rawMessage) {
@@ -185,9 +185,9 @@ static NSString *const kFCMTargetHostIDKey = @"target_host_id";
   }
 
   // Create a new message dropping unexpected values
-  NSArray *allowedKeys = @[ kFCMActionKey, kFCMFileHashKey, kFCMFileNameKey, kFCMTargetHostIDKey ];
-  NSMutableDictionary *message = [NSMutableDictionary dictionaryWithCapacity:allowedKeys.count];
-  for (NSString *key in allowedKeys) {
+  NSArray* allowedKeys = @[ kFCMActionKey, kFCMFileHashKey, kFCMFileNameKey, kFCMTargetHostIDKey ];
+  NSMutableDictionary* message = [NSMutableDictionary dictionaryWithCapacity:allowedKeys.count];
+  for (NSString* key in allowedKeys) {
     if ([rawMessage[key] isKindOfClass:[NSString class]] && [rawMessage[key] length]) {
       message[key] = rawMessage[key];
     }

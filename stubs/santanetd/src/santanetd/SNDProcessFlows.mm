@@ -16,24 +16,24 @@
 
 @implementation SNDProcessFlows
 
-- (instancetype)initWithProcessInfo:(SNDProcessInfo *)processInfo {
+- (instancetype)initWithProcessInfo:(SNDProcessInfo*)processInfo {
   return [self init];
 }
 
-- (void)addFlow:(SNDFlowInfo *)flow {
+- (void)addFlow:(SNDFlowInfo*)flow {
 }
 
-- (void)enumerateFlowsUsingBlock:(void(NS_NOESCAPE ^)(SNDFlowInfo *flow))block {
+- (void)enumerateFlowsUsingBlock:(void(NS_NOESCAPE ^)(SNDFlowInfo* flow))block {
 }
 
 + (BOOL)supportsSecureCoding {
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
 }
 
-- (instancetype)initWithCoder:(NSCoder *)coder {
+- (instancetype)initWithCoder:(NSCoder*)coder {
   return [self init];
 }
 

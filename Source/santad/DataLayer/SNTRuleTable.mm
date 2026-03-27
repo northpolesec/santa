@@ -41,11 +41,11 @@ static const int64_t kTransitiveRuleCullingThreshold = 500000;
 // Consider transitive rules out of date if they haven't been used in six months.
 static const NSUInteger kTransitiveRuleExpirationSeconds = 6 * 30 * 24 * 3600;
 
-static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
+static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // Create a temporary ES client in order to grab the default set of muted paths.
   // TODO(mlw): Reorganize this code so that a temporary ES client doesn't need to be created
-  es_client_t *client = NULL;
-  es_new_client_result_t ret = es_new_client(&client, ^(es_client_t *c, const es_message_t *m){
+  es_client_t* client = NULL;
+  es_new_client_result_t ret = es_new_client(&client, ^(es_client_t* c, const es_message_t* m){
                                                  // noop
                                              });
   if (ret != ES_NEW_CLIENT_RESULT_SUCCESS) {
@@ -54,7 +54,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     return;
   }
 
-  es_muted_paths_t *mps = NULL;
+  es_muted_paths_t* mps = NULL;
   if (es_muted_paths_events(client, &mps) != ES_RETURN_SUCCESS) {
     LOGE(@"Failed to obtain list of default muted paths.");
     es_delete_client(client);
@@ -76,19 +76,19 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   std::unique_ptr<santa::cel::Evaluator<false>> _celEvaluator;
   std::unique_ptr<santa::cel::Evaluator<true>> _celV2Evaluator;
 }
-@property MOLCodesignChecker *santadCSInfo;
-@property MOLCodesignChecker *launchdCSInfo;
-@property NSDate *lastTransitiveRuleCulling;
-@property NSDictionary *criticalSystemBinaries;
-@property(readonly) NSArray *criticalSystemBinaryPaths;
-@property(readwrite) NSDictionary<NSString *, SNTRule *> *cachedStaticRules;
-@property(atomic) NSString *executionRulesHash;
-@property(atomic) NSString *fileAccessRulesHash;
+@property MOLCodesignChecker* santadCSInfo;
+@property MOLCodesignChecker* launchdCSInfo;
+@property NSDate* lastTransitiveRuleCulling;
+@property NSDictionary* criticalSystemBinaries;
+@property(readonly) NSArray* criticalSystemBinaryPaths;
+@property(readwrite) NSDictionary<NSString*, SNTRule*>* cachedStaticRules;
+@property(atomic) NSString* executionRulesHash;
+@property(atomic) NSString* fileAccessRulesHash;
 @end
 
 @implementation SNTRuleTableRulesHash
-- (instancetype)initWithExecutionRulesHash:(NSString *)executionRulesHash
-                       fileAccessRulesHash:(NSString *)fileAccessRulesHash {
+- (instancetype)initWithExecutionRulesHash:(NSString*)executionRulesHash
+                       fileAccessRulesHash:(NSString*)fileAccessRulesHash {
   self = [super init];
   if (self) {
     _executionRulesHash = executionRulesHash;
@@ -103,14 +103,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 //  ES on Monterey now has a “default mute set” of paths that are automatically applied to each ES
 //  client. This mute set contains most (not all) AUTH event types for some paths that were deemed
 //  “system critical”.
-+ (NSArray *)criticalSystemBinaryPaths {
++ (NSArray*)criticalSystemBinaryPaths {
   static dispatch_once_t onceToken;
-  static NSArray *criticalPaths = nil;
+  static NSArray* criticalPaths = nil;
   dispatch_once(&onceToken, ^{
     // These paths have previously existed in the ES default mute set. They are hardcoded
     // here in case grabbing the current default mute set fails, or if Santa is running on
     // an OS that did not yet support this feature.
-    NSSet *fallbackDefaultMuteSet = [[NSSet alloc] initWithArray:@[
+    NSSet* fallbackDefaultMuteSet = [[NSSet alloc] initWithArray:@[
       @"/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/Resources/WindowServer",
       @"/System/Library/PrivateFrameworks/TCC.framework/Support/tccd",
       @"/System/Library/PrivateFrameworks/TCC.framework/Versions/A/Resources/tccd",
@@ -127,7 +127,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     // This is a Santa-curated list of paths to check on startup. This list will be merged
     // with the set of default muted paths from ES.
 
-    NSSet *santaDefinedCriticalPaths = [NSSet setWithArray:@[
+    NSSet* santaDefinedCriticalPaths = [NSSet setWithArray:@[
       @"/usr/libexec/trustd",
       @"/usr/lib/dyld",
       @"/usr/libexec/xpcproxy",
@@ -142,7 +142,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
     ]];
 
     // Combine the fallback default mute set and Santa-curated set
-    NSMutableSet *superSet = [NSMutableSet setWithSet:fallbackDefaultMuteSet];
+    NSMutableSet* superSet = [NSMutableSet setWithSet:fallbackDefaultMuteSet];
     [superSet unionSet:santaDefinedCriticalPaths];
 
     // Attempt to add the real default mute set
@@ -155,16 +155,16 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 }
 
 - (void)setupSystemCriticalBinaries {
-  NSMutableDictionary *bins = [NSMutableDictionary dictionary];
-  for (NSString *path in [SNTRuleTable criticalSystemBinaryPaths]) {
-    SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithPath:path];
+  NSMutableDictionary* bins = [NSMutableDictionary dictionary];
+  for (NSString* path in [SNTRuleTable criticalSystemBinaryPaths]) {
+    SNTFileInfo* binInfo = [[SNTFileInfo alloc] initWithPath:path];
     if (!binInfo.SHA256) {
       // If there isn't a hash, no need to compute the other info here.
       // Just continue on to the next binary.
       LOGD(@"Unable to compute hash for critical system binary %@.", path);
       continue;
     }
-    MOLCodesignChecker *csInfo = [binInfo codesignCheckerWithError:NULL];
+    MOLCodesignChecker* csInfo = [binInfo codesignCheckerWithError:NULL];
 
     // Make sure the critical system binary is signed by the same chain as launchd/self
     BOOL systemBin = NO;
@@ -179,7 +179,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
       continue;
     }
 
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
 
     cd.decision = SNTEventStateAllowSigningID;
     cd.decisionExtra = systemBin ? @"critical system binary" : @"santa binary";
@@ -211,7 +211,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return kRuleTableCurrentVersion;
 }
 
-- (uint32_t)initializeDatabase:(FMDatabase *)db fromVersion:(uint32_t)version {
+- (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
   // Lock this database from other processes
   [[db executeQuery:@"PRAGMA locking_mode = EXCLUSIVE;"] close];
 
@@ -339,7 +339,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (int64_t)executionRuleCount {
   __block NSUInteger count = 0;
-  [self inDatabase:^(FMDatabase *db) {
+  [self inDatabase:^(FMDatabase* db) {
     count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules"];
   }];
   return count;
@@ -347,7 +347,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (int64_t)ruleCountForRuleType:(SNTRuleType)ruleType {
   __block int64_t count = 0;
-  [self inDatabase:^(FMDatabase *db) {
+  [self inDatabase:^(FMDatabase* db) {
     count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE type=?", @(ruleType)];
   }];
   return count;
@@ -363,7 +363,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (int64_t)compilerRuleCount {
   __block NSUInteger count = 0;
-  [self inDatabase:^(FMDatabase *db) {
+  [self inDatabase:^(FMDatabase* db) {
     count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE state=?",
                              @(SNTRuleStateAllowCompiler)];
   }];
@@ -372,7 +372,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 - (int64_t)transitiveRuleCount {
   __block NSUInteger count = 0;
-  [self inDatabase:^(FMDatabase *db) {
+  [self inDatabase:^(FMDatabase* db) {
     count = [db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE state=?",
                              @(SNTRuleStateAllowTransitive)];
   }];
@@ -391,27 +391,27 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return [self ruleCountForRuleType:SNTRuleTypeCDHash];
 }
 
-- (int64_t)fileAccessRuleCountSerialized:(FMDatabase *)db {
+- (int64_t)fileAccessRuleCountSerialized:(FMDatabase*)db {
   return [db longForQuery:@"SELECT COUNT(*) FROM file_access_rules"];
 }
 
 - (int64_t)fileAccessRuleCount {
   __block NSUInteger count = 0;
-  [self inDatabase:^(FMDatabase *db) {
+  [self inDatabase:^(FMDatabase* db) {
     count = [self fileAccessRuleCountSerialized:db];
   }];
   return count;
 }
 
-- (NSDictionary *)fileAccessRuleFromResultSet:(FMResultSet *)rs {
-  NSString *name = [rs stringForColumn:@"name"];
-  NSData *details = [rs dataNoCopyForColumn:@"rule_data"];
+- (NSDictionary*)fileAccessRuleFromResultSet:(FMResultSet*)rs {
+  NSString* name = [rs stringForColumn:@"name"];
+  NSData* details = [rs dataNoCopyForColumn:@"rule_data"];
 
   if (!details) {
     return nil;
   }
 
-  NSDictionary *ruleDict = [NSKeyedUnarchiver
+  NSDictionary* ruleDict = [NSKeyedUnarchiver
       unarchivedObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class],
                                                       [NSString class], [NSNumber class],
                                                       [NSData class], nil]
@@ -425,7 +425,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   }
 }
 
-- (SNTRule *)executionRuleFromResultSet:(FMResultSet *)rs {
+- (SNTRule*)executionRuleFromResultSet:(FMResultSet*)rs {
   return [[SNTRule alloc] initWithIdentifier:[rs stringForColumn:@"identifier"]
                                        state:static_cast<SNTRuleState>([rs intForColumn:@"state"])
                                         type:static_cast<SNTRuleType>([rs intForColumn:@"type"])
@@ -437,11 +437,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
                                        error:nil];
 }
 
-- (SNTRule *)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers {
-  __block SNTRule *rule;
+- (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers {
+  __block SNTRule* rule;
 
   // Look for a static rule that matches.
-  NSDictionary *staticRules = self.cachedStaticRules;
+  NSDictionary* staticRules = self.cachedStaticRules;
   if (staticRules.count) {
     // IMPORTANT: The order static rules are checked here should be the same
     // order as given by the SQL query for the rules database.
@@ -490,8 +490,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   //
   // There is a test for this in SNTRuleTableTests in case SQLite behavior changes in the future.
   //
-  [self inDatabase:^(FMDatabase *db) {
-    FMResultSet *rs =
+  [self inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs =
         [db executeQuery:@"SELECT * FROM execution_rules WHERE "
                          @"   (identifier=? AND type=500) "
                          @"OR (identifier=? AND type=1000) "
@@ -519,10 +519,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 #pragma mark Adding
 
-- (BOOL)addFileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
-                      toDB:(FMDatabase *)db
-                    errors:(NSMutableArray<NSError *> *)errors {
-  for (SNTFileAccessRule *rule in fileAccessRules) {
+- (BOOL)addFileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
+                      toDB:(FMDatabase*)db
+                    errors:(NSMutableArray<NSError*>*)errors {
+  for (SNTFileAccessRule* rule in fileAccessRules) {
     // FAA rules must:
     // 1. Be the right type
     // 2. Have a name
@@ -561,10 +561,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return YES;
 }
 
-- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
-                     toDB:(FMDatabase *)db
-                   errors:(NSMutableArray<NSError *> *)errors {
-  for (SNTRule *rule in executionRules) {
+- (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
+                     toDB:(FMDatabase*)db
+                   errors:(NSMutableArray<NSError*>*)errors {
+  for (SNTRule* rule in executionRules) {
     if (![rule isKindOfClass:[SNTRule class]] || rule.identifier.length == 0 ||
         rule.state == SNTRuleStateUnknown || rule.type == SNTRuleTypeUnknown) {
       [errors
@@ -621,19 +621,19 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return YES;
 }
 
-- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
+- (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
               ruleCleanup:(SNTRuleCleanup)cleanupType
-                   errors:(NSArray<NSError *> **)errors {
+                   errors:(NSArray<NSError*>**)errors {
   return [self addExecutionRules:executionRules
                  fileAccessRules:nil
                      ruleCleanup:cleanupType
                           errors:errors];
 }
 
-- (BOOL)addExecutionRules:(NSArray<SNTRule *> *)executionRules
-          fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+- (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
+          fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
               ruleCleanup:(SNTRuleCleanup)cleanupType
-                   errors:(NSArray<NSError *> **)errors {
+                   errors:(NSArray<NSError*>**)errors {
   // Only accept an empty rules array if the cleanup-type is not none.
   if (executionRules.count == 0 && fileAccessRules.count == 0 &&
       cleanupType == SNTRuleCleanupNone) {
@@ -645,12 +645,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   }
 
   __block BOOL failed = NO;
-  __block NSMutableArray<NSError *> *blockErrors = [NSMutableArray array];
-  __block NSString *faaRulesHashBefore;
-  __block NSString *faaRulesHashAfter;
+  __block NSMutableArray<NSError*>* blockErrors = [NSMutableArray array];
+  __block NSString* faaRulesHashBefore;
+  __block NSString* faaRulesHashAfter;
   __block int64_t faaRuleCount = 0;
 
-  [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
+  [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
     faaRulesHashBefore = [self fileAccessRulesHashSerialized:db];
     switch (cleanupType) {
       case SNTRuleCleanupAll:
@@ -706,10 +706,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return !failed;
 }
 
-- (BOOL)addedRulesShouldFlushDecisionCache:(NSArray *)rules {
+- (BOOL)addedRulesShouldFlushDecisionCache:(NSArray*)rules {
   uint64_t nonAllowRuleCount = 0;
 
-  for (SNTRule *rule in rules) {
+  for (SNTRule* rule in rules) {
     // If the rule is a remove rule, act conservatively and flush the cache.
     // This is to make sure cached rules of different precedence rules do not
     // impact final decision.
@@ -733,8 +733,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   // identifier.  If so we find such a rule, then cache should be flushed.
   __block BOOL flushDecisionCache = NO;
 
-  [self inTransaction:^(FMDatabase *db, BOOL *rollback) {
-    for (SNTRule *rule in rules) {
+  [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
+    for (SNTRule* rule in rules) {
       if (rule.state != SNTRuleStateAllow) {
         // If the rule is a CEL rule, block rule, silent block rule, or a compiler rule check if it
         // already exists in the database. If it is a CEL rule also check the expression is the
@@ -771,10 +771,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 }
 
 // Updates the timestamp to current time for the given rule.
-- (void)resetTimestampForExecutionRule:(SNTRule *)rule {
+- (void)resetTimestampForExecutionRule:(SNTRule*)rule {
   if (!rule) return;
   [rule resetTimestamp];
-  [self inDatabase:^(FMDatabase *db) {
+  [self inDatabase:^(FMDatabase* db) {
     if (![db executeUpdate:@"UPDATE execution_rules SET timestamp=? WHERE identifier=? AND type=?",
                            @(rule.timestamp), rule.identifier, @(rule.type)]) {
       LOGE(@"Could not update timestamp for rule with sha256=%@", rule.identifier);
@@ -795,7 +795,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   NSUInteger outdatedTimestamp =
       [[NSDate date] timeIntervalSinceReferenceDate] - kTransitiveRuleExpirationSeconds;
 
-  [self inDatabase:^(FMDatabase *db) {
+  [self inDatabase:^(FMDatabase* db) {
     if (![db executeUpdate:@"DELETE FROM execution_rules WHERE state=? AND timestamp < ?",
                            @(SNTRuleStateAllowTransitive), @(outdatedTimestamp)]) {
       LOGE(@"Could not remove outdated transitive rules");
@@ -808,10 +808,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 #pragma mark Querying
 
 // Retrieve all rules from the Database
-- (NSArray<SNTRule *> *)retrieveAllExecutionRules {
-  NSMutableArray<SNTRule *> *rules = [NSMutableArray array];
-  [self inDatabase:^(FMDatabase *db) {
-    FMResultSet *rs = [db executeQuery:@"SELECT * FROM execution_rules"];
+- (NSArray<SNTRule*>*)retrieveAllExecutionRules {
+  NSMutableArray<SNTRule*>* rules = [NSMutableArray array];
+  [self inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs = [db executeQuery:@"SELECT * FROM execution_rules"];
     while ([rs next]) {
       [rules addObject:[self executionRuleFromResultSet:rs]];
     }
@@ -820,12 +820,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   return rules;
 }
 
-- (NSDictionary<NSString *, NSDictionary *> *)retrieveAllFileAccessRules {
-  NSMutableDictionary<NSString *, NSDictionary *> *faaRules = [NSMutableDictionary dictionary];
-  [self inDatabase:^(FMDatabase *db) {
-    FMResultSet *rs = [db executeQuery:@"SELECT * FROM file_access_rules"];
+- (NSDictionary<NSString*, NSDictionary*>*)retrieveAllFileAccessRules {
+  NSMutableDictionary<NSString*, NSDictionary*>* faaRules = [NSMutableDictionary dictionary];
+  [self inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs = [db executeQuery:@"SELECT * FROM file_access_rules"];
     while ([rs next]) {
-      NSDictionary *rule = [self fileAccessRuleFromResultSet:rs];
+      NSDictionary* rule = [self fileAccessRuleFromResultSet:rs];
       if (rule) {
         [faaRules addEntriesFromDictionary:rule];
       }
@@ -836,18 +836,18 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
 #pragma mark Caching Static Rules
 
-- (void)updateStaticRules:(NSArray<NSDictionary *> *)staticRules {
+- (void)updateStaticRules:(NSArray<NSDictionary*>*)staticRules {
   if (![staticRules isKindOfClass:[NSArray class]]) {
     self.cachedStaticRules = nil;
     return;
   }
 
-  NSMutableDictionary<NSString *, SNTRule *> *rules =
+  NSMutableDictionary<NSString*, SNTRule*>* rules =
       [NSMutableDictionary dictionaryWithCapacity:staticRules.count];
   for (id rule in staticRules) {
     if (![rule isKindOfClass:[NSDictionary class]]) continue;
-    NSError *error;
-    SNTRule *r = [[SNTRule alloc] initStaticRuleWithDictionary:rule error:&error];
+    NSError* error;
+    SNTRule* r = [[SNTRule alloc] initStaticRuleWithDictionary:rule error:&error];
     if (error) {
       LOGE(@"Failed to initialize static rule %@: %@", rule, error.localizedDescription);
     }
@@ -868,7 +868,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
   self.cachedStaticRules = [rules copy];
 }
 
-- (NSString *)executionRulesHashSerialized:(FMDatabase *)db {
+- (NSString*)executionRulesHashSerialized:(FMDatabase*)db {
   // If santad has previously computed the hash and stored it in memory, return it.
   // When a rule is added or removed the hash will be cleared so that the next
   // request for the hash will recompute it.
@@ -878,30 +878,30 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
   santa::Xxhash128 hash;
 
-  FMResultSet *rs =
+  FMResultSet* rs =
       [db executeQuery:
               @"SELECT identifier, state, type, cel_expr FROM execution_rules WHERE state != ?",
               @(SNTRuleStateAllowTransitive)];
   while ([rs next]) {
-    NSString *identifier = [rs stringForColumn:@"identifier"];
-    NSString *cel = [rs stringForColumn:@"cel_expr"];
+    NSString* identifier = [rs stringForColumn:@"identifier"];
+    NSString* cel = [rs stringForColumn:@"cel_expr"];
     int state = [rs intForColumn:@"state"];
     int type = [rs intForColumn:@"type"];
 
     hash.Update(identifier.UTF8String,
                 [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
     hash.Update(cel.UTF8String, [cel lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
-    hash.Update(static_cast<void *>(&state), sizeof(state));
-    hash.Update(static_cast<void *>(&type), sizeof(type));
+    hash.Update(static_cast<void*>(&state), sizeof(state));
+    hash.Update(static_cast<void*>(&type), sizeof(type));
   }
   [rs close];
 
-  NSString *digest = santa::StringToNSString(hash.HexDigest());
+  NSString* digest = santa::StringToNSString(hash.HexDigest());
   self.executionRulesHash = digest;
   return digest;
 }
 
-- (NSString *)fileAccessRulesHashSerialized:(FMDatabase *)db {
+- (NSString*)fileAccessRulesHashSerialized:(FMDatabase*)db {
   // If santad has previously computed the hash and stored it in memory, return it.
   // When a rule is added or removed the hash will be cleared so that the next
   // request for the hash will recompute it.
@@ -911,24 +911,24 @@ static void addPathsFromDefaultMuteSet(NSMutableSet *criticalPaths) {
 
   santa::Xxhash128 hash;
 
-  FMResultSet *rs = [db executeQuery:@"SELECT name, rule_data FROM file_access_rules"];
+  FMResultSet* rs = [db executeQuery:@"SELECT name, rule_data FROM file_access_rules"];
   while ([rs next]) {
-    NSString *name = [rs stringForColumn:@"name"];
-    NSData *blob = [rs dataNoCopyForColumn:@"rule_data"];
+    NSString* name = [rs stringForColumn:@"name"];
+    NSData* blob = [rs dataNoCopyForColumn:@"rule_data"];
 
     hash.Update(name.UTF8String, [name lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
     hash.Update(blob.bytes, blob.length);
   }
   [rs close];
 
-  NSString *digest = santa::StringToNSString(hash.HexDigest());
+  NSString* digest = santa::StringToNSString(hash.HexDigest());
   self.fileAccessRulesHash = digest;
   return digest;
 }
 
-- (SNTRuleTableRulesHash *)hashOfHashes {
-  __block SNTRuleTableRulesHash *hashes;
-  [self inDatabase:^(FMDatabase *db) {
+- (SNTRuleTableRulesHash*)hashOfHashes {
+  __block SNTRuleTableRulesHash* hashes;
+  [self inDatabase:^(FMDatabase* db) {
     hashes = [[SNTRuleTableRulesHash alloc]
         initWithExecutionRulesHash:[self executionRulesHashSerialized:db]
                fileAccessRulesHash:[self fileAccessRulesHashSerialized:db]];

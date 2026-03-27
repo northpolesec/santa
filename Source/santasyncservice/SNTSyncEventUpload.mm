@@ -45,22 +45,22 @@ using santa::NSStringToUTF8StringView;
 namespace {
 
 template <bool IsV2>
-BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch);
+BOOL PerformRequest(SNTSyncEventUpload* self, google::protobuf::Message* req, int eventsInBatch);
 template <bool IsV2>
-typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(SNTStoredExecutionEvent *event,
-                                                                    google::protobuf::Arena *arena);
+typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(SNTStoredExecutionEvent* event,
+                                                                    google::protobuf::Arena* arena);
 template <bool IsV2>
-typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
-    SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena);
-::pbv2::AuditEvent *MessageForTemporaryMonitorModeAuditEvent(
-    SNTStoredTemporaryMonitorModeAuditEvent *event, google::protobuf::Arena *arena);
-::pbv2::NetworkMountEvent *MessageForNetworkMountEvent(SNTStoredNetworkMountEvent *event,
-                                                       google::protobuf::Arena *arena);
-::pbv2::USBMountEvent *MessageForUSBMountEvent(SNTStoredUSBMountEvent *event,
-                                               google::protobuf::Arena *arena);
+typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
+    SNTStoredFileAccessEvent* event, google::protobuf::Arena* arena);
+::pbv2::AuditEvent* MessageForTemporaryMonitorModeAuditEvent(
+    SNTStoredTemporaryMonitorModeAuditEvent* event, google::protobuf::Arena* arena);
+::pbv2::NetworkMountEvent* MessageForNetworkMountEvent(SNTStoredNetworkMountEvent* event,
+                                                       google::protobuf::Arena* arena);
+::pbv2::USBMountEvent* MessageForUSBMountEvent(SNTStoredUSBMountEvent* event,
+                                               google::protobuf::Arena* arena);
 
 template <bool IsV2>
-BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, int eventsInBatch) {
+BOOL PerformRequest(SNTSyncEventUpload* self, google::protobuf::Message* req, int eventsInBatch) {
   using Traits = santa::ProtoTraits<IsV2>;
   if (eventsInBatch == 0) {
     return YES;
@@ -69,7 +69,7 @@ BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, in
   if (self.syncState.syncType == SNTSyncTypeNormal ||
       [[SNTConfigurator configurator] enableCleanSyncEventUpload]) {
     typename Traits::EventUploadResponseT response;
-    NSError *err = [self performRequest:[self requestWithMessage:req]
+    NSError* err = [self performRequest:[self requestWithMessage:req]
                             intoMessage:&response
                                 timeout:30];
     if (err) {
@@ -81,8 +81,8 @@ BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, in
     if (response.event_upload_bundle_binaries_size()) {
       self.syncState.bundleBinaryRequests =
           [NSMutableArray arrayWithCapacity:response.event_upload_bundle_binaries_size()];
-      for (const std::string &bundle_binary : response.event_upload_bundle_binaries()) {
-        [(NSMutableArray *)self.syncState.bundleBinaryRequests
+      for (const std::string& bundle_binary : response.event_upload_bundle_binaries()) {
+        [(NSMutableArray*)self.syncState.bundleBinaryRequests
             addObject:santa::StringToNSString(bundle_binary)];
       }
     }
@@ -92,20 +92,20 @@ BOOL PerformRequest(SNTSyncEventUpload *self, google::protobuf::Message *req, in
 }
 
 template <bool IsV2>
-BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
+BOOL EventUpload(SNTSyncEventUpload* self, NSArray<SNTStoredEvent*>* events) {
   using Traits = santa::ProtoTraits<IsV2>;
   google::protobuf::Arena arena;
-  google::protobuf::Arena *pArena = &arena;
-  NSMutableSet *eventIds = [NSMutableSet setWithCapacity:events.count];
+  google::protobuf::Arena* pArena = &arena;
+  NSMutableSet* eventIds = [NSMutableSet setWithCapacity:events.count];
   auto req = google::protobuf::Arena::Create<typename Traits::EventUploadRequestT>(&arena);
   req->set_machine_id(NSStringToUTF8String(self.syncState.machineID));
-  google::protobuf::RepeatedPtrField<typename Traits::EventT> *uploadEvents = req->mutable_events();
-  google::protobuf::RepeatedPtrField<typename Traits::FileAccessEventT> *uploadFAAEvents =
+  google::protobuf::RepeatedPtrField<typename Traits::EventT>* uploadEvents = req->mutable_events();
+  google::protobuf::RepeatedPtrField<typename Traits::FileAccessEventT>* uploadFAAEvents =
       req->mutable_file_access_events();
-  google::protobuf::RepeatedPtrField<typename Traits::AuditEventT> *uploadAuditEvents =
+  google::protobuf::RepeatedPtrField<typename Traits::AuditEventT>* uploadAuditEvents =
       req->mutable_audit_events();
-  google::protobuf::RepeatedPtrField<::pbv2::NetworkMountEvent> *uploadNetworkMountEvents;
-  google::protobuf::RepeatedPtrField<::pbv2::USBMountEvent> *uploadUSBMountEvents;
+  google::protobuf::RepeatedPtrField<::pbv2::NetworkMountEvent>* uploadNetworkMountEvents;
+  google::protobuf::RepeatedPtrField<::pbv2::USBMountEvent>* uploadUSBMountEvents;
   if constexpr (IsV2) {
     uploadNetworkMountEvents = req->mutable_network_mount_events();
     uploadUSBMountEvents = req->mutable_usb_mount_events();
@@ -113,35 +113,35 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
   __block BOOL success = YES;
   NSUInteger finalIdx = (events.count - 1);
 
-  [events enumerateObjectsUsingBlock:^(SNTStoredEvent *event, NSUInteger idx, BOOL *stop) {
+  [events enumerateObjectsUsingBlock:^(SNTStoredEvent* event, NSUInteger idx, BOOL* stop) {
     // Track the idx as processed immediately so that it will always be removed
     // from the database, even if not uploaded.
     if (event.idx) [eventIds addObject:event.idx];
 
     if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
-      if (auto e = MessageForExecutionEvent<IsV2>((SNTStoredExecutionEvent *)event, pArena)) {
+      if (auto e = MessageForExecutionEvent<IsV2>((SNTStoredExecutionEvent*)event, pArena)) {
         uploadEvents->UnsafeArenaAddAllocated(e);
       }
     } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
-      if (auto e = MessageForFileAccessEvent<IsV2>((SNTStoredFileAccessEvent *)event, pArena)) {
+      if (auto e = MessageForFileAccessEvent<IsV2>((SNTStoredFileAccessEvent*)event, pArena)) {
         uploadFAAEvents->UnsafeArenaAddAllocated(e);
       }
     } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]) {
       if constexpr (IsV2) {
         if (auto e = MessageForTemporaryMonitorModeAuditEvent(
-                (SNTStoredTemporaryMonitorModeAuditEvent *)event, pArena)) {
+                (SNTStoredTemporaryMonitorModeAuditEvent*)event, pArena)) {
           uploadAuditEvents->UnsafeArenaAddAllocated(e);
         }
       }
     } else if ([event isKindOfClass:[SNTStoredNetworkMountEvent class]]) {
       if constexpr (IsV2) {
-        if (auto e = MessageForNetworkMountEvent((SNTStoredNetworkMountEvent *)event, pArena)) {
+        if (auto e = MessageForNetworkMountEvent((SNTStoredNetworkMountEvent*)event, pArena)) {
           uploadNetworkMountEvents->UnsafeArenaAddAllocated(e);
         }
       }
     } else if ([event isKindOfClass:[SNTStoredUSBMountEvent class]]) {
       if constexpr (IsV2) {
-        if (auto e = MessageForUSBMountEvent((SNTStoredUSBMountEvent *)event, pArena)) {
+        if (auto e = MessageForUSBMountEvent((SNTStoredUSBMountEvent*)event, pArena)) {
           uploadUSBMountEvents->UnsafeArenaAddAllocated(e);
         }
       }
@@ -191,8 +191,8 @@ BOOL EventUpload(SNTSyncEventUpload *self, NSArray<SNTStoredEvent *> *events) {
 }
 
 template <bool IsV2>
-typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
-    SNTStoredExecutionEvent *event, google::protobuf::Arena *arena) {
+typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
+    SNTStoredExecutionEvent* event, google::protobuf::Arena* arena) {
   using Traits = santa::ProtoTraits<IsV2>;
   auto e = google::protobuf::Arena::Create<typename Traits::EventT>(arena);
 
@@ -202,10 +202,10 @@ typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
   e->set_executing_user(NSStringToUTF8String(event.executingUser));
   e->set_execution_time([event.occurrenceDate timeIntervalSince1970]);
 
-  for (NSString *user in event.loggedInUsers) {
+  for (NSString* user in event.loggedInUsers) {
     e->add_logged_in_users(NSStringToUTF8String(user));
   }
-  for (NSString *session in event.currentSessions) {
+  for (NSString* session in event.currentSessions) {
     e->add_current_sessions(NSStringToUTF8String(session));
   }
 
@@ -282,8 +282,8 @@ typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
     default: e->set_signing_status(Traits::SIGNING_STATUS_UNSPECIFIED); break;
   }
 
-  for (MOLCertificate *cert in event.signingChain) {
-    typename Traits::CertificateT *c = e->add_signing_chain();
+  for (MOLCertificate* cert in event.signingChain) {
+    typename Traits::CertificateT* c = e->add_signing_chain();
     c->set_sha256(NSStringToUTF8String(cert.SHA256));
     c->set_cn(NSStringToUTF8String(cert.commonName));
     c->set_org(NSStringToUTF8String(cert.orgName));
@@ -292,7 +292,7 @@ typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
     c->set_valid_until([cert.validUntil timeIntervalSince1970]);
   }
 
-  typename Traits::EntitlementInfoT *pb_entitlement_info = e->mutable_entitlement_info();
+  typename Traits::EntitlementInfoT* pb_entitlement_info = e->mutable_entitlement_info();
 
   santa::EncodeEntitlementsCommon(
       event.entitlements, event.entitlementsFiltered,
@@ -300,8 +300,8 @@ typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
         pb_entitlement_info->set_entitlements_filtered(is_filtered);
         pb_entitlement_info->mutable_entitlements()->Reserve((int)count);
       },
-      ^(NSString *entitlement, NSString *value) {
-        typename Traits::EntitlementT *pb_entitlement = pb_entitlement_info->add_entitlements();
+      ^(NSString* entitlement, NSString* value) {
+        typename Traits::EntitlementT* pb_entitlement = pb_entitlement_info->add_entitlements();
         pb_entitlement->set_key(NSStringToUTF8StringView(entitlement));
         pb_entitlement->set_value(NSStringToUTF8StringView(value));
       });
@@ -317,8 +317,8 @@ typename santa::ProtoTraits<IsV2>::EventT *MessageForExecutionEvent(
 }
 
 template <bool IsV2>
-typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
-    SNTStoredFileAccessEvent *event, google::protobuf::Arena *arena) {
+typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
+    SNTStoredFileAccessEvent* event, google::protobuf::Arena* arena) {
   using Traits = santa::ProtoTraits<IsV2>;
   auto e = google::protobuf::Arena::Create<typename Traits::FileAccessEventT>(arena);
 
@@ -343,10 +343,10 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
     default: return nullptr;
   }
 
-  SNTStoredFileAccessProcess *p = event.process;
+  SNTStoredFileAccessProcess* p = event.process;
   auto process_chain = e->mutable_process_chain();
   while (p) {
-    typename Traits::ProcessT *proc = process_chain->Add();
+    typename Traits::ProcessT* proc = process_chain->Add();
     if (p.filePath) {
       proc->set_file_path(NSStringToUTF8StringView(p.filePath));
     }
@@ -371,8 +371,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
       proc->set_pid([p.pid intValue]);
     }
 
-    for (MOLCertificate *cert in p.signingChain) {
-      typename Traits::CertificateT *c = proc->add_signing_chain();
+    for (MOLCertificate* cert in p.signingChain) {
+      typename Traits::CertificateT* c = proc->add_signing_chain();
       c->set_sha256(NSStringToUTF8String(cert.SHA256));
       c->set_cn(NSStringToUTF8String(cert.commonName));
       c->set_org(NSStringToUTF8String(cert.orgName));
@@ -387,8 +387,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
   return e;
 }
 
-::pbv2::NetworkMountEvent *MessageForNetworkMountEvent(SNTStoredNetworkMountEvent *event,
-                                                       google::protobuf::Arena *arena) {
+::pbv2::NetworkMountEvent* MessageForNetworkMountEvent(SNTStoredNetworkMountEvent* event,
+                                                       google::protobuf::Arena* arena) {
   auto pbNetworkMountEvent =
       google::protobuf::Arena::Create<typename ::pbv2::NetworkMountEvent>(arena);
 
@@ -402,8 +402,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
   return pbNetworkMountEvent;
 }
 
-::pbv2::USBMountEvent *MessageForUSBMountEvent(SNTStoredUSBMountEvent *event,
-                                               google::protobuf::Arena *arena) {
+::pbv2::USBMountEvent* MessageForUSBMountEvent(SNTStoredUSBMountEvent* event,
+                                               google::protobuf::Arena* arena) {
   auto pbUSBMountEvent = google::protobuf::Arena::Create<typename ::pbv2::USBMountEvent>(arena);
 
   pbUSBMountEvent->set_uuid(NSStringToUTF8String(event.uuid));
@@ -417,7 +417,7 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
   pbUSBMountEvent->set_access_time([event.occurrenceDate timeIntervalSince1970]);
   pbUSBMountEvent->set_protocol(NSStringToUTF8String(event.protocol));
 
-  for (NSString *mountFlag in event.remountArgs) {
+  for (NSString* mountFlag in event.remountArgs) {
     pbUSBMountEvent->add_remount_flags(NSStringToUTF8String(mountFlag));
   }
 
@@ -437,8 +437,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT *MessageForFileAccessEvent(
 }
 
 void MessageForTemporaryMonitorModeEnterAuditEvent(
-    SNTStoredTemporaryMonitorModeEnterAuditEvent *event,
-    ::pbv2::TemporaryMonitorModeEnter *pbEnter) {
+    SNTStoredTemporaryMonitorModeEnterAuditEvent* event,
+    ::pbv2::TemporaryMonitorModeEnter* pbEnter) {
   if (!pbEnter) {
     return;
   }
@@ -460,8 +460,8 @@ void MessageForTemporaryMonitorModeEnterAuditEvent(
 }
 
 void MessageForTemporaryMonitorModeLeaveAuditEvent(
-    SNTStoredTemporaryMonitorModeLeaveAuditEvent *event,
-    ::pbv2::TemporaryMonitorModeLeave *pbLeave) {
+    SNTStoredTemporaryMonitorModeLeaveAuditEvent* event,
+    ::pbv2::TemporaryMonitorModeLeave* pbLeave) {
   if (!pbLeave) {
     return;
   }
@@ -486,8 +486,8 @@ void MessageForTemporaryMonitorModeLeaveAuditEvent(
   }
 }
 
-::pbv2::AuditEvent *MessageForTemporaryMonitorModeAuditEvent(
-    SNTStoredTemporaryMonitorModeAuditEvent *event, google::protobuf::Arena *arena) {
+::pbv2::AuditEvent* MessageForTemporaryMonitorModeAuditEvent(
+    SNTStoredTemporaryMonitorModeAuditEvent* event, google::protobuf::Arena* arena) {
   if (![event isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]] &&
       ![event isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]) {
     return nullptr;
@@ -501,10 +501,10 @@ void MessageForTemporaryMonitorModeLeaveAuditEvent(
 
   if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]) {
     MessageForTemporaryMonitorModeEnterAuditEvent(
-        (SNTStoredTemporaryMonitorModeEnterAuditEvent *)event, pbTmm->mutable_enter());
+        (SNTStoredTemporaryMonitorModeEnterAuditEvent*)event, pbTmm->mutable_enter());
   } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]) {
     MessageForTemporaryMonitorModeLeaveAuditEvent(
-        (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)event, pbTmm->mutable_leave());
+        (SNTStoredTemporaryMonitorModeLeaveAuditEvent*)event, pbTmm->mutable_leave());
   }
 
   return pbAudit;
@@ -514,14 +514,14 @@ void MessageForTemporaryMonitorModeLeaveAuditEvent(
 
 @implementation SNTSyncEventUpload
 
-- (NSURL *)stageURL {
-  NSString *stageName = [@"eventupload" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+- (NSURL*)stageURL {
+  NSString* stageName = [@"eventupload" stringByAppendingFormat:@"/%@", self.syncState.machineID];
   return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 }
 
 - (BOOL)sync {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  [[self.daemonConn remoteObjectProxy] databaseEventsPending:^(NSArray *events) {
+  [[self.daemonConn remoteObjectProxy] databaseEventsPending:^(NSArray* events) {
     if (events.count) {
       [self uploadEvents:events];
     }
@@ -530,7 +530,7 @@ void MessageForTemporaryMonitorModeLeaveAuditEvent(
   return (dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER) == 0);
 }
 
-- (BOOL)uploadEvents:(NSArray<SNTStoredEvent *> *)events {
+- (BOOL)uploadEvents:(NSArray<SNTStoredEvent*>*)events {
   if (self.syncState.isSyncV2) {
     return EventUpload<true>(self, events);
   } else {

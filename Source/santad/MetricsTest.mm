@@ -39,11 +39,11 @@ using santa::Processor;
 
 namespace santa {
 
-extern NSString *const ProcessorToString(Processor processor);
-extern NSString *const EventTypeToString(es_event_type_t eventType);
-extern NSString *const EventDispositionToString(EventDisposition d);
-extern NSString *const FileAccessMetricStatusToString(FileAccessMetricStatus status);
-extern NSString *const FileAccessPolicyDecisionToString(FileAccessPolicyDecision decision);
+extern NSString* const ProcessorToString(Processor processor);
+extern NSString* const EventTypeToString(es_event_type_t eventType);
+extern NSString* const EventDispositionToString(EventDisposition d);
+extern NSString* const FileAccessMetricStatusToString(FileAccessMetricStatus status);
+extern NSString* const FileAccessPolicyDecisionToString(FileAccessPolicyDecision decision);
 
 class MetricsPeer : public Metrics {
  public:
@@ -83,7 +83,7 @@ using santa::Metrics;
 using santa::MetricsPeer;
 using santa::ProcessorToString;
 
-std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^block)(Metrics *)) {
+std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^block)(Metrics*)) {
   dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
   return std::make_shared<MetricsPeer>(q, timer, 100, nil, nil, nil, nil, nil, nil, block);
 }
@@ -102,7 +102,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testStartStop {
-  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *) {
+  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics*) {
     dispatch_semaphore_signal(self.sema);
   });
 
@@ -136,7 +136,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testSetInterval {
-  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *){
+  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics*){
                                                                 });
 
   XCTAssertEqual(100, metrics->interval_);
@@ -146,7 +146,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testProcessorToString {
-  std::map<Processor, NSString *> processorToString = {
+  std::map<Processor, NSString*> processorToString = {
       {Processor::kAuthorizer, @"Authorizer"},
       {Processor::kDeviceManager, @"DeviceManager"},
       {Processor::kRecorder, @"Recorder"},
@@ -155,7 +155,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
       {Processor::kProcessFileAccessAuthorizer, @"ProcessFileAccessAuthorizer"},
   };
 
-  for (const auto &kv : processorToString) {
+  for (const auto& kv : processorToString) {
     XCTAssertEqualObjects(ProcessorToString(kv.first), kv.second);
   }
 
@@ -163,7 +163,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testEventTypeToString {
-  std::map<es_event_type_t, NSString *> eventTypeToString = {
+  std::map<es_event_type_t, NSString*> eventTypeToString = {
       {ES_EVENT_TYPE_AUTH_CLONE, @"AuthClone"},
       {ES_EVENT_TYPE_AUTH_COPYFILE, @"AuthCopyfile"},
       {ES_EVENT_TYPE_AUTH_CREATE, @"AuthCreate"},
@@ -214,7 +214,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
       {ES_EVENT_TYPE_LAST, @"Global"},
   };
 
-  for (const auto &kv : eventTypeToString) {
+  for (const auto& kv : eventTypeToString) {
     XCTAssertEqualObjects(EventTypeToString(kv.first), kv.second);
   }
 
@@ -222,12 +222,12 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testEventDispositionToString {
-  std::map<EventDisposition, NSString *> dispositionToString = {
+  std::map<EventDisposition, NSString*> dispositionToString = {
       {EventDisposition::kDropped, @"Dropped"},
       {EventDisposition::kProcessed, @"Processed"},
   };
 
-  for (const auto &kv : dispositionToString) {
+  for (const auto& kv : dispositionToString) {
     XCTAssertEqualObjects(EventDispositionToString(kv.first), kv.second);
   }
 
@@ -235,12 +235,12 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testFileAccessMetricStatusToString {
-  std::map<FileAccessMetricStatus, NSString *> statusToString = {
+  std::map<FileAccessMetricStatus, NSString*> statusToString = {
       {FileAccessMetricStatus::kOK, @"OK"},
       {FileAccessMetricStatus::kBlockedUser, @"BLOCKED_USER"},
   };
 
-  for (const auto &kv : statusToString) {
+  for (const auto& kv : statusToString) {
     XCTAssertEqualObjects(FileAccessMetricStatusToString(kv.first), kv.second);
   }
 
@@ -248,13 +248,13 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testFileAccessPolicyDecisionToString {
-  std::map<FileAccessPolicyDecision, NSString *> decisionToString = {
+  std::map<FileAccessPolicyDecision, NSString*> decisionToString = {
       {FileAccessPolicyDecision::kDenied, @"Denied"},
       {FileAccessPolicyDecision::kDeniedInvalidSignature, @"Denied"},
       {FileAccessPolicyDecision::kDeniedInvalidSignature, @"Denied"},
   };
 
-  for (const auto &kv : decisionToString) {
+  for (const auto& kv : decisionToString) {
     XCTAssertEqualObjects(FileAccessPolicyDecisionToString(kv.first), kv.second);
   }
 
@@ -264,7 +264,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
       FileAccessPolicyDecision::kAllowedReadAccess,
       (FileAccessPolicyDecision)12345,
   };
-  for (const auto &v : decisionToStringThrows) {
+  for (const auto& v : decisionToStringThrows) {
     XCTAssertThrows(FileAccessPolicyDecisionToString(v));
   }
 }
@@ -272,7 +272,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 - (void)testSetEventMetrics {
   int64_t nanos = 1234;
 
-  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *){
+  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics*){
                                                                 });
 
   // Initial maps are empty
@@ -314,7 +314,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testAddRateLimitingMetrics {
-  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *){
+  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics*){
                                                                 });
 
   // Initial count is zero
@@ -333,7 +333,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testSetFileAccessEventMetrics {
-  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *){
+  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics*){
                                                                 });
 
   // Initial map is empty
@@ -368,7 +368,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 }
 
 - (void)testUpdateEventStats {
-  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics *){
+  std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics*){
                                                                 });
 
   EventStatsTuple eventStats{Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC};
@@ -415,13 +415,13 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
 
   OCMStub([mockEventCounts incrementBy:0 forFieldValues:[OCMArg any]])
       .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation *inv) {
+      .andDo(^(NSInvocation* inv) {
         dispatch_semaphore_signal(self.sema);
       });
 
-  OCMStub([(SNTMetricInt64Gauge *)mockEventProcessingTimes set:nanos forFieldValues:[OCMArg any]])
+  OCMStub([(SNTMetricInt64Gauge*)mockEventProcessingTimes set:nanos forFieldValues:[OCMArg any]])
       .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation *inv) {
+      .andDo(^(NSInvocation* inv) {
         dispatch_semaphore_signal(self.sema);
       });
 
@@ -429,7 +429,7 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   auto metrics =
       std::make_shared<MetricsPeer>(self.q, timer, 100, mockEventProcessingTimes, mockEventCounts,
                                     mockEventCounts, mockEventCounts, mockEventCounts, nil,
-                                    ^(santa::Metrics *m){
+                                    ^(santa::Metrics* m){
                                         // This block intentionally left blank
                                     });
 

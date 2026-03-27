@@ -19,7 +19,7 @@
 
 @implementation SNTConfigState
 
-- (instancetype)initWithConfig:(SNTConfigurator *)config {
+- (instancetype)initWithConfig:(SNTConfigurator*)config {
   self = [super init];
   if (self) {
     _clientMode = config.clientMode;
@@ -35,7 +35,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, clientMode);
   ENCODE_BOXABLE(coder, enableNotificationSilences);
   ENCODE(coder, eventDetailText);
@@ -43,7 +43,7 @@
   ENCODE(coder, fileAccessEventDetailText);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE_SELECTOR(decoder, clientMode, NSNumber, integerValue);

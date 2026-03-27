@@ -42,14 +42,14 @@
 
 using santa::Message;
 
-using PostActionBlock = bool (^)(SNTAction, SNTCachedDecision *);
+using PostActionBlock = bool (^)(SNTAction, SNTCachedDecision*);
 using VerifyPostActionBlock = PostActionBlock (^)(SNTAction);
 
-static const char *kExampleSigningID = "example.signing.id";
-static const char *kExampleTeamID = "myteamid";
+static const char* kExampleSigningID = "example.signing.id";
+static const char* kExampleTeamID = "myteamid";
 
 VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) {
-  return ^bool(SNTAction gotAction, SNTCachedDecision *cd) {
+  return ^bool(SNTAction gotAction, SNTCachedDecision* cd) {
     XCTAssertEqual(gotAction, wantAction);
     return true;
   };
@@ -59,7 +59,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 // Making these properties readwrite makes some tests much easier to write.
 @property(readwrite) SNTRuleState state;
 @property(readwrite) SNTRuleType type;
-@property(readwrite) NSString *customMsg;
+@property(readwrite) NSString* customMsg;
 @end
 
 @interface SNTExecutionControllerTest : XCTestCase
@@ -70,7 +70,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 @property id mockRuleDatabase;
 @property id mockEventDatabase;
 
-@property SNTExecutionController *sut;
+@property SNTExecutionController* sut;
 @end
 
 @implementation SNTExecutionControllerTest
@@ -91,7 +91,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
-  NSURL *url = [NSURL URLWithString:@"https://localhost/test"];
+  NSURL* url = [NSURL URLWithString:@"https://localhost/test"];
   OCMStub([self.mockConfigurator syncBaseURL]).andReturn(url);
 
   self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
@@ -107,7 +107,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter =
       santa::EntitlementsFilter::Create(@[], @[]);
-  SNTPolicyProcessor *policyProcessor =
+  SNTPolicyProcessor* policyProcessor =
       [[SNTPolicyProcessor alloc] initWithRuleTable:self.mockRuleDatabase
                                  entitlementsFilter:entitlementsFilter];
 
@@ -128,12 +128,12 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   self.sut = nil;
 }
 
-- (void)checkMetricCounters:(const NSString *)expectedFieldValueName
-                   expected:(NSNumber *)expectedValue {
-  SNTMetricSet *metricSet = [SNTMetricSet sharedInstance];
-  NSDictionary *eventCounter = [metricSet export][@"metrics"][@"/santa/events"];
+- (void)checkMetricCounters:(const NSString*)expectedFieldValueName
+                   expected:(NSNumber*)expectedValue {
+  SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
+  NSDictionary* eventCounter = [metricSet export][@"metrics"][@"/santa/events"];
   BOOL foundField;
-  for (NSDictionary *fieldValue in eventCounter[@"fields"][@"action_response"]) {
+  for (NSDictionary* fieldValue in eventCounter[@"fields"][@"action_response"]) {
     if (![expectedFieldValueName isEqualToString:fieldValue[@"value"]]) continue;
     XCTAssertEqualObjects(expectedValue, fieldValue[@"data"],
                           @"%@ counter does not match expected value", expectedFieldValueName);
@@ -182,12 +182,12 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   {
     size_t oldLen = esMsg.event.exec.target->executable->path.length;
     esMsg.event.exec.target->executable->path.length = 24000;
-    es_file_t *targetExecutable = esMsg.event.exec.target->executable;
+    es_file_t* targetExecutable = esMsg.event.exec.target->executable;
 
     Message msg(mockESApi, &esMsg);
 
     OCMExpect(
-        [self.mockDecisionCache cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
+        [self.mockDecisionCache cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision* cd) {
                                   return cd.decision == SNTEventStateBlockLongPath &&
                                          cd.vnodeId.fsid == targetExecutable->stat.st_dev &&
                                          cd.vnodeId.fileid == targetExecutable->stat.st_ino;
@@ -199,7 +199,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
     esMsg.event.exec.target->executable->path_truncated = true;
 
     OCMExpect(
-        [self.mockDecisionCache cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision *cd) {
+        [self.mockDecisionCache cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision* cd) {
                                   return cd.decision == SNTEventStateBlockLongPath &&
                                          cd.vnodeId.fsid == targetExecutable->stat.st_dev &&
                                          cd.vnodeId.fileid == targetExecutable->stat.st_ino;
@@ -214,7 +214,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)validateExecEvent:(SNTAction)wantAction
-             messageSetup:(void (^)(es_message_t *))messageSetupBlock {
+             messageSetup:(void (^)(es_message_t*))messageSetupBlock {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
   es_file_t fileExec = MakeESFile("bar", {
@@ -246,10 +246,10 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   [self validateExecEvent:wantAction messageSetup:nil];
 }
 
-- (void)stubRule:(SNTRule *)rule forIdentifiers:(struct RuleIdentifiers)wantIdentifiers {
+- (void)stubRule:(SNTRule*)rule forIdentifiers:(struct RuleIdentifiers)wantIdentifiers {
   OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:wantIdentifiers])
       .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation *inv) {
+      .andDo(^(NSInvocation* inv) {
         struct RuleIdentifiers gotIdentifiers = {};
         [inv getArgument:&gotIdentifiers atIndex:2];
 
@@ -266,18 +266,18 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
 
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.decision = SNTEventStateAllowBinary;
-  SNTCachedDecision *cd2 = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd2 = [[SNTCachedDecision alloc] init];
   cd2.decision = SNTEventStateAllowSigningID;
 
-  NSString *signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
-  NSDictionary *critBins = @{@"abcdefg" : cd, signingID : cd2};
+  NSString* signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+  NSDictionary* critBins = @{@"abcdefg" : cd, signingID : cd2};
 
   OCMStub([self.mockRuleDatabase criticalSystemBinaries]).andReturn(critBins);
 
   [self validateExecEvent:SNTActionRespondAllow
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
                msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
                msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
@@ -288,7 +288,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeBinary;
 
@@ -302,7 +302,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateBlock;
   rule.type = SNTRuleTypeBinary;
 
@@ -313,14 +313,14 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testCDHashAllowRule {
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeCDHash;
 
   [self stubRule:rule forIdentifiers:{.cdhash = @"aa00000000000000000000000000000000000000"}];
 
   [self validateExecEvent:SNTActionRespondAllow
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->cdhash[0] = 0xaa;
                msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
              }];
@@ -328,7 +328,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testCDHashNoHardenedRuntimeRule {
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeCDHash;
 
@@ -336,7 +336,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   [self stubRule:rule forIdentifiers:{.cdhash = nil}];
 
   [self validateExecEvent:SNTActionRespondAllow
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->cdhash[0] = 0xaa;
                // Ensure CS_HARD and CS_KILL are not set
                msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
@@ -345,14 +345,14 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testCDHashBlockRule {
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateBlock;
   rule.type = SNTRuleTypeCDHash;
 
   [self stubRule:rule forIdentifiers:{.cdhash = @"aa00000000000000000000000000000000000000"}];
 
   [self validateExecEvent:SNTActionRespondDeny
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->cdhash[0] = 0xaa;
                msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
              }];
@@ -362,14 +362,14 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 - (void)testCDHashAllowCompilerRule {
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllowCompiler;
   rule.type = SNTRuleTypeCDHash;
 
   [self stubRule:rule forIdentifiers:{.cdhash = @"aa00000000000000000000000000000000000000"}];
 
   [self validateExecEvent:SNTActionRespondAllowCompiler
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->cdhash[0] = 0xaa;
                msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
              }];
@@ -380,14 +380,14 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 - (void)testCDHashAllowCompilerRuleTransitiveRuleDisabled {
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(NO);
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllowCompiler;
   rule.type = SNTRuleTypeCDHash;
 
   [self stubRule:rule forIdentifiers:{.cdhash = @"aa00000000000000000000000000000000000000"}];
 
   [self validateExecEvent:SNTActionRespondAllow
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->cdhash[0] = 0xaa;
                msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
              }];
@@ -396,16 +396,16 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testSigningIDAllowRule {
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeSigningID;
 
-  NSString *signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+  NSString* signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
 
   [self stubRule:rule forIdentifiers:{.signingID = signingID, .teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondAllow
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
                msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
              }];
@@ -414,15 +414,15 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testSigningIDBlockRule {
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateBlock;
   rule.type = SNTRuleTypeSigningID;
 
-  NSString *signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+  NSString* signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
   [self stubRule:rule forIdentifiers:{.signingID = signingID, .teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondDeny
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
                msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
              }];
@@ -432,14 +432,14 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 - (void)testTeamIDAllowRule {
   OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeTeamID;
 
   [self stubRule:rule forIdentifiers:{.teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondAllow
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
              }];
   [self checkMetricCounters:kAllowTeamID expected:@1];
@@ -448,14 +448,14 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 - (void)testTeamIDBlockRule {
   OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateBlock;
   rule.type = SNTRuleTypeTeamID;
 
   [self stubRule:rule forIdentifiers:{.teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondDeny
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
              }];
   [self checkMetricCounters:kBlockTeamID expected:@1];
@@ -468,7 +468,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockCodesignChecker leafCertificate]).andReturn(cert);
   OCMStub([cert SHA256]).andReturn(@"a");
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeCertificate;
 
@@ -485,7 +485,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockCodesignChecker leafCertificate]).andReturn(cert);
   OCMStub([cert SHA256]).andReturn(@"a");
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateBlock;
   rule.type = SNTRuleTypeCertificate;
 
@@ -504,7 +504,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllowCompiler;
   rule.type = SNTRuleTypeBinary;
 
@@ -519,7 +519,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(NO);
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllowCompiler;
   rule.type = SNTRuleTypeBinary;
 
@@ -534,7 +534,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllowTransitive;
   rule.type = SNTRuleTypeBinary;
 
@@ -550,7 +550,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(NO);
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllowTransitive;
   rule.type = SNTRuleTypeBinary;
 
@@ -571,9 +571,9 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
 
-  NSString *signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+  NSString* signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllowCompiler;
   rule.type = SNTRuleTypeSigningID;
 
@@ -581,7 +581,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
       forIdentifiers:{.binarySHA256 = @"a", .signingID = signingID, .teamID = @(kExampleTeamID)}];
 
   [self validateExecEvent:SNTActionRespondAllowCompiler
-             messageSetup:^(es_message_t *msg) {
+             messageSetup:^(es_message_t* msg) {
                msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
                msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
              }];
@@ -595,7 +595,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(NO);
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllowTransitive;
   rule.type = SNTRuleTypeSigningID;
 
@@ -616,9 +616,9 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
   OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(NO);
 
-  NSString *signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+  NSString* signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
 
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.decision = SNTEventStateAllowSigningID;
   OCMStub([self.mockRuleDatabase criticalSystemBinaries]).andReturn(@{signingID : cd});
 
@@ -636,12 +636,12 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  __block SNTCachedDecision *returnedCd = nil;
+  __block SNTCachedDecision* returnedCd = nil;
   {
     Message msg(mockESApi, &esMsg);
     [self.sut validateExecEvent:msg
                  cachedDecision:nil
-                     postAction:^bool(SNTAction action, SNTCachedDecision *resultCd) {
+                     postAction:^bool(SNTAction action, SNTCachedDecision* resultCd) {
                        XCTAssertEqual(action, SNTActionRespondAllow);
                        returnedCd = resultCd;
                        return true;
@@ -733,7 +733,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   OCMExpect([self.mockConfigurator enableAllEventUpload]).andReturn(YES);
   OCMExpect([self.mockEventDatabase addStoredEvent:OCMOCK_ANY]);
 
-  SNTRule *rule = [[SNTRule alloc] init];
+  SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeBinary;
 
@@ -759,7 +759,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 - (void)validateHoldAndAskWithApproval:(BOOL)approved
                        initialDecision:(SNTEventState)initialState
                       expectedDecision:(SNTEventState)expectedState
-                         expectedExtra:(NSString *)expectedExtra
+                         expectedExtra:(NSString*)expectedExtra
                         expectedAction:(SNTAction)expectedAction
                        expectedControl:(santa::ProcessControl)expectedControl {
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
@@ -774,7 +774,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                             customURL:OCMOCK_ANY
                           configState:OCMOCK_ANY
                              andReply:OCMOCK_ANY])
-      .andDo(^(NSInvocation *invocation) {
+      .andDo(^(NSInvocation* invocation) {
         __unsafe_unretained NotificationReplyBlock block;
         [invocation getArgument:&block atIndex:6];
         capturedReplyBlock = [block copy];
@@ -795,7 +795,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   // Create mock policy processor with holdAndAsk decision
   id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
-  SNTCachedDecision *holdAndAskDecision = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* holdAndAskDecision = [[SNTCachedDecision alloc] init];
   holdAndAskDecision.decision = initialState;
   holdAndAskDecision.holdAndAsk = YES;
   holdAndAskDecision.decisionClientMode = SNTClientModeLockdown;
@@ -819,7 +819,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
 
-  SNTExecutionController *controller =
+  SNTExecutionController* controller =
       [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                              eventTable:self.mockEventDatabase
                                           notifierQueue:mockNotifierQueue
@@ -838,7 +838,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
     Message msg(mockESApi, &esMsg);
     [controller validateExecEvent:msg
                    cachedDecision:nil
-                       postAction:^bool(SNTAction action, SNTCachedDecision *cd) {
+                       postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
                          resultAction = action;
                          return true;
                        }];
@@ -892,7 +892,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                             customURL:OCMOCK_ANY
                           configState:OCMOCK_ANY
                              andReply:OCMOCK_ANY])
-      .andDo(^(NSInvocation *invocation) {
+      .andDo(^(NSInvocation* invocation) {
         __unsafe_unretained NotificationReplyBlock block;
         [invocation getArgument:&block atIndex:6];
         capturedReplyBlock = [block copy];
@@ -907,7 +907,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   // Create mock policy processor that returns a new decision each time
   id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
-  __block SNTCachedDecision *currentDecision = nil;
+  __block SNTCachedDecision* currentDecision = nil;
 
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
@@ -924,13 +924,13 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                                 activationCallback:OCMOCK_ANY
                                     cachedDecision:OCMOCK_ANY])
       .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation *invocation) {
+      .andDo(^(NSInvocation* invocation) {
         [invocation setReturnValue:&currentDecision];
       });
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
 
-  SNTExecutionController *controller =
+  SNTExecutionController* controller =
       [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                              eventTable:self.mockEventDatabase
                                           notifierQueue:mockNotifierQueue
@@ -945,7 +945,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   // Track all actions received to verify the flow
-  __block NSMutableArray<NSNumber *> *receivedActions = [NSMutableArray array];
+  __block NSMutableArray<NSNumber*>* receivedActions = [NSMutableArray array];
 
   // First execution: should prompt for TouchID (cache is empty)
   currentDecision = [[SNTCachedDecision alloc] init];
@@ -959,7 +959,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
     Message msg(mockESApi, &esMsg);
     [controller validateExecEvent:msg
                    cachedDecision:nil
-                       postAction:^bool(SNTAction action, SNTCachedDecision *cd) {
+                       postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
                          [receivedActions addObject:@(action)];
                          return true;
                        }];
@@ -983,7 +983,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
   [receivedActions removeAllObjects];
 
   // Create a new holdAndAsk decision for the second execution (same SHA256)
-  SNTCachedDecision *secondDecision = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* secondDecision = [[SNTCachedDecision alloc] init];
   secondDecision.decision = SNTEventStateBlockUnknown;
   secondDecision.holdAndAsk = YES;
   secondDecision.decisionClientMode = SNTClientModeLockdown;
@@ -997,7 +997,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
     Message msg(mockESApi, &esMsg);
     [controller validateExecEvent:msg
                    cachedDecision:nil
-                       postAction:^bool(SNTAction action, SNTCachedDecision *cd) {
+                       postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
                          [receivedActions addObject:@(action)];
                          return true;
                        }];
@@ -1025,7 +1025,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
 // Test that flushTouchIDApprovalCache clears the cache
 - (void)testFlushTouchIDApprovalCache {
-  SNTExecutionController *controller =
+  SNTExecutionController* controller =
       [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                              eventTable:self.mockEventDatabase
                                           notifierQueue:nil

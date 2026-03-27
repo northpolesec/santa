@@ -18,7 +18,7 @@
 @implementation NSArray (SNTDeepCopy)
 
 - (instancetype)sntDeepCopy {
-  NSMutableArray<__kindof NSObject *> *deepCopy = [NSMutableArray arrayWithCapacity:self.count];
+  NSMutableArray<__kindof NSObject*>* deepCopy = [NSMutableArray arrayWithCapacity:self.count];
   for (id object in self) {
     if ([object respondsToSelector:@selector(sntDeepCopy)]) {
       [deepCopy addObject:[object sntDeepCopy]];
@@ -36,7 +36,7 @@
 @implementation NSDictionary (SNTDeepCopy)
 
 - (instancetype)sntDeepCopy {
-  NSMutableDictionary<__kindof NSObject *, __kindof NSObject *> *deepCopy =
+  NSMutableDictionary<__kindof NSObject*, __kindof NSObject*>* deepCopy =
       [NSMutableDictionary dictionary];
   for (id key in self) {
     id value = self[key];

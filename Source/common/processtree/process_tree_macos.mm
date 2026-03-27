@@ -137,7 +137,7 @@ absl::StatusOr<std::vector<std::string>> ProcessArgumentsForPID(pid_t pid) {
 }
 }  // namespace
 
-struct Pid PidFromAuditToken(const audit_token_t &tok) {
+struct Pid PidFromAuditToken(const audit_token_t& tok) {
   return (struct Pid){.pid = audit_token_to_pid(tok),
                       .pidversion = (uint64_t)audit_token_to_pidversion(tok)};
 }
@@ -202,8 +202,8 @@ absl::Status ProcessTree::Backfill() {
     }
   }
 
-  auto &roots = parent_map[0];
-  for (const BackfilledProcess &p : roots) {
+  auto& roots = parent_map[0];
+  for (const BackfilledProcess& p : roots) {
     BackfillInsertChildren(parent_map, std::shared_ptr<Process>(), p);
   }
 

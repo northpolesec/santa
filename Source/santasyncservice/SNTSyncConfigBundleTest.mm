@@ -25,35 +25,35 @@
 #import "Source/santasyncservice/SNTSyncState.h"
 
 @interface SNTConfigBundle (ConfigBundleCreator)
-@property NSNumber *clientMode;
-@property NSNumber *syncType;
-@property NSString *allowlistRegex;
-@property NSString *blocklistRegex;
-@property NSNumber *blockUSBMount;
-@property NSNumber *blockUnencryptedRemovableMediaMount;
-@property NSArray *remountUSBMode;
-@property NSNumber *blockNetworkMount;
-@property NSString *bannedNetworkMountBlockMessage;
-@property NSArray<NSString *> *allowedNetworkMountHosts;
-@property NSNumber *enableBundles;
-@property NSNumber *enableTransitiveRules;
-@property NSNumber *enableAllEventUpload;
-@property NSNumber *disableUnknownEventUpload;
-@property NSString *overrideFileAccessAction;
-@property SNTExportConfiguration *exportConfiguration;
-@property NSDate *fullSyncLastSuccess;
-@property NSDate *ruleSyncLastSuccess;
-@property SNTModeTransition *modeTransition;
-@property NSString *eventDetailURL;
-@property NSString *eventDetailText;
-@property NSString *fileAccessEventDetailURL;
-@property NSString *fileAccessEventDetailText;
-@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
-@property NSArray<NSString *> *pushTokenChain;
-@property NSArray<NSString *> *telemetryFilterExpressions;
-@property NSArray<SNTCELFallbackRule *> *celFallbackRules;
-@property NSNumber *fullSyncInterval;
-@property NSNumber *pushNotificationsFullSyncInterval;
+@property NSNumber* clientMode;
+@property NSNumber* syncType;
+@property NSString* allowlistRegex;
+@property NSString* blocklistRegex;
+@property NSNumber* blockUSBMount;
+@property NSNumber* blockUnencryptedRemovableMediaMount;
+@property NSArray* remountUSBMode;
+@property NSNumber* blockNetworkMount;
+@property NSString* bannedNetworkMountBlockMessage;
+@property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSNumber* enableBundles;
+@property NSNumber* enableTransitiveRules;
+@property NSNumber* enableAllEventUpload;
+@property NSNumber* disableUnknownEventUpload;
+@property NSString* overrideFileAccessAction;
+@property SNTExportConfiguration* exportConfiguration;
+@property NSDate* fullSyncLastSuccess;
+@property NSDate* ruleSyncLastSuccess;
+@property SNTModeTransition* modeTransition;
+@property NSString* eventDetailURL;
+@property NSString* eventDetailText;
+@property NSString* fileAccessEventDetailURL;
+@property NSString* fileAccessEventDetailText;
+@property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSArray<NSString*>* pushTokenChain;
+@property NSArray<NSString*>* telemetryFilterExpressions;
+@property NSArray<SNTCELFallbackRule*>* celFallbackRules;
+@property NSNumber* fullSyncInterval;
+@property NSNumber* pushNotificationsFullSyncInterval;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -62,11 +62,11 @@
 @implementation SNTSyncConfigBundleTest
 
 - (void)testPreflightConfigBundle {
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
   syncState.pushIssuerJWT = @"issuerToken";
   syncState.pushJWT = @"userToken";
 
-  SNTConfigBundle *bundle = PreflightConfigBundle(syncState);
+  SNTConfigBundle* bundle = PreflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.pushTokenChain, (@[ @"issuerToken", @"userToken" ]));
 
   XCTAssertNil(bundle.clientMode);
@@ -96,8 +96,8 @@
 }
 
 - (void)testPostflightConfigBundle {
-  SNTConfigBundle *bundle;
-  SNTSyncState *syncState = [[SNTSyncState alloc] init];
+  SNTConfigBundle* bundle;
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
 
   syncState.clientMode = SNTClientModeUnknown;
   bundle = PostflightConfigBundle(syncState);
@@ -179,8 +179,8 @@
 }
 
 - (void)testRuleSyncConfigBundle {
-  NSDate *curTime = [NSDate now];
-  SNTConfigBundle *bundle = RuleSyncConfigBundle();
+  NSDate* curTime = [NSDate now];
+  SNTConfigBundle* bundle = RuleSyncConfigBundle();
   XCTAssertGreaterThanOrEqual([bundle.ruleSyncLastSuccess timeIntervalSince1970],
                               [curTime timeIntervalSince1970]);
 
@@ -213,7 +213,7 @@
 }
 
 - (void)testSyncTypeConfigBundle {
-  SNTConfigBundle *bundle;
+  SNTConfigBundle* bundle;
 
   bundle = SyncTypeConfigBundle(SNTSyncTypeNormal);
   XCTAssertEqualObjects(bundle.syncType, @(SNTSyncTypeNormal));

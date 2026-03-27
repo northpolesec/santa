@@ -19,12 +19,12 @@
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
-static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.netd";
+static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.netd";
 
 @implementation SNTXPCNetworkExtensionInterface
 
-+ (NSXPCInterface *)networkExtensionInterface {
-  NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNDNetworkExtensionXPC)];
++ (NSXPCInterface*)networkExtensionInterface {
+  NSXPCInterface* r = [NSXPCInterface interfaceWithProtocol:@protocol(SNDNetworkExtensionXPC)];
 
   [r setClasses:[NSSet setWithObject:[SNTNetworkExtensionSettings class]]
         forSelector:@selector(updateNetworkExtensionSettings:reply:)
@@ -34,13 +34,13 @@ static NSString *const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
   return r;
 }
 
-+ (NSString *)serviceID {
-  MOLCodesignChecker *csc = [[MOLCodesignChecker alloc] initWithSelf];
++ (NSString*)serviceID {
+  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithSelf];
   return [NSString stringWithFormat:@"%@.%@.xpc", csc.teamID, kSantanetdExtensionBundleID];
 }
 
-+ (MOLXPCConnection *)configuredConnection {
-  MOLXPCConnection *c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
++ (MOLXPCConnection*)configuredConnection {
+  MOLXPCConnection* c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
                                                           privileged:YES];
   c.remoteInterface = [self networkExtensionInterface];
   return c;

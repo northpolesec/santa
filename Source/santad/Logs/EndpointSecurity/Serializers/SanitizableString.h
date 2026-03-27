@@ -29,15 +29,15 @@ namespace santa {
 // sanitized, this class only uses the given buffers.
 class SanitizableString {
  public:
-  SanitizableString(const es_file_t *file);
-  SanitizableString(const es_string_token_t &tok);
-  SanitizableString(const char *str, size_t len);
-  SanitizableString(NSString *str);
+  SanitizableString(const es_file_t* file);
+  SanitizableString(const es_string_token_t& tok);
+  SanitizableString(const char* str, size_t len);
+  SanitizableString(NSString* str);
 
-  SanitizableString(SanitizableString &&other) = delete;
-  SanitizableString(const SanitizableString &other) = delete;
-  SanitizableString &operator=(const SanitizableString &rhs) = delete;
-  SanitizableString &operator=(SanitizableString &&rhs) = delete;
+  SanitizableString(SanitizableString&& other) = delete;
+  SanitizableString(const SanitizableString& other) = delete;
+  SanitizableString& operator=(const SanitizableString& rhs) = delete;
+  SanitizableString& operator=(SanitizableString&& rhs) = delete;
 
   // Return the original, unsanitized string
   std::string_view String() const;
@@ -45,10 +45,10 @@ class SanitizableString {
   // Return the sanitized string
   std::string_view Sanitized() const;
 
-  static std::optional<std::string> SanitizeString(const char *str);
-  static std::optional<std::string> SanitizeString(const char *str, size_t length);
+  static std::optional<std::string> SanitizeString(const char* str);
+  static std::optional<std::string> SanitizeString(const char* str, size_t length);
 
-  friend std::ostream &operator<<(std::ostream &ss, const SanitizableString &sani_string);
+  friend std::ostream& operator<<(std::ostream& ss, const SanitizableString& sani_string);
 
  private:
   std::string_view data_;

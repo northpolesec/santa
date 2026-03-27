@@ -63,7 +63,7 @@ using santa::TTYWriter;
 using santa::Unit;
 using santa::WatchItems;
 
-static NSString *ClientModeName(SNTClientMode mode) {
+static NSString* ClientModeName(SNTClientMode mode) {
   switch (mode) {
     case SNTClientModeMonitor: return @"Monitor";
     case SNTClientModeLockdown: return @"Lockdown";
@@ -76,17 +76,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 std::shared_ptr<Metrics> metrics, std::shared_ptr<santa::WatchItems> watch_items,
                 std::shared_ptr<Enricher> enricher,
                 std::shared_ptr<AuthResultCache> auth_result_cache,
-                MOLXPCConnection *control_connection, SNTCompilerController *compiler_controller,
-                SNTNotificationQueue *notifier_queue, SNTSyncdQueue *syncd_queue,
-                SNTNetworkExtensionQueue *netext_queue, SNTExecutionController *exec_controller,
+                MOLXPCConnection* control_connection, SNTCompilerController* compiler_controller,
+                SNTNotificationQueue* notifier_queue, SNTSyncdQueue* syncd_queue,
+                SNTNetworkExtensionQueue* netext_queue, SNTExecutionController* exec_controller,
                 std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
                 std::shared_ptr<TTYWriter> tty_writer,
                 std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
                 std::shared_ptr<santa::EntitlementsFilter> entitlements_filter) {
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  SNTConfigurator* configurator = [SNTConfigurator configurator];
 
   std::weak_ptr<Metrics> weak_metrics(metrics);
-  SNTDaemonControlController *dc =
+  SNTDaemonControlController* dc =
       [[SNTDaemonControlController alloc] initWithNotificationQueue:notifier_queue
           syncdQueue:syncd_queue
           netExtensionQueue:netext_queue
@@ -96,7 +96,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             auth_result_cache->FlushCache(mode, reason);
             [exec_controller flushTouchIDApprovalCache];
           }
-          cacheCountBlock:^NSArray<NSNumber *> *() {
+          cacheCountBlock:^NSArray<NSNumber*>*() {
             return auth_result_cache->CacheCounts();
           }
           checkCacheBlock:^SNTAction(SantaVnode vnode) {
@@ -117,7 +117,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     metrics->StartPoll();
   }
 
-  SNTEndpointSecurityDeviceManager *device_client = [[SNTEndpointSecurityDeviceManager alloc]
+  SNTEndpointSecurityDeviceManager* device_client = [[SNTEndpointSecurityDeviceManager alloc]
                             initWithESAPI:esapi
                                   metrics:metrics
                                    logger:logger
@@ -128,12 +128,12 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                            remountUSBMode:[configurator remountUSBMode]
                        startupPreferences:[configurator onStartUSBOptions]];
 
-  device_client.deviceBlockCallback = ^(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent) {
+  device_client.deviceBlockCallback = ^(SNTDeviceEvent* event, SNTStoredUSBMountEvent* usbEvent) {
     [syncd_queue addStoredEvent:usbEvent];
     [[notifier_queue.notifierConnection remoteObjectProxy] postUSBBlockNotification:event];
   };
 
-  device_client.networkMountCallback = ^(SNTStoredNetworkMountEvent *event) {
+  device_client.networkMountCallback = ^(SNTStoredNetworkMountEvent* event) {
     [syncd_queue addStoredEvent:event];
     [[notifier_queue.notifierConnection remoteObjectProxy]
         postNetworkMountNotification:event
@@ -141,7 +141,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                          [SNTConfigurator configurator])];
   };
 
-  SNTEndpointSecurityRecorder *monitor_client =
+  SNTEndpointSecurityRecorder* monitor_client =
       [[SNTEndpointSecurityRecorder alloc] initWithESAPI:esapi
                                                  metrics:metrics
                                                   logger:logger
@@ -151,7 +151,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                               prefixTree:prefix_tree
                                              processTree:process_tree];
 
-  SNTEndpointSecurityAuthorizer *authorizer_client =
+  SNTEndpointSecurityAuthorizer* authorizer_client =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:esapi
                                                    metrics:metrics
                                             execController:exec_controller
@@ -163,7 +163,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   // authorizer client as it is most concerned with the state of ES caches.
   auth_result_cache->SetESClient(authorizer_client);
 
-  SNTEndpointSecurityTamperResistance *tamper_client =
+  SNTEndpointSecurityTamperResistance* tamper_client =
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:esapi
                                                          metrics:metrics
                                                           logger:logger];
@@ -172,10 +172,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
       [SNTDecisionCache sharedCache], enricher, logger, tty_writer, metrics,
       configurator.fileAccessGlobalLogsPerSec, configurator.fileAccessGlobalWindowSizeSec,
       ^santa::FAAPolicyProcessor::URLTextPair(
-          const std::shared_ptr<santa::WatchItemPolicyBase> &policy) {
+          const std::shared_ptr<santa::WatchItemPolicyBase>& policy) {
         return watch_items->EventDetailLinkInfo(policy);
       },
-      ^(SNTStoredFileAccessEvent *event, bool sendImmediately) {
+      ^(SNTStoredFileAccessEvent* event, bool sendImmediately) {
         // Only store FAA events if a sync server is configured.
         if (configurator.syncBaseURL) {
           [[SNTDatabaseController eventTable] addStoredEvent:event];
@@ -186,7 +186,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         }
       });
 
-  SNTEndpointSecurityDataFileAccessAuthorizer *data_faa_client =
+  SNTEndpointSecurityDataFileAccessAuthorizer* data_faa_client =
       [[SNTEndpointSecurityDataFileAccessAuthorizer alloc]
                         initWithESAPI:esapi
                               metrics:metrics
@@ -200,15 +200,15 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
           }];
 
   watch_items->RegisterDataWatchItemsUpdatedCallback(
-      ^(size_t count, const santa::SetPairPathAndType &new_paths,
-        const santa::SetPairPathAndType &removed_paths) {
+      ^(size_t count, const santa::SetPairPathAndType& new_paths,
+        const santa::SetPairPathAndType& removed_paths) {
         [data_faa_client watchItemsCount:count newPaths:new_paths removedPaths:removed_paths];
       });
 
-  data_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent *event, NSString *customMsg,
-                                            NSString *customURL, NSString *customText) {
+  data_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent* event, NSString* customMsg,
+                                            NSString* customURL, NSString* customText) {
     // TODO: The config state should be an argument to the block.
-    SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+    SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
     [[notifier_queue.notifierConnection remoteObjectProxy]
         postFileAccessBlockNotification:event
                           customMessage:customMsg
@@ -217,7 +217,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                             configState:cs];
   };
 
-  SNTEndpointSecurityProcessFileAccessAuthorizer *proc_faa_client =
+  SNTEndpointSecurityProcessFileAccessAuthorizer* proc_faa_client =
       [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc]
                         initWithESAPI:esapi
                               metrics:metrics
@@ -231,10 +231,10 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [proc_faa_client processWatchItemsCount:count];
   });
 
-  proc_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent *event, NSString *customMsg,
-                                            NSString *customURL, NSString *customText) {
+  proc_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent* event, NSString* customMsg,
+                                            NSString* customURL, NSString* customText) {
     // TODO: The config state should be an argument to the block.
-    SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+    SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
     [[notifier_queue.notifierConnection remoteObjectProxy]
         postFileAccessBlockNotification:event
                           customMessage:customMsg
@@ -248,13 +248,13 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   [syncd_queue reassessSyncServiceConnectionImmediately];
 
-  NSMutableArray<SNTKVOManager *> *kvoObservers = [[NSMutableArray alloc] init];
+  NSMutableArray<SNTKVOManager*>* kvoObservers = [[NSMutableArray alloc] init];
   [kvoObservers addObjectsFromArray:@[
     [[SNTKVOManager alloc]
         initWithObject:configurator
               selector:@selector(clientMode)
                   type:[NSNumber class]
-              callback:^(NSNumber *oldValue, NSNumber *newValue) {
+              callback:^(NSNumber* oldValue, NSNumber* newValue) {
                 if ([oldValue longLongValue] == [newValue longLongValue]) {
                   // Note: This case apparently can happen and if not checked
                   // will result in excessive notification messages sent to the
@@ -288,7 +288,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(syncBaseURL)
                   type:[NSURL class]
-              callback:^(NSURL *oldValue, NSURL *newValue) {
+              callback:^(NSURL* oldValue, NSURL* newValue) {
                 if ((!newValue && !oldValue) ||
                     ([newValue.absoluteString isEqualToString:oldValue.absoluteString])) {
                   return;
@@ -301,7 +301,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(enableStatsCollection)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    BOOL oldBool = [oldValue boolValue];
                                    BOOL newBool = [newValue boolValue];
                                    if (oldBool != newBool) {
@@ -314,7 +314,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(statsOrganizationID)
                   type:[NSString class]
-              callback:^(NSString *oldValue, NSString *newValue) {
+              callback:^(NSString* oldValue, NSString* newValue) {
                 if ((!newValue && !oldValue) || ([newValue isEqualToString:oldValue])) {
                   return;
                 } else {
@@ -332,7 +332,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(exportMetrics)
                   type:[NSNumber class]
-              callback:^(NSNumber *oldValue, NSNumber *newValue) {
+              callback:^(NSNumber* oldValue, NSNumber* newValue) {
                 BOOL oldBool = [oldValue boolValue];
                 BOOL newBool = [newValue boolValue];
                 if (oldBool == NO && newBool == YES) {
@@ -349,7 +349,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(metricExportInterval)
                   type:[NSNumber class]
-              callback:^(NSNumber *oldValue, NSNumber *newValue) {
+              callback:^(NSNumber* oldValue, NSNumber* newValue) {
                 uint64_t oldInterval = [oldValue unsignedIntValue];
                 uint64_t newInterval = [newValue unsignedIntValue];
                 LOGI(@"MetricExportInterval changed: %llu -> %llu. Restarting export.", oldInterval,
@@ -360,7 +360,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(allowedPathRegex)
                   type:[NSRegularExpression class]
-              callback:^(NSRegularExpression *oldValue, NSRegularExpression *newValue) {
+              callback:^(NSRegularExpression* oldValue, NSRegularExpression* newValue) {
                 if ((!newValue && !oldValue) ||
                     ([newValue.pattern isEqualToString:oldValue.pattern])) {
                   return;
@@ -374,7 +374,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(blockedPathRegex)
                   type:[NSRegularExpression class]
-              callback:^(NSRegularExpression *oldValue, NSRegularExpression *newValue) {
+              callback:^(NSRegularExpression* oldValue, NSRegularExpression* newValue) {
                 if ((!newValue && !oldValue) ||
                     ([newValue.pattern isEqualToString:oldValue.pattern])) {
                   return;
@@ -387,7 +387,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(blockUSBMount)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    BOOL oldBool = [oldValue boolValue];
                                    BOOL newBool = [newValue boolValue];
 
@@ -401,7 +401,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(blockUnencryptedRemovableMediaMount)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    BOOL oldBool = [oldValue boolValue];
                                    BOOL newBool = [newValue boolValue];
 
@@ -416,7 +416,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(remountUSBMode)
                                      type:[NSArray class]
-                                 callback:^(NSArray *oldValue, NSArray *newValue) {
+                                 callback:^(NSArray* oldValue, NSArray* newValue) {
                                    if (!oldValue && !newValue) {
                                      return;
                                    }
@@ -446,7 +446,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(staticRules)
                                      type:[NSArray class]
-                                 callback:^(NSArray *oldValue, NSArray *newValue) {
+                                 callback:^(NSArray* oldValue, NSArray* newValue) {
                                    if ([oldValue isEqualToArray:newValue]) {
                                      return;
                                    }
@@ -462,7 +462,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(eventLogType)
                   type:[NSNumber class]
-              callback:^(NSNumber *oldValue, NSNumber *newValue) {
+              callback:^(NSNumber* oldValue, NSNumber* newValue) {
                 NSInteger oldLogType = [oldValue integerValue];
                 NSInteger newLogType = [newValue integerValue];
 
@@ -492,7 +492,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(entitlementsTeamIDFilter)
                   type:[NSArray class]
-              callback:^(NSArray<NSString *> *oldValue, NSArray<NSString *> *newValue) {
+              callback:^(NSArray<NSString*>* oldValue, NSArray<NSString*>* newValue) {
                 if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
                   return;
                 }
@@ -514,7 +514,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(entitlementsPrefixFilter)
                   type:[NSArray class]
-              callback:^(NSArray<NSString *> *oldValue, NSArray<NSString *> *newValue) {
+              callback:^(NSArray<NSString*>* oldValue, NSArray<NSString*>* newValue) {
                 if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
                   return;
                 }
@@ -536,7 +536,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(telemetry)
                   type:[NSArray class]
-              callback:^(NSArray *oldValue, NSArray *newValue) {
+              callback:^(NSArray* oldValue, NSArray* newValue) {
                 if (!oldValue && !newValue) {
                   return;
                 }
@@ -561,7 +561,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(enableSilentTTYMode)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    BOOL oldBool = [oldValue boolValue];
                                    BOOL newBool = [newValue boolValue];
 
@@ -576,7 +576,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(enableMachineIDDecoration)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    BOOL oldBool = [oldValue boolValue];
                                    BOOL newBool = [newValue boolValue];
 
@@ -592,7 +592,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(machineID)
                                      type:[NSString class]
-                                 callback:^(NSString *oldValue, NSString *newValue) {
+                                 callback:^(NSString* oldValue, NSString* newValue) {
                                    if ((!newValue && !oldValue) ||
                                        ([newValue isEqualToString:oldValue])) {
                                      return;
@@ -605,7 +605,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(enableTelemetryExport)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    BOOL oldBool = [oldValue boolValue];
                                    BOOL newBool = [newValue boolValue];
 
@@ -629,7 +629,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(telemetryExportIntervalSec)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    uint32_t oldInterval = [oldValue unsignedIntValue];
                                    uint32_t newInterval = [newValue unsignedIntValue];
 
@@ -645,7 +645,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(telemetryExportTimeoutSec)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    uint32_t oldInterval = [oldValue unsignedIntValue];
                                    uint32_t newInterval = [newValue unsignedIntValue];
 
@@ -661,7 +661,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(telemetryExportBatchThresholdSizeMB)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    uint32_t oldInterval = [oldValue unsignedIntValue];
                                    uint32_t newInterval = [newValue unsignedIntValue];
 
@@ -677,7 +677,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(telemetryExportMaxFilesPerBatch)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    uint32_t oldInterval = [oldValue unsignedIntValue];
                                    uint32_t newInterval = [newValue unsignedIntValue];
 
@@ -695,7 +695,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
         initWithObject:configurator
               selector:@selector(fileAccessPolicyPlist)
                   type:[NSString class]
-              callback:^(NSString *oldValue, NSString *newValue) {
+              callback:^(NSString* oldValue, NSString* newValue) {
                 if ((oldValue && !newValue) || (newValue && ![oldValue isEqualToString:newValue])) {
                   if ([configurator fileAccessPolicy]) {
                     LOGI(@"Ignoring change to FileAccessPolicyPlist "
@@ -716,7 +716,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(fileAccessPolicy)
                                      type:[NSDictionary class]
-                                 callback:^(NSDictionary *oldValue, NSDictionary *newValue) {
+                                 callback:^(NSDictionary* oldValue, NSDictionary* newValue) {
                                    if ((oldValue && !newValue) ||
                                        (newValue && ![oldValue isEqualToDictionary:newValue])) {
                                      if ([[SNTDatabaseController ruleTable] fileAccessRuleCount] >
@@ -733,7 +733,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(fileAccessPolicyUpdateIntervalSec)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    uint32_t oldInterval = [oldValue unsignedIntValue];
                                    uint32_t newInterval = [newValue unsignedIntValue];
 
@@ -749,7 +749,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(fileAccessGlobalLogsPerSec)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    uint32_t oldLogPerSec = [oldValue unsignedIntValue];
                                    uint32_t newLogPerSec = [newValue unsignedIntValue];
 
@@ -765,7 +765,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(fileAccessGlobalWindowSizeSec)
                                      type:[NSNumber class]
-                                 callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                    uint32_t oldWindowSizeSec = [oldValue unsignedIntValue];
                                    uint32_t newWindowSizeSec = [newValue unsignedIntValue];
 
@@ -828,7 +828,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                    });
   }
 
-  void (^installNetworkExtension)(NSString *reason) = ^(NSString *reason) {
+  void (^installNetworkExtension)(NSString* reason) = ^(NSString* reason) {
     LOGD(@"%@, triggering network extension install/upgrade if authorized", reason);
     [dc installNetworkExtensionForce:NO
                                reply:^(BOOL success) {

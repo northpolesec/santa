@@ -36,7 +36,7 @@
 
     _q = dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0);
 
-    NSString *bundleID = [SNTXPCControlInterface santaExtensionBundleID];
+    NSString* bundleID = [SNTXPCControlInterface santaExtensionBundleID];
     if (isNetworkExtension) {
       bundleID = [SNTXPCControlInterface santanetdExtensionBundleID];
     }
@@ -76,7 +76,7 @@
     if (self.isNetworkExtension) {
       if (self.isActivation) {
         // Verify with the daemon that network extension installation is authorized
-        MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+        MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
         daemonConn.unprivilegedInterface = [SNTXPCUnprivilegedControlInterface controlInterface];
         [daemonConn resume];
 
@@ -107,26 +107,26 @@
 
 #pragma mark OSSystemExtensionRequestDelegate
 
-- (OSSystemExtensionReplacementAction)request:(OSSystemExtensionRequest *)request
-                  actionForReplacingExtension:(OSSystemExtensionProperties *)oldExt
-                                withExtension:(OSSystemExtensionProperties *)newExt {
+- (OSSystemExtensionReplacementAction)request:(OSSystemExtensionRequest*)request
+                  actionForReplacingExtension:(OSSystemExtensionProperties*)oldExt
+                                withExtension:(OSSystemExtensionProperties*)newExt {
   LOGI(@"SystemExtension \"%@\" request for replacement", request.identifier);
   return OSSystemExtensionReplacementActionReplace;
 }
 
-- (void)requestNeedsUserApproval:(OSSystemExtensionRequest *)request {
+- (void)requestNeedsUserApproval:(OSSystemExtensionRequest*)request {
   LOGI(@"SystemExtension \"%@\" request needs user approval", request.identifier);
 
   // If the sysx is not authorized, don't wait around. macOS will start the sysx once authorized.
   exit(EXIT_FAILURE);
 }
 
-- (void)request:(OSSystemExtensionRequest *)request didFailWithError:(NSError *)error {
+- (void)request:(OSSystemExtensionRequest*)request didFailWithError:(NSError*)error {
   LOGE(@"SystemExtension \"%@\" request did fail: %@", request.identifier, error);
   exit(EXIT_FAILURE);
 }
 
-- (void)request:(OSSystemExtensionRequest *)request
+- (void)request:(OSSystemExtensionRequest*)request
     didFinishWithResult:(OSSystemExtensionRequestResult)result {
   LOGI(@"SystemExtension \"%@\" request did finish: %ld", request.identifier, (long)result);
 
@@ -136,7 +136,7 @@
     // Default to NO if santad is not reachable or no settings exist
     __block BOOL enabled = NO;
 
-    MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+    MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
     daemonConn.unprivilegedInterface = [SNTXPCUnprivilegedControlInterface controlInterface];
     [daemonConn resume];
 

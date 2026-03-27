@@ -36,8 +36,8 @@ class FilePeer : public File {
   using File::WatchLogFile;
 
   // Member accesses wrapped in a dispatch_sync to satisfy tsan.
-  NSFileHandle *FileHandle() {
-    __block NSFileHandle *h;
+  NSFileHandle* FileHandle() {
+    __block NSFileHandle* h;
     dispatch_sync(q_, ^{
       h = file_handle_;
     });
@@ -82,7 +82,7 @@ bool WaitFor(bool (^condition)(void)) {
   return attempts < maxAttempts;
 }
 
-bool WaitForNewLogFile(NSFileManager *fileManager, NSString *path) {
+bool WaitForNewLogFile(NSFileManager* fileManager, NSString* path) {
   return WaitFor(^bool() {
     return [fileManager fileExistsAtPath:path];
   });
@@ -95,12 +95,12 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
 }
 
 @interface FileTest : XCTestCase
-@property NSString *path;
-@property NSString *logPath;
-@property NSString *logRenamePath;
+@property NSString* path;
+@property NSString* logPath;
+@property NSString* logRenamePath;
 @property dispatch_queue_t q;
 @property dispatch_source_t timer;
-@property NSFileManager *fileManager;
+@property NSFileManager* fileManager;
 @end
 
 @implementation FileTest

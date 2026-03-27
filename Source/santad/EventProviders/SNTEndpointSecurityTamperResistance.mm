@@ -67,7 +67,7 @@ void RemoveLegacyLaunchdPlists() {
       "/private/etc/newsyslog.d/com.google.santa.newsyslog.conf",
   };
 
-  for (const auto &plist : legacyPlists) {
+  for (const auto& plist : legacyPlists) {
     // Note: As currently written, all legacy plists will be removed when any of the individual
     // plists are attempted to be loaded. This is a bit overkill in that each plist will be removed
     // 5 times, but not a big deal. If the unlink error is that the file doesn't exist, the log
@@ -81,7 +81,7 @@ void RemoveLegacyLaunchdPlists() {
 /// Return a pair of whether or not to allow the exec and whether or not the ES response should be
 /// cached. If the exec is not launchctl, the response can be cached, otherwise the response should
 /// not be cached.
-std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
+std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
   es_string_token_t exec_path = esMsg->event.exec.target->executable->path;
   if (strncmp(exec_path.data, "/bin/launchctl", exec_path.length) != 0) {
     return {ES_AUTH_RESULT_ALLOW, true};
@@ -142,11 +142,11 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message &esMsg) {
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return @"Tamper Resistance";
 }
 
-- (void)handleMessage:(Message &&)esMsg
+- (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   es_auth_result_t result = ES_AUTH_RESULT_ALLOW;
   bool cacheable = true;

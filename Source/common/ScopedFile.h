@@ -29,15 +29,15 @@ namespace santa {
 class ScopedFile {
  public:
   static absl::StatusOr<ScopedFile> CreateTemporary(
-      NSString *path_prefix = nil, NSString *filename_template = @"santa_test_XXXXXX") {
+      NSString* path_prefix = nil, NSString* filename_template = @"santa_test_XXXXXX") {
     if (filename_template.length == 0) {
       return absl::FailedPreconditionError("No temp file template provided");
     }
 
-    NSString *path = NSTemporaryDirectory();
+    NSString* path = NSTemporaryDirectory();
     if (path_prefix) {
       path = [path stringByAppendingFormat:@"/%@", path_prefix];
-      NSError *err;
+      NSError* err;
       if (![[NSFileManager defaultManager] createDirectoryAtPath:path
                                      withIntermediateDirectories:YES
                                                       attributes:nil
@@ -48,7 +48,7 @@ class ScopedFile {
 
     path = [path stringByAppendingFormat:@"/%@", filename_template];
 
-    char *mutable_path = strdup(path.UTF8String);
+    char* mutable_path = strdup(path.UTF8String);
     if (!mutable_path) {
       return absl::InternalError("Failed to allocate memory for temp file path");
     }
@@ -78,15 +78,15 @@ class ScopedFile {
     }
   }
 
-  ScopedFile(const ScopedFile &) = delete;
-  ScopedFile &operator=(const ScopedFile &) = delete;
+  ScopedFile(const ScopedFile&) = delete;
+  ScopedFile& operator=(const ScopedFile&) = delete;
 
-  ScopedFile(ScopedFile &&other) {
+  ScopedFile(ScopedFile&& other) {
     fd_ = other.fd_;
     other.fd_ = -1;
   }
 
-  ScopedFile &operator=(ScopedFile &&rhs) {
+  ScopedFile& operator=(ScopedFile&& rhs) {
     if (this != &rhs) {
       fd_ = rhs.fd_;
       rhs.fd_ = -1;
@@ -94,11 +94,11 @@ class ScopedFile {
     return *this;
   }
 
-  NSFileHandle *Reader() const {
+  NSFileHandle* Reader() const {
     return [[NSFileHandle alloc] initWithFileDescriptor:dup(fd_) closeOnDealloc:YES];
   }
 
-  NSFileHandle *Writer() const {
+  NSFileHandle* Writer() const {
     return [[NSFileHandle alloc] initWithFileDescriptor:dup(fd_) closeOnDealloc:YES];
   }
 

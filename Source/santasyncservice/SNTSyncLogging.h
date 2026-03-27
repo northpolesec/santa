@@ -20,7 +20,7 @@
 
 __BEGIN_DECLS
 
-void LogSyncMessage(os_log_type_t logType, NSString *message);
+void LogSyncMessage(os_log_type_t logType, NSString* message);
 
 ///  Send logs to the standard pipeline AND to any active sync
 ///  listeners, such as santactl or the UI.

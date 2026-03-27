@@ -44,7 +44,7 @@ class LoggerPeer;
 
 namespace santa {
 
-using GetExportConfigBlock = SNTExportConfiguration * (^)(void);
+using GetExportConfigBlock = SNTExportConfiguration* (^)(void);
 
 class Logger : public Timer<Logger> {
  public:
@@ -57,8 +57,8 @@ class Logger : public Timer<Logger> {
       std::shared_ptr<santa::EndpointSecurityAPI> esapi,
       std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
       GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
-      SNTEventLogType log_type, SNTDecisionCache *decision_cache, NSString *event_log_path,
-      NSString *spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
+      SNTEventLogType log_type, SNTDecisionCache* decision_cache, NSString* event_log_path,
+      NSString* spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
       uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds,
       uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
       uint32_t telemetry_export_max_files_per_batch);
@@ -72,27 +72,27 @@ class Logger : public Timer<Logger> {
 
   virtual ~Logger() = default;
 
-  Logger(Logger &&) = default;
-  Logger &operator=(Logger &&rhs) = default;
-  Logger(Logger &) = delete;
-  Logger &operator=(Logger &rhs) = delete;
+  Logger(Logger&&) = default;
+  Logger& operator=(Logger&& rhs) = default;
+  Logger(Logger&) = delete;
+  Logger& operator=(Logger& rhs) = delete;
 
   virtual void Log(std::unique_ptr<santa::EnrichedMessage> msg);
 
-  void LogAllowlist(const santa::Message &msg, const std::string_view hash,
+  void LogAllowlist(const santa::Message& msg, const std::string_view hash,
                     const std::string_view target_path);
 
-  void LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent *> *events);
+  void LogBundleHashingEvents(NSArray<SNTStoredExecutionEvent*>* events);
 
-  void LogDiskAppeared(NSDictionary *props, bool allowed);
-  void LogDiskDisappeared(NSDictionary *props);
+  void LogDiskAppeared(NSDictionary* props, bool allowed);
+  void LogDiskDisappeared(NSDictionary* props);
 
-  void LogNetworkFlows(SNDProcessFlows *processFlows, struct timespec window_start,
+  void LogNetworkFlows(SNDProcessFlows* processFlows, struct timespec window_start,
                        struct timespec window_end);
 
-  virtual void LogFileAccess(const std::string &policy_version, const std::string &policy_name,
-                             const santa::Message &msg,
-                             const santa::EnrichedProcess &enriched_process, size_t target_index,
+  virtual void LogFileAccess(const std::string& policy_version, const std::string& policy_name,
+                             const santa::Message& msg,
+                             const santa::EnrichedProcess& enriched_process, size_t target_index,
                              std::optional<santa::EnrichedFile> enriched_event_target,
                              FileAccessPolicyDecision decision);
 
@@ -125,10 +125,10 @@ class Logger : public Timer<Logger> {
     }
 
     ExportTracker(dispatch_queue_t q) : q_(q) {}
-    ExportTracker(ExportTracker &&) = default;
-    ExportTracker &operator=(ExportTracker &&rhs) = default;
-    ExportTracker(ExportTracker &) = default;
-    ExportTracker &operator=(ExportTracker &rhs) = default;
+    ExportTracker(ExportTracker&&) = default;
+    ExportTracker& operator=(ExportTracker&& rhs) = default;
+    ExportTracker(ExportTracker&) = default;
+    ExportTracker& operator=(ExportTracker& rhs) = default;
 
     /// Track a new key. If the key isn't yet tracked, its value will be set
     /// to false. If the key is already tracked, its value will not be changed.

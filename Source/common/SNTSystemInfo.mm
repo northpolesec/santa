@@ -18,8 +18,8 @@
 
 @implementation SNTSystemInfo
 
-+ (NSString *)serialNumber {
-  static NSString *serial;
++ (NSString*)serialNumber {
+  static NSString* serial;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     io_service_t platformExpert = IOServiceGetMatchingService(
@@ -34,8 +34,8 @@
   return serial;
 }
 
-+ (NSString *)hardwareUUID {
-  static NSString *uuid;
++ (NSString*)hardwareUUID {
+  static NSString* uuid;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     io_service_t platformExpert = IOServiceGetMatchingService(
@@ -51,8 +51,8 @@
   return uuid;
 }
 
-+ (NSString *)bootSessionUUID {
-  static NSString *uuid;
++ (NSString*)bootSessionUUID {
+  static NSString* uuid;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     uuid_string_t bootSessionUUID = {};
@@ -71,49 +71,49 @@
   return uuid;
 }
 
-+ (NSString *)osVersion {
++ (NSString*)osVersion {
   return [SNTSystemInfo _systemVersionDictionary][@"ProductVersion"];
 }
 
-+ (NSString *)osBuild {
++ (NSString*)osBuild {
   return [SNTSystemInfo _systemVersionDictionary][@"ProductBuildVersion"];
 }
 
-+ (NSString *)shortHostname {
++ (NSString*)shortHostname {
   return [[[SNTSystemInfo longHostname] componentsSeparatedByString:@"."] firstObject];
 }
 
-+ (NSString *)longHostname {
++ (NSString*)longHostname {
   char hostname[MAXHOSTNAMELEN];
   gethostname(hostname, (int)sizeof(hostname));
   return @(hostname);
 }
 
-+ (NSString *)modelIdentifier {
++ (NSString*)modelIdentifier {
   char model[32];
   size_t len = 32;
   sysctlbyname("hw.model", model, &len, NULL, 0);
   return @(model);
 }
 
-+ (NSString *)santaProductVersion {
-  NSDictionary *info_dict = [[NSBundle mainBundle] infoDictionary];
++ (NSString*)santaProductVersion {
+  NSDictionary* info_dict = [[NSBundle mainBundle] infoDictionary];
   return info_dict[@"CFBundleShortVersionString"];
 }
 
-+ (NSString *)santaBuildVersion {
-  NSDictionary *info_dict = [[NSBundle mainBundle] infoDictionary];
++ (NSString*)santaBuildVersion {
+  NSDictionary* info_dict = [[NSBundle mainBundle] infoDictionary];
   return [[info_dict[@"CFBundleVersion"] componentsSeparatedByString:@"."] lastObject];
 }
 
-+ (NSString *)santaFullVersion {
-  NSDictionary *info_dict = [[NSBundle mainBundle] infoDictionary];
++ (NSString*)santaFullVersion {
+  NSDictionary* info_dict = [[NSBundle mainBundle] infoDictionary];
   return info_dict[@"CFBundleVersion"];
 }
 
 #pragma mark - Internal
 
-+ (NSDictionary *)_systemVersionDictionary {
++ (NSDictionary*)_systemVersionDictionary {
   return [NSDictionary
       dictionaryWithContentsOfFile:@"/System/Library/CoreServices/SystemVersion.plist"];
 }

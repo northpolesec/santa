@@ -16,14 +16,14 @@
 
 // Expose necessary setters for SNTConfigBundle properties needed by the daemon
 @interface SNTConfigBundle (DaemonConfigBundleCreator)
-@property NSNumber *enableNotificationSilences;
-@property NSString *bannedNetworkMountBlockMessage;
+@property NSNumber* enableNotificationSilences;
+@property NSString* bannedNetworkMountBlockMessage;
 @end
 
 namespace santa {
 
-SNTConfigBundle *NetworkMountConfigBundle(SNTConfigurator *configurator) {
-  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+SNTConfigBundle* NetworkMountConfigBundle(SNTConfigurator* configurator) {
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.enableNotificationSilences = @(configurator.enableNotificationSilences);
   bundle.bannedNetworkMountBlockMessage = configurator.bannedNetworkMountBlockMessage;

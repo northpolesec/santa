@@ -41,11 +41,11 @@ REGISTER_COMMAND_NAME(@"command")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Trigger Santa commands. Debug only.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return (@"Usage: santactl command <command> [options]\n"
           @"  One of:\n"
           @"    kill: Kill processes based on given identifier information.\n"
@@ -60,7 +60,7 @@ REGISTER_COMMAND_NAME(@"command")
           @"\n");
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   if (!arguments.count) {
     [self printErrorUsageAndExit:@"No arguments"];
   }
@@ -71,7 +71,7 @@ REGISTER_COMMAND_NAME(@"command")
   };
 
   Operation operation = Operation::kUnknown;
-  NSString *arg = arguments[0];
+  NSString* arg = arguments[0];
 
   if ([arg caseInsensitiveCompare:@"kill"] == NSOrderedSame) {
     operation = Operation::kKill;
@@ -91,13 +91,13 @@ REGISTER_COMMAND_NAME(@"command")
   exit(EXIT_FAILURE);
 }
 
-- (void)killWithArguments:(NSArray *)arguments {
-  SNTKillRequest *killRequest = nil;
-  NSString *uuid = [[NSUUID UUID] UUIDString];
+- (void)killWithArguments:(NSArray*)arguments {
+  SNTKillRequest* killRequest = nil;
+  NSString* uuid = [[NSUUID UUID] UUIDString];
 
   // Parse arguments
   for (NSUInteger i = 0; i < arguments.count; ++i) {
-    NSString *arg = arguments[i];
+    NSString* arg = arguments[i];
 
     if ([arg caseInsensitiveCompare:@"--process"] == NSOrderedSame) {
       if (i + 2 >= arguments.count) {
@@ -152,9 +152,9 @@ REGISTER_COMMAND_NAME(@"command")
 
   TEE_LOGI(@"Sending kill request to santad. Waiting for a response...");
 
-  __block SNTKillResponse *resp;
+  __block SNTKillResponse* resp;
   [[self.daemonConn remoteObjectProxy] killProcesses:killRequest
-                                               reply:^(SNTKillResponse *response) {
+                                               reply:^(SNTKillResponse* response) {
                                                  resp = response;
                                                  dispatch_semaphore_signal(sema);
                                                }];
@@ -178,7 +178,7 @@ REGISTER_COMMAND_NAME(@"command")
 
   bool hadError = false;
   TEE_LOGI(@"Killed %ld process(es)", resp.killedProcesses.count);
-  for (SNTKilledProcess *proc in resp.killedProcesses) {
+  for (SNTKilledProcess* proc in resp.killedProcesses) {
     if (proc.error == SNTKilledProcessErrorNone) {
       TEE_LOGI(@"Killed pid: %d, pidversion: %d", proc.pid, proc.pidversion);
     } else {

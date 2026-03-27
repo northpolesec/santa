@@ -40,36 +40,36 @@
 #import "Source/common/Unit.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 
-NSString *const kWatchItemConfigKeyVersion = @"Version";
-NSString *const kWatchItemConfigKeyEventDetailURL = @"EventDetailURL";
-NSString *const kWatchItemConfigKeyEventDetailText = @"EventDetailText";
-NSString *const kWatchItemConfigKeyWatchItems = @"WatchItems";
-NSString *const kWatchItemConfigKeyPaths = @"Paths";
-NSString *const kWatchItemConfigKeyPathsPath = @"Path";
-NSString *const kWatchItemConfigKeyPathsIsPrefix = @"IsPrefix";
-NSString *const kWatchItemConfigKeyOptions = @"Options";
-NSString *const kWatchItemConfigKeyOptionsAllowReadAccess = @"AllowReadAccess";
-NSString *const kWatchItemConfigKeyOptionsAuditOnly = @"AuditOnly";
-NSString *const kWatchItemConfigKeyOptionsInvertProcessExceptions = @"InvertProcessExceptions";
-NSString *const kWatchItemConfigKeyOptionsRuleType = @"RuleType";
-NSString *const kWatchItemConfigKeyOptionsEnableSilentMode = @"EnableSilentMode";
-NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode = @"EnableSilentTTYMode";
-NSString *const kWatchItemConfigKeyOptionsCustomMessage = @"BlockMessage";
-NSString *const kWatchItemConfigKeyOptionsEventDetailURL = kWatchItemConfigKeyEventDetailURL;
-NSString *const kWatchItemConfigKeyOptionsEventDetailText = kWatchItemConfigKeyEventDetailText;
-NSString *const kWatchItemConfigKeyOptionsVersion = kWatchItemConfigKeyVersion;
-NSString *const kWatchItemConfigKeyProcesses = @"Processes";
-NSString *const kWatchItemConfigKeyProcessesBinaryPath = @"BinaryPath";
-NSString *const kWatchItemConfigKeyProcessesCertificateSha256 = @"CertificateSha256";
-NSString *const kWatchItemConfigKeyProcessesSigningID = @"SigningID";
-NSString *const kWatchItemConfigKeyProcessesTeamID = @"TeamID";
-NSString *const kWatchItemConfigKeyProcessesCDHash = @"CDHash";
-NSString *const kWatchItemConfigKeyProcessesPlatformBinary = @"PlatformBinary";
+NSString* const kWatchItemConfigKeyVersion = @"Version";
+NSString* const kWatchItemConfigKeyEventDetailURL = @"EventDetailURL";
+NSString* const kWatchItemConfigKeyEventDetailText = @"EventDetailText";
+NSString* const kWatchItemConfigKeyWatchItems = @"WatchItems";
+NSString* const kWatchItemConfigKeyPaths = @"Paths";
+NSString* const kWatchItemConfigKeyPathsPath = @"Path";
+NSString* const kWatchItemConfigKeyPathsIsPrefix = @"IsPrefix";
+NSString* const kWatchItemConfigKeyOptions = @"Options";
+NSString* const kWatchItemConfigKeyOptionsAllowReadAccess = @"AllowReadAccess";
+NSString* const kWatchItemConfigKeyOptionsAuditOnly = @"AuditOnly";
+NSString* const kWatchItemConfigKeyOptionsInvertProcessExceptions = @"InvertProcessExceptions";
+NSString* const kWatchItemConfigKeyOptionsRuleType = @"RuleType";
+NSString* const kWatchItemConfigKeyOptionsEnableSilentMode = @"EnableSilentMode";
+NSString* const kWatchItemConfigKeyOptionsEnableSilentTTYMode = @"EnableSilentTTYMode";
+NSString* const kWatchItemConfigKeyOptionsCustomMessage = @"BlockMessage";
+NSString* const kWatchItemConfigKeyOptionsEventDetailURL = kWatchItemConfigKeyEventDetailURL;
+NSString* const kWatchItemConfigKeyOptionsEventDetailText = kWatchItemConfigKeyEventDetailText;
+NSString* const kWatchItemConfigKeyOptionsVersion = kWatchItemConfigKeyVersion;
+NSString* const kWatchItemConfigKeyProcesses = @"Processes";
+NSString* const kWatchItemConfigKeyProcessesBinaryPath = @"BinaryPath";
+NSString* const kWatchItemConfigKeyProcessesCertificateSha256 = @"CertificateSha256";
+NSString* const kWatchItemConfigKeyProcessesSigningID = @"SigningID";
+NSString* const kWatchItemConfigKeyProcessesTeamID = @"TeamID";
+NSString* const kWatchItemConfigKeyProcessesCDHash = @"CDHash";
+NSString* const kWatchItemConfigKeyProcessesPlatformBinary = @"PlatformBinary";
 
-NSString *const kRuleTypePathsWithAllowedProcesses = @"pathswithallowedprocesses";
-NSString *const kRuleTypePathsWithDeniedProcesses = @"pathswithdeniedprocesses";
-NSString *const kRuleTypeProcessesWithAllowedPaths = @"processeswithallowedpaths";
-NSString *const kRuleTypeProcessesWithDeniedPaths = @"processeswithdeniedpaths";
+NSString* const kRuleTypePathsWithAllowedProcesses = @"pathswithallowedprocesses";
+NSString* const kRuleTypePathsWithDeniedProcesses = @"pathswithdeniedprocesses";
+NSString* const kRuleTypeProcessesWithAllowedPaths = @"processeswithallowedpaths";
+NSString* const kRuleTypeProcessesWithDeniedPaths = @"processeswithdeniedpaths";
 
 // https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/
 static constexpr NSUInteger kMaxTeamIDLength = 10;
@@ -79,7 +79,7 @@ static constexpr NSUInteger kMaxSigningIDLength = 512;
 
 // FAA Rule names must conform to rules for valid C identifiers
 static constexpr NSUInteger kMaxRuleNameLength = 63;
-static NSString *const kValidRuleNamePattern = @"^[A-Za-z_][A-Za-z0-9_]*$";
+static NSString* const kValidRuleNamePattern = @"^[A-Za-z_][A-Za-z0-9_]*$";
 
 // Semi-arbitrary min/max allowed reapplication frequency.
 // Goal is to prevent a configuration setting that would cause too much
@@ -111,12 +111,12 @@ namespace santa {
 
 namespace {
 // Type aliases
-using ValidatorBlock = bool (^)(id, NSError **);
+using ValidatorBlock = bool (^)(id, NSError**);
 }  // namespace
 
 /// Ensure the given string has the expected length and only
 /// contains valid hex digits
-bool ConfirmValidHexString(NSString *str, size_t expected_length) {
+bool ConfirmValidHexString(NSString* str, size_t expected_length) {
   if (str.length != expected_length) {
     return false;
   }
@@ -130,11 +130,11 @@ bool ConfirmValidHexString(NSString *str, size_t expected_length) {
   return true;
 }
 
-static inline bool GetBoolValue(NSDictionary *options, NSString *key, bool default_value) {
+static inline bool GetBoolValue(NSDictionary* options, NSString* key, bool default_value) {
   return options[key] ? [options[key] boolValue] : default_value;
 }
 
-std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type) {
+std::optional<WatchItemRuleType> GetRuleType(NSString* rule_type) {
   rule_type = [rule_type lowercaseString];
   if ([rule_type isEqualToString:kRuleTypePathsWithAllowedProcesses]) {
     return WatchItemRuleType::kPathsWithAllowedProcesses;
@@ -152,8 +152,8 @@ std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type) {
 // The given function is expected to return std::nullopt when it
 // is provided an invalid value.
 template <typename T>
-ValidatorBlock ValidValuesValidator(std::function<std::optional<T>(NSString *)> f) {
-  return ^bool(NSString *val, NSError **err) {
+ValidatorBlock ValidValuesValidator(std::function<std::optional<T>(NSString*)> f) {
+  return ^bool(NSString* val, NSError** err) {
     if (!f(val).has_value()) {
       [SNTError populateError:err withFormat:@"Invalid value. Got: \"%@\"", val];
       return false;
@@ -165,7 +165,7 @@ ValidatorBlock ValidValuesValidator(std::function<std::optional<T>(NSString *)> 
 // Given a length, returns a ValidatorBlock that confirms the
 // string is a valid hex string of the given length.
 ValidatorBlock HexValidator(NSUInteger expected_length) {
-  return ^bool(NSString *val, NSError **err) {
+  return ^bool(NSString* val, NSError** err) {
     if (!ConfirmValidHexString(val, expected_length)) {
       [SNTError populateError:err withFormat:@"Expected hex string of length %lu", expected_length];
       return false;
@@ -178,7 +178,7 @@ ValidatorBlock HexValidator(NSUInteger expected_length) {
 // Given a min and max length, returns a ValidatorBlock that confirms the
 // string is within the given bounds.
 ValidatorBlock LenRangeValidator(NSUInteger min_length, NSUInteger max_length) {
-  return ^bool(NSString *val, NSError **err) {
+  return ^bool(NSString* val, NSError** err) {
     if (val.length < min_length) {
       [SNTError populateError:err
                    withFormat:@"Value too short. Got: %lu, Min: %lu", val.length, min_length];
@@ -194,8 +194,8 @@ ValidatorBlock LenRangeValidator(NSUInteger min_length, NSUInteger max_length) {
 }
 
 /// Ensure the key exists (if required) and the value matches the expected type
-bool VerifyConfigKey(NSDictionary *dict, const NSString *key, Class expected, NSError **err,
-                     bool required = false, bool (^Validator)(id, NSError **) = nil) {
+bool VerifyConfigKey(NSDictionary* dict, const NSString* key, Class expected, NSError** err,
+                     bool required = false, bool (^Validator)(id, NSError**) = nil) {
   if (dict[key]) {
     if (![dict[key] isKindOfClass:expected]) {
       [SNTError
@@ -205,7 +205,7 @@ bool VerifyConfigKey(NSDictionary *dict, const NSString *key, Class expected, NS
       return false;
     }
 
-    NSError *validator_err;
+    NSError* validator_err;
     if (Validator && !Validator(dict[key], &validator_err)) {
       [SNTError populateError:err
                    withFormat:@"Invalid content in key '%@': %@", key,
@@ -223,16 +223,16 @@ bool VerifyConfigKey(NSDictionary *dict, const NSString *key, Class expected, NS
 /// Ensure all values of the array key in the dictionary conform to the
 /// expected type. If a Validator block is supplied, each item is also
 /// subject to the custom validation method.
-bool VerifyConfigKeyArray(NSDictionary *dict, NSString *key, Class expected, NSError **err,
-                          bool (^Validator)(id, NSError **) = nil) {
+bool VerifyConfigKeyArray(NSDictionary* dict, NSString* key, Class expected, NSError** err,
+                          bool (^Validator)(id, NSError**) = nil) {
   if (!VerifyConfigKey(dict, key, [NSArray class], err)) {
     return false;
   }
 
   __block bool success = true;
-  __block NSError *block_err;
+  __block NSError* block_err;
 
-  [dict[key] enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+  [dict[key] enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL* stop) {
     if (![obj isKindOfClass:expected]) {
       success = false;
       [SNTError populateError:&block_err
@@ -242,7 +242,7 @@ bool VerifyConfigKeyArray(NSDictionary *dict, NSString *key, Class expected, NSE
       return;
     }
 
-    NSError *validator_err;
+    NSError* validator_err;
     if (Validator && !Validator(obj, &validator_err)) {
       [SNTError populateError:&block_err
                    withFormat:@"Invalid content in array key '%@': %@", key,
@@ -275,23 +275,23 @@ bool VerifyConfigKeyArray(NSDictionary *dict, NSString *key, Class expected, NSE
 ///     <true/>
 ///   </dict>
 /// </array>
-std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id> *paths,
-                                                                  NSError **err) {
+std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* paths,
+                                                                  NSError** err) {
   SetPairPathAndType path_list;
 
   for (id path in paths) {
     if ([path isKindOfClass:[NSDictionary class]]) {
-      NSDictionary *path_dict = (NSDictionary *)path;
+      NSDictionary* path_dict = (NSDictionary*)path;
       if (!VerifyConfigKey(path_dict, kWatchItemConfigKeyPathsPath, [NSString class], err, true,
                            LenRangeValidator(1, PATH_MAX))) {
         return Unit{};
       }
 
-      NSString *path_str = path_dict[kWatchItemConfigKeyPathsPath];
+      NSString* path_str = path_dict[kWatchItemConfigKeyPathsPath];
       WatchItemPathType path_type = kWatchItemPolicyDefaultPathType;
 
       if (VerifyConfigKey(path_dict, kWatchItemConfigKeyPathsIsPrefix, [NSNumber class], err)) {
-        path_type = ([(NSNumber *)path_dict[kWatchItemConfigKeyPathsIsPrefix] boolValue] == NO
+        path_type = ([(NSNumber*)path_dict[kWatchItemConfigKeyPathsIsPrefix] boolValue] == NO
                          ? WatchItemPathType::kLiteral
                          : WatchItemPathType::kPrefix);
       } else {
@@ -307,7 +307,7 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id> *p
         return Unit{};
       }
 
-      path_list.insert({NSStringToUTF8String(((NSString *)path)), kWatchItemPolicyDefaultPathType});
+      path_list.insert({NSStringToUTF8String(((NSString*)path)), kWatchItemPolicyDefaultPathType});
     } else {
       [SNTError
           populateError:err
@@ -346,13 +346,13 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id> *p
 ///     <string>EEEE</string>
 ///   </dict>
 /// </array>
-std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDictionary *watch_item,
-                                                                       NSError **err) {
+std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDictionary* watch_item,
+                                                                       NSError** err) {
   __block SetWatchItemProcess proc_list;
 
   if (!VerifyConfigKeyArray(
           watch_item, kWatchItemConfigKeyProcesses, [NSDictionary class], err,
-          ^bool(NSDictionary *process, NSError **err) {
+          ^bool(NSDictionary* process, NSError** err) {
             if (!VerifyConfigKey(process, kWatchItemConfigKeyProcessesBinaryPath, [NSString class],
                                  err, false, LenRangeValidator(1, PATH_MAX)) ||
                 !VerifyConfigKey(process, kWatchItemConfigKeyProcessesSigningID, [NSString class],
@@ -434,10 +434,10 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
 ///   ... See VerifyConfigWatchItemProcesses for more details ...
 ///   </array>
 /// </dict>
-bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy_version,
-                                NSDictionary *watch_item,
-                                SetSharedDataWatchItemPolicy *data_policies,
-                                SetSharedProcessWatchItemPolicy *proc_policies, NSError **err) {
+bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy_version,
+                                NSDictionary* watch_item,
+                                SetSharedDataWatchItemPolicy* data_policies,
+                                SetSharedProcessWatchItemPolicy* proc_policies, NSError** err) {
   if (!VerifyConfigKey(watch_item, kWatchItemConfigKeyPaths, [NSArray class], err, true)) {
     return false;
   }
@@ -453,9 +453,9 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
     return false;
   }
 
-  NSDictionary *options = watch_item[kWatchItemConfigKeyOptions];
+  NSDictionary* options = watch_item[kWatchItemConfigKeyOptions];
   if (options) {
-    NSArray<NSString *> *boolOptions = @[
+    NSArray<NSString*>* boolOptions = @[
       kWatchItemConfigKeyOptionsAllowReadAccess,
       kWatchItemConfigKeyOptionsAuditOnly,
       kWatchItemConfigKeyOptionsInvertProcessExceptions,
@@ -463,7 +463,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
       kWatchItemConfigKeyOptionsEnableSilentTTYMode,
     ];
 
-    for (NSString *key in boolOptions) {
+    for (NSString* key in boolOptions) {
       if (!VerifyConfigKey(options, key, [NSNumber class], err)) {
         return false;
       }
@@ -542,7 +542,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
   switch (rule_type) {
     case WatchItemRuleType::kPathsWithAllowedProcesses: [[fallthrough]];
     case WatchItemRuleType::kPathsWithDeniedProcesses:
-      for (const PairPathAndType &path_type_pair : std::get<SetPairPathAndType>(path_list)) {
+      for (const PairPathAndType& path_type_pair : std::get<SetPairPathAndType>(path_list)) {
         data_policies->insert(std::make_shared<DataWatchItemPolicy>(
             NSStringToUTF8StringView(name), policy_version, path_type_pair.first,
             path_type_pair.second, allow_read_access, audit_only, rule_type, enable_silent_mode,
@@ -571,7 +571,7 @@ bool ParseConfigSingleWatchItem(NSString *name, std::string_view fallback_policy
   return true;
 }
 
-bool IsWatchItemNameValid(id key, NSError **err) {
+bool IsWatchItemNameValid(id key, NSError** err) {
   if (![key isKindOfClass:[NSString class]]) {
     [SNTError populateError:err
                  withFormat:@"Invalid %@ key %@: Expected type '%@' (got: %@)",
@@ -580,7 +580,7 @@ bool IsWatchItemNameValid(id key, NSError **err) {
     return false;
   }
 
-  NSString *watch_item_name = (NSString *)key;
+  NSString* watch_item_name = (NSString*)key;
   if (!watch_item_name) {
     // This shouldn't be possible as written, but handle just in case
     [SNTError populateError:err withFormat:@"Rule name not set"];
@@ -595,7 +595,7 @@ bool IsWatchItemNameValid(id key, NSError **err) {
   }
 
   static dispatch_once_t once_token;
-  static NSRegularExpression *regex;
+  static NSRegularExpression* regex;
 
   dispatch_once(&once_token, ^{
     // Should only match legal C identifiers
@@ -615,9 +615,9 @@ bool IsWatchItemNameValid(id key, NSError **err) {
   return true;
 }
 
-bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_policies,
-                 SetSharedProcessWatchItemPolicy *proc_policies, uint64_t *rules_loaded,
-                 NSError **err) {
+bool ParseConfig(NSDictionary* config, SetSharedDataWatchItemPolicy* data_policies,
+                 SetSharedProcessWatchItemPolicy* proc_policies, uint64_t* rules_loaded,
+                 NSError** err) {
   // If the top level version key exists, it must be well formatted.
   // If no top level key exists, every individual rule is required to
   // have its own version information set.
@@ -649,7 +649,7 @@ bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_polici
     return false;
   }
 
-  NSDictionary *watch_items = config[kWatchItemConfigKeyWatchItems];
+  NSDictionary* watch_items = config[kWatchItemConfigKeyWatchItems];
 
   uint64_t count = 0;
   for (id key in watch_items) {
@@ -684,11 +684,11 @@ bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_polici
 
 #pragma mark DataWatchItems
 
-SetPairPathAndType DataWatchItems::operator-(const DataWatchItems &other) const {
+SetPairPathAndType DataWatchItems::operator-(const DataWatchItems& other) const {
   // NB: std::set_difference requires the container is ordered. Use a simple
   // loop here instead since our data is unordered.
   SetPairPathAndType diff;
-  for (const auto &p : paths_) {
+  for (const auto& p : paths_) {
     if (other.paths_.find(p) == other.paths_.end()) {
       diff.insert(p);
     }
@@ -697,10 +697,10 @@ SetPairPathAndType DataWatchItems::operator-(const DataWatchItems &other) const 
 }
 
 bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
-  for (const std::shared_ptr<DataWatchItemPolicy> &item : data_policies) {
+  for (const std::shared_ptr<DataWatchItemPolicy>& item : data_policies) {
     std::vector<std::string> matches = FindMatches(@(item->path.c_str()));
 
-    for (const auto &match : matches) {
+    for (const auto& match : matches) {
       if (item->path_type == WatchItemPathType::kPrefix) {
         tree_->InsertPrefix(match.c_str(), item);
       } else {
@@ -716,7 +716,7 @@ bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
 
 void DataWatchItems::FindPolicies(IterateTargetsBlock iterateTargetsBlock) const {
   iterateTargetsBlock(
-      ^std::optional<std::shared_ptr<WatchItemPolicyBase>>(const std::string &path) {
+      ^std::optional<std::shared_ptr<WatchItemPolicyBase>>(const std::string& path) {
         return tree_->LookupLongestMatchingPrefix(path);
       });
 }
@@ -729,7 +729,7 @@ bool ProcessWatchItems::Build(SetSharedProcessWatchItemPolicy proc_policies) {
 }
 
 void ProcessWatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
-  for (const auto &p : policies_) {
+  for (const auto& p : policies_) {
     bool stop = checkPolicyBlock(p);
     if (stop) {
       break;
@@ -739,27 +739,27 @@ void ProcessWatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock
 
 #pragma mark WatchItems
 
-std::shared_ptr<WatchItems> WatchItems::CreateFromPath(NSString *config_path,
+std::shared_ptr<WatchItems> WatchItems::CreateFromPath(NSString* config_path,
                                                        uint32_t reapply_config_frequency_secs) {
   return CreateInternal(DataSource::kDetachedConfig, config_path, nil,
                         reapply_config_frequency_secs);
 }
 
 std::shared_ptr<WatchItems> WatchItems::CreateFromEmbeddedConfig(
-    NSDictionary *config, uint32_t reapply_config_frequency_secs) {
+    NSDictionary* config, uint32_t reapply_config_frequency_secs) {
   return CreateInternal(DataSource::kEmbeddedConfig, nil, config, reapply_config_frequency_secs);
 }
 
-std::shared_ptr<WatchItems> WatchItems::CreateFromRules(NSDictionary *rules,
+std::shared_ptr<WatchItems> WatchItems::CreateFromRules(NSDictionary* rules,
                                                         uint32_t reapply_config_frequency_secs) {
   // The provided rules dictionary must be wrapped within another dictionary as a value
   // for the `kWatchItemConfigKeyWatchItems` key.
-  NSDictionary *config = @{kWatchItemConfigKeyWatchItems : rules};
+  NSDictionary* config = @{kWatchItemConfigKeyWatchItems : rules};
   return CreateInternal(DataSource::kDatabase, nil, config, reapply_config_frequency_secs);
 }
 
 std::shared_ptr<WatchItems> WatchItems::CreateInternal(DataSource data_source,
-                                                       NSString *config_path, NSDictionary *config,
+                                                       NSString* config_path, NSDictionary* config,
                                                        uint32_t reapply_config_frequency_secs) {
   if (config_path && config) {
     LOGW(@"Invalid arguments creating WatchItems - both config and config_path cannot be set.");
@@ -775,7 +775,7 @@ std::shared_ptr<WatchItems> WatchItems::CreateInternal(DataSource data_source,
   return watch_items;
 }
 
-WatchItems::WatchItems(PassKey, DataSource data_source, NSString *config_path, NSDictionary *config,
+WatchItems::WatchItems(PassKey, DataSource data_source, NSString* config_path, NSDictionary* config,
                        dispatch_queue_t q, void (^periodic_task_complete_f)(void))
     : Timer<WatchItems>(kMinReapplyConfigFrequencySecs, kMaxReapplyConfigFrequencySecs,
                         Timer::OnStart::kFireImmediately, "FileAccessPolicyUpdateIntervalSec"),
@@ -785,18 +785,18 @@ WatchItems::WatchItems(PassKey, DataSource data_source, NSString *config_path, N
       q_(q),
       periodic_task_complete_f_(periodic_task_complete_f) {}
 
-bool WatchItems::IsValidRule(NSString *name, NSDictionary *rule, NSError **error) {
+bool WatchItems::IsValidRule(NSString* name, NSDictionary* rule, NSError** error) {
   return IsWatchItemNameValid(name, error) &&
          ParseConfigSingleWatchItem(name, "", rule, nullptr, nullptr, error);
 }
 
-bool WatchItems::IsValidConfig(NSDictionary *config, NSError **error) {
+bool WatchItems::IsValidConfig(NSDictionary* config, NSError** error) {
   uint64_t rules_loaded = 0;
   if (!ParseConfig(config, nullptr, nullptr, &rules_loaded, error)) {
     return false;
   }
 
-  NSDictionary *watch_items = config[kWatchItemConfigKeyWatchItems];
+  NSDictionary* watch_items = config[kWatchItemConfigKeyWatchItems];
   if ([watch_items isKindOfClass:[NSDictionary class]] && rules_loaded != watch_items.count) {
     [SNTError populateError:error
                  withFormat:@"%llu of %lu rules failed validation",
@@ -808,7 +808,7 @@ bool WatchItems::IsValidConfig(NSDictionary *config, NSError **error) {
   return true;
 }
 
-NSString *WatchItems::DataSourceName(DataSource data_source) {
+NSString* WatchItems::DataSourceName(DataSource data_source) {
   switch (data_source) {
     case DataSource::kUnknown: return @"Unknown";
     case DataSource::kEmbeddedConfig: return @"Embedded in configuration profile";
@@ -834,7 +834,7 @@ void WatchItems::RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBloc
 
 void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
                                     ProcessWatchItems new_proc_watch_items,
-                                    NSDictionary *new_config, uint64_t rules_loaded) {
+                                    NSDictionary* new_config, uint64_t rules_loaded) {
   absl::MutexLock lock(lock_);
 
   // The following conditions require updating the current config:
@@ -862,7 +862,7 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
       policy_version_ = NSStringToUTF8String(new_config[kWatchItemConfigKeyVersion]);
       // Non-existent kWatchItemConfigKeyEventDetailURL key or zero length value
       // will both result in a nil global policy event detail URL.
-      if (((NSString *)new_config[kWatchItemConfigKeyEventDetailURL]).length) {
+      if (((NSString*)new_config[kWatchItemConfigKeyEventDetailURL]).length) {
         policy_event_detail_url_ = new_config[kWatchItemConfigKeyEventDetailURL];
       } else {
         policy_event_detail_url_ = nil;
@@ -901,7 +901,7 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
   }
 }
 
-void WatchItems::ReloadConfig(NSDictionary *new_config) {
+void WatchItems::ReloadConfig(NSDictionary* new_config) {
   DataWatchItems new_data_watch_items;
   ProcessWatchItems new_proc_watch_items;
   uint64_t rules_loaded = 0;
@@ -909,7 +909,7 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
   if (new_config) {
     SetSharedDataWatchItemPolicy new_data_policies;
     SetSharedProcessWatchItemPolicy new_proc_policies;
-    NSError *err;
+    NSError* err;
     if (!ParseConfig(new_config, &new_data_policies, &new_proc_policies, &rules_loaded, &err)) {
       LOGE(@"Failed to parse watch item config: %@",
            err ? err.localizedDescription : @"Unknown failure");
@@ -924,12 +924,12 @@ void WatchItems::ReloadConfig(NSDictionary *new_config) {
                      rules_loaded);
 }
 
-NSDictionary *WatchItems::ReadConfig() {
+NSDictionary* WatchItems::ReadConfig() {
   absl::ReaderMutexLock lock(lock_);
   return ReadConfigLocked();
 }
 
-NSDictionary *WatchItems::ReadConfigLocked() {
+NSDictionary* WatchItems::ReadConfigLocked() {
   if (config_path_) {
     return [NSDictionary dictionaryWithContentsOfFile:config_path_];
   } else {
@@ -957,7 +957,7 @@ void WatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
   proc_watch_items_.IterateProcessPolicies(checkPolicyBlock);
 }
 
-void WatchItems::SetDBRules(NSDictionary *rules) {
+void WatchItems::SetDBRules(NSDictionary* rules) {
   {
     absl::MutexLock lock(lock_);
     config_path_ = nil;
@@ -967,10 +967,10 @@ void WatchItems::SetDBRules(NSDictionary *rules) {
   ReloadConfig(embedded_config_);
 }
 
-void WatchItems::SetConfigPath(NSString *config_path) {
+void WatchItems::SetConfigPath(NSString* config_path) {
   // Acquire the lock to set the config path and read the config, but drop
   // the lock before reloading the config
-  NSDictionary *config;
+  NSDictionary* config;
   {
     absl::MutexLock lock(lock_);
     config_path_ = config_path;
@@ -981,7 +981,7 @@ void WatchItems::SetConfigPath(NSString *config_path) {
   ReloadConfig(config);
 }
 
-void WatchItems::SetConfig(NSDictionary *config) {
+void WatchItems::SetConfig(NSDictionary* config) {
   {
     absl::MutexLock lock(lock_);
     config_path_ = nil;
@@ -1009,17 +1009,17 @@ std::optional<WatchItemsState> WatchItems::State() {
   return state;
 }
 
-std::pair<NSString *, NSString *> WatchItems::EventDetailLinkInfo(
-    const std::shared_ptr<WatchItemPolicyBase> &watch_item) {
+std::pair<NSString*, NSString*> WatchItems::EventDetailLinkInfo(
+    const std::shared_ptr<WatchItemPolicyBase>& watch_item) {
   absl::ReaderMutexLock lock(lock_);
   if (!watch_item) {
     return {policy_event_detail_url_, policy_event_detail_text_};
   }
 
-  NSString *url = watch_item->event_detail_url.has_value() ? watch_item->event_detail_url.value()
+  NSString* url = watch_item->event_detail_url.has_value() ? watch_item->event_detail_url.value()
                                                            : policy_event_detail_url_;
 
-  NSString *text = watch_item->event_detail_text.has_value() ? watch_item->event_detail_text.value()
+  NSString* text = watch_item->event_detail_text.has_value() ? watch_item->event_detail_text.value()
                                                              : policy_event_detail_text_;
 
   // Ensure empty strings are repplaced with nil

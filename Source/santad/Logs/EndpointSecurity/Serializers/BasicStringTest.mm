@@ -61,7 +61,7 @@ extern std::string GetTCCAuthorizationReasonString(es_tcc_authorization_reason_t
 }  // namespace santa
 
 std::string BasicStringSerializeMessage(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                        es_message_t *esMsg, SNTDecisionCache *decisionCache) {
+                                        es_message_t* esMsg, SNTDecisionCache* decisionCache) {
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   std::shared_ptr<Serializer> bs = BasicString::Create(mockESApi, decisionCache, false);
@@ -72,7 +72,7 @@ std::string BasicStringSerializeMessage(std::shared_ptr<MockEndpointSecurityAPI>
   return std::string(ret.begin(), ret.end());
 }
 
-std::string BasicStringSerializeMessage(es_message_t *esMsg) {
+std::string BasicStringSerializeMessage(es_message_t* esMsg) {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   return BasicStringSerializeMessage(mockESApi, esMsg, nil);
 }
@@ -81,7 +81,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 @property id mockConfigurator;
 @property id mockDecisionCache;
 
-@property SNTCachedDecision *testCachedDecision;
+@property SNTCachedDecision* testCachedDecision;
 @end
 
 @implementation BasicStringTest
@@ -552,7 +552,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {(es_touchid_mode_t)1234, "UNKNOWN"},
   };
 
-  for (const auto &kv : touchIDModeToString) {
+  for (const auto& kv : touchIDModeToString) {
     XCTAssertCppStringEqual(santa::GetAuthenticationTouchIDModeString(kv.first), kv.second);
   }
 }
@@ -768,7 +768,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {(es_auto_unlock_type_t)1234, "UNKNOWN"},
   };
 
-  for (const auto &kv : autoUnlockTypeToString) {
+  for (const auto& kv : autoUnlockTypeToString) {
     XCTAssertCppStringEqual(santa::GetAuthenticationAutoUnlockTypeString(kv.first), kv.second);
   }
 }
@@ -807,7 +807,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {ES_BTM_ITEM_TYPE_DAEMON, "DAEMON"},         {(es_btm_item_type_t)1234, "UNKNOWN"},
   };
 
-  for (const auto &kv : launchItemTypeToString) {
+  for (const auto& kv : launchItemTypeToString) {
     XCTAssertCppStringEqual(santa::GetBTMLaunchItemTypeString(kv.first), kv.second);
   }
 }
@@ -1114,7 +1114,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {(es_tcc_identity_type_t)1234, "UNKNOWN"},
   };
 
-  for (const auto &kv : identityTypeToString) {
+  for (const auto& kv : identityTypeToString) {
     XCTAssertCppStringEqual(santa::GetTCCIdentityTypeString(kv.first), kv.second);
   }
 }
@@ -1126,7 +1126,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {(es_tcc_event_type_t)1234, "UNKNOWN"},
   };
 
-  for (const auto &kv : eventTypeToString) {
+  for (const auto& kv : eventTypeToString) {
     XCTAssertCppStringEqual(santa::GetTCCEventTypeString(kv.first), kv.second);
   }
 }
@@ -1142,7 +1142,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {(es_tcc_authorization_right_t)1234, "UNKNOWN"},
   };
 
-  for (const auto &kv : authRightToString) {
+  for (const auto& kv : authRightToString) {
     XCTAssertCppStringEqual(santa::GetTCCAuthorizationRightString(kv.first), kv.second);
   }
 }
@@ -1165,7 +1165,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {(es_tcc_authorization_reason_t)1234, "UNKNOWN"},
   };
 
-  for (const auto &kv : authReasonToString) {
+  for (const auto& kv : authReasonToString) {
     XCTAssertCppStringEqual(santa::GetTCCAuthorizationReasonString(kv.first), kv.second);
   }
 }
@@ -1238,7 +1238,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {ES_EVENT_TYPE_AUTH_COPYFILE, "COPYFILE"}, {(es_event_type_t)1234, "UNKNOWN_TYPE_1234"},
   };
 
-  for (const auto &kv : accessTypeToString) {
+  for (const auto& kv : accessTypeToString) {
     XCTAssertCppStringEqual(santa::GetAccessTypeString(kv.first), kv.second);
   }
 }
@@ -1254,7 +1254,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {(FileAccessPolicyDecision)1234, "UNKNOWN_DECISION_1234"},
   };
 
-  for (const auto &kv : policyDecisionToString) {
+  for (const auto& kv : policyDecisionToString) {
     XCTAssertCppStringEqual(santa::GetFileAccessPolicyDecisionString(kv.first), kv.second);
   }
 }
@@ -1310,7 +1310,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 }
 
 - (void)testSerializeBundleHashingEvent {
-  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"file_hash";
   se.fileBundleHash = @"file_bundle_hash";
@@ -1331,7 +1331,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 }
 
 - (void)testSerializeDiskAppearedAllowed {
-  NSDictionary *props = @{
+  NSDictionary* props = @{
     @"DADevicePath" : @"",
     @"DADeviceVendor" : @"vendor",
     @"DADeviceModel" : @"model",
@@ -1359,7 +1359,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 }
 
 - (void)testSerializeDiskAppearedBlocked {
-  NSDictionary *props = @{
+  NSDictionary* props = @{
     @"DADevicePath" : @"",
     @"DADeviceVendor" : @"vendor",
     @"DADeviceModel" : @"model",
@@ -1384,7 +1384,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
 }
 
 - (void)testSerializeDiskDisappeared {
-  NSDictionary *props = @{
+  NSDictionary* props = @{
     @"DAVolumePath" : [NSURL URLWithString:@"path"],
     @"DAMediaBSDName" : @"bsd",
   };
@@ -1422,7 +1422,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {SNTEventStateAllowCELFallback, "ALLOW"},
   };
 
-  for (const auto &kv : stateToDecision) {
+  for (const auto& kv : stateToDecision) {
     XCTAssertCppStringEqual(santa::GetDecisionString(kv.first), kv.second);
   }
 }
@@ -1475,7 +1475,7 @@ std::string BasicStringSerializeMessage(es_message_t *esMsg) {
       {(SNTClientMode)123, "U"},
   };
 
-  for (const auto &kv : modeToString) {
+  for (const auto& kv : modeToString) {
     XCTAssertCppStringEqual(santa::GetModeString(kv.first), kv.second);
   }
 }

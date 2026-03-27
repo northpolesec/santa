@@ -31,8 +31,8 @@
 @end
 
 @interface SNTNotificationQueueTest : XCTestCase
-@property santa::RingBuffer<NSMutableDictionary *> *ringbuf;
-@property SNTNotificationQueue *sut;
+@property santa::RingBuffer<NSMutableDictionary*>* ringbuf;
+@property SNTNotificationQueue* sut;
 @property id mockConnection;
 @property id mockProxy;
 @end
@@ -40,7 +40,7 @@
 @implementation SNTNotificationQueueTest
 
 - (void)setUp {
-  auto rbUnique = std::make_unique<santa::RingBuffer<NSMutableDictionary *>>(3);
+  auto rbUnique = std::make_unique<santa::RingBuffer<NSMutableDictionary*>>(3);
   self.ringbuf = rbUnique.get();
   self.sut = [[SNTNotificationQueue alloc] initWithRingBuffer:std::move(rbUnique)];
 
@@ -54,16 +54,16 @@
 
 - (void)testAddEventBasic {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
-  NSString *customMessage = @"custom msg";
-  NSString *customURL = @"https://northpolesec.com";
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  NSString* customMessage = @"custom msg";
+  NSString* customURL = @"https://northpolesec.com";
 
   OCMExpect([self.mockProxy postBlockNotification:se
                                 withCustomMessage:customMessage
                                         customURL:customURL
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
-      .andDo(^(NSInvocation *inv) {
+      .andDo(^(NSInvocation* inv) {
         // Extract the reply block from the invocation and call it
         void (^__unsafe_unretained replyBlock)(BOOL);
         [inv getArgument:&replyBlock atIndex:6];
@@ -87,8 +87,8 @@
 
 - (void)testAddEventNil {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  NSString *customMessage = @"custom msg";
-  NSString *customURL = @"https://northpolesec.com";
+  NSString* customMessage = @"custom msg";
+  NSString* customURL = @"https://northpolesec.com";
 
   [self.sut addEvent:nil
       withCustomMessage:customMessage
@@ -112,18 +112,18 @@
 // message forcefully dequeues the first item, the reply block is called with FALSE, as
 // well as posting messages for everything in the queue.
 - (void)testAddEventMulti {
-  NSString *customMessage = @"custom msg";
-  NSString *customURL = @"https://northpolesec.com";
+  NSString* customMessage = @"custom msg";
+  NSString* customURL = @"https://northpolesec.com";
 
-  SNTStoredExecutionEvent *se1 = [[SNTStoredExecutionEvent alloc] init];
-  SNTStoredExecutionEvent *se2 = [[SNTStoredExecutionEvent alloc] init];
-  SNTStoredExecutionEvent *se3 = [[SNTStoredExecutionEvent alloc] init];
-  SNTStoredExecutionEvent *se4 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se1 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se2 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se3 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se4 = [[SNTStoredExecutionEvent alloc] init];
 
-  XCTestExpectation *reply1Expectation = [self expectationWithDescription:@"Reply 1 called"];
-  XCTestExpectation *reply2Expectation = [self expectationWithDescription:@"Reply 2 called"];
-  XCTestExpectation *reply3Expectation = [self expectationWithDescription:@"Reply 3 called"];
-  XCTestExpectation *reply4Expectation = [self expectationWithDescription:@"Reply 4 called"];
+  XCTestExpectation* reply1Expectation = [self expectationWithDescription:@"Reply 1 called"];
+  XCTestExpectation* reply2Expectation = [self expectationWithDescription:@"Reply 2 called"];
+  XCTestExpectation* reply3Expectation = [self expectationWithDescription:@"Reply 3 called"];
+  XCTestExpectation* reply4Expectation = [self expectationWithDescription:@"Reply 4 called"];
 
   void (^replyBlock1)(BOOL) = ^(BOOL val) {
     XCTAssertFalse(val);
@@ -146,19 +146,19 @@
   };
 
   // Create dictionaries to enqueue
-  NSMutableDictionary *d1 = [NSMutableDictionary dictionary];
+  NSMutableDictionary* d1 = [NSMutableDictionary dictionary];
   [d1 setValue:se1 forKey:@"event"];
   [d1 setValue:@"Message 1" forKey:@"message"];
   [d1 setValue:@"https://northpolesec.com/1" forKey:@"url"];
   [d1 setValue:replyBlock1 forKey:@"reply"];
 
-  NSMutableDictionary *d2 = [NSMutableDictionary dictionary];
+  NSMutableDictionary* d2 = [NSMutableDictionary dictionary];
   [d2 setValue:se2 forKey:@"event"];
   [d2 setValue:@"Message 2" forKey:@"message"];
   [d2 setValue:@"https://northpolesec.com/2" forKey:@"url"];
   [d2 setValue:replyBlock2 forKey:@"reply"];
 
-  NSMutableDictionary *d3 = [NSMutableDictionary dictionary];
+  NSMutableDictionary* d3 = [NSMutableDictionary dictionary];
   [d3 setValue:se3 forKey:@"event"];
   [d3 setValue:@"Message 3" forKey:@"message"];
   [d3 setValue:@"https://northpolesec.com/3" forKey:@"url"];
@@ -183,7 +183,7 @@
                                         customURL:@"https://northpolesec.com/2"
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
-      .andDo(^(NSInvocation *invocation) {
+      .andDo(^(NSInvocation* invocation) {
         void (^__unsafe_unretained replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
@@ -197,7 +197,7 @@
                                         customURL:@"https://northpolesec.com/3"
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
-      .andDo(^(NSInvocation *invocation) {
+      .andDo(^(NSInvocation* invocation) {
         void (^__unsafe_unretained replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
@@ -211,7 +211,7 @@
                                         customURL:customURL
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
-      .andDo(^(NSInvocation *inv) {
+      .andDo(^(NSInvocation* inv) {
         void (^__unsafe_unretained replyBlock)(BOOL);
         [inv getArgument:&replyBlock atIndex:6];
         // Note: The replyBlock must be called asynchronously
@@ -235,14 +235,14 @@
 }
 
 - (void)testClearAllPendingWithRepliesSerialized {
-  SNTStoredExecutionEvent *se1 = [[SNTStoredExecutionEvent alloc] init];
-  SNTStoredExecutionEvent *se2 = [[SNTStoredExecutionEvent alloc] init];
-  SNTStoredExecutionEvent *se3 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se1 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se2 = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se3 = [[SNTStoredExecutionEvent alloc] init];
 
   // Setup expectations for reply blocks
-  XCTestExpectation *reply1Expectation =
+  XCTestExpectation* reply1Expectation =
       [self expectationWithDescription:@"Reply 1 called with NO"];
-  XCTestExpectation *reply2Expectation =
+  XCTestExpectation* reply2Expectation =
       [self expectationWithDescription:@"Reply 2 called with NO"];
 
   void (^replyBlock1)(BOOL) = ^(BOOL val) {
@@ -255,20 +255,20 @@
   };
 
   // Create dictionaries to enqueue
-  NSMutableDictionary *d1 = [NSMutableDictionary dictionary];
+  NSMutableDictionary* d1 = [NSMutableDictionary dictionary];
   [d1 setValue:se1 forKey:@"event"];
   [d1 setValue:@"Message 1" forKey:@"message"];
   [d1 setValue:@"https://northpolesec.com/1" forKey:@"url"];
   [d1 setValue:[replyBlock1 copy] forKey:@"reply"];
 
-  NSMutableDictionary *d2 = [NSMutableDictionary dictionary];
+  NSMutableDictionary* d2 = [NSMutableDictionary dictionary];
   [d2 setValue:se2 forKey:@"event"];
   [d2 setValue:@"Message 2" forKey:@"message"];
   [d2 setValue:@"https://northpolesec.com/2" forKey:@"url"];
   [d2 setValue:[replyBlock2 copy] forKey:@"reply"];
 
   // Create dictionary with no reply block
-  NSMutableDictionary *d3 = [NSMutableDictionary dictionary];
+  NSMutableDictionary* d3 = [NSMutableDictionary dictionary];
   [d3 setValue:se3 forKey:@"event"];
   [d3 setValue:@"Message 3" forKey:@"message"];
   [d3 setValue:@"https://northpolesec.com/3" forKey:@"url"];
@@ -291,7 +291,7 @@
   XCTAssertFalse(self.ringbuf->Empty());
 
   // There should only be one item left in the ringbuf, d3, which didn't have a replyBlock
-  NSMutableDictionary *d = self.ringbuf->Dequeue().value_or(nil);
+  NSMutableDictionary* d = self.ringbuf->Dequeue().value_or(nil);
   XCTAssertNotNil(d);
   XCTAssertEqualObjects(d, d3);
 

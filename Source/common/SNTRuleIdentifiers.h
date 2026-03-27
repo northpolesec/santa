@@ -29,20 +29,20 @@
 #import "Source/common/SNTCommonEnums.h"
 
 struct RuleIdentifiers {
-  NSString *cdhash;
-  NSString *binarySHA256;
-  NSString *signingID;
-  NSString *certificateSHA256;
-  NSString *teamID;
+  NSString* cdhash;
+  NSString* binarySHA256;
+  NSString* signingID;
+  NSString* certificateSHA256;
+  NSString* teamID;
 };
 
 @interface SNTRuleIdentifiers : NSObject <NSSecureCoding>
 
-@property(readonly) NSString *cdhash;
-@property(readonly) NSString *binarySHA256;
-@property(readonly) NSString *signingID;
-@property(readonly) NSString *certificateSHA256;
-@property(readonly) NSString *teamID;
+@property(readonly) NSString* cdhash;
+@property(readonly) NSString* binarySHA256;
+@property(readonly) NSString* signingID;
+@property(readonly) NSString* certificateSHA256;
+@property(readonly) NSString* teamID;
 
 /// Please use `initWithRuleIdentifiers:` or `initWithRuleIdentifiers:andSigningStatus:`
 - (instancetype)init NS_UNAVAILABLE;

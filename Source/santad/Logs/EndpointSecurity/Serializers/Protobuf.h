@@ -39,77 +39,77 @@ namespace santa {
 class Protobuf : public Serializer {
  public:
   static std::shared_ptr<Protobuf> Create(std::shared_ptr<santa::EndpointSecurityAPI> esapi,
-                                          SNTDecisionCache *decision_cache, bool json = false);
+                                          SNTDecisionCache* decision_cache, bool json = false);
 
-  Protobuf(std::shared_ptr<santa::EndpointSecurityAPI> esapi, SNTDecisionCache *decision_cache,
+  Protobuf(std::shared_ptr<santa::EndpointSecurityAPI> esapi, SNTDecisionCache* decision_cache,
            bool json = false);
 
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedClose &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedExchange &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedExec &, SNTCachedDecision *) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedExit &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedFork &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLink &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedRename &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedUnlink &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogout &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLock &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionUnlock &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingAttach &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingDetach &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogin &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogout &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogin &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogout &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationOD &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationAutoUnlock &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLaunchItem &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectDetected &) override;
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectRemediated &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedClose&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedExchange&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedExec&, SNTCachedDecision*) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedExit&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedFork&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLink&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedRename&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedUnlink&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogout&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLock&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionUnlock&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingAttach&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingDetach&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogin&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogout&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogin&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogout&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationOD&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationAutoUnlock&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedLaunchItem&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectDetected&) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectRemediated&) override;
 #if HAVE_MACOS_15
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride&) override;
 #endif  // HAVE_MACOS_15
 #if HAVE_MACOS_15_4
-  std::vector<uint8_t> SerializeMessage(const santa::EnrichedTCCModification &) override;
+  std::vector<uint8_t> SerializeMessage(const santa::EnrichedTCCModification&) override;
 #endif  // HAVE_MACOS_15_4
 
-  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows *, struct timespec, struct timespec,
-                                             SNTCachedDecision *) override;
+  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows*, struct timespec, struct timespec,
+                                             SNTCachedDecision*) override;
 
   std::vector<uint8_t> SerializeFileAccess(
-      const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
-      const santa::EnrichedProcess &enriched_process, size_t target_index,
+      const std::string& policy_version, const std::string& policy_name, const santa::Message& msg,
+      const santa::EnrichedProcess& enriched_process, size_t target_index,
       std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
       std::string_view operation_id) override;
 
-  std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view,
+  std::vector<uint8_t> SerializeAllowlist(const santa::Message&, const std::string_view,
                                           const std::string_view) override;
 
-  std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) override;
+  std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent*) override;
 
-  std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *, bool) override;
-  std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) override;
+  std::vector<uint8_t> SerializeDiskAppeared(NSDictionary*, bool) override;
+  std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary*) override;
 
  private:
-  ::santa::pb::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena);
-  ::santa::pb::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
-                                                    const santa::EnrichedEventType &msg);
-  ::santa::pb::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
-                                                    const santa::Message &msg);
-  ::santa::pb::v1::SantaMessage *CreateDefaultProto(google::protobuf::Arena *arena,
+  ::santa::pb::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena);
+  ::santa::pb::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
+                                                    const santa::EnrichedEventType& msg);
+  ::santa::pb::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
+                                                    const santa::Message& msg);
+  ::santa::pb::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
                                                     struct timespec event_time,
                                                     struct timespec processed_time);
 
-  std::vector<uint8_t> FinalizeProto(::santa::pb::v1::SantaMessage *santa_msg);
+  std::vector<uint8_t> FinalizeProto(::santa::pb::v1::SantaMessage* santa_msg);
 
-  std::vector<uint8_t> SerializeMessageLaunchItemAdd(const santa::EnrichedLaunchItem &);
-  std::vector<uint8_t> SerializeMessageLaunchItemRemove(const santa::EnrichedLaunchItem &);
+  std::vector<uint8_t> SerializeMessageLaunchItemAdd(const santa::EnrichedLaunchItem&);
+  std::vector<uint8_t> SerializeMessageLaunchItemRemove(const santa::EnrichedLaunchItem&);
 
   std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
   // Toggle for transforming protobuf output to its JSON form.

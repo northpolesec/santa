@@ -23,14 +23,14 @@ static constexpr int kWindowSizeGzip = kWindowSizeZlib + 16;
 
 @implementation NSData (Zlib)
 
-- (NSData *)compressIncludingGzipHeader:(BOOL)includeHeader {
+- (NSData*)compressIncludingGzipHeader:(BOOL)includeHeader {
   if ([self length]) {
     z_stream stream;
     stream.zalloc = Z_NULL;
     stream.zfree = Z_NULL;
     stream.opaque = Z_NULL;
     stream.avail_in = (uint)[self length];
-    stream.next_in = (Bytef *)[self bytes];
+    stream.next_in = (Bytef*)[self bytes];
     stream.total_out = 0;
     stream.avail_out = 0;
 
@@ -38,12 +38,12 @@ static constexpr int kWindowSizeGzip = kWindowSizeZlib + 16;
 
     if (deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, windowSize, 8,
                      Z_DEFAULT_STRATEGY) == Z_OK) {
-      NSMutableData *data = [NSMutableData dataWithLength:kChunkSize];
+      NSMutableData* data = [NSMutableData dataWithLength:kChunkSize];
       while (stream.avail_out == 0) {
         if (stream.total_out >= [data length]) {
           data.length += kChunkSize;
         }
-        stream.next_out = (uint8_t *)[data mutableBytes] + stream.total_out;
+        stream.next_out = (uint8_t*)[data mutableBytes] + stream.total_out;
         stream.avail_out = (uInt)([data length] - stream.total_out);
         deflate(&stream, Z_FINISH);
       }
@@ -55,28 +55,28 @@ static constexpr int kWindowSizeGzip = kWindowSizeZlib + 16;
   return nil;
 }
 
-- (NSData *)decompressIncludingGzipHeader:(BOOL)includeHeader {
+- (NSData*)decompressIncludingGzipHeader:(BOOL)includeHeader {
   if ([self length]) {
     z_stream stream;
     stream.zalloc = Z_NULL;
     stream.zfree = Z_NULL;
     stream.opaque = Z_NULL;
     stream.avail_in = (uint)[self length];
-    stream.next_in = (Bytef *)[self bytes];
+    stream.next_in = (Bytef*)[self bytes];
     stream.total_out = 0;
     stream.avail_out = 0;
 
     int windowSize = includeHeader ? kWindowSizeGzip : kWindowSizeZlib;
 
     if (inflateInit2(&stream, windowSize) == Z_OK) {
-      NSMutableData *data = [NSMutableData dataWithLength:kChunkSize];
+      NSMutableData* data = [NSMutableData dataWithLength:kChunkSize];
       int status = Z_OK;
 
       while (status == Z_OK) {
         if (stream.total_out >= [data length]) {
           data.length += kChunkSize;
         }
-        stream.next_out = (uint8_t *)[data mutableBytes] + stream.total_out;
+        stream.next_out = (uint8_t*)[data mutableBytes] + stream.total_out;
         stream.avail_out = (uInt)([data length] - stream.total_out);
         status = inflate(&stream, Z_SYNC_FLUSH);
       }
@@ -92,19 +92,19 @@ static constexpr int kWindowSizeGzip = kWindowSizeZlib + 16;
   return nil;
 }
 
-- (NSData *)zlibCompressed {
+- (NSData*)zlibCompressed {
   return [self compressIncludingGzipHeader:NO];
 }
 
-- (NSData *)gzipCompressed {
+- (NSData*)gzipCompressed {
   return [self compressIncludingGzipHeader:YES];
 }
 
-- (NSData *)zlibDecompressed {
+- (NSData*)zlibDecompressed {
   return [self decompressIncludingGzipHeader:NO];
 }
 
-- (NSData *)gzipDecompressed {
+- (NSData*)gzipDecompressed {
   return [self decompressIncludingGzipHeader:YES];
 }
 

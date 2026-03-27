@@ -23,8 +23,8 @@
 @class SNTBinaryMessageWindowController;
 
 @interface SNTNotificationManager (Testing)
-- (void)hashBundleBinariesForEvent:(SNTStoredEvent *)event
-                    withController:(SNTBinaryMessageWindowController *)controller;
+- (void)hashBundleBinariesForEvent:(SNTStoredEvent*)event
+                    withController:(SNTBinaryMessageWindowController*)controller;
 @end
 
 @interface SNTNotificationManagerTest : XCTestCase
@@ -38,7 +38,7 @@
 }
 
 - (void)testPostBlockNotificationSendsDistributedNotification {
-  SNTStoredExecutionEvent *ev = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* ev = [[SNTStoredExecutionEvent alloc] init];
   ev.fileSHA256 = @"the-sha256";
   ev.filePath = @"/Applications/Safari.app/Contents/MacOS/Safari";
   ev.fileBundleName = @"Safari";
@@ -53,7 +53,7 @@
   ev.ppid = @1;
   ev.parentName = @"launchd";
 
-  SNTNotificationManager *sut = OCMPartialMock([[SNTNotificationManager alloc] init]);
+  SNTNotificationManager* sut = OCMPartialMock([[SNTNotificationManager alloc] init]);
   OCMStub([sut hashBundleBinariesForEvent:OCMOCK_ANY withController:OCMOCK_ANY]).andDo(nil);
 
   id dncMock = OCMClassMock([NSDistributedNotificationCenter class]);
@@ -68,7 +68,7 @@
 
   OCMVerify([dncMock postNotificationName:@"com.northpolesec.santa.notification.blockedeexecution"
                                    object:@"com.northpolesec.santa"
-                                 userInfo:[OCMArg checkWithBlock:^BOOL(NSDictionary *userInfo) {
+                                 userInfo:[OCMArg checkWithBlock:^BOOL(NSDictionary* userInfo) {
                                    XCTAssertEqualObjects(userInfo[@"file_sha256"], @"the-sha256");
                                    XCTAssertEqualObjects(userInfo[@"pid"], @84156);
                                    XCTAssertEqualObjects(userInfo[@"ppid"], @1);

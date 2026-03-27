@@ -47,7 +47,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
 namespace {
 
-bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest &command, NSData *hmacKey) {
+bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest& command, NSData* hmacKey) {
   if (hmacKey.length == 0) {
     LOGE(@"NATS: HMAC verification failed - no key available");
     return false;
@@ -82,7 +82,7 @@ bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest &command, NSData
   return true;
 }
 
-bool VerifyCommandRequestTimestamp(const ::pbv1::SantaCommandRequest &command) {
+bool VerifyCommandRequestTimestamp(const ::pbv1::SantaCommandRequest& command) {
   int64_t now = static_cast<int64_t>(time(nullptr));
   int64_t issued_at = command.issued_at();
   int64_t age = now - issued_at;
@@ -97,7 +97,7 @@ bool VerifyCommandRequestTimestamp(const ::pbv1::SantaCommandRequest &command) {
   return true;
 }
 
-void SetKillResponseError(SNTKillResponseError error, ::pbv1::KillResponse *pbResponse) {
+void SetKillResponseError(SNTKillResponseError error, ::pbv1::KillResponse* pbResponse) {
   switch (error) {
     case SNTKillResponseErrorListPids:
       pbResponse->set_error(::pbv1::KillResponse::ERROR_LIST_PIDS);
@@ -112,7 +112,7 @@ void SetKillResponseError(SNTKillResponseError error, ::pbv1::KillResponse *pbRe
   }
 }
 
-void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Process *pbProcess) {
+void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Process* pbProcess) {
   switch (error) {
     case SNTKilledProcessErrorUnknown:
       pbProcess->set_error(::pbv1::KillResponse::KILL_ERROR_INTERNAL);
@@ -146,34 +146,34 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 @property(atomic) BOOL isShuttingDown;
 @property(nonatomic) dispatch_queue_t messageQueue;
 @property(nonatomic) dispatch_queue_t connectionQueue;
-@property(nonatomic) natsConnection *conn;
+@property(nonatomic) natsConnection* conn;
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
-@property(nonatomic, copy) NSData *hmacKey;
-@property(nonatomic) NSMutableSet<NSString *> *currentNonces;
-@property(nonatomic) NSMutableSet<NSString *> *previousNonces;
+@property(nonatomic, copy) NSData* hmacKey;
+@property(nonatomic) NSMutableSet<NSString*>* currentNonces;
+@property(nonatomic) NSMutableSet<NSString*>* previousNonces;
 @property(nonatomic) int64_t lastRotationTime;
 
 - (BOOL)isConnectionAlive;
-- (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
-           toReplyTopic:(NSString *)replyTopic;
+- (void)publishResponse:(const ::pbv1::SantaCommandResponse&)response
+           toReplyTopic:(NSString*)replyTopic;
 @end
 
 // Category for command handling methods
 @interface SNTPushClientNATS (Commands)
-- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
-                            withCommandUUID:(NSString *)uuid
-                                    onArena:(google::protobuf::Arena *)arena;
-- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
-                            withCommandUUID:(NSString *)uuid
-                                    onArena:(google::protobuf::Arena *)arena;
-- (::pbv1::EventUploadResponse *)handleEventUploadRequest:
-                                     (const ::pbv1::EventUploadRequest &)eventUploadRequest
-                                          withCommandUUID:(NSString *)uuid
-                                                  onArena:(google::protobuf::Arena *)arena;
-- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
-                                      (const ::pbv1::SantaCommandRequest &)command
-                                                        onArena:(google::protobuf::Arena *)arena;
-- (BOOL)checkAndRecordNonce:(NSString *)uuid;
+- (::pbv1::PingResponse*)handlePingRequest:(const ::pbv1::PingRequest&)pingRequest
+                           withCommandUUID:(NSString*)uuid
+                                   onArena:(google::protobuf::Arena*)arena;
+- (::pbv1::KillResponse*)handleKillRequest:(const ::pbv1::KillRequest&)killRequest
+                           withCommandUUID:(NSString*)uuid
+                                   onArena:(google::protobuf::Arena*)arena;
+- (::pbv1::EventUploadResponse*)handleEventUploadRequest:
+                                    (const ::pbv1::EventUploadRequest&)eventUploadRequest
+                                         withCommandUUID:(NSString*)uuid
+                                                 onArena:(google::protobuf::Arena*)arena;
+- (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
+                                     (const ::pbv1::SantaCommandRequest&)command
+                                                       onArena:(google::protobuf::Arena*)arena;
+- (BOOL)checkAndRecordNonce:(NSString*)uuid;
 @end
 
 @implementation SNTPushClientNATS (Commands)
@@ -181,7 +181,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 // Check and record a nonce (UUID) for replay protection
 // Returns YES if the nonce is new, NO if it's a replay
 // Note: Must be called from messageQueue for thread safety
-- (BOOL)checkAndRecordNonce:(NSString *)uuid {
+- (BOOL)checkAndRecordNonce:(NSString*)uuid {
   // Rotate cache if needed (lazy rotation)
   // Lazy rotation is fine for now because command volume will be very low.
   int64_t now = time(nullptr);
@@ -209,18 +209,18 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 
 // Handle PingRequest command
 // Always returns a successful response. Failures are handled by the caller.
-- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
-                            withCommandUUID:(NSString *)uuid
-                                    onArena:(google::protobuf::Arena *)arena {
+- (::pbv1::PingResponse*)handlePingRequest:(const ::pbv1::PingRequest&)pingRequest
+                           withCommandUUID:(NSString*)uuid
+                                   onArena:(google::protobuf::Arena*)arena {
   return google::protobuf::Arena::Create<::pbv1::PingResponse>(arena);
 }
 
 // Handle KillRequest command
-- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)pbKillReq
-                            withCommandUUID:(NSString *)uuid
-                                    onArena:(google::protobuf::Arena *)arena {
+- (::pbv1::KillResponse*)handleKillRequest:(const ::pbv1::KillRequest&)pbKillReq
+                           withCommandUUID:(NSString*)uuid
+                                   onArena:(google::protobuf::Arena*)arena {
   auto pbKillResponse = google::protobuf::Arena::Create<::pbv1::KillResponse>(arena);
-  SNTKillRequest *req;
+  SNTKillRequest* req;
   switch (pbKillReq.process_case()) {
     case ::pbv1::KillRequest::kRunningProcess:
       req = [[SNTKillRequestRunningProcess alloc]
@@ -267,10 +267,10 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   }
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  __block SNTKillResponse *resp;
+  __block SNTKillResponse* resp;
   [[[strongSyncDelegate daemonConnection] remoteObjectProxy]
       killProcesses:req
-              reply:^(SNTKillResponse *killResponse) {
+              reply:^(SNTKillResponse* killResponse) {
                 resp = killResponse;
                 dispatch_semaphore_signal(sema);
               }];
@@ -283,7 +283,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 
   SetKillResponseError(resp.error, pbKillResponse);
 
-  for (SNTKilledProcess *killedProc in resp.killedProcesses) {
+  for (SNTKilledProcess* killedProc in resp.killedProcesses) {
     auto pbProc = google::protobuf::Arena::Create<::pbv1::KillResponse::Process>(arena);
 
     pbProc->set_pid(killedProc.pid);
@@ -297,13 +297,13 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 }
 
 // Handle EventUploadRequest command
-- (::pbv1::EventUploadResponse *)handleEventUploadRequest:
-                                     (const ::pbv1::EventUploadRequest &)eventUploadRequest
-                                          withCommandUUID:(NSString *)uuid
-                                                  onArena:(google::protobuf::Arena *)arena {
+- (::pbv1::EventUploadResponse*)handleEventUploadRequest:
+                                    (const ::pbv1::EventUploadRequest&)eventUploadRequest
+                                         withCommandUUID:(NSString*)uuid
+                                                 onArena:(google::protobuf::Arena*)arena {
   auto pbResponse = google::protobuf::Arena::Create<::pbv1::EventUploadResponse>(arena);
 
-  NSString *path = StringToNSString(eventUploadRequest.path());
+  NSString* path = StringToNSString(eventUploadRequest.path());
   if (path.length == 0) {
     LOGE(@"NATS: EventUploadRequest has empty path");
     pbResponse->set_error(::pbv1::EventUploadResponse::ERROR_INVALID_PATH);
@@ -320,7 +320,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   // Fire off the event upload asynchronously - don't wait for completion
   [strongSyncDelegate
       eventUploadForPath:path
-                   reply:^(NSError *error) {
+                   reply:^(NSError* error) {
                      if (error) {
                        LOGE(@"NATS: EventUploadRequest failed for path %@: %@", path, error);
                      } else {
@@ -332,9 +332,9 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 }
 
 // Dispatch Santa command to appropriate handler based on command type
-- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
-                                      (const ::pbv1::SantaCommandRequest &)command
-                                                        onArena:(google::protobuf::Arena *)arena {
+- (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
+                                     (const ::pbv1::SantaCommandRequest&)command
+                                                       onArena:(google::protobuf::Arena*)arena {
   auto response = google::protobuf::Arena::Create<::pbv1::SantaCommandResponse>(arena);
 
   // Verify HMAC signature first
@@ -350,7 +350,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
     return response;
   }
 
-  NSString *uuid = StringToNSString(command.uuid());
+  NSString* uuid = StringToNSString(command.uuid());
   if (![[NSUUID alloc] initWithUUIDString:uuid]) {
     LOGE(@"NATS: Invalid command uuid: \"%@\"", uuid);
     response->set_error(::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
@@ -367,7 +367,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 
   // Check if command type is allowed by client configuration
   // No default case — compiler enforces all proto cases are handled (-Werror + -Wswitch)
-  NSString *commandName = nil;
+  NSString* commandName = nil;
   switch (commandCase) {
     case ::pbv1::SantaCommandRequest::kPing: commandName = @"ping"; break;
     case ::pbv1::SantaCommandRequest::kKill: commandName = @"kill"; break;
@@ -376,7 +376,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   }
 
   if (commandName) {
-    NSArray<NSString *> *allowed = [[SNTConfigurator configurator] allowedSantaCommands];
+    NSArray<NSString*>* allowed = [[SNTConfigurator configurator] allowedSantaCommands];
     if (allowed && ![allowed containsObject:commandName]) {
       LOGW(@"NATS: Command '%@' rejected - not in AllowedSantaCommands", commandName);
       response->set_error(::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
@@ -387,7 +387,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   switch (commandCase) {
     case ::pbv1::SantaCommandRequest::kPing: {
       LOGI(@"NATS: Dispatching PingRequest command");
-      auto *pingResponse = [self handlePingRequest:command.ping()
+      auto* pingResponse = [self handlePingRequest:command.ping()
                                    withCommandUUID:uuid
                                            onArena:arena];
       response->unsafe_arena_set_allocated_ping(pingResponse);
@@ -396,7 +396,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 
     case ::pbv1::SantaCommandRequest::kKill: {
       LOGI(@"NATS: Dispatching KillRequest command");
-      auto *killResponse = [self handleKillRequest:command.kill()
+      auto* killResponse = [self handleKillRequest:command.kill()
                                    withCommandUUID:uuid
                                            onArena:arena];
       response->unsafe_arena_set_allocated_kill(killResponse);
@@ -405,7 +405,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 
     case ::pbv1::SantaCommandRequest::kEventUpload: {
       LOGI(@"NATS: Dispatching EventUploadRequest command");
-      auto *eventUploadResponse = [self handleEventUploadRequest:command.event_upload()
+      auto* eventUploadResponse = [self handleEventUploadRequest:command.event_upload()
                                                  withCommandUUID:uuid
                                                          onArena:arena];
       response->unsafe_arena_set_allocated_event_upload(eventUploadResponse);
@@ -426,8 +426,8 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 
 // NATS command message handler - handles serialization/deserialization and
 // dispatches to handlers
-static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub, natsMsg *msg,
-                                      SNTPushClientNATS *self) {
+static void CommandMessageHandlerImpl(natsConnection* nc, natsSubscription* sub, natsMsg* msg,
+                                      SNTPushClientNATS* self) {
   absl::Cleanup glob_cleaup = ^{
     // Destroy the message on return.
     if (msg) {
@@ -443,8 +443,8 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
     return;
   }
 
-  NSString *msgSubject = @(natsMsg_GetSubject(msg) ?: "<unknown>");
-  NSString *replyTopic = natsMsg_GetReply(msg) ? @(natsMsg_GetReply(msg)) : nil;
+  NSString* msgSubject = @(natsMsg_GetSubject(msg) ?: "<unknown>");
+  NSString* replyTopic = natsMsg_GetReply(msg) ? @(natsMsg_GetReply(msg)) : nil;
 
   LOGD(@"NATS: Received command message on subject '%@' with reply '%@'", msgSubject,
        replyTopic ?: @"<no reply>");
@@ -484,7 +484,7 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
     }
 
     google::protobuf::Arena arena;
-    ::pbv1::SantaCommandResponse *response = [self dispatchSantaCommandToHandler:command
+    ::pbv1::SantaCommandResponse* response = [self dispatchSantaCommandToHandler:command
                                                                          onArena:&arena];
 
     // Publish the response
@@ -495,8 +495,8 @@ static void CommandMessageHandlerImpl(natsConnection *nc, natsSubscription *sub,
 __BEGIN_DECLS
 
 // NATS-compatible wrapper that converts void *closure to SNTPushClientNATS *
-void commandMessageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure) {
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+void commandMessageHandler(natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure) {
+  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
   CommandMessageHandlerImpl(nc, sub, msg, self);
 }
 

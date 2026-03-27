@@ -58,13 +58,13 @@ class MessageSource {
  public:
   // Factory method to return either a AnyMessageSource or StreamMessageSource based
   // on the type of the log file being parsed.
-  static absl::StatusOr<std::unique_ptr<MessageSource>> Create(NSString *path);
+  static absl::StatusOr<std::unique_ptr<MessageSource>> Create(NSString* path);
 
   virtual ~MessageSource() = default;
 
   // Not copyable
-  MessageSource(const MessageSource &) = delete;
-  MessageSource &operator=(const MessageSource &) = delete;
+  MessageSource(const MessageSource&) = delete;
+  MessageSource& operator=(const MessageSource&) = delete;
 
   virtual absl::StatusOr<::pbv1::SantaMessage> Next() = 0;
 
@@ -159,8 +159,8 @@ class StreamMessageSource : public MessageSource {
       santa::Xxhash64 xxhash;
       xxhash.Update(msg_buf.data(), msg_buf.size());
       __block uint64_t got_hash;
-      xxhash.Digest(^(const uint8_t *buf, size_t size) {
-        got_hash = *(uint64_t *)buf;
+      xxhash.Digest(^(const uint8_t* buf, size_t size) {
+        got_hash = *(uint64_t*)buf;
       });
 
       if (got_hash != expected_hash) {
@@ -181,7 +181,7 @@ class StreamMessageSource : public MessageSource {
   std::unique_ptr<google::protobuf::io::CodedInputStream> coded_input_;
 };
 
-absl::Status CanProcessFile(const ScopedFile &scoped_file) {
+absl::Status CanProcessFile(const ScopedFile& scoped_file) {
   struct stat sb;
   if (fstat(scoped_file.UnsafeFD(), &sb) != 0) {
     return absl::ErrnoToStatus(errno, "Unable to stat file");
@@ -196,14 +196,14 @@ absl::Status CanProcessFile(const ScopedFile &scoped_file) {
   return absl::OkStatus();
 }
 
-absl::StatusOr<std::unique_ptr<MessageSource>> CreateStreamSource(NSData *buffer) {
+absl::StatusOr<std::unique_ptr<MessageSource>> CreateStreamSource(NSData* buffer) {
   auto temp_file = santa::ScopedFile::CreateTemporary();
   if (!temp_file.ok()) {
     return temp_file.status();
   }
 
-  NSFileHandle *temp_handle = temp_file->Writer();
-  NSError *err;
+  NSFileHandle* temp_handle = temp_file->Writer();
+  NSError* err;
   if (![temp_handle writeData:buffer error:&err]) {
     return absl::InternalError(absl::StrFormat("Failed to write decompressed data to temp file: %s",
                                                err.localizedDescription.UTF8String));
@@ -220,15 +220,15 @@ absl::StatusOr<std::unique_ptr<MessageSource>> HandleGzipFileSource(ScopedFile s
     return status;
   }
 
-  NSFileHandle *handle = scoped_file.Reader();
-  NSError *err;
-  NSData *compressed = [handle readDataToEndOfFileAndReturnError:&err];
+  NSFileHandle* handle = scoped_file.Reader();
+  NSError* err;
+  NSData* compressed = [handle readDataToEndOfFileAndReturnError:&err];
   if (err) {
     return absl::InternalError(
         absl::StrFormat("Failed to read compressed file: %s", err.localizedDescription.UTF8String));
   }
 
-  NSData *decompressed = [compressed gzipDecompressed];
+  NSData* decompressed = [compressed gzipDecompressed];
   if (!decompressed) {
     return absl::InternalError("Failed to decompress file");
   }
@@ -241,9 +241,9 @@ absl::StatusOr<std::unique_ptr<MessageSource>> HandleZstdFileSource(ScopedFile s
     return status;
   }
 
-  NSFileHandle *handle = scoped_file.Reader();
-  NSError *err;
-  NSData *compressed = [handle readDataToEndOfFileAndReturnError:&err];
+  NSFileHandle* handle = scoped_file.Reader();
+  NSError* err;
+  NSData* compressed = [handle readDataToEndOfFileAndReturnError:&err];
   if (err) {
     return absl::InternalError(
         absl::StrFormat("Failed to read compressed file: %s", err.localizedDescription.UTF8String));
@@ -254,7 +254,7 @@ absl::StatusOr<std::unique_ptr<MessageSource>> HandleZstdFileSource(ScopedFile s
     return absl::OutOfRangeError("Failed to calculate decompressed size");
   }
 
-  NSMutableData *decompressed = [[NSMutableData alloc] initWithCapacity:max_size];
+  NSMutableData* decompressed = [[NSMutableData alloc] initWithCapacity:max_size];
   decompressed.length = max_size;
 
   size_t bytes_decompressed =
@@ -271,7 +271,7 @@ absl::StatusOr<std::unique_ptr<MessageSource>> HandleZstdFileSource(ScopedFile s
   return CreateStreamSource(decompressed);
 }
 
-absl::StatusOr<std::unique_ptr<MessageSource>> MessageSource::Create(NSString *path) {
+absl::StatusOr<std::unique_ptr<MessageSource>> MessageSource::Create(NSString* path) {
   // Open the file
   int fd = open(path.UTF8String, O_RDONLY);
   if (fd < 0) {
@@ -325,11 +325,11 @@ REGISTER_COMMAND_NAME(@"printlog")
   return NO;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Prints the contents of Santa protobuf log files as JSON.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return @"Prints the contents of serialized Santa protobuf logs as JSON.\n"
          @"Multiple paths can be provided. The output is a list of all the \n"
          @"SantaMessage entries per-file. E.g.: \n"
@@ -343,7 +343,7 @@ REGISTER_COMMAND_NAME(@"printlog")
          @"  ]";
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   JsonPrintOptions options;
   options.always_print_enums_as_ints = false;
   options.always_print_fields_with_no_presence = true;
@@ -352,7 +352,7 @@ REGISTER_COMMAND_NAME(@"printlog")
 
   bool printed_opening_brace = false;
 
-  for (NSString *path in arguments) {
+  for (NSString* path in arguments) {
     auto source = MessageSource::Create(path);
     if (!source.ok()) {
       TEE_LOGE(@"%@: %s", path, source.status().ToString().c_str());

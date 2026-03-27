@@ -24,9 +24,9 @@
 // Use this instead of init.
 + (instancetype)tracker;
 
-- (void)addNotification:(NSDictionary *)notification forHash:(NSString *)hash;
-- (void)removeNotificationsForHashes:(NSArray<NSString *> *)hashes;
-- (void)decrementPendingRulesForHash:(NSString *)hash totalRuleCount:(NSNumber *)totalRuleCount;
-- (NSDictionary *)all;
+- (void)addNotification:(NSDictionary*)notification forHash:(NSString*)hash;
+- (void)removeNotificationsForHashes:(NSArray<NSString*>*)hashes;
+- (void)decrementPendingRulesForHash:(NSString*)hash totalRuleCount:(NSNumber*)totalRuleCount;
+- (NSDictionary*)all;
 
 @end

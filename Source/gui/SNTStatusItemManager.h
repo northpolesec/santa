@@ -20,13 +20,13 @@
 @interface SNTStatusItemManager : NSObject
 
 /// The status bar item
-@property(strong, nonatomic, readonly) NSStatusItem *statusItem;
+@property(strong, nonatomic, readonly) NSStatusItem* statusItem;
 
 /// Updates the title displayed in the status bar
 /// @param title The new title to display
-- (void)updateTitle:(NSString *)title;
+- (void)updateTitle:(NSString*)title;
 
-- (void)enterMonitorModeWithExpiration:(NSDate *)expiration;
+- (void)enterMonitorModeWithExpiration:(NSDate*)expiration;
 - (void)leaveMonitorMode;
 
 /// Sets whether the temporary monitor mode menu items should be visible

@@ -17,9 +17,9 @@
 
 namespace santa {
 
-BOOL SNTIsLiteAppBundle(NSString *appPath) {
-  NSString *plistPath = [appPath stringByAppendingPathComponent:@"Contents/Info.plist"];
-  NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+BOOL SNTIsLiteAppBundle(NSString* appPath) {
+  NSString* plistPath = [appPath stringByAppendingPathComponent:@"Contents/Info.plist"];
+  NSDictionary* plist = [NSDictionary dictionaryWithContentsOfFile:plistPath];
   return [plist[@"SNTIsLite"] boolValue];
 }
 

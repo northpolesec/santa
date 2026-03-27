@@ -47,18 +47,18 @@
 
 #pragma mark SNTBundleServiceXPC Methods
 
-- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent *)event
-                          listener:(NSXPCListenerEndpoint *)listener
+- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent*)event
+                          listener:(NSXPCListenerEndpoint*)listener
                              reply:(SNTBundleHashBlock)reply {
-  NSProgress *progress =
+  NSProgress* progress =
       [NSProgress currentProgress] ? [NSProgress progressWithTotalUnitCount:100] : nil;
 
-  NSDate *startTime = [NSDate date];
+  NSDate* startTime = [NSDate date];
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   // Connect back to the client.
-  MOLXPCConnection *clientListener;
+  MOLXPCConnection* clientListener;
   if (listener) {
     clientListener = [[MOLXPCConnection alloc] initClientWithListener:listener];
     clientListener.remoteInterface =
@@ -71,7 +71,7 @@
 
   dispatch_async(self.queue, ^{
     // Use the highest bundle we can find.
-    SNTFileInfo *b = [[SNTFileInfo alloc] initWithPath:event.fileBundlePath];
+    SNTFileInfo* b = [[SNTFileInfo alloc] initWithPath:event.fileBundlePath];
     b.useAncestorBundle = YES;
     event.fileBundlePath = b.bundlePath;
 
@@ -95,12 +95,12 @@
           [b.bundle.executablePath substringFromIndex:b.bundlePath.length + 1];
     }
 
-    NSDictionary *relatedEvents = [self findRelatedBinaries:event
+    NSDictionary* relatedEvents = [self findRelatedBinaries:event
                                                    progress:progress
                                              clientListener:clientListener];
-    NSString *bundleHash = [self calculateBundleHashFromSHA256Hashes:relatedEvents.allKeys
+    NSString* bundleHash = [self calculateBundleHashFromSHA256Hashes:relatedEvents.allKeys
                                                             progress:progress];
-    NSNumber *ms = [NSNumber numberWithDouble:[startTime timeIntervalSinceNow] * -1000.0];
+    NSNumber* ms = [NSNumber numberWithDouble:[startTime timeIntervalSinceNow] * -1000.0];
 
     reply(bundleHash, relatedEvents.allValues, ms);
     dispatch_semaphore_signal(sema);
@@ -115,20 +115,20 @@
   });
 }
 
-- (void)generateEventsFromPath:(NSString *)path
+- (void)generateEventsFromPath:(NSString*)path
                  enableBundles:(BOOL)enableBundles
-                         reply:(void (^)(NSArray<SNTStoredExecutionEvent *> *events))reply {
+                         reply:(void (^)(NSArray<SNTStoredExecutionEvent*>* events))reply {
   dispatch_async(self.queue, ^{
-    NSMutableArray<SNTStoredExecutionEvent *> *allEvents = [NSMutableArray array];
+    NSMutableArray<SNTStoredExecutionEvent*>* allEvents = [NSMutableArray array];
 
     std::vector<std::string> matches = santa::FindMatches(path);
-    for (const auto &match : matches) {
+    for (const auto& match : matches) {
       @autoreleasepool {
-        NSString *matchPath = @(match.c_str());
-        SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:matchPath];
+        NSString* matchPath = @(match.c_str());
+        SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:matchPath];
         if (!fi) continue;
 
-        SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
+        SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
         if (!se) continue;
         se.decision = SNTEventStateBundleBinary;
 
@@ -137,7 +137,7 @@
           se.fileBundlePath = fi.bundlePath;
 
           // Use the highest bundle we can find.
-          SNTFileInfo *b = [[SNTFileInfo alloc] initWithPath:se.fileBundlePath];
+          SNTFileInfo* b = [[SNTFileInfo alloc] initWithPath:se.fileBundlePath];
           b.useAncestorBundle = YES;
           se.fileBundlePath = b.bundlePath;
 
@@ -152,16 +152,16 @@
                   [b.bundle.executablePath substringFromIndex:b.bundlePath.length + 1];
             }
 
-            NSDate *startTime = [NSDate date];
-            NSDictionary *relatedEvents = [self findRelatedBinaries:se
+            NSDate* startTime = [NSDate date];
+            NSDictionary* relatedEvents = [self findRelatedBinaries:se
                                                            progress:nil
                                                      clientListener:nil];
-            NSString *bundleHash = [self calculateBundleHashFromSHA256Hashes:relatedEvents.allKeys
+            NSString* bundleHash = [self calculateBundleHashFromSHA256Hashes:relatedEvents.allKeys
                                                                     progress:nil];
-            NSNumber *ms = [NSNumber numberWithDouble:[startTime timeIntervalSinceNow] * -1000.0];
+            NSNumber* ms = [NSNumber numberWithDouble:[startTime timeIntervalSinceNow] * -1000.0];
 
-            NSNumber *bundleCount = @(relatedEvents.count);
-            for (SNTStoredExecutionEvent *e in relatedEvents.allValues) {
+            NSNumber* bundleCount = @(relatedEvents.count);
+            for (SNTStoredExecutionEvent* e in relatedEvents.allValues) {
               e.fileBundleHash = bundleHash;
               e.fileBundleHashMilliseconds = ms;
               e.fileBundleBinaryCount = bundleCount;
@@ -197,12 +197,12 @@
   @return An NSDictionary object with keys of fileSHA256 and values of SNTStoredExecutionEvent
   objects.
 */
-- (NSDictionary *)findRelatedBinaries:(SNTStoredExecutionEvent *)event
-                             progress:(NSProgress *)progress
-                       clientListener:(MOLXPCConnection *)clientListener {
+- (NSDictionary*)findRelatedBinaries:(SNTStoredExecutionEvent*)event
+                            progress:(NSProgress*)progress
+                      clientListener:(MOLXPCConnection*)clientListener {
   // Find all files and folders within the fileBundlePath
-  NSFileManager *fm = [NSFileManager defaultManager];
-  NSArray *subpaths = [fm subpathsOfDirectoryAtPath:event.fileBundlePath error:NULL];
+  NSFileManager* fm = [NSFileManager defaultManager];
+  NSArray* subpaths = [fm subpathsOfDirectoryAtPath:event.fileBundlePath error:NULL];
 
   // This array is used to store pointers to executable SNTFileInfo objects. There will be one block
   // dispatched per file in dirEnum. These blocks will write pointers to this array concurrently.
@@ -211,14 +211,14 @@
   // Xcode.app has roughly 500k files, 8bytes per pointer is ~4MB for this array. This size to space
   // ratio seems appropriate as Xcode.app is in the upper bounds of bundle size.
   // Using a shared pointer to make block capture easy.
-  __block auto fis = std::make_shared<std::vector<SNTFileInfo *>>(subpaths.count);
+  __block auto fis = std::make_shared<std::vector<SNTFileInfo*>>(subpaths.count);
 
   // Counts used as additional progress information in SantaGUI
   __block auto binaryCount = std::make_shared<std::atomic<int64_t>>(0);
   __block auto completedUnits = std::make_shared<std::atomic<int64_t>>(0);
 
   // Account for 80% of the work
-  NSProgress *p;
+  NSProgress* p;
   if (progress) {
     [progress becomeCurrentWithPendingUnitCount:80];
     p = [NSProgress progressWithTotalUnitCount:subpaths.count * 100];
@@ -242,11 +242,11 @@
         }
       });
 
-      NSString *subpath = subpaths[i];
+      NSString* subpath = subpaths[i];
 
-      NSString *file =
+      NSString* file =
           [event.fileBundlePath stringByAppendingPathComponent:subpath].stringByStandardizingPath;
-      SNTFileInfo *fi = [[SNTFileInfo alloc] initWithResolvedPath:file error:NULL];
+      SNTFileInfo* fi = [[SNTFileInfo alloc] initWithResolvedPath:file error:NULL];
       if (!fi.isExecutable) return;
 
       fis->at(i) = fi;
@@ -256,7 +256,7 @@
 
   [progress resignCurrent];
 
-  NSMutableArray *fileInfos = [NSMutableArray arrayWithCapacity:binaryCount->load()];
+  NSMutableArray* fileInfos = [NSMutableArray arrayWithCapacity:binaryCount->load()];
   for (NSUInteger i = 0; i < subpaths.count; i++) {
     if (fis->at(i)) [fileInfos addObject:fis->at(i)];
   }
@@ -267,16 +267,16 @@
                            clientListener:clientListener];
 }
 
-- (NSDictionary *)generateEventsFromBinaries:(NSArray *)fis
-                               blockingEvent:(SNTStoredExecutionEvent *)event
-                                    progress:(NSProgress *)progress
-                              clientListener:(MOLXPCConnection *)clientListener {
+- (NSDictionary*)generateEventsFromBinaries:(NSArray*)fis
+                              blockingEvent:(SNTStoredExecutionEvent*)event
+                                   progress:(NSProgress*)progress
+                             clientListener:(MOLXPCConnection*)clientListener {
   if (progress.isCancelled) return nil;
 
-  NSMutableDictionary *relatedEvents = [NSMutableDictionary dictionaryWithCapacity:fis.count];
+  NSMutableDictionary* relatedEvents = [NSMutableDictionary dictionaryWithCapacity:fis.count];
 
   // Account for 15% of the work
-  NSProgress *p;
+  NSProgress* p;
   if (progress) {
     [progress becomeCurrentWithPendingUnitCount:15];
     p = [NSProgress progressWithTotalUnitCount:fis.count * 100];
@@ -286,9 +286,9 @@
     @autoreleasepool {
       if (progress.isCancelled) return;
 
-      SNTFileInfo *fi = fis[i];
+      SNTFileInfo* fi = fis[i];
 
-      SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
+      SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
       se.decision = SNTEventStateBundleBinary;
       se.fileBundlePath = event.fileBundlePath;
       se.fileBundleExecutableRelPath = event.fileBundleExecutableRelPath;
@@ -315,32 +315,31 @@
   return relatedEvents;
 }
 
-- (NSString *)calculateBundleHashFromSHA256Hashes:(NSArray *)hashes
-                                         progress:(NSProgress *)progress {
+- (NSString*)calculateBundleHashFromSHA256Hashes:(NSArray*)hashes progress:(NSProgress*)progress {
   if (!hashes.count) return nil;
 
   // Account for 5% of the work
-  NSProgress *p;
+  NSProgress* p;
   if (progress) {
     [progress becomeCurrentWithPendingUnitCount:5];
     p = [NSProgress progressWithTotalUnitCount:5 * 100];
   }
 
-  NSMutableArray *sortedHashes = [hashes mutableCopy];
+  NSMutableArray* sortedHashes = [hashes mutableCopy];
   [sortedHashes sortUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
-  NSString *sha256Hashes = [sortedHashes componentsJoinedByString:@""];
+  NSString* sha256Hashes = [sortedHashes componentsJoinedByString:@""];
 
   CC_SHA256_CTX c256;
   CC_SHA256_Init(&c256);
-  CC_SHA256_Update(&c256, (const void *)sha256Hashes.UTF8String, (CC_LONG)sha256Hashes.length);
+  CC_SHA256_Update(&c256, (const void*)sha256Hashes.UTF8String, (CC_LONG)sha256Hashes.length);
   unsigned char digest[CC_SHA256_DIGEST_LENGTH];
   CC_SHA256_Final(digest, &c256);
 
-  NSString *const SHA256FormatString =
+  NSString* const SHA256FormatString =
       @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
        "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
 
-  NSString *sha256 = [[NSString alloc]
+  NSString* sha256 = [[NSString alloc]
       initWithFormat:SHA256FormatString, digest[0], digest[1], digest[2], digest[3], digest[4],
                      digest[5], digest[6], digest[7], digest[8], digest[9], digest[10], digest[11],
                      digest[12], digest[13], digest[14], digest[15], digest[16], digest[17],

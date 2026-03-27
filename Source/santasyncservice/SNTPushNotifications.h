@@ -24,20 +24,20 @@
 - (void)ruleSyncSecondsFromNow:(uint64_t)seconds;
 - (void)preflightSync;
 - (void)pushNotificationSyncSecondsFromNow:(uint64_t)seconds;
-- (MOLXPCConnection *)daemonConnection;
-- (void)eventUploadForPath:(NSString *)path reply:(void (^)(NSError *error))reply;
+- (MOLXPCConnection*)daemonConnection;
+- (void)eventUploadForPath:(NSString*)path reply:(void (^)(NSError* error))reply;
 @end
 
 @class SNTSyncState;
 
 @protocol SNTPushNotificationsClientDelegate <NSObject>
 
-@property(readonly) NSString *token;
+@property(readonly) NSString* token;
 @property(readonly) NSUInteger fullSyncInterval;
 
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
 - (BOOL)isConnected;
-- (void)handlePreflightSyncState:(SNTSyncState *)syncState;
+- (void)handlePreflightSyncState:(SNTSyncState*)syncState;
 
 @optional
 

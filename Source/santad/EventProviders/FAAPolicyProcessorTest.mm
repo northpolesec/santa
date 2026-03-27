@@ -49,7 +49,7 @@ extern bool ShouldLogDecision(FileAccessPolicyDecision decision);
 }  // namespace santa
 
 // Helper to reset a policy to an empty state
-static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
+static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   proc.binary_path = "";
   proc.UnsafeUpdateSigningId("");
   proc.team_id = "";
@@ -95,7 +95,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
       {FileAccessPolicyDecision::kAllowedAuditOnly, ES_AUTH_RESULT_ALLOW},
   };
 
-  for (const auto &kv : policyDecisionToAuthResult) {
+  for (const auto& kv : policyDecisionToAuthResult) {
     XCTAssertEqual(santa::FileAccessPolicyDecisionToESAuthResult(kv.first), kv.second);
   }
 
@@ -113,7 +113,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
       {(FileAccessPolicyDecision)123, false},
   };
 
-  for (const auto &kv : policyDecisionToShouldLog) {
+  for (const auto& kv : policyDecisionToShouldLog) {
     XCTAssertEqual(santa::ShouldLogDecision(kv.first), kv.second);
   }
 }
@@ -129,7 +129,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
       {(FileAccessPolicyDecision)123, false},
   };
 
-  for (const auto &kv : policyDecisionToIsBlockDecision) {
+  for (const auto& kv : policyDecisionToIsBlockDecision) {
     XCTAssertEqual(santa::IsBlockDecision(kv.first), kv.second);
   }
 }
@@ -168,7 +168,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
            FileAccessPolicyDecision::kNoPolicy},
   };
 
-  for (const auto &kv : decisionAndOverrideToDecision) {
+  for (const auto& kv : decisionAndOverrideToDecision) {
     XCTAssertEqual(santa::ApplyOverrideToDecision(kv.first.first, kv.first.second), kv.second);
   }
 
@@ -207,7 +207,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
                                             nil, nil);
 
   EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
-      .WillRepeatedly([&faaPolicyProcessor](const Message &msg, const Message::PathTarget &target,
+      .WillRepeatedly([&faaPolicyProcessor](const Message& msg, const Message::PathTarget& target,
                                             std::shared_ptr<santa::WatchItemPolicyBase> policy) {
         return faaPolicyProcessor.PolicyAllowsReadsForTargetWrapper(msg, target, policy);
       });
@@ -286,7 +286,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
       ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_TRUNCATE,     ES_EVENT_TYPE_AUTH_UNLINK,
   };
 
-  for (const auto &event : eventTypes) {
+  for (const auto& event : eventTypes) {
     esMsg.event_type = event;
     Message msg(mockESApi, &esMsg);
     XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
@@ -294,7 +294,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
 }
 
 - (void)testApplyPolicy {
-  const char *instigatingPath = "/path/to/proc";
+  const char* instigatingPath = "/path/to/proc";
   WatchItemProcess policyProc(instigatingPath, "", "", {}, "", false);
   es_file_t esFile = MakeESFile(instigatingPath);
   es_process_t esProc = MakeESProcess(&esFile);
@@ -315,12 +315,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   // If no policy exists, the operation is allowed
   {
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, std::nullopt,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return false;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, std::nullopt,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return false;
+            }),
         FileAccessPolicyDecision::kNoPolicy);
     XCTAssertSemaFalse(sema, "Semaphore should never have been signaled");
   }
@@ -335,12 +335,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
     OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(YES);
     esMsg.process->codesigning_flags = CS_SIGNED;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return false;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return false;
+            }),
         FileAccessPolicyDecision::kDeniedInvalidSignature);
     XCTAssertSemaFalse(sema, "Semaphore should never have been signaled");
   }
@@ -352,12 +352,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
     OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
     esMsg.process->codesigning_flags = CS_SIGNED;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return true;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return true;
+            }),
         FileAccessPolicyDecision::kAllowed);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
@@ -369,12 +369,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   {
     policy->audit_only = false;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return false;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return false;
+            }),
         FileAccessPolicyDecision::kDenied);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
@@ -383,12 +383,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   {
     policy->audit_only = true;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return false;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return false;
+            }),
         FileAccessPolicyDecision::kAllowedAuditOnly);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
@@ -402,12 +402,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   {
     policy->audit_only = false;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return false;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return false;
+            }),
         FileAccessPolicyDecision::kAllowed);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
@@ -421,12 +421,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   {
     policy->audit_only = false;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return false;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return false;
+            }),
         FileAccessPolicyDecision::kAllowed);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
@@ -436,12 +436,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   {
     policy->audit_only = true;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return false;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return false;
+            }),
         FileAccessPolicyDecision::kAllowed);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
@@ -451,12 +451,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   {
     policy->audit_only = true;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return true;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return true;
+            }),
         FileAccessPolicyDecision::kAllowedAuditOnly);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
@@ -466,12 +466,12 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   {
     policy->audit_only = false;
     XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
-                                              ^bool(const santa::WatchItemPolicyBase &,
-                                                    const Message::PathTarget &, const Message &) {
-                                                dispatch_semaphore_signal(sema);
-                                                return true;
-                                              }),
+        faaPolicyProcessor.ApplyPolicyWrapper(
+            Message(mockESApi, &esMsg), target, optionalPolicy,
+            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+              dispatch_semaphore_signal(sema);
+              return true;
+            }),
         FileAccessPolicyDecision::kDenied);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
@@ -483,17 +483,17 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   es_file_t esFile1 = MakeESFile("foo", MakeStat(100));
   es_file_t esFile2 = MakeESFile("foo", MakeStat(200));
   es_file_t esFile3 = MakeESFile("foo", MakeStat(300));
-  NSString *certHash2 = @"abc123";
-  NSString *certHash3 = @"xyz789";
-  NSString *got;
-  NSString *want;
+  NSString* certHash2 = @"abc123";
+  NSString* certHash3 = @"xyz789";
+  NSString* got;
+  NSString* want;
   id certMock = OCMClassMock([MOLCertificate class]);
 
   MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
                                             nil, nil);
 
   EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
-      .WillRepeatedly([&faaPolicyProcessor](const es_file_t *es_file) {
+      .WillRepeatedly([&faaPolicyProcessor](const es_file_t* es_file) {
         return faaPolicyProcessor.GetCertificateHashWrapper(es_file);
       });
 
@@ -544,7 +544,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   //
   // Test 3 - Not in local cache, but is in decision cache
   //
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.certSHA256 = certHash3;
   OCMExpect([self.dcMock cachedDecisionForFile:esFile3.stat]).ignoringNonObjectArgs().andReturn(cd);
 
@@ -561,9 +561,9 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
 }
 
 - (void)testPolicyMatchesProcess {
-  const char *instigatingCertHash = "abc123";
-  const char *teamId = "myvalidtid";
-  const char *signingId = "com.northpolesec.test";
+  const char* instigatingCertHash = "abc123";
+  const char* teamId = "myvalidtid";
+  const char* signingId = "com.northpolesec.test";
   std::vector<uint8_t> cdhashBytes(CS_CDHASH_LEN);
   std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
   es_file_t esFile = MakeESFile("foo");
@@ -574,15 +574,15 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess &proc) {
   esProc.is_platform_binary = true;
   std::memcpy(esProc.cdhash, cdhashBytes.data(), sizeof(esProc.cdhash));
 
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.certSHA256 = @(instigatingCertHash);
 
   MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
                                             nil, nil);
 
   EXPECT_CALL(faaPolicyProcessor, PolicyMatchesProcess)
-      .WillRepeatedly([&faaPolicyProcessor](const WatchItemProcess &policy_proc,
-                                            const es_process_t *es_proc) {
+      .WillRepeatedly([&faaPolicyProcessor](const WatchItemProcess& policy_proc,
+                                            const es_process_t* es_proc) {
         return faaPolicyProcessor.FAAPolicyProcessor::PolicyMatchesProcess(policy_proc, es_proc);
       });
 

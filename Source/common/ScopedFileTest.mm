@@ -40,13 +40,13 @@
 }
 
 - (void)testCreateTemporary {
-  NSString *prefix = @"foo/bar";
-  NSString *uuid = [[NSUUID UUID] UUIDString];
+  NSString* prefix = @"foo/bar";
+  NSString* uuid = [[NSUUID UUID] UUIDString];
 
-  NSString *fullPath =
+  NSString* fullPath =
       [NSString stringWithFormat:@"%@/%@/%@", NSTemporaryDirectory(), prefix, uuid];
 
-  NSFileManager *fileMgr = [NSFileManager defaultManager];
+  NSFileManager* fileMgr = [NSFileManager defaultManager];
 
   // The shouldn't exist before creating the temporary file
   XCTAssertFalse([fileMgr fileExistsAtPath:fullPath]);
@@ -58,13 +58,13 @@
   XCTAssertFalse([fileMgr fileExistsAtPath:fullPath]);
 
   // Ensure we can read/write the file
-  NSFileHandle *writer = file->Writer();
-  NSData *writeContents = [@"foo" dataUsingEncoding:NSUTF8StringEncoding];
+  NSFileHandle* writer = file->Writer();
+  NSData* writeContents = [@"foo" dataUsingEncoding:NSUTF8StringEncoding];
   XCTAssertTrue([writer writeData:writeContents error:nil]);
   [writer seekToFileOffset:0];
 
-  NSFileHandle *reader = file->Reader();
-  NSData *readContents = [reader readDataToEndOfFileAndReturnError:nil];
+  NSFileHandle* reader = file->Reader();
+  NSData* readContents = [reader readDataToEndOfFileAndReturnError:nil];
 
   XCTAssertEqualObjects(readContents, writeContents);
 }

@@ -44,29 +44,29 @@ class PrefixTree {
 
   ~PrefixTree() { PruneLocked(root_); }
 
-  bool InsertPrefix(const char *s, ValueT value) {
+  bool InsertPrefix(const char* s, ValueT value) {
     absl::MutexLock lock(lock_);
     return InsertLocked(s, value, NodeType::kPrefix);
   }
 
-  bool InsertLiteral(const char *s, ValueT value) {
+  bool InsertLiteral(const char* s, ValueT value) {
     absl::MutexLock lock(lock_);
     return InsertLocked(s, value, NodeType::kLiteral);
   }
 
-  bool HasPrefix(const char *input) {
+  bool HasPrefix(const char* input) {
     absl::ReaderMutexLock lock(lock_);
     return HasPrefixLocked(input);
   }
 
-  std::optional<ValueT> LookupLongestMatchingPrefix(const std::string &input) {
+  std::optional<ValueT> LookupLongestMatchingPrefix(const std::string& input) {
     absl::ReaderMutexLock lock(lock_);
     return LookupLongestMatchingPrefixLocked(input);
   }
 
   /// Returns true if the tree contains any prefix or literal
   /// string that matches the input, otherwise false.
-  bool Contains(const char *input) {
+  bool Contains(const char* input) {
     if (!input) {
       return false;
     }
@@ -98,14 +98,14 @@ class PrefixTree {
 
  private:
   ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_)
-  bool InsertLocked(const char *input, ValueT value, NodeType node_type) {
-    const char *p = input;
-    TreeNode *node = root_;
+  bool InsertLocked(const char* input, ValueT value, NodeType node_type) {
+    const char* p = input;
+    TreeNode* node = root_;
 
     while (*p) {
       uint8_t cur_byte = (uint8_t)*p;
 
-      TreeNode *child_node = node->children_[cur_byte];
+      TreeNode* child_node = node->children_[cur_byte];
       if (!child_node) {
         // Current node doesn't exist...
         // Create the rest of the nodes in the tree for the given string
@@ -113,11 +113,11 @@ class PrefixTree {
         // Keep a pointer to where this new branch starts from. If the
         // input length exceeds max_depth, the new branch will need to
         // be pruned.
-        TreeNode *branch_start_node = node;
+        TreeNode* branch_start_node = node;
         uint8_t branch_start_byte = (uint8_t)*p;
 
         do {
-          TreeNode *new_node = new TreeNode();
+          TreeNode* new_node = new TreeNode();
           node->children_[cur_byte] = new_node;
           node = new_node;
           node_count_++;
@@ -166,9 +166,9 @@ class PrefixTree {
   }
 
   ABSL_SHARED_LOCKS_REQUIRED(lock_)
-  bool HasPrefixLocked(const char *input) {
-    TreeNode *node = root_;
-    const char *p = input;
+  bool HasPrefixLocked(const char* input) {
+    TreeNode* node = root_;
+    const char* p = input;
 
     while (*p) {
       node = node->children_[(uint8_t)*p++];
@@ -187,10 +187,10 @@ class PrefixTree {
   }
 
   ABSL_SHARED_LOCKS_REQUIRED(lock_)
-  std::optional<ValueT> LookupLongestMatchingPrefixLocked(const std::string &input) {
-    TreeNode *node = root_;
-    TreeNode *match = nullptr;
-    const char *p = input.c_str();
+  std::optional<ValueT> LookupLongestMatchingPrefixLocked(const std::string& input) {
+    TreeNode* node = root_;
+    TreeNode* match = nullptr;
+    const char* p = input.c_str();
 
     while (*p) {
       node = node->children_[(uint8_t)*p++];
@@ -209,9 +209,9 @@ class PrefixTree {
   }
 
   ABSL_SHARED_LOCKS_REQUIRED(lock_)
-  bool ContainsLocked(const char *input) {
-    TreeNode *node = root_;
-    const char *p = input;
+  bool ContainsLocked(const char* input) {
+    TreeNode* node = root_;
+    const char* p = input;
 
     while (*p) {
       node = node->children_[(uint8_t)*p++];
@@ -230,7 +230,7 @@ class PrefixTree {
   }
 
   ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_)
-  void PruneLocked(TreeNode *target) {
+  void PruneLocked(TreeNode* target) {
     if (!target) {
       return;
     }
@@ -238,7 +238,7 @@ class PrefixTree {
     // For deep trees, a recursive approach will generate too many stack frames.
     // Since the depth of the tree is configurable, err on the side of caution
     // and use a "stack" to walk the tree in a non-recursive manner.
-    TreeNode **stack = new TreeNode *[node_count_ + 1];
+    TreeNode** stack = new TreeNode*[node_count_ + 1];
     if (!stack) {
       LOGE(@"Unable to prune tree!");
       return;
@@ -252,7 +252,7 @@ class PrefixTree {
     // Start at the target node and walk the tree to find and delete all the
     // sub-nodes.
     while (count) {
-      TreeNode *node = stack[--count];
+      TreeNode* node = stack[--count];
 
       for (int i = 0; i < 256; ++i) {
         if (!node->children_[i]) {
@@ -270,9 +270,9 @@ class PrefixTree {
 
 #if SANTA_PREFIX_TREE_DEBUG
   ABSL_SHARED_LOCKS_REQUIRED(lock_)
-  void PrintLocked(TreeNode *node, char *buf, uint32_t depth) {
+  void PrintLocked(TreeNode* node, char* buf, uint32_t depth) {
     for (size_t i = 0; i < 256; i++) {
-      TreeNode *cur_node = node->children_[i];
+      TreeNode* cur_node = node->children_[i];
       if (cur_node) {
         buf[depth] = i;
         if (cur_node->node_type_ != NodeType::kInner) {
@@ -317,12 +317,12 @@ class PrefixTree {
    public:
     TreeNode() : children_(), node_type_(NodeType::kInner) {}
     ~TreeNode() = default;
-    TreeNode *children_[256];
+    TreeNode* children_[256];
     PrefixTree::NodeType node_type_;
     ValueT value_;
   };
 
-  TreeNode *root_;
+  TreeNode* root_;
   const uint32_t max_depth_;
   uint32_t node_count_ ABSL_GUARDED_BY(lock_);
   absl::Mutex lock_;

@@ -27,9 +27,9 @@
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/TestUtils.h"
 
-NSString *GenerateRandomHexStringWithSHA256Length() {
+NSString* GenerateRandomHexStringWithSHA256Length() {
   // Create an array to hold random bytes
-  NSMutableData *randomData = [NSMutableData dataWithLength:CC_SHA256_DIGEST_LENGTH];
+  NSMutableData* randomData = [NSMutableData dataWithLength:CC_SHA256_DIGEST_LENGTH];
 
   // Fill the array with random bytes
   int result = SecRandomCopyBytes(kSecRandomDefault, randomData.length, randomData.mutableBytes);
@@ -40,16 +40,16 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   }
 
   // Convert the random bytes to a hex string
-  NSMutableString *hexString = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
+  NSMutableString* hexString = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
   for (NSInteger i = 0; i < randomData.length; i++) {
-    [hexString appendFormat:@"%02x", ((const unsigned char *)randomData.bytes)[i]];
+    [hexString appendFormat:@"%02x", ((const unsigned char*)randomData.bytes)[i]];
   }
 
   return hexString;
 }
 
 @interface SNTEventTable (Testing)
-- (SNTStoredEvent *)eventFromResultSet:(FMResultSet *)rs;
+- (SNTStoredEvent*)eventFromResultSet:(FMResultSet*)rs;
 @property NSTimeInterval unactionableEventCacheTimeSeconds;
 @end
 
@@ -62,8 +62,8 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 /// MOLCertificate) to avoid duplicating code into these tests.
 ///
 @interface SNTEventTableTest : XCTestCase
-@property SNTEventTable *sut;
-@property FMDatabaseQueue *dbq;
+@property SNTEventTable* sut;
+@property FMDatabaseQueue* dbq;
 @end
 
 @implementation SNTEventTableTest
@@ -75,10 +75,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   self.sut = [[SNTEventTable alloc] initWithDatabaseQueue:self.dbq];
 }
 
-- (SNTStoredExecutionEvent *)createTestEvent {
-  SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/false"];
-  MOLCodesignChecker *csInfo = [binInfo codesignCheckerWithError:NULL];
-  SNTStoredExecutionEvent *event = [[SNTStoredExecutionEvent alloc] init];
+- (SNTStoredExecutionEvent*)createTestEvent {
+  SNTFileInfo* binInfo = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/false"];
+  MOLCodesignChecker* csInfo = [binInfo codesignCheckerWithError:NULL];
+  SNTStoredExecutionEvent* event = [[SNTStoredExecutionEvent alloc] init];
   event.filePath = @"/usr/bin/false";
   event.fileSHA256 = GenerateRandomHexStringWithSHA256Length();
   event.signingChain = [csInfo certificates];
@@ -89,10 +89,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   return event;
 }
 
-- (SNTStoredFileAccessEvent *)createTestFileAccessEvent {
-  SNTFileInfo *binInfo = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/false"];
-  MOLCodesignChecker *csInfo = [binInfo codesignCheckerWithError:NULL];
-  SNTStoredFileAccessEvent *event = [[SNTStoredFileAccessEvent alloc] init];
+- (SNTStoredFileAccessEvent*)createTestFileAccessEvent {
+  SNTFileInfo* binInfo = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/false"];
+  MOLCodesignChecker* csInfo = [binInfo codesignCheckerWithError:NULL];
+  SNTStoredFileAccessEvent* event = [[SNTStoredFileAccessEvent alloc] init];
   event.ruleName = @"MyTestRule";
   event.ruleVersion = @"MyTestVersion";
   event.accessedPath = @"/this/path/was/accessed";
@@ -107,14 +107,14 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   return event;
 }
 
-- (SNTStoredTemporaryMonitorModeEnterAuditEvent *)createTestTemporaryMonitorModeEnterAuditEvent {
+- (SNTStoredTemporaryMonitorModeEnterAuditEvent*)createTestTemporaryMonitorModeEnterAuditEvent {
   return [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
       initWithUUID:@"enter_uuid"
            seconds:123
             reason:SNTTemporaryMonitorModeEnterReasonOnDemand];
 }
 
-- (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)createTestTemporaryMonitorModeLeaveAuditEvent {
+- (SNTStoredTemporaryMonitorModeLeaveAuditEvent*)createTestTemporaryMonitorModeLeaveAuditEvent {
   return [[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
       initWithUUID:@"leave_uuid"
             reason:SNTTemporaryMonitorModeLeaveReasonSessionExpired];
@@ -131,7 +131,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 - (void)testUniqueIndexActionable {
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
 
-  SNTStoredExecutionEvent *event = [self createTestEvent];
+  SNTStoredExecutionEvent* event = [self createTestEvent];
   XCTAssertTrue([self.sut addStoredEvent:event]);
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
@@ -153,7 +153,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   XCTAssertEqual(self.sut.pendingEventsCount, 2);
 
   // Now for FAA Events...
-  SNTStoredFileAccessEvent *faaEvent = [self createTestFileAccessEvent];
+  SNTStoredFileAccessEvent* faaEvent = [self createTestFileAccessEvent];
   XCTAssertTrue([self.sut addStoredEvent:faaEvent]);
   XCTAssertEqual(self.sut.pendingEventsCount, 3);
 
@@ -177,7 +177,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 - (void)testUniqueIndexUnactionable {
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
 
-  SNTStoredExecutionEvent *event = [self createTestEvent];
+  SNTStoredExecutionEvent* event = [self createTestEvent];
   // Make this an "unactionable" event
   event.decision = SNTEventStateAllowBinary;
   XCTAssertTrue([self.sut addStoredEvent:event]);
@@ -201,7 +201,7 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   XCTAssertEqual(self.sut.pendingEventsCount, 2);
 
   // Now for FAA Events...
-  SNTStoredFileAccessEvent *faaEvent = [self createTestFileAccessEvent];
+  SNTStoredFileAccessEvent* faaEvent = [self createTestFileAccessEvent];
   // Make this an "unactionable" event
   faaEvent.decision = FileAccessPolicyDecision::kAllowedAuditOnly;
   XCTAssertTrue([self.sut addStoredEvent:faaEvent]);
@@ -230,10 +230,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   // Set the backoff time to 3 seconds
   self.sut.unactionableEventCacheTimeSeconds = 3;
 
-  SNTStoredExecutionEvent *event = [self createTestEvent];
+  SNTStoredExecutionEvent* event = [self createTestEvent];
   // Make this an "unactionable" event
   event.decision = SNTEventStateAllowBinary;
-  NSNumber *origId = event.idx;
+  NSNumber* origId = event.idx;
   XCTAssertTrue([self.sut addStoredEvent:event]);
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
@@ -263,10 +263,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 }
 
 - (void)testRetrieveExecutionEvent {
-  SNTStoredExecutionEvent *event = [self createTestEvent];
+  SNTStoredExecutionEvent* event = [self createTestEvent];
   [self.sut addStoredEvent:event];
 
-  SNTStoredExecutionEvent *storedEvent = [self.sut pendingEvents].firstObject;
+  SNTStoredExecutionEvent* storedEvent = [self.sut pendingEvents].firstObject;
   XCTAssertNotNil(storedEvent);
   XCTAssertEqualObjects(event.filePath, storedEvent.filePath);
   XCTAssertEqualObjects(event.signingChain, storedEvent.signingChain);
@@ -276,10 +276,10 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 }
 
 - (void)testRetrieveFAAEvent {
-  SNTStoredFileAccessEvent *event = [self createTestFileAccessEvent];
+  SNTStoredFileAccessEvent* event = [self createTestFileAccessEvent];
   [self.sut addStoredEvent:event];
 
-  SNTStoredFileAccessEvent *storedEvent = [self.sut pendingEvents].firstObject;
+  SNTStoredFileAccessEvent* storedEvent = [self.sut pendingEvents].firstObject;
   XCTAssertNotNil(storedEvent);
   XCTAssertEqualObjects(event.ruleName, storedEvent.ruleName);
   XCTAssertEqualObjects(event.ruleVersion, storedEvent.ruleVersion);
@@ -294,45 +294,45 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 }
 
 - (void)testRetrieveTemporaryMonitorModeEnterAuditEvent {
-  SNTStoredTemporaryMonitorModeEnterAuditEvent *event =
+  SNTStoredTemporaryMonitorModeEnterAuditEvent* event =
       [self createTestTemporaryMonitorModeEnterAuditEvent];
   [self.sut addStoredEvent:event];
 
-  SNTStoredFileAccessEvent *storedEvent = [self.sut pendingEvents].firstObject;
+  SNTStoredFileAccessEvent* storedEvent = [self.sut pendingEvents].firstObject;
   XCTAssertNotNil(storedEvent);
   XCTAssertTrue([storedEvent isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]);
 
-  SNTStoredTemporaryMonitorModeEnterAuditEvent *tmmEnter =
-      (SNTStoredTemporaryMonitorModeEnterAuditEvent *)storedEvent;
+  SNTStoredTemporaryMonitorModeEnterAuditEvent* tmmEnter =
+      (SNTStoredTemporaryMonitorModeEnterAuditEvent*)storedEvent;
   XCTAssertEqualObjects(tmmEnter.uuid, @"enter_uuid");
   XCTAssertEqual(tmmEnter.reason, SNTTemporaryMonitorModeEnterReasonOnDemand);
   XCTAssertEqual(tmmEnter.seconds, 123);
 }
 
 - (void)testRetrieveTemporaryMonitorModeLeaveAuditEvent {
-  SNTStoredTemporaryMonitorModeLeaveAuditEvent *event =
+  SNTStoredTemporaryMonitorModeLeaveAuditEvent* event =
       [self createTestTemporaryMonitorModeLeaveAuditEvent];
   [self.sut addStoredEvent:event];
 
-  SNTStoredFileAccessEvent *storedEvent = [self.sut pendingEvents].firstObject;
+  SNTStoredFileAccessEvent* storedEvent = [self.sut pendingEvents].firstObject;
   XCTAssertNotNil(storedEvent);
   XCTAssertTrue([storedEvent isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]);
 
-  SNTStoredTemporaryMonitorModeLeaveAuditEvent *tmmLeave =
-      (SNTStoredTemporaryMonitorModeLeaveAuditEvent *)storedEvent;
+  SNTStoredTemporaryMonitorModeLeaveAuditEvent* tmmLeave =
+      (SNTStoredTemporaryMonitorModeLeaveAuditEvent*)storedEvent;
   XCTAssertEqualObjects(tmmLeave.uuid, @"leave_uuid");
   XCTAssertEqual(tmmLeave.reason, SNTTemporaryMonitorModeLeaveReasonSessionExpired);
 }
 
 - (void)testDeleteEventWithId {
-  SNTStoredEvent *newEvent = [self createTestEvent];
+  SNTStoredEvent* newEvent = [self createTestEvent];
   [self.sut addStoredEvent:newEvent];
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
   [self.sut deleteEventWithId:newEvent.idx];
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
 
-  SNTStoredEvent *newEvent2 = [self createTestFileAccessEvent];
+  SNTStoredEvent* newEvent2 = [self createTestFileAccessEvent];
   [self.sut addStoredEvent:newEvent2];
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
@@ -343,21 +343,21 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 - (void)testDeleteEventsWithIds {
   // Add 50 exec and faa events to the database
   for (int i = 0; i < 50; ++i) {
-    SNTStoredEvent *newEvent =
+    SNTStoredEvent* newEvent =
         (i % 2 == 0) ? [self createTestEvent] : [self createTestFileAccessEvent];
     [self.sut addStoredEvent:newEvent];
   }
 
   // Fetch those events (so we have the IDs)
-  NSArray *pendingEvents = [self.sut pendingEvents];
+  NSArray* pendingEvents = [self.sut pendingEvents];
 
   // Ensure enough events were added and retrieved
   XCTAssertEqual(self.sut.pendingEventsCount, 50);
   XCTAssertEqual(self.sut.pendingEventsCount, pendingEvents.count);
 
   // Collect the IDs
-  NSMutableArray *eventIds = [NSMutableArray array];
-  for (SNTStoredEvent *event in pendingEvents) {
+  NSMutableArray* eventIds = [NSMutableArray array];
+  for (SNTStoredEvent* event in pendingEvents) {
     [eventIds addObject:event.idx];
   }
 
@@ -369,17 +369,17 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 }
 
 - (void)testDeleteCorruptEvent {
-  [self.dbq inDatabase:^(FMDatabase *db) {
+  [self.dbq inDatabase:^(FMDatabase* db) {
     [db executeUpdate:@"INSERT INTO events (filesha256) VALUES ('deadbeef')"];
   }];
 
-  NSArray *events = [self.sut pendingEvents];
+  NSArray* events = [self.sut pendingEvents];
   if (events.count > 0) {
     XCTFail("Received bad event");
   }
 
-  [self.dbq inDatabase:^(FMDatabase *db) {
-    FMResultSet *rs = [db executeQuery:@"SELECT * FROM events WHERE filesha256='deadbeef'"];
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs = [db executeQuery:@"SELECT * FROM events WHERE filesha256='deadbeef'"];
     if ([rs next]) {
       XCTFail("Bad event was not deleted.");
     }
@@ -387,8 +387,8 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
   }];
 }
 
-- (NSData *)dataFromFixture:(NSString *)file {
-  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
+- (NSData*)dataFromFixture:(NSString*)file {
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
   XCTAssertNotNil(path, @"failed to load testdata: %@", file);
   return [NSData dataWithContentsOfFile:path];
 }
@@ -396,17 +396,17 @@ NSString *GenerateRandomHexStringWithSHA256Length() {
 - (void)testEventFromResultSet {
   // Attempt to unarchive data. The first is an SNTStoredEvent which is no longer valid
   // and it should fail. The second is a valid event and should succeed.
-  FMResultSet *rs = [[FMResultSet alloc] init];
+  FMResultSet* rs = [[FMResultSet alloc] init];
   id mockResultSet = OCMPartialMock(rs);
 
-  NSData *oldStoredEventData = [self dataFromFixture:@"old_sntstoredevent_archive.plist"];
+  NSData* oldStoredEventData = [self dataFromFixture:@"old_sntstoredevent_archive.plist"];
   OCMExpect([mockResultSet dataNoCopyForColumn:@"eventdata"]).andReturn(oldStoredEventData);
 
-  NSData *newStoredExecEventData =
+  NSData* newStoredExecEventData =
       [self dataFromFixture:@"new_sntstoredexecutionevent_archive.plist"];
   OCMExpect([mockResultSet dataNoCopyForColumn:@"eventdata"]).andReturn(newStoredExecEventData);
 
-  NSData *newStoredFileAccessEventData =
+  NSData* newStoredFileAccessEventData =
       [self dataFromFixture:@"sntstoredfileaccessevent_archive.plist"];
   OCMExpect([mockResultSet dataNoCopyForColumn:@"eventdata"])
       .andReturn(newStoredFileAccessEventData);

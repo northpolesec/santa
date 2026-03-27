@@ -30,7 +30,7 @@
 ///  @param event the event to store.
 ///  @return YES if event was successfully stored.
 ///
-- (BOOL)addStoredEvent:(SNTStoredEvent *)event;
+- (BOOL)addStoredEvent:(SNTStoredEvent*)event;
 
 ///
 ///  Add events to the database.
@@ -38,14 +38,14 @@
 ///  @param events the events to store.
 ///  @return YES if events were successfully stored.
 ///
-- (BOOL)addStoredEvents:(NSArray<SNTStoredEvent *> *)events;
+- (BOOL)addStoredEvents:(NSArray<SNTStoredEvent*>*)events;
 
 ///
 ///  Retrieves all events in the database
 ///
 ///  @return NSArray of SNTStoredEvent's
 ///
-- (NSArray *)pendingEvents;
+- (NSArray*)pendingEvents;
 
 ///
 ///  Retrieves number of events in database without fetching every event.
@@ -59,13 +59,13 @@
 ///
 ///  @param index the event ID.
 ///
-- (void)deleteEventWithId:(NSNumber *)index;
+- (void)deleteEventWithId:(NSNumber*)index;
 
 ///
 ///  Delete multiple events from the database with an array of IDs.
 ///
 ///  @param indexes an array of event IDs.
 ///
-- (void)deleteEventsWithIds:(NSArray *)indexes;
+- (void)deleteEventsWithIds:(NSArray*)indexes;
 
 @end

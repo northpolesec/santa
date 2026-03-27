@@ -21,36 +21,36 @@
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 @interface SNTConfigBundle ()
-@property NSNumber *clientMode;
-@property NSNumber *syncType;
-@property NSString *allowlistRegex;
-@property NSString *blocklistRegex;
-@property NSNumber *blockUSBMount;
-@property NSNumber *blockUnencryptedRemovableMediaMount;
-@property NSArray *remountUSBMode;
-@property NSNumber *blockNetworkMount;
-@property NSString *bannedNetworkMountBlockMessage;
-@property NSArray<NSString *> *allowedNetworkMountHosts;
-@property NSNumber *enableBundles;
-@property NSNumber *enableTransitiveRules;
-@property NSNumber *enableAllEventUpload;
-@property NSNumber *disableUnknownEventUpload;
-@property NSString *overrideFileAccessAction;
-@property SNTExportConfiguration *exportConfiguration;
-@property NSDate *fullSyncLastSuccess;
-@property NSDate *ruleSyncLastSuccess;
-@property SNTModeTransition *modeTransition;
-@property NSString *eventDetailURL;
-@property NSString *eventDetailText;
-@property NSString *fileAccessEventDetailURL;
-@property NSString *fileAccessEventDetailText;
-@property NSNumber *enableNotificationSilences;
-@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
-@property NSArray<NSString *> *pushTokenChain;
-@property NSArray<NSString *> *telemetryFilterExpressions;
-@property NSArray<SNTCELFallbackRule *> *celFallbackRules;
-@property NSNumber *fullSyncInterval;
-@property NSNumber *pushNotificationsFullSyncInterval;
+@property NSNumber* clientMode;
+@property NSNumber* syncType;
+@property NSString* allowlistRegex;
+@property NSString* blocklistRegex;
+@property NSNumber* blockUSBMount;
+@property NSNumber* blockUnencryptedRemovableMediaMount;
+@property NSArray* remountUSBMode;
+@property NSNumber* blockNetworkMount;
+@property NSString* bannedNetworkMountBlockMessage;
+@property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSNumber* enableBundles;
+@property NSNumber* enableTransitiveRules;
+@property NSNumber* enableAllEventUpload;
+@property NSNumber* disableUnknownEventUpload;
+@property NSString* overrideFileAccessAction;
+@property SNTExportConfiguration* exportConfiguration;
+@property NSDate* fullSyncLastSuccess;
+@property NSDate* ruleSyncLastSuccess;
+@property SNTModeTransition* modeTransition;
+@property NSString* eventDetailURL;
+@property NSString* eventDetailText;
+@property NSString* fileAccessEventDetailURL;
+@property NSString* fileAccessEventDetailText;
+@property NSNumber* enableNotificationSilences;
+@property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSArray<NSString*>* pushTokenChain;
+@property NSArray<NSString*>* telemetryFilterExpressions;
+@property NSArray<SNTCELFallbackRule*>* celFallbackRules;
+@property NSNumber* fullSyncInterval;
+@property NSNumber* pushNotificationsFullSyncInterval;
 @end
 
 @implementation SNTConfigBundle
@@ -59,7 +59,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, clientMode);
   ENCODE(coder, syncType);
   ENCODE(coder, allowlistRegex);
@@ -92,7 +92,7 @@
   ENCODE(coder, pushNotificationsFullSyncInterval);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, clientMode, NSNumber);
@@ -141,13 +141,13 @@
   }
 }
 
-- (void)allowlistRegex:(void (^)(NSString *))block {
+- (void)allowlistRegex:(void (^)(NSString*))block {
   if (self.allowlistRegex) {
     block(self.allowlistRegex);
   }
 }
 
-- (void)blocklistRegex:(void (^)(NSString *))block {
+- (void)blocklistRegex:(void (^)(NSString*))block {
   if (self.blocklistRegex) {
     block(self.blocklistRegex);
   }
@@ -165,7 +165,7 @@
   }
 }
 
-- (void)remountUSBMode:(void (^)(NSArray *))block {
+- (void)remountUSBMode:(void (^)(NSArray*))block {
   if (self.remountUSBMode) {
     block(self.remountUSBMode);
   }
@@ -177,13 +177,13 @@
   }
 }
 
-- (void)bannedNetworkMountBlockMessage:(void (^)(NSString *))block {
+- (void)bannedNetworkMountBlockMessage:(void (^)(NSString*))block {
   if (self.bannedNetworkMountBlockMessage) {
     block(self.bannedNetworkMountBlockMessage);
   }
 }
 
-- (void)allowedNetworkMountHosts:(void (^)(NSArray<NSString *> *))block {
+- (void)allowedNetworkMountHosts:(void (^)(NSArray<NSString*>*))block {
   if (self.allowedNetworkMountHosts) {
     block(self.allowedNetworkMountHosts);
   }
@@ -213,54 +213,54 @@
   }
 }
 
-- (void)overrideFileAccessAction:(void (^)(NSString *))block {
+- (void)overrideFileAccessAction:(void (^)(NSString*))block {
   if (self.overrideFileAccessAction) {
     block(self.overrideFileAccessAction);
   }
 }
 
-- (void)exportConfiguration:(void (^)(SNTExportConfiguration *))block {
+- (void)exportConfiguration:(void (^)(SNTExportConfiguration*))block {
   if (self.exportConfiguration) {
     block(self.exportConfiguration);
   }
 }
 
-- (void)fullSyncLastSuccess:(void (^)(NSDate *))block {
+- (void)fullSyncLastSuccess:(void (^)(NSDate*))block {
   if (self.fullSyncLastSuccess) {
     block(self.fullSyncLastSuccess);
   }
 }
-- (void)ruleSyncLastSuccess:(void (^)(NSDate *))block {
+- (void)ruleSyncLastSuccess:(void (^)(NSDate*))block {
   if (self.ruleSyncLastSuccess) {
     block(self.ruleSyncLastSuccess);
   }
 }
 
-- (void)modeTransition:(void (^)(SNTModeTransition *))block {
+- (void)modeTransition:(void (^)(SNTModeTransition*))block {
   if (self.modeTransition) {
     block(self.modeTransition);
   }
 }
 
-- (void)eventDetailURL:(void (^)(NSString *))block {
+- (void)eventDetailURL:(void (^)(NSString*))block {
   if (self.eventDetailURL) {
     block(self.eventDetailURL);
   }
 }
 
-- (void)eventDetailText:(void (^)(NSString *))block {
+- (void)eventDetailText:(void (^)(NSString*))block {
   if (self.eventDetailText) {
     block(self.eventDetailText);
   }
 }
 
-- (void)fileAccessEventDetailURL:(void (^)(NSString *))block {
+- (void)fileAccessEventDetailURL:(void (^)(NSString*))block {
   if (self.fileAccessEventDetailURL) {
     block(self.fileAccessEventDetailURL);
   }
 }
 
-- (void)fileAccessEventDetailText:(void (^)(NSString *))block {
+- (void)fileAccessEventDetailText:(void (^)(NSString*))block {
   if (self.fileAccessEventDetailText) {
     block(self.fileAccessEventDetailText);
   }
@@ -272,25 +272,25 @@
   }
 }
 
-- (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings *))block {
+- (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings*))block {
   if (self.networkExtensionSettings) {
     block(self.networkExtensionSettings);
   }
 }
 
-- (void)pushTokenChain:(void (^)(NSArray<NSString *> *))block {
+- (void)pushTokenChain:(void (^)(NSArray<NSString*>*))block {
   if (self.pushTokenChain) {
     block(self.pushTokenChain);
   }
 }
 
-- (void)telemetryFilterExpressions:(void (^)(NSArray<NSString *> *))block {
+- (void)telemetryFilterExpressions:(void (^)(NSArray<NSString*>*))block {
   if (self.telemetryFilterExpressions) {
     block(self.telemetryFilterExpressions);
   }
 }
 
-- (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule *> *))block {
+- (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule*>*))block {
   if (self.celFallbackRules) {
     block(self.celFallbackRules);
   }

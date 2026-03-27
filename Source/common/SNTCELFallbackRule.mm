@@ -18,16 +18,16 @@
 #import "Source/common/SNTLogging.h"
 
 @interface SNTCELFallbackRule ()
-@property(readwrite, copy) NSString *celExpr;
-@property(readwrite, copy) NSString *customMsg;
-@property(readwrite, copy) NSString *customURL;
+@property(readwrite, copy) NSString* celExpr;
+@property(readwrite, copy) NSString* customMsg;
+@property(readwrite, copy) NSString* customURL;
 @end
 
 @implementation SNTCELFallbackRule
 
-- (instancetype)initWithCELExpr:(NSString *)celExpr
-                      customMsg:(NSString *)customMsg
-                      customURL:(NSString *)customURL {
+- (instancetype)initWithCELExpr:(NSString*)celExpr
+                      customMsg:(NSString*)customMsg
+                      customURL:(NSString*)customURL {
   self = [super init];
   if (self) {
     _celExpr = [celExpr copy];
@@ -41,13 +41,13 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, celExpr);
   ENCODE(coder, customMsg);
   ENCODE(coder, customURL);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, celExpr, NSString);
@@ -57,12 +57,12 @@
   return self;
 }
 
-+ (NSData *)serializeArray:(NSArray<SNTCELFallbackRule *> *)rules {
++ (NSData*)serializeArray:(NSArray<SNTCELFallbackRule*>*)rules {
   if (!rules) {
     return nil;
   }
-  NSError *error;
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:rules
+  NSError* error;
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:rules
                                        requiringSecureCoding:YES
                                                        error:&error];
   if (error) {
@@ -72,13 +72,13 @@
   return data;
 }
 
-+ (NSArray<SNTCELFallbackRule *> *)deserializeArray:(NSData *)data {
++ (NSArray<SNTCELFallbackRule*>*)deserializeArray:(NSData*)data {
   if (!data) {
     return nil;
   }
-  NSError *error;
-  NSSet *classes = [NSSet setWithObjects:[NSArray class], [SNTCELFallbackRule class], nil];
-  NSArray *rules = [NSKeyedUnarchiver unarchivedObjectOfClasses:classes fromData:data error:&error];
+  NSError* error;
+  NSSet* classes = [NSSet setWithObjects:[NSArray class], [SNTCELFallbackRule class], nil];
+  NSArray* rules = [NSKeyedUnarchiver unarchivedObjectOfClasses:classes fromData:data error:&error];
   if (error) {
     LOGE(@"CEL fallback rules deserialization failed: %@", error.localizedDescription);
     return nil;

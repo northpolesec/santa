@@ -69,7 +69,7 @@ static size_t GetResidentMemoryBytes() {
   for (int i = 0; i < 200; i++) {
     largeArgs.push_back(std::string(256, 'a' + (i % 26)));
   }
-  const auto *argsPtr = &largeArgs;
+  const auto* argsPtr = &largeArgs;
 
   // Expression that forces materialization of the full args list onto the arena.
   absl::string_view expr = "args.exists(x, x == 'nonexistent_value')";

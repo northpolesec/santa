@@ -34,11 +34,11 @@ REGISTER_COMMAND_NAME(@"telemetry")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Interact with Santa telemetry.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return (@"Usage: santactl telemetry [options]\n"
           @"  One of:\n"
           @"    --export: Export current telemetry.\n"
@@ -49,7 +49,7 @@ REGISTER_COMMAND_NAME(@"telemetry")
   return YES;
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   if (!arguments.count) {
     [self printErrorUsageAndExit:@"No arguments"];
   }
@@ -63,7 +63,7 @@ REGISTER_COMMAND_NAME(@"telemetry")
 
   // Parse arguments
   for (NSUInteger i = 0; i < arguments.count; ++i) {
-    NSString *arg = arguments[i];
+    NSString* arg = arguments[i];
 
     if ([arg caseInsensitiveCompare:@"--export"] == NSOrderedSame) {
       operation = TelemetryOperation::kExport;

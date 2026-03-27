@@ -30,33 +30,33 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 @property(readwrite) NSUInteger timestamp;
 @property(readwrite) SNTRuleState state;
 @property(readwrite) SNTRuleType type;
-@property(readwrite) NSString *customMsg;
-@property(readwrite) NSString *customURL;
-@property(readwrite) NSString *comment;
-@property(readwrite) NSString *identifier;
-@property(readwrite) NSString *celExpr;
+@property(readwrite) NSString* customMsg;
+@property(readwrite) NSString* customURL;
+@property(readwrite) NSString* comment;
+@property(readwrite) NSString* identifier;
+@property(readwrite) NSString* celExpr;
 @end
 
 @implementation SNTRule
 
-- (instancetype)initWithIdentifier:(NSString *)identifier
+- (instancetype)initWithIdentifier:(NSString*)identifier
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
-                         customMsg:(NSString *)customMsg
-                         customURL:(NSString *)customURL
+                         customMsg:(NSString*)customMsg
+                         customURL:(NSString*)customURL
                          timestamp:(NSUInteger)timestamp
-                           comment:(NSString *)comment
-                           celExpr:(NSString *)celExpr
-                             error:(NSError **)error {
+                           comment:(NSString*)comment
+                           celExpr:(NSString*)celExpr
+                             error:(NSError**)error {
   self = [super init];
   if (self) {
     if (identifier.length == 0) {
       return nil;
     }
 
-    NSCharacterSet *nonHex =
+    NSCharacterSet* nonHex =
         [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
-    NSCharacterSet *nonAlnum = [[NSCharacterSet
+    NSCharacterSet* nonAlnum = [[NSCharacterSet
         characterSetWithCharactersInString:
             @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"] invertedSet];
 
@@ -100,7 +100,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         // their case will be kept as-is. However, platform binaries are expected to
         // have the hardcoded string "platform" as the team ID and the case will be left
         // as is.
-        NSArray *sidComponents = [identifier componentsSeparatedByString:@":"];
+        NSArray* sidComponents = [identifier componentsSeparatedByString:@":"];
         if (!sidComponents || sidComponents.count < 2) {
           [SNTError populateError:error
                          withCode:SNTErrorCodeRuleInvalidIdentifier
@@ -110,7 +110,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         }
 
         // The first component is the TeamID
-        NSString *teamID = sidComponents[0];
+        NSString* teamID = sidComponents[0];
 
         if (![[teamID lowercaseString] isEqualToString:@"platform"]) {
           if (teamID.length != kExpectedTeamIDLength ||
@@ -125,7 +125,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
         // The rest of the components are the Signing ID since ":" a legal character.
         // Join all but the last element of the components to rebuild the SigningID.
-        NSString *signingID =
+        NSString* signingID =
             [[sidComponents subarrayWithRange:NSMakeRange(1, sidComponents.count - 1)]
                 componentsJoinedByString:@":"];
         if (signingID.length == 0) {
@@ -185,12 +185,12 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return self;
 }
 
-- (instancetype)initWithIdentifier:(NSString *)identifier
+- (instancetype)initWithIdentifier:(NSString*)identifier
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type
-                         customMsg:(NSString *)customMsg
-                         customURL:(NSString *)customURL
-                           celExpr:(NSString *)celExpr {
+                         customMsg:(NSString*)customMsg
+                         customURL:(NSString*)customURL
+                           celExpr:(NSString*)celExpr {
   self = [self initWithIdentifier:identifier
                             state:state
                              type:type
@@ -207,7 +207,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return self;
 }
 
-- (instancetype)initWithIdentifier:(NSString *)identifier
+- (instancetype)initWithIdentifier:(NSString*)identifier
                              state:(SNTRuleState)state
                               type:(SNTRuleType)type {
   return [self initWithIdentifier:identifier
@@ -221,8 +221,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                             error:nil];
 }
 
-- (NSString *)invalidIdentifier:(NSString *)identifier forType:(SNTRuleType)type {
-  static NSDictionary<NSNumber *, NSString *> *const typeStr = @{
+- (NSString*)invalidIdentifier:(NSString*)identifier forType:(SNTRuleType)type {
+  static NSDictionary<NSNumber*, NSString*>* const typeStr = @{
     @(SNTRuleTypeCDHash) : kRuleTypeCDHash,
     @(SNTRuleTypeBinary) : kRuleTypeBinary,
     @(SNTRuleTypeSigningID) : kRuleTypeSigningID,
@@ -235,12 +235,12 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 }
 
 // lowercase policy keys and upper case the policy decision.
-- (NSDictionary *)normalizeRuleDictionary:(NSDictionary *)dict {
-  NSMutableDictionary *newDict = [NSMutableDictionary dictionaryWithCapacity:dict.count];
+- (NSDictionary*)normalizeRuleDictionary:(NSDictionary*)dict {
+  NSMutableDictionary* newDict = [NSMutableDictionary dictionaryWithCapacity:dict.count];
   for (id rawKey in dict) {
     if (![rawKey isKindOfClass:[NSString class]]) continue;
-    NSString *key = (NSString *)rawKey;
-    NSString *newKey = [key lowercaseString];
+    NSString* key = (NSString*)rawKey;
+    NSString* newKey = [key lowercaseString];
     if (([newKey isEqualToString:kRulePolicy] || [newKey isEqualToString:kRuleType]) &&
         [dict[key] isKindOfClass:[NSString class]]) {
       newDict[newKey] = [dict[key] uppercaseString];
@@ -252,7 +252,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 }
 
 // Converts rule information from santactl or static rules into a SNTRule.
-- (instancetype)initWithDictionary:(NSDictionary *)rawDict error:(NSError **)error {
+- (instancetype)initWithDictionary:(NSDictionary*)rawDict error:(NSError**)error {
   if (![rawDict isKindOfClass:[NSDictionary class]]) {
     [SNTError populateError:error
                    withCode:SNTErrorCodeInvalidType
@@ -260,9 +260,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     return nil;
   }
 
-  NSDictionary *dict = [self normalizeRuleDictionary:rawDict];
+  NSDictionary* dict = [self normalizeRuleDictionary:rawDict];
 
-  NSString *identifier = dict[kRuleIdentifier];
+  NSString* identifier = dict[kRuleIdentifier];
   if (![identifier isKindOfClass:[NSString class]] || !identifier.length) {
     identifier = dict[kRuleSHA256];
   }
@@ -273,7 +273,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     return nil;
   }
 
-  NSString *policyString = dict[kRulePolicy];
+  NSString* policyString = dict[kRulePolicy];
   SNTRuleState state;
   if (![policyString isKindOfClass:[NSString class]]) {
     [SNTError populateError:error
@@ -308,7 +308,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     return nil;
   }
 
-  NSString *ruleTypeString = dict[kRuleType];
+  NSString* ruleTypeString = dict[kRuleType];
   SNTRuleType type;
   if (![ruleTypeString isKindOfClass:[NSString class]]) {
     [SNTError populateError:error
@@ -333,22 +333,22 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     return nil;
   }
 
-  NSString *customMsg = dict[kRuleCustomMsg];
+  NSString* customMsg = dict[kRuleCustomMsg];
   if (![customMsg isKindOfClass:[NSString class]] || customMsg.length == 0) {
     customMsg = nil;
   }
 
-  NSString *customURL = dict[kRuleCustomURL];
+  NSString* customURL = dict[kRuleCustomURL];
   if (![customURL isKindOfClass:[NSString class]] || customURL.length == 0) {
     customURL = nil;
   }
 
-  NSString *comment = dict[kRuleComment];
+  NSString* comment = dict[kRuleComment];
   if (![comment isKindOfClass:[NSString class]] || comment.length == 0) {
     comment = nil;
   }
 
-  NSString *celExpr = dict[kRuleCELExpr];
+  NSString* celExpr = dict[kRuleCELExpr];
   if (![celExpr isKindOfClass:[NSString class]] || celExpr.length == 0) {
     celExpr = nil;
   }
@@ -364,7 +364,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                             error:error];
 }
 
-- (instancetype)initStaticRuleWithDictionary:(NSDictionary *)rawDict error:(NSError **)error {
+- (instancetype)initStaticRuleWithDictionary:(NSDictionary*)rawDict error:(NSError**)error {
   self = [self initWithDictionary:rawDict error:error];
   if (self) {
     _staticRule = YES;
@@ -378,7 +378,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, identifier);
   ENCODE_BOXABLE(coder, state);
   ENCODE_BOXABLE(coder, type);
@@ -390,7 +390,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   ENCODE_BOXABLE(coder, staticRule);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, identifier, NSString);
@@ -406,7 +406,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return self;
 }
 
-- (NSString *)ruleStateToPolicyString:(SNTRuleState)state {
+- (NSString*)ruleStateToPolicyString:(SNTRuleState)state {
   switch (state) {
     case SNTRuleStateAllow: return kRulePolicyAllowlist;
     case SNTRuleStateAllowCompiler: return kRulePolicyAllowlistCompiler;
@@ -422,7 +422,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   }
 }
 
-- (NSString *)ruleTypeToString:(SNTRuleType)ruleType {
+- (NSString*)ruleTypeToString:(SNTRuleType)ruleType {
   switch (ruleType) {
     case SNTRuleTypeBinary: return kRuleTypeBinary;
     case SNTRuleTypeCertificate: return kRuleTypeCertificate;
@@ -436,7 +436,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 
 // Returns an NSDictionary representation of the rule. Primarily use for
 // exporting rules.
-- (NSDictionary *)dictionaryRepresentation {
+- (NSDictionary*)dictionaryRepresentation {
   return @{
     kRuleIdentifier : self.identifier,
     kRulePolicy : [self ruleStateToPolicyString:self.state],
@@ -451,7 +451,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 - (BOOL)isEqual:(id)other {
   if (other == self) return YES;
   if (![other isKindOfClass:[SNTRule class]]) return NO;
-  SNTRule *o = other;
+  SNTRule* o = other;
   return ([self.identifier isEqual:o.identifier] && self.state == o.state && self.type == o.type &&
           (self.celExpr == nil || [self.celExpr isEqual:o.celExpr]));
 }
@@ -467,14 +467,14 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   return result;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString
       stringWithFormat:@"SNTRule: Identifier: %@, State: %ld, Type: %ld, Timestamp: %lu",
                        self.identifier, self.state, self.type, (unsigned long)self.timestamp];
 }
 
-- (NSString *)stringifyWithColor:(BOOL)colorize {
-  NSMutableString *output;
+- (NSString*)stringifyWithColor:(BOOL)colorize {
+  NSMutableString* output;
   // Rule state is saved as eventState for output colorization down below
   SNTEventState eventState = SNTEventStateUnknown;
 
@@ -542,7 +542,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   }
 
   if (self.state == SNTRuleStateAllowTransitive) {
-    NSDate *date = [NSDate dateWithTimeIntervalSinceReferenceDate:self.timestamp];
+    NSDate* date = [NSDate dateWithTimeIntervalSinceReferenceDate:self.timestamp];
     [output appendString:[NSString stringWithFormat:@"\nlast access date: %@", [date description]]];
   }
   return output;

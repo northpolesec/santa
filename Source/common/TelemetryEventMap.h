@@ -58,7 +58,7 @@ inline TelemetryEvent operator|(TelemetryEvent lhs, TelemetryEvent rhs) {
                                      static_cast<std::underlying_type_t<TelemetryEvent>>(rhs));
 }
 
-inline TelemetryEvent &operator|=(TelemetryEvent &lhs, TelemetryEvent rhs) {
+inline TelemetryEvent& operator|=(TelemetryEvent& lhs, TelemetryEvent rhs) {
   lhs = lhs | rhs;
   return lhs;
 }
@@ -68,7 +68,7 @@ inline TelemetryEvent operator&(TelemetryEvent lhs, TelemetryEvent rhs) {
                                      static_cast<std::underlying_type_t<TelemetryEvent>>(rhs));
 }
 
-inline TelemetryEvent &operator&=(TelemetryEvent &lhs, TelemetryEvent rhs) {
+inline TelemetryEvent& operator&=(TelemetryEvent& lhs, TelemetryEvent rhs) {
   lhs = lhs & rhs;
   return lhs;
 }
@@ -81,7 +81,7 @@ inline TelemetryEvent operator~(TelemetryEvent rhs) {
 //
 // If `Telemetry` is set, the events specified will be used.
 // If `Telemetry` is not set, `everything` (all events) are assumed.
-TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry);
+TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString*>* telemetry);
 
 // Returns the appropriate `TelemetryEvent` enum value for a given ES event
 TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event);

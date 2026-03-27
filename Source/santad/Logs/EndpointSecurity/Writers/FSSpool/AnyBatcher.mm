@@ -18,7 +18,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_platform_specific.h"
 #include "absl/strings/str_cat.h"
 
-static const char *kTypeGoogleApisComPrefix = "type.googleapis.com/";
+static const char* kTypeGoogleApisComPrefix = "type.googleapis.com/";
 static constexpr int kReservedBatchSize = 2048;
 
 namespace fsspool {
@@ -39,7 +39,7 @@ bool AnyBatcher::NeedToOpenFile() {
 
 absl::Status AnyBatcher::Write(std::vector<uint8_t> bytes) {
   google::protobuf::Any any;
-  any.set_value(absl::string_view((const char *)bytes.data(), bytes.size()));
+  any.set_value(absl::string_view((const char*)bytes.data(), bytes.size()));
   any.set_type_url(type_url_);
 
   *cache_.mutable_records()->Add() = any;

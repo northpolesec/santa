@@ -94,25 +94,25 @@ using santa::LoggerPeer;
 
 class MockSerializer : public Empty {
  public:
-  MOCK_METHOD(std::vector<uint8_t>, SerializeMessage, (const EnrichedClose &msg));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeMessage, (const EnrichedClose& msg));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeAllowlist,
-              (const Message &, const std::string_view, const std::string_view));
+              (const Message&, const std::string_view, const std::string_view));
 
-  MOCK_METHOD(std::vector<uint8_t>, SerializeBundleHashingEvent, (SNTStoredExecutionEvent *));
-  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary *, bool));
-  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskDisappeared, (NSDictionary *));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeBundleHashingEvent, (SNTStoredExecutionEvent*));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary*, bool));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskDisappeared, (NSDictionary*));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
-              (const std::string &policy_version, const std::string &policy_name,
-               const santa::Message &msg, const santa::EnrichedProcess &enriched_process,
+              (const std::string& policy_version, const std::string& policy_name,
+               const santa::Message& msg, const santa::EnrichedProcess& enriched_process,
                size_t target_index, std::optional<santa::EnrichedFile> enriched_event_target,
                FileAccessPolicyDecision decision, std::string_view operation_id),
               (override));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
-              (const std::string &policy_version, const std::string &policy_name,
-               const santa::Message &msg, const santa::EnrichedProcess &enriched_process,
+              (const std::string& policy_version, const std::string& policy_name,
+               const santa::Message& msg, const santa::EnrichedProcess& enriched_process,
                size_t target_index, std::optional<santa::EnrichedFile> enriched_event_target,
                FileAccessPolicyDecision decision),
               (override));
@@ -132,13 +132,13 @@ class MockSleighLauncher : public santa::SleighLauncher {
   MockSleighLauncher() : santa::SleighLauncher("/fake/sleigh") {}
 
   MOCK_METHOD(absl::Status, Launch,
-              (const std::vector<std::string> &input_files, uint32_t timeout_seconds), (override));
+              (const std::vector<std::string>& input_files, uint32_t timeout_seconds), (override));
 };
 
 @interface LoggerTest : XCTestCase
-@property NSFileManager *fileMgr;
-@property NSString *testDir;
-@property SNTExportConfiguration * (^exportConfigBlock)(void);
+@property NSFileManager* fileMgr;
+@property NSString* testDir;
+@property SNTExportConfiguration* (^exportConfigBlock)(void);
 @end
 
 @implementation LoggerTest
@@ -160,16 +160,16 @@ class MockSleighLauncher : public santa::SleighLauncher {
 }
 
 - (void)tearDown {
-  NSError *err;
+  NSError* err;
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:&err]);
   if (err) {
     XCTFail(@"Test dir cleanup failed: %@", err);
   }
 }
 
-- (NSString *)createTestFile:(NSString *)name
-                 contentSize:(NSUInteger)contentSize
-                        type:(ExportLogType)fileType {
+- (NSString*)createTestFile:(NSString*)name
+                contentSize:(NSUInteger)contentSize
+                       type:(ExportLogType)fileType {
   static uint32_t magic = 0x0;
   XCTAssertGreaterThanOrEqual(contentSize, sizeof(magic));
   switch (fileType) {
@@ -178,17 +178,17 @@ class MockSleighLauncher : public santa::SleighLauncher {
     default: XCTFail("Creating unsupported file type: %d", (int)fileType); break;
   }
 
-  NSMutableData *d = [[NSMutableData alloc] initWithBytes:&magic length:sizeof(magic)];
-  NSString *content = RepeatedString(@"A", contentSize - sizeof(magic));
+  NSMutableData* d = [[NSMutableData alloc] initWithBytes:&magic length:sizeof(magic)];
+  NSString* content = RepeatedString(@"A", contentSize - sizeof(magic));
   [d appendBytes:content.UTF8String length:content.length];
 
-  NSString *path = [NSString stringWithFormat:@"%@/%@", self.testDir, name];
+  NSString* path = [NSString stringWithFormat:@"%@/%@", self.testDir, name];
   XCTAssertTrue([d writeToFile:path atomically:YES]);
 
   return path;
 }
 
-- (NSString *)createTestFile:(NSString *)name contentSize:(NSUInteger)contentSize {
+- (NSString*)createTestFile:(NSString*)name contentSize:(NSUInteger)contentSize {
   return [self createTestFile:name contentSize:contentSize type:ExportLogType::kUnknown];
 }
 
@@ -270,7 +270,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
                         EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
         EnrichedFile(std::nullopt, std::nullopt, std::nullopt)));
 
-    EXPECT_CALL(*mockSerializer, SerializeMessage(testing::A<const EnrichedClose &>())).Times(1);
+    EXPECT_CALL(*mockSerializer, SerializeMessage(testing::A<const EnrichedClose&>())).Times(1);
     EXPECT_CALL(*mockWriter, Write).Times(1);
 
     Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
@@ -305,7 +305,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
 - (void)testLogBundleHashingEvents {
   auto mockSerializer = std::make_shared<MockSerializer>();
   auto mockWriter = std::make_shared<MockWriter>();
-  NSArray<id> *events = @[ @"event1", @"event2", @"event3" ];
+  NSArray<id>* events = @[ @"event1", @"event2", @"event3" ];
 
   EXPECT_CALL(*mockSerializer, SerializeBundleHashingEvent).Times((int)[events count]);
   EXPECT_CALL(*mockWriter, Write).Times((int)[events count]);
@@ -424,7 +424,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
   XCTAssertEqual(map.at("qaz"), true);
 }
 
-- (void)setExportExpectationSuccess:(BOOL)success mock:(MockSleighLauncher *)mock {
+- (void)setExportExpectationSuccess:(BOOL)success mock:(MockSleighLauncher*)mock {
   absl::Status result = success ? absl::OkStatus() : absl::InternalError("mock failure");
   EXPECT_CALL(*mock, Launch).WillOnce(Return(result));
 }
@@ -432,14 +432,14 @@ class MockSleighLauncher : public santa::SleighLauncher {
 - (void)testExportSuccessWithSupportedTypeAndUnknownFile {
   auto mockWriter = std::make_shared<MockWriter>();
   auto mockSleigh = std::make_unique<MockSleighLauncher>();
-  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
+  MockSleighLauncher* mockSleighPtr = mockSleigh.get();
 
   [self setExportExpectationSuccess:YES mock:mockSleighPtr];
 
   // Only f2 and f3 will be exported (total 25 bytes)
-  NSString *f1 = [self createTestFile:@"f1" contentSize:5];
-  NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
-  NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
+  NSString* f1 = [self createTestFile:@"f1" contentSize:5];
+  NSString* f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
+  NSString* f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
 
   LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 10,
                nullptr, mockWriter);
@@ -465,11 +465,11 @@ class MockSleighLauncher : public santa::SleighLauncher {
 - (void)testExportFail {
   auto mockWriter = std::make_shared<MockWriter>();
   auto mockSleigh = std::make_unique<MockSleighLauncher>();
-  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
+  MockSleighLauncher* mockSleighPtr = mockSleigh.get();
 
-  NSString *f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
-  NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
-  NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
+  NSString* f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
+  NSString* f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
+  NSString* f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
 
   [self setExportExpectationSuccess:NO mock:mockSleighPtr];
 
@@ -496,15 +496,15 @@ class MockSleighLauncher : public santa::SleighLauncher {
 - (void)testExportMaxOpenedFiles {
   auto mockWriter = std::make_shared<MockWriter>();
   auto mockSleigh = std::make_unique<MockSleighLauncher>();
-  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
+  MockSleighLauncher* mockSleighPtr = mockSleigh.get();
 
   // Only f1, f2, and f3 will be exported in the first batch (total 30 bytes).
   // File f4 will not be visited because of the limit being reached, but will
   // be exported in the second batch.
-  NSString *f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
-  NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
-  NSString *f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
-  NSString *f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
+  NSString* f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
+  NSString* f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
+  NSString* f3 = [self createTestFile:@"f3" contentSize:15 type:ExportLogType::kZstdStream];
+  NSString* f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
 
   absl::Status successResult = absl::OkStatus();
   EXPECT_CALL(*mockSleighPtr, Launch)
@@ -539,7 +539,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
   // This test ensures that FilesExported is called even when there are no files to export.
   auto mockWriter = std::make_shared<MockWriter>();
   auto mockSleigh = std::make_unique<MockSleighLauncher>();
-  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
+  MockSleighLauncher* mockSleighPtr = mockSleigh.get();
 
   // No Launch call expected since there are no files
   EXPECT_CALL(*mockSleighPtr, Launch(testing::_, testing::_)).Times(0);
@@ -560,19 +560,19 @@ class MockSleighLauncher : public santa::SleighLauncher {
 - (void)testExportMaxBatchSize {
   auto mockWriter = std::make_shared<MockWriter>();
   auto mockSleigh = std::make_unique<MockSleighLauncher>();
-  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
+  MockSleighLauncher* mockSleighPtr = mockSleigh.get();
 
   // Files f1 and f2 will be exported in the first batch.
   // File f3 will go alone in the second batch.
   // Files f4 and f5 will go in the third batch.
   static constexpr NSUInteger oneMB = 1024 * 1024;
-  NSString *f1 = [self createTestFile:@"f1"
+  NSString* f1 = [self createTestFile:@"f1"
                           contentSize:(oneMB - 1)
                                  type:ExportLogType::kZstdStream];
-  NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
-  NSString *f3 = [self createTestFile:@"f3" contentSize:oneMB type:ExportLogType::kZstdStream];
-  NSString *f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
-  NSString *f5 = [self createTestFile:@"f5" contentSize:oneMB type:ExportLogType::kZstdStream];
+  NSString* f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
+  NSString* f3 = [self createTestFile:@"f3" contentSize:oneMB type:ExportLogType::kZstdStream];
+  NSString* f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
+  NSString* f5 = [self createTestFile:@"f5" contentSize:oneMB type:ExportLogType::kZstdStream];
 
   absl::Status successResult = absl::OkStatus();
   EXPECT_CALL(*mockSleighPtr, Launch)
@@ -610,11 +610,11 @@ class MockSleighLauncher : public santa::SleighLauncher {
 - (void)testExportNoMoreBatchesAfterFailedExport {
   auto mockWriter = std::make_shared<MockWriter>();
   auto mockSleigh = std::make_unique<MockSleighLauncher>();
-  MockSleighLauncher *mockSleighPtr = mockSleigh.get();
+  MockSleighLauncher* mockSleighPtr = mockSleigh.get();
 
   // Only f1 and f2 will be sent in the first batch due to file limitations.
-  NSString *f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
-  NSString *f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
+  NSString* f1 = [self createTestFile:@"f1" contentSize:5 type:ExportLogType::kZstdStream];
+  NSString* f2 = [self createTestFile:@"f2" contentSize:10 type:ExportLogType::kZstdStream];
 
   // Simulate failed export
   [self setExportExpectationSuccess:NO mock:mockSleighPtr];

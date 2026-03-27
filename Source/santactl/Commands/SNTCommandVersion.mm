@@ -39,33 +39,33 @@ REGISTER_COMMAND_NAME(@"version")
   return NO;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Show Santa component versions.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return (@"Show versions of all Santa components.\n"
           @"  Use --json to output in JSON format.");
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   BOOL isLite = santa::SNTIsLiteInstall();
   BOOL hasNetd = [[NSFileManager defaultManager] fileExistsAtPath:@(kSantaNetdPath)];
 
   // Best-effort connection to santad for querying santanetd info.
   // Skip XPC queries if the connection fails to avoid unnecessary timeouts.
-  NSDictionary *loadedNetdInfo = nil;
+  NSDictionary* loadedNetdInfo = nil;
   BOOL netExtEnabled = NO;
   [self.daemonConn resume];
   if (self.daemonConn.isConnected) {
     loadedNetdInfo = [self queryLoadedNetdBundleInfo];
     netExtEnabled = [self queryNetworkExtensionEnabled];
   }
-  NSString *loadedNetdVersion = [self composeVersionsFromDict:loadedNetdInfo];
-  NSString *bundledNetdVersion = hasNetd ? [self santanetdBundledVersion] : @"";
+  NSString* loadedNetdVersion = [self composeVersionsFromDict:loadedNetdInfo];
+  NSString* bundledNetdVersion = hasNetd ? [self santanetdBundledVersion] : @"";
 
   if ([arguments containsObject:@"--json"]) {
-    NSMutableDictionary *versions = [@{
+    NSMutableDictionary* versions = [@{
       @"santad" : [self santadVersion],
       @"santactl" : [self santactlVersion],
       @"SantaGUI" : [self santaAppVersion],
@@ -85,10 +85,10 @@ REGISTER_COMMAND_NAME(@"version")
       versions[@"santanetd"] = bundledNetdVersion;
     }
 
-    NSData *versionsData = [NSJSONSerialization dataWithJSONObject:versions
+    NSData* versionsData = [NSJSONSerialization dataWithJSONObject:versions
                                                            options:NSJSONWritingPrettyPrinted
                                                              error:nil];
-    NSString *versionsStr = [[NSString alloc] initWithData:versionsData
+    NSString* versionsStr = [[NSString alloc] initWithData:versionsData
                                                   encoding:NSUTF8StringEncoding];
     printf("%s\n", [versionsStr UTF8String]);
   } else {
@@ -114,15 +114,15 @@ REGISTER_COMMAND_NAME(@"version")
   exit(0);
 }
 
-- (NSDictionary *)queryLoadedNetdBundleInfo {
+- (NSDictionary*)queryLoadedNetdBundleInfo {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   self.daemonConn.invalidationHandler = ^{
     dispatch_semaphore_signal(sema);
   };
 
-  __block NSDictionary *result = nil;
+  __block NSDictionary* result = nil;
   [[self.daemonConn remoteObjectProxy]
-      networkExtensionLoadedBundleVersionInfo:^(NSDictionary *bundleInfo) {
+      networkExtensionLoadedBundleVersionInfo:^(NSDictionary* bundleInfo) {
         result = bundleInfo;
         dispatch_semaphore_signal(sema);
       }];
@@ -147,12 +147,12 @@ REGISTER_COMMAND_NAME(@"version")
   return enabled;
 }
 
-- (NSString *)composeVersionsFromDict:(NSDictionary *)dict {
+- (NSString*)composeVersionsFromDict:(NSDictionary*)dict {
   if (!dict[@"CFBundleVersion"]) return @"";
-  NSString *productVersion = dict[@"CFBundleShortVersionString"];
-  NSString *buildVersion = [[dict[@"CFBundleVersion"] componentsSeparatedByString:@"."] lastObject];
+  NSString* productVersion = dict[@"CFBundleShortVersionString"];
+  NSString* buildVersion = [[dict[@"CFBundleVersion"] componentsSeparatedByString:@"."] lastObject];
 
-  NSString *commitHash = dict[@"SNTCommitHash"];
+  NSString* commitHash = dict[@"SNTCommitHash"];
   if (commitHash.length > 8) {
     commitHash = [commitHash substringToIndex:8];
   }
@@ -161,22 +161,22 @@ REGISTER_COMMAND_NAME(@"version")
       stringWithFormat:@"%@ (build %@, commit %@)", productVersion, buildVersion, commitHash];
 }
 
-- (NSString *)santadVersion {
-  SNTFileInfo *daemonInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaDPath)];
+- (NSString*)santadVersion {
+  SNTFileInfo* daemonInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaDPath)];
   return [self composeVersionsFromDict:daemonInfo.infoPlist];
 }
 
-- (NSString *)santaAppVersion {
-  SNTFileInfo *guiInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaAppPath)];
+- (NSString*)santaAppVersion {
+  SNTFileInfo* guiInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaAppPath)];
   return [self composeVersionsFromDict:guiInfo.infoPlist];
 }
 
-- (NSString *)santactlVersion {
+- (NSString*)santactlVersion {
   return [self composeVersionsFromDict:[[NSBundle mainBundle] infoDictionary]];
 }
 
-- (NSString *)santanetdBundledVersion {
-  SNTFileInfo *netdInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)];
+- (NSString*)santanetdBundledVersion {
+  SNTFileInfo* netdInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)];
   return [self composeVersionsFromDict:netdInfo.infoPlist];
 }
 

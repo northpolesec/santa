@@ -16,9 +16,9 @@ AllowShortFunctionsOnASingleLine: Inline
 # Allow spaces in NSArray/NSDictionary literals @[ and @{
 SpacesInContainerLiterals: true
 
-# For pointers, always put the * next to the variable name.
+# For pointers, always put the * next to the type.
 DerivePointerAlignment: false
-PointerAlignment: Right
+PointerAlignment: Left
 
 SpaceBeforeParens: Custom
 SpaceBeforeParensOptions:
@@ -34,6 +34,10 @@ BasedOnStyle: Google
 
 # For C++, the line limit is 80
 ColumnLimit: 80
+
+# For pointers, always put the * next to the type.
+DerivePointerAlignment: false
+PointerAlignment: Left
 
 SpaceBeforeParens: Custom
 SpaceBeforeParensOptions:

@@ -24,7 +24,7 @@ __BEGIN_DECLS
 typedef uint32_t csr_config_t;
 
 // https://github.com/apple-oss-distributions/xnu/blob/8d741a5de7ff4191bf97d57b9f54c2f6d4a15585/bsd/sys/csr.h#L104
-extern int csr_get_active_config(csr_config_t *) WEAK_IMPORT_ATTRIBUTE;
+extern int csr_get_active_config(csr_config_t*) WEAK_IMPORT_ATTRIBUTE;
 
 __END_DECLS;
 

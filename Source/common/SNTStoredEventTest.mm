@@ -26,15 +26,15 @@
 
 - (void)testUniqueID {
   // The base class should throw
-  SNTStoredEvent *baseEvent = [[SNTStoredEvent alloc] init];
+  SNTStoredEvent* baseEvent = [[SNTStoredEvent alloc] init];
   XCTAssertThrows([baseEvent uniqueID]);
 
   // Derived classes should not throw
-  SNTStoredExecutionEvent *execEvent = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* execEvent = [[SNTStoredExecutionEvent alloc] init];
   execEvent.fileSHA256 = @"foo";
   XCTAssertEqualObjects([execEvent uniqueID], @"foo");
 
-  SNTStoredFileAccessEvent *faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  SNTStoredFileAccessEvent* faaEvent = [[SNTStoredFileAccessEvent alloc] init];
   faaEvent.ruleName = @"MyRule";
   faaEvent.ruleVersion = @"MyVersion";
   faaEvent.accessedPath = @"/not/included";
@@ -44,18 +44,18 @@
 
 - (void)testUnactionableEvent {
   // The base class should throw
-  SNTStoredEvent *baseEvent = [[SNTStoredEvent alloc] init];
+  SNTStoredEvent* baseEvent = [[SNTStoredEvent alloc] init];
   XCTAssertThrows([baseEvent unactionableEvent]);
 
   // Spot check allow/block events
-  SNTStoredExecutionEvent *execEvent = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* execEvent = [[SNTStoredExecutionEvent alloc] init];
   execEvent.decision = SNTEventStateAllowBinary;
   XCTAssertTrue([execEvent unactionableEvent]);
   execEvent.decision = SNTEventStateBlockBinary;
   XCTAssertFalse([execEvent unactionableEvent]);
 
   // Spot check audit only/denied events
-  SNTStoredFileAccessEvent *faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  SNTStoredFileAccessEvent* faaEvent = [[SNTStoredFileAccessEvent alloc] init];
   faaEvent.decision = FileAccessPolicyDecision::kAllowedAuditOnly;
   XCTAssertTrue([faaEvent unactionableEvent]);
   faaEvent.decision = FileAccessPolicyDecision::kDenied;
@@ -63,26 +63,26 @@
 }
 
 - (void)testEncodeDecode {
-  SNTStoredExecutionEvent *execEvent = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* execEvent = [[SNTStoredExecutionEvent alloc] init];
   execEvent.fileSHA256 = @"foo";
 
-  SNTStoredFileAccessEvent *faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  SNTStoredFileAccessEvent* faaEvent = [[SNTStoredFileAccessEvent alloc] init];
   faaEvent.process.fileSHA256 = @"bar";
 
   faaEvent.process.parent = [[SNTStoredFileAccessProcess alloc] init];
   faaEvent.process.parent.pid = @(123);
 
-  NSData *archivedExecEvent = [NSKeyedArchiver archivedDataWithRootObject:execEvent
+  NSData* archivedExecEvent = [NSKeyedArchiver archivedDataWithRootObject:execEvent
                                                     requiringSecureCoding:YES
                                                                     error:nil];
-  NSData *archivedFaaEvent = [NSKeyedArchiver archivedDataWithRootObject:faaEvent
+  NSData* archivedFaaEvent = [NSKeyedArchiver archivedDataWithRootObject:faaEvent
                                                    requiringSecureCoding:YES
                                                                    error:nil];
 
   XCTAssertNotNil(archivedExecEvent);
   XCTAssertNotNil(archivedFaaEvent);
 
-  SNTStoredEvent *unarchivedExecEvent = [NSKeyedUnarchiver
+  SNTStoredEvent* unarchivedExecEvent = [NSKeyedUnarchiver
       unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTStoredExecutionEvent class],
                                                       [SNTStoredFileAccessEvent class], nil]
                        fromData:archivedExecEvent
@@ -90,9 +90,9 @@
 
   XCTAssertNotNil(unarchivedExecEvent);
   XCTAssertTrue([unarchivedExecEvent isKindOfClass:[SNTStoredExecutionEvent class]]);
-  XCTAssertEqualObjects(((SNTStoredExecutionEvent *)unarchivedExecEvent).fileSHA256, @"foo");
+  XCTAssertEqualObjects(((SNTStoredExecutionEvent*)unarchivedExecEvent).fileSHA256, @"foo");
 
-  SNTStoredEvent *unarchivedFaaEvent = [NSKeyedUnarchiver
+  SNTStoredEvent* unarchivedFaaEvent = [NSKeyedUnarchiver
       unarchivedObjectOfClasses:[NSSet setWithObjects:[SNTStoredExecutionEvent class],
                                                       [SNTStoredFileAccessEvent class], nil]
                        fromData:archivedFaaEvent
@@ -100,12 +100,10 @@
 
   XCTAssertNotNil(unarchivedFaaEvent);
   XCTAssertTrue([unarchivedFaaEvent isKindOfClass:[SNTStoredFileAccessEvent class]]);
-  XCTAssertEqualObjects(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.fileSHA256,
-                        @"bar");
-  XCTAssertNotNil(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.parent);
-  XCTAssertEqualObjects(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.parent.pid,
-                        @(123));
-  XCTAssertNil(((SNTStoredFileAccessEvent *)unarchivedFaaEvent).process.parent.parent);
+  XCTAssertEqualObjects(((SNTStoredFileAccessEvent*)unarchivedFaaEvent).process.fileSHA256, @"bar");
+  XCTAssertNotNil(((SNTStoredFileAccessEvent*)unarchivedFaaEvent).process.parent);
+  XCTAssertEqualObjects(((SNTStoredFileAccessEvent*)unarchivedFaaEvent).process.parent.pid, @(123));
+  XCTAssertNil(((SNTStoredFileAccessEvent*)unarchivedFaaEvent).process.parent.parent);
 }
 
 @end

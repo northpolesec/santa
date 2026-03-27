@@ -20,7 +20,7 @@ std::shared_ptr<Null> Null::Create() {
   return std::make_shared<Null>();
 }
 
-void Null::Write(std::vector<uint8_t> &&bytes) {
+void Null::Write(std::vector<uint8_t>&& bytes) {
   // Intentionally do nothing
 }
 

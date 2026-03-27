@@ -20,7 +20,7 @@
 @class SNTStoredExecutionEvent;
 
 ///  A block that takes the calculated bundle hash, associated events and hashing time in ms.
-typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredExecutionEvent *> *, NSNumber *);
+typedef void (^SNTBundleHashBlock)(NSString*, NSArray<SNTStoredExecutionEvent*>*, NSNumber*);
 
 ///
 ///  Protocol implemented by the client of of SNTBundleServiceXPC. A listener of this type is passed
@@ -28,7 +28,7 @@ typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredExecutionEvent *
 ///  will then message the listener with hashing progress.
 ///
 @protocol SNTBundleServiceProgressXPC
-- (void)updateCountsForEvent:(SNTStoredExecutionEvent *)event
+- (void)updateCountsForEvent:(SNTStoredExecutionEvent*)event
                  binaryCount:(uint64_t)binaryCount
                    fileCount:(uint64_t)fileCount
                  hashedCount:(uint64_t)hashedCount;
@@ -48,8 +48,8 @@ typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredExecutionEvent *
 ///
 ///  @note If there is a current NSProgress when called this method will report back its progress.
 ///
-- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent *)event
-                          listener:(NSXPCListenerEndpoint *)listener
+- (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent*)event
+                          listener:(NSXPCListenerEndpoint*)listener
                              reply:(SNTBundleHashBlock)reply;
 
 ///
@@ -59,9 +59,9 @@ typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredExecutionEvent *
 ///  full bundle hashing is performed and the resulting related-binary events
 ///  are included in the reply.
 ///
-- (void)generateEventsFromPath:(NSString *)path
+- (void)generateEventsFromPath:(NSString*)path
                  enableBundles:(BOOL)enableBundles
-                         reply:(void (^)(NSArray<SNTStoredExecutionEvent *> *events))reply;
+                         reply:(void (^)(NSArray<SNTStoredExecutionEvent*>* events))reply;
 
 @end
 
@@ -71,17 +71,17 @@ typedef void (^SNTBundleHashBlock)(NSString *, NSArray<SNTStoredExecutionEvent *
 ///  Returns an initialized NSXPCInterface for the SNTBundleServiceXPC protocol.
 ///  Ensures any methods that accept custom classes as arguments are set-up before returning.
 ///
-+ (NSXPCInterface *)bundleServiceInterface;
++ (NSXPCInterface*)bundleServiceInterface;
 
 ///
 ///  Returns the MachService ID for this service.
 ///
-+ (NSString *)serviceID;
++ (NSString*)serviceID;
 
 ///
 ///  Retrieve a pre-configured MOLXPCConnection for communicating with santabundleservice.
 ///  Connections just needs any handlers set and then can be resumed and used.
 ///
-+ (MOLXPCConnection *)configuredConnection;
++ (MOLXPCConnection*)configuredConnection;
 
 @end

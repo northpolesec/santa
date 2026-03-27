@@ -20,10 +20,10 @@
 #import "Source/gui/SNTAppDelegate.h"
 #import "Source/gui/SNTSystemExtensionDelegate.h"
 
-int main(int argc, const char *argv[]) {
+int main(int argc, const char* argv[]) {
   @autoreleasepool {
-    SNTSystemExtensionDelegate *delegate;
-    NSArray *args = [NSProcessInfo processInfo].arguments;
+    SNTSystemExtensionDelegate* delegate;
+    NSArray* args = [NSProcessInfo processInfo].arguments;
 
     if ([args containsObject:@"--load-system-extension"]) {
       LOGI(@"Requesting Santa System Extension activation");
@@ -53,8 +53,8 @@ int main(int argc, const char *argv[]) {
                      });
       [[NSRunLoop mainRunLoop] run];
     } else {
-      NSApplication *app = [NSApplication sharedApplication];
-      SNTAppDelegate *appDelegate = [[SNTAppDelegate alloc] init];
+      NSApplication* app = [NSApplication sharedApplication];
+      SNTAppDelegate* appDelegate = [[SNTAppDelegate alloc] init];
       [app setDelegate:appDelegate];
       [app finishLaunching];
       [app run];

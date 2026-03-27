@@ -52,12 +52,12 @@ using santa::WatchItems;
 
 namespace santa {
 
-std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
-                                               SNTMetricSet *metric_set,
+std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
+                                               SNTMetricSet* metric_set,
                                                santa::ProcessControlBlock processControlBlock) {
   // TODO(mlw): The XPC interfaces should be injectable. Could either make a new
   // protocol defining appropriate methods or accept values as params.
-  MOLXPCConnection *control_connection =
+  MOLXPCConnection* control_connection =
       [[MOLXPCConnection alloc] initServerWithName:[SNTXPCControlInterface serviceID]];
   if (!control_connection) {
     LOGE(@"Failed to initialize control connection.");
@@ -67,33 +67,33 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   control_connection.privilegedInterface = [SNTXPCControlInterface controlInterface];
   control_connection.unprivilegedInterface = [SNTXPCUnprivilegedControlInterface controlInterface];
 
-  SNTRuleTable *rule_table = [SNTDatabaseController ruleTable];
+  SNTRuleTable* rule_table = [SNTDatabaseController ruleTable];
   if (!rule_table) {
     LOGE(@"Failed to initialize rule table.");
     exit(EXIT_FAILURE);
   }
 
-  SNTEventTable *event_table = [SNTDatabaseController eventTable];
+  SNTEventTable* event_table = [SNTDatabaseController eventTable];
   if (!event_table) {
     LOGE(@"Failed to initialize event table.");
     exit(EXIT_FAILURE);
   }
 
-  SNTCompilerController *compiler_controller = [[SNTCompilerController alloc] init];
+  SNTCompilerController* compiler_controller = [[SNTCompilerController alloc] init];
   if (!compiler_controller) {
     LOGE(@"Failed to initialize compiler controller.");
     exit(EXIT_FAILURE);
   }
 
-  auto ringbuf = std::make_unique<RingBuffer<NSMutableDictionary *>>(10);
-  SNTNotificationQueue *notifier_queue =
+  auto ringbuf = std::make_unique<RingBuffer<NSMutableDictionary*>>(10);
+  SNTNotificationQueue* notifier_queue =
       [[SNTNotificationQueue alloc] initWithRingBuffer:std::move(ringbuf)];
   if (!notifier_queue) {
     LOGE(@"Failed to initialize notification queue.");
     exit(EXIT_FAILURE);
   }
 
-  SNTSyncdQueue *syncd_queue = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
+  SNTSyncdQueue* syncd_queue = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
   if (!syncd_queue) {
     LOGE(@"Failed to initialize syncd queue.");
     exit(EXIT_FAILURE);
@@ -112,7 +112,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
   std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>> annotators;
 
-  for (NSString *annotation in [configurator enabledProcessAnnotations]) {
+  for (NSString* annotation in [configurator enabledProcessAnnotations]) {
     if ([[annotation lowercaseString] isEqualToString:@"originator"]) {
       annotators.emplace_back(std::make_unique<santa::santad::process_tree::OriginatorAnnotator>());
     } else {
@@ -127,16 +127,16 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
   }
   process_tree = *tree_status;
 
-  SNTPolicyProcessor *policy_processor =
+  SNTPolicyProcessor* policy_processor =
       [[SNTPolicyProcessor alloc] initWithRuleTable:rule_table
                                  entitlementsFilter:entitlements_filter];
 
   std::shared_ptr<::PrefixTree<Unit>> prefix_tree = std::make_shared<::PrefixTree<Unit>>();
 
   // TODO(bur): Add KVO handling for fileChangesPrefixFilters.
-  NSArray<NSString *> *prefix_filters =
+  NSArray<NSString*>* prefix_filters =
       [@[ @"/.", @"/dev/" ] arrayByAddingObjectsFromArray:[configurator fileChangesPrefixFilters]];
-  for (NSString *filter in prefix_filters) {
+  for (NSString* filter in prefix_filters) {
     prefix_tree->InsertPrefix([filter fileSystemRepresentation], Unit {});
   }
 
@@ -153,7 +153,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
 
   std::shared_ptr<::Logger> logger = Logger::Create(
       esapi, SleighLauncher::Create(std::string(SleighLauncher::kDefaultSleighPath)),
-      ^SNTExportConfiguration *() {
+      ^SNTExportConfiguration*() {
         return [configurator exportConfig];
       },
       TelemetryConfigToBitmask([configurator telemetry]), [configurator eventLogType],
@@ -167,7 +167,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     exit(EXIT_FAILURE);
   }
 
-  SNTNetworkExtensionQueue *netext_queue =
+  SNTNetworkExtensionQueue* netext_queue =
       [[SNTNetworkExtensionQueue alloc] initWithNotifierQueue:notifier_queue
                                                    syncdQueue:syncd_queue
                                                        logger:logger];
@@ -182,7 +182,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
     logger->Log(std::move(enrichedMsg));
   };
 
-  SNTExecutionController *exec_controller =
+  SNTExecutionController* exec_controller =
       [[SNTExecutionController alloc] initWithRuleTable:rule_table
                                              eventTable:event_table
                                           notifierQueue:notifier_queue
@@ -253,10 +253,10 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator *configurator,
 SantadDeps::SantadDeps(
     std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<::Logger> logger,
     std::shared_ptr<::Metrics> metrics, std::shared_ptr<::WatchItems> watch_items,
-    std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection *control_connection,
-    SNTCompilerController *compiler_controller, SNTNotificationQueue *notifier_queue,
-    SNTSyncdQueue *syncd_queue, SNTNetworkExtensionQueue *netext_queue,
-    SNTExecutionController *exec_controller, std::shared_ptr<::PrefixTree<Unit>> prefix_tree,
+    std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection* control_connection,
+    SNTCompilerController* compiler_controller, SNTNotificationQueue* notifier_queue,
+    SNTSyncdQueue* syncd_queue, SNTNetworkExtensionQueue* netext_queue,
+    SNTExecutionController* exec_controller, std::shared_ptr<::PrefixTree<Unit>> prefix_tree,
     std::shared_ptr<::TTYWriter> tty_writer,
     std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
     std::shared_ptr<santa::EntitlementsFilter> entitlements_filter)
@@ -300,27 +300,27 @@ std::shared_ptr<::WatchItems> SantadDeps::WatchItems() {
   return watch_items_;
 }
 
-MOLXPCConnection *SantadDeps::ControlConnection() {
+MOLXPCConnection* SantadDeps::ControlConnection() {
   return control_connection_;
 }
 
-SNTCompilerController *SantadDeps::CompilerController() {
+SNTCompilerController* SantadDeps::CompilerController() {
   return compiler_controller_;
 }
 
-SNTNotificationQueue *SantadDeps::NotifierQueue() {
+SNTNotificationQueue* SantadDeps::NotifierQueue() {
   return notifier_queue_;
 }
 
-SNTSyncdQueue *SantadDeps::SyncdQueue() {
+SNTSyncdQueue* SantadDeps::SyncdQueue() {
   return syncd_queue_;
 }
 
-SNTNetworkExtensionQueue *SantadDeps::NetworkExtensionQueue() {
+SNTNetworkExtensionQueue* SantadDeps::NetworkExtensionQueue() {
   return netext_queue_;
 }
 
-SNTExecutionController *SantadDeps::ExecController() {
+SNTExecutionController* SantadDeps::ExecController() {
   return exec_controller_;
 }
 

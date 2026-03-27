@@ -28,7 +28,7 @@
   every time. The properties below, with the exception of userAgent, will be updated even in
   already-created session objects.
 */
-@property(readonly) NSURLSession *session;
+@property(readonly) NSURLSession* session;
 
 /**
   If set, this is the user-agent to send with requests, otherwise remains the default
@@ -36,7 +36,7 @@
 
   This property does not update existing session objects retrieved with the session property.
 */
-@property(copy, nonatomic) NSString *userAgent;
+@property(copy, nonatomic) NSString* userAgent;
 
 /**  If set to YES, this session refuses redirect requests. Defaults to NO. */
 @property(nonatomic) BOOL refusesRedirects;
@@ -45,16 +45,16 @@
   If set, the server that we connect to _must_ match this string. Redirects to other
   hosts will not be allowed.
 */
-@property(copy, nonatomic) NSString *serverHostname;
+@property(copy, nonatomic) NSString* serverHostname;
 
 /**  If set and client certificate authentication is needed, the pkcs#12 file will be loaded */
-@property(copy, nonatomic) NSString *clientCertFile;
+@property(copy, nonatomic) NSString* clientCertFile;
 
 /**
   If set and client certificate authentication is needed, the password being used for
   loading the clientCertFile
 */
-@property(copy, nonatomic) NSString *clientCertPassword;
+@property(copy, nonatomic) NSString* clientCertPassword;
 
 /**
   If set and client certificate authentication is needed, will search the keychain for a
@@ -65,7 +65,7 @@
   @note If this property is not set and neither is |clientCertIssuerCn|, the allowed issuers
   provided by the server will be used to find a matching certificate.
 */
-@property(copy, nonatomic) NSString *clientCertCommonName;
+@property(copy, nonatomic) NSString* clientCertCommonName;
 
 /**
   If set and client certificate authentication is needed, will search the keychain for a
@@ -76,27 +76,25 @@
   @note If this property is not set and neither is |clientCertCommonName|, the allowed issuers
         provided by the server will be used to find a matching certificate.
 */
-@property(copy, nonatomic) NSString *clientCertIssuerCn;
+@property(copy, nonatomic) NSString* clientCertIssuerCn;
 
 /**
   If set, this block will be called with a string argument during authentication and when
   certain authentication issues occur.
 */
-@property(copy) void (^loggingBlock)(NSString *);
+@property(copy) void (^loggingBlock)(NSString*);
 
 /**
   If set, this block will be called when the URLSession:task:didCompleteWithError: delegate
   method is called.
 */
-@property(copy) void (^taskDidCompleteWithErrorBlock)(NSURLSession *, NSURLSessionTask *, NSError *)
-    ;
+@property(copy) void (^taskDidCompleteWithErrorBlock)(NSURLSession*, NSURLSessionTask*, NSError*);
 
 /**
   If set, this block will be called when the URLSession:dataTask:didReceiveData: delegate
   method is called.
 */
-@property(copy) void (^dataTaskDidReceiveDataBlock)
-    (NSURLSession *, NSURLSessionDataTask *, NSData *);
+@property(copy) void (^dataTaskDidReceiveDataBlock)(NSURLSession*, NSURLSessionDataTask*, NSData*);
 
 /**
   If set, this block will be called when a redirect is attempted. This overrides the
@@ -108,29 +106,29 @@
   returns: request, A valid request to make or nil to refuse the redirect. Returning the request
       passed as the third parameter is valid.
 */
-@property(copy) NSURLRequest * (^redirectHandlerBlock)
-    (NSURLSessionTask *, NSHTTPURLResponse *, NSURLRequest *);
+@property(copy) NSURLRequest* (^redirectHandlerBlock)
+    (NSURLSessionTask*, NSHTTPURLResponse*, NSURLRequest*);
 
 /**
   This method should be called with PEM data containing one or more certificates to use to verify
   the server's certificate chain. This will override the trusted system roots. If there are no
   usable certificates within the data, the trusted system roots will be used.
 */
-- (void)setServerRootsPemData:(NSData *)serverRootsPemData;
+- (void)setServerRootsPemData:(NSData*)serverRootsPemData;
 
 /**
   Same as `setServerRootsPemData:`, but for strings.
 */
-- (void)setServerRootsPemString:(NSString *)serverRootsPemString;
+- (void)setServerRootsPemString:(NSString*)serverRootsPemString;
 
 /**
   This method should be called with the path to a PEM file containing one or more certificates to
   use to verify the server's certificate chain. This will override the trusted system roots. If
   there are no usable certificates within the file, the trusted system roots will be used.
 */
-- (void)setServerRootsPemFile:(NSString *)serverRootsPemFile;
+- (void)setServerRootsPemFile:(NSString*)serverRootsPemFile;
 
 /**  Designated initializer */
-- (instancetype)initWithSessionConfiguration:(NSURLSessionConfiguration *)configuration;
+- (instancetype)initWithSessionConfiguration:(NSURLSessionConfiguration*)configuration;
 
 @end

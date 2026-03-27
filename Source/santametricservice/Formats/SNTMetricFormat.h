@@ -16,7 +16,7 @@
 #import <Foundation/Foundation.h>
 
 @protocol SNTMetricFormat
-- (NSArray<NSData *> *)convert:(NSDictionary *)metrics
-                  endTimestamp:(NSDate *)endTimestamp
-                         error:(NSError **)err;
+- (NSArray<NSData*>*)convert:(NSDictionary*)metrics
+                endTimestamp:(NSDate*)endTimestamp
+                       error:(NSError**)err;
 @end

@@ -39,33 +39,33 @@
 @implementation MOLCodesignCheckerTest
 
 - (void)testInitWithBinaryPath {
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithBinaryPath:@"/sbin/launchd"];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:@"/sbin/launchd"];
   XCTAssertNotNil(sut);
 }
 
 - (void)testInitWithInvalidBinaryPath {
-  NSError *error;
-  MOLCodesignChecker *sut =
+  NSError* error;
+  MOLCodesignChecker* sut =
       [[MOLCodesignChecker alloc] initWithBinaryPath:@"/tmp/this/file/doesnt/exist" error:&error];
   XCTAssertNil(sut);
   XCTAssertNotNil(error);
 }
 
 - (void)testInitWithPID {
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithPID:1];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithPID:1];
   XCTAssertNotNil(sut);
 }
 
 - (void)testInitWithInvalidPID {
-  NSError *error;
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithPID:999999999 error:&error];
+  NSError* error;
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithPID:999999999 error:&error];
   XCTAssertNil(sut);
   XCTAssertNotNil(error);
 }
 
 - (void)testInitWithSelf {
   // n.b: 'self' in this case is xctest, which should always be signed.
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithSelf];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithSelf];
   XCTAssertNotNil(sut);
 }
 
@@ -74,34 +74,34 @@
 }
 
 - (void)testDescription {
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithPID:1];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithPID:1];
   XCTAssertEqualObjects([sut description],
                         @"In-memory binary, signed by Apple Inc., located at: /sbin/launchd");
 }
 
 - (void)testLeafCertificate {
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithPID:1];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithPID:1];
   XCTAssertNotNil(sut.leafCertificate);
 }
 
 - (void)testBinaryPath {
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithPID:1];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithPID:1];
   XCTAssertEqualObjects(sut.binaryPath, @"/sbin/launchd");
 }
 
 - (void)testSigningInformationMatches {
-  MOLCodesignChecker *sut1 = [[MOLCodesignChecker alloc] initWithBinaryPath:@"/sbin/launchd"];
-  MOLCodesignChecker *sut2 = [[MOLCodesignChecker alloc] initWithPID:1];
+  MOLCodesignChecker* sut1 = [[MOLCodesignChecker alloc] initWithBinaryPath:@"/sbin/launchd"];
+  MOLCodesignChecker* sut2 = [[MOLCodesignChecker alloc] initWithPID:1];
   XCTAssertTrue([sut1 signingInformationMatches:sut2]);
 }
 
 - (void)testCodeRef {
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithSelf];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithSelf];
   XCTAssertNotNil((id)sut.codeRef);
 }
 
 - (void)testCodeRefCast {
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithSelf];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithSelf];
   XCTAssertEqual(CFGetTypeID(sut.codeRef), SecCodeGetTypeID());
 
   sut = [[MOLCodesignChecker alloc] initWithBinaryPath:@"/sbin/launchd"];
@@ -109,31 +109,31 @@
 }
 
 - (void)testSigningInformation {
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithPID:1];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithPID:1];
   XCTAssertNotNil(sut.signingInformation);
   XCTAssertEqualObjects(sut.signingInformation[@"source"], @"embedded");
 }
 
 - (void)testValidateRequirement {
-  MOLCodesignChecker *sut1 = [[MOLCodesignChecker alloc] initWithPID:1];
-  MOLCodesignChecker *sut2 = [[MOLCodesignChecker alloc] initWithSelf];
+  MOLCodesignChecker* sut1 = [[MOLCodesignChecker alloc] initWithPID:1];
+  MOLCodesignChecker* sut2 = [[MOLCodesignChecker alloc] initWithSelf];
 
   XCTAssertFalse([sut1 validateWithRequirement:sut2.requirement]);
 }
 
 - (void)testInitWithFileDescriptor {
-  NSString *path = @"/usr/bin/yes";
+  NSString* path = @"/usr/bin/yes";
   int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path fileDescriptor:fd];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path fileDescriptor:fd];
   XCTAssertNotNil(sut.signingInformation);
   close(fd);
 }
 
 - (void)testAllArchitectures {
-  NSError *error;
-  NSBundle *bundle = [NSBundle bundleForClass:[self class]];
-  NSString *path = [bundle pathForResource:@"cal-yikes-universal" ofType:@""];
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"cal-yikes-universal" ofType:@""];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
   XCTAssertNotNil(sut.universalSigningInformation);
   XCTAssertNil(sut.leafCertificate);
   XCTAssertEqual(error.code, errSecCSSignatureInvalid);
@@ -177,44 +177,44 @@
 }
 
 - (void)testTeamID {
-  NSError *error;
-  NSBundle *bundle = [NSBundle bundleForClass:[self class]];
-  NSString *path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
 
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
   XCTAssertNotNil(sut.signingInformation);
   XCTAssertNil(error);
   XCTAssertEqualObjects(sut.teamID, @"EQHXZ8M8AV");
 }
 
 - (void)testCDHash {
-  NSError *error;
-  NSBundle *bundle = [NSBundle bundleForClass:[self class]];
-  NSString *path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
 
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
   XCTAssertNotNil(sut.signingInformation);
   XCTAssertNil(error);
   XCTAssertEqualObjects(sut.cdhash, @"23cbe7039ac34bf26f0b1ccc22ff96d6f0d80b72");
 }
 
 - (void)testSigningID {
-  NSError *error;
-  NSBundle *bundle = [NSBundle bundleForClass:[self class]];
-  NSString *path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
 
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
   XCTAssertNotNil(sut.signingInformation);
   XCTAssertNil(error);
   XCTAssertEqualObjects(sut.signingID, @"goodcert");
 }
 
 - (void)testPlatformBinary {
-  NSError *error;
-  NSBundle *bundle = [NSBundle bundleForClass:[self class]];
-  NSString *path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
 
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
   XCTAssertNotNil(sut.signingInformation);
   XCTAssertNil(error);
   XCTAssertFalse(sut.platformBinary);
@@ -225,21 +225,21 @@
 }
 
 - (void)testEntitlements {
-  NSError *error;
-  NSBundle *bundle = [NSBundle bundleForClass:[self class]];
-  NSString *path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
 
-  MOLCodesignChecker *sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
   XCTAssertNotNil(sut.signingInformation);
   XCTAssertNil(error);
   XCTAssertNil(sut.entitlements);
 
   sut = [[MOLCodesignChecker alloc] initWithBinaryPath:@"/usr/bin/eslogger"];
   XCTAssertNotNil(sut);
-  NSDictionary *wantedEntitlements = @{
+  NSDictionary* wantedEntitlements = @{
     @"com.apple.developer.endpoint-security.client" : @YES,
   };
-  [wantedEntitlements enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL *stop) {
+  [wantedEntitlements enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL* stop) {
     XCTAssertEqualObjects(sut.entitlements[key], value);
   }];
 }

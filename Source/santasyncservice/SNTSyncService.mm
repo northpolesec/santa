@@ -27,16 +27,16 @@
 #import "Source/santasyncservice/SNTSyncManager.h"
 
 @interface SNTSyncService ()
-@property(nonatomic, readonly) SNTSyncManager *syncManager;
-@property(nonatomic, readonly) MOLXPCConnection *daemonConn;
-@property(nonatomic, readonly) NSMutableArray *logListeners;
+@property(nonatomic, readonly) SNTSyncManager* syncManager;
+@property(nonatomic, readonly) MOLXPCConnection* daemonConn;
+@property(nonatomic, readonly) NSMutableArray* logListeners;
 
 @property(nonatomic) dispatch_source_t statsSubmissionTimer;
-@property NSDate *lastStatsSubmissionAttempt;
-@property NSString *lastStatsSubmissionVersion;
-@property NSString *currentVersion;
+@property NSDate* lastStatsSubmissionAttempt;
+@property NSString* lastStatsSubmissionVersion;
+@property NSString* currentVersion;
 
-@property NSArray<SNTKVOManager *> *kvoWatchers;
+@property NSArray<SNTKVOManager*>* kvoWatchers;
 @end
 
 @implementation SNTSyncService
@@ -45,7 +45,7 @@
   self = [super init];
   if (self) {
     _logListeners = [NSMutableArray array];
-    MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+    MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
     daemonConn.invalidationHandler = ^(void) {
       // Spindown this process if we can't establish a connection
       // or if the daemon is killed or crashes.
@@ -62,7 +62,7 @@
 
     // Initialize SNTConfigurator ONLY after privileges have been dropped.
     [SNTConfigurator configurator];
-    NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
+    NSDictionary* infoDict = [[NSBundle mainBundle] infoDictionary];
     _currentVersion = infoDict[@"CFBundleVersion"];
     LOGI(@"Started, version %@", _currentVersion);
 
@@ -88,7 +88,7 @@
       [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
                                    selector:@selector(enablePushNotifications)
                                        type:[NSNumber class]
-                                   callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                      BOOL oldBool = [oldValue boolValue];
                                      BOOL newBool = [newValue boolValue];
 
@@ -103,11 +103,11 @@
   return self;
 }
 
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events reply:(void (^)(BOOL))reply {
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent*>*)events reply:(void (^)(BOOL))reply {
   [self.syncManager postEventsToSyncServer:events reply:reply];
 }
 
-- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
                               reply:(void (^)(SNTBundleEventAction))reply {
   [self.syncManager postBundleEventToSyncServer:event reply:reply];
 }
@@ -116,7 +116,7 @@
   [self.syncManager pushNotificationStatus:reply];
 }
 
-- (void)pushNotificationServerAddress:(void (^)(NSString *))reply {
+- (void)pushNotificationServerAddress:(void (^)(NSString*))reply {
   [self.syncManager pushNotificationServerAddress:reply];
 }
 
@@ -124,13 +124,13 @@
   [self.syncManager pushNotificationReconnect];
 }
 
-- (void)publishMetrics:(NSDictionary *)metrics reply:(void (^)(BOOL))reply {
+- (void)publishMetrics:(NSDictionary*)metrics reply:(void (^)(BOOL))reply {
   [self.syncManager publishMetrics:metrics reply:reply];
 }
 
-- (void)checkSyncServerStatus:(NSXPCListenerEndpoint *)logListener
-                        reply:(void (^)(NSInteger statusCode, NSString *description))reply {
-  MOLXPCConnection *ll;
+- (void)checkSyncServerStatus:(NSXPCListenerEndpoint*)logListener
+                        reply:(void (^)(NSInteger statusCode, NSString* description))reply {
+  MOLXPCConnection* ll;
   if (logListener) {
     ll = [[MOLXPCConnection alloc] initClientWithListener:logListener];
     ll.remoteInterface =
@@ -138,17 +138,17 @@
     [ll resume];
     [[SNTSyncBroadcaster broadcaster] addLogListener:ll];
   }
-  [self.syncManager checkSyncServerStatus:^(NSInteger statusCode, NSString *description) {
+  [self.syncManager checkSyncServerStatus:^(NSInteger statusCode, NSString* description) {
     [[SNTSyncBroadcaster broadcaster] barrier];
     if (ll) [[SNTSyncBroadcaster broadcaster] removeLogListener:ll];
     reply(statusCode, description);
   }];
 }
 
-- (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
+- (void)syncWithLogListener:(NSXPCListenerEndpoint*)logListener
                    syncType:(SNTSyncType)syncType
                       reply:(void (^)(SNTSyncStatusType))reply {
-  MOLXPCConnection *ll;
+  MOLXPCConnection* ll;
   if (logListener) {
     ll = [[MOLXPCConnection alloc] initClientWithListener:logListener];
     ll.remoteInterface =
@@ -174,7 +174,7 @@
 
 - (void)statSubmissionThread {
   [[self.daemonConn synchronousRemoteObjectProxy]
-      retrieveStatsState:^(NSDate *timestamp, NSString *version) {
+      retrieveStatsState:^(NSDate* timestamp, NSString* version) {
         if (!timestamp || [timestamp timeIntervalSinceNow] > 0) {
           // There was no stored date or the stored date was in the future.
           // Change the timestamp to UNIX epoch time as a starting point.
