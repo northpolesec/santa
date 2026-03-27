@@ -108,7 +108,8 @@ double watchdogRAMPeak = 0;
                           flushCacheBlock:(void (^)(santa::FlushCacheMode,
                                                     santa::FlushCacheReason))flushCacheBlock
                           cacheCountBlock:(NSArray<NSNumber *> * (^)(void))cacheCountBlock
-                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock {
+                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
+                       metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock {
   self = [super init];
   if (self) {
     _logger = logger;
@@ -119,6 +120,7 @@ double watchdogRAMPeak = 0;
     _flushCacheBlock = flushCacheBlock;
     _cacheCountsBlock = cacheCountBlock;
     _checkCacheBlock = checkCacheBlock;
+    _metricsExportBlock = [metricsExportBlock copy];
 
     _generalQ = dispatch_queue_create_with_target(
         "com.northpolesec.santa.generalXPCq", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,

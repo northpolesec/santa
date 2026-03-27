@@ -66,6 +66,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 @property NSString *xsrfToken;
 @property NSString *xsrfTokenHeader;
 
+@property(nonatomic, readonly) dispatch_queue_t metricsQueue;
+
 @end
 
 @implementation SNTSyncManager
@@ -104,6 +106,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _syncLimiter = dispatch_semaphore_create(kMaxEnqueuedSyncs);
 
     _eventBatchSize = kDefaultEventBatchSize;
+    _metricsQueue = dispatch_queue_create_with_target(
+        "com.northpolesec.santa.syncservice.metrics",
+        DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+        dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
   }
   return self;
 }
@@ -223,23 +229,25 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (reply) reply(NO);
     return;
   }
-  SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-  SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
-  if (!syncState) {
-    LOGE(@"Publish metrics failed to create sync state: %ld", status);
-    if (reply) reply(NO);
-    return;
-  }
-  SNTSyncPublishMetrics *p = [[SNTSyncPublishMetrics alloc] initWithState:syncState];
-  BOOL success = [p publishMetrics:metrics];
-  if (success) {
-    LOGD(@"Publish metrics complete");
-  } else {
-    LOGE(@"Publish metrics failed");
-  }
-  self.xsrfToken = syncState.xsrfToken;
-  self.xsrfTokenHeader = syncState.xsrfTokenHeader;
-  if (reply) reply(success);
+  dispatch_async(self.metricsQueue, ^{
+    SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
+    SNTSyncState *syncState = [self createSyncStateWithStatus:&status];
+    if (!syncState) {
+      LOGE(@"Publish metrics failed to create sync state: %ld", status);
+      if (reply) reply(NO);
+      return;
+    }
+    SNTSyncPublishMetrics *p = [[SNTSyncPublishMetrics alloc] initWithState:syncState];
+    BOOL success = [p publishMetrics:metrics];
+    if (success) {
+      LOGD(@"Publish metrics complete");
+    } else {
+      LOGE(@"Publish metrics failed");
+    }
+    self.xsrfToken = syncState.xsrfToken;
+    self.xsrfTokenHeader = syncState.xsrfTokenHeader;
+    if (reply) reply(success);
+  });
 }
 
 - (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString *description))reply {

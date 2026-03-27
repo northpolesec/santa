@@ -115,6 +115,7 @@ void PopulateRequest(PublishMetricsRequest *request, NSDictionary *metrics) {
 
 - (BOOL)publishMetrics:(NSDictionary *)metrics {
   PublishMetricsRequest request;
+  request.set_machine_id([self.syncState.machineID UTF8String]);
   PopulateRequest(&request, metrics);
 
   NSMutableURLRequest *req = [self requestWithMessage:&request];

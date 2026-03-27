@@ -40,10 +40,8 @@
                           flushCacheBlock:(void (^)(santa::FlushCacheMode,
                                                     santa::FlushCacheReason))flushCacheBlock
                           cacheCountBlock:(NSArray<NSNumber *> * (^)(void))cacheCountBlock
-                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock;
-
-/// Block that triggers an immediate metric export. Set by the caller that owns the Metrics object.
-@property(nonatomic, copy) void (^metricsExportBlock)(void (^reply)(BOOL));
+                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
+                       metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock;
 
 /// Install the network extension, optionally checking whether an upgrade is needed first.
 /// When force is YES, delegates to installNetworkExtension: as long as installation is authorized.
