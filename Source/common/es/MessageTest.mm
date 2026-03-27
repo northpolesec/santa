@@ -60,7 +60,7 @@ std::string GetProcessPath(pid_t pid) {
   if (ret > 0) {
     return std::string(pathbuf);
   } else {
-    return nil;
+    return {};
   }
 }
 

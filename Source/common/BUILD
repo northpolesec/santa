@@ -147,9 +147,11 @@ santa_unit_test(
     ],
 )
 
-cc_library(
+objc_library(
     name = "AuditUtilities",
+    srcs = ["AuditUtilities.mm"],
     hdrs = ["AuditUtilities.h"],
+    sdk_dylibs = ["bsm"],
 )
 
 # This target shouldn't be used directly.
@@ -519,6 +521,7 @@ objc_library(
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
+        "//Source/common/faa:WatchItems",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )

@@ -23,8 +23,11 @@
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
+#import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 #import "Source/common/SystemResources.h"
+#import "Source/common/faa/WatchItems.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
@@ -136,6 +139,9 @@ REGISTER_COMMAND_NAME(@"doctor")
 
 - (BOOL)validateConfiguration {
   print(@"=> Validating configuration...");
+
+  [self checkFileAccessPolicyOverride];
+
   NSArray *errors = [[SNTConfigurator configurator] validateConfiguration];
   if (!errors.count) {
     print(@"[+] No configuration errors detected");
@@ -149,6 +155,37 @@ REGISTER_COMMAND_NAME(@"doctor")
 
   print(@"");
   return YES;
+}
+
+- (void)checkFileAccessPolicyOverride {
+  SNTConfigurator *config = [SNTConfigurator configurator];
+
+  // Only relevant if MDM has an FAA config set.
+  if (!config.fileAccessPolicy && !config.fileAccessPolicyPlist) {
+    return;
+  }
+
+  MOLXPCConnection *conn = [SNTXPCControlInterface configuredConnection];
+  [conn resume];
+
+  id<SNTDaemonControlXPC> proxy = [conn synchronousRemoteObjectProxy];
+  if (!proxy) {
+    return;
+  }
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  [proxy watchItemsState:^(BOOL enabled, uint64_t ruleCount, NSString *policyVersion,
+                           santa::WatchItems::DataSource dataSource, NSString *configPath,
+                           NSTimeInterval lastUpdateEpoch) {
+    if (enabled && dataSource == santa::WatchItems::DataSource::kDatabase) {
+      print(@"[?] File access policy from MDM configuration is being overridden by sync server "
+            @"rules (%llu rules active)",
+            ruleCount);
+    }
+    dispatch_semaphore_signal(sema);
+  }];
+  dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+  [conn invalidate];
 }
 
 - (void)didReceiveLog:(NSString *)log withType:(os_log_type_t)logType {
