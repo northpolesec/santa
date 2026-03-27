@@ -13,6 +13,7 @@
 /// limitations under the License.
 
 #import "Source/santasyncservice/SNTSyncPublishMetrics.h"
+#include "Source/common/String.h"
 
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
@@ -53,7 +54,7 @@ void SetMetricValue(Value *value, id data, SNTMetricType type) {
     case SNTMetricTypeConstantDouble:
     case SNTMetricTypeGaugeDouble: value->set_double_([data doubleValue]); break;
     case SNTMetricTypeConstantString:
-    case SNTMetricTypeGaugeString: value->set_string(data ? [data UTF8String] : ""); break;
+    case SNTMetricTypeGaugeString: value->set_string(santa::NSStringToUTF8StringView(data)); break;
     default: LOGE(@"Unknown SNTMetricType %d", (int)type); break;
   }
 }
@@ -63,7 +64,7 @@ void PopulateRequest(PublishMetricsRequest *request, NSDictionary *metrics) {
     NSDictionary *metric = metrics[@"metrics"][metricName];
 
     Metric *protoMetric = request->add_metrics();
-    protoMetric->set_path([metricName UTF8String]);
+    protoMetric->set_path(santa::NSStringToUTF8StringView(metricName));
 
     SNTMetricType type = static_cast<SNTMetricType>([metric[@"type"] integerValue]);
     protoMetric->set_kind(MetricKindForType(type));
@@ -81,8 +82,8 @@ void PopulateRequest(PublishMetricsRequest *request, NSDictionary *metrics) {
 
           Value *value = protoMetric->add_values();
           for (NSUInteger i = 0; i < fieldNames.count; i++) {
-            value->add_fields(
-                [[NSString stringWithFormat:@"%@=%@", fieldNames[i], fieldValues[i]] UTF8String]);
+            NSString *v = [NSString stringWithFormat:@"%@=%@", fieldNames[i], fieldValues[i]];
+            value->add_fields(santa::NSStringToUTF8StringView(v));
           }
           SetMetricValue(value, entry[@"data"], type);
         } else {
@@ -95,7 +96,8 @@ void PopulateRequest(PublishMetricsRequest *request, NSDictionary *metrics) {
 
   for (NSString *key in metrics[@"root_labels"]) {
     NSString *value = metrics[@"root_labels"][key];
-    (*request->mutable_root_labels())[[key UTF8String]] = value ? [value UTF8String] : "";
+    (*request->mutable_root_labels())[santa::NSStringToUTF8StringView(key)] =
+        santa::NSStringToUTF8StringView(value);
   }
 }
 
