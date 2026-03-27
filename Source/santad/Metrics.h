@@ -70,6 +70,7 @@ class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Me
 
   // Force an immediate flush and export of metrics
   void Export();
+  void Export(void (^reply)(BOOL));
 
   // Used for tracking event sequence numbers to determine if drops occured
   void UpdateEventStats(Processor processor, es_event_type_t event_type, uint64_t seq_num,
@@ -94,6 +95,7 @@ class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Me
 
   void FlushMetrics();
   void ExportSerialized(SNTMetricSet *metric_set);
+  void ExportSerialized(SNTMetricSet *metric_set, void (^reply)(BOOL));
 
   MOLXPCConnection *metrics_connection_;
   dispatch_queue_t q_;

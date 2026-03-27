@@ -44,7 +44,8 @@ REGISTER_COMMAND_NAME(@"metrics")
 + (NSString *)longHelpText {
   return (@"Provides metrics about Santa's operation while it's running.\n"
           @"Pass prefixes to filter list of metrics, if desired.\n"
-          @"  Use --json to output in JSON format");
+          @"  Use --json to output in JSON format\n"
+          @"  Use --export to trigger an immediate metric export");
 }
 
 - (void)prettyPrintRootLabels:(NSDictionary *)rootLabels {
@@ -110,10 +111,11 @@ REGISTER_COMMAND_NAME(@"metrics")
 }
 
 - (void)prettyPrintMetrics:(NSDictionary *)metrics asJSON:(BOOL)exportJSON {
-  BOOL exportMetrics = [[SNTConfigurator configurator] exportMetrics];
-  NSURL *metricsURLStr = [[SNTConfigurator configurator] metricURL];
-  SNTMetricFormatType metricFormat = [[SNTConfigurator configurator] metricFormat];
-  NSUInteger metricExportInterval = [[SNTConfigurator configurator] metricExportInterval];
+  SNTConfigurator *config = [SNTConfigurator configurator];
+  BOOL exportMetrics = [config exportMetrics];
+  SNTMetricFormatType metricFormat = [config metricFormat];
+  NSUInteger metricExportInterval = [config metricExportInterval];
+  NSURL *metricsURL = [config metricURL];
   NSDictionary *normalizedMetrics = SNTMetricConvertDatesToISO8601Strings(metrics);
 
   if (exportJSON) {
@@ -132,7 +134,7 @@ REGISTER_COMMAND_NAME(@"metrics")
   }
 
   printf(">>> Metrics Info\n");
-  printf("  %-25s | %s\n", "Metrics Server", [metricsURLStr.absoluteString UTF8String]);
+  printf("  %-25s | %s\n", "Metrics Server", [metricsURL.absoluteString UTF8String]);
   printf("  %-25s | %s\n", "Metrics Format",
          [SNTMetricStringFromMetricFormatType(metricFormat) UTF8String]);
   printf("  %-25s | %lu\n", "Export Interval (seconds)", metricExportInterval);
@@ -166,6 +168,19 @@ REGISTER_COMMAND_NAME(@"metrics")
 }
 
 - (void)runWithArguments:(NSArray *)arguments {
+  if ([arguments containsObject:@"--export"]) {
+    __block BOOL success = NO;
+    [[self.daemonConn synchronousRemoteObjectProxy] exportMetrics:^(BOOL result) {
+      success = result;
+    }];
+    if (success) {
+      TEE_LOGI(@"Metrics exported successfully");
+    } else {
+      TEE_LOGE(@"Metrics export failed (metrics may not be configured)");
+    }
+    exit(success ? 0 : 1);
+  }
+
   __block NSDictionary *metrics;
 
   [[self.daemonConn synchronousRemoteObjectProxy] metrics:^(NSDictionary *exportedMetrics) {

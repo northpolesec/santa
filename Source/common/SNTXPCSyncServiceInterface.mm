@@ -27,6 +27,12 @@
       argumentIndex:0
             ofReply:NO];
 
+  [r setClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], [NSString class],
+                                      [NSNumber class], [NSDate class], nil]
+        forSelector:@selector(publishMetrics:reply:)
+      argumentIndex:0
+            ofReply:NO];
+
   return r;
 }
 

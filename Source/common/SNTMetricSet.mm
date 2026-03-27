@@ -638,6 +638,7 @@ NSString *SNTMetricStringFromMetricFormatType(SNTMetricFormatType format) {
   switch (format) {
     case SNTMetricFormatTypeRawJSON: return @"rawjson";
     case SNTMetricFormatTypeMonarchJSON: return @"monarchjson";
+    case SNTMetricFormatTypeProto: return @"proto";
     default: return @"Unknown Metric Format";
   }
 }

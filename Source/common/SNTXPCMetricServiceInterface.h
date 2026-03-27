@@ -25,6 +25,7 @@
 ///  @param metrics The current metric/counter values serialized to an NSDictionary.
 ///
 - (void)exportForMonitoring:(NSDictionary *)metrics;
+- (void)exportForMonitoring:(NSDictionary *)metrics reply:(void (^)(BOOL))reply;
 
 @end
 

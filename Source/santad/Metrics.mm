@@ -320,9 +320,20 @@ void Metrics::Export() {
   });
 }
 
+void Metrics::Export(void (^reply)(BOOL)) {
+  dispatch_sync(q_, ^{
+    ExportSerialized(metric_set_, reply);
+  });
+}
+
 void Metrics::ExportSerialized(SNTMetricSet *metric_set) {
   FlushMetrics();
   [[metrics_connection_ remoteObjectProxy] exportForMonitoring:[metric_set export]];
+}
+
+void Metrics::ExportSerialized(SNTMetricSet *metric_set, void (^reply)(BOOL)) {
+  FlushMetrics();
+  [[metrics_connection_ remoteObjectProxy] exportForMonitoring:[metric_set export] reply:reply];
 }
 
 void Metrics::FlushMetrics() {

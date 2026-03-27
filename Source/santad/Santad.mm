@@ -85,6 +85,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 std::shared_ptr<santa::EntitlementsFilter> entitlements_filter) {
   SNTConfigurator *configurator = [SNTConfigurator configurator];
 
+  std::weak_ptr<Metrics> weak_metrics(metrics);
   SNTDaemonControlController *dc =
       [[SNTDaemonControlController alloc] initWithNotificationQueue:notifier_queue
           syncdQueue:syncd_queue
@@ -100,6 +101,13 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
           }
           checkCacheBlock:^SNTAction(SantaVnode vnode) {
             return auth_result_cache->CheckCache(vnode).action;
+          }
+          metricsExportBlock:^(void (^reply)(BOOL)) {
+            if (auto m = weak_metrics.lock()) {
+              m->Export(reply);
+            } else {
+              if (reply) reply(NO);
+            }
           }];
 
   control_connection.exportedObject = dc;
