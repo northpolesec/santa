@@ -379,7 +379,7 @@ static NSString* const kCertDataKey = @"certData";
                        }];
 }
 
-- (NSString*)orgUnits {
+- (NSArray*)orgUnits {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          return [self
