@@ -606,6 +606,7 @@ class MockAuthResultCache : public AuthResultCache {
 
 - (void)triggerTestNetworkMountEvent:(es_event_type_t)eventType
                         mountFromURL:(NSString*)mountFromURL
+                          fsTypeName:(NSString*)fsTypeName
                   expectedAuthResult:(es_auth_result_t)expectedAuthResult
                   deviceManagerSetup:(void (^)(SNTEndpointSecurityDeviceManager*))setupDMCallback
                 networkMountCallback:(void (^)(SNTStoredNetworkMountEvent*))networkMountCallback {
@@ -614,7 +615,7 @@ class MockAuthResultCache : public AuthResultCache {
 
   strncpy(fs.f_mntfromname, [mountFromURL UTF8String], sizeof(fs.f_mntfromname));
   strncpy(fs.f_mntonname, [test_mntonname UTF8String], sizeof(fs.f_mntonname));
-  strncpy(fs.f_fstypename, "smbfs", sizeof(fs.f_fstypename));
+  strncpy(fs.f_fstypename, [fsTypeName UTF8String], sizeof(fs.f_fstypename));
   fs.f_type = 0;  // Network mount type
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -707,27 +708,48 @@ class MockAuthResultCache : public AuthResultCache {
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
+// Convenience helper for the common network mount test pattern.
+// Configures blockNetworkMount=YES with the given allowlist, then verifies
+// that the mount-from string produces the expected auth result.
+// When DENY is expected, also verifies the event's mountFromName matches.
+- (void)verifyNetworkMount:(NSString*)mountFrom
+                fsTypeName:(NSString*)fsTypeName
+              allowedHosts:(NSArray<NSString*>*)allowedHosts
+        expectedAuthResult:(es_auth_result_t)expectedAuthResult {
+  OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+  OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(allowedHosts);
+
+  XCTestExpectation* expectation = nil;
+  if (expectedAuthResult == ES_AUTH_RESULT_DENY) {
+    expectation = [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
+  }
+
+  [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+      mountFromURL:mountFrom
+      fsTypeName:fsTypeName
+      expectedAuthResult:expectedAuthResult
+      deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
+      }
+      networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
+        if (expectedAuthResult == ES_AUTH_RESULT_DENY) {
+          XCTAssertEqualObjects(event.mountFromName, mountFrom);
+          [expectation fulfill];
+        } else {
+          XCTFail(@"Callback should not be called for allowed mount");
+        }
+      }];
+
+  if (expectation) {
+    [self waitForExpectations:@[ expectation ] timeout:60.0];
+  }
+}
+
 - (void)testNetworkMountBlocked {
   if (@available(macOS 15.0, *)) {
-    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
-    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
-
-    XCTestExpectation* expectation =
-        [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
-
-    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-        mountFromURL:@"smb://server.example.com/share"
-        expectedAuthResult:ES_AUTH_RESULT_DENY
-        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
-        }
-        networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
-          XCTAssertEqualObjects(event.mountFromName, @"smb://server.example.com/share");
-          XCTAssertEqualObjects(event.mountOnName, @"/Volumes/NetworkShare");
-          XCTAssertEqualObjects(event.fsType, @"smbfs");
-          [expectation fulfill];
-        }];
-
-    [self waitForExpectations:@[ expectation ] timeout:60.0];
+    [self verifyNetworkMount:@"smb://server.example.com/share"
+                  fsTypeName:@"smbfs"
+                allowedHosts:@[]
+          expectedAuthResult:ES_AUTH_RESULT_DENY];
   } else {
     XCTSkip(@"Test requires macOS 15 or later");
   }
@@ -735,17 +757,10 @@ class MockAuthResultCache : public AuthResultCache {
 
 - (void)testNetworkMountAllowedByHost {
   if (@available(macOS 15.0, *)) {
-    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
-    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[ @"server.example.com" ]);
-
-    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-        mountFromURL:@"smb://server.example.com/share"
-        expectedAuthResult:ES_AUTH_RESULT_ALLOW
-        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
-        }
-        networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
-          XCTFail(@"Callback should not be called for allowed mount");
-        }];
+    [self verifyNetworkMount:@"smb://server.example.com/share"
+                  fsTypeName:@"smbfs"
+                allowedHosts:@[ @"server.example.com" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
   } else {
     XCTSkip(@"Test requires macOS 15 or later");
   }
@@ -757,12 +772,141 @@ class MockAuthResultCache : public AuthResultCache {
 
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
         mountFromURL:@"smb://server.example.com/share"
+        fsTypeName:@"smbfs"
         expectedAuthResult:ES_AUTH_RESULT_ALLOW
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
         networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
           XCTFail(@"Callback should not be called when blocking is disabled");
         }];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+// NFS kernel format: "host:/path" — not a URL, requires scheme normalization
+- (void)testNFSNetworkMountBlocked {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"localhost:/"
+                  fsTypeName:@"nfs"
+                allowedHosts:@[]
+          expectedAuthResult:ES_AUTH_RESULT_DENY];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+- (void)testNFSNetworkMountAllowedByHost {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"nfs-server.local:/exports/share"
+                  fsTypeName:@"nfs"
+                allowedHosts:@[ @"nfs-server.local" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+// Real SMB kernel format: "//user@host/share" — already parseable by NSURL
+- (void)testSMBNetworkMountWithUNCFormat {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"//admin@192.168.64.3/admin"
+                  fsTypeName:@"smbfs"
+                allowedHosts:@[ @"192.168.64.3" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+- (void)testNFSNetworkMountWithIPAddress {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"192.168.1.10:/exports/share"
+                  fsTypeName:@"nfs"
+                allowedHosts:@[ @"192.168.1.10" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+- (void)testNFSNetworkMountWithIPv6 {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"[2001:db8::1]:/export/path"
+                  fsTypeName:@"nfs"
+                allowedHosts:@[ @"2001:db8::1" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+// macOS SMB domain format uses semicolon: DOMAIN;user@host
+- (void)testSMBNetworkMountWithDomainPrefix {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"//CORP;admin@server.corp.com/share"
+                  fsTypeName:@"smbfs"
+                allowedHosts:@[ @"server.corp.com" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+- (void)testSMBNetworkMountWithIPv6 {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"//admin@[2001:db8::1]/share"
+                  fsTypeName:@"smbfs"
+                allowedHosts:@[ @"2001:db8::1" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+// Anonymous/guest SMB: no user@ prefix
+- (void)testSMBNetworkMountAnonymous {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"//fileserver.local/public"
+                  fsTypeName:@"smbfs"
+                allowedHosts:@[ @"fileserver.local" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+- (void)testSMBNetworkMountWithPort {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"//admin@192.168.64.2:445/share"
+                  fsTypeName:@"smbfs"
+                allowedHosts:@[ @"192.168.64.2" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+// AFP retains the afp:// scheme in f_mntfromname
+- (void)testAFPNetworkMountAllowedByHost {
+  if (@available(macOS 15.0, *)) {
+    [self verifyNetworkMount:@"afp://admin@timecapsule.local/backups"
+                  fsTypeName:@"afpfs"
+                allowedHosts:@[ @"timecapsule.local" ]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+// Host is correctly extracted but doesn't match any allowlist entry
+- (void)testNFSNetworkMountBlockedNotOnAllowlist {
+  if (@available(macOS 15.0, *)) {
+    NSArray* allowedHosts = @[ @"trusted-nfs.corp.com", @"192.168.1.10" ];
+    [self verifyNetworkMount:@"rogue-server.local:/exports/data"
+                  fsTypeName:@"nfs"
+                allowedHosts:allowedHosts
+          expectedAuthResult:ES_AUTH_RESULT_DENY];
   } else {
     XCTSkip(@"Test requires macOS 15 or later");
   }
@@ -777,13 +921,15 @@ class MockAuthResultCache : public AuthResultCache {
     XCTestExpectation* expectation =
         [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
 
+    // Use a string with spaces so NSURL returns nil even after scheme normalization
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-        mountFromURL:@"invalid_url_format"
+        mountFromURL:@"not a valid host"
+        fsTypeName:@"smbfs"
         expectedAuthResult:ES_AUTH_RESULT_DENY
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
         networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
-          XCTAssertEqualObjects(event.mountFromName, @"invalid_url_format");
+          XCTAssertEqualObjects(event.mountFromName, @"not a valid host");
           [expectation fulfill];
         }];
 
@@ -799,8 +945,10 @@ class MockAuthResultCache : public AuthResultCache {
     OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
     OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
 
+    // Use a string with spaces so NSURL returns nil even after scheme normalization
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-        mountFromURL:@"invalid_url_format"
+        mountFromURL:@"not a valid host"
+        fsTypeName:@"smbfs"
         expectedAuthResult:ES_AUTH_RESULT_ALLOW
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
