@@ -764,8 +764,7 @@ NS_ASSUME_NONNULL_BEGIN
   // Prepend the filesystem type as a URL scheme when needed to make it parseable.
   NSString* urlString = mountFromName;
   if (![mountFromName containsString:@"://"] && ![mountFromName hasPrefix:@"//"]) {
-    urlString =
-        [NSString stringWithFormat:@"%s://%@", eventStatFS->f_fstypename, mountFromName];
+    urlString = [NSString stringWithFormat:@"%s://%@", eventStatFS->f_fstypename, mountFromName];
   }
   NSURL* fromURL = [NSURL URLWithString:urlString];
   if (!fromURL.host) {
