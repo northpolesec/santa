@@ -680,6 +680,32 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCSInvalidated& msg
   return FinalizeProto(santa_msg);
 }
 
+static ::pbv1::ProcSuspendResume::Type GetProcSuspendResumeType(
+    es_proc_suspend_resume_type_t type) {
+  switch (type) {
+    case ES_PROC_SUSPEND_RESUME_TYPE_SUSPEND: return ::pbv1::ProcSuspendResume::TYPE_SUSPEND;
+    case ES_PROC_SUSPEND_RESUME_TYPE_RESUME: return ::pbv1::ProcSuspendResume::TYPE_RESUME;
+    case ES_PROC_SUSPEND_RESUME_TYPE_SHUTDOWN_SOCKETS:
+      return ::pbv1::ProcSuspendResume::TYPE_SHUTDOWN_SOCKETS;
+    default: return ::pbv1::ProcSuspendResume::TYPE_UNKNOWN;
+  }
+}
+
+std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedProcSuspendResume& msg) {
+  Arena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+
+  ::pbv1::ProcSuspendResume* pb_psr = santa_msg->mutable_proc_suspend_resume();
+  EncodeProcessInfoLight(pb_psr->mutable_instigator(), msg);
+  if (msg->event.proc_suspend_resume.target) {
+    EncodeProcessInfo(pb_psr->mutable_target(), msg->version, msg->event.proc_suspend_resume.target,
+                      *msg.target());
+  }
+  pb_psr->set_type(GetProcSuspendResumeType(msg->event.proc_suspend_resume.type));
+
+  return FinalizeProto(santa_msg);
+}
+
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClone& msg) {
   Arena arena;
   ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);

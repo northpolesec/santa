@@ -520,6 +520,29 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCopyfile& msg) 
   return FinalizeString(str);
 }
 
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedProcSuspendResume& msg) {
+  std::string str = CreateDefaultString();
+
+  str.append("action=PROC_SUSPEND_RESUME");
+
+  switch (msg->event.proc_suspend_resume.type) {
+    case ES_PROC_SUSPEND_RESUME_TYPE_SUSPEND: str.append("|type=SUSPEND"); break;
+    case ES_PROC_SUSPEND_RESUME_TYPE_RESUME: str.append("|type=RESUME"); break;
+    case ES_PROC_SUSPEND_RESUME_TYPE_SHUTDOWN_SOCKETS: str.append("|type=SHUTDOWN_SOCKETS"); break;
+    default: str.append("|type=UNKNOWN"); break;
+  }
+
+  if (msg->event.proc_suspend_resume.target) {
+    str.append("|targetpid=");
+    str.append(
+        std::to_string(audit_token_to_pid(msg->event.proc_suspend_resume.target->audit_token)));
+  }
+
+  AppendInstigator(str, msg);
+
+  return FinalizeString(str);
+}
+
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLogin& msg) {
   std::string str = CreateDefaultString();
 

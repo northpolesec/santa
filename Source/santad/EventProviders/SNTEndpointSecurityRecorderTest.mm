@@ -101,7 +101,8 @@ class MockAuthResultCache : public AuthResultCache {
                                               ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD,
                                               ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE,
                                               ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED,
-                                              ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED};
+                                              ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED,
+                                              ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME};
 
 #if HAVE_MACOS_15
   if (@available(macOS 15.0, *)) {

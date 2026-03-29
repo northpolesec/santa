@@ -376,6 +376,7 @@ The following sequences will be replaced in the final URL:
         { value: "LaunchItem" },
         { value: "TCCModification" },
         { value: "XProtect" },
+        { value: "ProcSuspendResume" },
         { value: "None" },
       ],
       versionAdded: "2024.11",
