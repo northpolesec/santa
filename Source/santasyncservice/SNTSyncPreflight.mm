@@ -186,10 +186,14 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
     self.syncState.eventBatchSize = resp.batch_size();
   }
 
-  // Don't let these go too low
+  // Only set pushNotificationsFullSyncInterval when the server actually provides a value.
+  // If neither field is set (e.g. sync v1 servers), leave the property nil so that the
+  // push client doesn't adopt a bogus minimum interval.
   uint64_t value = resp.push_notification_full_sync_interval_seconds()
                        ?: resp.deprecated_fcm_full_sync_interval_seconds();
-  self.syncState.pushNotificationsFullSyncInterval = @(MAX(value, kMinimumFullSyncInterval));
+  if (value > 0) {
+    self.syncState.pushNotificationsFullSyncInterval = @(MAX(value, kMinimumFullSyncInterval));
+  }
 
   value = resp.push_notification_global_rule_sync_deadline_seconds()
               ?: resp.deprecated_fcm_global_rule_sync_deadline_seconds();
